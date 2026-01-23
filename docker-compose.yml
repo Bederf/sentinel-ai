@@ -11,7 +11,7 @@ services:
       dockerfile: Dockerfile
     container_name: bms-backend
     ports:
-      - "8000:8000"
+      - "8082:8000"
     environment:
       - PYTHONUNBUFFERED=1
     networks:
@@ -29,10 +29,10 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        - VITE_API_URL=http://localhost:8000
+        - VITE_API_URL=http://localhost:8082
     container_name: bms-frontend
     ports:
-      - "3000:80"
+      - "3002:80"
     depends_on:
       backend:
         condition: service_healthy
