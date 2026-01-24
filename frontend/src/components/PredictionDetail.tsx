@@ -8,10 +8,12 @@
  * - Similar historical failures
  * - Technician notes
  * - Financial impact analysis
+ * - Cost impact analysis (NEW)
  * - Recommended actions
  *
  * Requirements:
  * - PRED-02: Full explainability with evidence breakdown
+ * - PRED-03: Cost impact analysis with breakdowns
  */
 
 import { useState } from "react";
@@ -45,7 +47,11 @@ import {
   Activity,
   CheckCircle2,
   XCircle,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
+import { CostCard } from "./CostCard";
+import { CostBreakdownDetail } from "./CostBreakdownDetail";
 
 interface PredictionDetailProps {
   prediction: {
@@ -92,6 +98,23 @@ interface PredictionDetailProps {
       estimated_repair_hours: number;
       potential_loss_zar: number;
     };
+    costImpact?: {
+      estimatedFailureCost: number;
+      estimatedPreventiveCost: number;
+      potentialSavings: number;
+      failureBreakdown: {
+        parts: number;
+        labor: number;
+        downtime: number;
+        secondaryDamage: number;
+      };
+      preventiveBreakdown: {
+        parts: number;
+        labor: number;
+        downtime: number;
+      };
+      story?: string;
+    };
     recommended_action: string;
     parts_required: string[];
     urgency: string;
@@ -105,6 +128,8 @@ export function PredictionDetail({
   isOpen,
   onClose,
 }: PredictionDetailProps) {
+  const [showCostBreakdown, setShowCostBreakdown] = useState(false);
+
   if (!isOpen) return null;
 
   // Severity color mapping
@@ -261,6 +286,43 @@ export function PredictionDetail({
             ))}
           </List>
         </Card>
+
+        {/* Cost Impact Analysis */}
+        {prediction.costImpact && (
+          <>
+            <Title className="text-lg font-semibold text-gray-900 mb-3">
+              Cost Impact Analysis
+            </Title>
+
+            {!showCostBreakdown ? (
+              <Card className="mb-6">
+                <CostCard costImpact={prediction.costImpact} />
+                <Button
+                  variant="light"
+                  size="sm"
+                  icon={ChevronDown}
+                  className="mt-3"
+                  onClick={() => setShowCostBreakdown(true)}
+                >
+                  View detailed breakdown
+                </Button>
+              </Card>
+            ) : (
+              <Card className="mb-6">
+                <CostBreakdownDetail costImpact={prediction.costImpact} />
+                <Button
+                  variant="light"
+                  size="sm"
+                  icon={ChevronUp}
+                  className="mt-3"
+                  onClick={() => setShowCostBreakdown(false)}
+                >
+                  Hide breakdown
+                </Button>
+              </Card>
+            )}
+          </>
+        )}
 
         {/* Evidence Details */}
         <Grid numCols={2} className="gap-4 mb-6">
