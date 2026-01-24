@@ -246,11 +246,11 @@ export function Dashboard() {
       </Grid>
 
       {/* Main Content Grid - Two Columns */}
-      <Grid numItems={1} numItemsLg={3} className="gap-6">
+      <Grid numItems={1} numItemsMd={1} numItemsLg={3} className="gap-6">
         {/* Left Column - Site Overview Grid (2/3 width on large) - DASH-01 */}
-        <Col numColSpan={1} numColSpanLg={2}>
+        <Col numColSpan={1} numColSpanMd={1} numColSpanLg={2}>
           <Card className="h-full">
-            <Flex justifyContent="between" alignItems="center" className="mb-4">
+            <Flex justifyContent="between" alignItems="center" className="mb-4 flex-wrap gap-2">
               <Title>Site Overview</Title>
               {sites.length > 0 && (
                 <Badge color="blue" size="sm">
@@ -261,7 +261,7 @@ export function Dashboard() {
 
             {sites.length === 0 && loading ? (
               // Loading skeletons for sites
-              <Grid numItems={1} numItemsMd={2} numItemsLg={3} className="gap-4">
+              <Grid numItems={1} numItemsSm={1} numItemsMd={2} numItemsLg={3} className="gap-4">
                 {[1, 2, 3, 4, 5, 6].map((i) => (
                   <Col key={i}>
                     <LoadingCard height="h-32" />
@@ -274,7 +274,7 @@ export function Dashboard() {
                 <Text className="text-gray-500">No sites available</Text>
               </div>
             ) : (
-              <Grid numItems={1} numItemsMd={2} numItemsLg={3} className="gap-4">
+              <Grid numItems={1} numItemsSm={1} numItemsMd={2} numItemsLg={3} className="gap-4">
                 {sites.map((site) => (
                   <Col key={site.id}>
                     <SiteCard site={site} onClick={handleSiteClick} />
@@ -296,7 +296,7 @@ export function Dashboard() {
 
       {/* Energy Consumption Section - DASH-03 */}
       <div className="mt-6">
-        <Card>
+        <Card className="overflow-x-auto">
           <Flex
             justifyContent="between"
             alignItems="center"
@@ -305,7 +305,7 @@ export function Dashboard() {
             <Title>Energy Analytics</Title>
             <Flex className="gap-4 flex-wrap">
               {/* Site Filter */}
-              <div className="w-48">
+              <div className="w-full sm:w-48">
                 <SiteSelector
                   sites={sites}
                   selectedSiteId={selectedSiteId}
@@ -318,37 +318,39 @@ export function Dashboard() {
                 onIndexChange={(index) => setSelectedDays(TIME_PERIODS[index])}
               >
                 <TabList variant="solid">
-                  <Tab>7 Days</Tab>
-                  <Tab>30 Days</Tab>
-                  <Tab>90 Days</Tab>
+                  <Tab>7d</Tab>
+                  <Tab>30d</Tab>
+                  <Tab>90d</Tab>
                 </TabList>
               </TabGroup>
             </Flex>
           </Flex>
-          <EnergyChart
-            data={energyData}
-            loading={energyLoading}
-            selectedSiteId={selectedSiteId}
-            days={selectedDays}
-          />
+          <div className="min-w-[600px] sm:min-w-0">
+            <EnergyChart
+              data={energyData}
+              loading={energyLoading}
+              selectedSiteId={selectedSiteId}
+              days={selectedDays}
+            />
+          </div>
         </Card>
       </div>
 
       {/* Bottom Area - AI Failure Predictions */}
       <div className="mt-6">
         <Card>
-          <Flex justifyContent="between" alignItems="center" className="mb-4">
+          <Flex justifyContent="between" alignItems="center" className="mb-4 flex-wrap gap-2">
             <Title>AI Failure Predictions</Title>
             {predictions.length > 0 && (
               <Badge color="purple" size="sm">
-                {predictions.length} at-risk assets | {formatZAR(totalPotentialSavings)} potential savings
+                {predictions.length} at-risk | {formatZAR(totalPotentialSavings)} savings
               </Badge>
             )}
           </Flex>
           <div>
             {predictions.length === 0 && loading ? (
               // Loading skeletons for predictions
-              <Grid numItems={1} numItemsMd={2} numItemsLg={3} className="gap-4">
+              <Grid numItems={1} numItemsSm={1} numItemsMd={2} numItemsLg={3} className="gap-4">
                 {[1, 2, 3].map((i) => (
                   <Col key={i}>
                     <LoadingCard height="h-40" />
@@ -361,7 +363,7 @@ export function Dashboard() {
                 <Text className="text-gray-500">No failure predictions</Text>
               </div>
             ) : (
-              <Grid numItems={1} numItemsMd={2} numItemsLg={3} className="gap-4">
+              <Grid numItems={1} numItemsSm={1} numItemsMd={2} numItemsLg={3} className="gap-4">
                 {predictions.map((prediction) => (
                   <Col key={prediction.id}>
                     <PredictionCard
