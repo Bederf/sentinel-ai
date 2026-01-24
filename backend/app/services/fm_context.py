@@ -238,6 +238,33 @@ class FMContextService:
             lines.append(f"- Potential loss: R{financial.get('potential_loss_zar', 0):,.0f}")
             lines.append(f"- Potential savings: R{financial.get('potential_loss_zar', 0) - financial.get('repair_cost_zar', 0):,.0f}")
 
+            # Cost impact breakdown
+            cost_impact = pred.get("costImpact")
+            if cost_impact:
+                lines.append(f"**Cost Impact Analysis:**")
+                lines.append(f"- Failure cost: R{cost_impact.get('estimatedFailureCost', 0):,.0f}")
+                lines.append(f"- Preventive cost: R{cost_impact.get('estimatedPreventiveCost', 0):,.0f}")
+                lines.append(f"- **Potential savings: R{cost_impact.get('potentialSavings', 0):,.0f}**")
+
+                failure_breakdown = cost_impact.get("failureBreakdown", {})
+                if failure_breakdown:
+                    lines.append(f"  - Failure breakdown:")
+                    lines.append(f"    - Parts: R{failure_breakdown.get('parts', 0):,.0f}")
+                    lines.append(f"    - Labor: R{failure_breakdown.get('labor', 0):,.0f}")
+                    lines.append(f"    - Downtime: R{failure_breakdown.get('downtime', 0):,.0f}")
+                    lines.append(f"    - Secondary damage: R{failure_breakdown.get('secondaryDamage', 0):,.0f}")
+
+                preventive_breakdown = cost_impact.get("preventiveBreakdown", {})
+                if preventive_breakdown:
+                    lines.append(f"  - Preventive breakdown:")
+                    lines.append(f"    - Parts: R{preventive_breakdown.get('parts', 0):,.0f}")
+                    lines.append(f"    - Labor: R{preventive_breakdown.get('labor', 0):,.0f}")
+                    lines.append(f"    - Downtime: R{preventive_breakdown.get('downtime', 0):,.0f}")
+
+                story = cost_impact.get("story")
+                if story:
+                    lines.append(f"  - Context: {story}")
+
             # Similar failures
             similar = pred.get("similar_failures", [])
             if similar:
