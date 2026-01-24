@@ -2,13 +2,15 @@
  * Dashboard Component - Main dashboard view with grid layout
  *
  * Features:
- * - Grid layout for cards and charts
- * - Header with title
- * - Placeholder sections for future content:
- *   - KPIs (top row)
- *   - Site Overview (left column)
- *   - Alerts Feed (right column)
- *   - Charts (bottom area)
+ * - Top row: 4 KPI cards (sites, equipment, alerts, anomalies)
+ * - Left column: Site grid using SiteCard components
+ * - Right column: AlertFeed with auto-refresh
+ * - Bottom: AI Predictions & Anomalies section
+ *
+ * Requirements:
+ * - DASH-01: Multi-site overview with all 15 sites
+ * - DASH-02: Alert feed with severity colors
+ * - DASH-04: KPI cards with trend indicators
  */
 
 import { useState, useEffect } from "react";
@@ -18,52 +20,24 @@ import {
   Text,
   Grid,
   Col,
-  Metric,
   Badge,
   Flex,
 } from "@tremor/react";
 import {
   Building2,
   AlertTriangle,
-  Activity,
   Cpu,
   TrendingUp,
   Bell,
 } from "lucide-react";
 import api from "../lib/api";
-import type { DashboardStats, Alert, Site, Anomaly } from "../lib/api";
-
-// KPI Card component for top row
-interface KPICardProps {
-  title: string;
-  value: string | number;
-  icon: React.ReactNode;
-  trend?: string;
-  trendColor?: "green" | "red" | "gray";
-}
-
-function KPICard({ title, value, icon, trend, trendColor = "gray" }: KPICardProps) {
-  return (
-    <Card className="p-4">
-      <Flex justifyContent="start" className="gap-4">
-        <div className="p-3 bg-bidvest-blue-50 rounded-lg">{icon}</div>
-        <div>
-          <Text className="text-gray-500">{title}</Text>
-          <Metric className="text-2xl font-bold text-gray-900">{value}</Metric>
-          {trend && (
-            <Badge color={trendColor} size="sm" className="mt-1">
-              {trend}
-            </Badge>
-          )}
-        </div>
-      </Flex>
-    </Card>
-  );
-}
+import type { DashboardStats, Site, Anomaly } from "../lib/api";
+import { KPICard } from "./KPICard";
+import { SiteCard } from "./SiteCard";
+import { AlertFeed } from "./AlertFeed";
 
 export function Dashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [alerts, setAlerts] = useState<Alert[]>([]);
   const [sites, setSites] = useState<Site[]>([]);
   const [anomalies, setAnomalies] = useState<Anomaly[]>([]);
   const [loading, setLoading] = useState(true);
@@ -73,15 +47,14 @@ export function Dashboard() {
     const loadDashboardData = async () => {
       try {
         setLoading(true);
-        // Load all data in parallel
-        const [statsData, alertsData, sitesData, anomaliesData] = await Promise.all([
+        // Load stats, sites, and anomalies in parallel
+        // AlertFeed fetches its own data
+        const [statsData, sitesData, anomaliesData] = await Promise.all([
           api.getStats(),
-          api.getAlerts(),
           api.getSites(),
           api.getAnomalies(),
         ]);
         setStats(statsData);
-        setAlerts(alertsData);
         setSites(sitesData);
         setAnomalies(anomaliesData);
         setError(null);
@@ -96,11 +69,15 @@ export function Dashboard() {
     loadDashboardData();
   }, []);
 
-  // Calculate critical counts from alerts
-  const criticalAlerts = alerts.filter((a) => a.severity === "critical").length;
-
-  // Get site status counts
+  // Calculate site status counts for KPI
   const normalSites = sites.filter((s) => s.status === "normal").length;
+  const warningSites = sites.filter((s) => s.status === "warning").length;
+
+  // Handle site card click (placeholder for future navigation)
+  const handleSiteClick = (site: Site) => {
+    console.log("Site clicked:", site.name);
+    // Future: navigate to site details page
+  };
 
   if (loading) {
     return (
@@ -135,15 +112,14 @@ export function Dashboard() {
         </Text>
       </div>
 
-      {/* KPI Row */}
+      {/* KPI Row - DASH-04 */}
       <Grid numItems={1} numItemsSm={2} numItemsLg={4} className="gap-4 mb-6">
         <Col>
           <KPICard
             title="Total Sites"
             value={stats?.total_sites ?? 0}
             icon={<Building2 className="h-6 w-6 text-bidvest-blue-600" />}
-            trend={`${normalSites} healthy`}
-            trendColor="green"
+            subtitle={`${normalSites} healthy, ${warningSites} warning`}
           />
         </Col>
         <Col>
@@ -151,8 +127,8 @@ export function Dashboard() {
             title="Equipment"
             value={stats?.total_equipment ?? 0}
             icon={<Cpu className="h-6 w-6 text-bidvest-blue-600" />}
-            trend={`${stats?.uptime_percent ?? 0}% uptime`}
-            trendColor="green"
+            delta={stats?.uptime_percent ? stats.uptime_percent - 95 : 0}
+            deltaText="vs 95% target"
           />
         </Col>
         <Col>
@@ -160,143 +136,70 @@ export function Dashboard() {
             title="Active Alerts"
             value={stats?.active_alerts ?? 0}
             icon={<Bell className="h-6 w-6 text-amber-500" />}
-            trend={criticalAlerts > 0 ? `${criticalAlerts} critical` : "None critical"}
-            trendColor={criticalAlerts > 0 ? "red" : "green"}
+            delta={stats?.critical_alerts ? -(stats.critical_alerts * 10) : 0}
+            isInverseTrend={true}
+            deltaText={`${stats?.critical_alerts ?? 0} critical`}
           />
         </Col>
         <Col>
           <KPICard
-            title="Anomalies Detected"
+            title="AI Predictions"
             value={stats?.pending_anomalies ?? 0}
             icon={<TrendingUp className="h-6 w-6 text-purple-500" />}
-            trend="AI predictions"
-            trendColor="gray"
+            subtitle="Potential issues detected"
           />
         </Col>
       </Grid>
 
-      {/* Main Content Grid */}
-      <Grid numItems={1} numItemsLg={2} className="gap-6">
-        {/* Left Column - Site Overview */}
-        <Col>
+      {/* Main Content Grid - Two Columns */}
+      <Grid numItems={1} numItemsLg={3} className="gap-6">
+        {/* Left Column - Site Overview Grid (2/3 width on large) - DASH-01 */}
+        <Col numColSpan={1} numColSpanLg={2}>
           <Card className="h-full">
-            <Title className="mb-4">Site Overview</Title>
-            <div className="space-y-3">
-              {sites.length === 0 ? (
-                <Text className="text-gray-400">No sites available</Text>
-              ) : (
-                sites.slice(0, 5).map((site) => (
-                  <div
-                    key={site.id}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <Building2 className="h-5 w-5 text-gray-400" />
-                      <div>
-                        <Text className="font-medium text-gray-900">
-                          {site.name}
-                        </Text>
-                        <Text className="text-sm text-gray-500">
-                          {site.location} · {site.equipment_count} equipment
-                        </Text>
-                      </div>
-                    </div>
-                    <Badge
-                      color={
-                        site.status === "normal"
-                          ? "green"
-                          : site.status === "warning"
-                          ? "yellow"
-                          : "red"
-                      }
-                      size="sm"
-                    >
-                      {site.status}
-                    </Badge>
-                  </div>
-                ))
-              )}
-              {sites.length > 5 && (
-                <Text className="text-center text-gray-400 text-sm pt-2">
-                  +{sites.length - 5} more sites
-                </Text>
-              )}
-            </div>
+            <Flex justifyContent="between" alignItems="center" className="mb-4">
+              <Title>Site Overview</Title>
+              <Badge color="blue" size="sm">
+                {sites.length} sites
+              </Badge>
+            </Flex>
+
+            {sites.length === 0 ? (
+              <div className="text-center py-8">
+                <Building2 className="h-12 w-12 text-gray-300 mx-auto mb-2" />
+                <Text className="text-gray-500">No sites available</Text>
+              </div>
+            ) : (
+              <Grid numItems={1} numItemsMd={2} numItemsLg={3} className="gap-4">
+                {sites.map((site) => (
+                  <Col key={site.id}>
+                    <SiteCard site={site} onClick={handleSiteClick} />
+                  </Col>
+                ))}
+              </Grid>
+            )}
           </Card>
         </Col>
 
-        {/* Right Column - Alerts Feed */}
-        <Col>
-          <Card className="h-full">
-            <Flex justifyContent="between" alignItems="center" className="mb-4">
-              <Title>Recent Alerts</Title>
-              {criticalAlerts > 0 && (
-                <Badge color="red" size="sm">
-                  {criticalAlerts} critical
-                </Badge>
-              )}
-            </Flex>
-            <div className="space-y-3">
-              {alerts.length === 0 ? (
-                <div className="text-center py-8">
-                  <Activity className="h-12 w-12 text-green-500 mx-auto mb-2" />
-                  <Text className="text-gray-500">No active alerts</Text>
-                </div>
-              ) : (
-                alerts.slice(0, 5).map((alert) => (
-                  <div
-                    key={alert.id}
-                    className={`p-3 rounded-lg border-l-4 ${
-                      alert.severity === "critical"
-                        ? "bg-red-50 border-red-500"
-                        : alert.severity === "high"
-                        ? "bg-orange-50 border-orange-500"
-                        : alert.severity === "medium"
-                        ? "bg-yellow-50 border-yellow-500"
-                        : "bg-gray-50 border-gray-300"
-                    }`}
-                  >
-                    <Flex justifyContent="between" alignItems="start">
-                      <div className="flex-1">
-                        <Text className="font-medium text-gray-900">
-                          {alert.message}
-                        </Text>
-                        <Text className="text-sm text-gray-500">
-                          {alert.site_name} · {alert.equipment_name}
-                        </Text>
-                      </div>
-                      <Badge
-                        color={
-                          alert.severity === "critical"
-                            ? "red"
-                            : alert.severity === "high"
-                            ? "orange"
-                            : alert.severity === "medium"
-                            ? "yellow"
-                            : "gray"
-                        }
-                        size="sm"
-                      >
-                        {alert.severity}
-                      </Badge>
-                    </Flex>
-                  </div>
-                ))
-              )}
-              {alerts.length > 5 && (
-                <Text className="text-center text-gray-400 text-sm pt-2">
-                  +{alerts.length - 5} more alerts
-                </Text>
-              )}
-            </div>
-          </Card>
+        {/* Right Column - Alerts Feed (1/3 width on large) - DASH-02 */}
+        <Col numColSpan={1} numColSpanLg={1}>
+          <AlertFeed
+            limit={10}
+            refreshInterval={30000}
+          />
         </Col>
       </Grid>
 
-      {/* Bottom Area - Anomalies / Charts Placeholder */}
+      {/* Bottom Area - AI Predictions & Anomalies */}
       <div className="mt-6">
         <Card>
-          <Title className="mb-4">AI Predictions & Anomalies</Title>
+          <Flex justifyContent="between" alignItems="center" className="mb-4">
+            <Title>AI Predictions & Anomalies</Title>
+            {anomalies.length > 0 && (
+              <Badge color="purple" size="sm">
+                {anomalies.length} predictions
+              </Badge>
+            )}
+          </Flex>
           <div className="space-y-3">
             {anomalies.length === 0 ? (
               <div className="text-center py-8">
@@ -305,7 +208,7 @@ export function Dashboard() {
               </div>
             ) : (
               <Grid numItems={1} numItemsMd={2} numItemsLg={3} className="gap-4">
-                {anomalies.slice(0, 3).map((anomaly) => (
+                {anomalies.map((anomaly) => (
                   <Col key={anomaly.id}>
                     <div className="p-4 bg-purple-50 rounded-lg border border-purple-100">
                       <Flex justifyContent="between" alignItems="start" className="mb-2">
@@ -318,7 +221,7 @@ export function Dashboard() {
                         {anomaly.prediction}
                       </Text>
                       <Text className="text-sm text-gray-500 mb-2">
-                        {anomaly.site_name} · {anomaly.equipment_name}
+                        {anomaly.site_name} - {anomaly.equipment_name}
                       </Text>
                       <Text className="text-xs text-purple-600">
                         Recommendation: {anomaly.recommendation}
