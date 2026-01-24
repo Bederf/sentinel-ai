@@ -12,7 +12,7 @@
  * Requirement: DASH-04 - KPI cards with trend indicators
  */
 
-import { Card, Metric, Text, Flex, BadgeDelta } from "@tremor/react";
+import { Card, Metric, Text, Flex, BadgeDelta, Tooltip } from "@tremor/react";
 import type { DeltaType } from "@tremor/react";
 import type { ReactNode } from "react";
 
@@ -33,6 +33,8 @@ export interface KPICardProps {
   isInverseTrend?: boolean;
   /** Optional subtitle or description */
   subtitle?: string;
+  /** Optional tooltip text */
+  tooltip?: string;
   /** Optional click handler */
   onClick?: () => void;
 }
@@ -71,6 +73,7 @@ export function KPICard({
   deltaText,
   isInverseTrend = false,
   subtitle,
+  tooltip,
   onClick,
 }: KPICardProps) {
   // Calculate delta type if not explicitly provided
@@ -93,46 +96,48 @@ export function KPICard({
       decorationColor={decorationColor}
       onClick={onClick}
     >
-      <Flex justifyContent="start" className="gap-4">
-        {/* Icon */}
-        {icon && (
-          <div className="p-3 bg-bidvest-blue-50 rounded-lg shrink-0">
-            {icon}
+      <Tooltip content={tooltip}>
+        <Flex justifyContent="start" className="gap-4">
+          {/* Icon */}
+          {icon && (
+            <div className="p-3 bg-bidvest-blue-50 rounded-lg shrink-0">
+              {icon}
+            </div>
+          )}
+
+          {/* Content */}
+          <div className="flex-1 min-w-0">
+            {/* Title */}
+            <Text className="text-gray-500 truncate">{title}</Text>
+
+            {/* Value */}
+            <Metric className="text-2xl font-bold text-gray-900 mt-1">
+              {typeof value === "number" ? value.toLocaleString() : value}
+            </Metric>
+
+            {/* Trend indicator */}
+            {delta !== undefined && (
+              <Flex justifyContent="start" className="gap-2 mt-2">
+                <BadgeDelta
+                  deltaType={computedDeltaType}
+                  size="sm"
+                  isIncreasePositive={!isInverseTrend}
+                >
+                  {formatDelta(delta)}
+                </BadgeDelta>
+                {deltaText && (
+                  <Text className="text-xs text-gray-400">{deltaText}</Text>
+                )}
+              </Flex>
+            )}
+
+            {/* Subtitle (alternative to trend) */}
+            {subtitle && !delta && (
+              <Text className="text-sm text-gray-500 mt-1">{subtitle}</Text>
+            )}
           </div>
-        )}
-
-        {/* Content */}
-        <div className="flex-1 min-w-0">
-          {/* Title */}
-          <Text className="text-gray-500 truncate">{title}</Text>
-
-          {/* Value */}
-          <Metric className="text-2xl font-bold text-gray-900 mt-1">
-            {typeof value === "number" ? value.toLocaleString() : value}
-          </Metric>
-
-          {/* Trend indicator */}
-          {delta !== undefined && (
-            <Flex justifyContent="start" className="gap-2 mt-2">
-              <BadgeDelta
-                deltaType={computedDeltaType}
-                size="sm"
-                isIncreasePositive={!isInverseTrend}
-              >
-                {formatDelta(delta)}
-              </BadgeDelta>
-              {deltaText && (
-                <Text className="text-xs text-gray-400">{deltaText}</Text>
-              )}
-            </Flex>
-          )}
-
-          {/* Subtitle (alternative to trend) */}
-          {subtitle && !delta && (
-            <Text className="text-sm text-gray-500 mt-1">{subtitle}</Text>
-          )}
-        </div>
-      </Flex>
+        </Flex>
+      </Tooltip>
     </Card>
   );
 }

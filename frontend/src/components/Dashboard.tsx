@@ -34,6 +34,7 @@ import {
   Cpu,
   TrendingUp,
   Bell,
+  DollarSign,
 } from "lucide-react";
 import api from "../lib/api";
 import type { DashboardStats, Site, Prediction, EnergyDataPoint } from "../lib/api";
@@ -114,6 +115,23 @@ export function Dashboard() {
   const normalSites = sites.filter((s) => s.status === "normal").length;
   const warningSites = sites.filter((s) => s.status === "warning").length;
 
+  // Calculate total potential savings from all predictions
+  const totalPotentialSavings = predictions.reduce((sum, prediction) => {
+    if (prediction.costImpact) {
+      return sum + prediction.costImpact.potentialSavings;
+    }
+    return sum;
+  }, 0);
+
+  // Format currency for display
+  const formatZAR = (amount: number) =>
+    new Intl.NumberFormat("en-ZA", {
+      style: "currency",
+      currency: "ZAR",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+
   // Handle site card click (placeholder for future navigation)
   const handleSiteClick = (site: Site) => {
     console.log("Site clicked:", site.name);
@@ -166,7 +184,7 @@ export function Dashboard() {
       </div>
 
       {/* KPI Row - DASH-04 */}
-      <Grid numItems={1} numItemsSm={2} numItemsLg={4} className="gap-4 mb-6">
+      <Grid numItems={1} numItemsSm={2} numItemsLg={5} className="gap-4 mb-6">
         <Col>
           <KPICard
             title="Total Sites"
@@ -192,6 +210,15 @@ export function Dashboard() {
             delta={stats?.critical_alerts ? -(stats.critical_alerts * 10) : 0}
             isInverseTrend={true}
             deltaText={`${stats?.critical_alerts ?? 0} critical`}
+          />
+        </Col>
+        <Col>
+          <KPICard
+            title="Potential Savings"
+            value={formatZAR(totalPotentialSavings)}
+            icon={<DollarSign className="h-6 w-6 text-emerald-600" />}
+            subtitle="If all preventive actions taken"
+            tooltip="Total savings if all preventive maintenance actions are completed"
           />
         </Col>
         <Col>
@@ -289,7 +316,7 @@ export function Dashboard() {
             <Title>AI Failure Predictions</Title>
             {predictions.length > 0 && (
               <Badge color="purple" size="sm">
-                {predictions.length} predictions
+                {predictions.length} at-risk assets | {formatZAR(totalPotentialSavings)} potential savings
               </Badge>
             )}
           </Flex>
