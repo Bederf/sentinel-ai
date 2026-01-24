@@ -1,0 +1,26 @@
+reading_id,site_id,site_name,meter_id,reading_type,reading_source,period_start,period_end,consumption,unit,cost_zar,gla_sqm,kwh_per_sqm,notes
+EN-2025-001,SITE-003,Centurion Mall,MAIN-ELEC-001,electricity,utility-bill,2025-01-01,2025-01-31,1850000,kWh,2775000,95000,19.47,January - summer peak
+EN-2025-002,SITE-003,Centurion Mall,MAIN-ELEC-001,electricity,utility-bill,2025-02-01,2025-02-28,1720000,kWh,2580000,95000,18.11,February - still high
+EN-2025-003,SITE-003,Centurion Mall,MAIN-ELEC-001,electricity,utility-bill,2025-03-01,2025-03-31,1580000,kWh,2370000,95000,16.63,March - cooling down
+EN-2025-004,SITE-003,Centurion Mall,MAIN-ELEC-001,electricity,utility-bill,2025-04-01,2025-04-30,1420000,kWh,2130000,95000,14.95,April - autumn
+EN-2025-005,SITE-003,Centurion Mall,MAIN-ELEC-001,electricity,utility-bill,2025-05-01,2025-05-31,1650000,kWh,2475000,95000,17.37,May - AHU-002 failure increased temp hire usage
+EN-2025-006,SITE-003,Centurion Mall,MAIN-ELEC-001,electricity,utility-bill,2025-06-01,2025-06-30,1280000,kWh,1920000,95000,13.47,June - winter
+EN-2025-007,SITE-005,Gateway Theatre of Shopping,MAIN-ELEC-001,electricity,utility-bill,2025-01-01,2025-01-31,2950000,kWh,4425000,180000,16.39,January
+EN-2025-008,SITE-005,Gateway Theatre of Shopping,MAIN-ELEC-001,electricity,utility-bill,2025-02-01,2025-02-28,2780000,kWh,4170000,180000,15.44,February
+EN-2025-009,SITE-005,Gateway Theatre of Shopping,MAIN-ELEC-001,electricity,utility-bill,2025-03-01,2025-03-31,2520000,kWh,3780000,180000,14.00,March
+EN-2025-010,SITE-005,Gateway Theatre of Shopping,MAIN-ELEC-001,electricity,utility-bill,2025-10-01,2025-10-31,2650000,kWh,3975000,180000,14.72,October - chiller efficiency dropping
+EN-2025-011,SITE-005,Gateway Theatre of Shopping,MAIN-ELEC-001,electricity,utility-bill,2025-11-01,2025-11-30,2820000,kWh,4230000,180000,15.67,November - chiller working harder due to wear
+EN-2025-012,SITE-005,Gateway Theatre of Shopping,MAIN-ELEC-001,electricity,utility-bill,2025-12-01,2025-12-31,3050000,kWh,4575000,180000,16.94,December - chiller efficiency significantly worse
+EN-2025-013,SITE-006,Mediclinic Sandton,MAIN-ELEC-001,electricity,smart-meter,2025-01-01,2025-01-31,485000,kWh,727500,35000,13.86,Hospital - consistent usage
+EN-2025-014,SITE-006,Mediclinic Sandton,MAIN-ELEC-001,electricity,smart-meter,2025-06-01,2025-06-30,465000,kWh,697500,35000,13.29,Winter - slightly lower
+EN-2025-015,SITE-001,Rosebank Towers,MAIN-ELEC-001,electricity,utility-bill,2025-01-01,2025-01-31,620000,kWh,930000,45000,13.78,Commercial office - standard
+EN-2025-016,SITE-001,Rosebank Towers,MAIN-ELEC-001,electricity,utility-bill,2025-06-01,2025-06-30,480000,kWh,720000,45000,10.67,Winter - reduced HVAC
+EN-2025-017,SITE-002,Sandton City Office Tower,MAIN-ELEC-001,electricity,smart-meter,2025-01-01,2025-01-31,980000,kWh,1470000,68000,14.41,Modern building - efficient
+EN-2025-018,SITE-002,Sandton City Office Tower,MAIN-ELEC-001,electricity,smart-meter,2025-06-01,2025-06-30,720000,kWh,1080000,68000,10.59,Winter efficiency
+EN-2025-019,SITE-008,Standard Bank Centre,MAIN-ELEC-001,electricity,utility-bill,2025-01-01,2025-01-31,1350000,kWh,2025000,85000,15.88,Older building - less efficient
+EN-2025-020,SITE-008,Standard Bank Centre,MAIN-ELEC-001,electricity,utility-bill,2025-06-01,2025-06-30,1050000,kWh,1575000,85000,12.35,Winter
+EN-2025-021,SITE-003,Centurion Mall,WATER-001,water,utility-bill,2025-01-01,2025-01-31,8500,kL,127500,95000,0.089,Summer - cooling towers
+EN-2025-022,SITE-003,Centurion Mall,WATER-001,water,utility-bill,2025-06-01,2025-06-30,5200,kL,78000,95000,0.055,Winter - reduced
+EN-2025-023,SITE-003,Centurion Mall,DIESEL-001,diesel,manual,2025-01-01,2025-03-31,2500,L,62500,,,Q1 - minimal load shedding
+EN-2025-024,SITE-003,Centurion Mall,DIESEL-001,diesel,manual,2025-04-01,2025-06-30,18500,L,462500,,,Q2 - heavy load shedding
+EN-2025-025,SITE-003,Centurion Mall,DIESEL-001,diesel,manual,2025-07-01,2025-09-30,22000,L,550000,,,Q3 - worst load shedding period

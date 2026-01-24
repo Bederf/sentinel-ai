@@ -1,0 +1,45 @@
+register_address,register_name,data_type,unit,scale_factor,description,failure_threshold_low,failure_threshold_high,predictive_indicator
+768,module_id,uint16,,,Module identification - DSE product code,,,
+769,module_version,uint16,,,Firmware version,,,
+1024,engine_speed,uint16,rpm,1,Engine RPM,1450,1550,Unstable = governor issue
+1025,oil_pressure,uint16,kPa,1,Engine oil pressure,250,,Dropping trend = wear
+1026,coolant_temp,int16,°C,1,Engine coolant temperature,,95,Rising trend = cooling issue
+1027,fuel_level,uint16,%,1,Fuel tank level,10,,Low fuel warning
+1028,charge_alt_voltage,uint16,V,0.1,Charge alternator voltage,,,
+1029,battery_voltage,uint16,V,0.1,DC supply voltage,24.0,30.0,<25V = battery degradation
+1030,run_hours,uint32,hours,0.1,Total engine run hours,,,Service interval trigger
+1031,number_of_starts,uint32,count,1,Total engine starts,,,Start ratio analysis
+1032,engine_runtime,uint16,seconds,1,Current run session time,,,
+1536,gen_voltage_l1,uint16,V,0.1,Generator voltage L1-N,380,420,Phase imbalance
+1537,gen_voltage_l2,uint16,V,0.1,Generator voltage L2-N,380,420,Phase imbalance
+1538,gen_voltage_l3,uint16,V,0.1,Generator voltage L3-N,380,420,Phase imbalance
+1539,gen_voltage_l1_l2,uint16,V,0.1,Generator voltage L1-L2,380,440,
+1540,gen_voltage_l2_l3,uint16,V,0.1,Generator voltage L2-L3,380,440,
+1541,gen_voltage_l3_l1,uint16,V,0.1,Generator voltage L3-L1,380,440,
+1542,gen_current_l1,uint16,A,0.1,Generator current L1,,,Overload detection
+1543,gen_current_l2,uint16,A,0.1,Generator current L2,,,Overload detection
+1544,gen_current_l3,uint16,A,0.1,Generator current L3,,,Overload detection
+1545,gen_frequency,uint16,Hz,0.1,Generator frequency,49.5,50.5,Instability = governor
+1546,gen_kw_total,int32,kW,0.001,Total generator power,,,Load analysis
+1547,gen_kva_total,uint32,kVA,0.001,Total apparent power,,,
+1548,gen_power_factor,int16,,0.01,Generator power factor,0.8,,Low PF = load issues
+1549,gen_kwh_total,uint32,kWh,0.1,Total energy generated,,,
+2048,mains_voltage_l1,uint16,V,0.1,Mains/utility voltage L1-N,,,
+2049,mains_voltage_l2,uint16,V,0.1,Mains/utility voltage L2-N,,,
+2050,mains_voltage_l3,uint16,V,0.1,Mains/utility voltage L3-N,,,
+2051,mains_frequency,uint16,Hz,0.1,Mains/utility frequency,,,
+2304,oil_temp,int16,°C,1,Engine oil temperature,,110,High = lubrication issue
+2305,fuel_rate,uint16,L/hr,0.1,Fuel consumption rate,,,Efficiency trending
+2306,exhaust_temp,int16,°C,1,Exhaust temperature,,600,High = combustion issue
+2307,turbo_pressure,uint16,kPa,1,Turbocharger pressure,,,Turbo health
+2308,coolant_pressure,uint16,kPa,1,Coolant pressure,,,Leak detection
+2560,status_flags,uint16,bits,,Operating status bitmap,,,
+2561,alarm_flags,uint16,bits,,Active alarm bitmap,,,
+2562,warning_flags,uint16,bits,,Active warning bitmap,,,
+2563,shutdown_flags,uint16,bits,,Shutdown cause bitmap,,,
+2564,start_attempts,uint16,count,1,Start attempts this cycle,,3,>2 = starting issue
+2565,last_shutdown_reason,uint16,code,,Last shutdown code,,,Failure analysis
+3072,ambient_temp,int16,°C,1,Ambient temperature,,,Environmental
+3073,coolant_level,uint16,%,1,Coolant level,20,,Low = leak
+3074,air_filter_dp,uint16,kPa,1,Air filter differential pressure,,5,High = blocked filter
+3075,fuel_filter_dp,uint16,kPa,1,Fuel filter differential pressure,,3,High = blocked filter
