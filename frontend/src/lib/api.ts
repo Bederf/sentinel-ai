@@ -4,6 +4,8 @@
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:9095";
 
+// ============= Response Interfaces =============
+
 interface HealthResponse {
   status: string;
   version: string;
@@ -12,6 +14,70 @@ interface HealthResponse {
 interface ApiError {
   message: string;
   status: number;
+}
+
+// Site/Building interface
+export interface Site {
+  id: string;
+  name: string;
+  location: string;
+  region: string;
+  type: string;
+  equipment_count: number;
+  alert_count: number;
+  status: "normal" | "warning" | "critical";
+}
+
+// Equipment interface
+export interface Equipment {
+  id: string;
+  name: string;
+  type: string;
+  site_id: string;
+  site_name: string;
+  status: "online" | "offline" | "maintenance";
+  last_reading?: {
+    timestamp: string;
+    value: number;
+    unit: string;
+  };
+}
+
+// Alert interface
+export interface Alert {
+  id: string;
+  site_id: string;
+  site_name: string;
+  equipment_id: string;
+  equipment_name: string;
+  severity: "low" | "medium" | "high" | "critical";
+  message: string;
+  timestamp: string;
+  acknowledged: boolean;
+}
+
+// Anomaly prediction interface
+export interface Anomaly {
+  id: string;
+  site_id: string;
+  site_name: string;
+  equipment_id: string;
+  equipment_name: string;
+  prediction: string;
+  confidence: number;
+  predicted_date: string;
+  recommendation: string;
+}
+
+// Dashboard stats interface
+export interface DashboardStats {
+  total_sites: number;
+  total_equipment: number;
+  total_sensors: number;
+  active_alerts: number;
+  critical_alerts: number;
+  pending_anomalies: number;
+  uptime_percent: number;
 }
 
 /**
@@ -122,6 +188,43 @@ export const api = {
    * Stream chat with AI assistant
    */
   streamChat,
+
+  // ============= Dashboard API Methods =============
+
+  /**
+   * Get all sites/buildings
+   */
+  async getSites(): Promise<Site[]> {
+    return fetchApi<Site[]>("/api/sites");
+  },
+
+  /**
+   * Get dashboard statistics overview
+   */
+  async getStats(): Promise<DashboardStats> {
+    return fetchApi<DashboardStats>("/api/stats");
+  },
+
+  /**
+   * Get active alerts
+   */
+  async getAlerts(): Promise<Alert[]> {
+    return fetchApi<Alert[]>("/api/alerts");
+  },
+
+  /**
+   * Get anomaly predictions
+   */
+  async getAnomalies(): Promise<Anomaly[]> {
+    return fetchApi<Anomaly[]>("/api/anomalies");
+  },
+
+  /**
+   * Get equipment list
+   */
+  async getEquipment(): Promise<Equipment[]> {
+    return fetchApi<Equipment[]>("/api/equipment");
+  },
 };
 
 export default api;
