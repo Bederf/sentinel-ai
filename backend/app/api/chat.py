@@ -1,6 +1,7 @@
 """Chat API endpoint with Server-Sent Events streaming."""
 
 import logging
+import os
 from typing import AsyncGenerator
 
 from fastapi import APIRouter, HTTPException
@@ -9,6 +10,7 @@ from pydantic import BaseModel
 
 from app.services.claude_service import claude_service
 from app.services.command_executor import command_executor
+from app.services.demo_cache import DemoCache
 from app.services.work_order_service import work_order_service
 from app.config.settings import settings
 
@@ -154,7 +156,40 @@ async def chat(request: ChatRequest) -> StreamingResponse:
             },
         )
 
-    # 3. Regular AI chat with building context
+    # 3. Check demo cache if DEMO_MODE is enabled
+    demo_mode = os.getenv("DEMO_MODE", "false").lower() == "true"
+    if demo_mode:
+        demo_cache = DemoCache()
+        cached_response = demo_cache.get_cached_response(user_message)
+        if cached_response:
+            logger.info(f"Using cached demo response for query")
+            citations = demo_cache.get_citations(user_message)
+
+            # Stream cached response with SSE format
+            async def stream_cached_response() -> AsyncGenerator[str, None]:
+                # Stream line by line to simulate streaming behavior
+                lines = cached_response.split("\n")
+                for i, line in enumerate(lines):
+                    # Add newline to each line except the last if it doesn't have one
+                    if i < len(lines) - 1 or line.endswith("\n"):
+                        yield f"data: {line}\n\n"
+                    else:
+                        yield f"data: {line}\n\n"
+                yield "data: [DONE]\n\n"
+
+            return StreamingResponse(
+                stream_cached_response(),
+                media_type="text/event-stream",
+                headers={
+                    "Cache-Control": "no-cache",
+                    "Connection": "keep-alive",
+                    "X-Accel-Buffering": "no",
+                    "X-Response-Type": "ai_response",
+                    "X-Demo-Cached": "true",
+                },
+            )
+
+    # 4. Regular AI chat with building context
     if not claude_service.is_configured():
         raise HTTPException(
             status_code=503,
@@ -176,13 +211,16 @@ async def chat(request: ChatRequest) -> StreamingResponse:
 @router.get("/chat/status")
 async def chat_status():
     """Check if the chat service is configured and available."""
+    demo_mode = os.getenv("DEMO_MODE", "false").lower() == "true"
     return {
         "configured": claude_service.is_configured(),
+        "demo_mode": demo_mode,
         "model": settings.claude_model,
         "features": {
             "control_commands": True,
             "work_orders": True,
             "building_context": True,
+            "demo_cache": demo_mode,
         },
     }
 
