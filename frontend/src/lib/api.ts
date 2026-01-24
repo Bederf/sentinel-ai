@@ -80,6 +80,24 @@ export interface DashboardStats {
   uptime_percent: number;
 }
 
+// Energy data point interface
+export interface EnergyDataPoint {
+  date: string;
+  site_id: string;
+  site_name: string;
+  hvac_kwh: number;
+  lighting_kwh: number;
+  other_kwh: number;
+  total_kwh: number;
+}
+
+// Energy response interface
+export interface EnergyResponse {
+  days: number;
+  site_id: string | null;
+  data: EnergyDataPoint[];
+}
+
 /**
  * Generic fetch wrapper with error handling
  */
@@ -224,6 +242,23 @@ export const api = {
    */
   async getEquipment(): Promise<Equipment[]> {
     return fetchApi<Equipment[]>("/api/equipment");
+  },
+
+  /**
+   * Get energy consumption data
+   * @param siteId - Optional site ID filter
+   * @param days - Number of days (default 30)
+   */
+  async getEnergy(
+    siteId: string | null = null,
+    days: number = 30
+  ): Promise<EnergyResponse> {
+    const params = new URLSearchParams();
+    if (siteId) {
+      params.append("site_id", siteId);
+    }
+    params.append("days", days.toString());
+    return fetchApi<EnergyResponse>(`/api/energy?${params.toString()}`);
   },
 };
 

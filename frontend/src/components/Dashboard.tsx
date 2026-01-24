@@ -5,11 +5,13 @@
  * - Top row: 4 KPI cards (sites, equipment, alerts, anomalies)
  * - Left column: Site grid using SiteCard components
  * - Right column: AlertFeed with auto-refresh
+ * - Middle: Energy consumption charts with site and time period selection
  * - Bottom: AI Predictions & Anomalies section
  *
  * Requirements:
  * - DASH-01: Multi-site overview with all 15 sites
  * - DASH-02: Alert feed with severity colors
+ * - DASH-03: Energy consumption charts
  * - DASH-04: KPI cards with trend indicators
  */
 
@@ -22,6 +24,9 @@ import {
   Col,
   Badge,
   Flex,
+  TabGroup,
+  TabList,
+  Tab,
 } from "@tremor/react";
 import {
   Building2,
@@ -31,10 +36,16 @@ import {
   Bell,
 } from "lucide-react";
 import api from "../lib/api";
-import type { DashboardStats, Site, Anomaly } from "../lib/api";
+import type { DashboardStats, Site, Anomaly, EnergyDataPoint } from "../lib/api";
 import { KPICard } from "./KPICard";
 import { SiteCard } from "./SiteCard";
 import { AlertFeed } from "./AlertFeed";
+import { SiteSelector } from "./SiteSelector";
+import { EnergyChart } from "./EnergyChart";
+
+// Time period options for energy chart
+const TIME_PERIODS = [7, 30, 90] as const;
+type TimePeriod = (typeof TIME_PERIODS)[number];
 
 export function Dashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -42,6 +53,12 @@ export function Dashboard() {
   const [anomalies, setAnomalies] = useState<Anomaly[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Energy chart state
+  const [energyData, setEnergyData] = useState<EnergyDataPoint[]>([]);
+  const [energyLoading, setEnergyLoading] = useState(false);
+  const [selectedSiteId, setSelectedSiteId] = useState<string | null>(null);
+  const [selectedDays, setSelectedDays] = useState<TimePeriod>(30);
 
   useEffect(() => {
     const loadDashboardData = async () => {
@@ -68,6 +85,24 @@ export function Dashboard() {
 
     loadDashboardData();
   }, []);
+
+  // Load energy data when filters change
+  useEffect(() => {
+    const loadEnergyData = async () => {
+      try {
+        setEnergyLoading(true);
+        const response = await api.getEnergy(selectedSiteId, selectedDays);
+        setEnergyData(response.data);
+      } catch (err) {
+        console.error("Failed to load energy data:", err);
+        setEnergyData([]);
+      } finally {
+        setEnergyLoading(false);
+      }
+    };
+
+    loadEnergyData();
+  }, [selectedSiteId, selectedDays]);
 
   // Calculate site status counts for KPI
   const normalSites = sites.filter((s) => s.status === "normal").length;
@@ -188,6 +223,46 @@ export function Dashboard() {
           />
         </Col>
       </Grid>
+
+      {/* Energy Consumption Section - DASH-03 */}
+      <div className="mt-6">
+        <Card>
+          <Flex
+            justifyContent="between"
+            alignItems="center"
+            className="mb-4 flex-wrap gap-4"
+          >
+            <Title>Energy Analytics</Title>
+            <Flex className="gap-4 flex-wrap">
+              {/* Site Filter */}
+              <div className="w-48">
+                <SiteSelector
+                  sites={sites}
+                  selectedSiteId={selectedSiteId}
+                  onSiteChange={setSelectedSiteId}
+                />
+              </div>
+              {/* Time Period Tabs */}
+              <TabGroup
+                index={TIME_PERIODS.indexOf(selectedDays)}
+                onIndexChange={(index) => setSelectedDays(TIME_PERIODS[index])}
+              >
+                <TabList variant="solid">
+                  <Tab>7 Days</Tab>
+                  <Tab>30 Days</Tab>
+                  <Tab>90 Days</Tab>
+                </TabList>
+              </TabGroup>
+            </Flex>
+          </Flex>
+          <EnergyChart
+            data={energyData}
+            loading={energyLoading}
+            selectedSiteId={selectedSiteId}
+            days={selectedDays}
+          />
+        </Card>
+      </div>
 
       {/* Bottom Area - AI Predictions & Anomalies */}
       <div className="mt-6">

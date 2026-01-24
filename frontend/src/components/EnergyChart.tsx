@@ -16,17 +16,7 @@
 
 import { Card, Title, AreaChart, Text, Flex } from "@tremor/react";
 import { Zap } from "lucide-react";
-
-// Energy data point from API
-export interface EnergyDataPoint {
-  date: string;
-  site_id: string;
-  site_name: string;
-  hvac_kwh: number;
-  lighting_kwh: number;
-  other_kwh: number;
-  total_kwh: number;
-}
+import type { EnergyDataPoint } from "../lib/api";
 
 interface EnergyChartProps {
   data: EnergyDataPoint[];
