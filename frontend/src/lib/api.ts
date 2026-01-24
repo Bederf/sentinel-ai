@@ -43,6 +43,71 @@ async function fetchApi<T>(
 }
 
 /**
+ * Stream chat response using Server-Sent Events
+ *
+ * @param message - User message to send
+ * @param conversationId - Optional conversation ID for context
+ * @param onChunk - Callback called for each text chunk received
+ */
+export async function streamChat(
+  message: string,
+  conversationId: string | undefined,
+  onChunk: (chunk: string) => void
+): Promise<void> {
+  const url = `${API_BASE_URL}/api/chat`;
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      message,
+      conversation_id: conversationId,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Chat API error: ${response.status} ${response.statusText}`);
+  }
+
+  if (!response.body) {
+    throw new Error("No response body available for streaming");
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      // Decode the chunk
+      const text = decoder.decode(value, { stream: true });
+
+      // Parse SSE format: "data: <content>\n\n"
+      const lines = text.split("\n");
+      for (const line of lines) {
+        if (line.startsWith("data: ")) {
+          const data = line.slice(6); // Remove "data: " prefix
+
+          // Check for completion sentinel
+          if (data === "[DONE]") {
+            return;
+          }
+
+          // Call callback with the chunk
+          onChunk(data);
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+/**
  * API Methods
  */
 export const api = {
@@ -52,6 +117,11 @@ export const api = {
   async health(): Promise<HealthResponse> {
     return fetchApi<HealthResponse>("/api/health");
   },
+
+  /**
+   * Stream chat with AI assistant
+   */
+  streamChat,
 };
 
 export default api;
