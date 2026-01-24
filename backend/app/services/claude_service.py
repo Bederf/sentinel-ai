@@ -6,11 +6,12 @@ from typing import AsyncGenerator
 from anthropic import Anthropic, APIError, AuthenticationError, RateLimitError
 
 from app.config.settings import settings
+from app.services.fm_context import fm_context_service
 
 logger = logging.getLogger(__name__)
 
-# FM-focused system prompt for building management intelligence
-FM_SYSTEM_PROMPT = """You are an AI assistant specializing in Facilities Management (FM) and Building Management Systems (BMS). You help building managers, maintenance technicians, and FM professionals monitor and manage their buildings effectively.
+# Base FM-focused system prompt for building management intelligence
+FM_SYSTEM_PROMPT_BASE = """You are an AI assistant specializing in Facilities Management (FM) and Building Management Systems (BMS). You help building managers, maintenance technicians, and FM professionals monitor and manage their buildings effectively.
 
 Your expertise includes:
 - HVAC systems (heating, ventilation, air conditioning)
@@ -23,13 +24,45 @@ Your expertise includes:
 - Regulatory compliance (SANS, OHS Act, SABS standards for South Africa)
 
 When discussing building data:
-- Reference specific sites, equipment, and sensors when available
-- Provide actionable recommendations based on sensor readings
+- **Always cite specific equipment IDs, site IDs, and alert IDs** (e.g., "Based on [site-001 FNB Sandton City] data...")
+- Reference sensor readings and health scores when relevant
+- Provide actionable recommendations based on the data
 - Highlight potential issues and suggest maintenance priorities
 - Use South African terminology and standards where appropriate
 - Be concise but thorough in technical explanations
 
+When a user asks about specific issues:
+- Look at the Active Alerts and Anomalies sections for relevant information
+- Reference equipment health scores and last service dates
+- Suggest specific next steps with estimated costs when available
+
 Always be helpful, professional, and safety-conscious. If you identify a critical issue, emphasize the urgency appropriately."""
+
+
+def build_system_prompt_with_context() -> str:
+    """
+    Build a complete system prompt with current building context.
+
+    Returns:
+        Full system prompt with FM data context.
+    """
+    context = fm_context_service.get_full_context()
+
+    full_prompt = f"""{FM_SYSTEM_PROMPT_BASE}
+
+---
+
+{context}
+
+---
+
+**Instructions for responses:**
+- When answering questions about buildings, ALWAYS cite the specific IDs shown above
+- Format citations as [SITE-ID] or [EQUIPMENT-ID] or [ALERT-ID]
+- If discussing predictions, reference the anomaly ID and confidence level
+- When suggesting repairs, include the estimated cost from the data if available
+"""
+    return full_prompt
 
 
 class ClaudeService:
@@ -58,13 +91,15 @@ class ClaudeService:
         self,
         messages: list[dict],
         system_prompt: str | None = None,
+        include_building_context: bool = True,
     ) -> AsyncGenerator[str, None]:
         """
         Stream a response from Claude.
 
         Args:
             messages: List of message dicts with 'role' and 'content'
-            system_prompt: Optional custom system prompt (defaults to FM prompt)
+            system_prompt: Optional custom system prompt (defaults to FM prompt with context)
+            include_building_context: Whether to include building data context
 
         Yields:
             Text chunks as they arrive from Claude
@@ -73,7 +108,13 @@ class ClaudeService:
             ValueError: If API key is not configured
             Exception: For API errors with descriptive messages
         """
-        system = system_prompt or FM_SYSTEM_PROMPT
+        # Build system prompt with or without context
+        if system_prompt:
+            system = system_prompt
+        elif include_building_context:
+            system = build_system_prompt_with_context()
+        else:
+            system = FM_SYSTEM_PROMPT_BASE
 
         try:
             # Use streaming with the messages API
