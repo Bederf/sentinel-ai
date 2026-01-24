@@ -430,6 +430,48 @@ export function PredictionDetail({
           </List>
         </Card>
 
+        {/* Cross-Site Pattern Recognition */}
+        {prediction.similar_failures.length >= 2 && (
+          <>
+            <Title className="text-lg font-semibold text-gray-900 mb-3">
+              🔍 Cross-Site Pattern Detected
+            </Title>
+            <Card className="mb-6">
+              <Text className="text-gray-700 mb-3">
+                This vibration pattern matches failures at{" "}
+                {prediction.similar_failures.length} other sites:
+              </Text>
+              <List className="mb-3">
+                {prediction.similar_failures.map((failure, index) => (
+                  <ListItem key={index}>
+                    <Flex justifyContent="between" className="w-full">
+                      <Text className="font-semibold text-gray-900">
+                        {failure.site} {failure.equipment}
+                      </Text>
+                      <Badge color="red" size="sm">
+                        failed
+                      </Badge>
+                    </Flex>
+                  </ListItem>
+                ))}
+              </List>
+              <Callout
+                title="Pattern Recognition Insight"
+                icon={TrendingUp}
+                color="blue"
+              >
+                "{prediction.site_name},{" "}
+                {prediction.similar_failures
+                  .slice(0, 2)
+                  .map((f) => f.site)
+                  .join(", ")}
+                {prediction.similar_failures.length > 2 && "..."} all showing this
+                early warning pattern."
+              </Callout>
+            </Card>
+          </>
+        )}
+
         {/* Similar Failures */}
         {prediction.similar_failures.length > 0 && (
           <>
