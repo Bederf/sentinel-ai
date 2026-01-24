@@ -103,10 +103,10 @@ export function Chat() {
   return (
     <div className="chat-container flex flex-col h-full bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
       {/* Messages area */}
-      <div className="flex-1 overflow-y-auto p-4" role="list" aria-label="Chat messages">
+      <div className="flex-1 overflow-y-auto p-4 pb-24 md:pb-4" role="list" aria-label="Chat messages">
         {messages.length === 0 && !isLoading && (
           <div className="h-full flex items-center justify-center text-gray-400">
-            <p>Start a conversation with the FM Assistant</p>
+            <p className="text-sm md:text-base">Start a conversation with the FM Assistant</p>
           </div>
         )}
 
@@ -143,12 +143,12 @@ export function Chat() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input area */}
+      {/* Input area - fixed bottom on mobile, inline on desktop */}
       <form
         onSubmit={handleSubmit}
-        className="border-t border-gray-200 p-4 bg-gray-50"
+        className="border-t border-gray-200 p-4 bg-gray-50 sticky bottom-0 md:relative"
       >
-        <div className="flex gap-3">
+        <div className="flex gap-2 md:gap-3">
           <input
             ref={inputRef}
             type="text"
@@ -157,13 +157,13 @@ export function Chat() {
             onKeyDown={handleKeyDown}
             placeholder="Ask about building management..."
             disabled={isLoading}
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-bidvest-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+            className="flex-1 px-3 py-2 md:px-4 md:py-2 text-sm md:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-bidvest-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
             aria-label="Chat message input"
           />
           <button
             type="submit"
             disabled={isLoading || !input.trim()}
-            className="px-4 py-2 bg-bidvest-blue-600 text-white rounded-lg hover:bg-bidvest-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+            className="px-3 py-2 md:px-4 md:py-2 bg-bidvest-blue-600 text-white rounded-lg hover:bg-bidvest-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
             aria-label="Send message"
           >
             <Send className="w-4 h-4" />
