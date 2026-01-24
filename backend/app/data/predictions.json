@@ -83,6 +83,24 @@
       "potential_loss_zar": 102000
     },
 
+    "costImpact": {
+      "estimatedFailureCost": 65000,
+      "estimatedPreventiveCost": 28000,
+      "potentialSavings": 37000,
+      "failureBreakdown": {
+        "parts": 35000,
+        "labor": 15000,
+        "downtime": 10000,
+        "secondaryDamage": 5000
+      },
+      "preventiveBreakdown": {
+        "parts": 18000,
+        "labor": 8000,
+        "downtime": 2000
+      },
+      "story": "Emergency compressor replacement during mall hours vs scheduled maintenance. Emergency parts carry 50% premium, overtime labor rates apply, and downtime risks SLA penalties."
+    },
+
     "recommended_action": "Schedule compressor replacement within 14 days. Order York YLAA compressor assembly (part# YLAA-CMP-220). This is a gateway chiller serving critical loads - proactive replacement prevents emergency failure.",
     "parts_required": ["York compressor assembly YLAA-CMP-220", "Refrigerant R410A 40kg", "Oil filter kit", "Expansion valve"],
     "urgency": "critical",
@@ -165,6 +183,24 @@
       "potential_loss_zar": 41600
     },
 
+    "costImpact": {
+      "estimatedFailureCost": 45000,
+      "estimatedPreventiveCost": 18000,
+      "potentialSavings": 27000,
+      "failureBreakdown": {
+        "parts": 22000,
+        "labor": 11000,
+        "downtime": 8000,
+        "secondaryDamage": 4000
+      },
+      "preventiveBreakdown": {
+        "parts": 10000,
+        "labor": 6000,
+        "downtime": 2000
+      },
+      "story": "Complete system failure vs planned leak repair. Failure requires full refrigerant recharge and compressor replacement. Preventive repair targets leak location with minimal downtime."
+    },
+
     "recommended_action": "Schedule leak detection and repair within 30 days. Requires certified technician, nitrogen pressure test, and brazed joint inspection. Monitor refrigerant levels weekly until repair.",
     "parts_required": ["R410A refrigerant 20kg", "Leak detection dye kit", "Brazed joint repair materials", "Filter drier"],
     "urgency": "high",
@@ -245,6 +281,24 @@
       "downtime_cost_per_hour_zar": 1200,
       "estimated_repair_hours": 4,
       "potential_loss_zar": 4800
+    },
+
+    "costImpact": {
+      "estimatedFailureCost": 12000,
+      "estimatedPreventiveCost": 6000,
+      "potentialSavings": 6000,
+      "failureBreakdown": {
+        "parts": 7000,
+        "labor": 3000,
+        "downtime": 1200,
+        "secondaryDamage": 800
+      },
+      "preventiveBreakdown": {
+        "parts": 4000,
+        "labor": 1500,
+        "downtime": 500
+      },
+      "story": "Compressor burnout replacement vs planned unit upgrade. Burnout damages electrical components and requires emergency procurement. Planned replacement allows competitive sourcing."
     },
 
     "recommended_action": "Plan for replacement within 60 days. Unit is 3 years beyond expected life. Budget for new split unit installation. Continue monitoring - if thermal trips increase, expedite replacement.",
@@ -336,6 +390,24 @@
       "potential_loss_zar": 90000
     },
 
+    "costImpact": {
+      "estimatedFailureCost": 120000,
+      "estimatedPreventiveCost": 40000,
+      "potentialSavings": 80000,
+      "failureBreakdown": {
+        "parts": 65000,
+        "labor": 25000,
+        "downtime": 20000,
+        "secondaryDamage": 10000
+      },
+      "preventiveBreakdown": {
+        "parts": 22000,
+        "labor": 15000,
+        "downtime": 3000
+      },
+      "story": "Generator failure during power outage with no backup. Critical systems down, data loss risk, tenant complaints. Preventive maintenance ensures backup reliability during grid failures."
+    },
+
     "recommended_action": "URGENT: Service generator within 14 days. Inspect fuel system, replace fuel filters, test starter motor. This is backup power for critical systems - cannot afford failure during outage.",
     "parts_required": ["Fuel filter set", "Starter motor (if testing confirms)", "Injectors (preventive)", "Battery if load test fails"],
     "urgency": "high",
@@ -416,6 +488,24 @@
       "downtime_cost_per_hour_zar": 3500,
       "estimated_repair_hours": 16,
       "potential_loss_zar": 56000
+    },
+
+    "costImpact": {
+      "estimatedFailureCost": 70000,
+      "estimatedPreventiveCost": 35000,
+      "potentialSavings": 35000,
+      "failureBreakdown": {
+        "parts": 40000,
+        "labor": 18000,
+        "downtime": 8000,
+        "secondaryDamage": 4000
+      },
+      "preventiveBreakdown": {
+        "parts": 22000,
+        "labor": 10000,
+        "downtime": 3000
+      },
+      "story": "BMS failure results in manual override mode, loss of optimization, tenant discomfort. Emergency replacement requires weekend work with overtime rates. Planned upgrade includes improved features."
     },
 
     "recommended_action": "Plan controller replacement within 60 days. NAE35 is end-of-life. Upgrade to NAE55 or Metasys 10. Begin point mapping and programming backup immediately.",
