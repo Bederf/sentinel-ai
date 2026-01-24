@@ -30,7 +30,8 @@ import {
   TrendingUp,
   Bell,
 } from "lucide-react";
-import api, { DashboardStats, Alert, Site, Anomaly } from "../lib/api";
+import api from "../lib/api";
+import type { DashboardStats, Alert, Site, Anomaly } from "../lib/api";
 
 // KPI Card component for top row
 interface KPICardProps {
@@ -95,14 +96,11 @@ export function Dashboard() {
     loadDashboardData();
   }, []);
 
-  // Calculate critical and warning counts from alerts
+  // Calculate critical counts from alerts
   const criticalAlerts = alerts.filter((a) => a.severity === "critical").length;
-  const highAlerts = alerts.filter((a) => a.severity === "high").length;
 
   // Get site status counts
   const normalSites = sites.filter((s) => s.status === "normal").length;
-  const warningSites = sites.filter((s) => s.status === "warning").length;
-  const criticalSites = sites.filter((s) => s.status === "critical").length;
 
   if (loading) {
     return (
