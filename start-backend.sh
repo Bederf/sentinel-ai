@@ -18,5 +18,5 @@ if [ ! -f "venv/.deps_installed" ]; then
     touch venv/.deps_installed
 fi
 
-echo "Starting backend on http://localhost:8082"
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8082
+echo "Starting backend on http://localhost:9090"
+uvicorn app.main:app --reload --host 0.0.0.0 --port 9090
