@@ -17,6 +17,7 @@
 import { Card, Title, AreaChart, Text, Flex } from "@tremor/react";
 import { Zap } from "lucide-react";
 import type { EnergyDataPoint } from "../lib/api";
+import { LoadingCard } from "./LoadingCard";
 
 interface EnergyChartProps {
   data: EnergyDataPoint[];
@@ -103,10 +104,18 @@ export function EnergyChart({
   if (loading) {
     return (
       <Card>
-        <div className="h-80 flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin h-8 w-8 border-4 border-bidvest-blue-600 border-t-transparent rounded-full mx-auto mb-4" />
-            <Text>Loading energy data...</Text>
+        <Flex justifyContent="start" alignItems="center" className="gap-2 mb-4">
+          <Zap className="h-5 w-5 text-yellow-500" />
+          <Title>Energy Consumption</Title>
+        </Flex>
+        <div className="h-72">
+          <div className="animate-pulse flex flex-col h-full justify-end space-y-2 p-4">
+            <div className="h-2 bg-gray-200 rounded w-full"></div>
+            <div className="h-8 bg-gray-200 rounded w-full"></div>
+            <div className="h-16 bg-gray-200 rounded w-full"></div>
+            <div className="h-24 bg-gray-200 rounded w-full"></div>
+            <div className="h-12 bg-gray-200 rounded w-full"></div>
+            <div className="h-6 bg-gray-200 rounded w-full"></div>
           </div>
         </div>
       </Card>
