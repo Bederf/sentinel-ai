@@ -36,12 +36,14 @@ import {
   Bell,
 } from "lucide-react";
 import api from "../lib/api";
-import type { DashboardStats, Site, Anomaly, EnergyDataPoint } from "../lib/api";
+import type { DashboardStats, Site, Prediction, EnergyDataPoint } from "../lib/api";
 import { KPICard } from "./KPICard";
 import { SiteCard } from "./SiteCard";
 import { AlertFeed } from "./AlertFeed";
 import { SiteSelector } from "./SiteSelector";
 import { EnergyChart } from "./EnergyChart";
+import { PredictionCard } from "./PredictionCard";
+import { PredictionDetail } from "./PredictionDetail";
 
 // Time period options for energy chart
 const TIME_PERIODS = [7, 30, 90] as const;
@@ -50,9 +52,13 @@ type TimePeriod = (typeof TIME_PERIODS)[number];
 export function Dashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [sites, setSites] = useState<Site[]>([]);
-  const [anomalies, setAnomalies] = useState<Anomaly[]>([]);
+  const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Prediction detail modal state
+  const [selectedPrediction, setSelectedPrediction] = useState<Prediction | null>(null);
+  const [isPredictionDetailOpen, setIsPredictionDetailOpen] = useState(false);
 
   // Energy chart state
   const [energyData, setEnergyData] = useState<EnergyDataPoint[]>([]);
@@ -64,16 +70,16 @@ export function Dashboard() {
     const loadDashboardData = async () => {
       try {
         setLoading(true);
-        // Load stats, sites, and anomalies in parallel
+        // Load stats, sites, and predictions in parallel
         // AlertFeed fetches its own data
-        const [statsData, sitesData, anomaliesData] = await Promise.all([
+        const [statsData, sitesData, predictionsData] = await Promise.all([
           api.getStats(),
           api.getSites(),
-          api.getAnomalies(),
+          api.getPredictions(),
         ]);
         setStats(statsData);
         setSites(sitesData);
-        setAnomalies(anomaliesData);
+        setPredictions(predictionsData.predictions);
         setError(null);
       } catch (err) {
         console.error("Failed to load dashboard data:", err);
@@ -112,6 +118,18 @@ export function Dashboard() {
   const handleSiteClick = (site: Site) => {
     console.log("Site clicked:", site.name);
     // Future: navigate to site details page
+  };
+
+  // Handle prediction card click - open detail modal
+  const handlePredictionClick = (prediction: Prediction) => {
+    setSelectedPrediction(prediction);
+    setIsPredictionDetailOpen(true);
+  };
+
+  // Close prediction detail modal
+  const closePredictionDetail = () => {
+    setIsPredictionDetailOpen(false);
+    setSelectedPrediction(null);
   };
 
   if (loading) {
@@ -179,9 +197,9 @@ export function Dashboard() {
         <Col>
           <KPICard
             title="AI Predictions"
-            value={stats?.pending_anomalies ?? 0}
+            value={predictions.length}
             icon={<TrendingUp className="h-6 w-6 text-purple-500" />}
-            subtitle="Potential issues detected"
+            subtitle="Failure predictions detected"
           />
         </Col>
       </Grid>
@@ -264,44 +282,31 @@ export function Dashboard() {
         </Card>
       </div>
 
-      {/* Bottom Area - AI Predictions & Anomalies */}
+      {/* Bottom Area - AI Failure Predictions */}
       <div className="mt-6">
         <Card>
           <Flex justifyContent="between" alignItems="center" className="mb-4">
-            <Title>AI Predictions & Anomalies</Title>
-            {anomalies.length > 0 && (
+            <Title>AI Failure Predictions</Title>
+            {predictions.length > 0 && (
               <Badge color="purple" size="sm">
-                {anomalies.length} predictions
+                {predictions.length} predictions
               </Badge>
             )}
           </Flex>
-          <div className="space-y-3">
-            {anomalies.length === 0 ? (
+          <div>
+            {predictions.length === 0 ? (
               <div className="text-center py-8">
                 <TrendingUp className="h-12 w-12 text-gray-300 mx-auto mb-2" />
-                <Text className="text-gray-500">No anomalies predicted</Text>
+                <Text className="text-gray-500">No failure predictions</Text>
               </div>
             ) : (
               <Grid numItems={1} numItemsMd={2} numItemsLg={3} className="gap-4">
-                {anomalies.map((anomaly) => (
-                  <Col key={anomaly.id}>
-                    <div className="p-4 bg-purple-50 rounded-lg border border-purple-100">
-                      <Flex justifyContent="between" alignItems="start" className="mb-2">
-                        <AlertTriangle className="h-5 w-5 text-purple-500" />
-                        <Badge color="purple" size="sm">
-                          {Math.round(anomaly.confidence * 100)}% confidence
-                        </Badge>
-                      </Flex>
-                      <Text className="font-medium text-gray-900 mb-1">
-                        {anomaly.prediction}
-                      </Text>
-                      <Text className="text-sm text-gray-500 mb-2">
-                        {anomaly.site_name} - {anomaly.equipment_name}
-                      </Text>
-                      <Text className="text-xs text-purple-600">
-                        Recommendation: {anomaly.recommendation}
-                      </Text>
-                    </div>
+                {predictions.map((prediction) => (
+                  <Col key={prediction.id}>
+                    <PredictionCard
+                      prediction={prediction}
+                      onClick={() => handlePredictionClick(prediction)}
+                    />
                   </Col>
                 ))}
               </Grid>
@@ -309,6 +314,15 @@ export function Dashboard() {
           </div>
         </Card>
       </div>
+
+      {/* Prediction Detail Modal */}
+      {selectedPrediction && (
+        <PredictionDetail
+          prediction={selectedPrediction}
+          isOpen={isPredictionDetailOpen}
+          onClose={closePredictionDetail}
+        />
+      )}
     </div>
   );
 }

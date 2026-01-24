@@ -98,6 +98,70 @@ export interface EnergyResponse {
   data: EnergyDataPoint[];
 }
 
+// Prediction interface
+export interface Prediction {
+  id: string;
+  equipment_id: string;
+  site_id: string;
+  site_name: string;
+  equipment_name: string;
+  equipment_type: string;
+  prediction_type: string;
+  probability_percent: number;
+  confidence: "high" | "medium" | "low";
+  predicted_failure_date: string;
+  timeframe_days: number;
+  severity: "critical" | "high" | "medium" | "low";
+  evidence: {
+    repeat_work_orders: number;
+    repeat_period_months: number;
+    alarm_frequency: Record<string, number>;
+    asset_age_years: number;
+    expected_life_years: number;
+    technician_notes: string[];
+    latest_reading: {
+      parameter: string;
+      value: number;
+      baseline: number;
+      threshold: number;
+      trend: string;
+    };
+  };
+  contributing_factors: Array<{
+    factor: string;
+    weight: number;
+    description: string;
+  }>;
+  similar_failures: Array<{
+    site: string;
+    equipment: string;
+    failure_date: string;
+    common_factors: string[];
+  }>;
+  financial_impact: {
+    repair_cost_zar: number;
+    replacement_cost_zar: number;
+    downtime_cost_per_hour_zar: number;
+    estimated_repair_hours: number;
+    potential_loss_zar: number;
+  };
+  recommended_action: string;
+  parts_required: string[];
+  urgency: string;
+}
+
+// Predictions response interface
+export interface PredictionsResponse {
+  total: number;
+  avg_probability: number;
+  total_repair_cost_zar: number;
+  total_potential_loss_zar: number;
+  potential_savings_zar: number;
+  by_severity: Record<string, number>;
+  by_equipment_type: Record<string, number>;
+  predictions: Prediction[];
+}
+
 /**
  * Generic fetch wrapper with error handling
  */
@@ -259,6 +323,46 @@ export const api = {
     }
     params.append("days", days.toString());
     return fetchApi<EnergyResponse>(`/api/energy?${params.toString()}`);
+  },
+
+  /**
+   * Get AI-driven failure predictions
+   * @param siteId - Optional site ID filter
+   * @param equipmentType - Optional equipment type filter
+   * @param severity - Optional severity filter
+   * @param minProbability - Optional minimum probability filter
+   */
+  async getPredictions(
+    siteId?: string,
+    equipmentType?: string,
+    severity?: string,
+    minProbability?: number
+  ): Promise<PredictionsResponse> {
+    const params = new URLSearchParams();
+    if (siteId) {
+      params.append("site_id", siteId);
+    }
+    if (equipmentType) {
+      params.append("equipment_type", equipmentType);
+    }
+    if (severity) {
+      params.append("severity", severity);
+    }
+    if (minProbability !== undefined) {
+      params.append("min_probability", minProbability.toString());
+    }
+    const queryString = params.toString();
+    return fetchApi<PredictionsResponse>(
+      `/api/predictions${queryString ? `?${queryString}` : ""}`
+    );
+  },
+
+  /**
+   * Get single prediction detail by ID
+   * @param predictionId - Prediction ID
+   */
+  async getPrediction(predictionId: string): Promise<Prediction> {
+    return fetchApi<Prediction>(`/api/predictions/${predictionId}`);
   },
 };
 
