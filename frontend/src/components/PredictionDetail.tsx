@@ -169,9 +169,19 @@ export function PredictionDetail({
 
   return (
     <Dialog open={isOpen} onClose={onClose} className="z-50">
-      <DialogPanel className="max-w-5xl max-h-[90vh] overflow-y-auto">
+      <DialogPanel className="w-full h-full md:w-2/3 md:h-auto md:max-w-5xl md:max-h-[90vh] md:overflow-y-auto">
+        {/* Mobile close button */}
+        <div className="md:hidden fixed top-4 right-4 z-50">
+          <Button
+            variant="light"
+            icon={X}
+            onClick={onClose}
+            className="bg-white shadow-lg"
+          />
+        </div>
+
         {/* Header */}
-        <Flex justifyContent="between" alignItems="start" className="mb-4">
+        <Flex justifyContent="between" alignItems="start" className="mb-4 pr-12 md:pr-0">
           <div>
             <DialogTitle className="text-2xl font-bold text-gray-900 mb-2">
               Failure Prediction Details
@@ -199,7 +209,7 @@ export function PredictionDetail({
         <Divider />
 
         {/* Probability & Timeframe */}
-        <Grid numCols={3} className="gap-4 mt-4 mb-6">
+        <Grid numItems={1} numItemsSm={2} numItemsMd={3} className="gap-4 mt-4 mb-6">
           <Col>
             <Card>
               <Metric>{prediction.probability_percent}%</Metric>
@@ -325,7 +335,7 @@ export function PredictionDetail({
         )}
 
         {/* Evidence Details */}
-        <Grid numCols={2} className="gap-4 mb-6">
+        <Grid numItems={1} numItemsMd={2} className="gap-4 mb-6">
           {/* Latest Reading */}
           <Col>
             <Title className="text-lg font-semibold text-gray-900 mb-3">
@@ -516,7 +526,7 @@ export function PredictionDetail({
           Financial Impact Analysis
         </Title>
         <Card className="mb-6">
-          <Grid numCols={2} className="gap-4">
+          <Grid numItems={1} numItemsSm={2} numItemsMd={2} className="gap-4">
             <Col>
               <Metric>{formatZAR(prediction.financial_impact.repair_cost_zar)}</Metric>
               <Text className="text-gray-500">Repair Cost</Text>
