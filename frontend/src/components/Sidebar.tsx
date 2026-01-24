@@ -71,6 +71,7 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
           transform transition-transform duration-200 ease-in-out
           ${isMobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
           flex flex-col
+          shadow-xl md:shadow-none
         `}
       >
         {/* Logo area - hidden on mobile when header is visible */}
