@@ -170,6 +170,9 @@ export function AlertFeed({
       <Flex justifyContent="between" alignItems="center" className="mb-4">
         <div className="flex items-center gap-2">
           <Title>Recent Alerts</Title>
+          {loading && alerts.length > 0 && (
+            <Text className="text-xs text-gray-400 animate-pulse">Refreshing...</Text>
+          )}
           {criticalCount > 0 && (
             <Badge color="red" size="sm">
               {criticalCount} critical
