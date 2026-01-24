@@ -176,6 +176,79 @@ class FMContextService:
 
         return "\n".join(lines)
 
+    def get_predictions_context(self) -> str:
+        """
+        Get formatted AI failure predictions context for Claude.
+
+        Returns:
+            Markdown-formatted prediction information with explainability.
+        """
+        predictions = load_json("predictions.json")
+
+        if not predictions:
+            return "No AI failure predictions available."
+
+        # Sort by probability (highest first)
+        predictions.sort(key=lambda p: p.get("probability_percent", 0), reverse=True)
+
+        lines = ["| Prediction ID | Site | Equipment | Type | Probability | Timeframe | Severity |"]
+        lines.append("|---------------|------|-----------|------|-------------|----------|----------|")
+
+        for pred in predictions:
+            site_name = pred.get("site_name", "Unknown")
+            eq_name = pred.get("equipment_name", "Unknown")
+            prob = pred.get("probability_percent", 0)
+            timeframe = f"{pred.get('timeframe_days', 0)} days"
+            severity = pred.get("severity", "unknown").upper()
+            lines.append(
+                f"| {pred['id']} | {site_name[:15]} | {eq_name} | "
+                f"{pred['prediction_type']} | **{prob}%** | {timeframe} | **{severity}** |"
+            )
+
+        # Add detailed explainability for each prediction
+        lines.append("\n### Prediction Details (High Probability Only)")
+        lines.append("")
+
+        for pred in predictions:
+            if pred.get("probability_percent", 0) < 70:
+                continue
+
+            lines.append(f"#### {pred['id']}: {pred['equipment_name']} at {pred['site_name']}")
+            lines.append(f"**Prediction:** {pred['prediction_type'].replace('_', ' ').title()}")
+            lines.append(f"**Probability:** {pred['probability_percent']}% ({pred['confidence']} confidence)")
+            lines.append(f"**Predicted Failure:** {pred['predicted_failure_date']}")
+
+            # Evidence summary
+            evidence = pred.get("evidence", {})
+            lines.append(f"**Evidence:**")
+            lines.append(f"- Repeat work orders: {evidence.get('repeat_work_orders', 0)} in {evidence.get('repeat_period_months', 0)} months")
+            lines.append(f"- Asset age: {evidence.get('asset_age_years', 0)} years (expected life: {evidence.get('expected_life_years', 0)} years)")
+
+            # Top contributing factors
+            lines.append(f"**Top Contributing Factors:**")
+            factors = pred.get("contributing_factors", [])[:3]
+            for factor in factors:
+                weight_pct = int(factor.get("weight", 0) * 100)
+                lines.append(f"- {factor['factor']} ({weight_pct}%): {factor['description']}")
+
+            # Financial impact
+            financial = pred.get("financial_impact", {})
+            lines.append(f"**Financial Impact:**")
+            lines.append(f"- Repair cost: R{financial.get('repair_cost_zar', 0):,.0f}")
+            lines.append(f"- Potential loss: R{financial.get('potential_loss_zar', 0):,.0f}")
+            lines.append(f"- Potential savings: R{financial.get('potential_loss_zar', 0) - financial.get('repair_cost_zar', 0):,.0f}")
+
+            # Similar failures
+            similar = pred.get("similar_failures", [])
+            if similar:
+                lines.append(f"**Similar Historical Failures:**")
+                for fail in similar[:2]:
+                    lines.append(f"- {fail['site']} {fail['equipment']} (failed {fail['failure_date']})")
+
+            lines.append("")
+
+        return "\n".join(lines)
+
     def get_full_context(self) -> str:
         """
         Get complete building context for Claude system prompt.
@@ -193,6 +266,8 @@ class FMContextService:
             self.get_alerts_context(),
             "\n### Predicted Issues (Anomalies)\n",
             self.get_anomalies_context(),
+            "\n### AI Failure Predictions\n",
+            self.get_predictions_context(),
         ]
 
         return "\n".join(sections)
