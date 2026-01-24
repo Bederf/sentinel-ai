@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config.settings import settings
-from app.api import health, sites, equipment, sensors, alerts
+from app.api import health, sites, equipment, sensors, alerts, stats
 
 app = FastAPI(
     title=settings.app_name,
@@ -27,6 +27,7 @@ app.include_router(sites.router, prefix="/api", tags=["sites"])
 app.include_router(equipment.router, prefix="/api", tags=["equipment"])
 app.include_router(sensors.router, prefix="/api", tags=["sensors"])
 app.include_router(alerts.router, prefix="/api", tags=["alerts"])
+app.include_router(stats.router, prefix="/api", tags=["stats"])
 
 
 @app.get("/")
