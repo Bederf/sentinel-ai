@@ -131,10 +131,9 @@ export function Chat() {
         {isLoading && !streamingContent && (
           <div className="flex justify-start mb-4">
             <div className="bg-gray-100 rounded-lg px-4 py-3 rounded-bl-sm">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+              <div className="flex items-center gap-2 text-gray-600">
+                <div className="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                <span className="text-sm">AI is thinking...</span>
               </div>
             </div>
           </div>
