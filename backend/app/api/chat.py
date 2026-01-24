@@ -8,6 +8,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from app.services.claude_service import claude_service
+from app.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -96,5 +97,5 @@ async def chat_status():
     """Check if the chat service is configured and available."""
     return {
         "configured": claude_service.is_configured(),
-        "model": "claude-3-5-sonnet-20241022",
+        "model": settings.claude_model,
     }
