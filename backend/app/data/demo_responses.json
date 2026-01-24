@@ -1,0 +1,44 @@
+{
+  "responses": [
+    {
+      "query_pattern": "Gateway Chiller status",
+      "response": "**Gateway Chiller-CH-1 has a 95% probability of compressor failure** within 2-4 weeks.\n\n**Contributing Factors:**\n• **Repeat fault calls** (35%): 3 work orders in 6 months for same fault code (FC-2201)\n• **Technician observations** (30%): Progressive bearing wear documented across 3 service visits\n• **Asset age** (20%): 10 years old, approaching end of reliable service life (15 years)\n• **Alarm pattern** (15%): Increasing frequency of high pressure/temp alarms\n\n**Latest Reading:** Vibration at 4.2 mm/s vs 2.1 mm/s baseline (+100% increase, threshold: 5.0 mm/s)\n\n**Recommended Action:** Schedule compressor replacement within 14 days. Order York YLAA compressor assembly (part# YLAA-CMP-220).\n\nSources: [FNB Sandton City CH-1], [Work Order FC-2201], [Technician Notes 2025-08-15, 2025-10-20, 2025-12-05]",
+      "citations": ["FNB Sandton City CH-1", "Work Order FC-2201", "Technician Notes 2025-08-15"]
+    },
+    {
+      "query_pattern": "Why is Gateway Chiller flagged",
+      "response": "**Gateway Chiller-CH-1 is flagged for critical failure risk** due to multiple warning signs:\n\n**Primary Concerns:**\n1. **Repeat Work Orders**: 3 instances in 6 months - unresolved bearing issue (FC-2201)\n2. **Technician Documentation**:\n   - Aug 2025: \"Bearings showing wear, vibration increasing\"\n   - Oct 2025: \"Compressor noise elevated - recommend monitoring\"\n   - Dec 2025: \"Vibration levels at upper threshold - schedule replacement\"\n\n3. **Vibration Trend**: +100% increase over baseline (4.2 vs 2.1 mm/s)\n4. **Asset Age**: 10 years old vs 15-year expected life (67% through lifespan)\n\n**Probability Breakdown:**\n• Repeat fault calls: 35% weight\n• Technician observations: 30% weight\n• Asset age: 20% weight\n• Alarm patterns: 15% weight\n\n**AI Assessment**: \"This equipment exhibits classic pre-failure indicators. Based on similar equipment patterns, Gateway Chiller has approximately 21 days before critical failure if action isn't taken.\"\n\nSources: [FNB Sandton City CH-1], [Prediction pred-001], [Historical Work Orders]",
+      "citations": ["FNB Sandton City CH-1", "Prediction pred-001", "Historical Work Orders"]
+    },
+    {
+      "query_pattern": "cost impact Gateway",
+      "response": "**Cost Analysis for Gateway Chiller-CH-1:**\n\n**💥 If Failure Occurs: R65,000**\n• Emergency parts: R35,000 (50% premium after hours)\n• Overtime labor: R15,000\n• Downtime impact: R10,000\n• Secondary damage risk: R5,000\n\n**🔧 Preventive Action: R28,000**\n• Scheduled parts: R18,000\n• Planned labor: R8,000\n• Minor downtime: R2,000\n\n**✅ POTENTIAL SAVINGS: R37,000 (57% reduction)**\n\n**Context:** Emergency compressor replacement during mall hours vs scheduled maintenance. Emergency parts carry 50% premium, overtime labor rates apply, and downtime risks SLA penalties.\n\n**ROI:** Every R1 spent on prevention saves R2.32 in failure costs.\n\nSource: [Gateway Chiller Cost Impact Analysis pred-001]",
+      "citations": ["Gateway Chiller Cost Impact Analysis pred-001"]
+    },
+    {
+      "query_pattern": "similar failures Gateway",
+      "response": "**Cross-Site Pattern Detection:**\n\nGateway Chiller's failure pattern matches historical failures at **2 other sites**:\n\n**1. Centurion Mall AHU-002** - ❌ FAILED Jan 2026\n• Lead time: 175 days from first warning to failure\n• Common factors: High vibration, asset age >20 years\n• **Missed savings opportunity**: R45,000\n\n**2. East Rand Mall CH-3** - ❌ FAILED Nov 2025\n• Lead time: 148 days from first warning to failure\n• Common factors: Bearing wear progression, high head pressure history, technician noted similar noise\n• **Actual failure cost**: R67,000\n\n**🎯 AI Insight**: \"Gateway Chiller shows the same early warning pattern as Centurion and East Rand failures. Based on their timelines, Gateway has approximately **21 days** before critical failure if action isn't taken.\"\n\n**Portfolio-Wide Learning**: The AI system learns from every failure across 15 FNB sites to predict and prevent similar failures.\n\nSources: [Centurion Mall AHU-002], [East Rand Mall CH-3], [Gateway Chiller pred-001]",
+      "citations": ["Centurion Mall AHU-002", "East Rand Mall CH-3", "Gateway Chiller pred-001"]
+    },
+    {
+      "query_pattern": "Which sites have alerts",
+      "response": "**Current Portfolio Status - 5 Sites with AI Predictions:**\n\n**🔴 CRITICAL (95% probability)**\n• **FNB Sandton City** - Gateway Chiller CH-1\n  Compressor failure risk - 21 days to act\n  Savings: R37,000 if preventive action taken\n\n**🟠 HIGH RISK (78-82% probability)**\n• **FNB Canal Walk** - Chiller CH-1\n  Refrigerant leak failure - 45 days\n  Savings: R27,000\n\n• **FNB Pavilion** - Generator GEN-1\n  Starting failure risk - 36 days\n  Savings: R80,000 (critical backup power)\n\n**🟡 MEDIUM RISK (67-71% probability)**\n• **FNB Tygervalley** - Split AC-1\n  Compressor burnout risk - 86 days\n  Savings: R6,000\n\n• **FNB Gateway** - BMS Controller BMS-1\n  Controller failure risk - 71 days\n  Savings: R35,000\n\n**💰 Total Portfolio Savings Opportunity: R185,000**\n\n**AI monitors**: 15 sites, 130 equipment items, 260 sensors continuously\n\nSource: [AI Predictions Dashboard]",
+      "citations": ["AI Predictions Dashboard"]
+    },
+    {
+      "query_pattern": "Create a work order",
+      "response": "I can help you create a work order. To generate the work order, I need a few details:\n\n**Required Information:**\n• Which equipment needs attention? (e.g., \"Gateway Chiller CH-1\")\n• What's the issue or maintenance needed?\n• Priority level? (low/medium/high/critical)\n\n**Example formats:**\n• \"Create work order for Gateway Chiller CH-1 - replace compressor bearings\"\n• \"Work order for Sandton AHU-5 - high vibration alarm\"\n• \"Urgent work order for Pavilion Generator - failed start test\"\n\nOnce you provide these details, I'll generate a work order with:\n✅ Unique work order ID\n✅ Auto-generated priority based on equipment risk\n✅ Site and equipment reference\n✅ Creation timestamp\n\nWhat equipment would you like to create a work order for?",
+      "citations": []
+    },
+    {
+      "query_pattern": "portfolio savings",
+      "response": "**Portfolio-Wide Savings Opportunity: R185,000**\n\n**Breakdown by Site:**\n\n1. **FNB Pavilion** - Generator GEN-1: **R80,000** (82% probability)\n   Prevents backup power failure during outage\n\n2. **FNB Sandton City** - Gateway Chiller CH-1: **R37,000** (95% probability)\n   Avoids emergency compressor replacement\n\n3. **FNB Canal Walk** - Chiller CH-1: **R27,000** (78% probability)\n   Leak detection vs full system failure\n\n4. **FNB Gateway** - BMS Controller BMS-1: **R35,000** (71% probability)\n   Planned upgrade vs emergency replacement\n\n5. **FNB Tygervalley** - Split AC-1: **R6,000** (67% probability)\n   Prevent compressor burnout\n\n**📊 Portfolio Metrics:**\n• Total Failure Costs if Unaddressed: R312,000\n• Total Preventive Costs: R127,000\n• **Net Savings: R185,000 (59% reduction)**\n\n**AI Value Proposition**: \"By analyzing historical work orders, alarm patterns, and technician notes across 15 sites, the AI identifies failures 21-86 days in advance, enabling planned maintenance at 40% of emergency failure costs.\"\n\nSource: [Portfolio Cost Analysis]",
+      "citations": ["Portfolio Cost Analysis"]
+    },
+    {
+      "query_pattern": "help",
+      "response": "**AI Building Management Assistant - Help**\n\nI can help you with:\n\n**📊 Portfolio Overview**\n• \"Which sites have alerts?\" - See all 5 sites with predictions\n• \"What's the portfolio savings?\" - Total R185K savings opportunity\n\n**🔍 Equipment Status**\n• \"What's the status of [Site] [Equipment]?\" - Get detailed prediction\n• \"Why is [Equipment] flagged?\" - Understand contributing factors\n\n**💰 Cost Analysis**\n• \"What's the cost impact?\" - Compare failure vs preventive costs\n• \"Show me similar failures\" - Cross-site pattern detection\n\n**🛠️ Actions**\n• \"Create work order for [Equipment]\" - Generate maintenance requests\n• \"Set [Site] temperature to [X]\" - Adjust building controls\n\n**Examples:**\n• \"Gateway Chiller status\"\n• \"Why is Gateway Chiller flagged?\"\n• \"Cost impact for Gateway Chiller\"\n• \"Show me similar failures to Gateway\"\n• \"Which sites have alerts?\"\n• \"Create work order for Sandton Chiller\"\n\n**Data Sources**: 15 sites, 130 equipment items, 260 sensors, historical work orders, technician notes\n\nWhat would you like to know?",
+      "citations": []
+    }
+  ]
+}
