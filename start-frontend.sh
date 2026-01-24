@@ -9,5 +9,5 @@ if [ ! -d "node_modules" ]; then
     npm install
 fi
 
-echo "Starting frontend on http://localhost:9091"
-npm run dev -- --host 0.0.0.0 --port 9091
+echo "Starting frontend on http://localhost:9096"
+npm run dev -- --host 0.0.0.0 --port 9096

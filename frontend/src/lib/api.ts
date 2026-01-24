@@ -2,7 +2,7 @@
  * API Client for BMS Intelligence Backend
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:9090";
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:9095";
 
 interface HealthResponse {
   status: string;
