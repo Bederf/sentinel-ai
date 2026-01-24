@@ -45,6 +45,7 @@ import { SiteSelector } from "./SiteSelector";
 import { EnergyChart } from "./EnergyChart";
 import { PredictionCard } from "./PredictionCard";
 import { PredictionDetail } from "./PredictionDetail";
+import { LoadingCard } from "./LoadingCard";
 
 // Time period options for energy chart
 const TIME_PERIODS = [7, 30, 90] as const;
@@ -185,50 +186,63 @@ export function Dashboard() {
 
       {/* KPI Row - DASH-04 */}
       <Grid numItems={1} numItemsSm={2} numItemsLg={5} className="gap-4 mb-6">
-        <Col>
-          <KPICard
-            title="Total Sites"
-            value={stats?.total_sites ?? 0}
-            icon={<Building2 className="h-6 w-6 text-bidvest-blue-600" />}
-            subtitle={`${normalSites} healthy, ${warningSites} warning`}
-          />
-        </Col>
-        <Col>
-          <KPICard
-            title="Equipment"
-            value={stats?.total_equipment ?? 0}
-            icon={<Cpu className="h-6 w-6 text-bidvest-blue-600" />}
-            delta={stats?.uptime_percent ? stats.uptime_percent - 95 : 0}
-            deltaText="vs 95% target"
-          />
-        </Col>
-        <Col>
-          <KPICard
-            title="Active Alerts"
-            value={stats?.active_alerts ?? 0}
-            icon={<Bell className="h-6 w-6 text-amber-500" />}
-            delta={stats?.critical_alerts ? -(stats.critical_alerts * 10) : 0}
-            isInverseTrend={true}
-            deltaText={`${stats?.critical_alerts ?? 0} critical`}
-          />
-        </Col>
-        <Col>
-          <KPICard
-            title="Potential Savings"
-            value={formatZAR(totalPotentialSavings)}
-            icon={<DollarSign className="h-6 w-6 text-emerald-600" />}
-            subtitle="If all preventive actions taken"
-            tooltip="Total savings if all preventive maintenance actions are completed"
-          />
-        </Col>
-        <Col>
-          <KPICard
-            title="AI Predictions"
-            value={predictions.length}
-            icon={<TrendingUp className="h-6 w-6 text-purple-500" />}
-            subtitle="Failure predictions detected"
-          />
-        </Col>
+        {!stats ? (
+          // Loading skeletons for KPI cards
+          <>
+            {[1, 2, 3, 4, 5].map((i) => (
+              <Col key={i}>
+                <LoadingCard height="h-24" />
+              </Col>
+            ))}
+          </>
+        ) : (
+          <>
+            <Col>
+              <KPICard
+                title="Total Sites"
+                value={stats.total_sites}
+                icon={<Building2 className="h-6 w-6 text-bidvest-blue-600" />}
+                subtitle={`${normalSites} healthy, ${warningSites} warning`}
+              />
+            </Col>
+            <Col>
+              <KPICard
+                title="Equipment"
+                value={stats.total_equipment}
+                icon={<Cpu className="h-6 w-6 text-bidvest-blue-600" />}
+                delta={stats.uptime_percent ? stats.uptime_percent - 95 : 0}
+                deltaText="vs 95% target"
+              />
+            </Col>
+            <Col>
+              <KPICard
+                title="Active Alerts"
+                value={stats.active_alerts}
+                icon={<Bell className="h-6 w-6 text-amber-500" />}
+                delta={stats.critical_alerts ? -(stats.critical_alerts * 10) : 0}
+                isInverseTrend={true}
+                deltaText={`${stats.critical_alerts} critical`}
+              />
+            </Col>
+            <Col>
+              <KPICard
+                title="Potential Savings"
+                value={formatZAR(totalPotentialSavings)}
+                icon={<DollarSign className="h-6 w-6 text-emerald-600" />}
+                subtitle="If all preventive actions taken"
+                tooltip="Total savings if all preventive maintenance actions are completed"
+              />
+            </Col>
+            <Col>
+              <KPICard
+                title="AI Predictions"
+                value={predictions.length}
+                icon={<TrendingUp className="h-6 w-6 text-purple-500" />}
+                subtitle="Failure predictions detected"
+              />
+            </Col>
+          </>
+        )}
       </Grid>
 
       {/* Main Content Grid - Two Columns */}
@@ -238,12 +252,23 @@ export function Dashboard() {
           <Card className="h-full">
             <Flex justifyContent="between" alignItems="center" className="mb-4">
               <Title>Site Overview</Title>
-              <Badge color="blue" size="sm">
-                {sites.length} sites
-              </Badge>
+              {sites.length > 0 && (
+                <Badge color="blue" size="sm">
+                  {sites.length} sites
+                </Badge>
+              )}
             </Flex>
 
-            {sites.length === 0 ? (
+            {sites.length === 0 && loading ? (
+              // Loading skeletons for sites
+              <Grid numItems={1} numItemsMd={2} numItemsLg={3} className="gap-4">
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <Col key={i}>
+                    <LoadingCard height="h-32" />
+                  </Col>
+                ))}
+              </Grid>
+            ) : sites.length === 0 ? (
               <div className="text-center py-8">
                 <Building2 className="h-12 w-12 text-gray-300 mx-auto mb-2" />
                 <Text className="text-gray-500">No sites available</Text>
@@ -321,7 +346,16 @@ export function Dashboard() {
             )}
           </Flex>
           <div>
-            {predictions.length === 0 ? (
+            {predictions.length === 0 && loading ? (
+              // Loading skeletons for predictions
+              <Grid numItems={1} numItemsMd={2} numItemsLg={3} className="gap-4">
+                {[1, 2, 3].map((i) => (
+                  <Col key={i}>
+                    <LoadingCard height="h-40" />
+                  </Col>
+                ))}
+              </Grid>
+            ) : predictions.length === 0 ? (
               <div className="text-center py-8">
                 <TrendingUp className="h-12 w-12 text-gray-300 mx-auto mb-2" />
                 <Text className="text-gray-500">No failure predictions</Text>
