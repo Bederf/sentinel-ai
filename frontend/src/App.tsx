@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { Card, Title, Text, Badge } from "@tremor/react";
+import { Badge } from "@tremor/react";
 import { Building2, Activity } from "lucide-react";
 import api from "./lib/api";
+import { Chat } from "./components/Chat";
 
 interface HealthStatus {
   status: string;
@@ -31,66 +32,44 @@ function App() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <div className="max-w-4xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center gap-3 mb-8">
-          <Building2 className="h-10 w-10 text-bidvest-blue-600" />
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">
-              BMS Intelligence
-            </h1>
-            <p className="text-gray-500">
-              Building Management System Intelligence Platform
-            </p>
-          </div>
-        </div>
-
-        {/* Status Card */}
-        <Card className="mb-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Activity className="h-5 w-5 text-gray-500" />
-              <Title>System Status</Title>
+    <div className="h-screen flex flex-col bg-gray-50">
+      {/* Header - Fixed height */}
+      <header className="flex-none bg-white border-b border-gray-200 px-6 py-4">
+        <div className="flex items-center justify-between max-w-7xl mx-auto">
+          <div className="flex items-center gap-3">
+            <Building2 className="h-8 w-8 text-bidvest-blue-600" />
+            <div>
+              <h1 className="text-xl font-bold text-gray-900">
+                BMS Intelligence
+              </h1>
+              <p className="text-sm text-gray-500">
+                FM Assistant
+              </p>
             </div>
+          </div>
+
+          {/* Status indicator */}
+          <div className="flex items-center gap-2">
+            <Activity className="h-4 w-4 text-gray-400" />
             {loading ? (
-              <Badge color="gray">Checking...</Badge>
+              <Badge color="gray" size="sm">Checking...</Badge>
             ) : error ? (
-              <Badge color="red">Offline</Badge>
+              <Badge color="red" size="sm">Offline</Badge>
             ) : (
-              <Badge color="green">Online</Badge>
+              <Badge color="green" size="sm">
+                {health?.status} v{health?.version}
+              </Badge>
             )}
           </div>
+        </div>
+      </header>
 
-          {!loading && (
-            <div className="mt-4">
-              {error ? (
-                <Text className="text-red-600">{error}</Text>
-              ) : (
-                <div className="space-y-2">
-                  <Text>
-                    <span className="font-medium">Status:</span>{" "}
-                    {health?.status}
-                  </Text>
-                  <Text>
-                    <span className="font-medium">Version:</span>{" "}
-                    {health?.version}
-                  </Text>
-                </div>
-              )}
-            </div>
-          )}
-        </Card>
-
-        {/* Placeholder for future content */}
-        <Card>
-          <Title>Dashboard</Title>
-          <Text className="mt-2">
-            Building data and AI chat features will be added in subsequent
-            phases.
-          </Text>
-        </Card>
-      </div>
+      {/* Chat area - Takes remaining space */}
+      <main className="flex-1 overflow-hidden p-4 md:p-6">
+        <div className="h-full max-w-4xl mx-auto">
+          <Chat />
+        </div>
+      </main>
     </div>
   );
 }
