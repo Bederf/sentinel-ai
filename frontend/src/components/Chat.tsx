@@ -8,7 +8,8 @@
  * - Loading state during AI response
  */
 
-import { useState, useRef, useEffect, FormEvent, KeyboardEvent } from "react";
+import { useState, useRef, useEffect } from "react";
+import type { FormEvent, KeyboardEvent } from "react";
 import { Send } from "lucide-react";
 import { ChatMessage } from "./ChatMessage";
 import { streamChat } from "../lib/api";
@@ -34,7 +35,7 @@ export function Chat() {
   }, [messages, streamingContent]);
 
   // Generate unique ID for messages
-  const generateId = () => \`msg-\${Date.now()}-\${Math.random().toString(36).slice(2, 9)}\`;
+  const generateId = () => `msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
   // Handle form submission
   const handleSubmit = async (e: FormEvent) => {
