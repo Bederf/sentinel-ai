@@ -1,14 +1,14 @@
 /**
- * SiteCard Component - Grafana-inspired site panel
+ * SiteCard Component - SENTINEL site panel
  *
  * Displays:
- * - Site name with status indicator dot
+ * - Site name with protection status indicator
  * - Location and type information
  * - Equipment count metric
- * - Alert count with severity coloring
+ * - Risk alerts with severity coloring
  * - Status-based left border accent
  *
- * Follows Grafana panel design with dark theme.
+ * Follows SENTINEL dark theme design.
  */
 
 import { Building2, Cpu, AlertTriangle, MapPin } from "lucide-react";
@@ -20,7 +20,7 @@ interface SiteCardProps {
 }
 
 /**
- * Get status colors for Grafana theme
+ * Get status colors for SENTINEL theme
  */
 function getStatusConfig(status: Site["status"]): {
   color: string;
@@ -31,28 +31,28 @@ function getStatusConfig(status: Site["status"]): {
   switch (status) {
     case "normal":
       return {
-        color: "var(--color-status-success)",
-        bg: "rgba(115, 191, 105, 0.15)",
-        border: "rgba(115, 191, 105, 0.5)",
-        label: "Healthy",
+        color: "var(--color-sentinel-green)",
+        bg: "rgba(16, 185, 129, 0.15)",
+        border: "rgba(16, 185, 129, 0.5)",
+        label: "Protected",
       };
     case "warning":
       return {
-        color: "var(--color-status-warning)",
-        bg: "rgba(255, 152, 48, 0.15)",
-        border: "rgba(255, 152, 48, 0.5)",
-        label: "Warning",
+        color: "var(--color-sentinel-amber)",
+        bg: "rgba(245, 158, 11, 0.15)",
+        border: "rgba(245, 158, 11, 0.5)",
+        label: "Elevated",
       };
     case "critical":
       return {
-        color: "var(--color-status-error)",
-        bg: "rgba(242, 73, 92, 0.15)",
-        border: "rgba(242, 73, 92, 0.5)",
+        color: "var(--color-sentinel-red)",
+        bg: "rgba(220, 38, 38, 0.15)",
+        border: "rgba(220, 38, 38, 0.5)",
         label: "Critical",
       };
     default:
       return {
-        color: "var(--color-grafana-text-secondary)",
+        color: "var(--color-sentinel-text-secondary)",
         bg: "rgba(142, 142, 142, 0.15)",
         border: "rgba(142, 142, 142, 0.5)",
         label: "Unknown",
@@ -72,10 +72,10 @@ export function SiteCard({ site, onClick }: SiteCardProps) {
 
   return (
     <div
-      className={`relative rounded overflow-hidden transition-all duration-150 ${onClick ? "cursor-pointer hover:brightness-110" : ""}`}
+      className={`relative rounded-md overflow-hidden transition-all duration-150 ${onClick ? "cursor-pointer hover:brightness-110" : ""}`}
       style={{
-        background: "var(--color-grafana-bg-panel)",
-        border: "1px solid var(--color-grafana-border)",
+        background: "var(--color-sentinel-bg-panel)",
+        border: "1px solid var(--color-sentinel-border)",
       }}
       onClick={handleClick}
     >
@@ -91,11 +91,11 @@ export function SiteCard({ site, onClick }: SiteCardProps) {
           <div className="flex items-center gap-2">
             <Building2
               className="h-4 w-4"
-              style={{ color: "var(--color-grafana-blue)" }}
+              style={{ color: "var(--color-sentinel-blue)" }}
             />
             <span
               className="font-medium text-sm"
-              style={{ color: "var(--color-grafana-text-primary)" }}
+              style={{ color: "var(--color-sentinel-text-primary)" }}
             >
               {site.name}
             </span>
@@ -120,11 +120,11 @@ export function SiteCard({ site, onClick }: SiteCardProps) {
         <div className="flex items-center gap-1.5 mb-3">
           <MapPin
             className="h-3 w-3"
-            style={{ color: "var(--color-grafana-text-disabled)" }}
+            style={{ color: "var(--color-sentinel-text-disabled)" }}
           />
           <span
             className="text-xs"
-            style={{ color: "var(--color-grafana-text-secondary)" }}
+            style={{ color: "var(--color-sentinel-text-secondary)" }}
           >
             {site.location}
           </span>
@@ -134,9 +134,9 @@ export function SiteCard({ site, onClick }: SiteCardProps) {
         <div
           className="inline-block px-2 py-0.5 rounded text-xs mb-3"
           style={{
-            background: "var(--color-grafana-bg-secondary)",
-            color: "var(--color-grafana-text-secondary)",
-            border: "1px solid var(--color-grafana-border)",
+            background: "var(--color-sentinel-bg-secondary)",
+            color: "var(--color-sentinel-text-secondary)",
+            border: "1px solid var(--color-sentinel-border)",
           }}
         >
           {site.type}
@@ -145,19 +145,19 @@ export function SiteCard({ site, onClick }: SiteCardProps) {
         {/* Stats Row */}
         <div
           className="flex items-center justify-between pt-3"
-          style={{ borderTop: "1px solid var(--color-grafana-border)" }}
+          style={{ borderTop: "1px solid var(--color-sentinel-border)" }}
         >
           {/* Equipment Count */}
           <div className="flex items-center gap-2">
             <Cpu
               className="h-4 w-4"
-              style={{ color: "var(--color-grafana-cyan)" }}
+              style={{ color: "var(--color-sentinel-blue)" }}
             />
             <div>
               <div
                 className="text-lg font-medium"
                 style={{
-                  color: "var(--color-grafana-text-primary)",
+                  color: "var(--color-sentinel-text-primary)",
                   fontVariantNumeric: "tabular-nums",
                 }}
               >
@@ -165,30 +165,30 @@ export function SiteCard({ site, onClick }: SiteCardProps) {
               </div>
               <div
                 className="text-xs"
-                style={{ color: "var(--color-grafana-text-disabled)" }}
+                style={{ color: "var(--color-sentinel-text-disabled)" }}
               >
-                Equipment
+                Assets
               </div>
             </div>
           </div>
 
-          {/* Alert Count */}
+          {/* Risk Alert Count */}
           <div className="flex items-center gap-2">
             <AlertTriangle
               className="h-4 w-4"
               style={{
                 color: hasAlerts
-                  ? "var(--color-status-warning)"
-                  : "var(--color-grafana-text-disabled)",
+                  ? "var(--color-sentinel-amber)"
+                  : "var(--color-sentinel-text-disabled)",
               }}
             />
             <div className="text-right">
               <div
-                className={`text-lg font-medium ${hasAlerts ? "" : ""}`}
+                className="text-lg font-medium"
                 style={{
                   color: hasAlerts
-                    ? "var(--color-status-warning)"
-                    : "var(--color-grafana-text-primary)",
+                    ? "var(--color-sentinel-amber)"
+                    : "var(--color-sentinel-text-primary)",
                   fontVariantNumeric: "tabular-nums",
                 }}
               >
@@ -196,9 +196,9 @@ export function SiteCard({ site, onClick }: SiteCardProps) {
               </div>
               <div
                 className="text-xs"
-                style={{ color: "var(--color-grafana-text-disabled)" }}
+                style={{ color: "var(--color-sentinel-text-disabled)" }}
               >
-                Alerts
+                Risks
               </div>
             </div>
           </div>

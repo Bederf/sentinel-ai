@@ -1,14 +1,14 @@
 /**
- * PredictionCard Component - Grafana-inspired prediction panel
+ * PredictionCard Component - SENTINEL risk prediction panel
  *
  * Features:
- * - Gauge-style probability indicator
+ * - Gauge-style risk probability indicator
  * - Asset and site context
- * - Timeframe and severity badges
+ * - Timeframe and risk level badges
  * - Evidence metrics preview
  * - Clickable for full details
  *
- * Follows Grafana gauge panel design with dark theme.
+ * Follows SENTINEL dark theme design.
  */
 
 import {
@@ -41,7 +41,7 @@ interface PredictionCardProps {
 }
 
 /**
- * Get severity configuration for Grafana styling
+ * Get risk level configuration for SENTINEL styling
  */
 function getSeverityConfig(severity: string): {
   color: string;
@@ -51,31 +51,31 @@ function getSeverityConfig(severity: string): {
   switch (severity) {
     case "critical":
       return {
-        color: "var(--color-status-error)",
-        bg: "rgba(242, 73, 92, 0.15)",
+        color: "var(--color-sentinel-red)",
+        bg: "rgba(220, 38, 38, 0.15)",
         label: "CRITICAL",
       };
     case "high":
       return {
-        color: "var(--color-status-warning)",
-        bg: "rgba(255, 152, 48, 0.15)",
-        label: "HIGH",
+        color: "#F97316",
+        bg: "rgba(249, 115, 22, 0.15)",
+        label: "HIGH RISK",
       };
     case "medium":
       return {
-        color: "var(--color-grafana-yellow)",
-        bg: "rgba(242, 204, 12, 0.15)",
-        label: "MEDIUM",
+        color: "var(--color-sentinel-amber)",
+        bg: "rgba(245, 158, 11, 0.15)",
+        label: "ELEVATED",
       };
     case "low":
       return {
-        color: "var(--color-grafana-blue)",
-        bg: "rgba(50, 116, 217, 0.15)",
-        label: "LOW",
+        color: "var(--color-sentinel-green)",
+        bg: "rgba(16, 185, 129, 0.15)",
+        label: "LOW RISK",
       };
     default:
       return {
-        color: "var(--color-grafana-text-secondary)",
+        color: "var(--color-sentinel-text-secondary)",
         bg: "rgba(142, 142, 142, 0.15)",
         label: "UNKNOWN",
       };
@@ -92,22 +92,22 @@ function getConfidenceConfig(confidence: string): {
   switch (confidence) {
     case "high":
       return {
-        color: "var(--color-status-success)",
+        color: "var(--color-sentinel-green)",
         label: "HIGH CONFIDENCE",
       };
     case "medium":
       return {
-        color: "var(--color-grafana-yellow)",
+        color: "var(--color-sentinel-amber)",
         label: "MEDIUM CONFIDENCE",
       };
     case "low":
       return {
-        color: "var(--color-grafana-text-secondary)",
+        color: "var(--color-sentinel-text-secondary)",
         label: "LOW CONFIDENCE",
       };
     default:
       return {
-        color: "var(--color-grafana-text-secondary)",
+        color: "var(--color-sentinel-text-secondary)",
         label: "UNKNOWN",
       };
   }
@@ -117,10 +117,10 @@ function getConfidenceConfig(confidence: string): {
  * Get gauge color based on probability
  */
 function getGaugeColor(probability: number): string {
-  if (probability >= 75) return "var(--color-status-error)";
-  if (probability >= 50) return "var(--color-status-warning)";
-  if (probability >= 25) return "var(--color-grafana-yellow)";
-  return "var(--color-status-success)";
+  if (probability >= 75) return "var(--color-sentinel-red)";
+  if (probability >= 50) return "#F97316";
+  if (probability >= 25) return "var(--color-sentinel-amber)";
+  return "var(--color-sentinel-green)";
 }
 
 /**
@@ -151,14 +151,14 @@ export function PredictionCard({ prediction, onClick }: PredictionCardProps) {
 
   return (
     <div
-      className={`relative rounded overflow-hidden transition-all duration-150 ${onClick ? "cursor-pointer hover:brightness-110" : ""}`}
+      className={`relative rounded-md overflow-hidden transition-all duration-150 ${onClick ? "cursor-pointer hover:brightness-110" : ""}`}
       style={{
-        background: "var(--color-grafana-bg-panel)",
-        border: "1px solid var(--color-grafana-border)",
+        background: "var(--color-sentinel-bg-panel)",
+        border: "1px solid var(--color-sentinel-border)",
       }}
       onClick={onClick}
     >
-      {/* Top accent based on severity */}
+      {/* Top accent based on risk level */}
       <div
         className="absolute top-0 left-0 right-0 h-1"
         style={{ background: severityConfig.color }}
@@ -167,7 +167,7 @@ export function PredictionCard({ prediction, onClick }: PredictionCardProps) {
       <div className="p-4 pt-5">
         {/* Header: Gauge and Timeframe */}
         <div className="flex items-start gap-4 mb-4">
-          {/* Gauge Circle */}
+          {/* Risk Gauge Circle */}
           <div className="relative w-20 h-20 flex-shrink-0">
             <svg
               className="w-full h-full"
@@ -180,7 +180,7 @@ export function PredictionCard({ prediction, onClick }: PredictionCardProps) {
                 cy="50"
                 r="40"
                 fill="none"
-                stroke="var(--color-grafana-border)"
+                stroke="var(--color-sentinel-border)"
                 strokeWidth="8"
                 strokeDasharray={`${circumference * 0.75} ${circumference}`}
                 strokeLinecap="round"
@@ -214,14 +214,14 @@ export function PredictionCard({ prediction, onClick }: PredictionCardProps) {
               </span>
               <span
                 className="text-xs"
-                style={{ color: "var(--color-grafana-text-disabled)" }}
+                style={{ color: "var(--color-sentinel-text-disabled)" }}
               >
                 %
               </span>
             </div>
           </div>
 
-          {/* Timeframe and Severity */}
+          {/* Timeframe and Risk Level */}
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-2">
               <span
@@ -237,51 +237,51 @@ export function PredictionCard({ prediction, onClick }: PredictionCardProps) {
             <div className="flex items-center gap-1 mb-1">
               <Clock
                 className="h-4 w-4"
-                style={{ color: "var(--color-grafana-text-secondary)" }}
+                style={{ color: "var(--color-sentinel-text-secondary)" }}
               />
               <span
                 className="text-lg font-medium"
-                style={{ color: "var(--color-grafana-text-primary)" }}
+                style={{ color: "var(--color-sentinel-text-primary)" }}
               >
                 {prediction.timeframe_days} days
               </span>
             </div>
             <span
               className="text-xs"
-              style={{ color: "var(--color-grafana-text-disabled)" }}
+              style={{ color: "var(--color-sentinel-text-disabled)" }}
             >
-              until predicted failure
+              until predicted risk event
             </span>
           </div>
         </div>
 
-        {/* Equipment Info */}
+        {/* Asset Info */}
         <div
           className="pb-3 mb-3"
-          style={{ borderBottom: "1px solid var(--color-grafana-border)" }}
+          style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}
         >
           <h4
             className="font-medium text-sm mb-1"
-            style={{ color: "var(--color-grafana-text-primary)" }}
+            style={{ color: "var(--color-sentinel-text-primary)" }}
           >
             {prediction.equipment_name}
           </h4>
           <div className="flex items-center gap-2 text-xs">
             <Activity
               className="h-3 w-3"
-              style={{ color: "var(--color-grafana-text-disabled)" }}
+              style={{ color: "var(--color-sentinel-text-disabled)" }}
             />
-            <span style={{ color: "var(--color-grafana-text-secondary)" }}>
+            <span style={{ color: "var(--color-sentinel-text-secondary)" }}>
               {prediction.site_name}
             </span>
-            <span style={{ color: "var(--color-grafana-text-disabled)" }}>•</span>
-            <span style={{ color: "var(--color-grafana-text-secondary)" }}>
+            <span style={{ color: "var(--color-sentinel-text-disabled)" }}>•</span>
+            <span style={{ color: "var(--color-sentinel-text-secondary)" }}>
               {prediction.equipment_type}
             </span>
           </div>
         </div>
 
-        {/* Prediction Type Alert */}
+        {/* Risk Type Alert */}
         <div
           className="flex items-center gap-2 p-2 rounded mb-3"
           style={{
@@ -303,11 +303,11 @@ export function PredictionCard({ prediction, onClick }: PredictionCardProps) {
             <div className="flex items-center gap-1 mt-0.5">
               <Calendar
                 className="h-3 w-3"
-                style={{ color: "var(--color-grafana-text-disabled)" }}
+                style={{ color: "var(--color-sentinel-text-disabled)" }}
               />
               <span
                 className="text-xs"
-                style={{ color: "var(--color-grafana-text-secondary)" }}
+                style={{ color: "var(--color-sentinel-text-secondary)" }}
               >
                 {formattedDate}
               </span>
@@ -319,16 +319,16 @@ export function PredictionCard({ prediction, onClick }: PredictionCardProps) {
         <div className="grid grid-cols-2 gap-3 mb-3">
           <div
             className="p-2 rounded"
-            style={{ background: "var(--color-grafana-bg-secondary)" }}
+            style={{ background: "var(--color-sentinel-bg-secondary)" }}
           >
             <div className="flex items-center gap-1 mb-1">
               <Wrench
                 className="h-3 w-3"
-                style={{ color: "var(--color-grafana-cyan)" }}
+                style={{ color: "var(--color-sentinel-blue)" }}
               />
               <span
                 className="text-xs"
-                style={{ color: "var(--color-grafana-text-disabled)" }}
+                style={{ color: "var(--color-sentinel-text-disabled)" }}
               >
                 Repeat Calls
               </span>
@@ -336,7 +336,7 @@ export function PredictionCard({ prediction, onClick }: PredictionCardProps) {
             <span
               className="text-lg font-medium"
               style={{
-                color: "var(--color-grafana-cyan)",
+                color: "var(--color-sentinel-blue)",
                 fontVariantNumeric: "tabular-nums",
               }}
             >
@@ -345,16 +345,16 @@ export function PredictionCard({ prediction, onClick }: PredictionCardProps) {
           </div>
           <div
             className="p-2 rounded"
-            style={{ background: "var(--color-grafana-bg-secondary)" }}
+            style={{ background: "var(--color-sentinel-bg-secondary)" }}
           >
             <div className="flex items-center gap-1 mb-1">
               <Clock
                 className="h-3 w-3"
-                style={{ color: "var(--color-grafana-purple)" }}
+                style={{ color: "#a78bfa" }}
               />
               <span
                 className="text-xs"
-                style={{ color: "var(--color-grafana-text-disabled)" }}
+                style={{ color: "var(--color-sentinel-text-disabled)" }}
               >
                 Asset Age
               </span>
@@ -362,14 +362,14 @@ export function PredictionCard({ prediction, onClick }: PredictionCardProps) {
             <span
               className="text-lg font-medium"
               style={{
-                color: "var(--color-grafana-purple)",
+                color: "#a78bfa",
                 fontVariantNumeric: "tabular-nums",
               }}
             >
               {prediction.evidence.asset_age_years}
               <span
                 className="text-xs ml-1"
-                style={{ color: "var(--color-grafana-text-disabled)" }}
+                style={{ color: "var(--color-sentinel-text-disabled)" }}
               >
                 yrs
               </span>
@@ -391,7 +391,7 @@ export function PredictionCard({ prediction, onClick }: PredictionCardProps) {
           {onClick && (
             <div
               className="flex items-center gap-1 text-xs"
-              style={{ color: "var(--color-grafana-text-link)" }}
+              style={{ color: "var(--color-sentinel-amber)" }}
             >
               View Details
               <ChevronRight className="h-3 w-3" />

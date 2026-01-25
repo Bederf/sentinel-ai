@@ -1,14 +1,14 @@
 /**
- * Dashboard Component - Grafana-inspired main dashboard view
+ * Dashboard Component - SENTINEL Risk Dashboard
  *
  * Features:
  * - Top row: 5 KPI stat panels
- * - Left column: Site overview grid
- * - Right column: Alert feed
+ * - Left column: Site protection overview grid
+ * - Right column: Risk alert feed
  * - Middle: Energy consumption chart with filters
- * - Bottom: AI Failure Predictions
+ * - Bottom: AI Risk Predictions
  *
- * Follows Grafana dashboard design with dark theme panels.
+ * Follows SENTINEL dark theme design.
  */
 
 import { useState, useEffect } from "react";
@@ -16,7 +16,7 @@ import {
   Building2,
   AlertTriangle,
   Cpu,
-  TrendingUp,
+  Shield,
   Bell,
   DollarSign,
   RefreshCw,
@@ -136,15 +136,15 @@ export function Dashboard() {
     return (
       <div
         className="h-full flex items-center justify-center"
-        style={{ background: "var(--color-grafana-bg-canvas)" }}
+        style={{ background: "var(--color-sentinel-bg-canvas)" }}
       >
         <div className="text-center">
           <RefreshCw
             className="h-8 w-8 animate-spin mx-auto mb-4"
-            style={{ color: "var(--color-grafana-orange)" }}
+            style={{ color: "var(--color-sentinel-amber)" }}
           />
-          <span style={{ color: "var(--color-grafana-text-secondary)" }}>
-            Loading dashboard data...
+          <span style={{ color: "var(--color-sentinel-text-secondary)" }}>
+            Initializing SENTINEL protection...
           </span>
         </div>
       </div>
@@ -156,26 +156,26 @@ export function Dashboard() {
     return (
       <div
         className="h-full flex items-center justify-center"
-        style={{ background: "var(--color-grafana-bg-canvas)" }}
+        style={{ background: "var(--color-sentinel-bg-canvas)" }}
       >
         <div
-          className="p-8 rounded text-center"
+          className="p-8 rounded-md text-center"
           style={{
-            background: "var(--color-grafana-bg-panel)",
-            border: "1px solid var(--color-grafana-border)",
+            background: "var(--color-sentinel-bg-panel)",
+            border: "1px solid var(--color-sentinel-border)",
           }}
         >
           <AlertTriangle
             className="h-12 w-12 mx-auto mb-4"
-            style={{ color: "var(--color-status-error)" }}
+            style={{ color: "var(--color-sentinel-red)" }}
           />
           <h2
             className="text-lg font-medium mb-2"
-            style={{ color: "var(--color-grafana-text-primary)" }}
+            style={{ color: "var(--color-sentinel-text-primary)" }}
           >
             Error Loading Dashboard
           </h2>
-          <p style={{ color: "var(--color-grafana-text-secondary)" }}>{error}</p>
+          <p style={{ color: "var(--color-sentinel-text-secondary)" }}>{error}</p>
         </div>
       </div>
     );
@@ -184,21 +184,21 @@ export function Dashboard() {
   return (
     <div
       className="h-full overflow-y-auto p-4 md:p-6"
-      style={{ background: "var(--color-grafana-bg-canvas)" }}
+      style={{ background: "var(--color-sentinel-bg-canvas)" }}
     >
       {/* KPI Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         {stats && (
           <>
             <KPICard
-              title="Total Sites"
+              title="Protected Sites"
               value={stats.total_sites}
               icon={<Building2 className="h-5 w-5" />}
-              subtitle={`${normalSites} healthy, ${warningSites} warning`}
+              subtitle={`${normalSites} protected, ${warningSites} elevated`}
               accentColor="blue"
             />
             <KPICard
-              title="Equipment"
+              title="Monitored Assets"
               value={stats.total_equipment}
               icon={<Cpu className="h-5 w-5" />}
               delta={stats.uptime_percent ? stats.uptime_percent - 95 : 0}
@@ -206,7 +206,7 @@ export function Dashboard() {
               accentColor="cyan"
             />
             <KPICard
-              title="Active Alerts"
+              title="Active Risks"
               value={stats.active_alerts}
               icon={<Bell className="h-5 w-5" />}
               delta={stats.critical_alerts ? -(stats.critical_alerts * 10) : 0}
@@ -222,10 +222,10 @@ export function Dashboard() {
               accentColor="green"
             />
             <KPICard
-              title="AI Predictions"
+              title="Risk Predictions"
               value={predictions.length}
-              icon={<TrendingUp className="h-5 w-5" />}
-              subtitle="Failure predictions detected"
+              icon={<Shield className="h-5 w-5" />}
+              subtitle="AI-detected risk events"
               accentColor="purple"
             />
           </>
@@ -234,53 +234,53 @@ export function Dashboard() {
 
       {/* Main Content Grid - Two Columns */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column - Site Overview Grid (2/3 width on large) */}
+        {/* Left Column - Site Protection Overview (2/3 width on large) */}
         <div className="lg:col-span-2">
           <div
-            className="rounded overflow-hidden"
+            className="rounded-md overflow-hidden"
             style={{
-              background: "var(--color-grafana-bg-panel)",
-              border: "1px solid var(--color-grafana-border)",
+              background: "var(--color-sentinel-bg-panel)",
+              border: "1px solid var(--color-sentinel-border)",
             }}
           >
             {/* Panel Header */}
             <div
               className="p-4 flex items-center justify-between"
-              style={{ borderBottom: "1px solid var(--color-grafana-border)" }}
+              style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}
             >
               <div className="flex items-center gap-3">
                 <div
                   className="p-2 rounded"
-                  style={{ background: "rgba(50, 116, 217, 0.15)" }}
+                  style={{ background: "rgba(59, 130, 246, 0.15)" }}
                 >
                   <Building2
                     className="h-5 w-5"
-                    style={{ color: "var(--color-grafana-blue)" }}
+                    style={{ color: "var(--color-sentinel-blue)" }}
                   />
                 </div>
                 <div>
                   <h3
                     className="font-medium text-sm"
-                    style={{ color: "var(--color-grafana-text-primary)" }}
+                    style={{ color: "var(--color-sentinel-text-primary)" }}
                   >
-                    Site Overview
+                    Site Protection Status
                   </h3>
                   <span
                     className="text-xs"
-                    style={{ color: "var(--color-grafana-text-secondary)" }}
+                    style={{ color: "var(--color-sentinel-text-secondary)" }}
                   >
-                    {sites.length} sites monitored
+                    {sites.length} sites under protection
                   </span>
                 </div>
               </div>
               <span
                 className="text-xs px-2 py-1 rounded"
                 style={{
-                  background: "rgba(115, 191, 105, 0.15)",
-                  color: "var(--color-status-success)",
+                  background: "rgba(16, 185, 129, 0.15)",
+                  color: "var(--color-sentinel-green)",
                 }}
               >
-                {normalSites} healthy
+                {normalSites} protected
               </span>
             </div>
 
@@ -290,9 +290,9 @@ export function Dashboard() {
                 <div className="text-center py-8">
                   <Building2
                     className="h-12 w-12 mx-auto mb-2"
-                    style={{ color: "var(--color-grafana-text-disabled)" }}
+                    style={{ color: "var(--color-sentinel-text-disabled)" }}
                   />
-                  <span style={{ color: "var(--color-grafana-text-secondary)" }}>
+                  <span style={{ color: "var(--color-sentinel-text-secondary)" }}>
                     No sites available
                   </span>
                 </div>
@@ -316,20 +316,20 @@ export function Dashboard() {
       {/* Energy Consumption Section */}
       <div className="mt-6">
         <div
-          className="rounded overflow-hidden"
+          className="rounded-md overflow-hidden"
           style={{
-            background: "var(--color-grafana-bg-panel)",
-            border: "1px solid var(--color-grafana-border)",
+            background: "var(--color-sentinel-bg-panel)",
+            border: "1px solid var(--color-sentinel-border)",
           }}
         >
           {/* Panel Header with Filters */}
           <div
             className="p-4 flex flex-wrap items-center justify-between gap-4"
-            style={{ borderBottom: "1px solid var(--color-grafana-border)" }}
+            style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}
           >
             <h3
               className="font-medium text-sm"
-              style={{ color: "var(--color-grafana-text-primary)" }}
+              style={{ color: "var(--color-sentinel-text-primary)" }}
             >
               Energy Analytics
             </h3>
@@ -341,9 +341,9 @@ export function Dashboard() {
                 onChange={(e) => setSelectedSiteId(e.target.value || null)}
                 className="text-sm rounded px-3 py-1.5"
                 style={{
-                  background: "var(--color-grafana-bg-secondary)",
-                  border: "1px solid var(--color-grafana-border)",
-                  color: "var(--color-grafana-text-primary)",
+                  background: "var(--color-sentinel-bg-secondary)",
+                  border: "1px solid var(--color-sentinel-border)",
+                  color: "var(--color-sentinel-text-primary)",
                 }}
               >
                 <option value="">All Sites</option>
@@ -357,7 +357,7 @@ export function Dashboard() {
               {/* Time Period Tabs */}
               <div
                 className="flex rounded overflow-hidden"
-                style={{ border: "1px solid var(--color-grafana-border)" }}
+                style={{ border: "1px solid var(--color-sentinel-border)" }}
               >
                 {TIME_PERIODS.map((period) => (
                   <button
@@ -367,12 +367,12 @@ export function Dashboard() {
                     style={{
                       background:
                         selectedDays === period
-                          ? "var(--color-grafana-orange)"
-                          : "var(--color-grafana-bg-secondary)",
+                          ? "var(--color-sentinel-amber)"
+                          : "var(--color-sentinel-bg-secondary)",
                       color:
                         selectedDays === period
                           ? "white"
-                          : "var(--color-grafana-text-secondary)",
+                          : "var(--color-sentinel-text-secondary)",
                     }}
                   >
                     {period}d
@@ -394,42 +394,42 @@ export function Dashboard() {
         </div>
       </div>
 
-      {/* AI Failure Predictions Section */}
+      {/* AI Risk Predictions Section */}
       <div className="mt-6">
         <div
-          className="rounded overflow-hidden"
+          className="rounded-md overflow-hidden"
           style={{
-            background: "var(--color-grafana-bg-panel)",
-            border: "1px solid var(--color-grafana-border)",
+            background: "var(--color-sentinel-bg-panel)",
+            border: "1px solid var(--color-sentinel-border)",
           }}
         >
           {/* Panel Header */}
           <div
             className="p-4 flex items-center justify-between"
-            style={{ borderBottom: "1px solid var(--color-grafana-border)" }}
+            style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}
           >
             <div className="flex items-center gap-3">
               <div
                 className="p-2 rounded"
-                style={{ background: "rgba(184, 119, 217, 0.15)" }}
+                style={{ background: "rgba(245, 158, 11, 0.15)" }}
               >
-                <TrendingUp
+                <Shield
                   className="h-5 w-5"
-                  style={{ color: "var(--color-grafana-purple)" }}
+                  style={{ color: "var(--color-sentinel-amber)" }}
                 />
               </div>
               <div>
                 <h3
                   className="font-medium text-sm"
-                  style={{ color: "var(--color-grafana-text-primary)" }}
+                  style={{ color: "var(--color-sentinel-text-primary)" }}
                 >
-                  AI Failure Predictions
+                  Risk Intelligence
                 </h3>
                 <span
                   className="text-xs"
-                  style={{ color: "var(--color-grafana-text-secondary)" }}
+                  style={{ color: "var(--color-sentinel-text-secondary)" }}
                 >
-                  Predictive maintenance insights
+                  AI-powered predictive insights
                 </span>
               </div>
             </div>
@@ -438,20 +438,20 @@ export function Dashboard() {
                 <span
                   className="text-xs px-2 py-1 rounded"
                   style={{
-                    background: "rgba(184, 119, 217, 0.15)",
-                    color: "var(--color-grafana-purple)",
+                    background: "rgba(245, 158, 11, 0.15)",
+                    color: "var(--color-sentinel-amber)",
                   }}
                 >
-                  {predictions.length} at-risk
+                  {predictions.length} at-risk assets
                 </span>
                 <span
                   className="text-xs px-2 py-1 rounded"
                   style={{
-                    background: "rgba(115, 191, 105, 0.15)",
-                    color: "var(--color-status-success)",
+                    background: "rgba(16, 185, 129, 0.15)",
+                    color: "var(--color-sentinel-green)",
                   }}
                 >
-                  {formatZAR(totalPotentialSavings)} savings
+                  {formatZAR(totalPotentialSavings)} saveable
                 </span>
               </div>
             )}
@@ -461,12 +461,12 @@ export function Dashboard() {
           <div className="p-4">
             {predictions.length === 0 ? (
               <div className="text-center py-8">
-                <TrendingUp
+                <Shield
                   className="h-12 w-12 mx-auto mb-2"
-                  style={{ color: "var(--color-grafana-text-disabled)" }}
+                  style={{ color: "var(--color-sentinel-text-disabled)" }}
                 />
-                <span style={{ color: "var(--color-grafana-text-secondary)" }}>
-                  No failure predictions
+                <span style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                  No risk predictions detected
                 </span>
               </div>
             ) : (

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Activity, Clock, Wifi, WifiOff } from "lucide-react";
+import { Shield, Clock, Wifi, WifiOff } from "lucide-react";
 import api from "./lib/api";
 import { Chat } from "./components/Chat";
 import { Dashboard } from "./components/Dashboard";
@@ -63,59 +63,59 @@ function App() {
   return (
     <div
       className="h-screen flex"
-      style={{ background: "var(--color-grafana-bg-canvas)" }}
+      style={{ background: "var(--color-sentinel-bg-canvas)" }}
     >
       {/* Sidebar Navigation */}
       <Sidebar currentView={currentView} onViewChange={setCurrentView} />
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Header - Grafana style */}
+        {/* Header - SENTINEL style */}
         <header
           className="flex-none h-14 px-4 flex items-center justify-between"
           style={{
-            background: "var(--color-grafana-bg-primary)",
-            borderBottom: "1px solid var(--color-grafana-border)",
+            background: "var(--color-sentinel-bg-primary)",
+            borderBottom: "1px solid var(--color-sentinel-border)",
           }}
         >
           {/* Left side - Page title and breadcrumb */}
           <div className="flex items-center gap-4 ml-12 md:ml-0">
             <div className="flex items-center gap-2">
-              <Activity
+              <Shield
                 className="h-5 w-5"
-                style={{ color: "var(--color-grafana-orange)" }}
+                style={{ color: "var(--color-sentinel-amber)" }}
               />
               <h1
                 className="text-base font-medium"
-                style={{ color: "var(--color-grafana-text-primary)" }}
+                style={{ color: "var(--color-sentinel-text-primary)" }}
               >
-                {currentView === "dashboard" ? "Dashboard" : "Chat Assistant"}
+                {currentView === "dashboard" ? "Risk Dashboard" : "AI Assistant"}
               </h1>
             </div>
             <span
               className="hidden sm:inline-block text-xs px-2 py-0.5 rounded"
               style={{
-                background: "var(--color-grafana-bg-secondary)",
-                color: "var(--color-grafana-text-secondary)",
+                background: "var(--color-sentinel-bg-secondary)",
+                color: "var(--color-sentinel-text-secondary)",
               }}
             >
-              Facilities Management
+              Intelligent Asset Protection
             </span>
           </div>
 
           {/* Right side - Status and time */}
           <div className="flex items-center gap-4">
-            {/* Live indicator */}
+            {/* Protection status indicator */}
             <div className="hidden sm:flex items-center gap-2">
               <div
                 className="w-2 h-2 rounded-full pulse-live"
-                style={{ background: "var(--color-status-success)" }}
+                style={{ background: "var(--color-sentinel-green)" }}
               />
               <span
                 className="text-xs uppercase tracking-wide"
-                style={{ color: "var(--color-grafana-text-secondary)" }}
+                style={{ color: "var(--color-sentinel-text-secondary)" }}
               >
-                Live
+                Protected
               </span>
             </div>
 
@@ -124,16 +124,16 @@ function App() {
               className="flex items-center gap-2 px-2 py-1 rounded"
               style={{
                 background: error
-                  ? "rgba(242, 73, 92, 0.15)"
+                  ? "rgba(220, 38, 38, 0.15)"
                   : loading
                     ? "rgba(142, 142, 142, 0.15)"
-                    : "rgba(115, 191, 105, 0.15)",
+                    : "rgba(16, 185, 129, 0.15)",
                 border: `1px solid ${
                   error
-                    ? "rgba(242, 73, 92, 0.3)"
+                    ? "rgba(220, 38, 38, 0.3)"
                     : loading
                       ? "rgba(142, 142, 142, 0.3)"
-                      : "rgba(115, 191, 105, 0.3)"
+                      : "rgba(16, 185, 129, 0.3)"
                 }`,
               }}
             >
@@ -142,7 +142,7 @@ function App() {
                   <div className="w-3 h-3 rounded-full border-2 border-gray-400 border-t-transparent animate-spin" />
                   <span
                     className="text-xs hidden sm:inline"
-                    style={{ color: "var(--color-grafana-text-secondary)" }}
+                    style={{ color: "var(--color-sentinel-text-secondary)" }}
                   >
                     Connecting...
                   </span>
@@ -151,11 +151,11 @@ function App() {
                 <>
                   <WifiOff
                     className="h-3.5 w-3.5"
-                    style={{ color: "var(--color-status-error)" }}
+                    style={{ color: "var(--color-sentinel-red)" }}
                   />
                   <span
                     className="text-xs hidden sm:inline"
-                    style={{ color: "var(--color-status-error)" }}
+                    style={{ color: "var(--color-sentinel-red)" }}
                   >
                     Offline
                   </span>
@@ -164,11 +164,11 @@ function App() {
                 <>
                   <Wifi
                     className="h-3.5 w-3.5"
-                    style={{ color: "var(--color-status-success)" }}
+                    style={{ color: "var(--color-sentinel-green)" }}
                   />
                   <span
                     className="text-xs hidden sm:inline"
-                    style={{ color: "var(--color-status-success)" }}
+                    style={{ color: "var(--color-sentinel-green)" }}
                   >
                     v{health?.version}
                   </span>
@@ -176,28 +176,28 @@ function App() {
               )}
             </div>
 
-            {/* Time display - Grafana style */}
+            {/* Time display */}
             <div
               className="hidden md:flex items-center gap-2 px-3 py-1 rounded"
               style={{
-                background: "var(--color-grafana-bg-secondary)",
-                border: "1px solid var(--color-grafana-border)",
+                background: "var(--color-sentinel-bg-secondary)",
+                border: "1px solid var(--color-sentinel-border)",
               }}
             >
               <Clock
                 className="h-3.5 w-3.5"
-                style={{ color: "var(--color-grafana-text-secondary)" }}
+                style={{ color: "var(--color-sentinel-text-secondary)" }}
               />
               <div className="flex flex-col items-end">
                 <span
                   className="text-xs font-mono"
-                  style={{ color: "var(--color-grafana-text-primary)" }}
+                  style={{ color: "var(--color-sentinel-text-primary)" }}
                 >
                   {formatTime(currentTime)}
                 </span>
                 <span
                   className="text-xs"
-                  style={{ color: "var(--color-grafana-text-disabled)" }}
+                  style={{ color: "var(--color-sentinel-text-disabled)" }}
                 >
                   {formatDate(currentTime)}
                 </span>
@@ -209,7 +209,7 @@ function App() {
         {/* Main content - Takes remaining space */}
         <main
           className="flex-1 overflow-hidden"
-          style={{ background: "var(--color-grafana-bg-canvas)" }}
+          style={{ background: "var(--color-sentinel-bg-canvas)" }}
         >
           {currentView === "dashboard" ? (
             <Dashboard />
