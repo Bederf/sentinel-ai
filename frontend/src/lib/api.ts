@@ -2,7 +2,7 @@
  * API Client for BMS Intelligence Backend
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:9095";
+const API_BASE_URL = import.meta.env.VITE_API_URL || "";
 
 // ============= Response Interfaces =============
 
@@ -50,10 +50,14 @@ export interface Alert {
   site_name: string;
   equipment_id: string;
   equipment_name: string;
-  severity: "low" | "medium" | "high" | "critical";
+  severity: "low" | "medium" | "high" | "critical" | "warning" | "info";
   message: string;
-  timestamp: string;
+  created_at: string;
   acknowledged: boolean;
+  title?: string;
+  type?: string;
+  status?: string;
+  category?: string;
 }
 
 // Anomaly prediction interface
@@ -277,7 +281,8 @@ export const api = {
    * Get all sites/buildings
    */
   async getSites(): Promise<Site[]> {
-    return fetchApi<Site[]>("/api/sites");
+    const response = await fetchApi<{ total: number; sites: Site[] }>("/api/sites");
+    return response.sites;
   },
 
   /**
@@ -291,7 +296,8 @@ export const api = {
    * Get active alerts
    */
   async getAlerts(): Promise<Alert[]> {
-    return fetchApi<Alert[]>("/api/alerts");
+    const response = await fetchApi<{ total: number; alerts: Alert[] }>("/api/alerts");
+    return response.alerts;
   },
 
   /**

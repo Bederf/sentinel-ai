@@ -29,6 +29,8 @@ import { AlertFeed } from "./AlertFeed";
 import { EnergyChart } from "./EnergyChart";
 import { PredictionCard } from "./PredictionCard";
 import { PredictionDetail } from "./PredictionDetail";
+import { HeroPredictionCard } from "./HeroPredictionCard";
+import { ROISummaryCard } from "./ROISummaryCard";
 
 // Time period options for energy chart
 const TIME_PERIODS = [7, 30, 90] as const;
@@ -395,7 +397,27 @@ export function Dashboard() {
       </div>
 
       {/* AI Failure Predictions Section */}
-      <div className="mt-6">
+      <div className="mt-6 space-y-6">
+        {/* ROI Summary Card */}
+        {predictions.length > 0 && <ROISummaryCard predictions={predictions} />}
+
+        {/* Hero Prediction Card - Highest Risk */}
+        {predictions.length > 0 && (
+          <HeroPredictionCard
+            prediction={predictions.reduce((highest, p) =>
+              p.probability_percent > highest.probability_percent ? p : highest
+            )}
+            onClick={() =>
+              handlePredictionClick(
+                predictions.reduce((highest, p) =>
+                  p.probability_percent > highest.probability_percent ? p : highest
+                )
+              )
+            }
+          />
+        )}
+
+        {/* Predictions Panel */}
         <div
           className="rounded overflow-hidden"
           style={{
@@ -423,13 +445,13 @@ export function Dashboard() {
                   className="font-medium text-sm"
                   style={{ color: "var(--color-grafana-text-primary)" }}
                 >
-                  AI Failure Predictions
+                  All Failure Predictions
                 </h3>
                 <span
                   className="text-xs"
                   style={{ color: "var(--color-grafana-text-secondary)" }}
                 >
-                  Predictive maintenance insights
+                  Click any card for full analysis
                 </span>
               </div>
             </div>

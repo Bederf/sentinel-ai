@@ -109,7 +109,7 @@ export function AlertFeed({
       const sortedAlerts = data
         .sort(
           (a, b) =>
-            new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         )
         .slice(0, limit);
       setAlerts(sortedAlerts);
@@ -330,7 +330,7 @@ export function AlertFeed({
                         className="text-xs"
                         style={{ color: "var(--color-grafana-text-disabled)" }}
                       >
-                        {getRelativeTime(alert.timestamp)}
+                        {getRelativeTime(alert.created_at)}
                       </span>
                     </div>
                   </div>

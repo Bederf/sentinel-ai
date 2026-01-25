@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     claude_model: str = "claude-sonnet-4-20250514"
     claude_max_tokens: int = 4096
 
+    # Demo mode for pre-seeded responses
+    demo_mode: bool = False
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

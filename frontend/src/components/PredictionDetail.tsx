@@ -18,15 +18,15 @@ import {
   TrendingUp,
   Wrench,
   Clock,
-  FileText,
   Activity,
   CheckCircle2,
-  XCircle,
   ChevronDown,
   ChevronUp,
 } from "lucide-react";
 import { CostCard } from "./CostCard";
 import { CostBreakdownDetail } from "./CostBreakdownDetail";
+import { PatternTimeline } from "./PatternTimeline";
+import { HighlightedNotes } from "./HighlightedNotes";
 
 interface PredictionDetailProps {
   prediction: {
@@ -478,85 +478,17 @@ export function PredictionDetail({ prediction, isOpen, onClose }: PredictionDeta
             </SectionCard>
           </div>
 
-          {/* Technician Notes */}
-          <SectionCard title="Technician Notes">
-            <div className="space-y-3">
-              {prediction.evidence.technician_notes.map((note, index) => (
-                <div key={index} className="flex gap-3">
-                  <FileText
-                    className="h-4 w-4 mt-0.5 flex-shrink-0"
-                    style={{ color: "var(--color-grafana-text-disabled)" }}
-                  />
-                  <div>
-                    <span
-                      className="text-xs"
-                      style={{ color: "var(--color-grafana-text-disabled)" }}
-                    >
-                      {note.split(":")[0]}
-                    </span>
-                    <p
-                      className="text-sm"
-                      style={{ color: "var(--color-grafana-text-primary)" }}
-                    >
-                      {note.split(":").slice(1).join(":")}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </SectionCard>
+          {/* Technician Notes with AI Highlighting */}
+          <HighlightedNotes notes={prediction.evidence.technician_notes} />
 
-          {/* Similar Failures */}
+          {/* Pattern Timeline - Cross-site pattern recognition */}
           {prediction.similar_failures.length > 0 && (
-            <SectionCard title="Similar Historical Failures">
-              <div className="space-y-3">
-                {prediction.similar_failures.map((failure, index) => (
-                  <div
-                    key={index}
-                    className="p-3 rounded"
-                    style={{
-                      background: "var(--color-grafana-bg-secondary)",
-                      border: "1px solid var(--color-grafana-border)",
-                    }}
-                  >
-                    <div className="flex justify-between items-start mb-2">
-                      <span
-                        className="font-medium text-sm"
-                        style={{ color: "var(--color-grafana-text-primary)" }}
-                      >
-                        {failure.site} - {failure.equipment}
-                      </span>
-                      <XCircle className="h-4 w-4" style={{ color: "var(--color-status-error)" }} />
-                    </div>
-                    <p
-                      className="text-xs mb-2"
-                      style={{ color: "var(--color-grafana-text-secondary)" }}
-                    >
-                      Failed:{" "}
-                      {new Date(failure.failure_date).toLocaleDateString("en-ZA", {
-                        day: "numeric",
-                        month: "short",
-                        year: "numeric",
-                      })}
-                    </p>
-                    <div className="flex flex-wrap gap-1">
-                      {failure.common_factors.map((factor, i) => (
-                        <span
-                          key={i}
-                          className="text-xs px-1.5 py-0.5 rounded"
-                          style={{
-                            background: "var(--color-grafana-bg-panel)",
-                            color: "var(--color-grafana-text-secondary)",
-                          }}
-                        >
-                          {factor}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </SectionCard>
+            <PatternTimeline
+              currentSite={prediction.site_name}
+              currentEquipment={prediction.equipment_name}
+              predictedDate={prediction.predicted_failure_date}
+              similarFailures={prediction.similar_failures}
+            />
           )}
 
           {/* Financial Impact */}
