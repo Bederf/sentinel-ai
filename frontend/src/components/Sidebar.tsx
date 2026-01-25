@@ -1,11 +1,12 @@
 /**
- * Sidebar Navigation Component - Grafana-inspired dark theme
+ * Sidebar Navigation Component - SENTINEL Branding
  *
  * Features:
- * - Dark panel design with orange accent indicators
+ * - SENTINEL shield logo with amber accent
+ * - Dark panel design with amber accent indicators
  * - Navigation items: Dashboard, Chat
  * - Data Upload section for CSV files
- * - Lucide icons with Grafana styling
+ * - Lucide icons with SENTINEL styling
  * - Collapsible on mobile (hamburger menu)
  * - Active view highlighting with left border accent
  */
@@ -21,7 +22,7 @@ import {
   Check,
   AlertCircle,
   Database,
-  Activity,
+  Shield,
   ChevronDown,
   ChevronRight,
 } from "lucide-react";
@@ -176,24 +177,32 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
           borderRight: "1px solid var(--color-grafana-border)",
         }}
       >
-        {/* Logo area */}
+        {/* SENTINEL Logo area */}
         <div
-          className="flex-none h-14 flex items-center px-4 md:justify-center lg:justify-start"
-          style={{ borderBottom: "1px solid var(--color-grafana-border)" }}
+          className="flex-none h-16 flex items-center px-4 md:justify-center lg:justify-start"
+          style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}
         >
           <div className="flex items-center gap-3">
+            {/* SENTINEL Shield Logo */}
             <div
-              className="w-8 h-8 rounded flex items-center justify-center"
-              style={{ background: "var(--color-grafana-orange)" }}
+              className="w-9 h-9 rounded-lg flex items-center justify-center sentinel-shield sentinel-shield-active"
             >
-              <Activity className="h-5 w-5 text-white" />
+              <Shield className="h-5 w-5" style={{ color: "var(--color-sentinel-amber)" }} />
             </div>
-            <span
-              className="font-semibold text-sm md:hidden lg:block"
-              style={{ color: "var(--color-grafana-text-primary)" }}
-            >
-              BMS Intelligence
-            </span>
+            <div className="md:hidden lg:block">
+              <span
+                className="font-semibold text-sm tracking-wide"
+                style={{ color: "var(--color-sentinel-text-primary)" }}
+              >
+                SENTINEL
+              </span>
+              <div
+                className="text-[10px] tracking-wider"
+                style={{ color: "var(--color-sentinel-text-disabled)" }}
+              >
+                ASSET PROTECTION
+              </div>
+            </div>
           </div>
         </div>
 
@@ -222,16 +231,16 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
                   md:justify-center lg:justify-start
                 `}
                 style={{
-                  background: isActive ? "var(--color-grafana-bg-secondary)" : "transparent",
-                  borderLeft: isActive ? "3px solid var(--color-grafana-orange)" : "3px solid transparent",
-                  color: isActive ? "var(--color-grafana-text-primary)" : "var(--color-grafana-text-secondary)",
+                  background: isActive ? "var(--color-sentinel-bg-secondary)" : "transparent",
+                  borderLeft: isActive ? "3px solid var(--color-sentinel-amber)" : "3px solid transparent",
+                  color: isActive ? "var(--color-sentinel-text-primary)" : "var(--color-sentinel-text-secondary)",
                 }}
                 aria-current={isActive ? "page" : undefined}
               >
                 <Icon
                   className="h-5 w-5 flex-shrink-0"
                   style={{
-                    color: isActive ? "var(--color-grafana-orange)" : "var(--color-grafana-text-secondary)",
+                    color: isActive ? "var(--color-sentinel-amber)" : "var(--color-sentinel-text-secondary)",
                   }}
                 />
                 <div className="flex flex-col items-start md:hidden lg:flex">
@@ -259,14 +268,14 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
               className="w-full flex items-center gap-3 px-1 py-2 transition-all duration-150 md:justify-center lg:justify-start"
               style={{
                 color: isUploadOpen
-                  ? "var(--color-grafana-text-primary)"
-                  : "var(--color-grafana-text-secondary)",
+                  ? "var(--color-sentinel-text-primary)"
+                  : "var(--color-sentinel-text-secondary)",
               }}
             >
               <Database
                 className="h-5 w-5 flex-shrink-0"
                 style={{
-                  color: isUploadOpen ? "var(--color-grafana-cyan)" : "var(--color-grafana-text-secondary)",
+                  color: isUploadOpen ? "var(--color-sentinel-blue)" : "var(--color-sentinel-text-secondary)",
                 }}
               />
               <span className="font-medium text-sm md:hidden lg:block flex-1 text-left">Data Sources</span>
@@ -285,32 +294,32 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
                   <div
                     className="rounded p-3 text-xs space-y-1 mb-3"
                     style={{
-                      background: "var(--color-grafana-bg-secondary)",
-                      border: "1px solid var(--color-grafana-border)",
+                      background: "var(--color-sentinel-bg-secondary)",
+                      border: "1px solid var(--color-sentinel-border)",
                     }}
                   >
                     <div
                       className="font-medium mb-2"
-                      style={{ color: "var(--color-grafana-text-primary)" }}
+                      style={{ color: "var(--color-sentinel-text-primary)" }}
                     >
                       Current Data
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <span style={{ color: "var(--color-grafana-text-disabled)" }}>Work Orders</span>
-                        <div style={{ color: "var(--color-grafana-cyan)" }}>{dataStatus.work_orders}</div>
+                        <span style={{ color: "var(--color-sentinel-text-disabled)" }}>Work Orders</span>
+                        <div style={{ color: "var(--color-sentinel-blue)" }}>{dataStatus.work_orders}</div>
                       </div>
                       <div>
-                        <span style={{ color: "var(--color-grafana-text-disabled)" }}>Assets</span>
-                        <div style={{ color: "var(--color-grafana-cyan)" }}>{dataStatus.assets}</div>
+                        <span style={{ color: "var(--color-sentinel-text-disabled)" }}>Assets</span>
+                        <div style={{ color: "var(--color-sentinel-blue)" }}>{dataStatus.assets}</div>
                       </div>
                       <div>
-                        <span style={{ color: "var(--color-grafana-text-disabled)" }}>Sites</span>
-                        <div style={{ color: "var(--color-grafana-cyan)" }}>{dataStatus.sites}</div>
+                        <span style={{ color: "var(--color-sentinel-text-disabled)" }}>Sites</span>
+                        <div style={{ color: "var(--color-sentinel-blue)" }}>{dataStatus.sites}</div>
                       </div>
                       <div>
-                        <span style={{ color: "var(--color-grafana-text-disabled)" }}>Total Cost</span>
-                        <div style={{ color: "var(--color-grafana-green)" }}>
+                        <span style={{ color: "var(--color-sentinel-text-disabled)" }}>Total Cost</span>
+                        <div style={{ color: "var(--color-sentinel-green)" }}>
                           R{dataStatus.total_cost.toLocaleString()}
                         </div>
                       </div>
@@ -403,18 +412,18 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
         {/* Footer */}
         <div
           className="flex-none p-4"
-          style={{ borderTop: "1px solid var(--color-grafana-border)" }}
+          style={{ borderTop: "1px solid var(--color-sentinel-border)" }}
         >
           <div
             className="text-xs text-center md:hidden lg:block"
-            style={{ color: "var(--color-grafana-text-disabled)" }}
+            style={{ color: "var(--color-sentinel-text-disabled)" }}
           >
-            BMS Intelligence v1.0
+            <span style={{ color: "var(--color-sentinel-amber)" }}>SENTINEL</span> v1.0
           </div>
           <div className="hidden md:flex lg:hidden justify-center">
             <div
               className="w-2 h-2 rounded-full pulse-live"
-              style={{ background: "var(--color-status-success)" }}
+              style={{ background: "var(--color-sentinel-amber)" }}
             />
           </div>
         </div>

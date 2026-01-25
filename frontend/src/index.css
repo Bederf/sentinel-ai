@@ -1,59 +1,87 @@
 @import "tailwindcss";
 
-/* Grafana-inspired Dark Theme Configuration */
+/* SENTINEL - Intelligent Asset Protection
+ * Dark Theme with Brand Colors
+ * Navy (#1A2B4C), Amber (#F59E0B), Green (#10B981), Red (#DC2626), Blue (#3B82F6)
+ */
+
+/* Google Fonts - Inter & JetBrains Mono */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
 @theme {
-  /* Grafana Dark Theme Colors */
-  --color-grafana-bg-canvas: #111217;
-  --color-grafana-bg-primary: #181b1f;
-  --color-grafana-bg-secondary: #22252b;
-  --color-grafana-bg-panel: #1f1f20;
-  --color-grafana-border: #2c3235;
-  --color-grafana-border-strong: #3d4044;
+  /* SENTINEL Dark Theme Colors */
+  --color-sentinel-bg-canvas: #0d1117;
+  --color-sentinel-bg-primary: #161b22;
+  --color-sentinel-bg-secondary: #1c2128;
+  --color-sentinel-bg-panel: #21262d;
+  --color-sentinel-border: #30363d;
+  --color-sentinel-border-strong: #484f58;
 
   /* Text Colors */
-  --color-grafana-text-primary: #d8d9da;
-  --color-grafana-text-secondary: #8e8e8e;
-  --color-grafana-text-disabled: #6e6e6e;
-  --color-grafana-text-link: #6e9fff;
+  --color-sentinel-text-primary: #e6edf3;
+  --color-sentinel-text-secondary: #8b949e;
+  --color-sentinel-text-disabled: #6e7681;
+  --color-sentinel-text-link: #58a6ff;
 
-  /* Accent Colors - Grafana/Prometheus style */
-  --color-grafana-blue: #3274d9;
-  --color-grafana-cyan: #33b5e5;
-  --color-grafana-green: #73bf69;
-  --color-grafana-yellow: #f2cc0c;
-  --color-grafana-orange: #ff9830;
-  --color-grafana-red: #f2495c;
-  --color-grafana-purple: #b877d9;
+  /* SENTINEL Brand Colors */
+  --color-sentinel-navy: #1A2B4C;
+  --color-sentinel-navy-light: #2a4a7a;
+  --color-sentinel-navy-dark: #0f1a2e;
+  --color-sentinel-amber: #F59E0B;
+  --color-sentinel-amber-light: #FBBF24;
+  --color-sentinel-amber-dark: #D97706;
+  --color-sentinel-green: #10B981;
+  --color-sentinel-green-light: #34D399;
+  --color-sentinel-red: #DC2626;
+  --color-sentinel-red-light: #EF4444;
+  --color-sentinel-blue: #3B82F6;
+  --color-sentinel-blue-light: #60A5FA;
 
-  /* Status Colors */
-  --color-status-success: #73bf69;
-  --color-status-warning: #ff9830;
-  --color-status-error: #f2495c;
-  --color-status-info: #33b5e5;
+  /* Grafana-style aliases for backward compatibility */
+  --color-grafana-bg-canvas: var(--color-sentinel-bg-canvas);
+  --color-grafana-bg-primary: var(--color-sentinel-bg-primary);
+  --color-grafana-bg-secondary: var(--color-sentinel-bg-secondary);
+  --color-grafana-bg-panel: var(--color-sentinel-bg-panel);
+  --color-grafana-border: var(--color-sentinel-border);
+  --color-grafana-border-strong: var(--color-sentinel-border-strong);
+  --color-grafana-text-primary: var(--color-sentinel-text-primary);
+  --color-grafana-text-secondary: var(--color-sentinel-text-secondary);
+  --color-grafana-text-disabled: var(--color-sentinel-text-disabled);
+  --color-grafana-text-link: var(--color-sentinel-text-link);
 
-  /* Chart Colors */
-  --color-chart-1: #73bf69;
-  --color-chart-2: #f2cc0c;
-  --color-chart-3: #ff9830;
-  --color-chart-4: #3274d9;
-  --color-chart-5: #b877d9;
-  --color-chart-6: #33b5e5;
+  /* Accent Colors - SENTINEL palette */
+  --color-grafana-blue: var(--color-sentinel-blue);
+  --color-grafana-cyan: #22d3ee;
+  --color-grafana-green: var(--color-sentinel-green);
+  --color-grafana-yellow: var(--color-sentinel-amber);
+  --color-grafana-orange: var(--color-sentinel-amber);
+  --color-grafana-red: var(--color-sentinel-red);
+  --color-grafana-purple: #a78bfa;
+
+  /* Status Colors - SENTINEL Risk Levels */
+  --color-status-success: var(--color-sentinel-green);
+  --color-status-warning: var(--color-sentinel-amber);
+  --color-status-error: var(--color-sentinel-red);
+  --color-status-info: var(--color-sentinel-blue);
+
+  /* Risk Level Colors */
+  --color-risk-critical: var(--color-sentinel-red);
+  --color-risk-high: #F97316;
+  --color-risk-elevated: var(--color-sentinel-amber);
+  --color-risk-moderate: #EAB308;
+  --color-risk-low: var(--color-sentinel-green);
+
+  /* Chart Colors - SENTINEL palette */
+  --color-chart-1: var(--color-sentinel-green);
+  --color-chart-2: var(--color-sentinel-amber);
+  --color-chart-3: var(--color-sentinel-blue);
+  --color-chart-4: #8B5CF6;
+  --color-chart-5: #EC4899;
+  --color-chart-6: #22d3ee;
 
   /* Panel styling */
-  --radius-panel: 4px;
-  --shadow-panel: 0 1px 2px rgba(0, 0, 0, 0.4);
-
-  /* Keep Bidvest brand colors as accent */
-  --color-bidvest-blue-50: #eff6ff;
-  --color-bidvest-blue-100: #dbeafe;
-  --color-bidvest-blue-200: #bfdbfe;
-  --color-bidvest-blue-300: #93c5fd;
-  --color-bidvest-blue-400: #60a5fa;
-  --color-bidvest-blue-500: #3b82f6;
-  --color-bidvest-blue-600: #3274d9;
-  --color-bidvest-blue-700: #1d4ed8;
-  --color-bidvest-blue-800: #1e40af;
-  --color-bidvest-blue-900: #1e3a8a;
+  --radius-panel: 6px;
+  --shadow-panel: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 /* Custom base styles - Dark Theme */
@@ -63,10 +91,15 @@
   }
 
   body {
-    background-color: var(--color-grafana-bg-canvas);
-    color: var(--color-grafana-text-primary);
+    background-color: var(--color-sentinel-bg-canvas);
+    color: var(--color-sentinel-text-primary);
     @apply m-0 min-h-screen;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  /* Monospace for data/code */
+  code, pre, .font-mono {
+    font-family: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
   }
 
   /* Custom scrollbar for dark theme */
@@ -236,9 +269,9 @@
   }
 
   .sidebar-item-active {
-    background: var(--color-grafana-bg-secondary);
-    color: var(--color-grafana-text-primary);
-    border-left-color: var(--color-grafana-orange);
+    background: var(--color-sentinel-bg-secondary);
+    color: var(--color-sentinel-text-primary);
+    border-left-color: var(--color-sentinel-amber);
   }
 
   .sidebar-icon {
@@ -455,8 +488,8 @@
   }
 
   .tab-item-active {
-    color: var(--color-grafana-text-primary);
-    border-bottom-color: var(--color-grafana-orange);
+    color: var(--color-sentinel-text-primary);
+    border-bottom-color: var(--color-sentinel-amber);
   }
 
   /* Loading skeleton */
@@ -477,17 +510,70 @@
     100% { background-position: -200% 0; }
   }
 
-  /* Glow effects for status */
+  /* Glow effects for status - SENTINEL colors */
   .glow-green {
-    box-shadow: 0 0 8px rgba(115, 191, 105, 0.4);
+    box-shadow: 0 0 12px rgba(16, 185, 129, 0.4);
+  }
+
+  .glow-amber {
+    box-shadow: 0 0 12px rgba(245, 158, 11, 0.4);
   }
 
   .glow-orange {
-    box-shadow: 0 0 8px rgba(255, 152, 48, 0.4);
+    box-shadow: 0 0 12px rgba(245, 158, 11, 0.4);
   }
 
   .glow-red {
-    box-shadow: 0 0 8px rgba(242, 73, 92, 0.4);
+    box-shadow: 0 0 12px rgba(220, 38, 38, 0.4);
+  }
+
+  .glow-blue {
+    box-shadow: 0 0 12px rgba(59, 130, 246, 0.4);
+  }
+
+  /* SENTINEL Shield indicator */
+  .sentinel-shield {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--color-sentinel-navy) 0%, var(--color-sentinel-navy-light) 100%);
+    border: 2px solid var(--color-sentinel-amber);
+    border-radius: 8px;
+  }
+
+  .sentinel-shield-active {
+    box-shadow: 0 0 20px rgba(245, 158, 11, 0.3);
+  }
+
+  /* Risk level badges */
+  .risk-critical {
+    background: rgba(220, 38, 38, 0.15);
+    color: var(--color-risk-critical);
+    border: 1px solid rgba(220, 38, 38, 0.3);
+  }
+
+  .risk-high {
+    background: rgba(249, 115, 22, 0.15);
+    color: var(--color-risk-high);
+    border: 1px solid rgba(249, 115, 22, 0.3);
+  }
+
+  .risk-elevated {
+    background: rgba(245, 158, 11, 0.15);
+    color: var(--color-risk-elevated);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+  }
+
+  .risk-moderate {
+    background: rgba(234, 179, 8, 0.15);
+    color: var(--color-risk-moderate);
+    border: 1px solid rgba(234, 179, 8, 0.3);
+  }
+
+  .risk-low {
+    background: rgba(16, 185, 129, 0.15);
+    color: var(--color-risk-low);
+    border: 1px solid rgba(16, 185, 129, 0.3);
   }
 }
 

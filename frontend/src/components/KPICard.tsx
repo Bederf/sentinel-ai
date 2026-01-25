@@ -1,5 +1,5 @@
 /**
- * KPICard Component - Grafana-inspired stat panel
+ * KPICard Component - SENTINEL stat panel
  *
  * Displays:
  * - Large metric value with tabular numbers
@@ -8,7 +8,7 @@
  * - Icon with accent coloring
  * - Status-based accent bar at top
  *
- * Follows Grafana stat panel design patterns.
+ * Follows SENTINEL dark theme design patterns.
  */
 
 import type { ReactNode } from "react";
@@ -56,14 +56,14 @@ export function KPICard({
   const isGood = isInverseTrend ? isNegative : isPositive;
   const isBad = isInverseTrend ? isPositive : isNegative;
 
-  // Color mapping for accents
+  // Color mapping for SENTINEL accents
   const accentColors: Record<string, string> = {
-    green: "var(--color-status-success)",
-    orange: "var(--color-status-warning)",
-    red: "var(--color-status-error)",
-    blue: "var(--color-grafana-blue)",
-    purple: "var(--color-grafana-purple)",
-    cyan: "var(--color-grafana-cyan)",
+    green: "var(--color-sentinel-green)",
+    orange: "var(--color-sentinel-amber)",
+    red: "var(--color-sentinel-red)",
+    blue: "var(--color-sentinel-blue)",
+    purple: "#a78bfa",
+    cyan: "#22d3ee",
   };
 
   // Format delta value
@@ -74,10 +74,11 @@ export function KPICard({
 
   return (
     <div
-      className={`relative overflow-hidden rounded ${onClick ? "cursor-pointer" : ""}`}
+      className={`relative overflow-hidden rounded-md ${onClick ? "cursor-pointer hover:brightness-110" : ""}`}
       style={{
-        background: "var(--color-grafana-bg-panel)",
-        border: "1px solid var(--color-grafana-border)",
+        background: "var(--color-sentinel-bg-panel)",
+        border: "1px solid var(--color-sentinel-border)",
+        transition: "all 0.15s ease",
       }}
       onClick={onClick}
     >
@@ -92,7 +93,7 @@ export function KPICard({
         <div className="flex items-start justify-between mb-3">
           <span
             className="text-xs font-medium uppercase tracking-wider"
-            style={{ color: "var(--color-grafana-text-secondary)" }}
+            style={{ color: "var(--color-sentinel-text-secondary)" }}
           >
             {title}
           </span>
@@ -113,7 +114,7 @@ export function KPICard({
         <div
           className="text-3xl font-medium mb-2"
           style={{
-            color: "var(--color-grafana-text-primary)",
+            color: "var(--color-sentinel-text-primary)",
             fontVariantNumeric: "tabular-nums",
             letterSpacing: "-0.02em",
           }}
@@ -128,15 +129,15 @@ export function KPICard({
               className="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium"
               style={{
                 background: isGood
-                  ? "rgba(115, 191, 105, 0.15)"
+                  ? "rgba(16, 185, 129, 0.15)"
                   : isBad
-                    ? "rgba(242, 73, 92, 0.15)"
+                    ? "rgba(220, 38, 38, 0.15)"
                     : "rgba(142, 142, 142, 0.15)",
                 color: isGood
-                  ? "var(--color-status-success)"
+                  ? "var(--color-sentinel-green)"
                   : isBad
-                    ? "var(--color-status-error)"
-                    : "var(--color-grafana-text-secondary)",
+                    ? "var(--color-sentinel-red)"
+                    : "var(--color-sentinel-text-secondary)",
               }}
             >
               {isPositive ? (
@@ -151,7 +152,7 @@ export function KPICard({
             {deltaText && (
               <span
                 className="text-xs"
-                style={{ color: "var(--color-grafana-text-disabled)" }}
+                style={{ color: "var(--color-sentinel-text-disabled)" }}
               >
                 {deltaText}
               </span>
@@ -163,7 +164,7 @@ export function KPICard({
         {subtitle && delta === undefined && (
           <span
             className="text-xs"
-            style={{ color: "var(--color-grafana-text-secondary)" }}
+            style={{ color: "var(--color-sentinel-text-secondary)" }}
           >
             {subtitle}
           </span>
