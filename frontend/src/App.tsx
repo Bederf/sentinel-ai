@@ -4,6 +4,7 @@ import api from "./lib/api";
 import { Chat } from "./components/Chat";
 import { Dashboard } from "./components/Dashboard";
 import { Sidebar, type View } from "./components/Sidebar";
+import { SplashScreen } from "./components/SplashScreen";
 
 interface HealthStatus {
   status: string;
@@ -11,6 +12,7 @@ interface HealthStatus {
 }
 
 function App() {
+  const [showSplash, setShowSplash] = useState(true);
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -59,6 +61,11 @@ function App() {
       day: "numeric",
     });
   };
+
+  // Show splash screen on initial load
+  if (showSplash) {
+    return <SplashScreen onComplete={() => setShowSplash(false)} />;
+  }
 
   return (
     <div
