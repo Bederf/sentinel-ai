@@ -1,8 +1,9 @@
 /**
- * Chat Component - Main chat interface with message history and input
+ * Chat Component - Grafana-inspired chat interface
  *
  * Features:
  * - Message history display with auto-scroll
+ * - Dark theme styling matching dashboard
  * - Input field with Enter key support
  * - SSE stream consumption for real-time responses
  * - Loading state during AI response
@@ -10,7 +11,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import type { FormEvent, KeyboardEvent } from "react";
-import { Send } from "lucide-react";
+import { Send, MessageSquare, Bot } from "lucide-react";
 import { ChatMessage } from "./ChatMessage";
 import { streamChat } from "../lib/api";
 
@@ -57,7 +58,7 @@ export function Chat() {
 
     try {
       let fullResponse = "";
-      
+
       // Stream the response
       await streamChat(trimmedInput, undefined, (chunk) => {
         fullResponse += chunk;
@@ -92,7 +93,7 @@ export function Chat() {
     }
   };
 
-  // Handle Enter key (Shift+Enter for newline would need textarea)
+  // Handle Enter key
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -101,39 +102,99 @@ export function Chat() {
   };
 
   return (
-    <div className="chat-container flex flex-col h-full bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+    <div
+      className="chat-container flex flex-col h-full rounded overflow-hidden"
+      style={{
+        background: "var(--color-grafana-bg-panel)",
+        border: "1px solid var(--color-grafana-border)",
+      }}
+    >
+      {/* Header */}
+      <div
+        className="flex-none p-4 flex items-center gap-3"
+        style={{ borderBottom: "1px solid var(--color-grafana-border)" }}
+      >
+        <div
+          className="p-2 rounded"
+          style={{ background: "rgba(50, 116, 217, 0.15)" }}
+        >
+          <MessageSquare
+            className="h-5 w-5"
+            style={{ color: "var(--color-grafana-blue)" }}
+          />
+        </div>
+        <div>
+          <h3
+            className="font-medium text-sm"
+            style={{ color: "var(--color-grafana-text-primary)" }}
+          >
+            FM Assistant
+          </h3>
+          <span
+            className="text-xs"
+            style={{ color: "var(--color-grafana-text-secondary)" }}
+          >
+            AI-powered facilities management support
+          </span>
+        </div>
+      </div>
+
       {/* Messages area */}
-      <div className="flex-1 overflow-y-auto p-4 pb-24 md:pb-4" role="list" aria-label="Chat messages">
+      <div
+        className="flex-1 overflow-y-auto p-4 pb-24 md:pb-4"
+        role="list"
+        aria-label="Chat messages"
+      >
         {messages.length === 0 && !isLoading && (
-          <div className="h-full flex items-center justify-center text-gray-400">
-            <p className="text-sm md:text-base">Start a conversation with the FM Assistant</p>
+          <div className="h-full flex flex-col items-center justify-center gap-4">
+            <Bot
+              className="h-16 w-16"
+              style={{ color: "var(--color-grafana-text-disabled)" }}
+            />
+            <div className="text-center">
+              <p style={{ color: "var(--color-grafana-text-secondary)" }}>
+                Start a conversation with the FM Assistant
+              </p>
+              <p
+                className="text-xs mt-2"
+                style={{ color: "var(--color-grafana-text-disabled)" }}
+              >
+                Ask about equipment status, alerts, or maintenance insights
+              </p>
+            </div>
           </div>
         )}
 
         {messages.map((msg) => (
-          <ChatMessage
-            key={msg.id}
-            role={msg.role}
-            content={msg.content}
-          />
+          <ChatMessage key={msg.id} role={msg.role} content={msg.content} />
         ))}
 
         {/* Streaming message */}
         {isLoading && streamingContent && (
-          <ChatMessage
-            role="assistant"
-            content={streamingContent}
-            isStreaming={true}
-          />
+          <ChatMessage role="assistant" content={streamingContent} isStreaming={true} />
         )}
 
         {/* Loading indicator when waiting for first chunk */}
         {isLoading && !streamingContent && (
           <div className="flex justify-start mb-4">
-            <div className="bg-gray-100 rounded-lg px-4 py-3 rounded-bl-sm">
-              <div className="flex items-center gap-2 text-gray-600">
-                <div className="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full"></div>
-                <span className="text-sm">AI is thinking...</span>
+            <div
+              className="rounded-lg px-4 py-3"
+              style={{
+                background: "var(--color-grafana-bg-secondary)",
+                border: "1px solid var(--color-grafana-border)",
+              }}
+            >
+              <div className="flex items-center gap-2">
+                <div
+                  className="animate-spin h-4 w-4 border-2 border-t-transparent rounded-full"
+                  style={{ borderColor: "var(--color-grafana-blue)", borderTopColor: "transparent" }}
+                />
+                <span
+                  className="text-sm"
+                  style={{ color: "var(--color-grafana-text-secondary)" }}
+                >
+                  AI is thinking...
+                </span>
               </div>
             </div>
           </div>
@@ -143,10 +204,14 @@ export function Chat() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input area - fixed bottom on mobile, inline on desktop */}
+      {/* Input area */}
       <form
         onSubmit={handleSubmit}
-        className="border-t border-gray-200 p-4 bg-gray-50 sticky bottom-0 md:relative"
+        className="flex-none p-4 sticky bottom-0 md:relative"
+        style={{
+          borderTop: "1px solid var(--color-grafana-border)",
+          background: "var(--color-grafana-bg-secondary)",
+        }}
       >
         <div className="flex gap-2 md:gap-3">
           <input
@@ -157,13 +222,24 @@ export function Chat() {
             onKeyDown={handleKeyDown}
             placeholder="Ask about building management..."
             disabled={isLoading}
-            className="flex-1 px-3 py-2 md:px-4 md:py-2 text-sm md:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-bidvest-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+            className="flex-1 px-3 py-2 md:px-4 md:py-2 text-sm md:text-base rounded focus:outline-none disabled:cursor-not-allowed"
+            style={{
+              background: "var(--color-grafana-bg-panel)",
+              border: "1px solid var(--color-grafana-border)",
+              color: "var(--color-grafana-text-primary)",
+            }}
             aria-label="Chat message input"
           />
           <button
             type="submit"
             disabled={isLoading || !input.trim()}
-            className="px-3 py-2 md:px-4 md:py-2 bg-bidvest-blue-600 text-white rounded-lg hover:bg-bidvest-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+            className="px-3 py-2 md:px-4 md:py-2 rounded flex items-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{
+              background: isLoading || !input.trim()
+                ? "var(--color-grafana-border)"
+                : "var(--color-grafana-blue)",
+              color: "white",
+            }}
             aria-label="Send message"
           >
             <Send className="w-4 h-4" />

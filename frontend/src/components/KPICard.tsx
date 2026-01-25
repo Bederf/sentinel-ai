@@ -1,20 +1,18 @@
 /**
- * KPICard Component - Key Performance Indicator card
+ * KPICard Component - Grafana-inspired stat panel
  *
  * Displays:
- * - Title (e.g., "Total Sites", "Active Alerts")
- * - Value (large number)
- * - Trend indicator (up/down with %)
- * - Color based on trend (green good, red bad)
+ * - Large metric value with tabular numbers
+ * - Title in uppercase with muted color
+ * - Optional trend indicator with delta
+ * - Icon with accent coloring
+ * - Status-based accent bar at top
  *
- * Uses Tremor Metric and BadgeDelta components.
- *
- * Requirement: DASH-04 - KPI cards with trend indicators
+ * Follows Grafana stat panel design patterns.
  */
 
-import { Card, Metric, Text, Flex, BadgeDelta, Tooltip } from "@tremor/react";
-import type { DeltaType } from "@tremor/react";
 import type { ReactNode } from "react";
+import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 
 export interface KPICardProps {
   /** Card title */
@@ -25,8 +23,6 @@ export interface KPICardProps {
   icon?: ReactNode;
   /** Delta/trend percentage (e.g., 12.5 for +12.5%) */
   delta?: number;
-  /** Delta type for coloring: "increase" = green, "decrease" = red, etc. */
-  deltaType?: DeltaType;
   /** Custom delta text (e.g., "vs last week") */
   deltaText?: string;
   /** Whether the trend is inverted (decrease is good, increase is bad) */
@@ -37,31 +33,8 @@ export interface KPICardProps {
   tooltip?: string;
   /** Optional click handler */
   onClick?: () => void;
-}
-
-/**
- * Determine delta type based on value and inversion
- */
-function getDeltaType(delta: number, isInverse: boolean): DeltaType {
-  if (delta === 0) return "unchanged";
-
-  const isPositive = delta > 0;
-
-  // If inverted, positive is bad (e.g., alerts increasing)
-  if (isInverse) {
-    return isPositive ? "increase" : "decrease";
-  }
-
-  // Normal: positive is good (e.g., uptime increasing)
-  return isPositive ? "increase" : "decrease";
-}
-
-/**
- * Format delta value as percentage string
- */
-function formatDelta(delta: number): string {
-  const sign = delta >= 0 ? "+" : "";
-  return `${sign}${delta.toFixed(1)}%`;
+  /** Accent color for the card */
+  accentColor?: "green" | "orange" | "red" | "blue" | "purple" | "cyan";
 }
 
 export function KPICard({
@@ -69,76 +42,134 @@ export function KPICard({
   value,
   icon,
   delta,
-  deltaType,
   deltaText,
   isInverseTrend = false,
   subtitle,
-  tooltip,
   onClick,
+  accentColor = "blue",
 }: KPICardProps) {
-  // Calculate delta type if not explicitly provided
-  const computedDeltaType = deltaType ?? (delta !== undefined ? getDeltaType(delta, isInverseTrend) : "unchanged");
+  // Determine if trend is positive based on delta and inverse setting
+  const isPositive = delta !== undefined && delta > 0;
+  const isNegative = delta !== undefined && delta < 0;
 
-  // Determine color class based on delta type and inverse setting
-  const decorationColor =
-    computedDeltaType === "increase"
-      ? (isInverseTrend ? "red" : "green")
-      : computedDeltaType === "decrease"
-        ? (isInverseTrend ? "green" : "red")
-        : "gray";
+  // Calculate actual good/bad based on inverse
+  const isGood = isInverseTrend ? isNegative : isPositive;
+  const isBad = isInverseTrend ? isPositive : isNegative;
+
+  // Color mapping for accents
+  const accentColors: Record<string, string> = {
+    green: "var(--color-status-success)",
+    orange: "var(--color-status-warning)",
+    red: "var(--color-status-error)",
+    blue: "var(--color-grafana-blue)",
+    purple: "var(--color-grafana-purple)",
+    cyan: "var(--color-grafana-cyan)",
+  };
+
+  // Format delta value
+  const formatDelta = (d: number): string => {
+    const sign = d >= 0 ? "+" : "";
+    return `${sign}${d.toFixed(1)}%`;
+  };
 
   return (
-    <Card
-      className={`p-4 transition-all duration-200 ${
-        onClick ? "cursor-pointer hover:shadow-lg hover:border-bidvest-blue-300" : ""
-      }`}
-      decoration="top"
-      decorationColor={decorationColor}
+    <div
+      className={`relative overflow-hidden rounded ${onClick ? "cursor-pointer" : ""}`}
+      style={{
+        background: "var(--color-grafana-bg-panel)",
+        border: "1px solid var(--color-grafana-border)",
+      }}
       onClick={onClick}
     >
-      <Tooltip content={tooltip}>
-        <Flex justifyContent="start" className="gap-4">
-          {/* Icon */}
+      {/* Top accent bar */}
+      <div
+        className="absolute top-0 left-0 right-0 h-1"
+        style={{ background: accentColors[accentColor] }}
+      />
+
+      <div className="p-4 pt-5">
+        {/* Header row with icon */}
+        <div className="flex items-start justify-between mb-3">
+          <span
+            className="text-xs font-medium uppercase tracking-wider"
+            style={{ color: "var(--color-grafana-text-secondary)" }}
+          >
+            {title}
+          </span>
           {icon && (
-            <div className="p-3 bg-bidvest-blue-50 rounded-lg shrink-0">
+            <div
+              className="p-2 rounded"
+              style={{
+                background: `${accentColors[accentColor]}20`,
+                color: accentColors[accentColor],
+              }}
+            >
               {icon}
             </div>
           )}
+        </div>
 
-          {/* Content */}
-          <div className="flex-1 min-w-0">
-            {/* Title */}
-            <Text className="text-gray-500 truncate">{title}</Text>
+        {/* Main metric value */}
+        <div
+          className="text-3xl font-medium mb-2"
+          style={{
+            color: "var(--color-grafana-text-primary)",
+            fontVariantNumeric: "tabular-nums",
+            letterSpacing: "-0.02em",
+          }}
+        >
+          {typeof value === "number" ? value.toLocaleString() : value}
+        </div>
 
-            {/* Value */}
-            <Metric className="text-2xl font-bold text-gray-900 mt-1">
-              {typeof value === "number" ? value.toLocaleString() : value}
-            </Metric>
-
-            {/* Trend indicator */}
-            {delta !== undefined && (
-              <Flex justifyContent="start" className="gap-2 mt-2">
-                <BadgeDelta
-                  deltaType={computedDeltaType}
-                  size="sm"
-                  isIncreasePositive={!isInverseTrend}
-                >
-                  {formatDelta(delta)}
-                </BadgeDelta>
-                {deltaText && (
-                  <Text className="text-xs text-gray-400">{deltaText}</Text>
-                )}
-              </Flex>
-            )}
-
-            {/* Subtitle (alternative to trend) */}
-            {subtitle && !delta && (
-              <Text className="text-sm text-gray-500 mt-1">{subtitle}</Text>
+        {/* Delta indicator */}
+        {delta !== undefined && (
+          <div className="flex items-center gap-2">
+            <div
+              className="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium"
+              style={{
+                background: isGood
+                  ? "rgba(115, 191, 105, 0.15)"
+                  : isBad
+                    ? "rgba(242, 73, 92, 0.15)"
+                    : "rgba(142, 142, 142, 0.15)",
+                color: isGood
+                  ? "var(--color-status-success)"
+                  : isBad
+                    ? "var(--color-status-error)"
+                    : "var(--color-grafana-text-secondary)",
+              }}
+            >
+              {isPositive ? (
+                <TrendingUp className="h-3 w-3" />
+              ) : isNegative ? (
+                <TrendingDown className="h-3 w-3" />
+              ) : (
+                <Minus className="h-3 w-3" />
+              )}
+              {formatDelta(delta)}
+            </div>
+            {deltaText && (
+              <span
+                className="text-xs"
+                style={{ color: "var(--color-grafana-text-disabled)" }}
+              >
+                {deltaText}
+              </span>
             )}
           </div>
-        </Flex>
-      </Tooltip>
-    </Card>
+        )}
+
+        {/* Subtitle (alternative to delta) */}
+        {subtitle && delta === undefined && (
+          <span
+            className="text-xs"
+            style={{ color: "var(--color-grafana-text-secondary)" }}
+          >
+            {subtitle}
+          </span>
+        )}
+      </div>
+    </div>
   );
 }
 

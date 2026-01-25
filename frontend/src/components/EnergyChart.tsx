@@ -1,23 +1,18 @@
 /**
- * EnergyChart Component - Energy consumption visualization
+ * EnergyChart Component - Grafana-inspired chart visualization
  *
- * Uses Tremor AreaChart to display stacked energy consumption by category.
+ * Uses Tremor AreaChart with dark theme styling.
  *
  * Features:
  * - Stacked area chart (HVAC, Lighting, Other)
- * - Legend with category colors
- * - Tooltip with exact kWh values
- * - Y-axis: kWh, X-axis: dates
- *
- * Props:
- * - data: Energy data points from API
- * - loading: Show loading state
+ * - Grafana-style color palette
+ * - Dark theme grid and axes
+ * - Category breakdown with colored indicators
  */
 
-import { Card, Title, AreaChart, Text, Flex } from "@tremor/react";
-import { Zap } from "lucide-react";
+import { AreaChart } from "@tremor/react";
+import { Zap, TrendingUp } from "lucide-react";
 import type { EnergyDataPoint } from "../lib/api";
-import { LoadingCard } from "./LoadingCard";
 
 interface EnergyChartProps {
   data: EnergyDataPoint[];
@@ -35,7 +30,7 @@ function formatDate(dateStr: string): string {
   });
 }
 
-// Aggregate data by date (sum across sites if "All Sites" selected)
+// Aggregate data by date
 function aggregateByDate(
   data: EnergyDataPoint[],
   selectedSiteId: string | null
@@ -45,14 +40,12 @@ function aggregateByDate(
   Lighting: number;
   Other: number;
 }> {
-  // Group by date
   const byDate: Record<
     string,
     { hvac: number; lighting: number; other: number }
   > = {};
 
   for (const point of data) {
-    // Filter by site if specified
     if (selectedSiteId && point.site_id !== selectedSiteId) {
       continue;
     }
@@ -66,7 +59,6 @@ function aggregateByDate(
     byDate[dateKey].other += point.other_kwh;
   }
 
-  // Convert to chart format and sort by date
   return Object.entries(byDate)
     .map(([date, values]) => ({
       date: formatDate(date),
@@ -75,7 +67,6 @@ function aggregateByDate(
       Other: Math.round(values.other),
     }))
     .sort((a, b) => {
-      // Parse dates back for sorting
       const dateA = new Date(a.date);
       const dateB = new Date(b.date);
       return dateA.getTime() - dateB.getTime();
@@ -101,103 +92,253 @@ export function EnergyChart({
   );
   const grandTotal = totals.hvac + totals.lighting + totals.other;
 
+  // Loading skeleton
   if (loading) {
     return (
-      <Card>
-        <Flex justifyContent="start" alignItems="center" className="gap-2 mb-4">
-          <Zap className="h-5 w-5 text-yellow-500" />
-          <Title>Energy Consumption</Title>
-        </Flex>
-        <div className="h-72">
-          <div className="animate-pulse flex flex-col h-full justify-end space-y-2 p-4">
-            <div className="h-2 bg-gray-200 rounded w-full"></div>
-            <div className="h-8 bg-gray-200 rounded w-full"></div>
-            <div className="h-16 bg-gray-200 rounded w-full"></div>
-            <div className="h-24 bg-gray-200 rounded w-full"></div>
-            <div className="h-12 bg-gray-200 rounded w-full"></div>
-            <div className="h-6 bg-gray-200 rounded w-full"></div>
-          </div>
+      <div
+        className="rounded p-4"
+        style={{
+          background: "var(--color-grafana-bg-panel)",
+          border: "1px solid var(--color-grafana-border)",
+        }}
+      >
+        <div className="flex items-center gap-2 mb-4">
+          <Zap className="h-5 w-5" style={{ color: "var(--color-grafana-yellow)" }} />
+          <span
+            className="font-medium"
+            style={{ color: "var(--color-grafana-text-primary)" }}
+          >
+            Energy Consumption
+          </span>
         </div>
-      </Card>
+        <div className="h-72 flex flex-col justify-end space-y-2">
+          {[...Array(6)].map((_, i) => (
+            <div
+              key={i}
+              className="skeleton"
+              style={{ height: `${Math.random() * 60 + 20}px` }}
+            />
+          ))}
+        </div>
+      </div>
     );
   }
 
+  // Empty state
   if (chartData.length === 0) {
     return (
-      <Card>
-        <Flex justifyContent="start" alignItems="center" className="gap-2 mb-4">
-          <Zap className="h-5 w-5 text-yellow-500" />
-          <Title>Energy Consumption</Title>
-        </Flex>
-        <div className="h-80 flex items-center justify-center">
-          <Text className="text-gray-500">No energy data available</Text>
+      <div
+        className="rounded p-4"
+        style={{
+          background: "var(--color-grafana-bg-panel)",
+          border: "1px solid var(--color-grafana-border)",
+        }}
+      >
+        <div className="flex items-center gap-2 mb-4">
+          <Zap className="h-5 w-5" style={{ color: "var(--color-grafana-yellow)" }} />
+          <span
+            className="font-medium"
+            style={{ color: "var(--color-grafana-text-primary)" }}
+          >
+            Energy Consumption
+          </span>
         </div>
-      </Card>
+        <div className="h-72 flex items-center justify-center">
+          <span style={{ color: "var(--color-grafana-text-disabled)" }}>
+            No energy data available
+          </span>
+        </div>
+      </div>
     );
   }
 
   return (
-    <Card>
-      <Flex justifyContent="between" alignItems="start" className="mb-4">
-        <div>
-          <Flex justifyContent="start" alignItems="center" className="gap-2">
-            <Zap className="h-5 w-5 text-yellow-500" />
-            <Title>Energy Consumption</Title>
-          </Flex>
-          <Text className="text-gray-500">
-            Last {days} days{" "}
-            {selectedSiteId
-              ? `- ${data.find((d) => d.site_id === selectedSiteId)?.site_name || selectedSiteId}`
-              : "- All Sites"}
-          </Text>
+    <div
+      className="rounded overflow-hidden"
+      style={{
+        background: "var(--color-grafana-bg-panel)",
+        border: "1px solid var(--color-grafana-border)",
+      }}
+    >
+      {/* Header */}
+      <div
+        className="p-4 flex items-center justify-between"
+        style={{ borderBottom: "1px solid var(--color-grafana-border)" }}
+      >
+        <div className="flex items-center gap-3">
+          <div
+            className="p-2 rounded"
+            style={{ background: "rgba(242, 204, 12, 0.15)" }}
+          >
+            <Zap className="h-5 w-5" style={{ color: "var(--color-grafana-yellow)" }} />
+          </div>
+          <div>
+            <h3
+              className="font-medium text-sm"
+              style={{ color: "var(--color-grafana-text-primary)" }}
+            >
+              Energy Consumption
+            </h3>
+            <span
+              className="text-xs"
+              style={{ color: "var(--color-grafana-text-secondary)" }}
+            >
+              Last {days} days
+              {selectedSiteId
+                ? ` • ${data.find((d) => d.site_id === selectedSiteId)?.site_name || selectedSiteId}`
+                : " • All Sites"}
+            </span>
+          </div>
         </div>
+
+        {/* Total metric */}
         <div className="text-right">
-          <Text className="font-medium text-gray-900">
-            {grandTotal.toLocaleString()} kWh
-          </Text>
-          <Text className="text-xs text-gray-500">Total consumption</Text>
+          <div className="flex items-center gap-1">
+            <TrendingUp
+              className="h-4 w-4"
+              style={{ color: "var(--color-grafana-green)" }}
+            />
+            <span
+              className="text-xl font-medium"
+              style={{
+                color: "var(--color-grafana-text-primary)",
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              {grandTotal.toLocaleString()}
+            </span>
+            <span
+              className="text-sm"
+              style={{ color: "var(--color-grafana-text-secondary)" }}
+            >
+              kWh
+            </span>
+          </div>
+          <span
+            className="text-xs"
+            style={{ color: "var(--color-grafana-text-disabled)" }}
+          >
+            Total consumption
+          </span>
         </div>
-      </Flex>
+      </div>
 
-      <AreaChart
-        className="h-72"
-        data={chartData}
-        index="date"
-        categories={["HVAC", "Lighting", "Other"]}
-        colors={["blue", "amber", "slate"]}
-        valueFormatter={(value) => `${value.toLocaleString()} kWh`}
-        showLegend={true}
-        showGridLines={true}
-        showAnimation={true}
-        stack={true}
-        curveType="monotone"
-      />
+      {/* Chart */}
+      <div className="p-4">
+        <AreaChart
+          className="h-64"
+          data={chartData}
+          index="date"
+          categories={["HVAC", "Lighting", "Other"]}
+          colors={["cyan", "amber", "slate"]}
+          valueFormatter={(value) => `${value.toLocaleString()} kWh`}
+          showLegend={false}
+          showGridLines={true}
+          showAnimation={true}
+          stack={true}
+          curveType="monotone"
+        />
+      </div>
 
-      {/* Category breakdown summary */}
-      <Flex justifyContent="center" className="gap-6 mt-4 pt-4 border-t border-gray-100">
+      {/* Category breakdown */}
+      <div
+        className="px-4 py-3 flex justify-center gap-8"
+        style={{ borderTop: "1px solid var(--color-grafana-border)" }}
+      >
+        {/* HVAC */}
         <div className="text-center">
-          <div className="flex items-center gap-1 justify-center">
-            <div className="w-3 h-3 rounded bg-blue-500" />
-            <Text className="text-xs text-gray-500">HVAC</Text>
+          <div className="flex items-center gap-2 justify-center mb-1">
+            <div
+              className="w-3 h-3 rounded"
+              style={{ background: "var(--color-grafana-cyan)" }}
+            />
+            <span
+              className="text-xs uppercase tracking-wide"
+              style={{ color: "var(--color-grafana-text-secondary)" }}
+            >
+              HVAC
+            </span>
           </div>
-          <Text className="font-medium">{totals.hvac.toLocaleString()} kWh</Text>
+          <div
+            className="text-lg font-medium"
+            style={{
+              color: "var(--color-grafana-cyan)",
+              fontVariantNumeric: "tabular-nums",
+            }}
+          >
+            {totals.hvac.toLocaleString()}
+          </div>
+          <span
+            className="text-xs"
+            style={{ color: "var(--color-grafana-text-disabled)" }}
+          >
+            kWh
+          </span>
         </div>
+
+        {/* Lighting */}
         <div className="text-center">
-          <div className="flex items-center gap-1 justify-center">
-            <div className="w-3 h-3 rounded bg-amber-500" />
-            <Text className="text-xs text-gray-500">Lighting</Text>
+          <div className="flex items-center gap-2 justify-center mb-1">
+            <div
+              className="w-3 h-3 rounded"
+              style={{ background: "var(--color-grafana-yellow)" }}
+            />
+            <span
+              className="text-xs uppercase tracking-wide"
+              style={{ color: "var(--color-grafana-text-secondary)" }}
+            >
+              Lighting
+            </span>
           </div>
-          <Text className="font-medium">{totals.lighting.toLocaleString()} kWh</Text>
+          <div
+            className="text-lg font-medium"
+            style={{
+              color: "var(--color-grafana-yellow)",
+              fontVariantNumeric: "tabular-nums",
+            }}
+          >
+            {totals.lighting.toLocaleString()}
+          </div>
+          <span
+            className="text-xs"
+            style={{ color: "var(--color-grafana-text-disabled)" }}
+          >
+            kWh
+          </span>
         </div>
+
+        {/* Other */}
         <div className="text-center">
-          <div className="flex items-center gap-1 justify-center">
-            <div className="w-3 h-3 rounded bg-slate-500" />
-            <Text className="text-xs text-gray-500">Other</Text>
+          <div className="flex items-center gap-2 justify-center mb-1">
+            <div
+              className="w-3 h-3 rounded"
+              style={{ background: "#64748b" }}
+            />
+            <span
+              className="text-xs uppercase tracking-wide"
+              style={{ color: "var(--color-grafana-text-secondary)" }}
+            >
+              Other
+            </span>
           </div>
-          <Text className="font-medium">{totals.other.toLocaleString()} kWh</Text>
+          <div
+            className="text-lg font-medium"
+            style={{
+              color: "var(--color-grafana-text-primary)",
+              fontVariantNumeric: "tabular-nums",
+            }}
+          >
+            {totals.other.toLocaleString()}
+          </div>
+          <span
+            className="text-xs"
+            style={{ color: "var(--color-grafana-text-disabled)" }}
+          >
+            kWh
+          </span>
         </div>
-      </Flex>
-    </Card>
+      </div>
+    </div>
   );
 }
 

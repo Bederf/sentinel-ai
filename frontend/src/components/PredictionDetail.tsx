@@ -1,48 +1,23 @@
 /**
- * PredictionDetail Component - Full-screen modal for prediction details
+ * PredictionDetail Component - Grafana-styled prediction details modal
  *
  * Features:
  * - Complete prediction evidence
  * - Contributing factors with weights
- * - Related work orders
  * - Similar historical failures
  * - Technician notes
  * - Financial impact analysis
- * - Cost impact analysis (NEW)
  * - Recommended actions
- *
- * Requirements:
- * - PRED-02: Full explainability with evidence breakdown
- * - PRED-03: Cost impact analysis with breakdowns
  */
 
 import { useState } from "react";
-import {
-  Dialog,
-  DialogPanel,
-  DialogTitle,
-  Divider,
-  Badge,
-  Text,
-  Title,
-  Flex,
-  Card,
-  Grid,
-  Col,
-  Callout,
-  List,
-  ListItem,
-  Metric,
-  Progress,
-  Button,
-} from "@tremor/react";
+import { Dialog, DialogPanel } from "@tremor/react";
 import {
   X,
   AlertTriangle,
   TrendingUp,
   Wrench,
   Clock,
-  DollarSign,
   FileText,
   Activity,
   CheckCircle2,
@@ -123,33 +98,42 @@ interface PredictionDetailProps {
   onClose: () => void;
 }
 
-export function PredictionDetail({
-  prediction,
-  isOpen,
-  onClose,
-}: PredictionDetailProps) {
+// Severity color configuration
+function getSeverityConfig(severity: string) {
+  switch (severity) {
+    case "critical":
+      return { color: "var(--color-status-error)", bg: "rgba(242, 73, 92, 0.15)" };
+    case "high":
+      return { color: "var(--color-status-warning)", bg: "rgba(255, 152, 48, 0.15)" };
+    case "medium":
+      return { color: "var(--color-grafana-yellow)", bg: "rgba(242, 204, 12, 0.15)" };
+    case "low":
+      return { color: "var(--color-grafana-blue)", bg: "rgba(50, 116, 217, 0.15)" };
+    default:
+      return { color: "var(--color-grafana-text-secondary)", bg: "rgba(142, 142, 142, 0.15)" };
+  }
+}
+
+function getConfidenceConfig(confidence: string) {
+  switch (confidence) {
+    case "high":
+      return { color: "var(--color-status-success)", label: "HIGH CONFIDENCE" };
+    case "medium":
+      return { color: "var(--color-grafana-yellow)", label: "MEDIUM CONFIDENCE" };
+    case "low":
+      return { color: "var(--color-grafana-text-secondary)", label: "LOW CONFIDENCE" };
+    default:
+      return { color: "var(--color-grafana-text-secondary)", label: "UNKNOWN" };
+  }
+}
+
+export function PredictionDetail({ prediction, isOpen, onClose }: PredictionDetailProps) {
   const [showCostBreakdown, setShowCostBreakdown] = useState(false);
 
   if (!isOpen) return null;
 
-  // Severity color mapping
-  const severityColors = {
-    critical: "red",
-    high: "orange",
-    medium: "yellow",
-    low: "blue",
-  } as const;
-
-  const severityColor = severityColors[prediction.severity];
-
-  // Confidence color
-  const confidenceColors = {
-    high: "emerald",
-    medium: "yellow",
-    low: "gray",
-  } as const;
-
-  const confidenceColor = confidenceColors[prediction.confidence];
+  const severityConfig = getSeverityConfig(prediction.severity);
+  const confidenceConfig = getConfidenceConfig(prediction.confidence);
 
   // Format currency
   const formatZAR = (amount: number) =>
@@ -169,440 +153,593 @@ export function PredictionDetail({
 
   return (
     <Dialog open={isOpen} onClose={onClose} className="z-50">
-      <DialogPanel className="w-full h-full md:w-2/3 md:h-auto md:max-w-5xl md:max-h-[90vh] md:overflow-y-auto">
-        {/* Mobile close button */}
-        <div className="md:hidden fixed top-4 right-4 z-50">
-          <Button
-            variant="light"
-            icon={X}
+      <DialogPanel
+        className="w-full h-full md:w-2/3 md:h-auto md:max-w-5xl md:max-h-[90vh] md:overflow-y-auto md:rounded"
+        style={{
+          background: "var(--color-grafana-bg-canvas)",
+          border: "1px solid var(--color-grafana-border)",
+        }}
+      >
+        {/* Header */}
+        <div
+          className="sticky top-0 z-10 p-4 flex items-start justify-between"
+          style={{
+            background: "var(--color-grafana-bg-primary)",
+            borderBottom: "1px solid var(--color-grafana-border)",
+          }}
+        >
+          <div>
+            <h2
+              className="text-xl font-bold mb-2"
+              style={{ color: "var(--color-grafana-text-primary)" }}
+            >
+              Failure Prediction Details
+            </h2>
+            <div className="flex flex-wrap gap-2">
+              <span
+                className="text-xs font-medium px-2 py-0.5 rounded"
+                style={{
+                  background: severityConfig.bg,
+                  color: severityConfig.color,
+                }}
+              >
+                {prediction.severity.toUpperCase()}
+              </span>
+              <span
+                className="text-xs font-medium px-2 py-0.5 rounded"
+                style={{
+                  background: `${confidenceConfig.color}20`,
+                  color: confidenceConfig.color,
+                }}
+              >
+                {confidenceConfig.label}
+              </span>
+              <span
+                className="text-xs font-medium px-2 py-0.5 rounded"
+                style={{
+                  background: "var(--color-grafana-bg-secondary)",
+                  color: "var(--color-grafana-text-secondary)",
+                }}
+              >
+                {prediction.equipment_type.toUpperCase()}
+              </span>
+            </div>
+          </div>
+          <button
             onClick={onClose}
-            className="bg-white shadow-lg"
-          />
+            className="p-2 rounded transition-colors"
+            style={{ background: "var(--color-grafana-bg-secondary)" }}
+          >
+            <X className="h-5 w-5" style={{ color: "var(--color-grafana-text-secondary)" }} />
+          </button>
         </div>
 
-        {/* Header */}
-        <Flex justifyContent="between" alignItems="start" className="mb-4 pr-12 md:pr-0">
-          <div>
-            <DialogTitle className="text-2xl font-bold text-gray-900 mb-2">
-              Failure Prediction Details
-            </DialogTitle>
-            <Flex className="gap-2">
-              <Badge color={severityColor} size="sm">
-                {prediction.severity.toUpperCase()}
-              </Badge>
-              <Badge color={confidenceColor} size="sm">
-                {prediction.confidence.toUpperCase()} CONFIDENCE
-              </Badge>
-              <Badge color="gray" size="sm">
-                {prediction.equipment_type.toUpperCase()}
-              </Badge>
-            </Flex>
+        <div className="p-4 space-y-6">
+          {/* Key Metrics Row */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <MetricCard
+              value={`${prediction.probability_percent}%`}
+              label="Failure Probability"
+              color={severityConfig.color}
+            />
+            <MetricCard
+              value={prediction.timeframe_days.toString()}
+              label="Days Until Failure"
+              color="var(--color-grafana-orange)"
+            />
+            <MetricCard
+              value={`${prediction.evidence.asset_age_years} yrs`}
+              label="Asset Age"
+              color="var(--color-grafana-cyan)"
+            />
           </div>
-          <Button
-            variant="light"
-            icon={X}
-            onClick={onClose}
-            className="tremor-Button-root"
-          />
-        </Flex>
 
-        <Divider />
-
-        {/* Probability & Timeframe */}
-        <Grid numItems={1} numItemsSm={2} numItemsMd={3} className="gap-4 mt-4 mb-6">
-          <Col>
-            <Card>
-              <Metric>{prediction.probability_percent}%</Metric>
-              <Text className="text-gray-500">Failure Probability</Text>
-            </Card>
-          </Col>
-          <Col>
-            <Card>
-              <Metric>{prediction.timeframe_days}</Metric>
-              <Text className="text-gray-500">Days Until Failure</Text>
-            </Card>
-          </Col>
-          <Col>
-            <Card>
-              <Metric>{prediction.evidence.asset_age_years} years</Metric>
-              <Text className="text-gray-500">Asset Age</Text>
-            </Card>
-          </Col>
-        </Grid>
-
-        {/* Equipment Info */}
-        <Card className="mb-6">
-          <Flex justifyContent="between" className="mb-3">
-            <div>
-              <Title className="text-xl font-semibold text-gray-900 mb-1">
-                {prediction.equipment_name}
-              </Title>
-              <Flex alignItems="center" className="gap-2">
-                <Activity className="w-4 h-4 text-gray-500" />
-                <Text className="text-gray-600">
-                  {prediction.site_name} • {prediction.equipment_type}
-                </Text>
-              </Flex>
-            </div>
-          </Flex>
-
-          <Callout
-            title={formatPredictionType(prediction.prediction_type)}
-            icon={AlertTriangle}
-            color={severityColor}
-            className="mb-3"
+          {/* Equipment Info Card */}
+          <div
+            className="rounded p-4"
+            style={{
+              background: "var(--color-grafana-bg-panel)",
+              border: "1px solid var(--color-grafana-border)",
+            }}
           >
-            Predicted failure:{" "}
-            {new Date(prediction.predicted_failure_date).toLocaleDateString(
-              "en-ZA",
-              { day: "numeric", month: "long", year: "numeric" }
-            )}
-          </Callout>
+            <h3
+              className="text-lg font-semibold mb-2"
+              style={{ color: "var(--color-grafana-text-primary)" }}
+            >
+              {prediction.equipment_name}
+            </h3>
+            <div className="flex items-center gap-2 text-sm mb-4">
+              <Activity className="h-4 w-4" style={{ color: "var(--color-grafana-text-disabled)" }} />
+              <span style={{ color: "var(--color-grafana-text-secondary)" }}>
+                {prediction.site_name} • {prediction.equipment_type}
+              </span>
+            </div>
 
-          <Flex className="gap-4">
-            <Badge color="orange" icon={Wrench} size="sm">
-              {prediction.evidence.repeat_work_orders} work orders in{" "}
-              {prediction.evidence.repeat_period_months} months
-            </Badge>
-            <Badge color="blue" icon={Clock} size="sm">
-              Expected life: {prediction.evidence.expected_life_years} years
-            </Badge>
-          </Flex>
-        </Card>
+            {/* Prediction Alert */}
+            <div
+              className="p-3 rounded flex items-start gap-3"
+              style={{
+                background: severityConfig.bg,
+                border: `1px solid ${severityConfig.color}30`,
+              }}
+            >
+              <AlertTriangle className="h-5 w-5 mt-0.5" style={{ color: severityConfig.color }} />
+              <div>
+                <span className="font-medium text-sm" style={{ color: severityConfig.color }}>
+                  {formatPredictionType(prediction.prediction_type)}
+                </span>
+                <p className="text-sm mt-1" style={{ color: "var(--color-grafana-text-secondary)" }}>
+                  Predicted failure:{" "}
+                  {new Date(prediction.predicted_failure_date).toLocaleDateString("en-ZA", {
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                  })}
+                </p>
+              </div>
+            </div>
 
-        {/* Contributing Factors */}
-        <Title className="text-lg font-semibold text-gray-900 mb-3">
-          Contributing Factors
-        </Title>
-        <Card className="mb-6">
-          <List>
-            {prediction.contributing_factors.map((factor, index) => (
-              <ListItem key={index}>
-                <div className="w-full">
-                  <Flex justifyContent="between" className="mb-2">
-                    <Text className="font-semibold text-gray-900">
+            <div className="flex gap-3 mt-4">
+              <span
+                className="text-xs px-2 py-1 rounded flex items-center gap-1"
+                style={{
+                  background: "rgba(255, 152, 48, 0.15)",
+                  color: "var(--color-status-warning)",
+                }}
+              >
+                <Wrench className="h-3 w-3" />
+                {prediction.evidence.repeat_work_orders} work orders in {prediction.evidence.repeat_period_months} months
+              </span>
+              <span
+                className="text-xs px-2 py-1 rounded flex items-center gap-1"
+                style={{
+                  background: "rgba(50, 116, 217, 0.15)",
+                  color: "var(--color-grafana-blue)",
+                }}
+              >
+                <Clock className="h-3 w-3" />
+                Expected life: {prediction.evidence.expected_life_years} years
+              </span>
+            </div>
+          </div>
+
+          {/* Contributing Factors */}
+          <SectionCard title="Contributing Factors">
+            <div className="space-y-4">
+              {prediction.contributing_factors.map((factor, index) => (
+                <div key={index}>
+                  <div className="flex justify-between mb-1">
+                    <span
+                      className="text-sm font-medium"
+                      style={{ color: "var(--color-grafana-text-primary)" }}
+                    >
                       {factor.factor}
-                    </Text>
-                    <Text className="text-sm text-gray-600">
+                    </span>
+                    <span
+                      className="text-sm"
+                      style={{ color: "var(--color-grafana-text-secondary)" }}
+                    >
                       {Math.round(factor.weight * 100)}%
-                    </Text>
-                  </Flex>
-                  <Progress value={factor.weight * 100} color={severityColor} />
-                  <Text className="text-sm text-gray-600 mt-2">
+                    </span>
+                  </div>
+                  <div
+                    className="h-2 rounded-full overflow-hidden"
+                    style={{ background: "var(--color-grafana-border)" }}
+                  >
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${factor.weight * 100}%`,
+                        background: severityConfig.color,
+                      }}
+                    />
+                  </div>
+                  <p
+                    className="text-xs mt-1"
+                    style={{ color: "var(--color-grafana-text-secondary)" }}
+                  >
                     {factor.description}
-                  </Text>
+                  </p>
                 </div>
-              </ListItem>
-            ))}
-          </List>
-        </Card>
+              ))}
+            </div>
+          </SectionCard>
 
-        {/* Cost Impact Analysis */}
-        {prediction.costImpact && (
-          <>
-            <Title className="text-lg font-semibold text-gray-900 mb-3">
-              Cost Impact Analysis
-            </Title>
+          {/* Cost Impact Analysis */}
+          {prediction.costImpact && (
+            <SectionCard title="Cost Impact Analysis">
+              {!showCostBreakdown ? (
+                <div>
+                  <CostCard costImpact={prediction.costImpact} />
+                  <button
+                    onClick={() => setShowCostBreakdown(true)}
+                    className="mt-3 text-sm flex items-center gap-1"
+                    style={{ color: "var(--color-grafana-text-link)" }}
+                  >
+                    <ChevronDown className="h-4 w-4" />
+                    View detailed breakdown
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  <CostBreakdownDetail costImpact={prediction.costImpact} />
+                  <button
+                    onClick={() => setShowCostBreakdown(false)}
+                    className="mt-3 text-sm flex items-center gap-1"
+                    style={{ color: "var(--color-grafana-text-link)" }}
+                  >
+                    <ChevronUp className="h-4 w-4" />
+                    Hide breakdown
+                  </button>
+                </div>
+              )}
+            </SectionCard>
+          )}
 
-            {!showCostBreakdown ? (
-              <Card className="mb-6">
-                <CostCard costImpact={prediction.costImpact} />
-                <Button
-                  variant="light"
-                  size="sm"
-                  icon={ChevronDown}
-                  className="mt-3"
-                  onClick={() => setShowCostBreakdown(true)}
-                >
-                  View detailed breakdown
-                </Button>
-              </Card>
-            ) : (
-              <Card className="mb-6">
-                <CostBreakdownDetail costImpact={prediction.costImpact} />
-                <Button
-                  variant="light"
-                  size="sm"
-                  icon={ChevronUp}
-                  className="mt-3"
-                  onClick={() => setShowCostBreakdown(false)}
-                >
-                  Hide breakdown
-                </Button>
-              </Card>
-            )}
-          </>
-        )}
-
-        {/* Evidence Details */}
-        <Grid numItems={1} numItemsMd={2} className="gap-4 mb-6">
-          {/* Latest Reading */}
-          <Col>
-            <Title className="text-lg font-semibold text-gray-900 mb-3">
-              Latest Reading
-            </Title>
-            <Card>
-              <Flex justifyContent="between" className="mb-3">
-                <Text className="text-gray-600">
+          {/* Evidence Details Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Latest Reading */}
+            <SectionCard title="Latest Reading">
+              <div className="flex justify-between items-start mb-3">
+                <span style={{ color: "var(--color-grafana-text-secondary)" }}>
                   {prediction.evidence.latest_reading.parameter.replace(/_/g, " ")}
-                </Text>
-                <Badge
-                  color={
-                    prediction.evidence.latest_reading.trend === "increasing"
-                      ? "red"
-                      : "blue"
-                  }
-                  icon={
-                    prediction.evidence.latest_reading.trend === "increasing"
-                      ? TrendingUp
-                      : Activity
-                  }
-                  size="xs"
+                </span>
+                <span
+                  className="text-xs px-2 py-0.5 rounded flex items-center gap-1"
+                  style={{
+                    background:
+                      prediction.evidence.latest_reading.trend === "increasing"
+                        ? "rgba(242, 73, 92, 0.15)"
+                        : "rgba(50, 116, 217, 0.15)",
+                    color:
+                      prediction.evidence.latest_reading.trend === "increasing"
+                        ? "var(--color-status-error)"
+                        : "var(--color-grafana-blue)",
+                  }}
                 >
+                  {prediction.evidence.latest_reading.trend === "increasing" ? (
+                    <TrendingUp className="h-3 w-3" />
+                  ) : (
+                    <Activity className="h-3 w-3" />
+                  )}
                   {prediction.evidence.latest_reading.trend}
-                </Badge>
-              </Flex>
-              <Metric>
+                </span>
+              </div>
+              <div
+                className="text-3xl font-bold mb-2"
+                style={{ color: "var(--color-grafana-text-primary)" }}
+              >
                 {prediction.evidence.latest_reading.value}
-                <Text className="text-sm text-gray-500 ml-2">
+                <span
+                  className="text-sm ml-2"
+                  style={{ color: "var(--color-grafana-text-disabled)" }}
+                >
                   (baseline: {prediction.evidence.latest_reading.baseline})
-                </Text>
-              </Metric>
-              <Flex className="gap-2 mt-3">
-                <div className="flex-1">
-                  <Text className="text-xs text-gray-500">Change</Text>
-                  <Text
-                    className={`text-sm font-semibold ${
-                      trendPercent > 0 ? "text-red-600" : "text-emerald-600"
-                    }`}
+                </span>
+              </div>
+              <div className="flex gap-4">
+                <div>
+                  <span
+                    className="text-xs"
+                    style={{ color: "var(--color-grafana-text-disabled)" }}
+                  >
+                    Change
+                  </span>
+                  <div
+                    className="text-sm font-semibold"
+                    style={{
+                      color: trendPercent > 0 ? "var(--color-status-error)" : "var(--color-status-success)",
+                    }}
                   >
                     {trendPercent > 0 ? "+" : ""}
                     {trendPercent}%
-                  </Text>
-                </div>
-                <div className="flex-1">
-                  <Text className="text-xs text-gray-500">Threshold</Text>
-                  <Text className="text-sm font-semibold text-gray-900">
-                    {prediction.evidence.latest_reading.threshold}
-                  </Text>
-                </div>
-              </Flex>
-            </Card>
-          </Col>
-
-          {/* Alarm Frequency */}
-          <Col>
-            <Title className="text-lg font-semibold text-gray-900 mb-3">
-              Alarm Frequency (30 days)
-            </Title>
-            <Card>
-              <List>
-                {Object.entries(prediction.evidence.alarm_frequency).map(
-                  ([alarm, count]) => (
-                    <ListItem key={alarm}>
-                      <Flex justifyContent="between" className="w-full">
-                        <Text className="text-gray-600">
-                          {alarm.replace(/_/g, " ")}
-                        </Text>
-                        <Badge color="red" size="sm">
-                          {count}
-                        </Badge>
-                      </Flex>
-                    </ListItem>
-                  )
-                )}
-              </List>
-            </Card>
-          </Col>
-        </Grid>
-
-        {/* Technician Notes */}
-        <Title className="text-lg font-semibold text-gray-900 mb-3">
-          Technician Notes
-        </Title>
-        <Card className="mb-6">
-          <List>
-            {prediction.evidence.technician_notes.map((note, index) => (
-              <ListItem key={index}>
-                <Flex className="gap-3 w-full">
-                  <FileText className="w-4 h-4 text-gray-500 mt-1" />
-                  <div className="flex-1">
-                    <Text className="text-xs text-gray-500 mb-1">
-                      {note.split(":")[0]}
-                    </Text>
-                    <Text className="text-sm text-gray-900">
-                      {note.split(":").slice(1).join(":")}
-                    </Text>
                   </div>
-                </Flex>
-              </ListItem>
-            ))}
-          </List>
-        </Card>
+                </div>
+                <div>
+                  <span
+                    className="text-xs"
+                    style={{ color: "var(--color-grafana-text-disabled)" }}
+                  >
+                    Threshold
+                  </span>
+                  <div
+                    className="text-sm font-semibold"
+                    style={{ color: "var(--color-grafana-text-primary)" }}
+                  >
+                    {prediction.evidence.latest_reading.threshold}
+                  </div>
+                </div>
+              </div>
+            </SectionCard>
 
-        {/* Cross-Site Pattern Recognition */}
-        {prediction.similar_failures.length >= 2 && (
-          <>
-            <Title className="text-lg font-semibold text-gray-900 mb-3">
-              🔍 Cross-Site Pattern Detected
-            </Title>
-            <Card className="mb-6">
-              <Text className="text-gray-700 mb-3">
-                This vibration pattern matches failures at{" "}
-                {prediction.similar_failures.length} other sites:
-              </Text>
-              <List className="mb-3">
-                {prediction.similar_failures.map((failure, index) => (
-                  <ListItem key={index}>
-                    <Flex justifyContent="between" className="w-full">
-                      <Text className="font-semibold text-gray-900">
-                        {failure.site} {failure.equipment}
-                      </Text>
-                      <Badge color="red" size="sm">
-                        failed
-                      </Badge>
-                    </Flex>
-                  </ListItem>
+            {/* Alarm Frequency */}
+            <SectionCard title="Alarm Frequency (30 days)">
+              <div className="space-y-2">
+                {Object.entries(prediction.evidence.alarm_frequency).map(([alarm, count]) => (
+                  <div key={alarm} className="flex justify-between items-center">
+                    <span
+                      className="text-sm"
+                      style={{ color: "var(--color-grafana-text-secondary)" }}
+                    >
+                      {alarm.replace(/_/g, " ")}
+                    </span>
+                    <span
+                      className="text-xs font-medium px-2 py-0.5 rounded"
+                      style={{
+                        background: "rgba(242, 73, 92, 0.15)",
+                        color: "var(--color-status-error)",
+                      }}
+                    >
+                      {count}
+                    </span>
+                  </div>
                 ))}
-              </List>
-              <Callout
-                title="Pattern Recognition Insight"
-                icon={TrendingUp}
-                color="blue"
-              >
-                "{prediction.site_name},{" "}
-                {prediction.similar_failures
-                  .slice(0, 2)
-                  .map((f) => f.site)
-                  .join(", ")}
-                {prediction.similar_failures.length > 2 && "..."} all showing this
-                early warning pattern."
-              </Callout>
-            </Card>
-          </>
-        )}
+              </div>
+            </SectionCard>
+          </div>
 
-        {/* Similar Failures */}
-        {prediction.similar_failures.length > 0 && (
-          <>
-            <Title className="text-lg font-semibold text-gray-900 mb-3">
-              Similar Historical Failures
-            </Title>
-            <Card className="mb-6">
-              <List>
+          {/* Technician Notes */}
+          <SectionCard title="Technician Notes">
+            <div className="space-y-3">
+              {prediction.evidence.technician_notes.map((note, index) => (
+                <div key={index} className="flex gap-3">
+                  <FileText
+                    className="h-4 w-4 mt-0.5 flex-shrink-0"
+                    style={{ color: "var(--color-grafana-text-disabled)" }}
+                  />
+                  <div>
+                    <span
+                      className="text-xs"
+                      style={{ color: "var(--color-grafana-text-disabled)" }}
+                    >
+                      {note.split(":")[0]}
+                    </span>
+                    <p
+                      className="text-sm"
+                      style={{ color: "var(--color-grafana-text-primary)" }}
+                    >
+                      {note.split(":").slice(1).join(":")}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </SectionCard>
+
+          {/* Similar Failures */}
+          {prediction.similar_failures.length > 0 && (
+            <SectionCard title="Similar Historical Failures">
+              <div className="space-y-3">
                 {prediction.similar_failures.map((failure, index) => (
-                  <ListItem key={index}>
-                    <div className="w-full">
-                      <Flex justifyContent="between" className="mb-2">
-                        <Text className="font-semibold text-gray-900">
-                          {failure.site} - {failure.equipment}
-                        </Text>
-                        <XCircle className="w-4 h-4 text-red-500" />
-                      </Flex>
-                      <Text className="text-sm text-gray-600 mb-2">
-                        Failed:{" "}
-                        {new Date(failure.failure_date).toLocaleDateString(
-                          "en-ZA",
-                          { day: "numeric", month: "short", year: "numeric" }
-                        )}
-                      </Text>
-                      <Flex className="gap-1 flex-wrap">
-                        {failure.common_factors.map((factor, i) => (
-                          <Badge key={i} color="gray" size="xs">
-                            {factor}
-                          </Badge>
-                        ))}
-                      </Flex>
+                  <div
+                    key={index}
+                    className="p-3 rounded"
+                    style={{
+                      background: "var(--color-grafana-bg-secondary)",
+                      border: "1px solid var(--color-grafana-border)",
+                    }}
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <span
+                        className="font-medium text-sm"
+                        style={{ color: "var(--color-grafana-text-primary)" }}
+                      >
+                        {failure.site} - {failure.equipment}
+                      </span>
+                      <XCircle className="h-4 w-4" style={{ color: "var(--color-status-error)" }} />
                     </div>
-                  </ListItem>
+                    <p
+                      className="text-xs mb-2"
+                      style={{ color: "var(--color-grafana-text-secondary)" }}
+                    >
+                      Failed:{" "}
+                      {new Date(failure.failure_date).toLocaleDateString("en-ZA", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      })}
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {failure.common_factors.map((factor, i) => (
+                        <span
+                          key={i}
+                          className="text-xs px-1.5 py-0.5 rounded"
+                          style={{
+                            background: "var(--color-grafana-bg-panel)",
+                            color: "var(--color-grafana-text-secondary)",
+                          }}
+                        >
+                          {factor}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
                 ))}
-              </List>
-            </Card>
-          </>
-        )}
+              </div>
+            </SectionCard>
+          )}
 
-        {/* Financial Impact */}
-        <Title className="text-lg font-semibold text-gray-900 mb-3">
-          Financial Impact Analysis
-        </Title>
-        <Card className="mb-6">
-          <Grid numItems={1} numItemsSm={2} numItemsMd={2} className="gap-4">
-            <Col>
-              <Metric>{formatZAR(prediction.financial_impact.repair_cost_zar)}</Metric>
-              <Text className="text-gray-500">Repair Cost</Text>
-            </Col>
-            <Col>
-              <Metric>
-                {formatZAR(prediction.financial_impact.potential_loss_zar)}
-              </Metric>
-              <Text className="text-gray-500">Potential Loss</Text>
-            </Col>
-            <Col>
-              <Metric>
-                {formatZAR(
-                  prediction.financial_impact.potential_loss_zar -
-                    prediction.financial_impact.repair_cost_zar
-                )}
-              </Metric>
-              <Text className="text-gray-500">Potential Savings</Text>
-            </Col>
-            <Col>
-              <Metric>{prediction.financial_impact.estimated_repair_hours}h</Metric>
-              <Text className="text-gray-500">Estimated Downtime</Text>
-            </Col>
-          </Grid>
-        </Card>
+          {/* Financial Impact */}
+          <SectionCard title="Financial Impact Analysis">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div>
+                <div
+                  className="text-xl font-bold"
+                  style={{ color: "var(--color-grafana-text-primary)" }}
+                >
+                  {formatZAR(prediction.financial_impact.repair_cost_zar)}
+                </div>
+                <span
+                  className="text-xs"
+                  style={{ color: "var(--color-grafana-text-secondary)" }}
+                >
+                  Repair Cost
+                </span>
+              </div>
+              <div>
+                <div
+                  className="text-xl font-bold"
+                  style={{ color: "var(--color-status-error)" }}
+                >
+                  {formatZAR(prediction.financial_impact.potential_loss_zar)}
+                </div>
+                <span
+                  className="text-xs"
+                  style={{ color: "var(--color-grafana-text-secondary)" }}
+                >
+                  Potential Loss
+                </span>
+              </div>
+              <div>
+                <div
+                  className="text-xl font-bold"
+                  style={{ color: "var(--color-status-success)" }}
+                >
+                  {formatZAR(
+                    prediction.financial_impact.potential_loss_zar -
+                      prediction.financial_impact.repair_cost_zar
+                  )}
+                </div>
+                <span
+                  className="text-xs"
+                  style={{ color: "var(--color-grafana-text-secondary)" }}
+                >
+                  Potential Savings
+                </span>
+              </div>
+              <div>
+                <div
+                  className="text-xl font-bold"
+                  style={{ color: "var(--color-grafana-orange)" }}
+                >
+                  {prediction.financial_impact.estimated_repair_hours}h
+                </div>
+                <span
+                  className="text-xs"
+                  style={{ color: "var(--color-grafana-text-secondary)" }}
+                >
+                  Est. Downtime
+                </span>
+              </div>
+            </div>
+          </SectionCard>
 
-        {/* Recommended Action */}
-        <Title className="text-lg font-semibold text-gray-900 mb-3">
-          Recommended Action
-        </Title>
-        <Callout
-          title={prediction.urgency.toUpperCase()}
-          icon={CheckCircle2}
-          color={severityColor}
-          className="mb-4"
-        >
-          {prediction.recommended_action}
-        </Callout>
+          {/* Recommended Action */}
+          <div
+            className="p-4 rounded"
+            style={{
+              background: severityConfig.bg,
+              border: `1px solid ${severityConfig.color}30`,
+            }}
+          >
+            <div className="flex items-start gap-3">
+              <CheckCircle2 className="h-5 w-5 mt-0.5" style={{ color: severityConfig.color }} />
+              <div>
+                <span className="text-sm font-semibold" style={{ color: severityConfig.color }}>
+                  {prediction.urgency.toUpperCase()}
+                </span>
+                <p
+                  className="text-sm mt-1"
+                  style={{ color: "var(--color-grafana-text-primary)" }}
+                >
+                  {prediction.recommended_action}
+                </p>
+              </div>
+            </div>
+          </div>
 
-        {/* Parts Required */}
-        <Card>
-          <Title className="text-base font-semibold text-gray-900 mb-3">
-            Parts Required
-          </Title>
-          <List>
-            {prediction.parts_required.map((part, index) => (
-              <ListItem key={index}>
-                <Flex className="gap-2">
-                  <Wrench className="w-4 h-4 text-gray-500" />
-                  <Text className="text-gray-900">{part}</Text>
-                </Flex>
-              </ListItem>
-            ))}
-          </List>
-        </Card>
+          {/* Parts Required */}
+          <SectionCard title="Parts Required">
+            <div className="space-y-2">
+              {prediction.parts_required.map((part, index) => (
+                <div key={index} className="flex items-center gap-2">
+                  <Wrench
+                    className="h-4 w-4"
+                    style={{ color: "var(--color-grafana-text-disabled)" }}
+                  />
+                  <span style={{ color: "var(--color-grafana-text-primary)" }}>{part}</span>
+                </div>
+              ))}
+            </div>
+          </SectionCard>
 
-        {/* Footer */}
-        <Flex justifyContent="end" className="mt-6 gap-2">
-          <Button variant="light" onClick={onClose}>
-            Close
-          </Button>
-          <Button color={severityColor} icon={Wrench}>
-            Schedule Maintenance
-          </Button>
-        </Flex>
+          {/* Footer Actions */}
+          <div className="flex justify-end gap-3 pt-4">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 rounded text-sm font-medium transition-colors"
+              style={{
+                background: "var(--color-grafana-bg-secondary)",
+                color: "var(--color-grafana-text-primary)",
+                border: "1px solid var(--color-grafana-border)",
+              }}
+            >
+              Close
+            </button>
+            <button
+              className="px-4 py-2 rounded text-sm font-medium flex items-center gap-2 transition-colors"
+              style={{
+                background: severityConfig.color,
+                color: "white",
+              }}
+            >
+              <Wrench className="h-4 w-4" />
+              Schedule Maintenance
+            </button>
+          </div>
+        </div>
       </DialogPanel>
     </Dialog>
   );
 }
 
-/**
- * Format prediction type for display
- */
+// Helper Components
+function MetricCard({ value, label, color }: { value: string; label: string; color: string }) {
+  return (
+    <div
+      className="rounded p-4 text-center"
+      style={{
+        background: "var(--color-grafana-bg-panel)",
+        border: "1px solid var(--color-grafana-border)",
+      }}
+    >
+      <div className="text-3xl font-bold mb-1" style={{ color }}>
+        {value}
+      </div>
+      <span className="text-xs" style={{ color: "var(--color-grafana-text-secondary)" }}>
+        {label}
+      </span>
+    </div>
+  );
+}
+
+function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div
+      className="rounded overflow-hidden"
+      style={{
+        background: "var(--color-grafana-bg-panel)",
+        border: "1px solid var(--color-grafana-border)",
+      }}
+    >
+      <div
+        className="px-4 py-3"
+        style={{ borderBottom: "1px solid var(--color-grafana-border)" }}
+      >
+        <h3 className="font-semibold text-sm" style={{ color: "var(--color-grafana-text-primary)" }}>
+          {title}
+        </h3>
+      </div>
+      <div className="p-4">{children}</div>
+    </div>
+  );
+}
+
 function formatPredictionType(type: string): string {
   return type
     .split("_")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
 }
+
+export default PredictionDetail;

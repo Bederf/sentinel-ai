@@ -1,33 +1,17 @@
 /**
- * Dashboard Component - Main dashboard view with grid layout
+ * Dashboard Component - Grafana-inspired main dashboard view
  *
  * Features:
- * - Top row: 4 KPI cards (sites, equipment, alerts, anomalies)
- * - Left column: Site grid using SiteCard components
- * - Right column: AlertFeed with auto-refresh
- * - Middle: Energy consumption charts with site and time period selection
- * - Bottom: AI Predictions & Anomalies section
+ * - Top row: 5 KPI stat panels
+ * - Left column: Site overview grid
+ * - Right column: Alert feed
+ * - Middle: Energy consumption chart with filters
+ * - Bottom: AI Failure Predictions
  *
- * Requirements:
- * - DASH-01: Multi-site overview with all 15 sites
- * - DASH-02: Alert feed with severity colors
- * - DASH-03: Energy consumption charts
- * - DASH-04: KPI cards with trend indicators
+ * Follows Grafana dashboard design with dark theme panels.
  */
 
 import { useState, useEffect } from "react";
-import {
-  Card,
-  Title,
-  Text,
-  Grid,
-  Col,
-  Badge,
-  Flex,
-  TabGroup,
-  TabList,
-  Tab,
-} from "@tremor/react";
 import {
   Building2,
   AlertTriangle,
@@ -35,17 +19,16 @@ import {
   TrendingUp,
   Bell,
   DollarSign,
+  RefreshCw,
 } from "lucide-react";
 import api from "../lib/api";
 import type { DashboardStats, Site, Prediction, EnergyDataPoint } from "../lib/api";
 import { KPICard } from "./KPICard";
 import { SiteCard } from "./SiteCard";
 import { AlertFeed } from "./AlertFeed";
-import { SiteSelector } from "./SiteSelector";
 import { EnergyChart } from "./EnergyChart";
 import { PredictionCard } from "./PredictionCard";
 import { PredictionDetail } from "./PredictionDetail";
-import { LoadingCard } from "./LoadingCard";
 
 // Time period options for energy chart
 const TIME_PERIODS = [7, 30, 90] as const;
@@ -72,8 +55,6 @@ export function Dashboard() {
     const loadDashboardData = async () => {
       try {
         setLoading(true);
-        // Load stats, sites, and predictions in parallel
-        // AlertFeed fetches its own data
         const [statsData, sitesData, predictionsData] = await Promise.all([
           api.getStats(),
           api.getSites(),
@@ -118,8 +99,8 @@ export function Dashboard() {
 
   // Calculate total potential savings from all predictions
   const totalPotentialSavings = predictions.reduce((sum, prediction) => {
-    if (prediction.costImpact) {
-      return sum + prediction.costImpact.potentialSavings;
+    if (prediction.financial_impact) {
+      return sum + prediction.financial_impact.potential_loss_zar;
     }
     return sum;
   }, 0);
@@ -133,13 +114,12 @@ export function Dashboard() {
       maximumFractionDigits: 0,
     }).format(amount);
 
-  // Handle site card click (placeholder for future navigation)
+  // Handle site card click
   const handleSiteClick = (site: Site) => {
     console.log("Site clicked:", site.name);
-    // Future: navigate to site details page
   };
 
-  // Handle prediction card click - open detail modal
+  // Handle prediction card click
   const handlePredictionClick = (prediction: Prediction) => {
     setSelectedPrediction(prediction);
     setIsPredictionDetailOpen(true);
@@ -151,181 +131,259 @@ export function Dashboard() {
     setSelectedPrediction(null);
   };
 
+  // Loading state
   if (loading) {
     return (
-      <div className="h-full flex items-center justify-center">
+      <div
+        className="h-full flex items-center justify-center"
+        style={{ background: "var(--color-grafana-bg-canvas)" }}
+      >
         <div className="text-center">
-          <div className="animate-spin h-8 w-8 border-4 border-bidvest-blue-600 border-t-transparent rounded-full mx-auto mb-4" />
-          <Text>Loading dashboard data...</Text>
+          <RefreshCw
+            className="h-8 w-8 animate-spin mx-auto mb-4"
+            style={{ color: "var(--color-grafana-orange)" }}
+          />
+          <span style={{ color: "var(--color-grafana-text-secondary)" }}>
+            Loading dashboard data...
+          </span>
         </div>
       </div>
     );
   }
 
+  // Error state
   if (error) {
     return (
-      <div className="h-full flex items-center justify-center">
-        <Card className="p-8 text-center">
-          <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-          <Title>Error Loading Dashboard</Title>
-          <Text className="text-gray-500">{error}</Text>
-        </Card>
+      <div
+        className="h-full flex items-center justify-center"
+        style={{ background: "var(--color-grafana-bg-canvas)" }}
+      >
+        <div
+          className="p-8 rounded text-center"
+          style={{
+            background: "var(--color-grafana-bg-panel)",
+            border: "1px solid var(--color-grafana-border)",
+          }}
+        >
+          <AlertTriangle
+            className="h-12 w-12 mx-auto mb-4"
+            style={{ color: "var(--color-status-error)" }}
+          />
+          <h2
+            className="text-lg font-medium mb-2"
+            style={{ color: "var(--color-grafana-text-primary)" }}
+          >
+            Error Loading Dashboard
+          </h2>
+          <p style={{ color: "var(--color-grafana-text-secondary)" }}>{error}</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="h-full overflow-y-auto p-6">
-      {/* Header */}
-      <div className="mb-6">
-        <Title className="text-2xl font-bold text-gray-900">Dashboard</Title>
-        <Text className="text-gray-500">
-          Facilities Management Overview - Real-time monitoring
-        </Text>
-      </div>
-
-      {/* KPI Row - DASH-04 */}
-      <Grid numItems={1} numItemsSm={2} numItemsLg={5} className="gap-4 mb-6">
-        {!stats ? (
-          // Loading skeletons for KPI cards
+    <div
+      className="h-full overflow-y-auto p-4 md:p-6"
+      style={{ background: "var(--color-grafana-bg-canvas)" }}
+    >
+      {/* KPI Row */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+        {stats && (
           <>
-            {[1, 2, 3, 4, 5].map((i) => (
-              <Col key={i}>
-                <LoadingCard height="h-24" />
-              </Col>
-            ))}
-          </>
-        ) : (
-          <>
-            <Col>
-              <KPICard
-                title="Total Sites"
-                value={stats.total_sites}
-                icon={<Building2 className="h-6 w-6 text-bidvest-blue-600" />}
-                subtitle={`${normalSites} healthy, ${warningSites} warning`}
-              />
-            </Col>
-            <Col>
-              <KPICard
-                title="Equipment"
-                value={stats.total_equipment}
-                icon={<Cpu className="h-6 w-6 text-bidvest-blue-600" />}
-                delta={stats.uptime_percent ? stats.uptime_percent - 95 : 0}
-                deltaText="vs 95% target"
-              />
-            </Col>
-            <Col>
-              <KPICard
-                title="Active Alerts"
-                value={stats.active_alerts}
-                icon={<Bell className="h-6 w-6 text-amber-500" />}
-                delta={stats.critical_alerts ? -(stats.critical_alerts * 10) : 0}
-                isInverseTrend={true}
-                deltaText={`${stats.critical_alerts} critical`}
-              />
-            </Col>
-            <Col>
-              <KPICard
-                title="Potential Savings"
-                value={formatZAR(totalPotentialSavings)}
-                icon={<DollarSign className="h-6 w-6 text-emerald-600" />}
-                subtitle="If all preventive actions taken"
-                tooltip="Total savings if all preventive maintenance actions are completed"
-              />
-            </Col>
-            <Col>
-              <KPICard
-                title="AI Predictions"
-                value={predictions.length}
-                icon={<TrendingUp className="h-6 w-6 text-purple-500" />}
-                subtitle="Failure predictions detected"
-              />
-            </Col>
+            <KPICard
+              title="Total Sites"
+              value={stats.total_sites}
+              icon={<Building2 className="h-5 w-5" />}
+              subtitle={`${normalSites} healthy, ${warningSites} warning`}
+              accentColor="blue"
+            />
+            <KPICard
+              title="Equipment"
+              value={stats.total_equipment}
+              icon={<Cpu className="h-5 w-5" />}
+              delta={stats.uptime_percent ? stats.uptime_percent - 95 : 0}
+              deltaText="vs 95% target"
+              accentColor="cyan"
+            />
+            <KPICard
+              title="Active Alerts"
+              value={stats.active_alerts}
+              icon={<Bell className="h-5 w-5" />}
+              delta={stats.critical_alerts ? -(stats.critical_alerts * 10) : 0}
+              isInverseTrend={true}
+              deltaText={`${stats.critical_alerts} critical`}
+              accentColor="orange"
+            />
+            <KPICard
+              title="Potential Savings"
+              value={formatZAR(totalPotentialSavings)}
+              icon={<DollarSign className="h-5 w-5" />}
+              subtitle="If all preventive actions taken"
+              accentColor="green"
+            />
+            <KPICard
+              title="AI Predictions"
+              value={predictions.length}
+              icon={<TrendingUp className="h-5 w-5" />}
+              subtitle="Failure predictions detected"
+              accentColor="purple"
+            />
           </>
         )}
-      </Grid>
+      </div>
 
       {/* Main Content Grid - Two Columns */}
-      <Grid numItems={1} numItemsMd={1} numItemsLg={3} className="gap-6">
-        {/* Left Column - Site Overview Grid (2/3 width on large) - DASH-01 */}
-        <Col numColSpan={1} numColSpanMd={1} numColSpanLg={2}>
-          <Card className="h-full">
-            <Flex justifyContent="between" alignItems="center" className="mb-4 flex-wrap gap-2">
-              <Title>Site Overview</Title>
-              {sites.length > 0 && (
-                <Badge color="blue" size="sm">
-                  {sites.length} sites
-                </Badge>
-              )}
-            </Flex>
-
-            {sites.length === 0 && loading ? (
-              // Loading skeletons for sites
-              <Grid numItems={1} numItemsSm={1} numItemsMd={2} numItemsLg={3} className="gap-4">
-                {[1, 2, 3, 4, 5, 6].map((i) => (
-                  <Col key={i}>
-                    <LoadingCard height="h-32" />
-                  </Col>
-                ))}
-              </Grid>
-            ) : sites.length === 0 ? (
-              <div className="text-center py-8">
-                <Building2 className="h-12 w-12 text-gray-300 mx-auto mb-2" />
-                <Text className="text-gray-500">No sites available</Text>
-              </div>
-            ) : (
-              <Grid numItems={1} numItemsSm={1} numItemsMd={2} numItemsLg={3} className="gap-4">
-                {sites.map((site) => (
-                  <Col key={site.id}>
-                    <SiteCard site={site} onClick={handleSiteClick} />
-                  </Col>
-                ))}
-              </Grid>
-            )}
-          </Card>
-        </Col>
-
-        {/* Right Column - Alerts Feed (1/3 width on large) - DASH-02 */}
-        <Col numColSpan={1} numColSpanLg={1}>
-          <AlertFeed
-            limit={10}
-            refreshInterval={30000}
-          />
-        </Col>
-      </Grid>
-
-      {/* Energy Consumption Section - DASH-03 */}
-      <div className="mt-6">
-        <Card className="overflow-x-auto">
-          <Flex
-            justifyContent="between"
-            alignItems="center"
-            className="mb-4 flex-wrap gap-4"
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Column - Site Overview Grid (2/3 width on large) */}
+        <div className="lg:col-span-2">
+          <div
+            className="rounded overflow-hidden"
+            style={{
+              background: "var(--color-grafana-bg-panel)",
+              border: "1px solid var(--color-grafana-border)",
+            }}
           >
-            <Title>Energy Analytics</Title>
-            <Flex className="gap-4 flex-wrap">
-              {/* Site Filter */}
-              <div className="w-full sm:w-48">
-                <SiteSelector
-                  sites={sites}
-                  selectedSiteId={selectedSiteId}
-                  onSiteChange={setSelectedSiteId}
-                />
+            {/* Panel Header */}
+            <div
+              className="p-4 flex items-center justify-between"
+              style={{ borderBottom: "1px solid var(--color-grafana-border)" }}
+            >
+              <div className="flex items-center gap-3">
+                <div
+                  className="p-2 rounded"
+                  style={{ background: "rgba(50, 116, 217, 0.15)" }}
+                >
+                  <Building2
+                    className="h-5 w-5"
+                    style={{ color: "var(--color-grafana-blue)" }}
+                  />
+                </div>
+                <div>
+                  <h3
+                    className="font-medium text-sm"
+                    style={{ color: "var(--color-grafana-text-primary)" }}
+                  >
+                    Site Overview
+                  </h3>
+                  <span
+                    className="text-xs"
+                    style={{ color: "var(--color-grafana-text-secondary)" }}
+                  >
+                    {sites.length} sites monitored
+                  </span>
+                </div>
               </div>
-              {/* Time Period Tabs */}
-              <TabGroup
-                index={TIME_PERIODS.indexOf(selectedDays)}
-                onIndexChange={(index) => setSelectedDays(TIME_PERIODS[index])}
+              <span
+                className="text-xs px-2 py-1 rounded"
+                style={{
+                  background: "rgba(115, 191, 105, 0.15)",
+                  color: "var(--color-status-success)",
+                }}
               >
-                <TabList variant="solid">
-                  <Tab>7d</Tab>
-                  <Tab>30d</Tab>
-                  <Tab>90d</Tab>
-                </TabList>
-              </TabGroup>
-            </Flex>
-          </Flex>
-          <div className="min-w-[600px] sm:min-w-0">
+                {normalSites} healthy
+              </span>
+            </div>
+
+            {/* Sites Grid */}
+            <div className="p-4">
+              {sites.length === 0 ? (
+                <div className="text-center py-8">
+                  <Building2
+                    className="h-12 w-12 mx-auto mb-2"
+                    style={{ color: "var(--color-grafana-text-disabled)" }}
+                  />
+                  <span style={{ color: "var(--color-grafana-text-secondary)" }}>
+                    No sites available
+                  </span>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                  {sites.map((site) => (
+                    <SiteCard key={site.id} site={site} onClick={handleSiteClick} />
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column - Alerts Feed (1/3 width on large) */}
+        <div className="lg:col-span-1">
+          <AlertFeed limit={10} refreshInterval={30000} />
+        </div>
+      </div>
+
+      {/* Energy Consumption Section */}
+      <div className="mt-6">
+        <div
+          className="rounded overflow-hidden"
+          style={{
+            background: "var(--color-grafana-bg-panel)",
+            border: "1px solid var(--color-grafana-border)",
+          }}
+        >
+          {/* Panel Header with Filters */}
+          <div
+            className="p-4 flex flex-wrap items-center justify-between gap-4"
+            style={{ borderBottom: "1px solid var(--color-grafana-border)" }}
+          >
+            <h3
+              className="font-medium text-sm"
+              style={{ color: "var(--color-grafana-text-primary)" }}
+            >
+              Energy Analytics
+            </h3>
+
+            <div className="flex items-center gap-4">
+              {/* Site Filter */}
+              <select
+                value={selectedSiteId || ""}
+                onChange={(e) => setSelectedSiteId(e.target.value || null)}
+                className="text-sm rounded px-3 py-1.5"
+                style={{
+                  background: "var(--color-grafana-bg-secondary)",
+                  border: "1px solid var(--color-grafana-border)",
+                  color: "var(--color-grafana-text-primary)",
+                }}
+              >
+                <option value="">All Sites</option>
+                {sites.map((site) => (
+                  <option key={site.id} value={site.id}>
+                    {site.name}
+                  </option>
+                ))}
+              </select>
+
+              {/* Time Period Tabs */}
+              <div
+                className="flex rounded overflow-hidden"
+                style={{ border: "1px solid var(--color-grafana-border)" }}
+              >
+                {TIME_PERIODS.map((period) => (
+                  <button
+                    key={period}
+                    onClick={() => setSelectedDays(period)}
+                    className="px-3 py-1.5 text-xs font-medium transition-colors"
+                    style={{
+                      background:
+                        selectedDays === period
+                          ? "var(--color-grafana-orange)"
+                          : "var(--color-grafana-bg-secondary)",
+                      color:
+                        selectedDays === period
+                          ? "white"
+                          : "var(--color-grafana-text-secondary)",
+                    }}
+                  >
+                    {period}d
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Chart Container */}
+          <div className="p-4">
             <EnergyChart
               data={energyData}
               loading={energyLoading}
@@ -333,49 +391,97 @@ export function Dashboard() {
               days={selectedDays}
             />
           </div>
-        </Card>
+        </div>
       </div>
 
-      {/* Bottom Area - AI Failure Predictions */}
+      {/* AI Failure Predictions Section */}
       <div className="mt-6">
-        <Card>
-          <Flex justifyContent="between" alignItems="center" className="mb-4 flex-wrap gap-2">
-            <Title>AI Failure Predictions</Title>
-            {predictions.length > 0 && (
-              <Badge color="purple" size="sm">
-                {predictions.length} at-risk | {formatZAR(totalPotentialSavings)} savings
-              </Badge>
-            )}
-          </Flex>
-          <div>
-            {predictions.length === 0 && loading ? (
-              // Loading skeletons for predictions
-              <Grid numItems={1} numItemsSm={1} numItemsMd={2} numItemsLg={3} className="gap-4">
-                {[1, 2, 3].map((i) => (
-                  <Col key={i}>
-                    <LoadingCard height="h-40" />
-                  </Col>
-                ))}
-              </Grid>
-            ) : predictions.length === 0 ? (
-              <div className="text-center py-8">
-                <TrendingUp className="h-12 w-12 text-gray-300 mx-auto mb-2" />
-                <Text className="text-gray-500">No failure predictions</Text>
+        <div
+          className="rounded overflow-hidden"
+          style={{
+            background: "var(--color-grafana-bg-panel)",
+            border: "1px solid var(--color-grafana-border)",
+          }}
+        >
+          {/* Panel Header */}
+          <div
+            className="p-4 flex items-center justify-between"
+            style={{ borderBottom: "1px solid var(--color-grafana-border)" }}
+          >
+            <div className="flex items-center gap-3">
+              <div
+                className="p-2 rounded"
+                style={{ background: "rgba(184, 119, 217, 0.15)" }}
+              >
+                <TrendingUp
+                  className="h-5 w-5"
+                  style={{ color: "var(--color-grafana-purple)" }}
+                />
               </div>
-            ) : (
-              <Grid numItems={1} numItemsSm={1} numItemsMd={2} numItemsLg={3} className="gap-4">
-                {predictions.map((prediction) => (
-                  <Col key={prediction.id}>
-                    <PredictionCard
-                      prediction={prediction}
-                      onClick={() => handlePredictionClick(prediction)}
-                    />
-                  </Col>
-                ))}
-              </Grid>
+              <div>
+                <h3
+                  className="font-medium text-sm"
+                  style={{ color: "var(--color-grafana-text-primary)" }}
+                >
+                  AI Failure Predictions
+                </h3>
+                <span
+                  className="text-xs"
+                  style={{ color: "var(--color-grafana-text-secondary)" }}
+                >
+                  Predictive maintenance insights
+                </span>
+              </div>
+            </div>
+            {predictions.length > 0 && (
+              <div className="flex items-center gap-2">
+                <span
+                  className="text-xs px-2 py-1 rounded"
+                  style={{
+                    background: "rgba(184, 119, 217, 0.15)",
+                    color: "var(--color-grafana-purple)",
+                  }}
+                >
+                  {predictions.length} at-risk
+                </span>
+                <span
+                  className="text-xs px-2 py-1 rounded"
+                  style={{
+                    background: "rgba(115, 191, 105, 0.15)",
+                    color: "var(--color-status-success)",
+                  }}
+                >
+                  {formatZAR(totalPotentialSavings)} savings
+                </span>
+              </div>
             )}
           </div>
-        </Card>
+
+          {/* Predictions Grid */}
+          <div className="p-4">
+            {predictions.length === 0 ? (
+              <div className="text-center py-8">
+                <TrendingUp
+                  className="h-12 w-12 mx-auto mb-2"
+                  style={{ color: "var(--color-grafana-text-disabled)" }}
+                />
+                <span style={{ color: "var(--color-grafana-text-secondary)" }}>
+                  No failure predictions
+                </span>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {predictions.map((prediction) => (
+                  <PredictionCard
+                    key={prediction.id}
+                    prediction={prediction}
+                    onClick={() => handlePredictionClick(prediction)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Prediction Detail Modal */}

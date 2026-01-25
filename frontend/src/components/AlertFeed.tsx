@@ -1,23 +1,17 @@
 /**
- * AlertFeed Component - Real-time alert list
+ * AlertFeed Component - Grafana-inspired alert list
  *
  * Displays:
- * - Severity badge (critical=red, warning=yellow, info=blue)
- * - Site name
- * - Equipment ID
- * - Alert message
- * - Timestamp (relative: "2h ago")
+ * - Severity-coded alert rows with left border accent
+ * - Site and equipment context
+ * - Relative timestamps
+ * - Auto-refresh with visual indicator
  *
- * Features:
- * - Auto-refresh every 30 seconds
- * - Limit to 10 most recent
- *
- * Requirement: DASH-02 - Alert feed with severity colors
+ * Follows Grafana alert panel design with dark theme.
  */
 
 import { useState, useEffect, useCallback } from "react";
-import { Card, Title, Text, Badge, Flex } from "@tremor/react";
-import { Activity, Clock, RefreshCw } from "lucide-react";
+import { Bell, Clock, RefreshCw, CheckCircle } from "lucide-react";
 import api from "../lib/api";
 import type { Alert } from "../lib/api";
 
@@ -56,46 +50,50 @@ function getRelativeTime(timestamp: string): string {
 }
 
 /**
- * Get badge color based on severity
+ * Get severity configuration for Grafana styling
  */
-function getSeverityColor(
-  severity: Alert["severity"]
-): "red" | "orange" | "yellow" | "blue" | "gray" {
+function getSeverityConfig(severity: Alert["severity"]): {
+  color: string;
+  bg: string;
+  label: string;
+} {
   switch (severity) {
     case "critical":
-      return "red";
+      return {
+        color: "var(--color-status-error)",
+        bg: "rgba(242, 73, 92, 0.1)",
+        label: "CRITICAL",
+      };
     case "high":
-      return "orange";
+      return {
+        color: "var(--color-status-warning)",
+        bg: "rgba(255, 152, 48, 0.1)",
+        label: "HIGH",
+      };
     case "medium":
-      return "yellow";
+      return {
+        color: "var(--color-grafana-yellow)",
+        bg: "rgba(242, 204, 12, 0.1)",
+        label: "MEDIUM",
+      };
     case "low":
-      return "blue";
+      return {
+        color: "var(--color-grafana-blue)",
+        bg: "rgba(50, 116, 217, 0.1)",
+        label: "LOW",
+      };
     default:
-      return "gray";
-  }
-}
-
-/**
- * Get background color class based on severity
- */
-function getSeverityBgClass(severity: Alert["severity"]): string {
-  switch (severity) {
-    case "critical":
-      return "bg-red-50 border-l-4 border-red-500";
-    case "high":
-      return "bg-orange-50 border-l-4 border-orange-500";
-    case "medium":
-      return "bg-yellow-50 border-l-4 border-yellow-500";
-    case "low":
-      return "bg-blue-50 border-l-4 border-blue-500";
-    default:
-      return "bg-gray-50 border-l-4 border-gray-300";
+      return {
+        color: "var(--color-grafana-text-secondary)",
+        bg: "rgba(142, 142, 142, 0.1)",
+        label: "INFO",
+      };
   }
 }
 
 export function AlertFeed({
   limit = 10,
-  refreshInterval = 30000, // 30 seconds default
+  refreshInterval = 30000,
   initialAlerts,
   onRefresh,
 }: AlertFeedProps) {
@@ -108,7 +106,6 @@ export function AlertFeed({
   const fetchAlerts = useCallback(async () => {
     try {
       const data = await api.getAlerts();
-      // Sort by timestamp descending and limit
       const sortedAlerts = data
         .sort(
           (a, b) =>
@@ -150,104 +147,222 @@ export function AlertFeed({
     fetchAlerts();
   };
 
-  // Count critical alerts
+  // Count by severity
   const criticalCount = alerts.filter((a) => a.severity === "critical").length;
+  const warningCount = alerts.filter((a) => a.severity === "high" || a.severity === "medium").length;
 
+  // Loading state
   if (loading && alerts.length === 0) {
     return (
-      <Card className="h-full">
-        <Title className="mb-4">Recent Alerts</Title>
-        <div className="flex items-center justify-center py-8">
-          <RefreshCw className="h-6 w-6 text-gray-400 animate-spin" />
+      <div
+        className="h-full rounded overflow-hidden flex flex-col"
+        style={{
+          background: "var(--color-grafana-bg-panel)",
+          border: "1px solid var(--color-grafana-border)",
+        }}
+      >
+        <div
+          className="p-4 flex items-center gap-2"
+          style={{ borderBottom: "1px solid var(--color-grafana-border)" }}
+        >
+          <Bell className="h-5 w-5" style={{ color: "var(--color-grafana-orange)" }} />
+          <span
+            className="font-medium text-sm"
+            style={{ color: "var(--color-grafana-text-primary)" }}
+          >
+            Recent Alerts
+          </span>
         </div>
-      </Card>
+        <div className="flex-1 flex items-center justify-center">
+          <RefreshCw
+            className="h-6 w-6 animate-spin"
+            style={{ color: "var(--color-grafana-text-disabled)" }}
+          />
+        </div>
+      </div>
     );
   }
 
   return (
-    <Card className="h-full flex flex-col">
+    <div
+      className="h-full rounded overflow-hidden flex flex-col"
+      style={{
+        background: "var(--color-grafana-bg-panel)",
+        border: "1px solid var(--color-grafana-border)",
+      }}
+    >
       {/* Header */}
-      <Flex justifyContent="between" alignItems="center" className="mb-4">
-        <div className="flex items-center gap-2">
-          <Title>Recent Alerts</Title>
-          {loading && alerts.length > 0 && (
-            <Text className="text-xs text-gray-400 animate-pulse">Refreshing...</Text>
-          )}
-          {criticalCount > 0 && (
-            <Badge color="red" size="sm">
-              {criticalCount} critical
-            </Badge>
-          )}
+      <div
+        className="p-4 flex items-center justify-between"
+        style={{ borderBottom: "1px solid var(--color-grafana-border)" }}
+      >
+        <div className="flex items-center gap-3">
+          <div
+            className="p-2 rounded"
+            style={{ background: "rgba(255, 152, 48, 0.15)" }}
+          >
+            <Bell className="h-5 w-5" style={{ color: "var(--color-grafana-orange)" }} />
+          </div>
+          <div>
+            <h3
+              className="font-medium text-sm"
+              style={{ color: "var(--color-grafana-text-primary)" }}
+            >
+              Recent Alerts
+            </h3>
+            <div className="flex items-center gap-2 mt-0.5">
+              {criticalCount > 0 && (
+                <span
+                  className="text-xs px-1.5 py-0.5 rounded"
+                  style={{
+                    background: "rgba(242, 73, 92, 0.15)",
+                    color: "var(--color-status-error)",
+                  }}
+                >
+                  {criticalCount} critical
+                </span>
+              )}
+              {warningCount > 0 && (
+                <span
+                  className="text-xs px-1.5 py-0.5 rounded"
+                  style={{
+                    background: "rgba(255, 152, 48, 0.15)",
+                    color: "var(--color-status-warning)",
+                  }}
+                >
+                  {warningCount} warning
+                </span>
+              )}
+            </div>
+          </div>
         </div>
         <button
           onClick={handleManualRefresh}
-          className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+          className="p-2 rounded transition-colors hover:brightness-125"
+          style={{ background: "var(--color-grafana-bg-secondary)" }}
           title="Refresh alerts"
         >
           <RefreshCw
-            className={`h-4 w-4 text-gray-500 ${loading ? "animate-spin" : ""}`}
+            className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
+            style={{ color: "var(--color-grafana-text-secondary)" }}
           />
         </button>
-      </Flex>
+      </div>
 
       {/* Error State */}
       {error && (
-        <div className="p-3 bg-red-50 text-red-700 rounded-lg mb-4">
+        <div
+          className="mx-4 mt-4 p-3 rounded"
+          style={{
+            background: "rgba(242, 73, 92, 0.1)",
+            border: "1px solid rgba(242, 73, 92, 0.3)",
+            color: "var(--color-status-error)",
+          }}
+        >
           {error}
         </div>
       )}
 
       {/* Alert List */}
-      <div className="flex-1 space-y-3 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto p-2">
         {alerts.length === 0 ? (
           <div className="text-center py-8">
-            <Activity className="h-12 w-12 text-green-500 mx-auto mb-2" />
-            <Text className="text-gray-500">No active alerts</Text>
+            <CheckCircle
+              className="h-12 w-12 mx-auto mb-2"
+              style={{ color: "var(--color-status-success)" }}
+            />
+            <span style={{ color: "var(--color-grafana-text-secondary)" }}>
+              No active alerts
+            </span>
           </div>
         ) : (
-          alerts.map((alert) => (
-            <div
-              key={alert.id}
-              className={`p-3 rounded-lg ${getSeverityBgClass(alert.severity)}`}
-            >
-              <Flex justifyContent="between" alignItems="start">
-                <div className="flex-1 min-w-0">
-                  <Text className="font-medium text-gray-900 truncate">
-                    {alert.message}
-                  </Text>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Text className="text-sm text-gray-500 truncate">
-                      {alert.site_name}
-                    </Text>
-                    <span className="text-gray-300">·</span>
-                    <Text className="text-sm text-gray-500 truncate">
-                      {alert.equipment_name}
-                    </Text>
-                  </div>
-                  <div className="flex items-center gap-1 mt-1">
-                    <Clock className="h-3 w-3 text-gray-400" />
-                    <Text className="text-xs text-gray-400">
-                      {getRelativeTime(alert.timestamp)}
-                    </Text>
+          <div className="space-y-1">
+            {alerts.map((alert) => {
+              const config = getSeverityConfig(alert.severity);
+
+              return (
+                <div
+                  key={alert.id}
+                  className="rounded overflow-hidden transition-all hover:brightness-110"
+                  style={{
+                    background: config.bg,
+                    borderLeft: `3px solid ${config.color}`,
+                  }}
+                >
+                  <div className="p-3">
+                    {/* Header: Message and Severity */}
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <span
+                        className="font-medium text-sm line-clamp-2"
+                        style={{ color: "var(--color-grafana-text-primary)" }}
+                      >
+                        {alert.message}
+                      </span>
+                      <span
+                        className="flex-shrink-0 text-xs font-medium px-1.5 py-0.5 rounded"
+                        style={{
+                          color: config.color,
+                          background: "rgba(0, 0, 0, 0.2)",
+                        }}
+                      >
+                        {config.label}
+                      </span>
+                    </div>
+
+                    {/* Context: Site and Equipment */}
+                    <div className="flex items-center gap-2 text-xs mb-2">
+                      <span style={{ color: "var(--color-grafana-text-secondary)" }}>
+                        {alert.site_name}
+                      </span>
+                      <span style={{ color: "var(--color-grafana-text-disabled)" }}>•</span>
+                      <span style={{ color: "var(--color-grafana-text-secondary)" }}>
+                        {alert.equipment_name}
+                      </span>
+                    </div>
+
+                    {/* Timestamp */}
+                    <div className="flex items-center gap-1">
+                      <Clock
+                        className="h-3 w-3"
+                        style={{ color: "var(--color-grafana-text-disabled)" }}
+                      />
+                      <span
+                        className="text-xs"
+                        style={{ color: "var(--color-grafana-text-disabled)" }}
+                      >
+                        {getRelativeTime(alert.timestamp)}
+                      </span>
+                    </div>
                   </div>
                 </div>
-                <Badge color={getSeverityColor(alert.severity)} size="sm">
-                  {alert.severity}
-                </Badge>
-              </Flex>
-            </div>
-          ))
+              );
+            })}
+          </div>
         )}
       </div>
 
       {/* Footer with last refresh time */}
-      <div className="mt-4 pt-3 border-t border-gray-100">
-        <Text className="text-xs text-gray-400 text-center">
-          Last updated: {lastRefresh.toLocaleTimeString()}
-          {refreshInterval > 0 && ` · Auto-refresh every ${refreshInterval / 1000}s`}
-        </Text>
+      <div
+        className="p-3 text-center"
+        style={{ borderTop: "1px solid var(--color-grafana-border)" }}
+      >
+        <span
+          className="text-xs"
+          style={{ color: "var(--color-grafana-text-disabled)" }}
+        >
+          Updated: {lastRefresh.toLocaleTimeString()}
+          {refreshInterval > 0 && (
+            <span className="ml-2">
+              <span
+                className="inline-block w-1.5 h-1.5 rounded-full pulse-live mr-1"
+                style={{ background: "var(--color-status-success)" }}
+              />
+              Auto-refresh
+            </span>
+          )}
+        </span>
       </div>
-    </Card>
+    </div>
   );
 }
 
