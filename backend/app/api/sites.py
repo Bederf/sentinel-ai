@@ -2,7 +2,7 @@
 
 import json
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Literal
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
@@ -40,6 +40,37 @@ def load_alerts() -> list[dict]:
     return []
 
 
+def calculate_site_status(site_alerts: list[dict]) -> Literal["normal", "warning", "critical"]:
+    """
+    Calculate site status based on active alerts.
+    
+    Returns:
+        "critical" if any critical alerts exist
+        "warning" if any warning alerts exist (but no critical)
+        "normal" otherwise
+    """
+    if not site_alerts:
+        return "normal"
+    
+    # Check for critical alerts
+    has_critical = any(
+        a.get("severity", "").lower() == "critical" 
+        for a in site_alerts
+    )
+    if has_critical:
+        return "critical"
+    
+    # Check for warning alerts
+    has_warning = any(
+        a.get("severity", "").lower() in ["warning", "high"]
+        for a in site_alerts
+    )
+    if has_warning:
+        return "warning"
+    
+    return "normal"
+
+
 class OperatingHours(BaseModel):
     """Operating hours model."""
 
@@ -71,6 +102,9 @@ class SiteResponse(SiteBase):
 
     equipment_count: int = 0
     active_alerts: int = 0
+    alert_count: int = 0  # Alias for active_alerts for frontend compatibility
+    location: str = ""  # Alias for address for frontend compatibility
+    status: Literal["normal", "warning", "critical"] = "normal"  # Calculated based on alerts
 
 
 class SiteListResponse(BaseModel):
@@ -105,18 +139,20 @@ async def list_sites(
     if site_type:
         sites = [s for s in sites if s["type"].lower() == site_type.lower()]
 
-    # Enrich with counts
+    # Enrich with counts and status
     result = []
     for site in sites:
         site_equipment = [e for e in equipment if e.get("site_id") == site["id"]]
         site_alerts = [
             a for a in alerts if a.get("site_id") == site["id"] and a.get("status") == "active"
         ]
+        status = calculate_site_status(site_alerts)
         result.append(
             SiteResponse(
                 **site,
                 equipment_count=len(site_equipment),
                 active_alerts=len(site_alerts),
+                status=status,
             )
         )
 
@@ -149,9 +185,14 @@ async def get_site(site_id: str) -> SiteResponse:
     site_alerts = [
         a for a in alerts if a.get("site_id") == site_id and a.get("status") == "active"
     ]
+    alert_count = len(site_alerts)
+    status = calculate_site_status(site_alerts)
 
     return SiteResponse(
         **site,
         equipment_count=len(site_equipment),
-        active_alerts=len(site_alerts),
+        active_alerts=alert_count,
+        alert_count=alert_count,  # Frontend compatibility
+        location=site.get("address", ""),  # Frontend compatibility
+        status=status,
     )

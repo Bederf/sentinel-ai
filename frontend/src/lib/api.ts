@@ -16,16 +16,26 @@ interface ApiError {
   status: number;
 }
 
-// Site/Building interface
+// Site/Building interface (summary view)
 export interface Site {
   id: string;
   name: string;
   location: string;
+  address?: string; // Full address from backend
   region: string;
   type: string;
   equipment_count: number;
   alert_count: number;
   status: "normal" | "warning" | "critical";
+  // Extended fields from backend (optional for summary, required for detail)
+  sqm?: number;
+  floors?: number;
+  year_built?: number;
+  operating_hours?: { start: string; end: string };
+  occupancy_pattern?: string;
+  contact_email?: string;
+  contact_phone?: string;
+  active_alerts?: number;
 }
 
 // Equipment interface
@@ -286,6 +296,14 @@ export const api = {
   },
 
   /**
+   * Get a single site by ID
+   * @param siteId - Site ID
+   */
+  async getSite(siteId: string): Promise<Site> {
+    return fetchApi<Site>(`/api/sites/${siteId}`);
+  },
+
+  /**
    * Get dashboard statistics overview
    */
   async getStats(): Promise<DashboardStats> {
@@ -309,9 +327,18 @@ export const api = {
 
   /**
    * Get equipment list
+   * @param siteId - Optional site ID filter
    */
-  async getEquipment(): Promise<Equipment[]> {
-    return fetchApi<Equipment[]>("/api/equipment");
+  async getEquipment(siteId?: string): Promise<Equipment[]> {
+    const params = new URLSearchParams();
+    if (siteId) {
+      params.append("site_id", siteId);
+    }
+    const queryString = params.toString();
+    const response = await fetchApi<{ total: number; equipment: Equipment[] }>(
+      `/api/equipment${queryString ? `?${queryString}` : ""}`
+    );
+    return response.equipment;
   },
 
   /**

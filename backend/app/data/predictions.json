@@ -3,7 +3,7 @@
     "id": "pred-001",
     "equipment_id": "eqp-004",
     "site_id": "site-001",
-    "site_name": "FNB Sandton City",
+    "site_name": "Sandton City",
     "equipment_name": "CH-1",
     "equipment_type": "chiller",
     "prediction_type": "compressor_failure",
@@ -110,7 +110,7 @@
     "id": "pred-002",
     "equipment_id": "eqp-055",
     "site_id": "site-006",
-    "site_name": "FNB Canal Walk",
+    "site_name": "Canal Walk",
     "equipment_name": "CH-1",
     "equipment_type": "chiller",
     "prediction_type": "refrigerant_leak_failure",
@@ -210,7 +210,7 @@
     "id": "pred-003",
     "equipment_id": "eqp-031",
     "site_id": "site-004",
-    "site_name": "FNB Tygervalley",
+    "site_name": "Tygervalley",
     "equipment_name": "AC-1",
     "equipment_type": "split_unit",
     "prediction_type": "compressor_burnout",
@@ -268,7 +268,7 @@
 
     "similar_failures": [
       {
-        "site": "FNB Somerset West",
+        "site": "Somerset West",
         "equipment": "AC-3",
         "failure_date": "2025-12-01",
         "common_factors": ["Same manufacturer (LG)", "Age beyond 12 years", "High current pattern"]
@@ -310,7 +310,7 @@
     "id": "pred-004",
     "equipment_id": "eqp-076",
     "site_id": "site-008",
-    "site_name": "FNB Pavilion",
+    "site_name": "Pavilion",
     "equipment_name": "GEN-1",
     "equipment_type": "generator",
     "prediction_type": "starting_failure",
@@ -369,13 +369,13 @@
 
     "similar_failures": [
       {
-        "site": "FNB N1 City",
+        "site": "N1 City",
         "equipment": "GEN-1",
         "failure_date": "2025-11-08",
         "common_factors": ["Same FG Wilson model", "Similar age (14 years)", "Start failure progression"]
       },
       {
-        "site": "FNB Blue Route",
+        "site": "Blue Route",
         "equipment": "GEN-2",
         "failure_date": "2025-09-20",
         "common_factors": ["Extended crank pattern", "Fuel system issues"]
@@ -417,7 +417,7 @@
     "id": "pred-005",
     "equipment_id": "eqp-090",
     "site_id": "site-010",
-    "site_name": "FNB Gateaway",
+    "site_name": "Gateaway",
     "equipment_name": "BMS-1",
     "equipment_type": "bms_controller",
     "prediction_type": "controller_failure",
@@ -475,7 +475,7 @@
 
     "similar_failures": [
       {
-        "site": "FNB Cresta",
+        "site": "Cresta",
         "equipment": "BMS-1",
         "failure_date": "2025-08-12",
         "common_factors": ["Same NAE35 model", "High CPU pattern", "Comm loss history"]

@@ -128,7 +128,7 @@ export function Chat() {
             className="font-medium text-sm"
             style={{ color: "var(--color-grafana-text-primary)" }}
           >
-            FM Assistant
+            SENTINEL
           </h3>
           <span
             className="text-xs"
@@ -153,7 +153,7 @@ export function Chat() {
             />
             <div className="text-center">
               <p style={{ color: "var(--color-grafana-text-secondary)" }}>
-                Start a conversation with the FM Assistant
+                Start a conversation with SENTINEL
               </p>
               <p
                 className="text-xs mt-2"
@@ -193,7 +193,7 @@ export function Chat() {
                   className="text-sm"
                   style={{ color: "var(--color-grafana-text-secondary)" }}
                 >
-                  AI is thinking...
+                  SENTINEL is thinking...
                 </span>
               </div>
             </div>

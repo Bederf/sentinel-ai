@@ -25,6 +25,7 @@ import {
   Shield,
   ChevronDown,
   ChevronRight,
+  Info,
 } from "lucide-react";
 
 export type View = "dashboard" | "chat" | "upload";
@@ -70,6 +71,7 @@ const uploadTypes = [
 export function Sidebar({ currentView, onViewChange }: SidebarProps) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<Record<string, "idle" | "uploading" | "success" | "error">>({});
   const [dataStatus, setDataStatus] = useState<DataStatus | null>(null);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
@@ -404,6 +406,99 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
                 >
                   Reload All Data
                 </button>
+              </div>
+            )}
+          </div>
+
+          {/* About Section */}
+          <div
+            className="mt-4 pt-4 mx-3"
+            style={{ borderTop: "1px solid var(--color-grafana-border)" }}
+          >
+            <button
+              onClick={() => setIsAboutOpen(!isAboutOpen)}
+              className="w-full flex items-center gap-3 px-1 py-2 transition-all duration-150 md:justify-center lg:justify-start"
+              style={{
+                color: isAboutOpen
+                  ? "var(--color-sentinel-text-primary)"
+                  : "var(--color-sentinel-text-secondary)",
+              }}
+            >
+              <Info
+                className="h-5 w-5 flex-shrink-0"
+                style={{
+                  color: isAboutOpen ? "var(--color-sentinel-amber)" : "var(--color-sentinel-text-secondary)",
+                }}
+              />
+              <span className="font-medium text-sm md:hidden lg:block flex-1 text-left">About</span>
+              {isAboutOpen ? (
+                <ChevronDown className="h-4 w-4 md:hidden lg:block" />
+              ) : (
+                <ChevronRight className="h-4 w-4 md:hidden lg:block" />
+              )}
+            </button>
+
+            {/* Expandable about section */}
+            {isAboutOpen && (
+              <div className="mt-2 md:hidden lg:block">
+                <div
+                  className="rounded p-3 text-xs space-y-3"
+                  style={{
+                    background: "var(--color-sentinel-bg-secondary)",
+                    border: "1px solid var(--color-sentinel-border)",
+                  }}
+                >
+                  <div>
+                    <div
+                      className="font-medium mb-1"
+                      style={{ color: "var(--color-sentinel-amber)" }}
+                    >
+                      SENTINEL
+                    </div>
+                    <p style={{ color: "var(--color-sentinel-text-secondary)", lineHeight: "1.5" }}>
+                      AI-powered facilities intelligence platform for proactive asset management.
+                    </p>
+                  </div>
+
+                  <div>
+                    <div
+                      className="font-medium mb-1"
+                      style={{ color: "var(--color-sentinel-text-primary)" }}
+                    >
+                      Key Capabilities
+                    </div>
+                    <ul
+                      className="space-y-1"
+                      style={{ color: "var(--color-sentinel-text-secondary)" }}
+                    >
+                      <li className="flex items-start gap-2">
+                        <span style={{ color: "var(--color-sentinel-amber)" }}>•</span>
+                        Natural language queries across building data
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span style={{ color: "var(--color-sentinel-amber)" }}>•</span>
+                        Predictive maintenance with failure forecasting
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span style={{ color: "var(--color-sentinel-amber)" }}>•</span>
+                        Anomaly detection with contextual analysis
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span style={{ color: "var(--color-sentinel-amber)" }}>•</span>
+                        Cross-site pattern recognition
+                      </li>
+                    </ul>
+                  </div>
+
+                  <div
+                    className="pt-2"
+                    style={{ borderTop: "1px solid var(--color-sentinel-border)" }}
+                  >
+                    <p style={{ color: "var(--color-sentinel-text-disabled)", fontSize: "10px" }}>
+                      Transforming reactive maintenance into predictive asset protection.
+                    </p>
+                  </div>
+                </div>
               </div>
             )}
           </div>

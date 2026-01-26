@@ -1,7 +1,7 @@
 [
   {
     "id": "site-001",
-    "name": "FNB Sandton City",
+    "name": "Sandton City",
     "address": "Sandton City Complex, 83 Rivonia Road, Sandton",
     "region": "Gauteng",
     "type": "regional_office",
@@ -12,12 +12,12 @@
     "occupancy_pattern": "office",
     "latitude": -26.1076,
     "longitude": 28.0567,
-    "contact_email": "sandton.facilities@fnb.co.za",
+    "contact_email": "sandton.facilities@gmail.com",
     "contact_phone": "+27 11 350 4000"
   },
   {
     "id": "site-002",
-    "name": "FNB Rosebank",
+    "name": "Rosebank",
     "address": "The Zone @ Rosebank, 177 Oxford Road, Rosebank",
     "region": "Gauteng",
     "type": "branch",
@@ -28,12 +28,12 @@
     "occupancy_pattern": "retail",
     "latitude": -26.1455,
     "longitude": 28.0436,
-    "contact_email": "rosebank.facilities@fnb.co.za",
+    "contact_email": "rosebank.facilities@gmail.com",
     "contact_phone": "+27 11 788 4500"
   },
   {
     "id": "site-003",
-    "name": "FNB Menlyn Maine",
+    "name": "Menlyn Maine",
     "address": "Menlyn Maine Central Square, Pretoria",
     "region": "Gauteng",
     "type": "branch",
@@ -44,12 +44,12 @@
     "occupancy_pattern": "retail",
     "latitude": -25.7825,
     "longitude": 28.2754,
-    "contact_email": "menlyn.facilities@fnb.co.za",
+    "contact_email": "menlyn.facilities@gmail.com",
     "contact_phone": "+27 12 348 2000"
   },
   {
     "id": "site-004",
-    "name": "FNB Centurion",
+    "name": "Centurion",
     "address": "Centurion Gate, 124 Akkerboom Road, Centurion",
     "region": "Gauteng",
     "type": "branch",
@@ -60,12 +60,12 @@
     "occupancy_pattern": "retail",
     "latitude": -25.8603,
     "longitude": 28.1894,
-    "contact_email": "centurion.facilities@fnb.co.za",
+    "contact_email": "centurion.facilities@gmail.com",
     "contact_phone": "+27 12 663 1000"
   },
   {
     "id": "site-005",
-    "name": "FNB Midrand Data Centre",
+    "name": "Midrand Data Centre",
     "address": "Allandale Road, Midrand Business Park",
     "region": "Gauteng",
     "type": "data_center",
@@ -76,12 +76,12 @@
     "occupancy_pattern": "24x7",
     "latitude": -25.9867,
     "longitude": 28.1279,
-    "contact_email": "midrand.dc@fnb.co.za",
+    "contact_email": "midrand.dc@gmail.com",
     "contact_phone": "+27 11 315 8000"
   },
   {
     "id": "site-006",
-    "name": "FNB V&A Waterfront",
+    "name": "V&A Waterfront",
     "address": "V&A Waterfront, Dock Road, Cape Town",
     "region": "Western Cape",
     "type": "regional_office",
@@ -92,12 +92,12 @@
     "occupancy_pattern": "office",
     "latitude": -33.9036,
     "longitude": 18.4205,
-    "contact_email": "waterfront.facilities@fnb.co.za",
+    "contact_email": "waterfront.facilities@gmail.com",
     "contact_phone": "+27 21 405 3000"
   },
   {
     "id": "site-007",
-    "name": "FNB Century City",
+    "name": "Century City",
     "address": "Canal Walk, Century City, Cape Town",
     "region": "Western Cape",
     "type": "branch",
@@ -108,12 +108,12 @@
     "occupancy_pattern": "retail",
     "latitude": -33.8937,
     "longitude": 18.5124,
-    "contact_email": "centurycity.facilities@fnb.co.za",
+    "contact_email": "centurycity.facilities@gmail.com",
     "contact_phone": "+27 21 551 2000"
   },
   {
     "id": "site-008",
-    "name": "FNB Stellenbosch",
+    "name": "Stellenbosch",
     "address": "Eikestad Mall, Bird Street, Stellenbosch",
     "region": "Western Cape",
     "type": "branch",
@@ -124,12 +124,12 @@
     "occupancy_pattern": "retail",
     "latitude": -33.9346,
     "longitude": 18.8602,
-    "contact_email": "stellenbosch.facilities@fnb.co.za",
+    "contact_email": "stellenbosch.facilities@gmail.com",
     "contact_phone": "+27 21 887 1200"
   },
   {
     "id": "site-009",
-    "name": "FNB Paarl",
+    "name": "Paarl",
     "address": "Paarl Mall, Cecelia Street, Paarl",
     "region": "Western Cape",
     "type": "branch",
@@ -140,12 +140,12 @@
     "occupancy_pattern": "retail",
     "latitude": -33.7314,
     "longitude": 18.9621,
-    "contact_email": "paarl.facilities@fnb.co.za",
+    "contact_email": "paarl.facilities@gmail.com",
     "contact_phone": "+27 21 872 3500"
   },
   {
     "id": "site-010",
-    "name": "FNB Bellville",
+    "name": "Bellville",
     "address": "Tyger Valley Centre, Willie van Schoor Ave, Bellville",
     "region": "Western Cape",
     "type": "branch",
@@ -156,12 +156,12 @@
     "occupancy_pattern": "retail",
     "latitude": -33.8714,
     "longitude": 18.6328,
-    "contact_email": "bellville.facilities@fnb.co.za",
+    "contact_email": "bellville.facilities@gmail.com",
     "contact_phone": "+27 21 914 2800"
   },
   {
     "id": "site-011",
-    "name": "FNB Umhlanga Ridge",
+    "name": "Umhlanga Ridge",
     "address": "Gateway Theatre of Shopping, 1 Palm Boulevard, Umhlanga",
     "region": "KwaZulu-Natal",
     "type": "regional_office",
@@ -172,12 +172,12 @@
     "occupancy_pattern": "office",
     "latitude": -29.7299,
     "longitude": 31.0678,
-    "contact_email": "umhlanga.facilities@fnb.co.za",
+    "contact_email": "umhlanga.facilities@gmail.com",
     "contact_phone": "+27 31 566 3000"
   },
   {
     "id": "site-012",
-    "name": "FNB Durban CBD",
+    "name": "Durban CBD",
     "address": "320 Smith Street, Durban Central",
     "region": "KwaZulu-Natal",
     "type": "branch",
@@ -188,12 +188,12 @@
     "occupancy_pattern": "retail",
     "latitude": -29.8587,
     "longitude": 31.0218,
-    "contact_email": "durbancbd.facilities@fnb.co.za",
+    "contact_email": "durbancbd.facilities@gmail.com",
     "contact_phone": "+27 31 361 8000"
   },
   {
     "id": "site-013",
-    "name": "FNB Ballito",
+    "name": "Ballito",
     "address": "Ballito Junction, Ballito Drive, Ballito",
     "region": "KwaZulu-Natal",
     "type": "branch",
@@ -204,12 +204,12 @@
     "occupancy_pattern": "retail",
     "latitude": -29.5390,
     "longitude": 31.2134,
-    "contact_email": "ballito.facilities@fnb.co.za",
+    "contact_email": "ballito.facilities@gmail.com",
     "contact_phone": "+27 32 946 1500"
   },
   {
     "id": "site-014",
-    "name": "FNB Pietermaritzburg",
+    "name": "Pietermaritzburg",
     "address": "Liberty Midlands Mall, 50 Sanctuary Road, PMB",
     "region": "KwaZulu-Natal",
     "type": "branch",
@@ -220,12 +220,12 @@
     "occupancy_pattern": "retail",
     "latitude": -29.5534,
     "longitude": 30.3415,
-    "contact_email": "pmb.facilities@fnb.co.za",
+    "contact_email": "pmb.facilities@gmail.com",
     "contact_phone": "+27 33 345 6000"
   },
   {
     "id": "site-015",
-    "name": "FNB Richards Bay",
+    "name": "Richards Bay",
     "address": "Boardwalk Inkwazi Shopping Centre, Mark Sobukwe Road",
     "region": "KwaZulu-Natal",
     "type": "branch",
@@ -236,7 +236,7 @@
     "occupancy_pattern": "retail",
     "latitude": -28.7828,
     "longitude": 32.0628,
-    "contact_email": "richardsbay.facilities@fnb.co.za",
+    "contact_email": "richardsbay.facilities@gmail.com",
     "contact_phone": "+27 35 789 2200"
   }
 ]

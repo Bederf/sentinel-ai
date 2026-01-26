@@ -25,6 +25,7 @@ import api from "../lib/api";
 import type { DashboardStats, Site, Prediction, EnergyDataPoint } from "../lib/api";
 import { KPICard } from "./KPICard";
 import { SiteCard } from "./SiteCard";
+import { SiteDetail } from "./SiteDetail";
 import { AlertFeed } from "./AlertFeed";
 import { EnergyChart } from "./EnergyChart";
 import { PredictionCard } from "./PredictionCard";
@@ -43,6 +44,9 @@ export function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Site detail view state
+  const [selectedSiteId, setSelectedSiteId] = useState<string | null>(null);
+
   // Prediction detail modal state
   const [selectedPrediction, setSelectedPrediction] = useState<Prediction | null>(null);
   const [isPredictionDetailOpen, setIsPredictionDetailOpen] = useState(false);
@@ -50,7 +54,7 @@ export function Dashboard() {
   // Energy chart state
   const [energyData, setEnergyData] = useState<EnergyDataPoint[]>([]);
   const [energyLoading, setEnergyLoading] = useState(false);
-  const [selectedSiteId, setSelectedSiteId] = useState<string | null>(null);
+  const [energyFilterSiteId, setEnergyFilterSiteId] = useState<string | null>(null);
   const [selectedDays, setSelectedDays] = useState<TimePeriod>(30);
 
   useEffect(() => {
@@ -82,7 +86,7 @@ export function Dashboard() {
     const loadEnergyData = async () => {
       try {
         setEnergyLoading(true);
-        const response = await api.getEnergy(selectedSiteId, selectedDays);
+        const response = await api.getEnergy(energyFilterSiteId, selectedDays);
         setEnergyData(response.data);
       } catch (err) {
         console.error("Failed to load energy data:", err);
@@ -93,7 +97,7 @@ export function Dashboard() {
     };
 
     loadEnergyData();
-  }, [selectedSiteId, selectedDays]);
+  }, [energyFilterSiteId, selectedDays]);
 
   // Calculate site status counts for KPI
   const normalSites = sites.filter((s) => s.status === "normal").length;
@@ -116,9 +120,14 @@ export function Dashboard() {
       maximumFractionDigits: 0,
     }).format(amount);
 
-  // Handle site card click
+  // Handle site card click - navigate to site detail view
   const handleSiteClick = (site: Site) => {
-    console.log("Site clicked:", site.name);
+    setSelectedSiteId(site.id);
+  };
+
+  // Handle back from site detail view
+  const handleSiteDetailBack = () => {
+    setSelectedSiteId(null);
   };
 
   // Handle prediction card click
@@ -179,6 +188,15 @@ export function Dashboard() {
           </h2>
           <p style={{ color: "var(--color-sentinel-text-secondary)" }}>{error}</p>
         </div>
+      </div>
+    );
+  }
+
+  // Show site detail view if a site is selected
+  if (selectedSiteId) {
+    return (
+      <div className="h-full overflow-hidden">
+        <SiteDetail siteId={selectedSiteId} onBack={handleSiteDetailBack} />
       </div>
     );
   }
@@ -339,8 +357,8 @@ export function Dashboard() {
             <div className="flex items-center gap-4">
               {/* Site Filter */}
               <select
-                value={selectedSiteId || ""}
-                onChange={(e) => setSelectedSiteId(e.target.value || null)}
+                value={energyFilterSiteId || ""}
+                onChange={(e) => setEnergyFilterSiteId(e.target.value || null)}
                 className="text-sm rounded px-3 py-1.5"
                 style={{
                   background: "var(--color-sentinel-bg-secondary)",

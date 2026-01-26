@@ -56,7 +56,7 @@ CITATION_INSTRUCTIONS = """
 When referencing data in your responses, ALWAYS use these citation formats:
 
 **Sites:** Reference as [SITE-ID Site Name]
-- Example: "Based on [site-001 FNB Sandton City] data, the HVAC system shows..."
+- Example: "Based on [site-001 Sandton City] data, the HVAC system shows..."
 
 **Equipment:** Reference as [EQUIPMENT-ID Equipment Name]  
 - Example: "The [eqp-003 AHU-7] is showing signs of bearing degradation..."
