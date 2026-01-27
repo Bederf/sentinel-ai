@@ -13,7 +13,12 @@
     "latitude": -26.1076,
     "longitude": 28.0567,
     "contact_email": "sandton.facilities@gmail.com",
-    "contact_phone": "+27 11 350 4000"
+    "contact_phone": "+27 11 350 4000",
+    "optimization_enabled": true,
+    "optimization_status": "unknown",
+    "optimization_settings": {"mode": "supervised", "last_analysis": null, "analysis_interval_minutes": 15},
+    "last_optimization": null,
+    "optimization_history": []
   },
   {
     "id": "site-002",
@@ -29,7 +34,12 @@
     "latitude": -26.1455,
     "longitude": 28.0436,
     "contact_email": "rosebank.facilities@gmail.com",
-    "contact_phone": "+27 11 788 4500"
+    "contact_phone": "+27 11 788 4500",
+    "optimization_enabled": true,
+    "optimization_status": "unknown",
+    "optimization_settings": {"mode": "supervised", "last_analysis": null, "analysis_interval_minutes": 15},
+    "last_optimization": null,
+    "optimization_history": []
   },
   {
     "id": "site-003",
@@ -45,7 +55,12 @@
     "latitude": -25.7825,
     "longitude": 28.2754,
     "contact_email": "menlyn.facilities@gmail.com",
-    "contact_phone": "+27 12 348 2000"
+    "contact_phone": "+27 12 348 2000",
+    "optimization_enabled": false,
+    "optimization_status": "unknown",
+    "optimization_settings": {"mode": "supervised", "last_analysis": null, "analysis_interval_minutes": 15},
+    "last_optimization": null,
+    "optimization_history": []
   },
   {
     "id": "site-004",
@@ -61,7 +76,12 @@
     "latitude": -25.8603,
     "longitude": 28.1894,
     "contact_email": "centurion.facilities@gmail.com",
-    "contact_phone": "+27 12 663 1000"
+    "contact_phone": "+27 12 663 1000",
+    "optimization_enabled": false,
+    "optimization_status": "unknown",
+    "optimization_settings": {"mode": "supervised", "last_analysis": null, "analysis_interval_minutes": 15},
+    "last_optimization": null,
+    "optimization_history": []
   },
   {
     "id": "site-005",
@@ -77,7 +97,12 @@
     "latitude": -25.9867,
     "longitude": 28.1279,
     "contact_email": "midrand.dc@gmail.com",
-    "contact_phone": "+27 11 315 8000"
+    "contact_phone": "+27 11 315 8000",
+    "optimization_enabled": false,
+    "optimization_status": "unknown",
+    "optimization_settings": {"mode": "supervised", "last_analysis": null, "analysis_interval_minutes": 15},
+    "last_optimization": null,
+    "optimization_history": []
   },
   {
     "id": "site-006",
@@ -93,7 +118,12 @@
     "latitude": -33.9036,
     "longitude": 18.4205,
     "contact_email": "waterfront.facilities@gmail.com",
-    "contact_phone": "+27 21 405 3000"
+    "contact_phone": "+27 21 405 3000",
+    "optimization_enabled": false,
+    "optimization_status": "unknown",
+    "optimization_settings": {"mode": "supervised", "last_analysis": null, "analysis_interval_minutes": 15},
+    "last_optimization": null,
+    "optimization_history": []
   },
   {
     "id": "site-007",
@@ -109,7 +139,12 @@
     "latitude": -33.8937,
     "longitude": 18.5124,
     "contact_email": "centurycity.facilities@gmail.com",
-    "contact_phone": "+27 21 551 2000"
+    "contact_phone": "+27 21 551 2000",
+    "optimization_enabled": false,
+    "optimization_status": "unknown",
+    "optimization_settings": {"mode": "supervised", "last_analysis": null, "analysis_interval_minutes": 15},
+    "last_optimization": null,
+    "optimization_history": []
   },
   {
     "id": "site-008",
@@ -125,7 +160,12 @@
     "latitude": -33.9346,
     "longitude": 18.8602,
     "contact_email": "stellenbosch.facilities@gmail.com",
-    "contact_phone": "+27 21 887 1200"
+    "contact_phone": "+27 21 887 1200",
+    "optimization_enabled": false,
+    "optimization_status": "unknown",
+    "optimization_settings": {"mode": "supervised", "last_analysis": null, "analysis_interval_minutes": 15},
+    "last_optimization": null,
+    "optimization_history": []
   },
   {
     "id": "site-009",
@@ -141,7 +181,12 @@
     "latitude": -33.7314,
     "longitude": 18.9621,
     "contact_email": "paarl.facilities@gmail.com",
-    "contact_phone": "+27 21 872 3500"
+    "contact_phone": "+27 21 872 3500",
+    "optimization_enabled": false,
+    "optimization_status": "unknown",
+    "optimization_settings": {"mode": "supervised", "last_analysis": null, "analysis_interval_minutes": 15},
+    "last_optimization": null,
+    "optimization_history": []
   },
   {
     "id": "site-010",
@@ -157,7 +202,12 @@
     "latitude": -33.8714,
     "longitude": 18.6328,
     "contact_email": "bellville.facilities@gmail.com",
-    "contact_phone": "+27 21 914 2800"
+    "contact_phone": "+27 21 914 2800",
+    "optimization_enabled": false,
+    "optimization_status": "unknown",
+    "optimization_settings": {"mode": "supervised", "last_analysis": null, "analysis_interval_minutes": 15},
+    "last_optimization": null,
+    "optimization_history": []
   },
   {
     "id": "site-011",
@@ -173,7 +223,12 @@
     "latitude": -29.7299,
     "longitude": 31.0678,
     "contact_email": "umhlanga.facilities@gmail.com",
-    "contact_phone": "+27 31 566 3000"
+    "contact_phone": "+27 31 566 3000",
+    "optimization_enabled": true,
+    "optimization_status": "unknown",
+    "optimization_settings": {"mode": "supervised", "last_analysis": null, "analysis_interval_minutes": 15},
+    "last_optimization": null,
+    "optimization_history": []
   },
   {
     "id": "site-012",
@@ -189,7 +244,12 @@
     "latitude": -29.8587,
     "longitude": 31.0218,
     "contact_email": "durbancbd.facilities@gmail.com",
-    "contact_phone": "+27 31 361 8000"
+    "contact_phone": "+27 31 361 8000",
+    "optimization_enabled": false,
+    "optimization_status": "unknown",
+    "optimization_settings": {"mode": "supervised", "last_analysis": null, "analysis_interval_minutes": 15},
+    "last_optimization": null,
+    "optimization_history": []
   },
   {
     "id": "site-013",
@@ -205,7 +265,12 @@
     "latitude": -29.5390,
     "longitude": 31.2134,
     "contact_email": "ballito.facilities@gmail.com",
-    "contact_phone": "+27 32 946 1500"
+    "contact_phone": "+27 32 946 1500",
+    "optimization_enabled": false,
+    "optimization_status": "unknown",
+    "optimization_settings": {"mode": "supervised", "last_analysis": null, "analysis_interval_minutes": 15},
+    "last_optimization": null,
+    "optimization_history": []
   },
   {
     "id": "site-014",
@@ -221,7 +286,12 @@
     "latitude": -29.5534,
     "longitude": 30.3415,
     "contact_email": "pmb.facilities@gmail.com",
-    "contact_phone": "+27 33 345 6000"
+    "contact_phone": "+27 33 345 6000",
+    "optimization_enabled": false,
+    "optimization_status": "unknown",
+    "optimization_settings": {"mode": "supervised", "last_analysis": null, "analysis_interval_minutes": 15},
+    "last_optimization": null,
+    "optimization_history": []
   },
   {
     "id": "site-015",
@@ -237,6 +307,11 @@
     "latitude": -28.7828,
     "longitude": 32.0628,
     "contact_email": "richardsbay.facilities@gmail.com",
-    "contact_phone": "+27 35 789 2200"
+    "contact_phone": "+27 35 789 2200",
+    "optimization_enabled": false,
+    "optimization_status": "unknown",
+    "optimization_settings": {"mode": "supervised", "last_analysis": null, "analysis_interval_minutes": 15},
+    "last_optimization": null,
+    "optimization_history": []
   }
 ]
