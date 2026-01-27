@@ -313,7 +313,7 @@ def load_sites():
     return []
 
 
-def save_sites(sites: List[Dict[str, any]]):
+def save_sites(sites: List[Dict[str, Any]]):
     """Save sites to JSON file."""
     filepath = DATA_DIR / "sites.json"
     with open(filepath, 'w') as f:
@@ -321,7 +321,7 @@ def save_sites(sites: List[Dict[str, any]]):
 
 
 @router.post("/optimization/analyze")
-async def analyze_optimization(request: AnalyzeRequest) -> Dict[str, any]:
+async def analyze_optimization(request: AnalyzeRequest) -> Dict[str, Any]:
     """
     Analyze building conditions and generate optimization recommendations.
 
@@ -402,7 +402,7 @@ async def analyze_optimization(request: AnalyzeRequest) -> Dict[str, any]:
 async def approve_optimization(
     request: Request,
     body: ApproveRequest = Body(...)
-) -> Dict[str, any]:
+) -> Dict[str, Any]:
     """
     Apply approved optimization recommendations to building systems.
 
@@ -550,7 +550,7 @@ async def approve_optimization(
 
 
 @router.get("/optimization/status/{site_id}")
-async def get_optimization_status(site_id: str) -> Dict[str, any]:
+async def get_optimization_status(site_id: str) -> Dict[str, Any]:
     """
     Get optimization status for a specific site.
 
@@ -597,7 +597,7 @@ async def get_optimization_status(site_id: str) -> Dict[str, any]:
 
 
 @router.post("/optimization/toggle/{site_id}")
-async def toggle_optimization(site_id: str, request: ToggleRequest) -> Dict[str, any]:
+async def toggle_optimization(site_id: str, request: ToggleRequest) -> Dict[str, Any]:
     """
     Enable or disable optimization for a specific site.
 
