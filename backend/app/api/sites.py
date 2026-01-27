@@ -105,6 +105,8 @@ class SiteResponse(SiteBase):
     alert_count: int = 0  # Alias for active_alerts for frontend compatibility
     location: str = ""  # Alias for address for frontend compatibility
     status: Literal["normal", "warning", "critical"] = "normal"  # Calculated based on alerts
+    optimization_enabled: bool = False
+    optimization_status: str = "unknown"
 
 
 class SiteListResponse(BaseModel):
