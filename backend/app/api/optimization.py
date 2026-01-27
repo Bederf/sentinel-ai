@@ -5,7 +5,7 @@ import logging
 import random
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 
 from fastapi import APIRouter, HTTPException, Body, Request
 from pydantic import BaseModel
@@ -287,16 +287,16 @@ async def calculate_thermal_runway(
 class AnalyzeRequest(BaseModel):
     """Request model for analyze endpoint."""
     site_id: str
-    current_conditions: Optional[Dict[str, any]] = None
-    weather_forecast: Optional[Dict[str, any]] = None
-    energy_prices: Optional[Dict[str, any]] = None
+    current_conditions: Optional[Dict[str, Any]] = None
+    weather_forecast: Optional[Dict[str, Any]] = None
+    energy_prices: Optional[Dict[str, Any]] = None
 
 
 class ApproveRequest(BaseModel):
     """Request model for approve endpoint."""
     recommendation_id: str
     site_id: str
-    setpoints_to_apply: List[Dict[str, any]]
+    setpoints_to_apply: List[Dict[str, Any]]
 
 
 class ToggleRequest(BaseModel):
