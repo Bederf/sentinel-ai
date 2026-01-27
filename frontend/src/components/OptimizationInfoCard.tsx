@@ -49,6 +49,8 @@ export function OptimizationInfoCard({
 
   // Fetch optimization status
   useEffect(() => {
+    console.log("[OptimizationInfoCard] Component mounted", { siteId, optimizationEnabled });
+
     if (!optimizationEnabled) {
       setOptimizationStatus("unknown");
       setLoading(false);
@@ -57,12 +59,14 @@ export function OptimizationInfoCard({
 
     const fetchStatus = async () => {
       try {
+        console.log("[OptimizationInfoCard] Fetching status for", siteId);
         const status = await api.getOptimizationStatus(siteId);
+        console.log("[OptimizationInfoCard] Status response:", status);
         setOptimizationStatus(status.optimization_status);
         setLastOptimization(status.last_optimization);
         setCurrentRecommendation(status.last_recommendation);
       } catch (error) {
-        console.error("Failed to fetch optimization status:", error);
+        console.error("[OptimizationInfoCard] Failed to fetch optimization status:", error);
         setOptimizationStatus("error");
       } finally {
         setLoading(false);
@@ -135,6 +139,9 @@ export function OptimizationInfoCard({
       </div>
     );
   }
+
+  // Debug: Always render something
+  console.log("[OptimizationInfoCard] Rendering with status:", optimizationStatus);
 
   const getStatusConfig = (status: OptimizationStatusType) => {
     switch (status) {
