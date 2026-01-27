@@ -14,8 +14,9 @@
 
 import { Building2, Cpu, AlertTriangle, MapPin, Shield } from "lucide-react";
 import { useState, useEffect } from "react";
-import api, { type Site } from "../lib/api";
+import api, { type Site, type OptimizationRecommendation } from "../lib/api";
 import { OptimizationStatusBadge } from "./OptimizationStatusBadge";
+import { OptimizationRecommendationModal } from "./OptimizationRecommendationModal";
 
 interface SiteCardProps {
   site: Site;
@@ -84,6 +85,9 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
   const [safetySummary, setSafetySummary] = useState<DeviceSafetySummary | null>(null);
   const [loadingSafety, setLoadingSafety] = useState(false);
   const [optimizationStatus, setOptimizationStatus] = useState<OptimizationStatusType>("unknown");
+  const [showRecommendationModal, setShowRecommendationModal] = useState(false);
+  const [currentRecommendation, setCurrentRecommendation] = useState<OptimizationRecommendation | null>(null);
+  const [loadingRecommendation, setLoadingRecommendation] = useState(false);
 
   const handleClick = () => {
     if (onClick) {
@@ -178,6 +182,83 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
     return () => clearInterval(interval);
   }, [site.id, showOptimizationStatus, site.optimization_enabled]);
 
+  // Fetch latest recommendation when modal opens
+  useEffect(() => {
+    if (!showRecommendationModal || !site.id) return;
+
+    const fetchRecommendation = async () => {
+      setLoadingRecommendation(true);
+      try {
+        // For demo purposes, we'll fetch the full status and extract the recommendation
+        const status = await api.getOptimizationStatus(site.id);
+        if (status.last_recommendation) {
+          setCurrentRecommendation(status.last_recommendation);
+        } else {
+          // If no pending recommendation, show error or close modal
+          setShowRecommendationModal(false);
+        }
+      } catch (error) {
+        console.error('Failed to fetch recommendation:', error);
+        setShowRecommendationModal(false);
+      } finally {
+        setLoadingRecommendation(false);
+      }
+    };
+
+    fetchRecommendation();
+  }, [showRecommendationModal, site.id]);
+
+  // Handle optimization badge click
+  const handleOptimizationClick = () => {
+    if (optimizationStatus === "recommendation_pending") {
+      setShowRecommendationModal(true);
+    }
+  };
+
+  // Handle approve recommendation
+  const handleApproveRecommendation = async (recommendationId: string) => {
+    try {
+      // Build setpoints array from recommendation
+      const setpointsToApply = currentRecommendation?.recommendations.map((rec) => ({
+        equipment_id: rec.equipment_id,
+        point: "setpoint",
+        value: rec.recommended_value,
+      })) || [];
+
+      await api.approveOptimization(site.id, recommendationId, setpointsToApply);
+
+      // Refresh optimization status after approve
+      const status = await api.getOptimizationStatus(site.id);
+      setOptimizationStatus(status.optimization_status);
+
+      // Close modal
+      setShowRecommendationModal(false);
+      setCurrentRecommendation(null);
+    } catch (error) {
+      console.error('Failed to approve recommendation:', error);
+      throw error; // Re-throw to show error in modal
+    }
+  };
+
+  // Handle reject recommendation
+  const handleRejectRecommendation = async (recommendationId: string, reason?: string) => {
+    try {
+      // Note: reject API endpoint doesn't exist yet, so we'll just update status
+      // In production, this would call: api.rejectOptimization(site.id, recommendationId, reason)
+
+      // Refresh optimization status after reject
+      const status = await api.getOptimizationStatus(site.id);
+      setOptimizationStatus(status.optimization_status);
+
+      // Close modal
+      setShowRecommendationModal(false);
+      setCurrentRecommendation(null);
+    } catch (error) {
+      console.error('Failed to reject recommendation:', error);
+      throw error; // Re-throw to show error in modal
+    }
+  };
+
   return (
     <div
       className={`relative rounded-md overflow-hidden transition-all duration-150 ${onClick ? "cursor-pointer hover:brightness-110" : ""}`}
@@ -225,11 +306,17 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
             </div>
             {/* Optimization badge (if enabled) */}
             {showOptimizationStatus && site.optimization_enabled && (
-              <OptimizationStatusBadge
-                status={optimizationStatus}
-                size="sm"
-                lastOptimization={site.last_optimization}
-              />
+              <div
+                className={optimizationStatus === "recommendation_pending" ? "cursor-pointer hover:opacity-80 transition-opacity" : ""}
+                onClick={handleOptimizationClick}
+                title={optimizationStatus === "recommendation_pending" ? "Click to view recommendation" : undefined}
+              >
+                <OptimizationStatusBadge
+                  status={optimizationStatus}
+                  size="sm"
+                  lastOptimization={site.last_optimization}
+                />
+              </div>
             )}
           </div>
         </div>
@@ -384,6 +471,21 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
           </div>
         </div>
       </div>
+
+      {/* Recommendation Modal */}
+      {showRecommendationModal && currentRecommendation && (
+        <OptimizationRecommendationModal
+          isOpen={showRecommendationModal}
+          onClose={() => {
+            setShowRecommendationModal(false);
+            setCurrentRecommendation(null);
+          }}
+          recommendation={currentRecommendation}
+          onApprove={handleApproveRecommendation}
+          onReject={handleRejectRecommendation}
+          siteName={site.name}
+        />
+      )}
     </div>
   );
 }
