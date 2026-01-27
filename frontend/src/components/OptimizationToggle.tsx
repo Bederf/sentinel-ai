@@ -60,10 +60,6 @@ export function OptimizationToggle({
     }
   };
 
-  const toggleColor = currentEnabled
-    ? "var(--color-sentinel-green)"
-    : "var(--color-sentinel-text-disabled)";
-
   const bgColor = currentEnabled
     ? "var(--color-sentinel-green)"
     : "var(--color-sentinel-text-secondary)";
