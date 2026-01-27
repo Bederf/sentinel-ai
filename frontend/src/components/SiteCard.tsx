@@ -15,11 +15,13 @@
 import { Building2, Cpu, AlertTriangle, MapPin, Shield } from "lucide-react";
 import { useState, useEffect } from "react";
 import api, { type Site } from "../lib/api";
+import { OptimizationStatusBadge } from "./OptimizationStatusBadge";
 
 interface SiteCardProps {
   site: Site;
   onClick?: (site: Site) => void;
   showSafetyStatus?: boolean;
+  showOptimizationStatus?: boolean;
 }
 
 type SafetyStatus = 'safe' | 'warning' | 'blocked' | 'alarm' | 'unknown';
@@ -32,6 +34,8 @@ interface DeviceSafetySummary {
   alarm: number;
   overallStatus: SafetyStatus;
 }
+
+type OptimizationStatusType = "optimized" | "recommendation_pending" | "warning" | "error" | "unknown";
 
 /**
  * Get status colors for SENTINEL theme
@@ -74,11 +78,12 @@ function getStatusConfig(status: Site["status"]): {
   }
 }
 
-export function SiteCard({ site, onClick, showSafetyStatus = true }: SiteCardProps) {
+export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizationStatus = false }: SiteCardProps) {
   const statusConfig = getStatusConfig(site.status);
   const hasAlerts = site.alert_count > 0;
   const [safetySummary, setSafetySummary] = useState<DeviceSafetySummary | null>(null);
   const [loadingSafety, setLoadingSafety] = useState(false);
+  const [optimizationStatus, setOptimizationStatus] = useState<OptimizationStatusType>("unknown");
 
   const handleClick = () => {
     if (onClick) {
@@ -153,6 +158,26 @@ export function SiteCard({ site, onClick, showSafetyStatus = true }: SiteCardPro
     fetchSafetyStatus();
   }, [site.id, showSafetyStatus]);
 
+  // Fetch optimization status for this site
+  useEffect(() => {
+    if (!showOptimizationStatus || !site.optimization_enabled) return;
+
+    const fetchOptimizationStatus = async () => {
+      try {
+        const status = await api.getOptimizationStatus(site.id);
+        setOptimizationStatus(status.optimization_status);
+      } catch (error) {
+        console.error('Failed to fetch optimization status:', error);
+        setOptimizationStatus('error');
+      }
+    };
+
+    fetchOptimizationStatus();
+    // Refresh every 30 seconds
+    const interval = setInterval(fetchOptimizationStatus, 30000);
+    return () => clearInterval(interval);
+  }, [site.id, showOptimizationStatus, site.optimization_enabled]);
+
   return (
     <div
       className={`relative rounded-md overflow-hidden transition-all duration-150 ${onClick ? "cursor-pointer hover:brightness-110" : ""}`}
@@ -183,19 +208,29 @@ export function SiteCard({ site, onClick, showSafetyStatus = true }: SiteCardPro
               {site.name}
             </span>
           </div>
-          {/* Status badge */}
-          <div
-            className="flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium"
-            style={{
-              background: statusConfig.bg,
-              color: statusConfig.color,
-            }}
-          >
+          <div className="flex flex-col items-end gap-1">
+            {/* Status badge */}
             <div
-              className="w-1.5 h-1.5 rounded-full"
-              style={{ background: statusConfig.color }}
-            />
-            {statusConfig.label}
+              className="flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium"
+              style={{
+                background: statusConfig.bg,
+                color: statusConfig.color,
+              }}
+            >
+              <div
+                className="w-1.5 h-1.5 rounded-full"
+                style={{ background: statusConfig.color }}
+              />
+              {statusConfig.label}
+            </div>
+            {/* Optimization badge (if enabled) */}
+            {showOptimizationStatus && site.optimization_enabled && (
+              <OptimizationStatusBadge
+                status={optimizationStatus}
+                size="sm"
+                lastOptimization={site.last_optimization}
+              />
+            )}
           </div>
         </div>
 
