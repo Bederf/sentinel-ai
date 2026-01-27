@@ -1,0 +1,165 @@
+"""Optimization data models for AI-powered building optimization.
+
+Defines the data structures for the AI optimization engine that analyzes
+building telemetry and generates optimal HVAC setpoint recommendations.
+"""
+
+from dataclasses import dataclass, field
+from datetime import datetime
+from enum import Enum
+from typing import List, Dict, Any, Optional
+import json
+
+
+class OptimizationStatus(str, Enum):
+    """Optimization status for a building."""
+
+    OPTIMIZED = "optimized"
+    RECOMMENDATION_PENDING = "recommendation_pending"
+    WARNING = "warning"
+    ERROR = "error"
+    UNKNOWN = "unknown"
+
+
+@dataclass
+class OptimizationRecommendation:
+    """AI-generated optimization recommendation for a building.
+
+    Contains specific setpoint changes, projected savings, and confidence score.
+    """
+
+    site_id: str
+    timestamp: str
+    recommendations: List[Dict[str, Any]] = field(default_factory=list)
+    projected_savings: Dict[str, Any] = field(default_factory=dict)
+    confidence: float = 0.0
+    reasoning: str = ""
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "site_id": self.site_id,
+            "timestamp": self.timestamp,
+            "recommendations": self.recommendations,
+            "projected_savings": self.projected_savings,
+            "confidence": self.confidence,
+            "reasoning": self.reasoning,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "OptimizationRecommendation":
+        """Create instance from dictionary."""
+        return cls(
+            site_id=data.get("site_id", ""),
+            timestamp=data.get("timestamp", datetime.now().isoformat()),
+            recommendations=data.get("recommendations", []),
+            projected_savings=data.get("projected_savings", {}),
+            confidence=data.get("confidence", 0.0),
+            reasoning=data.get("reasoning", ""),
+        )
+
+
+@dataclass
+class OptimizationSettings:
+    """Optimization settings for a site."""
+
+    enabled: bool = False
+    mode: str = "supervised"  # "automatic" or "supervised"
+    last_analysis: Optional[str] = None
+    analysis_interval_minutes: int = 15
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "enabled": self.enabled,
+            "mode": self.mode,
+            "last_analysis": self.last_analysis,
+            "analysis_interval_minutes": self.analysis_interval_minutes,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "OptimizationSettings":
+        """Create instance from dictionary."""
+        return cls(
+            enabled=data.get("enabled", False),
+            mode=data.get("mode", "supervised"),
+            last_analysis=data.get("last_analysis"),
+            analysis_interval_minutes=data.get("analysis_interval_minutes", 15),
+        )
+
+
+@dataclass
+class OptimizationHistoryEntry:
+    """Entry in the optimization history log."""
+
+    timestamp: str
+    action: str  # "analyzed", "approved", "rejected", "error"
+    result: str  # "success", "warning", "error"
+    user: str = "system"
+    details: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "timestamp": self.timestamp,
+            "action": self.action,
+            "result": self.result,
+            "user": self.user,
+            "details": self.details,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "OptimizationHistoryEntry":
+        """Create instance from dictionary."""
+        return cls(
+            timestamp=data.get("timestamp", datetime.now().isoformat()),
+            action=data.get("action", "analyzed"),
+            result=data.get("result", "success"),
+            user=data.get("user", "system"),
+            details=data.get("details", {}),
+        )
+
+
+@dataclass
+class SiteOptimizationStatus:
+    """Current optimization status for a site."""
+
+    site_id: str
+    status: OptimizationStatus
+    settings: OptimizationSettings
+    last_recommendation: Optional[OptimizationRecommendation] = None
+    last_optimization: Optional[str] = None
+    history: List[OptimizationHistoryEntry] = field(default_factory=list)
+    error_message: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "site_id": self.site_id,
+            "status": self.status.value if isinstance(self.status, OptimizationStatus) else self.status,
+            "settings": self.settings.to_dict(),
+            "last_recommendation": self.last_recommendation.to_dict() if self.last_recommendation else None,
+            "last_optimization": self.last_optimization,
+            "history": [entry.to_dict() for entry in self.history],
+            "error_message": self.error_message,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "SiteOptimizationStatus":
+        """Create instance from dictionary."""
+        status_str = data.get("status", "unknown")
+        status = OptimizationStatus(status_str) if isinstance(status_str, str) else status_str
+
+        return cls(
+            site_id=data.get("site_id", ""),
+            status=status,
+            settings=OptimizationSettings.from_dict(data.get("settings", {})),
+            last_recommendation=OptimizationRecommendation.from_dict(data.get("last_recommendation", {}))
+            if data.get("last_recommendation") else None,
+            last_optimization=data.get("last_optimization"),
+            history=[
+                OptimizationHistoryEntry.from_dict(entry)
+                for entry in data.get("history", [])
+            ],
+            error_message=data.get("error_message"),
+        )
