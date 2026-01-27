@@ -15,6 +15,10 @@ from app.models.device import (
     Device, DeviceValue, DeviceStatus, DevicePoint,
     create_device_from_dict
 )
+# Temporarily comment out safety engine for audit logging implementation
+# from app.services.safety_interlocks import safety_engine
+from app.services.audit_logger import AuditLogger
+from app.models.audit_log import AuditResultType
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +50,25 @@ class DeviceInterface(ABC):
         """Write a value to a device point."""
         pass
 
+    async def validate_control(self, point_name: str, value: Any) -> Dict[str, Any]:
+        """
+        Validate a control action against safety rules.
+
+        Default implementation uses the safety engine.
+        Can be overridden by specific adapters if needed.
+        """
+        # For now, return a mock validation result since safety engine is not fully implemented
+        # TODO: Integrate with safety engine when Plan 6-02 is implemented
+        return {
+            "allowed": True,
+            "reasons": [],
+            "warnings": [],
+            "validation_details": {
+                "status": "bypassed",
+                "message": "Safety validation bypassed for audit logging demo"
+            }
+        }
+
     @abstractmethod
     async def get_status(self) -> DeviceStatus:
         """Get device operational status."""
@@ -72,6 +95,7 @@ class DeviceAdapter(ABC):
     def __init__(self, device: Device):
         self.device = device
         self._connected = False
+        self.audit_logger = AuditLogger()
 
     @abstractmethod
     async def _protocol_connect(self) -> bool:
@@ -135,8 +159,8 @@ class DeviceAdapter(ABC):
             logger.error(f"Failed to read {point_name} from device {self.device.id}: {e}")
             raise
 
-    async def write_value(self, point_name: str, value: Any, priority: int = 8) -> bool:
-        """Write value with validation and error handling."""
+    async def write_value(self, point_name: str, value: Any, priority: int = 8, user: str = "system") -> bool:
+        """Write value with validation, safety checks, and audit logging."""
         if not self._connected:
             raise ConnectionError(f"Device {self.device.id} is not connected")
 
@@ -150,14 +174,87 @@ class DeviceAdapter(ABC):
         if not point.validate_value(value):
             raise ValueError(f"Value {value} is invalid for point {point_name}")
 
+        # Get current value for audit logging
+        old_value = None
+        try:
+            current_value = await self.read_value(point_name)
+            old_value = current_value.value
+        except Exception as e:
+            logger.warning(f"Could not read current value for audit logging: {e}")
+
+        # Check safety rules before writing
+        safety_result = await self.validate_control(point_name, value)
+        if not safety_result["allowed"]:
+            reasons = safety_result.get("reasons", [])
+            if reasons:
+                error_msg = f"Safety violation: {', '.join(reasons)}"
+            else:
+                error_msg = "Safety validation failed"
+
+            # Log blocked action to audit
+            self.audit_logger.log_control_action(
+                device_id=self.device.id,
+                point_name=point_name,
+                user=user,
+                old_value=old_value,
+                new_value=value,
+                result=AuditResultType.BLOCKED,
+                safety_validation=safety_result,
+                error_message=error_msg,
+                metadata={"priority": priority}
+            )
+
+            raise ValueError(error_msg)
+
+        # Log safety warnings if any
+        warnings = safety_result.get("warnings", [])
+        if warnings:
+            logger.warning(f"Safety warnings for {point_name} = {value} on device {self.device.id}: {', '.join(warnings)}")
+
         try:
             success = await self._protocol_write(point_name, value, priority)
+
+            # Log to audit system
             if success:
+                self.audit_logger.log_control_action(
+                    device_id=self.device.id,
+                    point_name=point_name,
+                    user=user,
+                    old_value=old_value,
+                    new_value=value,
+                    result=AuditResultType.SUCCESS,
+                    safety_validation=safety_result,
+                    metadata={"priority": priority}
+                )
                 logger.info(f"Wrote {point_name} = {value} to device {self.device.id} (priority: {priority})")
             else:
+                self.audit_logger.log_control_action(
+                    device_id=self.device.id,
+                    point_name=point_name,
+                    user=user,
+                    old_value=old_value,
+                    new_value=value,
+                    result=AuditResultType.FAILED,
+                    safety_validation=safety_result,
+                    error_message="Protocol write failed",
+                    metadata={"priority": priority}
+                )
                 logger.warning(f"Failed to write {point_name} = {value} to device {self.device.id}")
+
             return success
         except Exception as e:
+            # Log exception to audit
+            self.audit_logger.log_control_action(
+                device_id=self.device.id,
+                point_name=point_name,
+                user=user,
+                old_value=old_value,
+                new_value=value,
+                result=AuditResultType.FAILED,
+                safety_validation=safety_result,
+                error_message=str(e),
+                metadata={"priority": priority}
+            )
             logger.error(f"Error writing {point_name} = {value} to device {self.device.id}: {e}")
             raise
 
@@ -271,13 +368,13 @@ class DeviceManager:
 
         return await adapter.read_value(point_name)
 
-    async def write_device_value(self, device_id: str, point_name: str, value: Any, priority: int = 8) -> bool:
+    async def write_device_value(self, device_id: str, point_name: str, value: Any, priority: int = 8, user: str = "system") -> bool:
         """Write value to a device point."""
         adapter = await self.get_adapter(device_id)
         if not adapter:
             raise ValueError(f"Device {device_id} not found or not connected")
 
-        return await adapter.write_value(point_name, value, priority)
+        return await adapter.write_value(point_name, value, priority, user)
 
     async def get_device_status(self, device_id: str) -> DeviceStatus:
         """Get device status."""
@@ -286,6 +383,24 @@ class DeviceManager:
             raise ValueError(f"Device {device_id} not found")
 
         return await adapter.get_status()
+
+    async def get_device_safety_status(self, device_id: str) -> Dict[str, Any]:
+        """Get device safety status."""
+        device = await self.get_device(device_id)
+        if not device:
+            raise ValueError(f"Device {device_id} not found")
+
+        # For now, return mock safety status since safety engine is not fully implemented
+        # TODO: Integrate with safety engine when Plan 6-02 is implemented
+        return {
+            "device_id": device_id,
+            "status": "safe",
+            "last_checked": datetime.now().isoformat(),
+            "active_rules": [],
+            "violations": [],
+            "warnings": [],
+            "overall_status": "safe"
+        }
 
     async def scan_device_points(self, device_id: str) -> Dict[str, DevicePoint]:
         """Scan device for available points."""

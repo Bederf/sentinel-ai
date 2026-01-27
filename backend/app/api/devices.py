@@ -10,7 +10,7 @@ import logging
 from pathlib import Path
 from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException, Query, Body
+from fastapi import APIRouter, HTTPException, Query, Body, Request
 
 from app.models.device import Device, DeviceValue
 from app.services.device_abstraction import device_manager
@@ -147,6 +147,7 @@ async def read_device_point(
 
 @router.post("/devices/{device_id}/control", response_model=dict)
 async def control_device(
+    request: Request,
     device_id: str,
     point: str = Body(..., embed=True, description="Point name to control"),
     value: float = Body(..., embed=True, description="Value to write"),
@@ -158,7 +159,10 @@ async def control_device(
         if priority < 1 or priority > 16:
             raise HTTPException(status_code=400, detail="Priority must be between 1 and 16")
 
-        success = await device_manager.write_device_value(device_id, point, value, priority)
+        # Extract user from headers (demo: hardcoded, production: from auth)
+        user = request.headers.get("X-User-Id", "system")
+
+        success = await device_manager.write_device_value(device_id, point, value, priority, user)
 
         if success:
             return {
@@ -205,6 +209,23 @@ async def get_device_status(device_id: str) -> dict:
         raise
     except Exception as e:
         logger.error(f"Error getting status for device {device_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/devices/{device_id}/safety-status", response_model=dict)
+async def get_device_safety_status(device_id: str) -> dict:
+    """Get device safety status."""
+    try:
+        device = await device_manager.get_device(device_id)
+        if not device:
+            raise HTTPException(status_code=404, detail=f"Device {device_id} not found")
+
+        safety_status = await device_manager.get_device_safety_status(device_id)
+        return safety_status
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting safety status for device {device_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
