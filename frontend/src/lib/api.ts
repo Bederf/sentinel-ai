@@ -83,6 +83,111 @@ export interface Anomaly {
   recommendation: string;
 }
 
+// ============= Device Interfaces =============
+
+// Device point interface
+export interface DevicePoint {
+  name: string;
+  point_type: string;
+  description: string;
+  unit: string;
+  min_value?: number;
+  max_value?: number;
+  default_value: number | boolean;
+  writable: boolean;
+  priority?: number;
+  metadata?: Record<string, any>;
+}
+
+// Device interface
+export interface Device {
+  id: string;
+  name: string;
+  device_type: string;
+  protocol: string;
+  location: string;
+  site_id: string;
+  description: string;
+  manufacturer?: string;
+  model?: string;
+  points: Record<string, DevicePoint>;
+  metadata?: Record<string, any>;
+}
+
+// Device value interface
+export interface DeviceValue {
+  device_id: string;
+  point_name: string;
+  value: number | boolean;
+  unit: string;
+  timestamp: string;
+  quality: string;
+}
+
+// Device control response interface
+export interface DeviceControlResponse {
+  success: boolean;
+  message: string;
+  device_id: string;
+  point: string;
+  value: number | boolean;
+  priority: number;
+}
+
+// Device status interface
+export interface DeviceStatus {
+  device_id: string;
+  device_name: string;
+  status: string;
+  last_seen: string;
+  protocol: string;
+}
+
+// ============= Audit Interfaces =============
+
+// Audit log entry interface
+export interface AuditLogEntryResponse {
+  id: string;
+  timestamp: string;
+  action: string;
+  user: string;
+  device_id?: string;
+  point_name?: string;
+  old_value?: any;
+  new_value?: any;
+  result: string;
+  safety_validation?: Record<string, any>;
+  error_message?: string;
+  correlation_id?: string;
+  metadata: Record<string, any>;
+}
+
+// Audit logs response with pagination
+export interface AuditLogsResponse {
+  entries: AuditLogEntryResponse[];
+  total_count: number;
+  page: number;
+  page_size: number;
+  has_more: boolean;
+}
+
+// Audit statistics response
+export interface AuditStatsResponse {
+  total_entries: number;
+  by_action: Record<string, number>;
+  by_result: Record<string, number>;
+  by_user: Record<string, number>;
+  recent_activity_count: number;
+  last_updated: string;
+}
+
+// Demo audit data generation response
+export interface DemoAuditDataResponse {
+  status: string;
+  entries_created: number;
+  message: string;
+}
+
 // ============= Optimization Interfaces =============
 
 // Load shedding stage interface
@@ -600,6 +705,161 @@ export const api = {
    */
   async getOptimizationScenarios(): Promise<OptimizationScenario[]> {
     return fetchApi<OptimizationScenario[]>(`/api/optimization/scenarios`);
+  },
+
+  // ============= Device API Methods =============
+
+  /**
+   * Get all devices with optional filtering
+   * @param siteId - Optional site ID filter
+   * @param deviceType - Optional device type filter
+   * @param protocol - Optional protocol filter
+   */
+  async getDevices(
+    siteId?: string,
+    deviceType?: string,
+    protocol?: string
+  ): Promise<Device[]> {
+    const params = new URLSearchParams();
+    if (siteId) {
+      params.append("site_id", siteId);
+    }
+    if (deviceType) {
+      params.append("device_type", deviceType);
+    }
+    if (protocol) {
+      params.append("protocol", protocol);
+    }
+    const queryString = params.toString();
+    return fetchApi<Device[]>(`/api/devices${queryString ? `?${queryString}` : ""}`);
+  },
+
+  /**
+   * Get a specific device by ID
+   * @param deviceId - Device ID
+   */
+  async getDevice(deviceId: string): Promise<Device> {
+    return fetchApi<Device>(`/api/devices/${deviceId}`);
+  },
+
+  /**
+   * Get all points for a device
+   * @param deviceId - Device ID
+   */
+  async getDevicePoints(deviceId: string): Promise<Record<string, DevicePoint>> {
+    const response = await fetchApi<{ points: Record<string, DevicePoint> }>(
+      `/api/devices/${deviceId}/points`
+    );
+    return response.points;
+  },
+
+  /**
+   * Read a value from a device point
+   * @param deviceId - Device ID
+   * @param pointName - Point name
+   */
+  async readDevicePoint(deviceId: string, pointName: string): Promise<DeviceValue> {
+    return fetchApi<DeviceValue>(`/api/devices/${deviceId}/points/${pointName}`);
+  },
+
+  /**
+   * Write a value to a device point (control command)
+   * @param deviceId - Device ID
+   * @param point - Point name to control
+   * @param value - Value to write
+   * @param priority - Write priority (1-16, default: 8)
+   */
+  async controlDevice(
+    deviceId: string,
+    point: string,
+    value: number | boolean,
+    priority: number = 8
+  ): Promise<DeviceControlResponse> {
+    const body = {
+      point,
+      value,
+      priority,
+    };
+    return fetchApi<DeviceControlResponse>(`/api/devices/${deviceId}/control`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  },
+
+  /**
+   * Get device operational status
+   * @param deviceId - Device ID
+   */
+  async getDeviceStatus(deviceId: string): Promise<DeviceStatus> {
+    return fetchApi<DeviceStatus>(`/api/devices/${deviceId}/status`);
+  },
+
+  /**
+   * Get all devices at a specific site
+   * @param siteId - Site ID
+   */
+  async getSiteDevices(siteId: string): Promise<Device[]> {
+    return fetchApi<Device[]>(`/api/sites/${siteId}/devices`);
+  },
+
+  // ============= Audit API Methods =============
+
+  /**
+   * Get audit logs with filtering and pagination
+   * @param page - Page number (default: 1)
+   * @param pageSize - Items per page (default: 50)
+   * @param startTime - Start time filter
+   * @param endTime - End time filter
+   * @param deviceId - Filter by device ID
+   * @param action - Filter by action type
+   * @param user - Filter by user
+   * @param result - Filter by result
+   */
+  async getAuditLogs(
+    page: number = 1,
+    pageSize: number = 50,
+    startTime?: string,
+    endTime?: string,
+    deviceId?: string,
+    action?: string,
+    user?: string,
+    result?: string
+  ): Promise<AuditLogsResponse> {
+    const params = new URLSearchParams();
+    params.append("page", page.toString());
+    params.append("page_size", pageSize.toString());
+    if (startTime) params.append("start_time", startTime);
+    if (endTime) params.append("end_time", endTime);
+    if (deviceId) params.append("device_id", deviceId);
+    if (action) params.append("action", action);
+    if (user) params.append("user", user);
+    if (result) params.append("result", result);
+
+    return fetchApi<AuditLogsResponse>(`/api/audit/logs?${params.toString()}`);
+  },
+
+  /**
+   * Get a specific audit log entry by ID
+   * @param entryId - Audit log entry ID
+   */
+  async getAuditLogEntry(entryId: string): Promise<AuditLogEntryResponse> {
+    return fetchApi<AuditLogEntryResponse>(`/api/audit/logs/${entryId}`);
+  },
+
+  /**
+   * Get audit log statistics
+   */
+  async getAuditStats(): Promise<AuditStatsResponse> {
+    return fetchApi<AuditStatsResponse>(`/api/audit/stats`);
+  },
+
+  /**
+   * Generate demo audit data for testing
+   */
+  async generateDemoAuditData(): Promise<DemoAuditDataResponse> {
+    return fetchApi<DemoAuditDataResponse>(`/api/audit/demo-data`, {
+      method: "POST",
+    });
   },
 };
 
