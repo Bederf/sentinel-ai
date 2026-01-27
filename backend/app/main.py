@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config.settings import settings
-from app.api import health, sites, equipment, sensors, alerts, stats, chat, energy, predictions
+from app.api import health, sites, equipment, sensors, alerts, stats, chat, energy, predictions, optimization
 
 app = FastAPI(
     title=settings.app_name,
@@ -31,6 +31,7 @@ app.include_router(stats.router, prefix="/api", tags=["stats"])
 app.include_router(chat.router, prefix="/api", tags=["chat"])
 app.include_router(energy.router, prefix="/api", tags=["energy"])
 app.include_router(predictions.router, prefix="/api", tags=["predictions"])
+app.include_router(optimization.router, prefix="/api", tags=["optimization"])
 
 
 @app.get("/")
