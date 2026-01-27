@@ -4,9 +4,12 @@ import re
 import logging
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Dict, Any
 import json
 from pathlib import Path
+
+from app.services.device_abstraction import device_manager
+from app.services.safety_interlocks import safety_engine
 
 logger = logging.getLogger(__name__)
 
@@ -183,7 +186,7 @@ class CommandExecutor:
 
         return None
 
-    def execute_command(self, command: dict) -> CommandResult:
+    async def execute_command(self, command: dict) -> CommandResult:
         """
         Execute a parsed command (simulated).
 
@@ -196,7 +199,7 @@ class CommandExecutor:
         command_type = command.get("type")
 
         if command_type == "temperature":
-            return self._execute_temperature(command)
+            return await self._execute_temperature(command)
         elif command_type == "lighting":
             return self._execute_lighting(command)
         elif command_type == "emergency":
@@ -210,7 +213,7 @@ class CommandExecutor:
                 message=f"Unknown command type: {command_type}",
             )
 
-    def _execute_temperature(self, command: dict) -> CommandResult:
+    async def _execute_temperature(self, command: dict) -> CommandResult:
         """Execute temperature control command."""
         temp = command["temperature"]
         location = command["location"]
@@ -226,7 +229,82 @@ class CommandExecutor:
                 message=f"Could not find site matching '{location}'. Please specify a valid site name or ID.",
             )
 
-        # Validate temperature range
+        # Try to find HVAC devices at this site
+        devices = await device_manager.list_devices_by_site(site["id"])
+        hvac_devices = [d for d in devices if d.device_type.value == "hvac"]
+
+        if not hvac_devices:
+            # Fall back to simulated execution
+            return self._execute_temperature_simulated(temp, site)
+
+        # Use the first HVAC device for demo
+        device = hvac_devices[0]
+
+        # Find temperature setpoint point
+        temp_points = [p for p in device.points.values()
+                      if "temp" in p.name.lower() and p.writable]
+
+        if not temp_points:
+            # Fall back to simulated execution
+            return self._execute_temperature_simulated(temp, site)
+
+        point_name = temp_points[0].name
+
+        try:
+            # Check safety validation first
+            if not safety_engine._initialized:
+                await safety_engine.initialize()
+
+            safety_result = await safety_engine.validate_control(device, point_name, temp)
+
+            if not safety_result["allowed"]:
+                reasons = safety_result.get("reasons", [])
+                if reasons:
+                    return CommandResult(
+                        success=False,
+                        command_type="temperature",
+                        target=f"{device.name} at {site['name']}",
+                        action=f"set to {temp}°C",
+                        message=f"Safety violation: {', '.join(reasons)}",
+                    )
+                else:
+                    return CommandResult(
+                        success=False,
+                        command_type="temperature",
+                        target=f"{device.name} at {site['name']}",
+                        action=f"set to {temp}°C",
+                        message="Safety validation failed for temperature control.",
+                    )
+
+            # Execute the control command
+            success = await device_manager.write_device_value(device.id, point_name, temp)
+
+            if success:
+                return CommandResult(
+                    success=True,
+                    command_type="temperature",
+                    target=f"{device.name} at {site['name']}",
+                    action=f"set to {temp}°C",
+                    message=f"Temperature setpoint on {device.name} [{device.id}] at {site['name']} set to {temp}°C. "
+                            f"Safety validation passed: {safety_result.get('message', 'OK')}",
+                )
+            else:
+                return CommandResult(
+                    success=False,
+                    command_type="temperature",
+                    target=f"{device.name} at {site['name']}",
+                    action=f"set to {temp}°C",
+                    message=f"Failed to write temperature setpoint to {device.name}.",
+                )
+
+        except Exception as e:
+            logger.error(f"Error executing temperature command: {e}")
+            # Fall back to simulated execution
+            return self._execute_temperature_simulated(temp, site)
+
+    def _execute_temperature_simulated(self, temp: float, site: dict) -> CommandResult:
+        """Fallback simulated temperature execution."""
+        # Validate temperature range (legacy validation)
         if temp < 16 or temp > 28:
             return CommandResult(
                 success=False,

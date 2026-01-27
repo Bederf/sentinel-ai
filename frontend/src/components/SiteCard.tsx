@@ -6,17 +6,31 @@
  * - Location and type information
  * - Equipment count metric
  * - Risk alerts with severity coloring
+ * - Safety status indicators
  * - Status-based left border accent
  *
  * Follows SENTINEL dark theme design.
  */
 
-import { Building2, Cpu, AlertTriangle, MapPin } from "lucide-react";
+import { Building2, Cpu, AlertTriangle, MapPin, Shield } from "lucide-react";
+import { useState, useEffect } from "react";
 import type { Site } from "../lib/api";
+import { fetchApi } from "../lib/api";
+import { SafetyIndicator, SafetyStatus } from "./SafetyIndicator";
 
 interface SiteCardProps {
   site: Site;
   onClick?: (site: Site) => void;
+  showSafetyStatus?: boolean;
+}
+
+interface DeviceSafetySummary {
+  total: number;
+  safe: number;
+  warning: number;
+  blocked: number;
+  alarm: number;
+  overallStatus: SafetyStatus;
 }
 
 /**
@@ -60,15 +74,88 @@ function getStatusConfig(status: Site["status"]): {
   }
 }
 
-export function SiteCard({ site, onClick }: SiteCardProps) {
+export function SiteCard({ site, onClick, showSafetyStatus = true }: SiteCardProps) {
   const statusConfig = getStatusConfig(site.status);
   const hasAlerts = site.alert_count > 0;
+  const [safetySummary, setSafetySummary] = useState<DeviceSafetySummary | null>(null);
+  const [loadingSafety, setLoadingSafety] = useState(false);
 
   const handleClick = () => {
     if (onClick) {
       onClick(site);
     }
   };
+
+  // Fetch safety status for devices at this site
+  useEffect(() => {
+    if (!showSafetyStatus) return;
+
+    const fetchSafetyStatus = async () => {
+      setLoadingSafety(true);
+      try {
+        // Get devices for this site
+        const devices = await fetchApi<Array<{ id: string }>>(
+          `/api/sites/${site.id}/devices`
+        );
+
+        if (devices.length === 0) {
+          setSafetySummary({
+            total: 0,
+            safe: 0,
+            warning: 0,
+            blocked: 0,
+            alarm: 0,
+            overallStatus: 'unknown',
+          });
+          return;
+        }
+
+        // Fetch safety status for a sample of devices (limit to 5 for performance)
+        const sampleDevices = devices.slice(0, 5);
+        const statusPromises = sampleDevices.map(async (device) => {
+          try {
+            const status = await fetchApi<{ overall_status: SafetyStatus }>(
+              `/api/devices/${device.id}/safety-status`
+            );
+            return status.overall_status;
+          } catch {
+            return 'unknown' as SafetyStatus;
+          }
+        });
+
+        const statuses = await Promise.all(statusPromises);
+
+        const summary: DeviceSafetySummary = {
+          total: devices.length,
+          safe: statuses.filter(s => s === 'safe').length,
+          warning: statuses.filter(s => s === 'warning').length,
+          blocked: statuses.filter(s => s === 'blocked').length,
+          alarm: statuses.filter(s => s === 'alarm').length,
+          overallStatus: 'unknown',
+        };
+
+        // Determine overall status
+        if (summary.blocked > 0) {
+          summary.overallStatus = 'blocked';
+        } else if (summary.alarm > 0) {
+          summary.overallStatus = 'alarm';
+        } else if (summary.warning > 0) {
+          summary.overallStatus = 'warning';
+        } else if (summary.safe > 0) {
+          summary.overallStatus = 'safe';
+        }
+
+        setSafetySummary(summary);
+      } catch (error) {
+        console.error('Failed to fetch safety status:', error);
+        setSafetySummary(null);
+      } finally {
+        setLoadingSafety(false);
+      }
+    };
+
+    fetchSafetyStatus();
+  }, [site.id, showSafetyStatus]);
 
   return (
     <div
@@ -171,6 +258,68 @@ export function SiteCard({ site, onClick }: SiteCardProps) {
               </div>
             </div>
           </div>
+
+          {/* Safety Status */}
+          {showSafetyStatus && (
+            <div className="flex items-center gap-2">
+              <Shield
+                className="h-4 w-4"
+                style={{
+                  color: safetySummary?.overallStatus === 'safe'
+                    ? "var(--color-sentinel-green)"
+                    : safetySummary?.overallStatus === 'warning'
+                    ? "var(--color-sentinel-amber)"
+                    : safetySummary?.overallStatus === 'blocked' || safetySummary?.overallStatus === 'alarm'
+                    ? "var(--color-sentinel-red)"
+                    : "var(--color-sentinel-text-disabled)",
+                }}
+              />
+              <div className="text-right">
+                {loadingSafety ? (
+                  <div
+                    className="text-lg font-medium"
+                    style={{
+                      color: "var(--color-sentinel-text-disabled)",
+                      fontVariantNumeric: "tabular-nums",
+                    }}
+                  >
+                    ...
+                  </div>
+                ) : safetySummary ? (
+                  <>
+                    <div
+                      className="text-lg font-medium"
+                      style={{
+                        color: safetySummary.overallStatus === 'safe'
+                          ? "var(--color-sentinel-green)"
+                          : safetySummary.overallStatus === 'warning'
+                          ? "var(--color-sentinel-amber)"
+                          : safetySummary.overallStatus === 'blocked' || safetySummary.overallStatus === 'alarm'
+                          ? "var(--color-sentinel-red)"
+                          : "var(--color-sentinel-text-primary)",
+                        fontVariantNumeric: "tabular-nums",
+                      }}
+                    >
+                      {safetySummary.safe}/{safetySummary.total}
+                    </div>
+                    <div
+                      className="text-xs"
+                      style={{ color: "var(--color-sentinel-text-disabled)" }}
+                    >
+                      Safe
+                    </div>
+                  </>
+                ) : (
+                  <div
+                    className="text-xs"
+                    style={{ color: "var(--color-sentinel-text-disabled)" }}
+                  >
+                    No data
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Risk Alert Count */}
           <div className="flex items-center gap-2">

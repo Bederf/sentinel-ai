@@ -112,7 +112,7 @@ async def chat(request: ChatRequest) -> StreamingResponse:
     command = command_executor.parse_command(user_message)
     if command:
         logger.info(f"Detected command: {command['type']}")
-        result = command_executor.execute_command(command)
+        result = await command_executor.execute_command(command)
 
         if result.success:
             response_message = f"{result.message}"
