@@ -97,12 +97,12 @@ function getStageColor(stage: number): string {
   return "red";
 }
 
-
 export function OptimizationPanel({ siteId = "site-001", scenarioId, compact = false }: OptimizationPanelProps) {
   const [eskomStatus, setEskomStatus] = useState<EskomStatusResponse | null>(mockEskomStatus);
   const [siteSchedule, setSiteSchedule] = useState<SiteScheduleResponse | null>(mockSiteSchedule);
   const [thermalRunway, setThermalRunway] = useState<ThermalRunwayResponse | null>(mockThermalRunway);
   const [loading, setLoading] = useState(false);
+
   // Load data on mount
   useEffect(() => {
     // TODO: Replace with actual API calls
@@ -253,10 +253,9 @@ export function OptimizationPanel({ siteId = "site-001", scenarioId, compact = f
             <div className="space-y-4">
               <ThermalRunwayChart
                 data={{
-                  timePoints: ["14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00", "18:30"],
-                  withoutPrecooling: [22.4, 23.1, 24.0, 24.9, 25.7, 26.5, 27.3, 28.1, 28.9],
-                  withPrecooling: [22.4, 21.8, 21.2, 21.5, 22.1, 22.9, 23.8, 24.7, 25.5],
-                  comfortLimit: 26.0
+                  time_points: ["14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00", "18:30"],
+                  without_precooling: [22.4, 23.1, 24.0, 24.9, 25.7, 26.5, 27.3, 28.1, 28.9],
+                  with_precooling: [22.4, 21.8, 21.2, 21.5, 22.1, 22.9, 23.8, 24.7, 25.5]
                 }}
                 outagePeriod={{ start: "16:00", end: "18:30" }}
                 metrics={{

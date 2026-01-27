@@ -5,6 +5,7 @@
  * The "aha moment" visualization for Phase 10.
  *
  * Uses Recharts for consistent charting with existing components.
+ * Follows SENTINEL dark theme design.
  */
 
 import { useState } from "react";
@@ -25,10 +26,9 @@ import { Thermometer, Clock } from "lucide-react";
 
 interface ThermalRunwayChartProps {
   data: {
-    timePoints: string[];
-    withoutPrecooling: number[];
-    withPrecooling: number[];
-    comfortLimit: number;
+    time_points: string[];
+    without_precooling: number[];
+    with_precooling: number[];
   };
   outagePeriod: {
     start: string;
@@ -71,9 +71,9 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 function prepareChartData(
   timePoints: string[],
   withoutPrecooling: number[],
-  withPrecooling: number[],
-  comfortLimit: number
+  withPrecooling: number[]
 ) {
+  const comfortLimit = 26.0; // Comfort limit is fixed at 26°C
   return timePoints.map((time, idx) => ({
     time,
     "Without Pre-cooling": withoutPrecooling[idx],
@@ -93,21 +93,21 @@ export function ThermalRunwayChart({ data, outagePeriod, metrics }: ThermalRunwa
   const [, setHoveredPoint] = useState<number | null>(null);
 
   const chartData = prepareChartData(
-    data.timePoints,
-    data.withoutPrecooling,
-    data.withPrecooling,
-    data.comfortLimit
+    data.time_points,
+    data.without_precooling,
+    data.with_precooling
   );
 
   const { startIdx, endIdx } = findOutageIndices(
-    data.timePoints,
+    data.time_points,
     outagePeriod.start,
     outagePeriod.end
   );
 
   // Calculate breach points
-  const breachWithoutIdx = data.withoutPrecooling.findIndex(temp => temp >= data.comfortLimit);
-  const breachWithIdx = data.withPrecooling.findIndex(temp => temp >= data.comfortLimit);
+  const comfortLimit = 26.0;
+  const breachWithoutIdx = data.without_precooling.findIndex(temp => temp >= comfortLimit);
+  const breachWithIdx = data.with_precooling.findIndex(temp => temp >= comfortLimit);
 
   // Handle mouse events for hover effects
   const handleMouseMove = (e: any) => {
@@ -173,7 +173,7 @@ export function ThermalRunwayChart({ data, outagePeriod, metrics }: ThermalRunwa
 
             {/* Comfort limit reference line */}
             <ReferenceLine
-              y={data.comfortLimit}
+              y={comfortLimit}
               stroke="#EF4444"
               strokeDasharray="3 3"
               strokeWidth={1.5}
@@ -188,7 +188,7 @@ export function ThermalRunwayChart({ data, outagePeriod, metrics }: ThermalRunwa
             {/* Outage period shading */}
             {startIdx >= 0 && endIdx >= 0 && (
               <ReferenceLine
-                x={data.timePoints[startIdx]}
+                x={data.time_points[startIdx]}
                 stroke="#F59E0B"
                 strokeWidth={2}
                 label={{
@@ -203,7 +203,7 @@ export function ThermalRunwayChart({ data, outagePeriod, metrics }: ThermalRunwa
 
             {startIdx >= 0 && endIdx >= 0 && (
               <ReferenceLine
-                x={data.timePoints[endIdx]}
+                x={data.time_points[endIdx]}
                 stroke="#10B981"
                 strokeWidth={2}
                 label={{
@@ -256,7 +256,7 @@ export function ThermalRunwayChart({ data, outagePeriod, metrics }: ThermalRunwa
             {/* Breach point markers */}
             {breachWithoutIdx >= 0 && (
               <ReferenceLine
-                x={data.timePoints[breachWithoutIdx]}
+                x={data.time_points[breachWithoutIdx]}
                 stroke="#EF4444"
                 strokeWidth={1}
                 strokeDasharray="3 3"
@@ -271,7 +271,7 @@ export function ThermalRunwayChart({ data, outagePeriod, metrics }: ThermalRunwa
 
             {breachWithIdx >= 0 && (
               <ReferenceLine
-                x={data.timePoints[breachWithIdx]}
+                x={data.time_points[breachWithIdx]}
                 stroke="#3B82F6"
                 strokeWidth={1}
                 strokeDasharray="3 3"
