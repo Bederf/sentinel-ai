@@ -20,6 +20,8 @@ import {
   Bell,
   DollarSign,
   RefreshCw,
+  Zap,
+  ArrowLeft,
 } from "lucide-react";
 import api from "../lib/api";
 import type { DashboardStats, Site, Prediction, EnergyDataPoint } from "../lib/api";
@@ -32,6 +34,8 @@ import { PredictionCard } from "./PredictionCard";
 import { PredictionDetail } from "./PredictionDetail";
 import { HeroPredictionCard } from "./HeroPredictionCard";
 import { ROISummaryCard } from "./ROISummaryCard";
+import { OptimizationPanel } from "./OptimizationPanel";
+import AuditTrail from "./AuditTrail";
 
 // Time period options for energy chart
 const TIME_PERIODS = [7, 30, 90] as const;
@@ -50,6 +54,9 @@ export function Dashboard() {
   // Prediction detail modal state
   const [selectedPrediction, setSelectedPrediction] = useState<Prediction | null>(null);
   const [isPredictionDetailOpen, setIsPredictionDetailOpen] = useState(false);
+
+  // Optimization page state
+  const [showOptimizationPage, setShowOptimizationPage] = useState(false);
 
   // Energy chart state
   const [energyData, setEnergyData] = useState<EnergyDataPoint[]>([]);
@@ -197,6 +204,38 @@ export function Dashboard() {
     return (
       <div className="h-full overflow-hidden">
         <SiteDetail siteId={selectedSiteId} onBack={handleSiteDetailBack} />
+      </div>
+    );
+  }
+
+  // Show optimization page if requested
+  if (showOptimizationPage) {
+    // TODO: Replace with actual OptimizationPage component
+    return (
+      <div className="h-full overflow-y-auto p-4 md:p-6" style={{ background: "var(--color-sentinel-bg-canvas)" }}>
+        <button
+          onClick={() => setShowOptimizationPage(false)}
+          className="flex items-center gap-2 mb-6 transition-colors"
+          style={{ color: "var(--color-sentinel-text-secondary)" }}
+        >
+          <ArrowLeft className="h-5 w-5" />
+          <span>Back to Dashboard</span>
+        </button>
+        <div
+          className="rounded-md p-8 text-center"
+          style={{
+            background: "var(--color-sentinel-bg-panel)",
+            border: "1px solid var(--color-sentinel-border)",
+          }}
+        >
+          <Zap className="h-12 w-12 mx-auto mb-4" style={{ color: "var(--color-sentinel-blue)" }} />
+          <h2 className="text-xl font-medium mb-2" style={{ color: "var(--color-sentinel-text-primary)" }}>
+            Optimization Page
+          </h2>
+          <p style={{ color: "var(--color-sentinel-text-secondary)" }}>
+            Full optimization interface will be implemented in Task 3
+          </p>
+        </div>
       </div>
     );
   }
@@ -520,6 +559,147 @@ export function Dashboard() {
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      </div>
+
+      {/* Load Shedding Optimization Section */}
+      <div className="mt-6">
+        <div
+          className="rounded-md overflow-hidden"
+          style={{
+            background: "var(--color-sentinel-bg-panel)",
+            border: "1px solid var(--color-sentinel-border)",
+          }}
+        >
+          {/* Panel Header */}
+          <div
+            className="p-4 flex items-center justify-between"
+            style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}
+          >
+            <div className="flex items-center gap-3">
+              <div
+                className="p-2 rounded"
+                style={{ background: "rgba(59, 130, 246, 0.15)" }}
+              >
+                <Zap className="h-5 w-5" style={{ color: "var(--color-sentinel-blue)" }} />
+              </div>
+              <div>
+                <h3
+                  className="font-medium text-sm"
+                  style={{ color: "var(--color-sentinel-text-primary)" }}
+                >
+                  Load Shedding Optimization
+                </h3>
+                <span
+                  className="text-xs"
+                  style={{ color: "var(--color-sentinel-text-secondary)" }}
+                >
+                  Optimize building comfort and energy use during outages
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <div
+                className="px-2 py-1 rounded text-xs font-medium"
+                style={{
+                  background: "rgba(16, 185, 129, 0.15)",
+                  color: "var(--color-sentinel-green)",
+                }}
+              >
+                Active Monitoring
+              </div>
+              <button
+                className="px-3 py-1.5 text-xs rounded transition-colors"
+                style={{
+                  background: "var(--color-sentinel-bg-secondary)",
+                  color: "var(--color-sentinel-text-primary)",
+                  border: "1px solid var(--color-sentinel-border)",
+                }}
+                onClick={() => setShowOptimizationPage(true)}
+              >
+                View Details
+              </button>
+            </div>
+          </div>
+
+          {/* Optimization Panel Content */}
+          <div className="p-4">
+            <OptimizationPanel compact={true} />
+          </div>
+        </div>
+      </div>
+
+      {/* Audit Trail Section */}
+      <div className="mt-6">
+        <div
+          className="rounded-md overflow-hidden"
+          style={{
+            background: "var(--color-sentinel-bg-panel)",
+            border: "1px solid var(--color-sentinel-border)",
+          }}
+        >
+          {/* Panel Header */}
+          <div
+            className="p-4 flex items-center justify-between"
+            style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}
+          >
+            <div className="flex items-center gap-3">
+              <div
+                className="p-2 rounded"
+                style={{ background: "rgba(139, 92, 246, 0.15)" }}
+              >
+                <svg
+                  className="h-5 w-5"
+                  style={{ color: "var(--color-sentinel-purple)" }}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                  />
+                </svg>
+              </div>
+              <div>
+                <h3
+                  className="font-medium text-sm"
+                  style={{ color: "var(--color-sentinel-text-primary)" }}
+                >
+                  Control Audit Trail
+                </h3>
+                <span
+                  className="text-xs"
+                  style={{ color: "var(--color-sentinel-text-secondary)" }}
+                >
+                  Complete trail of all control actions and safety validations
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <div
+                className="px-2 py-1 rounded text-xs font-medium"
+                style={{
+                  background: "rgba(139, 92, 246, 0.15)",
+                  color: "var(--color-sentinel-purple)",
+                }}
+              >
+                Live Monitoring
+              </div>
+            </div>
+          </div>
+
+          {/* Audit Trail Content */}
+          <div className="p-4">
+            <AuditTrail
+              pageSize={10}
+              refreshInterval={30000}
+              onRefresh={(logs) => console.log(`Refreshed ${logs.length} audit logs`)}
+            />
           </div>
         </div>
       </div>
