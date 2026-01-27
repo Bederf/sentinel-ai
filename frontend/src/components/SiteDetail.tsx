@@ -33,6 +33,7 @@ import { KPICard } from "./KPICard";
 import { EnergyChart } from "./EnergyChart";
 import { PredictionCard } from "./PredictionCard";
 import { PredictionDetail } from "./PredictionDetail";
+import { OptimizationInfoCard } from "./OptimizationInfoCard";
 
 interface SiteDetailProps {
   siteId: string;
@@ -57,6 +58,7 @@ interface SiteDetailData {
   active_alerts: number;
   alert_count?: number;
   status?: "normal" | "warning" | "critical";
+  optimization_enabled?: boolean;
 }
 
 interface Equipment {
@@ -423,6 +425,12 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
           </div>
         </div>
       </div>
+
+      {/* AI Optimization Info Card */}
+      <OptimizationInfoCard
+        siteId={siteId}
+        optimizationEnabled={site.optimization_enabled || false}
+      />
 
       {/* KPI Cards Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
