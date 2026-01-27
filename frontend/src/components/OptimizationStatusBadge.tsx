@@ -19,7 +19,7 @@ export type OptimizationStatus = "optimized" | "recommendation_pending" | "warni
 interface OptimizationStatusBadgeProps {
   status: OptimizationStatus;
   size?: "sm" | "md";
-  lastOptimization?: string | null;
+  lastOptimization?: string | null | undefined;
   className?: string;
 }
 
@@ -80,7 +80,7 @@ function getStatusConfig(status: OptimizationStatus): {
 /**
  * Format timestamp as relative time (e.g., "12 min ago")
  */
-function formatRelativeTime(timestamp: string | null): string | null {
+function formatRelativeTime(timestamp: string | null | undefined): string | null {
   if (!timestamp) return null;
 
   const now = new Date();
