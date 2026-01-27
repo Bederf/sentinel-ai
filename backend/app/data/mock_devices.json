@@ -1,0 +1,421 @@
+[
+  {
+    "id": "chiller-gateway-01",
+    "name": "Gateway Chiller",
+    "device_type": "hvac",
+    "protocol": "mock",
+    "location": "Basement Plant Room",
+    "site_id": "fnb-gateway",
+    "description": "Main chiller for Gateway building, 21 years old",
+    "manufacturer": "Trane",
+    "model": "RTAC 200",
+    "hvac_type": "chiller",
+    "capacity": 200,
+    "efficiency": 3.5,
+    "setpoints": {
+      "leaving_water_temp": 7.0,
+      "entering_water_temp": 12.0
+    },
+    "points": {
+      "supply_temp": {
+        "name": "supply_temp",
+        "point_type": "analog_input",
+        "description": "Chilled water supply temperature",
+        "unit": "°C",
+        "min_value": 5.0,
+        "max_value": 15.0,
+        "default_value": 7.2,
+        "writable": false
+      },
+      "return_temp": {
+        "name": "return_temp",
+        "point_type": "analog_input",
+        "description": "Chilled water return temperature",
+        "unit": "°C",
+        "min_value": 10.0,
+        "max_value": 20.0,
+        "default_value": 12.5,
+        "writable": false
+      },
+      "chiller_status": {
+        "name": "chiller_status",
+        "point_type": "multistate_value",
+        "description": "Chiller operational status",
+        "unit": "",
+        "default_value": 1,
+        "writable": true,
+        "metadata": {
+          "states": {
+            "0": "off",
+            "1": "running",
+            "2": "alarm",
+            "3": "maintenance"
+          }
+        }
+      },
+      "setpoint": {
+        "name": "setpoint",
+        "point_type": "analog_value",
+        "description": "Chilled water setpoint temperature",
+        "unit": "°C",
+        "min_value": 5.0,
+        "max_value": 10.0,
+        "default_value": 7.0,
+        "writable": true,
+        "priority": 10
+      },
+      "compressor_pressure": {
+        "name": "compressor_pressure",
+        "point_type": "analog_input",
+        "description": "Compressor discharge pressure",
+        "unit": "bar",
+        "min_value": 0,
+        "max_value": 25,
+        "default_value": 12.5,
+        "writable": false
+      }
+    },
+    "metadata": {
+      "critical": true,
+      "safety_device": true,
+      "maintenance_due": "2026-02-15"
+    }
+  },
+  {
+    "id": "ahu-level3-01",
+    "name": "Level 3 AHU",
+    "device_type": "hvac",
+    "protocol": "mock",
+    "location": "Level 3 Plant Room",
+    "site_id": "fnb-gateway",
+    "description": "Air handling unit serving executive offices",
+    "manufacturer": "Carrier",
+    "model": "39ER",
+    "hvac_type": "ahu",
+    "capacity": 50,
+    "efficiency": 2.8,
+    "points": {
+      "supply_air_temp": {
+        "name": "supply_air_temp",
+        "point_type": "analog_input",
+        "description": "Supply air temperature",
+        "unit": "°C",
+        "min_value": 15.0,
+        "max_value": 25.0,
+        "default_value": 18.5,
+        "writable": false
+      },
+      "return_air_temp": {
+        "name": "return_air_temp",
+        "point_type": "analog_input",
+        "description": "Return air temperature",
+        "unit": "°C",
+        "min_value": 20.0,
+        "max_value": 30.0,
+        "default_value": 23.5,
+        "writable": false
+      },
+      "fan_status": {
+        "name": "fan_status",
+        "point_type": "binary_value",
+        "description": "Fan on/off status",
+        "unit": "",
+        "default_value": true,
+        "writable": true
+      },
+      "damper_position": {
+        "name": "damper_position",
+        "point_type": "analog_value",
+        "description": "Outside air damper position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 30,
+        "writable": true
+      },
+      "filter_pressure": {
+        "name": "filter_pressure",
+        "point_type": "analog_input",
+        "description": "Filter differential pressure",
+        "unit": "Pa",
+        "min_value": 0,
+        "max_value": 250,
+        "default_value": 85,
+        "writable": false,
+        "metadata": {
+          "alarm_threshold": 200
+        }
+      }
+    },
+    "metadata": {
+      "zone": "executive",
+      "occupancy_schedule": "08:00-18:00"
+    }
+  },
+  {
+    "id": "lighting-lobby-01",
+    "name": "Lobby Lighting Panel",
+    "device_type": "lighting",
+    "protocol": "mock",
+    "location": "Ground Floor Lobby",
+    "site_id": "fnb-gateway",
+    "description": "Lighting control panel for main lobby area",
+    "manufacturer": "Philips",
+    "model": "Dynalite",
+    "lighting_type": "panel",
+    "circuit_count": 8,
+    "total_wattage": 3200,
+    "dimmable": true,
+    "points": {
+      "circuit1_level": {
+        "name": "circuit1_level",
+        "point_type": "analog_value",
+        "description": "Main entrance lighting level",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 75,
+        "writable": true
+      },
+      "circuit2_level": {
+        "name": "circuit2_level",
+        "point_type": "analog_value",
+        "description": "Reception desk lighting level",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 100,
+        "writable": true
+      },
+      "emergency_lighting": {
+        "name": "emergency_lighting",
+        "point_type": "binary_value",
+        "description": "Emergency lighting circuit status",
+        "unit": "",
+        "default_value": false,
+        "writable": false
+      },
+      "occupancy_sensor": {
+        "name": "occupancy_sensor",
+        "point_type": "binary_input",
+        "description": "Occupancy sensor status",
+        "unit": "",
+        "default_value": true,
+        "writable": false
+      },
+      "light_level": {
+        "name": "light_level",
+        "point_type": "analog_input",
+        "description": "Ambient light level",
+        "unit": "lux",
+        "min_value": 0,
+        "max_value": 2000,
+        "default_value": 450,
+        "writable": false
+      }
+    },
+    "metadata": {
+      "emergency_circuit": true,
+      "schedule_enabled": true
+    }
+  },
+  {
+    "id": "security-main-entrance-01",
+    "name": "Main Entrance Access",
+    "device_type": "security",
+    "protocol": "mock",
+    "location": "Ground Floor Main Entrance",
+    "site_id": "fnb-gateway",
+    "description": "Access control reader at main entrance",
+    "manufacturer": "HID",
+    "model": "iCLASS SE",
+    "security_type": "reader",
+    "zone": "entrance",
+    "armed": true,
+    "tamper_status": "normal",
+    "points": {
+      "door_status": {
+        "name": "door_status",
+        "point_type": "binary_input",
+        "description": "Door open/closed status",
+        "unit": "",
+        "default_value": false,
+        "writable": false
+      },
+      "lock_status": {
+        "name": "lock_status",
+        "point_type": "binary_value",
+        "description": "Electric lock engaged/disengaged",
+        "unit": "",
+        "default_value": true,
+        "writable": true
+      },
+      "access_granted": {
+        "name": "access_granted",
+        "point_type": "binary_input",
+        "description": "Last access granted status",
+        "unit": "",
+        "default_value": true,
+        "writable": false
+      },
+      "tamper_alarm": {
+        "name": "tamper_alarm",
+        "point_type": "binary_input",
+        "description": "Tamper alarm status",
+        "unit": "",
+        "default_value": false,
+        "writable": false
+      },
+      "reader_battery": {
+        "name": "reader_battery",
+        "point_type": "analog_input",
+        "description": "Reader battery level",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 92,
+        "writable": false
+      }
+    },
+    "metadata": {
+      "critical_access": true,
+      "monitored_24_7": true
+    }
+  },
+  {
+    "id": "fire-pump-01",
+    "name": "Fire Pump Controller",
+    "device_type": "fire_safety",
+    "protocol": "mock",
+    "location": "Basement Fire Pump Room",
+    "site_id": "fnb-gateway",
+    "description": "Fire pump controller and monitoring",
+    "manufacturer": "Grundfos",
+    "model": "Hydro MPC",
+    "points": {
+      "pump_status": {
+        "name": "pump_status",
+        "point_type": "multistate_value",
+        "description": "Fire pump operational status",
+        "unit": "",
+        "default_value": 0,
+        "writable": false,
+        "metadata": {
+          "states": {
+            "0": "standby",
+            "1": "running",
+            "2": "fault",
+            "3": "test"
+          }
+        }
+      },
+      "system_pressure": {
+        "name": "system_pressure",
+        "point_type": "analog_input",
+        "description": "Fire system pressure",
+        "unit": "bar",
+        "min_value": 0,
+        "max_value": 15,
+        "default_value": 4.2,
+        "writable": false
+      },
+      "jockey_pump_status": {
+        "name": "jockey_pump_status",
+        "point_type": "binary_value",
+        "description": "Jockey pump on/off status",
+        "unit": "",
+        "default_value": false,
+        "writable": true
+      },
+      "test_mode": {
+        "name": "test_mode",
+        "point_type": "binary_value",
+        "description": "Test mode active",
+        "unit": "",
+        "default_value": false,
+        "writable": true,
+        "priority": 15
+      },
+      "battery_voltage": {
+        "name": "battery_voltage",
+        "point_type": "analog_input",
+        "description": "Battery backup voltage",
+        "unit": "V",
+        "min_value": 0,
+        "max_value": 30,
+        "default_value": 24.5,
+        "writable": false
+      }
+    },
+    "metadata": {
+      "life_safety": true,
+      "requires_weekly_test": true,
+      "last_test": "2026-01-20"
+    }
+  },
+  {
+    "id": "vav-office-301",
+    "name": "Office 301 VAV",
+    "device_type": "hvac",
+    "protocol": "mock",
+    "location": "Level 3 Office 301",
+    "site_id": "fnb-gateway",
+    "description": "Variable air volume box for executive office",
+    "manufacturer": "Titus",
+    "model": "VAV-EC",
+    "hvac_type": "vav",
+    "capacity": 1.2,
+    "points": {
+      "room_temp": {
+        "name": "room_temp",
+        "point_type": "analog_input",
+        "description": "Room temperature",
+        "unit": "°C",
+        "min_value": 16.0,
+        "max_value": 28.0,
+        "default_value": 22.5,
+        "writable": false
+      },
+      "setpoint": {
+        "name": "setpoint",
+        "point_type": "analog_value",
+        "description": "Temperature setpoint",
+        "unit": "°C",
+        "min_value": 18.0,
+        "max_value": 26.0,
+        "default_value": 22.0,
+        "writable": true
+      },
+      "damper_position": {
+        "name": "damper_position",
+        "point_type": "analog_value",
+        "description": "Damper position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 65,
+        "writable": true
+      },
+      "occupancy": {
+        "name": "occupancy",
+        "point_type": "binary_input",
+        "description": "Occupancy sensor",
+        "unit": "",
+        "default_value": true,
+        "writable": false
+      },
+      "reheat_status": {
+        "name": "reheat_status",
+        "point_type": "binary_value",
+        "description": "Reheat coil status",
+        "unit": "",
+        "default_value": false,
+        "writable": true
+      }
+    },
+    "metadata": {
+      "zone": "executive",
+      "occupant": "CTO"
+    }
+  }
+]
