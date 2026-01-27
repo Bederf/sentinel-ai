@@ -83,6 +83,141 @@ export interface Anomaly {
   recommendation: string;
 }
 
+// ============= Optimization Interfaces =============
+
+// Load shedding stage interface
+export interface LoadSheddingStage {
+  stage: number;
+  start_time: string;
+  end_time: string;
+}
+
+// Eskom status response interface
+export interface EskomStatusResponse {
+  current_stage: number;
+  updated_at: string;
+  next_stages: LoadSheddingStage[];
+  area_schedules: Record<string, LoadSheddingStage[]>;
+}
+
+// Site-specific schedule response interface
+export interface SiteScheduleResponse {
+  site_id: string;
+  site_name: string;
+  current_stage: number;
+  schedules: LoadSheddingStage[];
+  next_outage: LoadSheddingStage | null;
+}
+
+// Thermal runway response interface
+export interface ThermalRunwayResponse {
+  site_id: string;
+  site_name: string;
+  current_temperature: number;
+  comfort_limit: number;
+  thermal_runway_minutes: number;
+  comfort_breach_time: string | null;
+  calculation_method: string;
+  building_params: {
+    thermal_mass: number;
+    insulation_factor: number;
+    internal_heat_gain: number;
+  };
+  weather_forecast: {
+    outside_temp: number;
+    solar_load: number;
+    humidity: number;
+  };
+}
+
+// Optimization scenario interface (from optimization_scenarios.json)
+export interface OptimizationScenario {
+  scenario_id: string;
+  site_id: string;
+  site_name: string;
+  description: string;
+  current_conditions: {
+    inside_temp: number;
+    comfort_limit: number;
+    outside_temp: number;
+    humidity: number;
+    solar_load: number;
+    time_of_day: string;
+  };
+  load_shedding: {
+    stage: number;
+    start: string;
+    end: string;
+    duration_minutes: number;
+    area: string;
+    confidence: string;
+  };
+  thermal_runway: {
+    without_precooling: number;
+    with_precooling: number;
+    comfort_breach_time: string;
+    comfort_maintained: boolean;
+    calculation_params: {
+      thermal_mass: number;
+      insulation_factor: number;
+      internal_heat_gain: number;
+    };
+  };
+  pre_cooling_schedule: {
+    start: string;
+    duration_minutes: number;
+    target_temp: number;
+    actions: Array<{
+      time: string;
+      action: string;
+      value: string;
+      description: string;
+    }>;
+    energy_impact_kwh: number;
+    peak_demand_increase_percent: number;
+  };
+  savings: {
+    energy_savings_percent: number;
+    comfort_extension_minutes: number;
+    fuel_savings_percent: number;
+    total_savings_zar: number;
+    breakdown: {
+      reduced_generator_runtime: number;
+      avoided_peak_demand_charges: number;
+      improved_efficiency: number;
+      reduced_restart_energy: number;
+    };
+  };
+  generator_readiness: {
+    test_passed: boolean;
+    last_test: string;
+    fuel_level_percent: number;
+    ups_status: string;
+    estimated_runtime_hours: number;
+    load_capacity_kw: number;
+    critical_loads: string[];
+  };
+  restart_plan: {
+    staged_restart: boolean;
+    sequence: Array<{
+      time_offset: number;
+      action: string;
+      loads?: string[];
+      zones?: string[];
+      description?: string;
+    }>;
+    estimated_restoration_time: string;
+  };
+  visualization_data: {
+    thermal_curve: number[][];
+    precooling_curve: number[][];
+    comfort_limit_line: number;
+    outage_period: number[];
+  };
+  created_at: string;
+  updated_at: string;
+}
+
 // Dashboard stats interface
 export interface DashboardStats {
   total_sites: number;
@@ -396,6 +531,75 @@ export const api = {
    */
   async getPrediction(predictionId: string): Promise<Prediction> {
     return fetchApi<Prediction>(`/api/predictions/${predictionId}`);
+  },
+
+  // ============= Optimization API Methods =============
+
+  /**
+   * Get current Eskom load shedding status
+   * @param siteId - Optional site ID for area-specific schedules
+   */
+  async getEskomStatus(siteId?: string): Promise<EskomStatusResponse> {
+    const params = new URLSearchParams();
+    if (siteId) {
+      params.append("site_id", siteId);
+    }
+    const queryString = params.toString();
+    return fetchApi<EskomStatusResponse>(
+      `/api/optimization/eskom-status${queryString ? `?${queryString}` : ""}`
+    );
+  },
+
+  /**
+   * Get load shedding schedule for a specific site
+   * @param siteId - Site ID to get schedule for
+   */
+  async getSiteEskomStatus(siteId: string): Promise<SiteScheduleResponse> {
+    return fetchApi<SiteScheduleResponse>(`/api/optimization/eskom-status/${siteId}`);
+  },
+
+  /**
+   * Calculate thermal runway for a building during load shedding
+   * @param siteId - Site ID
+   * @param currentTemp - Current inside temperature in °C (optional)
+   * @param comfortLimit - Comfort temperature limit in °C (optional)
+   */
+  async getThermalRunway(
+    siteId: string,
+    currentTemp?: number,
+    comfortLimit?: number
+  ): Promise<ThermalRunwayResponse> {
+    const params = new URLSearchParams();
+    params.append("site_id", siteId);
+    if (currentTemp !== undefined) {
+      params.append("current_temp", currentTemp.toString());
+    }
+    if (comfortLimit !== undefined) {
+      params.append("comfort_limit", comfortLimit.toString());
+    }
+    return fetchApi<ThermalRunwayResponse>(`/api/optimization/thermal-runway?${params.toString()}`);
+  },
+
+  /**
+   * Get optimization scenario by ID
+   * @param scenarioId - Scenario ID from optimization_scenarios.json
+   */
+  async getOptimizationScenario(scenarioId: string): Promise<OptimizationScenario> {
+    // Note: This endpoint doesn't exist yet in backend, but we'll implement it
+    // For now, we'll fetch from the scenarios JSON file
+    const response = await fetchApi<OptimizationScenario[]>(`/api/optimization/scenarios`);
+    const scenario = response.find(s => s.scenario_id === scenarioId);
+    if (!scenario) {
+      throw new Error(`Scenario ${scenarioId} not found`);
+    }
+    return scenario;
+  },
+
+  /**
+   * Get all optimization scenarios
+   */
+  async getOptimizationScenarios(): Promise<OptimizationScenario[]> {
+    return fetchApi<OptimizationScenario[]>(`/api/optimization/scenarios`);
   },
 };
 
