@@ -8,17 +8,78 @@
     "sqm": 4500,
     "floors": 3,
     "year_built": 2015,
-    "operating_hours": {"start": "07:00", "end": "19:00"},
+    "operating_hours": {
+      "start": "07:00",
+      "end": "19:00"
+    },
     "occupancy_pattern": "office",
     "latitude": -26.1076,
     "longitude": 28.0567,
     "contact_email": "sandton.facilities@gmail.com",
     "contact_phone": "+27 11 350 4000",
     "optimization_enabled": true,
-    "optimization_status": "unknown",
-    "optimization_settings": {"mode": "supervised", "last_analysis": null, "analysis_interval_minutes": 15},
+    "optimization_status": "warning",
+    "optimization_settings": {
+      "mode": "supervised",
+      "last_analysis": "2026-01-27T19:27:22.037365",
+      "analysis_interval_minutes": 15
+    },
     "last_optimization": null,
-    "optimization_history": []
+    "optimization_history": [
+      {
+        "timestamp": "2026-01-27T19:27:22.037365",
+        "action": "analyzed",
+        "result": "warning",
+        "user": "system",
+        "details": {
+          "confidence": 0.82,
+          "validation_passed": false
+        }
+      }
+    ],
+    "last_recommendation": {
+      "site_id": "site-001",
+      "timestamp": "2026-01-27T19:27:22.036922",
+      "recommendations": [
+        {
+          "device_id": "hvac-zone-001",
+          "device_name": "Main Zone Temperature Control",
+          "point_name": "cooling_setpoint",
+          "current_value": 22,
+          "recommended_value": 23.5,
+          "unit": "°C",
+          "reason": "Increase setpoint 1.5°C to reduce cooling load as outdoor temperature rises to 30°C over next 4 hours"
+        },
+        {
+          "device_id": "hvac-zone-001",
+          "device_name": "Main Zone Humidity Control",
+          "point_name": "humidity_setpoint",
+          "current_value": 55,
+          "recommended_value": 50,
+          "unit": "%",
+          "reason": "Reduce humidity setpoint to 50% as outdoor humidity drops to 48%, maintaining comfort while reducing dehumidification load"
+        },
+        {
+          "device_id": "chw-system-001",
+          "device_name": "Chilled Water Supply",
+          "point_name": "supply_temp_setpoint",
+          "current_value": 7,
+          "recommended_value": 8.5,
+          "unit": "°C",
+          "reason": "Increase CHW supply temperature by 1.5°C to improve chiller efficiency during rising outdoor temperatures"
+        }
+      ],
+      "projected_savings": {
+        "energy_percent": 12.3,
+        "energy_kwh": 18.7,
+        "cost_zar": 46.75,
+        "comfort_impact": "Within spec - no complaints expected",
+        "equipment_impact": "Reduces wear on chiller by 8%"
+      },
+      "confidence": 0.82,
+      "reasoning": "With outdoor temperature rising 2°C over 4 hours and high occupancy, strategic setpoint increases will maintain comfort while significantly reducing cooling energy consumption. The 1.5°C zone temperature increase leverages the 6°C temperature differential effectively, while higher CHW temperatures improve chiller COP. Humidity reduction aligns with dropping outdoor humidity, reducing dehumidification load."
+    },
+    "error_message": "Recommendation failed safety validation - devices not found in demo mode"
   },
   {
     "id": "site-002",
@@ -29,7 +90,10 @@
     "sqm": 1200,
     "floors": 1,
     "year_built": 2018,
-    "operating_hours": {"start": "08:00", "end": "17:00"},
+    "operating_hours": {
+      "start": "08:00",
+      "end": "17:00"
+    },
     "occupancy_pattern": "retail",
     "latitude": -26.1455,
     "longitude": 28.0436,
@@ -37,7 +101,11 @@
     "contact_phone": "+27 11 788 4500",
     "optimization_enabled": true,
     "optimization_status": "unknown",
-    "optimization_settings": {"mode": "supervised", "last_analysis": null, "analysis_interval_minutes": 15},
+    "optimization_settings": {
+      "mode": "supervised",
+      "last_analysis": null,
+      "analysis_interval_minutes": 15
+    },
     "last_optimization": null,
     "optimization_history": []
   },
@@ -50,7 +118,10 @@
     "sqm": 1800,
     "floors": 2,
     "year_built": 2019,
-    "operating_hours": {"start": "08:00", "end": "18:00"},
+    "operating_hours": {
+      "start": "08:00",
+      "end": "18:00"
+    },
     "occupancy_pattern": "retail",
     "latitude": -25.7825,
     "longitude": 28.2754,
@@ -58,7 +129,11 @@
     "contact_phone": "+27 12 348 2000",
     "optimization_enabled": false,
     "optimization_status": "unknown",
-    "optimization_settings": {"mode": "supervised", "last_analysis": null, "analysis_interval_minutes": 15},
+    "optimization_settings": {
+      "mode": "supervised",
+      "last_analysis": null,
+      "analysis_interval_minutes": 15
+    },
     "last_optimization": null,
     "optimization_history": []
   },
@@ -71,7 +146,10 @@
     "sqm": 950,
     "floors": 1,
     "year_built": 2012,
-    "operating_hours": {"start": "08:30", "end": "16:30"},
+    "operating_hours": {
+      "start": "08:30",
+      "end": "16:30"
+    },
     "occupancy_pattern": "retail",
     "latitude": -25.8603,
     "longitude": 28.1894,
@@ -79,7 +157,11 @@
     "contact_phone": "+27 12 663 1000",
     "optimization_enabled": false,
     "optimization_status": "unknown",
-    "optimization_settings": {"mode": "supervised", "last_analysis": null, "analysis_interval_minutes": 15},
+    "optimization_settings": {
+      "mode": "supervised",
+      "last_analysis": null,
+      "analysis_interval_minutes": 15
+    },
     "last_optimization": null,
     "optimization_history": []
   },
@@ -92,7 +174,10 @@
     "sqm": 2800,
     "floors": 2,
     "year_built": 2020,
-    "operating_hours": {"start": "00:00", "end": "23:59"},
+    "operating_hours": {
+      "start": "00:00",
+      "end": "23:59"
+    },
     "occupancy_pattern": "24x7",
     "latitude": -25.9867,
     "longitude": 28.1279,
@@ -100,7 +185,11 @@
     "contact_phone": "+27 11 315 8000",
     "optimization_enabled": false,
     "optimization_status": "unknown",
-    "optimization_settings": {"mode": "supervised", "last_analysis": null, "analysis_interval_minutes": 15},
+    "optimization_settings": {
+      "mode": "supervised",
+      "last_analysis": null,
+      "analysis_interval_minutes": 15
+    },
     "last_optimization": null,
     "optimization_history": []
   },
@@ -113,7 +202,10 @@
     "sqm": 3200,
     "floors": 2,
     "year_built": 2016,
-    "operating_hours": {"start": "07:30", "end": "18:30"},
+    "operating_hours": {
+      "start": "07:30",
+      "end": "18:30"
+    },
     "occupancy_pattern": "office",
     "latitude": -33.9036,
     "longitude": 18.4205,
@@ -121,7 +213,11 @@
     "contact_phone": "+27 21 405 3000",
     "optimization_enabled": false,
     "optimization_status": "unknown",
-    "optimization_settings": {"mode": "supervised", "last_analysis": null, "analysis_interval_minutes": 15},
+    "optimization_settings": {
+      "mode": "supervised",
+      "last_analysis": null,
+      "analysis_interval_minutes": 15
+    },
     "last_optimization": null,
     "optimization_history": []
   },
@@ -134,7 +230,10 @@
     "sqm": 1400,
     "floors": 1,
     "year_built": 2017,
-    "operating_hours": {"start": "09:00", "end": "18:00"},
+    "operating_hours": {
+      "start": "09:00",
+      "end": "18:00"
+    },
     "occupancy_pattern": "retail",
     "latitude": -33.8937,
     "longitude": 18.5124,
@@ -142,7 +241,11 @@
     "contact_phone": "+27 21 551 2000",
     "optimization_enabled": false,
     "optimization_status": "unknown",
-    "optimization_settings": {"mode": "supervised", "last_analysis": null, "analysis_interval_minutes": 15},
+    "optimization_settings": {
+      "mode": "supervised",
+      "last_analysis": null,
+      "analysis_interval_minutes": 15
+    },
     "last_optimization": null,
     "optimization_history": []
   },
@@ -155,7 +258,10 @@
     "sqm": 680,
     "floors": 1,
     "year_built": 2010,
-    "operating_hours": {"start": "08:30", "end": "16:30"},
+    "operating_hours": {
+      "start": "08:30",
+      "end": "16:30"
+    },
     "occupancy_pattern": "retail",
     "latitude": -33.9346,
     "longitude": 18.8602,
@@ -163,7 +269,11 @@
     "contact_phone": "+27 21 887 1200",
     "optimization_enabled": false,
     "optimization_status": "unknown",
-    "optimization_settings": {"mode": "supervised", "last_analysis": null, "analysis_interval_minutes": 15},
+    "optimization_settings": {
+      "mode": "supervised",
+      "last_analysis": null,
+      "analysis_interval_minutes": 15
+    },
     "last_optimization": null,
     "optimization_history": []
   },
@@ -176,7 +286,10 @@
     "sqm": 520,
     "floors": 1,
     "year_built": 2008,
-    "operating_hours": {"start": "08:30", "end": "16:30"},
+    "operating_hours": {
+      "start": "08:30",
+      "end": "16:30"
+    },
     "occupancy_pattern": "retail",
     "latitude": -33.7314,
     "longitude": 18.9621,
@@ -184,7 +297,11 @@
     "contact_phone": "+27 21 872 3500",
     "optimization_enabled": false,
     "optimization_status": "unknown",
-    "optimization_settings": {"mode": "supervised", "last_analysis": null, "analysis_interval_minutes": 15},
+    "optimization_settings": {
+      "mode": "supervised",
+      "last_analysis": null,
+      "analysis_interval_minutes": 15
+    },
     "last_optimization": null,
     "optimization_history": []
   },
@@ -197,7 +314,10 @@
     "sqm": 1100,
     "floors": 1,
     "year_built": 2014,
-    "operating_hours": {"start": "09:00", "end": "17:00"},
+    "operating_hours": {
+      "start": "09:00",
+      "end": "17:00"
+    },
     "occupancy_pattern": "retail",
     "latitude": -33.8714,
     "longitude": 18.6328,
@@ -205,7 +325,11 @@
     "contact_phone": "+27 21 914 2800",
     "optimization_enabled": false,
     "optimization_status": "unknown",
-    "optimization_settings": {"mode": "supervised", "last_analysis": null, "analysis_interval_minutes": 15},
+    "optimization_settings": {
+      "mode": "supervised",
+      "last_analysis": null,
+      "analysis_interval_minutes": 15
+    },
     "last_optimization": null,
     "optimization_history": []
   },
@@ -218,7 +342,10 @@
     "sqm": 2600,
     "floors": 2,
     "year_built": 2017,
-    "operating_hours": {"start": "07:30", "end": "18:00"},
+    "operating_hours": {
+      "start": "07:30",
+      "end": "18:00"
+    },
     "occupancy_pattern": "office",
     "latitude": -29.7299,
     "longitude": 31.0678,
@@ -226,7 +353,11 @@
     "contact_phone": "+27 31 566 3000",
     "optimization_enabled": true,
     "optimization_status": "unknown",
-    "optimization_settings": {"mode": "supervised", "last_analysis": null, "analysis_interval_minutes": 15},
+    "optimization_settings": {
+      "mode": "supervised",
+      "last_analysis": null,
+      "analysis_interval_minutes": 15
+    },
     "last_optimization": null,
     "optimization_history": []
   },
@@ -239,7 +370,10 @@
     "sqm": 1600,
     "floors": 2,
     "year_built": 2005,
-    "operating_hours": {"start": "08:00", "end": "16:00"},
+    "operating_hours": {
+      "start": "08:00",
+      "end": "16:00"
+    },
     "occupancy_pattern": "retail",
     "latitude": -29.8587,
     "longitude": 31.0218,
@@ -247,7 +381,11 @@
     "contact_phone": "+27 31 361 8000",
     "optimization_enabled": false,
     "optimization_status": "unknown",
-    "optimization_settings": {"mode": "supervised", "last_analysis": null, "analysis_interval_minutes": 15},
+    "optimization_settings": {
+      "mode": "supervised",
+      "last_analysis": null,
+      "analysis_interval_minutes": 15
+    },
     "last_optimization": null,
     "optimization_history": []
   },
@@ -260,15 +398,22 @@
     "sqm": 780,
     "floors": 1,
     "year_built": 2019,
-    "operating_hours": {"start": "09:00", "end": "17:00"},
+    "operating_hours": {
+      "start": "09:00",
+      "end": "17:00"
+    },
     "occupancy_pattern": "retail",
-    "latitude": -29.5390,
+    "latitude": -29.539,
     "longitude": 31.2134,
     "contact_email": "ballito.facilities@gmail.com",
     "contact_phone": "+27 32 946 1500",
     "optimization_enabled": false,
     "optimization_status": "unknown",
-    "optimization_settings": {"mode": "supervised", "last_analysis": null, "analysis_interval_minutes": 15},
+    "optimization_settings": {
+      "mode": "supervised",
+      "last_analysis": null,
+      "analysis_interval_minutes": 15
+    },
     "last_optimization": null,
     "optimization_history": []
   },
@@ -281,7 +426,10 @@
     "sqm": 920,
     "floors": 1,
     "year_built": 2013,
-    "operating_hours": {"start": "08:30", "end": "17:00"},
+    "operating_hours": {
+      "start": "08:30",
+      "end": "17:00"
+    },
     "occupancy_pattern": "retail",
     "latitude": -29.5534,
     "longitude": 30.3415,
@@ -289,7 +437,11 @@
     "contact_phone": "+27 33 345 6000",
     "optimization_enabled": false,
     "optimization_status": "unknown",
-    "optimization_settings": {"mode": "supervised", "last_analysis": null, "analysis_interval_minutes": 15},
+    "optimization_settings": {
+      "mode": "supervised",
+      "last_analysis": null,
+      "analysis_interval_minutes": 15
+    },
     "last_optimization": null,
     "optimization_history": []
   },
@@ -302,7 +454,10 @@
     "sqm": 650,
     "floors": 1,
     "year_built": 2011,
-    "operating_hours": {"start": "08:30", "end": "16:30"},
+    "operating_hours": {
+      "start": "08:30",
+      "end": "16:30"
+    },
     "occupancy_pattern": "retail",
     "latitude": -28.7828,
     "longitude": 32.0628,
@@ -310,7 +465,11 @@
     "contact_phone": "+27 35 789 2200",
     "optimization_enabled": false,
     "optimization_status": "unknown",
-    "optimization_settings": {"mode": "supervised", "last_analysis": null, "analysis_interval_minutes": 15},
+    "optimization_settings": {
+      "mode": "supervised",
+      "last_analysis": null,
+      "analysis_interval_minutes": 15
+    },
     "last_optimization": null,
     "optimization_history": []
   }
