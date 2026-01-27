@@ -22,6 +22,8 @@ import {
   RefreshCw,
   Zap,
   ArrowLeft,
+  ClipboardList,
+  ChevronRight,
 } from "lucide-react";
 import api from "../lib/api";
 import type { DashboardStats, Site, Prediction, EnergyDataPoint } from "../lib/api";
@@ -35,7 +37,7 @@ import { PredictionDetail } from "./PredictionDetail";
 import { HeroPredictionCard } from "./HeroPredictionCard";
 import { ROISummaryCard } from "./ROISummaryCard";
 import { OptimizationPanel } from "./OptimizationPanel";
-import AuditTrail from "./AuditTrail";
+import { OptimizationPage } from "../pages/OptimizationPage";
 
 // Time period options for energy chart
 const TIME_PERIODS = [7, 30, 90] as const;
@@ -210,34 +212,7 @@ export function Dashboard() {
 
   // Show optimization page if requested
   if (showOptimizationPage) {
-    // TODO: Replace with actual OptimizationPage component
-    return (
-      <div className="h-full overflow-y-auto p-4 md:p-6" style={{ background: "var(--color-sentinel-bg-canvas)" }}>
-        <button
-          onClick={() => setShowOptimizationPage(false)}
-          className="flex items-center gap-2 mb-6 transition-colors"
-          style={{ color: "var(--color-sentinel-text-secondary)" }}
-        >
-          <ArrowLeft className="h-5 w-5" />
-          <span>Back to Dashboard</span>
-        </button>
-        <div
-          className="rounded-md p-8 text-center"
-          style={{
-            background: "var(--color-sentinel-bg-panel)",
-            border: "1px solid var(--color-sentinel-border)",
-          }}
-        >
-          <Zap className="h-12 w-12 mx-auto mb-4" style={{ color: "var(--color-sentinel-blue)" }} />
-          <h2 className="text-xl font-medium mb-2" style={{ color: "var(--color-sentinel-text-primary)" }}>
-            Optimization Page
-          </h2>
-          <p style={{ color: "var(--color-sentinel-text-secondary)" }}>
-            Full optimization interface will be implemented in Task 3
-          </p>
-        </div>
-      </div>
-    );
+    return <OptimizationPage />;
   }
 
   return (
@@ -358,7 +333,7 @@ export function Dashboard() {
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                   {sites.map((site) => (
-                    <SiteCard key={site.id} site={site} onClick={handleSiteClick} />
+                    <SiteCard key={site.id} site={site} onClick={handleSiteClick} showOptimizationStatus={true} />
                   ))}
                 </div>
               )}
@@ -630,7 +605,7 @@ export function Dashboard() {
         </div>
       </div>
 
-      {/* Audit Trail Section */}
+      {/* Control Audit Trail Info Card */}
       <div className="mt-6">
         <div
           className="rounded-md overflow-hidden"
@@ -639,7 +614,7 @@ export function Dashboard() {
             border: "1px solid var(--color-sentinel-border)",
           }}
         >
-          {/* Panel Header */}
+          {/* Info Card Header */}
           <div
             className="p-4 flex items-center justify-between"
             style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}
@@ -649,21 +624,10 @@ export function Dashboard() {
                 className="p-2 rounded"
                 style={{ background: "rgba(139, 92, 246, 0.15)" }}
               >
-                <svg
+                <ClipboardList
                   className="h-5 w-5"
                   style={{ color: "var(--color-sentinel-purple)" }}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-                  />
-                </svg>
+                />
               </div>
               <div>
                 <h3
@@ -688,18 +652,82 @@ export function Dashboard() {
                   color: "var(--color-sentinel-purple)",
                 }}
               >
-                Live Monitoring
+                Available
               </div>
             </div>
           </div>
 
-          {/* Audit Trail Content */}
-          <div className="p-4">
-            <AuditTrail
-              pageSize={10}
-              refreshInterval={30000}
-              onRefresh={(logs) => console.log(`Refreshed ${logs.length} audit logs`)}
-            />
+          {/* Info Card Content */}
+          <div className="p-6">
+            <div className="flex flex-col items-center justify-center text-center">
+              <div
+                className="p-4 rounded-full mb-4"
+                style={{ background: "rgba(139, 92, 246, 0.1)" }}
+              >
+                <ClipboardList
+                  className="h-8 w-8"
+                  style={{ color: "var(--color-sentinel-purple)" }}
+                />
+              </div>
+              <h4
+                className="text-lg font-medium mb-2"
+                style={{ color: "var(--color-sentinel-text-primary)" }}
+              >
+                Control System Audit Logs
+              </h4>
+              <p
+                className="text-sm mb-6 max-w-md"
+                style={{ color: "var(--color-sentinel-text-secondary)" }}
+              >
+                View detailed audit logs for all building control actions,
+                safety validations, and system events. Monitor compliance and
+                trace all control operations.
+              </p>
+              <div className="flex items-center gap-6 text-xs mb-6">
+                <div className="flex items-center gap-2">
+                  <div
+                    className="w-2 h-2 rounded-full"
+                    style={{ background: "var(--color-sentinel-green)" }}
+                  />
+                  <span style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                    Live monitoring
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div
+                    className="w-2 h-2 rounded-full"
+                    style={{ background: "var(--color-sentinel-amber)" }}
+                  />
+                  <span style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                    60s refresh
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div
+                    className="w-2 h-2 rounded-full"
+                    style={{ background: "var(--color-sentinel-blue)" }}
+                  />
+                  <span style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                    Full history
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  // This would need to be passed as a prop or use a navigation context
+                  console.log("Navigate to Control Audit Trail tab");
+                }}
+                className="flex items-center gap-2 px-4 py-2 text-sm rounded-md transition-colors"
+                style={{
+                  background: "rgba(139, 92, 246, 0.15)",
+                  color: "var(--color-sentinel-purple)",
+                  border: "1px solid rgba(139, 92, 246, 0.3)",
+                }}
+              >
+                <span>View Audit Trail</span>
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
       </div>
