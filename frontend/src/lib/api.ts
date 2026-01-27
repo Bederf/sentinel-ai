@@ -36,6 +36,16 @@ export interface Site {
   contact_email?: string;
   contact_phone?: string;
   active_alerts?: number;
+  // Optimization fields (Phase 8)
+  optimization_enabled?: boolean;
+  optimization_status?: "optimized" | "recommendation_pending" | "warning" | "error" | "unknown";
+  optimization_settings?: {
+    mode: "supervised" | "automatic";
+    last_analysis: string | null;
+    analysis_interval_minutes?: number;
+  };
+  last_optimization?: string;
+  optimization_history?: OptimizationHistoryEntry[];
 }
 
 // Equipment interface
@@ -160,6 +170,21 @@ export interface AuditLogEntryResponse {
   error_message?: string;
   correlation_id?: string;
   metadata: Record<string, any>;
+}
+
+// Safety status for devices
+export interface DeviceSafetyStatus {
+  device_id: string;
+  device_name: string;
+  overall_status: 'safe' | 'warning' | 'blocked' | 'alarm' | 'unknown';
+  point_statuses: Record<string, {
+    value: any;
+    allowed: boolean;
+    warnings: string[];
+    alarms: string[];
+  }>;
+  active_rule_count: number;
+  last_check: string;
 }
 
 // Audit logs response with pagination
@@ -321,6 +346,61 @@ export interface OptimizationScenario {
   };
   created_at: string;
   updated_at: string;
+}
+
+// ============= AI Optimization Interfaces (Phase 8) =============
+
+// Optimization action (setpoint change recommendation)
+export interface OptimizationAction {
+  equipment_id: string;
+  equipment_name: string;
+  current_value: number;
+  recommended_value: number;
+  unit: string;
+  reason: string;
+}
+
+// Projected savings from optimization
+export interface ProjectedSavings {
+  energy_kwh: number;
+  cost_zar_per_hour: number;
+  percentage_improvement: number;
+}
+
+// Optimization recommendation from AI analysis
+export interface OptimizationRecommendation {
+  id: string;
+  site_id: string;
+  timestamp: string;
+  recommendations: OptimizationAction[];
+  projected_savings: ProjectedSavings;
+  confidence: number; // 0-100
+  reasoning: string;
+}
+
+// Optimization history entry
+export interface OptimizationHistoryEntry {
+  timestamp: string;
+  action: string;
+  result: string;
+  user: string;
+  details?: string;
+}
+
+// Full optimization status response
+export interface OptimizationStatusResponse {
+  site_id: string;
+  optimization_enabled: boolean;
+  optimization_status: "optimized" | "recommendation_pending" | "warning" | "error" | "unknown";
+  optimization_settings: {
+    mode: "supervised" | "automatic";
+    last_analysis: string | null;
+    analysis_interval_minutes: number;
+  };
+  last_recommendation: OptimizationRecommendation | null;
+  last_optimization: string | null;
+  optimization_history: OptimizationHistoryEntry[];
+  error_message?: string;
 }
 
 // Dashboard stats interface
@@ -707,6 +787,71 @@ export const api = {
     return fetchApi<OptimizationScenario[]>(`/api/optimization/scenarios`);
   },
 
+  // ============= AI Optimization API Methods (Phase 8) =============
+
+  /**
+   * Get optimization status for a specific site
+   * @param siteId - Site ID
+   */
+  async getOptimizationStatus(siteId: string): Promise<OptimizationStatusResponse> {
+    return fetchApi<OptimizationStatusResponse>(`/api/optimization/status/${siteId}`);
+  },
+
+  /**
+   * Analyze building for optimization opportunities
+   * @param siteId - Site ID to analyze
+   * @param currentConditions - Optional current conditions (if not provided, system will fetch)
+   */
+  async analyzeOptimization(
+    siteId: string,
+    currentConditions?: Record<string, any>
+  ): Promise<{ recommendation: OptimizationRecommendation; validation: any }> {
+    const body: Record<string, any> = { site_id: siteId };
+    if (currentConditions) {
+      body.current_conditions = currentConditions;
+    }
+    return fetchApi(`/api/optimization/analyze`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  },
+
+  /**
+   * Approve and apply optimization recommendation
+   * @param siteId - Site ID
+   * @param recommendationId - Recommendation ID to approve
+   * @param setpointsToApply - Array of setpoint changes to apply
+   */
+  async approveOptimization(
+    siteId: string,
+    recommendationId: string,
+    setpointsToApply: Array<{ equipment_id: string; point: string; value: number }>
+  ): Promise<{ success: boolean; results: any[] }> {
+    return fetchApi(`/api/optimization/approve`, {
+      method: "POST",
+      body: JSON.stringify({
+        site_id: siteId,
+        recommendation_id: recommendationId,
+        setpoints_to_apply: setpointsToApply,
+      }),
+    });
+  },
+
+  /**
+   * Toggle optimization on/off for a site
+   * @param siteId - Site ID
+   * @param enabled - Whether to enable optimization
+   */
+  async toggleOptimization(
+    siteId: string,
+    enabled: boolean
+  ): Promise<OptimizationStatusResponse> {
+    return fetchApi(`/api/optimization/toggle/${siteId}`, {
+      method: "POST",
+      body: JSON.stringify({ enabled }),
+    });
+  },
+
   // ============= Device API Methods =============
 
   /**
@@ -860,6 +1005,22 @@ export const api = {
     return fetchApi<DemoAuditDataResponse>(`/api/audit/demo-data`, {
       method: "POST",
     });
+  },
+
+  /**
+   * Get safety status for a specific device
+   * @param deviceId - Device ID
+   */
+  async getDeviceSafetyStatus(deviceId: string): Promise<{ overall_status: 'safe' | 'warning' | 'blocked' | 'alarm' | 'unknown' }> {
+    return fetchApi<{ overall_status: 'safe' | 'warning' | 'blocked' | 'alarm' | 'unknown' }>(`/api/devices/${deviceId}/safety-status`);
+  },
+
+  /**
+   * Get full safety status details for a specific device
+   * @param deviceId - Device ID
+   */
+  async getDeviceFullSafetyStatus(deviceId: string): Promise<DeviceSafetyStatus> {
+    return fetchApi<DeviceSafetyStatus>(`/api/devices/${deviceId}/safety-status`);
   },
 };
 

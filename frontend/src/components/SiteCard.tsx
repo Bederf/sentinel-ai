@@ -14,15 +14,15 @@
 
 import { Building2, Cpu, AlertTriangle, MapPin, Shield } from "lucide-react";
 import { useState, useEffect } from "react";
-import type { Site } from "../lib/api";
-import { fetchApi } from "../lib/api";
-import { SafetyIndicator, SafetyStatus } from "./SafetyIndicator";
+import api, { type Site } from "../lib/api";
 
 interface SiteCardProps {
   site: Site;
   onClick?: (site: Site) => void;
   showSafetyStatus?: boolean;
 }
+
+type SafetyStatus = 'safe' | 'warning' | 'blocked' | 'alarm' | 'unknown';
 
 interface DeviceSafetySummary {
   total: number;
@@ -94,9 +94,7 @@ export function SiteCard({ site, onClick, showSafetyStatus = true }: SiteCardPro
       setLoadingSafety(true);
       try {
         // Get devices for this site
-        const devices = await fetchApi<Array<{ id: string }>>(
-          `/api/sites/${site.id}/devices`
-        );
+        const devices = await api.getSiteDevices(site.id);
 
         if (devices.length === 0) {
           setSafetySummary({
@@ -114,9 +112,7 @@ export function SiteCard({ site, onClick, showSafetyStatus = true }: SiteCardPro
         const sampleDevices = devices.slice(0, 5);
         const statusPromises = sampleDevices.map(async (device) => {
           try {
-            const status = await fetchApi<{ overall_status: SafetyStatus }>(
-              `/api/devices/${device.id}/safety-status`
-            );
+            const status = await api.getDeviceSafetyStatus(device.id);
             return status.overall_status;
           } catch {
             return 'unknown' as SafetyStatus;
@@ -127,10 +123,10 @@ export function SiteCard({ site, onClick, showSafetyStatus = true }: SiteCardPro
 
         const summary: DeviceSafetySummary = {
           total: devices.length,
-          safe: statuses.filter(s => s === 'safe').length,
-          warning: statuses.filter(s => s === 'warning').length,
-          blocked: statuses.filter(s => s === 'blocked').length,
-          alarm: statuses.filter(s => s === 'alarm').length,
+          safe: statuses.filter((s) => s === 'safe').length,
+          warning: statuses.filter((s) => s === 'warning').length,
+          blocked: statuses.filter((s) => s === 'blocked').length,
+          alarm: statuses.filter((s) => s === 'alarm').length,
           overallStatus: 'unknown',
         };
 
