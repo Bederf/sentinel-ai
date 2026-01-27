@@ -1,16 +1,36 @@
-"""Optimization API endpoints for HVAC load shedding optimization."""
+"""Optimization API endpoints for HVAC load shedding and AI optimization."""
 
+import json
 import logging
 import random
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Body, Request
 from pydantic import BaseModel
+
+from app.services.ai_optimizer import ai_optimizer_service
+from app.services.device_abstraction import device_manager
+from app.services.audit_logger import AuditLogger
+from app.models.audit_log import AuditResultType
+from app.models.optimization import (
+    OptimizationRecommendation,
+    OptimizationSettings,
+    SiteOptimizationStatus,
+    OptimizationStatus,
+    OptimizationHistoryEntry,
+)
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# Data directory
+DATA_DIR = Path(__file__).parent.parent / "data"
+
+
+# Pydantic models for request/response validation
 
 
 # Pydantic models for request/response validation
@@ -258,3 +278,378 @@ async def calculate_thermal_runway(
         "building_params": building_params,
         "weather_forecast": weather_forecast
     }
+
+
+# ============================================================================
+# AI Optimization Endpoints (Phase 8)
+# ============================================================================
+
+class AnalyzeRequest(BaseModel):
+    """Request model for analyze endpoint."""
+    site_id: str
+    current_conditions: Optional[Dict[str, any]] = None
+    weather_forecast: Optional[Dict[str, any]] = None
+    energy_prices: Optional[Dict[str, any]] = None
+
+
+class ApproveRequest(BaseModel):
+    """Request model for approve endpoint."""
+    recommendation_id: str
+    site_id: str
+    setpoints_to_apply: List[Dict[str, any]]
+
+
+class ToggleRequest(BaseModel):
+    """Request model for toggle endpoint."""
+    enabled: bool
+
+
+def load_sites():
+    """Load sites from JSON file."""
+    filepath = DATA_DIR / "sites.json"
+    if filepath.exists():
+        with open(filepath) as f:
+            return json.load(f)
+    return []
+
+
+def save_sites(sites: List[Dict[str, any]]):
+    """Save sites to JSON file."""
+    filepath = DATA_DIR / "sites.json"
+    with open(filepath, 'w') as f:
+        json.dump(sites, f, indent=2)
+
+
+@router.post("/optimization/analyze")
+async def analyze_optimization(request: AnalyzeRequest) -> Dict[str, any]:
+    """
+    Analyze building conditions and generate optimization recommendations.
+
+    Uses AI to analyze current building telemetry, weather forecast, and
+    energy pricing to recommend optimal HVAC setpoints.
+
+    Args:
+        request: Analysis request with site_id and optional conditions
+
+    Returns:
+        OptimizationRecommendation with setpoint changes and projected savings
+    """
+    try:
+        logger.info(f"Analyzing optimization for site {request.site_id}")
+
+        # Call AI optimizer service
+        recommendation = await ai_optimizer_service.analyze_building(
+            site_id=request.site_id,
+            current_conditions=request.current_conditions,
+            weather_forecast=request.weather_forecast,
+            energy_prices=request.energy_prices,
+        )
+
+        # Validate recommendation against safety rules
+        validation = await ai_optimizer_service.validate_recommendation(
+            request.site_id, recommendation
+        )
+
+        # Update site status
+        sites = load_sites()
+        site = next((s for s in sites if s["id"] == request.site_id), None)
+        if site:
+            if validation["allowed"]:
+                site["optimization_status"] = OptimizationStatus.RECOMMENDATION_PENDING.value
+                site["last_recommendation"] = recommendation.to_dict()
+            else:
+                site["optimization_status"] = OptimizationStatus.WARNING.value
+                site["last_recommendation"] = recommendation.to_dict()
+                site["error_message"] = "Recommendation failed safety validation"
+
+            # Add to history
+            if "optimization_history" not in site:
+                site["optimization_history"] = []
+
+            history_entry = OptimizationHistoryEntry(
+                timestamp=datetime.now().isoformat(),
+                action="analyzed",
+                result="success" if validation["allowed"] else "warning",
+                user="system",
+                details={
+                    "confidence": recommendation.confidence,
+                    "validation_passed": validation["allowed"],
+                }
+            )
+            site["optimization_history"].append(history_entry.to_dict())
+
+            # Keep only last 50 history entries
+            if len(site["optimization_history"]) > 50:
+                site["optimization_history"] = site["optimization_history"][-50:]
+
+            save_sites(sites)
+
+        return {
+            "success": True,
+            "recommendation": recommendation.to_dict(),
+            "validation": validation,
+        }
+
+    except ValueError as e:
+        logger.error(f"Site not found: {e}")
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error analyzing optimization: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/optimization/approve")
+async def approve_optimization(
+    request: Request,
+    body: ApproveRequest = Body(...)
+) -> Dict[str, any]:
+    """
+    Apply approved optimization recommendations to building systems.
+
+    Validates setpoints against safety rules, applies changes via device
+    control API, and logs to audit trail.
+
+    Args:
+        body: Approval request with recommendation_id, site_id, and setpoints
+
+    Returns:
+        Success/failure result with details
+    """
+    try:
+        logger.info(f"Approving optimization for site {body.site_id}")
+
+        # Extract user from headers
+        user = request.headers.get("X-User-Id", "operator")
+
+        audit_logger = AuditLogger()
+        results = []
+        all_success = True
+
+        for setpoint in body.setpoints_to_apply:
+            device_id = setpoint.get("device_id")
+            point_name = setpoint.get("point_name")
+            value = setpoint.get("value")
+
+            if not all([device_id, point_name, value is not None]):
+                results.append({
+                    "device_id": device_id,
+                    "success": False,
+                    "error": "Missing required fields: device_id, point_name, value"
+                })
+                all_success = False
+                continue
+
+            try:
+                # Write to device via device manager
+                success = await device_manager.write_device_value(
+                    device_id=device_id,
+                    point_name=point_name,
+                    value=value,
+                    user=user,
+                )
+
+                if success:
+                    results.append({
+                        "device_id": device_id,
+                        "point_name": point_name,
+                        "success": True,
+                        "value": value,
+                    })
+
+                    # Log to audit trail
+                    audit_logger.log_control_action(
+                        device_id=device_id,
+                        point_name=point_name,
+                        user=user,
+                        old_value=None,  # Could fetch current value if needed
+                        new_value=value,
+                        result=AuditResultType.SUCCESS,
+                        metadata={
+                            "source": "ai_optimization",
+                            "recommendation_id": body.recommendation_id,
+                        }
+                    )
+                else:
+                    results.append({
+                        "device_id": device_id,
+                        "success": False,
+                        "error": f"Failed to write {value} to {point_name}"
+                    })
+                    all_success = False
+
+            except Exception as e:
+                logger.error(f"Error applying setpoint to {device_id}: {e}")
+                results.append({
+                    "device_id": device_id,
+                    "success": False,
+                    "error": str(e)
+                })
+                all_success = False
+
+        # Flush audit log
+        audit_logger.flush()
+
+        # Update site status
+        sites = load_sites()
+        site = next((s for s in sites if s["id"] == body.site_id), None)
+        if site:
+            if all_success:
+                site["optimization_status"] = OptimizationStatus.OPTIMIZED.value
+                site["last_optimization"] = datetime.now().isoformat()
+
+                # Add to history
+                if "optimization_history" not in site:
+                    site["optimization_history"] = []
+
+                history_entry = OptimizationHistoryEntry(
+                    timestamp=datetime.now().isoformat(),
+                    action="approved",
+                    result="success",
+                    user=user,
+                    details={
+                        "recommendation_id": body.recommendation_id,
+                        "setpoints_applied": len(body.setpoints_to_apply),
+                    }
+                )
+                site["optimization_history"].append(history_entry.to_dict())
+
+                # Keep only last 50 history entries
+                if len(site["optimization_history"]) > 50:
+                    site["optimization_history"] = site["optimization_history"][-50:]
+
+            else:
+                site["optimization_status"] = OptimizationStatus.ERROR.value
+
+                # Add to history
+                if "optimization_history" not in site:
+                    site["optimization_history"] = []
+
+                history_entry = OptimizationHistoryEntry(
+                    timestamp=datetime.now().isoformat(),
+                    action="approved",
+                    result="error",
+                    user=user,
+                    details={
+                        "recommendation_id": body.recommendation_id,
+                        "error": "Some setpoints failed to apply",
+                    }
+                )
+                site["optimization_history"].append(history_entry.to_dict())
+
+            save_sites(sites)
+
+        return {
+            "success": all_success,
+            "results": results,
+            "message": f"Applied {len([r for r in results if r['success']])} of {len(results)} setpoints"
+        }
+
+    except Exception as e:
+        logger.error(f"Error approving optimization: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/optimization/status/{site_id}")
+async def get_optimization_status(site_id: str) -> Dict[str, any]:
+    """
+    Get optimization status for a specific site.
+
+    Returns current optimization status, last recommendation, and
+    optimization history.
+
+    Args:
+        site_id: Site ID to get status for
+
+    Returns:
+        Site optimization status with history
+    """
+    try:
+        sites = load_sites()
+        site = next((s for s in sites if s["id"] == site_id), None)
+
+        if not site:
+            raise HTTPException(status_code=404, detail=f"Site {site_id} not found")
+
+        # Build status response
+        status = {
+            "site_id": site.get("id"),
+            "site_name": site.get("name"),
+            "optimization_enabled": site.get("optimization_enabled", False),
+            "optimization_status": site.get("optimization_status", OptimizationStatus.UNKNOWN.value),
+            "optimization_settings": site.get("optimization_settings", {
+                "mode": "supervised",
+                "last_analysis": None,
+                "analysis_interval_minutes": 15,
+            }),
+            "last_recommendation": site.get("last_recommendation"),
+            "last_optimization": site.get("last_optimization"),
+            "optimization_history": site.get("optimization_history", []),
+            "error_message": site.get("error_message"),
+        }
+
+        return status
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting optimization status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/optimization/toggle/{site_id}")
+async def toggle_optimization(site_id: str, request: ToggleRequest) -> Dict[str, any]:
+    """
+    Enable or disable optimization for a specific site.
+
+    Updates site optimization settings.
+
+    Args:
+        site_id: Site ID to toggle optimization for
+        request: Toggle request with enabled boolean
+
+    Returns:
+        Updated optimization settings
+    """
+    try:
+        sites = load_sites()
+        site = next((s for s in sites if s["id"] == site_id), None)
+
+        if not site:
+            raise HTTPException(status_code=404, detail=f"Site {site_id} not found")
+
+        # Update optimization enabled flag
+        site["optimization_enabled"] = request.enabled
+
+        # Initialize optimization settings if not present
+        if "optimization_settings" not in site:
+            site["optimization_settings"] = {
+                "mode": "supervised",
+                "last_analysis": None,
+                "analysis_interval_minutes": 15,
+            }
+
+        # Update status
+        if request.enabled:
+            site["optimization_status"] = OptimizationStatus.UNKNOWN.value
+        else:
+            site["optimization_status"] = OptimizationStatus.UNKNOWN.value
+            site["last_recommendation"] = None
+
+        # Save to file
+        save_sites(sites)
+
+        logger.info(f"Optimization {'enabled' if request.enabled else 'disabled'} for site {site_id}")
+
+        return {
+            "success": True,
+            "site_id": site_id,
+            "optimization_enabled": request.enabled,
+            "optimization_settings": site["optimization_settings"],
+            "message": f"Optimization {'enabled' if request.enabled else 'disabled'} for {site.get('name', site_id)}"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error toggling optimization: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
