@@ -28,12 +28,13 @@ import {
   AlertCircle,
 } from "lucide-react";
 import api from "../lib/api";
-import type { Alert, Prediction, EnergyDataPoint } from "../lib/api";
+import type { Alert, Prediction, EnergyDataPoint, Device } from "../lib/api";
 import { KPICard } from "./KPICard";
 import { EnergyChart } from "./EnergyChart";
 import { PredictionCard } from "./PredictionCard";
 import { PredictionDetail } from "./PredictionDetail";
 import { OptimizationInfoCard } from "./OptimizationInfoCard";
+import { ControlPanel } from "./ControlPanel";
 
 interface SiteDetailProps {
   siteId: string;
@@ -87,6 +88,10 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>("equipment");
+
+  // Equipment control
+  const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null);
+  const [showEquipmentControl, setShowEquipmentControl] = useState(false);
 
   // Prediction detail modal
   const [selectedPrediction, setSelectedPrediction] = useState<Prediction | null>(null);
@@ -254,6 +259,29 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
     if (score >= 90) return "var(--color-sentinel-green)";
     if (score >= 70) return "var(--color-sentinel-amber)";
     return "var(--color-sentinel-red)";
+  };
+
+  const handleEquipmentClick = async (equip: Equipment) => {
+    try {
+      // Fetch full device data from API
+      const device = await api.getDevice(equip.id);
+      setSelectedEquipment(equip);
+      setShowEquipmentControl(true);
+    } catch (error) {
+      console.error("Failed to load equipment details:", error);
+    }
+  };
+
+  const handleEquipmentControl = async (deviceId: string, point: string, value: number | boolean) => {
+    try {
+      await api.controlDevice(deviceId, point, value);
+      // Refresh equipment list after control action
+      const equipmentData = await api.getEquipment(siteId);
+      setEquipment(equipmentData as unknown as Equipment[]);
+    } catch (error) {
+      console.error("Equipment control failed:", error);
+      throw error;
+    }
   };
 
   if (loading) {
@@ -691,10 +719,11 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
                       {equipment.map((item) => (
                         <tr
                           key={item.id}
-                          className="hover:brightness-110 transition-colors"
+                          className="hover:brightness-110 cursor-pointer transition-colors"
                           style={{
                             borderBottom: "1px solid var(--color-sentinel-border)",
                           }}
+                          onClick={() => handleEquipmentClick(item)}
                         >
                           <td className="py-3 px-4">
                             <div className="flex items-center gap-3">
@@ -895,6 +924,77 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
             setSelectedPrediction(null);
           }}
         />
+      )}
+
+      {/* Equipment Control Modal */}
+      {showEquipmentControl && selectedEquipment && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: "rgba(0, 0, 0, 0.7)" }}
+          onClick={() => {
+            setShowEquipmentControl(false);
+            setSelectedEquipment(null);
+          }}
+        >
+          <div
+            className="rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden"
+            style={{
+              background: "var(--color-sentinel-bg-panel)",
+              border: "1px solid var(--color-sentinel-border)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div
+              className="p-4 border-b flex items-center justify-between"
+              style={{ borderColor: "var(--color-sentinel-border)" }}
+            >
+              <div>
+                <h3
+                  className="text-lg font-semibold"
+                  style={{ color: "var(--color-sentinel-text-primary)" }}
+                >
+                  {selectedEquipment.name}
+                </h3>
+                <p
+                  className="text-sm"
+                  style={{ color: "var(--color-sentinel-text-secondary)" }}
+                >
+                  {selectedEquipment.type.replace("_", " ")} • {selectedEquipment.id}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowEquipmentControl(false);
+                  setSelectedEquipment(null);
+                }}
+                className="p-2 rounded transition-colors"
+                style={{ color: "var(--color-sentinel-text-secondary)" }}
+              >
+                <XCircle className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Control Panel */}
+            <div className="p-4 overflow-y-auto" style={{ maxHeight: "calc(90vh - 80px)" }}>
+              <ControlPanel
+                device={{
+                  id: selectedEquipment.id,
+                  name: selectedEquipment.name,
+                  type: selectedEquipment.type,
+                  site_id: siteId,
+                  points: {},
+                  status: selectedEquipment.status,
+                  health_score: selectedEquipment.health_score,
+                }}
+                onControl={handleEquipmentControl}
+                safetyStatus={{
+                  status: "safe",
+                }}
+              />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
