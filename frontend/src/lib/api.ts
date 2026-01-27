@@ -852,6 +852,98 @@ export const api = {
     });
   },
 
+  /**
+   * Get latest pending recommendation for a site
+   * @param siteId - Site ID
+   */
+  async getLatestRecommendation(siteId: string): Promise<OptimizationRecommendation | null> {
+    try {
+      const status = await this.getOptimizationStatus(siteId);
+      return status.last_recommendation;
+    } catch (error) {
+      console.error(`Failed to fetch latest recommendation for site ${siteId}:`, error);
+      return null;
+    }
+  },
+
+  /**
+   * Reject optimization recommendation
+   * @param siteId - Site ID
+   * @param recommendationId - Recommendation ID to reject
+   * @param reason - Optional rejection reason
+   */
+  async rejectOptimization(
+    siteId: string,
+    recommendationId: string,
+    reason?: string
+  ): Promise<{ success: boolean; message: string }> {
+    // Note: This endpoint doesn't exist in backend yet
+    // For now, we'll update the status to "optimized" (current settings kept)
+    // In production, this would call POST /api/optimization/reject
+    try {
+      // Simulate API call - in production, this would be:
+      // return fetchApi(`/api/optimization/reject`, {
+      //   method: "POST",
+      //   body: JSON.stringify({
+      //     site_id: siteId,
+      //     recommendation_id: recommendationId,
+      //     reason,
+      //   }),
+      // });
+
+      // For now, just return success
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      return {
+        success: true,
+        message: reason ? `Recommendation rejected: ${reason}` : "Recommendation rejected",
+      };
+    } catch (error) {
+      console.error("Failed to reject recommendation:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Defer optimization recommendation
+   * @param siteId - Site ID
+   * @param recommendationId - Recommendation ID to defer
+   * @param deferMinutes - Minutes to defer (default: 15)
+   */
+  async deferOptimization(
+    siteId: string,
+    recommendationId: string,
+    deferMinutes: number = 15
+  ): Promise<{ success: boolean; message: string; deferUntil: string }> {
+    // Note: This endpoint doesn't exist in backend yet
+    // In production, this would call POST /api/optimization/defer
+    // and backend would re-queue the recommendation for later
+
+    const deferUntil = new Date(Date.now() + deferMinutes * 60 * 1000).toISOString();
+
+    try {
+      // Simulate API call - in production, this would be:
+      // return fetchApi(`/api/optimization/defer`, {
+      //   method: "POST",
+      //   body: JSON.stringify({
+      //     site_id: siteId,
+      //     recommendation_id: recommendationId,
+      //     defer_minutes: deferMinutes,
+      //   }),
+      // });
+
+      // For now, just return success
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      return {
+        success: true,
+        message: `Recommendation deferred for ${deferMinutes} minutes`,
+        deferUntil,
+      };
+    } catch (error) {
+      console.error("Failed to defer recommendation:", error);
+      throw error;
+    }
+  },
+
   // ============= Device API Methods =============
 
   /**
