@@ -2,16 +2,16 @@
  * Control Dashboard Component - Building Management Control Center
  *
  * Features:
- * - Two-column layout: Device list (left), Control panel (right)
+ * - Two-column layout: Device list (left), Control panel + Recent actions (right)
  * - Real-time device status updates
  * - Safety validation indicators
- * - Audit logging integration (now in separate tab)
+ * - Inline audit trail showing recent control actions
  * - Grafana-style design consistency
  *
  * Integration with:
  * - Device abstraction service (backend)
  * - Safety interlock validation
- * - Audit logger (via ControlAuditTrail component)
+ * - Audit logger (via RecentActions component)
  * - Existing dashboard theme
  */
 
@@ -19,17 +19,20 @@ import { useState, useEffect, useCallback } from "react";
 import {
   Cpu,
   Activity,
-  Shield,
   AlertTriangle,
   CheckCircle,
   XCircle,
   RefreshCw,
+  Clock,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import api from "../lib/api";
 import type { Device } from "../lib/api";
 import { DeviceList } from "./DeviceList";
 import { ControlPanel } from "./ControlPanel";
 import { LoadingCard } from "./LoadingCard";
+import { RecentActions } from "./RecentActions";
 
 interface ControlDashboardProps {
   onError?: (error: string) => void;
@@ -40,6 +43,8 @@ export function ControlDashboard({ onError }: ControlDashboardProps) {
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshDevices, setRefreshDevices] = useState(0);
+  const [recentActionsExpanded, setRecentActionsExpanded] = useState(true);
+  const [auditRefreshTrigger, setAuditRefreshTrigger] = useState(0);
 
   // Load devices on mount
   useEffect(() => {
@@ -78,8 +83,9 @@ export function ControlDashboard({ onError }: ControlDashboardProps) {
   const handleControlAction = useCallback(async (deviceId: string, point: string, value: number | boolean) => {
     try {
       await api.controlDevice(deviceId, point, value);
-      // Refresh devices after successful control
+      // Refresh devices and audit trail after successful control
       setRefreshDevices((prev) => prev + 1);
+      setAuditRefreshTrigger((prev) => prev + 1);
     } catch (error) {
       console.error("Control action failed:", error);
       throw error;
@@ -148,8 +154,9 @@ export function ControlDashboard({ onError }: ControlDashboardProps) {
         </div>
       </div>
 
-      {/* Center Column: Control Panel */}
-      <div className="flex-1 flex flex-col">
+      {/* Center Column: Control Panel + Recent Actions */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Control Panel Header */}
         <div
           className="flex-none p-4 border-b flex items-center justify-between"
           style={{ borderColor: "var(--color-sentinel-border)" }}
@@ -199,14 +206,84 @@ export function ControlDashboard({ onError }: ControlDashboardProps) {
             </div>
           )}
         </div>
-        <div className="flex-1 overflow-y-auto">
-          <ControlPanel
-            device={selectedDevice}
-            onControl={handleControlAction}
-            safetyStatus={{
-              status: selectedDevice.safety_status || "safe",
-            }}
-          />
+
+        {/* Control Panel Content */}
+        <div className="flex-1 overflow-y-auto min-h-0">
+          {selectedDevice && (
+            <ControlPanel
+              device={selectedDevice}
+              onControl={handleControlAction}
+              safetyStatus={{
+                status: (selectedDevice.safety_status === "critical" ? "blocked" : selectedDevice.safety_status || "safe") as "safe" | "warning" | "blocked",
+              }}
+            />
+          )}
+        </div>
+
+        {/* Recent Actions Section (Collapsible) */}
+        <div
+          className="flex-none border-t"
+          style={{
+            borderColor: "var(--color-sentinel-border)",
+            background: "var(--color-sentinel-bg-primary)",
+          }}
+        >
+          {/* Collapsible Header */}
+          <button
+            onClick={() => setRecentActionsExpanded(!recentActionsExpanded)}
+            className="w-full p-3 flex items-center justify-between hover:bg-opacity-80 transition-colors"
+            style={{ background: "var(--color-sentinel-bg-secondary)" }}
+          >
+            <div className="flex items-center gap-2">
+              <div
+                className="p-1.5 rounded"
+                style={{ background: "rgba(59, 130, 246, 0.15)" }}
+              >
+                <Clock className="h-4 w-4" style={{ color: "var(--color-sentinel-blue)" }} />
+              </div>
+              <span
+                className="font-medium text-sm"
+                style={{ color: "var(--color-sentinel-text-primary)" }}
+              >
+                Recent Actions
+              </span>
+              {selectedDevice && (
+                <span
+                  className="text-xs"
+                  style={{ color: "var(--color-sentinel-text-secondary)" }}
+                >
+                  ({selectedDevice.name})
+                </span>
+              )}
+            </div>
+            {recentActionsExpanded ? (
+              <ChevronDown
+                className="h-4 w-4"
+                style={{ color: "var(--color-sentinel-text-secondary)" }}
+              />
+            ) : (
+              <ChevronUp
+                className="h-4 w-4"
+                style={{ color: "var(--color-sentinel-text-secondary)" }}
+              />
+            )}
+          </button>
+
+          {/* Collapsible Content */}
+          {recentActionsExpanded && (
+            <div
+              className="max-h-64 overflow-y-auto"
+              style={{ background: "var(--color-sentinel-bg-primary)" }}
+            >
+              <RecentActions
+                deviceId={selectedDevice?.id}
+                limit={5}
+                autoRefresh={true}
+                refreshInterval={5000}
+                refreshTrigger={auditRefreshTrigger}
+              />
+            </div>
+          )}
         </div>
       </div>
     </div>
