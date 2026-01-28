@@ -8,7 +8,7 @@
  * - Demo narratives and success/failure stories
  */
 
-import type { Device, SafetyStatus } from "../lib/api";
+import type { Device } from "../lib/api";
 
 // Demo device configurations
 export const demoDevices: Device[] = [
@@ -190,7 +190,7 @@ export const demoDevices: Device[] = [
   },
 ];
 
-// Demo scenarios
+// Demo scenarios for Level 2 Manual Control
 export interface DemoScenario {
   id: string;
   name: string;
@@ -205,16 +205,17 @@ export interface DemoScenario {
   }>;
   expectedOutcome: string;
   narrative: string;
+  level2Flow: string; // New field to describe Level 2 control flow
 }
 
 export const demoScenarios: DemoScenario[] = [
   {
     id: "scenario-1",
-    name: "Adjust Chiller Temperature",
-    description: "Safe operation - adjust chiller setpoint within safe limits",
+    name: "Operator adjusts HVAC setpoint",
+    description: "Happy path: Adjust temperature within safe range → confirmation → success → audit entry",
     deviceId: "chiller-gateway-01",
     safetyStatus: "safe",
-    safetyMessage: "All safety rules passed. Temperature adjustment within safe operating range.",
+    safetyMessage: "All safety rules passed. Temperature adjustment within safe operating range (5-10°C).",
     initialActions: [
       {
         point: "setpoint",
@@ -223,54 +224,57 @@ export const demoScenarios: DemoScenario[] = [
       },
     ],
     expectedOutcome: "Chiller setpoint successfully adjusted. System remains within safe operating parameters.",
-    narrative: "As FM operator, you need to slightly increase chiller temperature to reduce energy consumption while maintaining comfort.",
+    narrative: "As FM operator, you need to slightly increase chiller temperature to reduce energy consumption while maintaining comfort. This demonstrates the standard Level 2 control flow.",
+    level2Flow: "1. Adjust slider → 2. Confirmation modal shows details → 3. Click Confirm → 4. See pending spinner → 5. Success feedback (green) → 6. Recent Actions updates",
   },
   {
     id: "scenario-2",
-    name: "Override Safety Limits",
-    description: "Safety warning - attempt to set chiller temperature outside safe range",
+    name: "Operator overrides with safety acknowledgment",
+    description: "Safety warning: Attempt value outside range → warning shown → operator acknowledges → logged",
     deviceId: "chiller-gateway-01",
     safetyStatus: "warning",
-    safetyMessage: "Warning: Temperature setpoint exceeds recommended safe operating range (5-10°C).",
+    safetyMessage: "Warning: Temperature setpoint (4.5°C) is below recommended minimum (5.0°C). Risk of evaporator icing.",
     initialActions: [
       {
         point: "setpoint",
         value: 4.5,
-        description: "Attempt to set chiller below minimum safe temperature",
+        description: "Set chiller below minimum safe temperature for emergency pre-cooling",
       },
     ],
-    expectedOutcome: "Control action allowed with warning. System logs safety override for audit trail.",
-    narrative: "During emergency maintenance, you need to temporarily lower chiller temperature below normal limits. Safety system warns but allows override with audit trail.",
+    expectedOutcome: "Control action allowed with warning acknowledgment. Safety override recorded in audit trail.",
+    narrative: "During load shedding preparation, you need to pre-cool the building below normal limits. The safety system warns you but allows override with full audit trail recording.",
+    level2Flow: "1. Adjust to 4.5°C → 2. Modal shows WARNING badge → 3. Acknowledge warning → 4. Execute → 5. Audit logs override reason",
   },
   {
     id: "scenario-3",
-    name: "Emergency Stop",
-    description: "Safety blocked - attempt to stop critical chiller during peak cooling",
+    name: "System blocks unsafe operation",
+    description: "Safety block: Attempt dangerous value → blocked → logged as rejected",
     deviceId: "chiller-gateway-01",
     safetyStatus: "blocked",
-    safetyMessage: "Blocked: Cannot stop critical chiller during peak cooling hours (10:00-16:00).",
+    safetyMessage: "BLOCKED: Cannot stop critical chiller during peak cooling hours (10:00-16:00). Building occupancy: 450 people.",
     initialActions: [
       {
         point: "chiller_status",
         value: 0,
-        description: "Attempt to stop critical chiller",
+        description: "Attempt to stop critical chiller during business hours",
       },
     ],
-    expectedOutcome: "Control action blocked by safety system. Requires emergency override authorization.",
-    narrative: "Attempting to stop the main chiller during business hours would cause building comfort issues. Safety system blocks this action to prevent disruption.",
+    expectedOutcome: "Control action blocked by safety system. Attempted action logged for compliance. Emergency override requires Level 3 authorization.",
+    narrative: "Attempting to stop the main chiller during business hours would cause building comfort issues affecting 450 occupants. Safety system blocks this action and logs the attempt.",
+    level2Flow: "1. Attempt to stop → 2. Modal shows BLOCKED badge → 3. Confirm button disabled → 4. Rejection logged in audit trail",
   },
   {
     id: "scenario-4",
-    name: "Lighting Schedule Override",
-    description: "Audit trail example - override lighting schedule for special event",
+    name: "Operator overrides lighting schedule",
+    description: "Audit trail: Override lighting for special event → confirmation → success → audit entry",
     deviceId: "lighting-lobby-01",
     safetyStatus: "safe",
-    safetyMessage: "Lighting override permitted. Audit trail will record override reason and duration.",
+    safetyMessage: "Lighting override permitted. All changes will be recorded in compliance audit trail.",
     initialActions: [
       {
         point: "circuit1_level",
         value: 100,
-        description: "Set lobby lighting to 100% for evening event",
+        description: "Set lobby lighting to 100% for executive dinner",
       },
       {
         point: "circuit2_level",
@@ -278,16 +282,17 @@ export const demoScenarios: DemoScenario[] = [
         description: "Set reception lighting to 100%",
       },
     ],
-    expectedOutcome: "Lighting successfully overridden. Audit trail records: 'Special event - executive dinner, 19:00-22:00'.",
-    narrative: "The CTO is hosting an executive dinner in the lobby after hours. You need to override the lighting schedule and maintain full brightness for the event.",
+    expectedOutcome: "Lighting successfully overridden. Audit trail records: operator, timestamp, values, reason.",
+    narrative: "The CTO is hosting an executive dinner in the lobby after hours. Every lighting change is recorded for energy compliance and billing allocation.",
+    level2Flow: "1. Set 100% → 2. Confirmation modal → 3. Confirm → 4. Success → 5. Audit shows: 'circuit1_level: 75% → 100%'",
   },
   {
     id: "scenario-5",
-    name: "AHU Mode Change",
-    description: "Change AHU operating mode based on occupancy",
+    name: "Operator improves air quality",
+    description: "Standard control: Increase ventilation → confirmation → success → audit entry",
     deviceId: "ahu-level3-01",
     safetyStatus: "safe",
-    safetyMessage: "AHU mode change permitted. Occupancy sensor indicates office is occupied.",
+    safetyMessage: "AHU adjustment permitted. Note: Filter pressure at 250 Pa (above 200 Pa warning threshold).",
     initialActions: [
       {
         point: "damper_position",
@@ -295,8 +300,9 @@ export const demoScenarios: DemoScenario[] = [
         description: "Increase outside air damper to 50% for better ventilation",
       },
     ],
-    expectedOutcome: "AHU ventilation increased. Improved indoor air quality for occupied executive offices.",
-    narrative: "The CTO has requested better ventilation in the executive offices. You're adjusting the AHU to bring in more fresh air while maintaining comfort.",
+    expectedOutcome: "AHU ventilation increased. Improved indoor air quality for occupied executive offices. Filter maintenance recommended.",
+    narrative: "The CTO has requested better ventilation in executive offices. The system shows a filter warning during the control - operators can see equipment health alongside controls.",
+    level2Flow: "1. Adjust damper → 2. Modal shows details + filter warning → 3. Confirm → 4. Success → 5. Consider scheduling filter replacement",
   },
 ];
 
@@ -355,53 +361,59 @@ export const demoSafetyStatuses: Record<string, any> = {
   },
 };
 
-// Demo narratives for chat integration
+// Demo narratives for chat integration - Level 2 Manual Control
 export const demoNarratives = {
   "chiller-gateway-01": {
-    safe: "The Gateway Chiller is operating normally. You can adjust the temperature setpoint between 5-10°C. Current setting is 7.0°C, which provides optimal cooling with good efficiency.",
-    warning: "You're attempting to set the chiller temperature below the recommended minimum of 5°C. This could cause icing in the evaporator. The system will allow this with a warning and audit trail entry.",
-    blocked: "You cannot stop the main chiller during business hours (10:00-16:00) as it provides critical cooling to the building. An emergency override would require authorization from the facilities manager.",
+    safe: "The Gateway Chiller is operating normally at 22°C setpoint. You can adjust the temperature between 5-10°C. All control actions require confirmation and are logged to the audit trail.",
+    warning: "You're attempting to set the chiller temperature outside the recommended range (5-10°C). This triggers a safety warning. You can acknowledge the warning and proceed - the override will be logged with your operator ID.",
+    blocked: "You cannot stop the main chiller during business hours (10:00-16:00) as it provides critical cooling to 450 building occupants. The attempted action has been logged. Emergency override requires Level 3 authorization.",
   },
   "lighting-lobby-01": {
-    safe: "The lobby lighting can be adjusted between 0-100%. Current settings are 75% for main entrance and 100% for reception. All changes are recorded in the audit trail for compliance.",
+    safe: "The lobby lighting can be adjusted between 0-100%. Current settings are 75% for main entrance and 100% for reception. All changes are recorded in the compliance audit trail with operator ID and timestamp.",
+  },
+  "ahu-level3-01": {
+    safe: "The Level 3 AHU is running with filter pressure at 250 Pa (above 200 Pa warning threshold). You can control the damper position and fan status. Filter maintenance is recommended.",
+  },
+  "vav-office-01": {
+    safe: "The Office VAV is currently at 26°C (above comfort range of 22-24°C). Temperature adjustment will help restore comfort. All changes go through confirmation workflow.",
   },
 };
 
-// Quick control actions for demo
+// Quick control actions for Level 2 demo
 export const quickControls = [
   {
-    label: "Increase Chiller Temp",
+    label: "Adjust Chiller Setpoint",
     deviceId: "chiller-gateway-01",
     point: "setpoint",
-    value: 7.5,
-    description: "Increase chiller setpoint by 0.5°C for energy savings",
+    value: 24,
+    description: "Adjust chiller setpoint from 22°C to 24°C (safe range)",
   },
   {
-    label: "Decrease Chiller Temp",
-    deviceId: "chiller-gateway-01",
+    label: "Fix Hot Office",
+    deviceId: "001-vav-001",
     point: "setpoint",
-    value: 6.5,
-    description: "Decrease chiller setpoint by 0.5°C for better cooling",
+    value: 22,
+    description: "Lower VAV setpoint from 26°C to 22°C to restore comfort",
   },
   {
-    label: "Turn On AHU Fan",
+    label: "Increase Ventilation",
     deviceId: "ahu-level3-01",
-    point: "fan_status",
-    value: true,
-    description: "Turn on Level 3 AHU fan",
+    point: "damper_position",
+    value: 50,
+    description: "Increase outside air damper to 50% (note filter warning)",
   },
   {
-    label: "Increase Lobby Lighting",
+    label: "Boost Lobby Lighting",
     deviceId: "lighting-lobby-01",
     point: "circuit1_level",
     value: 100,
-    description: "Set lobby lighting to 100%",
+    description: "Set lobby lighting to 100% for executive dinner",
   },
   {
-    label: "Decrease Lobby Lighting",
+    label: "Energy Save Mode",
     deviceId: "lighting-lobby-01",
     point: "circuit1_level",
     value: 50,
-    description: "Set lobby lighting to 50% for energy savings",
+    description: "Reduce lobby lighting to 50% for energy savings",
   },
 ];
