@@ -10,7 +10,7 @@
  * Follows SENTINEL dark theme design.
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Thermometer } from "lucide-react";
 
 interface TemperatureControlProps {
@@ -39,9 +39,16 @@ export function TemperatureControl({
   const [inputValue, setInputValue] = useState(value.toString());
   const [isEditing, setIsEditing] = useState(false);
 
-  // Handle slider change
+  // Sync inputValue when value prop changes externally (e.g., after successful control action)
+  useEffect(() => {
+    if (!isEditing) {
+      setInputValue(value.toString());
+    }
+  }, [value, isEditing]);
+
+  // Handle slider change - use integer values
   const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = parseFloat(e.target.value);
+    const newValue = parseInt(e.target.value, 10);
     if (!isNaN(newValue)) {
       onChange(newValue);
       setInputValue(newValue.toString());
@@ -53,10 +60,10 @@ export function TemperatureControl({
     setInputValue(e.target.value);
   };
 
-  // Handle input blur - validate and apply
+  // Handle input blur - validate and apply (use integer)
   const handleInputBlur = () => {
     setIsEditing(false);
-    const newValue = parseFloat(inputValue);
+    const newValue = parseInt(inputValue, 10);
     if (!isNaN(newValue)) {
       // Clamp value to min/max
       const clampedValue = Math.max(min, Math.min(max, newValue));
@@ -74,7 +81,7 @@ export function TemperatureControl({
   };
 
   // Handle key press (Enter to apply)
-  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       handleInputBlur();
     }
@@ -146,11 +153,11 @@ export function TemperatureControl({
         <div className="flex items-baseline gap-1">
           <input
             type="text"
-            value={isEditing ? inputValue : value.toFixed(1)}
+            value={isEditing ? inputValue : value.toString()}
             onChange={handleInputChange}
             onBlur={handleInputBlur}
             onFocus={handleInputFocus}
-            onKeyPress={handleKeyPress}
+            onKeyDown={handleKeyDown}
             disabled={disabled}
             className="bg-transparent border-none outline-none text-2xl font-bold w-20"
             style={{
@@ -201,13 +208,12 @@ export function TemperatureControl({
           }}
         />
         <div
-          className="absolute top-1/2 h-4 w-4 rounded-full -translate-y-1/2 pointer-events-none"
+          className="absolute top-1/2 h-4 w-4 rounded-full pointer-events-none -translate-x-1/2 -translate-y-1/2"
           style={{
             left: `${sliderPercentage}%`,
             background: disabled
               ? "var(--color-sentinel-text-disabled)"
               : "var(--color-sentinel-blue)",
-            transform: `translate(-${sliderPercentage}%, -50%)`,
           }}
         />
       </div>
