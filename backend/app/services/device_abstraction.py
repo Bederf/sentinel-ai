@@ -15,8 +15,7 @@ from app.models.device import (
     Device, DeviceValue, DeviceStatus, DevicePoint,
     create_device_from_dict
 )
-# Temporarily comment out safety engine for audit logging implementation
-# from app.services.safety_interlocks import safety_engine
+from app.services.safety_interlocks import safety_engine
 from app.services.audit_logger import AuditLogger
 from app.models.audit_log import AuditResultType
 
@@ -57,15 +56,23 @@ class DeviceInterface(ABC):
         Default implementation uses the safety engine.
         Can be overridden by specific adapters if needed.
         """
-        # For now, return a mock validation result since safety engine is not fully implemented
-        # TODO: Integrate with safety engine when Plan 6-02 is implemented
+        # Initialize safety engine if not already done
+        if not safety_engine._initialized:
+            await safety_engine.initialize()
+
+        # Get device for validation - subclasses should provide this
+        device = getattr(self, 'device', None)
+        if device:
+            return await safety_engine.validate_control(device, point_name, value)
+
+        # Fallback if no device available
         return {
             "allowed": True,
             "reasons": [],
             "warnings": [],
             "validation_details": {
-                "status": "bypassed",
-                "message": "Safety validation bypassed for audit logging demo"
+                "status": "no_device",
+                "message": "Safety validation skipped - no device context"
             }
         }
 
@@ -141,6 +148,19 @@ class DeviceAdapter(ABC):
             logger.error(f"Error disconnecting from device {self.device.id}: {e}")
         finally:
             self._connected = False
+
+    async def validate_control(self, point_name: str, value: Any) -> Dict[str, Any]:
+        """
+        Validate a control action against safety rules.
+
+        Uses the safety engine for validation.
+        """
+        # Initialize safety engine if not already done
+        if not safety_engine._initialized:
+            await safety_engine.initialize()
+
+        # Use device from adapter
+        return await safety_engine.validate_control(self.device, point_name, value)
 
     async def read_value(self, point_name: str) -> DeviceValue:
         """Read value with validation and error handling."""
@@ -385,22 +405,17 @@ class DeviceManager:
         return await adapter.get_status()
 
     async def get_device_safety_status(self, device_id: str) -> Dict[str, Any]:
-        """Get device safety status."""
+        """Get device safety status using safety engine."""
         device = await self.get_device(device_id)
         if not device:
             raise ValueError(f"Device {device_id} not found")
 
-        # For now, return mock safety status since safety engine is not fully implemented
-        # TODO: Integrate with safety engine when Plan 6-02 is implemented
-        return {
-            "device_id": device_id,
-            "status": "safe",
-            "last_checked": datetime.now().isoformat(),
-            "active_rules": [],
-            "violations": [],
-            "warnings": [],
-            "overall_status": "safe"
-        }
+        # Initialize safety engine if not already done
+        if not safety_engine._initialized:
+            await safety_engine.initialize()
+
+        # Get safety status from engine
+        return await safety_engine.get_device_safety_status(device)
 
     async def scan_device_points(self, device_id: str) -> Dict[str, DevicePoint]:
         """Scan device for available points."""
