@@ -625,5 +625,1286 @@
       "safety_status": "safe",
       "safety_note": "Primary loop operating normally, pump at 75% capacity"
     }
+  },
+  {
+    "id": "003-fcu-001",
+    "name": "Menlyn FCU-001",
+    "device_type": "hvac",
+    "protocol": "mock",
+    "hvac_type": "fcu",
+    "manufacturer": "Trane",
+    "model": "WCVF-06",
+    "capacity": 6,
+    "points": {
+      "room_temp": {
+        "name": "room_temp",
+        "point_type": "analog_input",
+        "description": "Room temperature",
+        "unit": "°C",
+        "min_value": 16.0,
+        "max_value": 32.0,
+        "default_value": 18.6,
+        "writable": false
+      },
+      "setpoint": {
+        "name": "setpoint",
+        "point_type": "analog_value",
+        "description": "Temperature setpoint",
+        "unit": "°C",
+        "min_value": 18.0,
+        "max_value": 26.0,
+        "default_value": 22.0,
+        "writable": true
+      },
+      "fan_speed": {
+        "name": "fan_speed",
+        "point_type": "multistate_value",
+        "description": "Fan speed setting",
+        "unit": "",
+        "default_value": 2,
+        "writable": true,
+        "metadata": {
+          "states": {
+            "0": "off",
+            "1": "low",
+            "2": "medium",
+            "3": "high",
+            "4": "auto"
+          }
+        }
+      },
+      "valve_position": {
+        "name": "valve_position",
+        "point_type": "analog_value",
+        "description": "Chilled water valve position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 85,
+        "writable": true
+      }
+    },
+    "metadata": {
+      "building": "Menlyn Maine",
+      "building_id": "site-003",
+      "floor": 1,
+      "zone": "Ground Floor",
+      "location": "Floor 1 Open Plan",
+      "serves": "Ground floor office area",
+      "safety_status": "safe",
+      "safety_note": "Room at 18.6°C - running cool"
+    }
+  },
+  {
+    "id": "003-fcu-002",
+    "name": "Menlyn FCU-002",
+    "device_type": "hvac",
+    "protocol": "mock",
+    "hvac_type": "fcu",
+    "manufacturer": "Trane",
+    "model": "WCVF-06",
+    "capacity": 6,
+    "points": {
+      "room_temp": {
+        "name": "room_temp",
+        "point_type": "analog_input",
+        "description": "Room temperature",
+        "unit": "°C",
+        "min_value": 16.0,
+        "max_value": 32.0,
+        "default_value": 18.5,
+        "writable": false
+      },
+      "setpoint": {
+        "name": "setpoint",
+        "point_type": "analog_value",
+        "description": "Temperature setpoint",
+        "unit": "°C",
+        "min_value": 18.0,
+        "max_value": 26.0,
+        "default_value": 22.0,
+        "writable": true
+      },
+      "fan_speed": {
+        "name": "fan_speed",
+        "point_type": "multistate_value",
+        "description": "Fan speed setting",
+        "unit": "",
+        "default_value": 2,
+        "writable": true,
+        "metadata": {
+          "states": {
+            "0": "off",
+            "1": "low",
+            "2": "medium",
+            "3": "high",
+            "4": "auto"
+          }
+        }
+      },
+      "valve_position": {
+        "name": "valve_position",
+        "point_type": "analog_value",
+        "description": "Chilled water valve position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 80,
+        "writable": true
+      }
+    },
+    "metadata": {
+      "building": "Menlyn Maine",
+      "building_id": "site-003",
+      "floor": 2,
+      "zone": "Upper Floor",
+      "location": "Floor 2 Open Plan",
+      "serves": "Upper floor office area",
+      "safety_status": "safe",
+      "safety_note": "Room at 18.5°C - running cool"
+    }
+  },
+  {
+    "id": "003-ahu-001",
+    "name": "Menlyn AHU-1",
+    "device_type": "hvac",
+    "protocol": "mock",
+    "hvac_type": "ahu",
+    "manufacturer": "Carrier",
+    "model": "39M-45",
+    "capacity": 45,
+    "efficiency": 2.9,
+    "points": {
+      "supply_air_temp": {
+        "name": "supply_air_temp",
+        "point_type": "analog_input",
+        "description": "Supply air temperature",
+        "unit": "°C",
+        "min_value": 12.0,
+        "max_value": 25.0,
+        "default_value": 14.5,
+        "writable": false
+      },
+      "return_air_temp": {
+        "name": "return_air_temp",
+        "point_type": "analog_input",
+        "description": "Return air temperature",
+        "unit": "°C",
+        "min_value": 18.0,
+        "max_value": 30.0,
+        "default_value": 21.0,
+        "writable": false
+      },
+      "fan_status": {
+        "name": "fan_status",
+        "point_type": "binary_value",
+        "description": "Fan on/off status",
+        "unit": "",
+        "default_value": true,
+        "writable": true
+      },
+      "fan_speed": {
+        "name": "fan_speed",
+        "point_type": "analog_value",
+        "description": "Fan speed percentage",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 75,
+        "writable": true
+      },
+      "damper_position": {
+        "name": "damper_position",
+        "point_type": "analog_value",
+        "description": "Outside air damper position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 25,
+        "writable": true
+      },
+      "filter_pressure": {
+        "name": "filter_pressure",
+        "point_type": "analog_input",
+        "description": "Filter differential pressure",
+        "unit": "Pa",
+        "min_value": 0,
+        "max_value": 350,
+        "default_value": 145,
+        "writable": false
+      }
+    },
+    "metadata": {
+      "building": "Menlyn Maine",
+      "building_id": "site-003",
+      "floor": 0,
+      "zone": "Plant Room",
+      "location": "Roof Plant Room",
+      "serves": "Both floors",
+      "safety_status": "safe",
+      "safety_note": "Return air at 21°C indicates space warmer than FCU readings"
+    }
+  },
+  {
+    "id": "003-chiller-001",
+    "name": "Menlyn Chiller",
+    "device_type": "hvac",
+    "protocol": "mock",
+    "hvac_type": "chiller",
+    "manufacturer": "York",
+    "model": "YLAA0120HE",
+    "capacity": 120,
+    "efficiency": 3.2,
+    "points": {
+      "chw_supply_temp": {
+        "name": "chw_supply_temp",
+        "point_type": "analog_input",
+        "description": "Chilled water supply temperature",
+        "unit": "°C",
+        "min_value": 4.0,
+        "max_value": 15.0,
+        "default_value": 6.8,
+        "writable": false
+      },
+      "chw_return_temp": {
+        "name": "chw_return_temp",
+        "point_type": "analog_input",
+        "description": "Chilled water return temperature",
+        "unit": "°C",
+        "min_value": 8.0,
+        "max_value": 20.0,
+        "default_value": 11.5,
+        "writable": false
+      },
+      "chw_setpoint": {
+        "name": "chw_setpoint",
+        "point_type": "analog_value",
+        "description": "Chilled water setpoint temperature",
+        "unit": "°C",
+        "min_value": 5.0,
+        "max_value": 12.0,
+        "default_value": 7.0,
+        "writable": true
+      },
+      "chiller_status": {
+        "name": "chiller_status",
+        "point_type": "multistate_value",
+        "description": "Chiller operational status",
+        "unit": "",
+        "default_value": 1,
+        "writable": true,
+        "metadata": {
+          "states": {
+            "0": "off",
+            "1": "running",
+            "2": "alarm",
+            "3": "maintenance"
+          }
+        }
+      },
+      "compressor_amps": {
+        "name": "compressor_amps",
+        "point_type": "analog_input",
+        "description": "Compressor current draw",
+        "unit": "A",
+        "min_value": 0,
+        "max_value": 200,
+        "default_value": 85,
+        "writable": false
+      },
+      "condenser_pressure": {
+        "name": "condenser_pressure",
+        "point_type": "analog_input",
+        "description": "Condenser pressure",
+        "unit": "bar",
+        "min_value": 0,
+        "max_value": 25,
+        "default_value": 14.2,
+        "writable": false
+      }
+    },
+    "metadata": {
+      "building": "Menlyn Maine",
+      "building_id": "site-003",
+      "floor": -1,
+      "zone": "Plant Room",
+      "location": "Basement Plant Room",
+      "serves": "Entire building chilled water",
+      "critical": true,
+      "safety_status": "safe",
+      "safety_note": "CHW setpoint at 7°C - consider raising to 8°C for efficiency"
+    }
+  },
+  {
+    "id": "001-ahu-001",
+    "name": "Sandton AHU-1",
+    "device_type": "hvac",
+    "protocol": "mock",
+    "hvac_type": "ahu",
+    "manufacturer": "Carrier",
+    "model": "39M-80",
+    "capacity": 80,
+    "efficiency": 2.9,
+    "points": {
+      "supply_air_temp": {
+        "name": "supply_air_temp",
+        "point_type": "analog_input",
+        "description": "Supply air temperature",
+        "unit": "°C",
+        "min_value": 12.0,
+        "max_value": 25.0,
+        "default_value": 15.2,
+        "writable": false
+      },
+      "return_air_temp": {
+        "name": "return_air_temp",
+        "point_type": "analog_input",
+        "description": "Return air temperature",
+        "unit": "°C",
+        "min_value": 18.0,
+        "max_value": 30.0,
+        "default_value": 23.5,
+        "writable": false
+      },
+      "fan_status": {
+        "name": "fan_status",
+        "point_type": "binary_value",
+        "description": "Fan on/off status",
+        "unit": "",
+        "default_value": true,
+        "writable": true
+      },
+      "fan_speed": {
+        "name": "fan_speed",
+        "point_type": "analog_value",
+        "description": "Fan speed percentage",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 70,
+        "writable": true
+      },
+      "damper_position": {
+        "name": "damper_position",
+        "point_type": "analog_value",
+        "description": "Outside air damper position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 30,
+        "writable": true
+      },
+      "filter_pressure": {
+        "name": "filter_pressure",
+        "point_type": "analog_input",
+        "description": "Filter differential pressure",
+        "unit": "Pa",
+        "min_value": 0,
+        "max_value": 350,
+        "default_value": 125,
+        "writable": false
+      }
+    },
+    "metadata": {
+      "building": "Sandton City",
+      "building_id": "site-001",
+      "floor": 0,
+      "zone": "Roof Level",
+      "location": "Roof Plant Room",
+      "serves": "All floors",
+      "safety_status": "safe",
+      "safety_note": "Operating normally"
+    }
+  },
+  {
+    "id": "001-chiller-001",
+    "name": "Sandton Chiller CH-1",
+    "device_type": "hvac",
+    "protocol": "mock",
+    "hvac_type": "chiller",
+    "manufacturer": "York",
+    "model": "YLAA0220HE",
+    "capacity": 220,
+    "efficiency": 3.4,
+    "points": {
+      "chw_supply_temp": {
+        "name": "chw_supply_temp",
+        "point_type": "analog_input",
+        "description": "Chilled water supply temperature",
+        "unit": "°C",
+        "min_value": 4.0,
+        "max_value": 15.0,
+        "default_value": 7.0,
+        "writable": false
+      },
+      "chw_return_temp": {
+        "name": "chw_return_temp",
+        "point_type": "analog_input",
+        "description": "Chilled water return temperature",
+        "unit": "°C",
+        "min_value": 8.0,
+        "max_value": 20.0,
+        "default_value": 12.0,
+        "writable": false
+      },
+      "chw_setpoint": {
+        "name": "chw_setpoint",
+        "point_type": "analog_value",
+        "description": "Chilled water setpoint temperature",
+        "unit": "°C",
+        "min_value": 5.0,
+        "max_value": 12.0,
+        "default_value": 7.0,
+        "writable": true
+      },
+      "chiller_status": {
+        "name": "chiller_status",
+        "point_type": "multistate_value",
+        "description": "Chiller operational status",
+        "unit": "",
+        "default_value": 1,
+        "writable": true,
+        "metadata": {
+          "states": {
+            "0": "off",
+            "1": "running",
+            "2": "alarm",
+            "3": "maintenance"
+          }
+        }
+      },
+      "compressor_amps": {
+        "name": "compressor_amps",
+        "point_type": "analog_input",
+        "description": "Compressor current draw",
+        "unit": "A",
+        "min_value": 0,
+        "max_value": 300,
+        "default_value": 145,
+        "writable": false
+      }
+    },
+    "metadata": {
+      "building": "Sandton City",
+      "building_id": "site-001",
+      "floor": -1,
+      "zone": "Chiller Plant Room",
+      "location": "Basement Plant Room",
+      "serves": "Entire building chilled water",
+      "critical": true,
+      "safety_status": "safe",
+      "safety_note": "Operating at rated capacity"
+    }
+  },
+  {
+    "id": "001-fcu-001",
+    "name": "Sandton FCU Floor 1",
+    "device_type": "hvac",
+    "protocol": "mock",
+    "hvac_type": "fcu",
+    "manufacturer": "Trane",
+    "model": "WCVF-08",
+    "capacity": 8,
+    "points": {
+      "room_temp": {
+        "name": "room_temp",
+        "point_type": "analog_input",
+        "description": "Room temperature",
+        "unit": "°C",
+        "min_value": 16.0,
+        "max_value": 32.0,
+        "default_value": 22.8,
+        "writable": false
+      },
+      "setpoint": {
+        "name": "setpoint",
+        "point_type": "analog_value",
+        "description": "Temperature setpoint",
+        "unit": "°C",
+        "min_value": 18.0,
+        "max_value": 26.0,
+        "default_value": 22.0,
+        "writable": true
+      },
+      "fan_speed": {
+        "name": "fan_speed",
+        "point_type": "multistate_value",
+        "description": "Fan speed setting",
+        "unit": "",
+        "default_value": 2,
+        "writable": true,
+        "metadata": {
+          "states": {
+            "0": "off",
+            "1": "low",
+            "2": "medium",
+            "3": "high",
+            "4": "auto"
+          }
+        }
+      },
+      "valve_position": {
+        "name": "valve_position",
+        "point_type": "analog_value",
+        "description": "Chilled water valve position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 45,
+        "writable": true
+      }
+    },
+    "metadata": {
+      "building": "Sandton City",
+      "building_id": "site-001",
+      "floor": 1,
+      "zone": "Floor 1 Office",
+      "location": "Floor 1 Open Plan",
+      "serves": "Floor 1 office area",
+      "safety_status": "safe",
+      "safety_note": "Room at comfort temperature"
+    }
+  },
+  {
+    "id": "001-zone-001",
+    "name": "Sandton Zone Controller",
+    "device_type": "hvac",
+    "protocol": "mock",
+    "hvac_type": "zone_controller",
+    "manufacturer": "Johnson Controls",
+    "model": "FX-PC",
+    "points": {
+      "zone_temp": {
+        "name": "zone_temp",
+        "point_type": "analog_input",
+        "description": "Average zone temperature",
+        "unit": "°C",
+        "min_value": 16.0,
+        "max_value": 30.0,
+        "default_value": 22.5,
+        "writable": false
+      },
+      "cooling_setpoint": {
+        "name": "cooling_setpoint",
+        "point_type": "analog_value",
+        "description": "Cooling temperature setpoint",
+        "unit": "°C",
+        "min_value": 20.0,
+        "max_value": 26.0,
+        "default_value": 22.0,
+        "writable": true
+      },
+      "heating_setpoint": {
+        "name": "heating_setpoint",
+        "point_type": "analog_value",
+        "description": "Heating temperature setpoint",
+        "unit": "°C",
+        "min_value": 18.0,
+        "max_value": 24.0,
+        "default_value": 20.0,
+        "writable": true
+      },
+      "mode": {
+        "name": "mode",
+        "point_type": "multistate_value",
+        "description": "HVAC operating mode",
+        "unit": "",
+        "default_value": 1,
+        "writable": true,
+        "metadata": {
+          "states": {
+            "0": "off",
+            "1": "cooling",
+            "2": "heating",
+            "3": "auto"
+          }
+        }
+      }
+    },
+    "metadata": {
+      "building": "Sandton City",
+      "building_id": "site-001",
+      "floor": "1-3",
+      "zone": "Main Office Area",
+      "location": "BMS Room Level 2",
+      "serves": "Floors 1-3",
+      "safety_status": "safe",
+      "safety_note": "Zone operating within comfort parameters"
+    }
+  },
+  {
+    "id": "002-ahu-001",
+    "name": "Rosebank AHU-1",
+    "device_type": "hvac",
+    "protocol": "mock",
+    "hvac_type": "ahu",
+    "manufacturer": "Daikin",
+    "model": "AHU-30",
+    "capacity": 30,
+    "efficiency": 3.0,
+    "points": {
+      "supply_air_temp": {
+        "name": "supply_air_temp",
+        "point_type": "analog_input",
+        "description": "Supply air temperature",
+        "unit": "°C",
+        "min_value": 12.0,
+        "max_value": 25.0,
+        "default_value": 16.0,
+        "writable": false
+      },
+      "return_air_temp": {
+        "name": "return_air_temp",
+        "point_type": "analog_input",
+        "description": "Return air temperature",
+        "unit": "°C",
+        "min_value": 18.0,
+        "max_value": 30.0,
+        "default_value": 24.0,
+        "writable": false
+      },
+      "fan_status": {
+        "name": "fan_status",
+        "point_type": "binary_value",
+        "description": "Fan on/off status",
+        "unit": "",
+        "default_value": true,
+        "writable": true
+      },
+      "fan_speed": {
+        "name": "fan_speed",
+        "point_type": "analog_value",
+        "description": "Fan speed percentage",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 65,
+        "writable": true
+      },
+      "damper_position": {
+        "name": "damper_position",
+        "point_type": "analog_value",
+        "description": "Outside air damper position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 20,
+        "writable": true
+      }
+    },
+    "metadata": {
+      "building": "Rosebank",
+      "building_id": "site-002",
+      "floor": 0,
+      "zone": "Roof",
+      "location": "Roof Plant Room",
+      "serves": "Banking hall and back office",
+      "safety_status": "safe",
+      "safety_note": "Operating normally"
+    }
+  },
+  {
+    "id": "002-split-001",
+    "name": "Rosebank AC-1 Banking Hall",
+    "device_type": "hvac",
+    "protocol": "mock",
+    "hvac_type": "split_unit",
+    "manufacturer": "Samsung",
+    "model": "AR24TXHQASIN",
+    "capacity": 7,
+    "points": {
+      "room_temp": {
+        "name": "room_temp",
+        "point_type": "analog_input",
+        "description": "Room temperature",
+        "unit": "°C",
+        "min_value": 16.0,
+        "max_value": 32.0,
+        "default_value": 23.0,
+        "writable": false
+      },
+      "setpoint": {
+        "name": "setpoint",
+        "point_type": "analog_value",
+        "description": "Temperature setpoint",
+        "unit": "°C",
+        "min_value": 18.0,
+        "max_value": 28.0,
+        "default_value": 22.0,
+        "writable": true
+      },
+      "mode": {
+        "name": "mode",
+        "point_type": "multistate_value",
+        "description": "Operating mode",
+        "unit": "",
+        "default_value": 1,
+        "writable": true,
+        "metadata": {
+          "states": {
+            "0": "off",
+            "1": "cooling",
+            "2": "heating",
+            "3": "fan_only",
+            "4": "auto"
+          }
+        }
+      },
+      "fan_speed": {
+        "name": "fan_speed",
+        "point_type": "multistate_value",
+        "description": "Fan speed",
+        "unit": "",
+        "default_value": 4,
+        "writable": true,
+        "metadata": {
+          "states": {
+            "1": "low",
+            "2": "medium",
+            "3": "high",
+            "4": "auto"
+          }
+        }
+      }
+    },
+    "metadata": {
+      "building": "Rosebank",
+      "building_id": "site-002",
+      "floor": 1,
+      "zone": "Banking Hall",
+      "location": "Banking Hall",
+      "serves": "Customer banking area",
+      "safety_status": "safe",
+      "safety_note": "Customer comfort area"
+    }
+  },
+  {
+    "id": "006-ahu-001",
+    "name": "V&A AHU-1",
+    "device_type": "hvac",
+    "protocol": "mock",
+    "hvac_type": "ahu",
+    "manufacturer": "Carrier",
+    "model": "39M-65",
+    "capacity": 65,
+    "efficiency": 2.8,
+    "points": {
+      "supply_air_temp": {
+        "name": "supply_air_temp",
+        "point_type": "analog_input",
+        "description": "Supply air temperature",
+        "unit": "°C",
+        "min_value": 12.0,
+        "max_value": 25.0,
+        "default_value": 15.5,
+        "writable": false
+      },
+      "return_air_temp": {
+        "name": "return_air_temp",
+        "point_type": "analog_input",
+        "description": "Return air temperature",
+        "unit": "°C",
+        "min_value": 18.0,
+        "max_value": 30.0,
+        "default_value": 22.0,
+        "writable": false
+      },
+      "fan_status": {
+        "name": "fan_status",
+        "point_type": "binary_value",
+        "description": "Fan on/off status",
+        "unit": "",
+        "default_value": true,
+        "writable": true
+      },
+      "fan_speed": {
+        "name": "fan_speed",
+        "point_type": "analog_value",
+        "description": "Fan speed percentage",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 72,
+        "writable": true
+      },
+      "damper_position": {
+        "name": "damper_position",
+        "point_type": "analog_value",
+        "description": "Outside air damper position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 35,
+        "writable": true
+      },
+      "filter_pressure": {
+        "name": "filter_pressure",
+        "point_type": "analog_input",
+        "description": "Filter differential pressure",
+        "unit": "Pa",
+        "min_value": 0,
+        "max_value": 350,
+        "default_value": 180,
+        "writable": false
+      }
+    },
+    "metadata": {
+      "building": "V&A Waterfront",
+      "building_id": "site-006",
+      "floor": 0,
+      "zone": "Roof",
+      "location": "Roof Plant Room",
+      "serves": "Both floors",
+      "safety_status": "safe",
+      "safety_note": "Operating normally"
+    }
+  },
+  {
+    "id": "006-chiller-001",
+    "name": "V&A Chiller CH-1",
+    "device_type": "hvac",
+    "protocol": "mock",
+    "hvac_type": "chiller",
+    "manufacturer": "York",
+    "model": "YLAA0180HE",
+    "capacity": 180,
+    "efficiency": 3.2,
+    "points": {
+      "chw_supply_temp": {
+        "name": "chw_supply_temp",
+        "point_type": "analog_input",
+        "description": "Chilled water supply temperature",
+        "unit": "°C",
+        "min_value": 4.0,
+        "max_value": 15.0,
+        "default_value": 7.2,
+        "writable": false
+      },
+      "chw_return_temp": {
+        "name": "chw_return_temp",
+        "point_type": "analog_input",
+        "description": "Chilled water return temperature",
+        "unit": "°C",
+        "min_value": 8.0,
+        "max_value": 20.0,
+        "default_value": 12.5,
+        "writable": false
+      },
+      "chw_setpoint": {
+        "name": "chw_setpoint",
+        "point_type": "analog_value",
+        "description": "Chilled water setpoint temperature",
+        "unit": "°C",
+        "min_value": 5.0,
+        "max_value": 12.0,
+        "default_value": 7.0,
+        "writable": true
+      },
+      "chiller_status": {
+        "name": "chiller_status",
+        "point_type": "multistate_value",
+        "description": "Chiller operational status",
+        "unit": "",
+        "default_value": 1,
+        "writable": true,
+        "metadata": {
+          "states": {
+            "0": "off",
+            "1": "running",
+            "2": "alarm",
+            "3": "maintenance"
+          }
+        }
+      },
+      "compressor_amps": {
+        "name": "compressor_amps",
+        "point_type": "analog_input",
+        "description": "Compressor current draw",
+        "unit": "A",
+        "min_value": 0,
+        "max_value": 250,
+        "default_value": 120,
+        "writable": false
+      }
+    },
+    "metadata": {
+      "building": "V&A Waterfront",
+      "building_id": "site-006",
+      "floor": -1,
+      "zone": "Plant Room",
+      "location": "Basement Plant Room",
+      "serves": "Entire building chilled water",
+      "critical": true,
+      "safety_status": "warning",
+      "safety_note": "Health score 68% - schedule maintenance"
+    }
+  },
+  {
+    "id": "006-fcu-001",
+    "name": "V&A FCU Floor 1",
+    "device_type": "hvac",
+    "protocol": "mock",
+    "hvac_type": "fcu",
+    "manufacturer": "Trane",
+    "model": "WCVF-08",
+    "capacity": 8,
+    "points": {
+      "room_temp": {
+        "name": "room_temp",
+        "point_type": "analog_input",
+        "description": "Room temperature",
+        "unit": "°C",
+        "min_value": 16.0,
+        "max_value": 32.0,
+        "default_value": 21.5,
+        "writable": false
+      },
+      "setpoint": {
+        "name": "setpoint",
+        "point_type": "analog_value",
+        "description": "Temperature setpoint",
+        "unit": "°C",
+        "min_value": 18.0,
+        "max_value": 26.0,
+        "default_value": 22.0,
+        "writable": true
+      },
+      "fan_speed": {
+        "name": "fan_speed",
+        "point_type": "multistate_value",
+        "description": "Fan speed setting",
+        "unit": "",
+        "default_value": 2,
+        "writable": true,
+        "metadata": {
+          "states": {
+            "0": "off",
+            "1": "low",
+            "2": "medium",
+            "3": "high",
+            "4": "auto"
+          }
+        }
+      },
+      "valve_position": {
+        "name": "valve_position",
+        "point_type": "analog_value",
+        "description": "Chilled water valve position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 55,
+        "writable": true
+      }
+    },
+    "metadata": {
+      "building": "V&A Waterfront",
+      "building_id": "site-006",
+      "floor": 1,
+      "zone": "Floor 1",
+      "location": "Floor 1 Open Plan",
+      "serves": "Floor 1 office area",
+      "safety_status": "safe",
+      "safety_note": "Room at comfort temperature"
+    }
+  },
+  {
+    "id": "011-ahu-001",
+    "name": "Umhlanga AHU-1",
+    "device_type": "hvac",
+    "protocol": "mock",
+    "hvac_type": "ahu",
+    "manufacturer": "Carrier",
+    "model": "39M-55",
+    "capacity": 55,
+    "efficiency": 2.9,
+    "points": {
+      "supply_air_temp": {
+        "name": "supply_air_temp",
+        "point_type": "analog_input",
+        "description": "Supply air temperature",
+        "unit": "°C",
+        "min_value": 12.0,
+        "max_value": 25.0,
+        "default_value": 16.5,
+        "writable": false
+      },
+      "return_air_temp": {
+        "name": "return_air_temp",
+        "point_type": "analog_input",
+        "description": "Return air temperature",
+        "unit": "°C",
+        "min_value": 18.0,
+        "max_value": 30.0,
+        "default_value": 24.5,
+        "writable": false
+      },
+      "fan_status": {
+        "name": "fan_status",
+        "point_type": "binary_value",
+        "description": "Fan on/off status",
+        "unit": "",
+        "default_value": true,
+        "writable": true
+      },
+      "fan_speed": {
+        "name": "fan_speed",
+        "point_type": "analog_value",
+        "description": "Fan speed percentage",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 78,
+        "writable": true
+      },
+      "damper_position": {
+        "name": "damper_position",
+        "point_type": "analog_value",
+        "description": "Outside air damper position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 40,
+        "writable": true
+      },
+      "filter_pressure": {
+        "name": "filter_pressure",
+        "point_type": "analog_input",
+        "description": "Filter differential pressure",
+        "unit": "Pa",
+        "min_value": 0,
+        "max_value": 350,
+        "default_value": 110,
+        "writable": false
+      }
+    },
+    "metadata": {
+      "building": "Umhlanga Ridge",
+      "building_id": "site-011",
+      "floor": 0,
+      "zone": "Roof",
+      "location": "Roof Plant Room",
+      "serves": "Both floors",
+      "safety_status": "safe",
+      "safety_note": "Operating normally - KZN humidity managed"
+    }
+  },
+  {
+    "id": "011-chiller-001",
+    "name": "Umhlanga Chiller CH-1",
+    "device_type": "hvac",
+    "protocol": "mock",
+    "hvac_type": "chiller",
+    "manufacturer": "York",
+    "model": "YLAA0150HE",
+    "capacity": 150,
+    "efficiency": 3.3,
+    "points": {
+      "chw_supply_temp": {
+        "name": "chw_supply_temp",
+        "point_type": "analog_input",
+        "description": "Chilled water supply temperature",
+        "unit": "°C",
+        "min_value": 4.0,
+        "max_value": 15.0,
+        "default_value": 6.5,
+        "writable": false
+      },
+      "chw_return_temp": {
+        "name": "chw_return_temp",
+        "point_type": "analog_input",
+        "description": "Chilled water return temperature",
+        "unit": "°C",
+        "min_value": 8.0,
+        "max_value": 20.0,
+        "default_value": 11.8,
+        "writable": false
+      },
+      "chw_setpoint": {
+        "name": "chw_setpoint",
+        "point_type": "analog_value",
+        "description": "Chilled water setpoint temperature",
+        "unit": "°C",
+        "min_value": 5.0,
+        "max_value": 12.0,
+        "default_value": 6.5,
+        "writable": true
+      },
+      "chiller_status": {
+        "name": "chiller_status",
+        "point_type": "multistate_value",
+        "description": "Chiller operational status",
+        "unit": "",
+        "default_value": 1,
+        "writable": true,
+        "metadata": {
+          "states": {
+            "0": "off",
+            "1": "running",
+            "2": "alarm",
+            "3": "maintenance"
+          }
+        }
+      },
+      "compressor_amps": {
+        "name": "compressor_amps",
+        "point_type": "analog_input",
+        "description": "Compressor current draw",
+        "unit": "A",
+        "min_value": 0,
+        "max_value": 200,
+        "default_value": 95,
+        "writable": false
+      }
+    },
+    "metadata": {
+      "building": "Umhlanga Ridge",
+      "building_id": "site-011",
+      "floor": -1,
+      "zone": "Plant Room",
+      "location": "Basement Plant Room",
+      "serves": "Entire building chilled water",
+      "critical": true,
+      "safety_status": "safe",
+      "safety_note": "Running lower setpoint for KZN humidity control"
+    }
+  },
+  {
+    "id": "011-fcu-001",
+    "name": "Umhlanga FCU Floor 1",
+    "device_type": "hvac",
+    "protocol": "mock",
+    "hvac_type": "fcu",
+    "manufacturer": "Trane",
+    "model": "WCVF-08",
+    "capacity": 8,
+    "points": {
+      "room_temp": {
+        "name": "room_temp",
+        "point_type": "analog_input",
+        "description": "Room temperature",
+        "unit": "°C",
+        "min_value": 16.0,
+        "max_value": 32.0,
+        "default_value": 23.5,
+        "writable": false
+      },
+      "setpoint": {
+        "name": "setpoint",
+        "point_type": "analog_value",
+        "description": "Temperature setpoint",
+        "unit": "°C",
+        "min_value": 18.0,
+        "max_value": 26.0,
+        "default_value": 23.0,
+        "writable": true
+      },
+      "fan_speed": {
+        "name": "fan_speed",
+        "point_type": "multistate_value",
+        "description": "Fan speed setting",
+        "unit": "",
+        "default_value": 3,
+        "writable": true,
+        "metadata": {
+          "states": {
+            "0": "off",
+            "1": "low",
+            "2": "medium",
+            "3": "high",
+            "4": "auto"
+          }
+        }
+      },
+      "valve_position": {
+        "name": "valve_position",
+        "point_type": "analog_value",
+        "description": "Chilled water valve position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 70,
+        "writable": true
+      }
+    },
+    "metadata": {
+      "building": "Umhlanga Ridge",
+      "building_id": "site-011",
+      "floor": 1,
+      "zone": "Floor 1",
+      "location": "Floor 1 Open Plan",
+      "serves": "Floor 1 office area",
+      "safety_status": "safe",
+      "safety_note": "Higher fan speed for humidity control"
+    }
+  },
+  {
+    "id": "011-fcu-002",
+    "name": "Umhlanga FCU Floor 2",
+    "device_type": "hvac",
+    "protocol": "mock",
+    "hvac_type": "fcu",
+    "manufacturer": "Trane",
+    "model": "WCVF-08",
+    "capacity": 8,
+    "points": {
+      "room_temp": {
+        "name": "room_temp",
+        "point_type": "analog_input",
+        "description": "Room temperature",
+        "unit": "°C",
+        "min_value": 16.0,
+        "max_value": 32.0,
+        "default_value": 24.0,
+        "writable": false
+      },
+      "setpoint": {
+        "name": "setpoint",
+        "point_type": "analog_value",
+        "description": "Temperature setpoint",
+        "unit": "°C",
+        "min_value": 18.0,
+        "max_value": 26.0,
+        "default_value": 23.0,
+        "writable": true
+      },
+      "fan_speed": {
+        "name": "fan_speed",
+        "point_type": "multistate_value",
+        "description": "Fan speed setting",
+        "unit": "",
+        "default_value": 3,
+        "writable": true,
+        "metadata": {
+          "states": {
+            "0": "off",
+            "1": "low",
+            "2": "medium",
+            "3": "high",
+            "4": "auto"
+          }
+        }
+      },
+      "valve_position": {
+        "name": "valve_position",
+        "point_type": "analog_value",
+        "description": "Chilled water valve position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 75,
+        "writable": true
+      }
+    },
+    "metadata": {
+      "building": "Umhlanga Ridge",
+      "building_id": "site-011",
+      "floor": 2,
+      "zone": "Floor 2",
+      "location": "Floor 2 Open Plan",
+      "serves": "Floor 2 office area",
+      "safety_status": "safe",
+      "safety_note": "Slightly warmer - upper floor heat gain"
+    }
   }
 ]

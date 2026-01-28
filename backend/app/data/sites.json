@@ -17,6 +17,8 @@
     "longitude": 28.0567,
     "contact_email": "sandton.facilities@gmail.com",
     "contact_phone": "+27 11 350 4000",
+    "control_enabled": true,
+    "control_note": "Remote control enabled 2026-01-28 - AHU, Chiller, FCU, Zone Controller",
     "optimization_enabled": true,
     "optimization_status": "warning",
     "optimization_settings": {
@@ -144,6 +146,8 @@
     "longitude": 28.0436,
     "contact_email": "rosebank.facilities@gmail.com",
     "contact_phone": "+27 11 788 4500",
+    "control_enabled": true,
+    "control_note": "Remote control enabled 2026-01-28 - AHU, Split unit",
     "optimization_enabled": true,
     "optimization_status": "unknown",
     "optimization_settings": {
@@ -172,15 +176,17 @@
     "longitude": 28.2754,
     "contact_email": "menlyn.facilities@gmail.com",
     "contact_phone": "+27 12 348 2000",
-    "optimization_enabled": false,
-    "optimization_status": "unknown",
+    "optimization_enabled": true,
+    "optimization_status": "active",
     "optimization_settings": {
       "mode": "supervised",
-      "last_analysis": null,
+      "last_analysis": "2026-01-28T18:00:00.000000",
       "analysis_interval_minutes": 15
     },
     "last_optimization": null,
-    "optimization_history": []
+    "optimization_history": [],
+    "control_enabled": true,
+    "control_note": "Remote control enabled 2026-01-28 - FCUs, AHU, Chiller"
   },
   {
     "id": "site-004",
@@ -256,6 +262,8 @@
     "longitude": 18.4205,
     "contact_email": "waterfront.facilities@gmail.com",
     "contact_phone": "+27 21 405 3000",
+    "control_enabled": true,
+    "control_note": "Remote control enabled 2026-01-28 - AHU, Chiller, FCU",
     "optimization_enabled": true,
     "optimization_status": "unknown",
     "optimization_settings": {
@@ -396,6 +404,8 @@
     "longitude": 31.0678,
     "contact_email": "umhlanga.facilities@gmail.com",
     "contact_phone": "+27 31 566 3000",
+    "control_enabled": true,
+    "control_note": "Remote control enabled 2026-01-28 - AHU, Chiller, FCU x2",
     "optimization_enabled": true,
     "optimization_status": "unknown",
     "optimization_settings": {
