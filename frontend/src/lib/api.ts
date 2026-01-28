@@ -6,7 +6,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || "";
 
 // ============= Response Interfaces =============
 
-interface HealthResponse {
+export interface HealthResponse {
   status: string;
   version: string;
 }
@@ -114,6 +114,7 @@ export interface Device {
   id: string;
   name: string;
   device_type: string;
+  type?: string; // Alias for device_type for backward compatibility
   protocol: string;
   location: string;
   site_id: string;
@@ -122,6 +123,11 @@ export interface Device {
   model?: string;
   points: Record<string, DevicePoint>;
   metadata?: Record<string, any>;
+  // Status properties
+  status?: "online" | "offline" | "maintenance";
+  safety_status?: "safe" | "warning" | "critical" | "unknown";
+  last_communication?: string; // ISO timestamp
+  current_value?: number;
 }
 
 // Device value interface
@@ -154,6 +160,21 @@ export interface DeviceStatus {
 }
 
 // ============= Audit Interfaces =============
+
+// Audit entry interface (for RecentActions component)
+export interface AuditEntry {
+  id: string;
+  timestamp: string;
+  device_id: string;
+  device_name: string;
+  action: string;
+  point: string;
+  old_value: any;
+  new_value: any;
+  user: string;
+  success: boolean;
+  message?: string;
+}
 
 // Audit log entry interface
 export interface AuditLogEntryResponse {
@@ -414,6 +435,20 @@ export interface DashboardStats {
   uptime_percent: number;
 }
 
+// Health thresholds interface
+export interface HealthThresholds {
+  healthy: number;
+  warning: number;
+  critical: number;
+}
+
+// Settings interface
+export interface Settings {
+  healthThresholds: HealthThresholds;
+  notifications: Record<string, any>;
+  display: Record<string, any>;
+}
+
 // Energy data point interface
 export interface EnergyDataPoint {
   date: string;
@@ -514,8 +549,15 @@ async function fetchApi<T>(
   });
 
   if (!response.ok) {
+    let errorMessage = response.statusText;
+    try {
+      const errorData = await response.json();
+      errorMessage = errorData.detail || errorData.message || JSON.stringify(errorData);
+    } catch {
+      // If response isn't JSON, use statusText
+    }
     const error: ApiError = {
-      message: `API Error: ${response.statusText}`,
+      message: `API Error: ${errorMessage}`,
       status: response.status,
     };
     throw error;
@@ -827,12 +869,29 @@ export const api = {
     recommendationId: string,
     setpointsToApply: Array<{ equipment_id: string; point: string; value: number }>
   ): Promise<{ success: boolean; results: any[] }> {
+    // Validate setpoints array is not empty
+    if (!setpointsToApply || setpointsToApply.length === 0) {
+      throw new Error("Cannot approve optimization: no setpoints to apply");
+    }
+    
+    // Map frontend field names to backend expected field names
+    const mappedSetpoints = setpointsToApply.map(sp => {
+      if (!sp.equipment_id || !sp.point || sp.value === undefined) {
+        throw new Error(`Invalid setpoint: missing required fields (equipment_id: ${sp.equipment_id}, point: ${sp.point}, value: ${sp.value})`);
+      }
+      return {
+        device_id: sp.equipment_id,
+        point_name: sp.point,
+        value: sp.value,
+      };
+    });
+    
     return fetchApi(`/api/optimization/approve`, {
       method: "POST",
       body: JSON.stringify({
         site_id: siteId,
         recommendation_id: recommendationId,
-        setpoints_to_apply: setpointsToApply,
+        setpoints_to_apply: mappedSetpoints,
       }),
     });
   },
@@ -873,8 +932,8 @@ export const api = {
    * @param reason - Optional rejection reason
    */
   async rejectOptimization(
-    siteId: string,
-    recommendationId: string,
+    _siteId: string,
+    _recommendationId: string,
     reason?: string
   ): Promise<{ success: boolean; message: string }> {
     // Note: This endpoint doesn't exist in backend yet
@@ -910,8 +969,8 @@ export const api = {
    * @param deferMinutes - Minutes to defer (default: 15)
    */
   async deferOptimization(
-    siteId: string,
-    recommendationId: string,
+    _siteId: string,
+    _recommendationId: string,
     deferMinutes: number = 15
   ): Promise<{ success: boolean; message: string; deferUntil: string }> {
     // Note: This endpoint doesn't exist in backend yet
@@ -1100,6 +1159,37 @@ export const api = {
   },
 
   /**
+   * Get recent audit logs for inline display (RecentActions component)
+   * @param limit - Maximum number of entries to return (default: 10)
+   * @param deviceId - Optional filter by device ID
+   */
+  async getRecentAuditLogs(limit: number = 10, deviceId?: string): Promise<AuditEntry[]> {
+    const params = new URLSearchParams();
+    params.append("page", "1");
+    params.append("page_size", limit.toString());
+    if (deviceId) {
+      params.append("device_id", deviceId);
+    }
+
+    const response = await fetchApi<AuditLogsResponse>(`/api/audit/logs?${params.toString()}`);
+
+    // Transform AuditLogEntryResponse to AuditEntry for RecentActions component
+    return response.entries.map((entry) => ({
+      id: entry.id,
+      timestamp: typeof entry.timestamp === 'string' ? entry.timestamp : new Date(entry.timestamp).toISOString(),
+      device_id: entry.device_id || "unknown",
+      device_name: entry.metadata?.device_name || entry.device_id || "Unknown Device",
+      action: entry.action,
+      point: entry.point_name || "",
+      old_value: entry.old_value,
+      new_value: entry.new_value,
+      user: entry.user,
+      success: entry.result === "success",
+      message: entry.error_message,
+    }));
+  },
+
+  /**
    * Get safety status for a specific device
    * @param deviceId - Device ID
    */
@@ -1113,6 +1203,44 @@ export const api = {
    */
   async getDeviceFullSafetyStatus(deviceId: string): Promise<DeviceSafetyStatus> {
     return fetchApi<DeviceSafetyStatus>(`/api/devices/${deviceId}/safety-status`);
+  },
+
+  // ============= Settings API Methods =============
+
+  /**
+   * Get all settings
+   */
+  async getSettings(): Promise<Settings> {
+    return fetchApi<Settings>("/api/settings");
+  },
+
+  /**
+   * Update all settings
+   * @param settingsData - Settings object to update
+   */
+  async updateSettings(settingsData: Partial<Settings>): Promise<Settings> {
+    return fetchApi<Settings>("/api/settings", {
+      method: "PUT",
+      body: JSON.stringify(settingsData),
+    });
+  },
+
+  /**
+   * Get health score thresholds
+   */
+  async getHealthThresholds(): Promise<HealthThresholds> {
+    return fetchApi<HealthThresholds>("/api/settings/health-thresholds");
+  },
+
+  /**
+   * Update health score thresholds
+   * @param thresholds - Threshold values to update
+   */
+  async updateHealthThresholds(thresholds: HealthThresholds): Promise<HealthThresholds> {
+    return fetchApi<HealthThresholds>("/api/settings/health-thresholds", {
+      method: "PUT",
+      body: JSON.stringify(thresholds),
+    });
   },
 };
 
