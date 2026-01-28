@@ -1,21 +1,14 @@
 [
   {
-    "id": "chiller-gateway-01",
+    "id": "001-chiller-001",
     "name": "Gateway Chiller",
     "device_type": "hvac",
     "protocol": "mock",
-    "location": "Basement Plant Room",
-    "site_id": "fnb-gateway",
-    "description": "Main chiller for Gateway building, 21 years old",
+    "hvac_type": "chiller",
     "manufacturer": "Trane",
     "model": "RTAC 200",
-    "hvac_type": "chiller",
     "capacity": 200,
     "efficiency": 3.5,
-    "setpoints": {
-      "leaving_water_temp": 7.0,
-      "entering_water_temp": 12.0
-    },
     "points": {
       "supply_temp": {
         "name": "supply_temp",
@@ -58,9 +51,9 @@
         "point_type": "analog_value",
         "description": "Chilled water setpoint temperature",
         "unit": "°C",
-        "min_value": 5.0,
-        "max_value": 10.0,
-        "default_value": 7.0,
+        "min_value": 18.0,
+        "max_value": 28.0,
+        "default_value": 22.0,
         "writable": true,
         "priority": 10
       },
@@ -76,22 +69,28 @@
       }
     },
     "metadata": {
+      "building": "Gateway Theatre",
+      "building_id": "fnb-gateway",
+      "floor": -1,
+      "zone": "Plant Room",
+      "location": "Basement Plant Room",
+      "serves": "Entire building chilled water loop",
       "critical": true,
       "safety_device": true,
-      "maintenance_due": "2026-02-15"
+      "maintenance_due": "2026-02-15",
+      "asset_age_years": 21,
+      "safety_status": "safe",
+      "safety_note": "Operating near upper limit of comfort range"
     }
   },
   {
-    "id": "ahu-level3-01",
+    "id": "001-ahu-001",
     "name": "Level 3 AHU",
     "device_type": "hvac",
     "protocol": "mock",
-    "location": "Level 3 Plant Room",
-    "site_id": "fnb-gateway",
-    "description": "Air handling unit serving executive offices",
+    "hvac_type": "ahu",
     "manufacturer": "Carrier",
     "model": "39ER",
-    "hvac_type": "ahu",
     "capacity": 50,
     "efficiency": 2.8,
     "points": {
@@ -112,7 +111,7 @@
         "unit": "°C",
         "min_value": 20.0,
         "max_value": 30.0,
-        "default_value": 23.5,
+        "default_value": 24.5,
         "writable": false
       },
       "fan_status": {
@@ -139,30 +138,104 @@
         "description": "Filter differential pressure",
         "unit": "Pa",
         "min_value": 0,
-        "max_value": 250,
-        "default_value": 85,
+        "max_value": 350,
+        "default_value": 250,
         "writable": false,
         "metadata": {
-          "alarm_threshold": 200
+          "alarm_threshold": 200,
+          "critical_threshold": 300
         }
       }
     },
     "metadata": {
-      "zone": "executive",
-      "occupancy_schedule": "08:00-18:00"
+      "building": "Gateway Theatre",
+      "building_id": "fnb-gateway",
+      "floor": 3,
+      "zone": "Executive Wing",
+      "location": "Level 3 Plant Room",
+      "serves": "Executive offices, CTO office, boardroom",
+      "occupancy_schedule": "08:00-18:00",
+      "safety_status": "warning",
+      "safety_note": "Filter pressure 250 Pa exceeds warning threshold (200 Pa) - schedule filter replacement"
     }
   },
   {
-    "id": "lighting-lobby-01",
+    "id": "001-vav-001",
+    "name": "Office VAV - CTO Suite",
+    "device_type": "hvac",
+    "protocol": "mock",
+    "hvac_type": "vav",
+    "manufacturer": "Titus",
+    "model": "VAV-EC",
+    "capacity": 1.2,
+    "points": {
+      "room_temp": {
+        "name": "room_temp",
+        "point_type": "analog_input",
+        "description": "Room temperature",
+        "unit": "°C",
+        "min_value": 16.0,
+        "max_value": 32.0,
+        "default_value": 26.0,
+        "writable": false
+      },
+      "setpoint": {
+        "name": "setpoint",
+        "point_type": "analog_value",
+        "description": "Temperature setpoint",
+        "unit": "°C",
+        "min_value": 18.0,
+        "max_value": 26.0,
+        "default_value": 24.0,
+        "writable": true
+      },
+      "damper_position": {
+        "name": "damper_position",
+        "point_type": "analog_value",
+        "description": "Damper position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 85,
+        "writable": true
+      },
+      "occupancy": {
+        "name": "occupancy",
+        "point_type": "binary_input",
+        "description": "Occupancy sensor",
+        "unit": "",
+        "default_value": true,
+        "writable": false
+      },
+      "reheat_status": {
+        "name": "reheat_status",
+        "point_type": "binary_value",
+        "description": "Reheat coil status",
+        "unit": "",
+        "default_value": false,
+        "writable": true
+      }
+    },
+    "metadata": {
+      "building": "Gateway Theatre",
+      "building_id": "fnb-gateway",
+      "floor": 3,
+      "zone": "Executive Wing",
+      "location": "CTO Office Suite 301",
+      "serves": "CTO Office",
+      "occupant": "CTO",
+      "safety_status": "warning",
+      "safety_note": "Room temperature 26°C above comfort range (22-24°C) - adjust setpoint to restore comfort"
+    }
+  },
+  {
+    "id": "001-lighting-001",
     "name": "Lobby Lighting Panel",
     "device_type": "lighting",
     "protocol": "mock",
-    "location": "Ground Floor Lobby",
-    "site_id": "fnb-gateway",
-    "description": "Lighting control panel for main lobby area",
+    "lighting_type": "panel",
     "manufacturer": "Philips",
     "model": "Dynalite",
-    "lighting_type": "panel",
     "circuit_count": 8,
     "total_wattage": 3200,
     "dimmable": true,
@@ -215,24 +288,26 @@
       }
     },
     "metadata": {
+      "building": "Gateway Theatre",
+      "building_id": "fnb-gateway",
+      "floor": 0,
+      "zone": "Lobby",
+      "location": "Ground Floor Main Lobby",
+      "serves": "Main entrance, reception area",
       "emergency_circuit": true,
-      "schedule_enabled": true
+      "schedule_enabled": true,
+      "safety_status": "safe",
+      "safety_note": "All circuits operational, compliance audit trail active"
     }
   },
   {
-    "id": "security-main-entrance-01",
-    "name": "Main Entrance Access",
+    "id": "001-access-001",
+    "name": "Main Entrance Access Control",
     "device_type": "security",
     "protocol": "mock",
-    "location": "Ground Floor Main Entrance",
-    "site_id": "fnb-gateway",
-    "description": "Access control reader at main entrance",
+    "security_type": "reader",
     "manufacturer": "HID",
     "model": "iCLASS SE",
-    "security_type": "reader",
-    "zone": "entrance",
-    "armed": true,
-    "tamper_status": "normal",
     "points": {
       "door_status": {
         "name": "door_status",
@@ -278,18 +353,23 @@
       }
     },
     "metadata": {
+      "building": "Gateway Theatre",
+      "building_id": "fnb-gateway",
+      "floor": 0,
+      "zone": "Entrance",
+      "location": "Ground Floor Main Entrance",
+      "serves": "Primary building access",
       "critical_access": true,
-      "monitored_24_7": true
+      "monitored_24_7": true,
+      "safety_status": "safe",
+      "safety_note": "All access points operational, battery 92%"
     }
   },
   {
-    "id": "fire-pump-01",
+    "id": "001-firepump-001",
     "name": "Fire Pump Controller",
     "device_type": "fire_safety",
     "protocol": "mock",
-    "location": "Basement Fire Pump Room",
-    "site_id": "fnb-gateway",
-    "description": "Fire pump controller and monitoring",
     "manufacturer": "Grundfos",
     "model": "Hydro MPC",
     "points": {
@@ -348,74 +428,202 @@
       }
     },
     "metadata": {
+      "building": "Gateway Theatre",
+      "building_id": "fnb-gateway",
+      "floor": -1,
+      "zone": "Fire Systems",
+      "location": "Basement Fire Pump Room",
+      "serves": "Entire building fire suppression",
       "life_safety": true,
       "requires_weekly_test": true,
-      "last_test": "2026-01-20"
+      "last_test": "2026-01-20",
+      "safety_status": "safe",
+      "safety_note": "Life safety device - limited control access, weekly test required"
     }
   },
   {
-    "id": "vav-office-301",
-    "name": "Office 301 VAV",
+    "id": "001-hvac-zone-001",
+    "name": "Main Zone Controller - Floors 1-3",
     "device_type": "hvac",
     "protocol": "mock",
-    "location": "Level 3 Office 301",
-    "site_id": "fnb-gateway",
-    "description": "Variable air volume box for executive office",
-    "manufacturer": "Titus",
-    "model": "VAV-EC",
-    "hvac_type": "vav",
-    "capacity": 1.2,
+    "hvac_type": "zone_controller",
+    "manufacturer": "Johnson Controls",
+    "model": "FX-PC",
     "points": {
-      "room_temp": {
-        "name": "room_temp",
+      "zone_temp": {
+        "name": "zone_temp",
         "point_type": "analog_input",
-        "description": "Room temperature",
+        "description": "Average zone temperature",
         "unit": "°C",
         "min_value": 16.0,
-        "max_value": 28.0,
-        "default_value": 22.5,
+        "max_value": 30.0,
+        "default_value": 23.2,
         "writable": false
       },
-      "setpoint": {
-        "name": "setpoint",
+      "cooling_setpoint": {
+        "name": "cooling_setpoint",
         "point_type": "analog_value",
-        "description": "Temperature setpoint",
+        "description": "Cooling temperature setpoint",
         "unit": "°C",
-        "min_value": 18.0,
+        "min_value": 20.0,
         "max_value": 26.0,
-        "default_value": 22.0,
+        "default_value": 23.0,
         "writable": true
       },
-      "damper_position": {
-        "name": "damper_position",
+      "heating_setpoint": {
+        "name": "heating_setpoint",
         "point_type": "analog_value",
-        "description": "Damper position",
+        "description": "Heating temperature setpoint",
+        "unit": "°C",
+        "min_value": 18.0,
+        "max_value": 24.0,
+        "default_value": 20.0,
+        "writable": true
+      },
+      "humidity_setpoint": {
+        "name": "humidity_setpoint",
+        "point_type": "analog_value",
+        "description": "Humidity setpoint",
+        "unit": "%",
+        "min_value": 30.0,
+        "max_value": 65.0,
+        "default_value": 55.0,
+        "writable": true
+      },
+      "zone_humidity": {
+        "name": "zone_humidity",
+        "point_type": "analog_input",
+        "description": "Current zone humidity",
         "unit": "%",
         "min_value": 0,
         "max_value": 100,
-        "default_value": 65,
-        "writable": true
-      },
-      "occupancy": {
-        "name": "occupancy",
-        "point_type": "binary_input",
-        "description": "Occupancy sensor",
-        "unit": "",
-        "default_value": true,
+        "default_value": 52.0,
         "writable": false
       },
-      "reheat_status": {
-        "name": "reheat_status",
-        "point_type": "binary_value",
-        "description": "Reheat coil status",
+      "mode": {
+        "name": "mode",
+        "point_type": "multistate_value",
+        "description": "HVAC operating mode",
         "unit": "",
-        "default_value": false,
-        "writable": true
+        "default_value": 1,
+        "writable": true,
+        "metadata": {
+          "states": {
+            "0": "off",
+            "1": "cooling",
+            "2": "heating",
+            "3": "auto"
+          }
+        }
+      },
+      "occupancy_mode": {
+        "name": "occupancy_mode",
+        "point_type": "multistate_value",
+        "description": "Occupancy mode",
+        "unit": "",
+        "default_value": 1,
+        "writable": true,
+        "metadata": {
+          "states": {
+            "0": "unoccupied",
+            "1": "occupied",
+            "2": "standby"
+          }
+        }
       }
     },
     "metadata": {
-      "zone": "executive",
-      "occupant": "CTO"
+      "building": "Gateway Theatre",
+      "building_id": "fnb-gateway",
+      "floor": "1-3",
+      "zone": "Main Office Area",
+      "location": "BMS Room Level 2",
+      "serves": "Open plan offices, meeting rooms (Floors 1-3)",
+      "vav_boxes_controlled": 12,
+      "safety_status": "safe",
+      "safety_note": "Zone operating within comfort parameters"
+    }
+  },
+  {
+    "id": "001-chw-001",
+    "name": "Chilled Water System - Primary Loop",
+    "device_type": "hvac",
+    "protocol": "mock",
+    "hvac_type": "chw_system",
+    "manufacturer": "Grundfos",
+    "model": "TPE 100-200",
+    "points": {
+      "chw_supply_temp": {
+        "name": "chw_supply_temp",
+        "point_type": "analog_input",
+        "description": "Chilled water supply temperature",
+        "unit": "°C",
+        "min_value": 4.0,
+        "max_value": 15.0,
+        "default_value": 7.0,
+        "writable": false
+      },
+      "chw_return_temp": {
+        "name": "chw_return_temp",
+        "point_type": "analog_input",
+        "description": "Chilled water return temperature",
+        "unit": "°C",
+        "min_value": 8.0,
+        "max_value": 20.0,
+        "default_value": 12.0,
+        "writable": false
+      },
+      "supply_temp_setpoint": {
+        "name": "supply_temp_setpoint",
+        "point_type": "analog_value",
+        "description": "CHW supply temperature setpoint",
+        "unit": "°C",
+        "min_value": 5.0,
+        "max_value": 12.0,
+        "default_value": 7.0,
+        "writable": true
+      },
+      "pump_speed": {
+        "name": "pump_speed",
+        "point_type": "analog_value",
+        "description": "Primary pump speed",
+        "unit": "%",
+        "min_value": 20,
+        "max_value": 100,
+        "default_value": 75,
+        "writable": true
+      },
+      "differential_pressure": {
+        "name": "differential_pressure",
+        "point_type": "analog_input",
+        "description": "Loop differential pressure",
+        "unit": "kPa",
+        "min_value": 0,
+        "max_value": 200,
+        "default_value": 85,
+        "writable": false
+      },
+      "flow_rate": {
+        "name": "flow_rate",
+        "point_type": "analog_input",
+        "description": "Chilled water flow rate",
+        "unit": "L/s",
+        "min_value": 0,
+        "max_value": 50,
+        "default_value": 32.5,
+        "writable": false
+      }
+    },
+    "metadata": {
+      "building": "Gateway Theatre",
+      "building_id": "fnb-gateway",
+      "floor": -1,
+      "zone": "Plant Room",
+      "location": "Basement Plant Room",
+      "serves": "All AHUs and FCUs",
+      "chillers_connected": ["001-chiller-001"],
+      "safety_status": "safe",
+      "safety_note": "Primary loop operating normally, pump at 75% capacity"
     }
   }
 ]
