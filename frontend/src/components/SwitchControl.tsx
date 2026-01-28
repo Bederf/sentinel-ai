@@ -4,12 +4,13 @@
  * Features:
  * - Toggle switch for on/off control
  * - Visual feedback for state changes
+ * - Optimistic UI updates
  * - Grafana-style design
  *
  * Follows SENTINEL dark theme design.
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Power, PowerOff } from "lucide-react";
 
 interface SwitchControlProps {
@@ -28,13 +29,25 @@ export function SwitchControl({
   error = null,
 }: SwitchControlProps) {
   const [isAnimating, setIsAnimating] = useState(false);
+  // Optimistic local state - shows immediately, syncs with prop
+  const [displayValue, setDisplayValue] = useState(value);
 
-  // Handle toggle
+  // Sync with prop when it changes from parent
+  useEffect(() => {
+    setDisplayValue(value);
+  }, [value]);
+
+  // Handle toggle with optimistic update
   const handleToggle = () => {
     if (disabled) return;
 
     setIsAnimating(true);
-    const newValue = !value;
+    const newValue = !displayValue;
+
+    // Optimistic update - show new state immediately
+    setDisplayValue(newValue);
+
+    // Notify parent
     onChange(newValue);
 
     // Reset animation state
@@ -53,7 +66,7 @@ export function SwitchControl({
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          {value ? (
+          {displayValue ? (
             <Power
               className="h-4 w-4"
               style={{ color: "var(--color-sentinel-green)" }}
@@ -61,7 +74,7 @@ export function SwitchControl({
           ) : (
             <PowerOff
               className="h-4 w-4"
-              style={{ color: "var(--color-sentinel-text-disabled)" }}
+              style={{ color: "var(--color-sentinel-red)" }}
             />
           )}
           <span
@@ -103,9 +116,9 @@ export function SwitchControl({
           <span
             className="text-xs"
             style={{
-              color: value
+              color: displayValue
                 ? "var(--color-sentinel-text-disabled)"
-                : "var(--color-sentinel-text-primary)",
+                : "var(--color-sentinel-red)",
             }}
           >
             OFF
@@ -117,15 +130,15 @@ export function SwitchControl({
             disabled={disabled}
             className={`relative w-14 h-7 rounded-full transition-all duration-300 ${isAnimating ? "scale-105" : ""}`}
             style={{
-              background: value
+              background: displayValue
                 ? "var(--color-sentinel-green)"
-                : "var(--color-sentinel-border)",
+                : "var(--color-sentinel-red)",
               cursor: disabled ? "not-allowed" : "pointer",
             }}
           >
             {/* Toggle knob */}
             <div
-              className={`absolute top-1 w-5 h-5 rounded-full bg-white transition-all duration-300 ${value ? "left-8" : "left-1"}`}
+              className={`absolute top-1 w-5 h-5 rounded-full bg-white transition-all duration-300 ${displayValue ? "left-8" : "left-1"}`}
               style={{
                 boxShadow: "0 1px 3px rgba(0, 0, 0, 0.3)",
               }}
@@ -135,8 +148,8 @@ export function SwitchControl({
           <span
             className="text-xs"
             style={{
-              color: value
-                ? "var(--color-sentinel-text-primary)"
+              color: displayValue
+                ? "var(--color-sentinel-green)"
                 : "var(--color-sentinel-text-disabled)",
             }}
           >
@@ -148,15 +161,15 @@ export function SwitchControl({
         <div
           className="px-3 py-1 rounded text-xs font-medium"
           style={{
-            background: value
+            background: displayValue
               ? "rgba(16, 185, 129, 0.15)"
-              : "rgba(142, 142, 142, 0.15)",
-            color: value
+              : "rgba(220, 38, 38, 0.15)",
+            color: displayValue
               ? "var(--color-sentinel-green)"
-              : "var(--color-sentinel-text-disabled)",
+              : "var(--color-sentinel-red)",
           }}
         >
-          {value ? "ACTIVE" : "INACTIVE"}
+          {displayValue ? "ACTIVE" : "INACTIVE"}
         </div>
       </div>
 
@@ -166,7 +179,7 @@ export function SwitchControl({
           className="text-xs"
           style={{ color: "var(--color-sentinel-text-secondary)" }}
         >
-          {value
+          {displayValue
             ? "Device is currently active and running."
             : "Device is currently inactive or in standby mode."}
         </p>

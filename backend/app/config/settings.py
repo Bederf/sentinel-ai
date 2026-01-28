@@ -21,9 +21,19 @@ class Settings(BaseSettings):
     # Demo mode for pre-seeded responses
     demo_mode: bool = False
 
+    # Supabase settings
+    supabase_url: str = ""
+    supabase_key: str = ""
+    supabase_service_role_key: str = ""
+    use_json_storage: bool = False
+
+    # Database URL (for direct PostgreSQL access if needed)
+    database_url: str = ""
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
+        extra = "ignore"  # Ignore extra env vars not defined in Settings
 
 
 settings = Settings()

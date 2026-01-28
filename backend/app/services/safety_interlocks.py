@@ -17,6 +17,7 @@ from app.models.safety_rules import (
     RuntimeLimitRule, BrightnessLimitRule, CustomRule
 )
 from app.models.device import Device, DeviceType
+from app.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,15 @@ class SafetyEngine:
     def __init__(self):
         self.rules: Dict[str, SafetyRule] = {}
         self._initialized = False
+        self._repository = None
+
+    @property
+    def repository(self):
+        """Lazy load SafetyRulesRepository."""
+        if self._repository is None:
+            from app.database.repositories.safety_rules_repository import SafetyRulesRepository
+            self._repository = SafetyRulesRepository()
+        return self._repository
 
     async def initialize(self, rules_data: Optional[List[Dict[str, Any]]] = None) -> None:
         """Initialize safety engine with rules."""
@@ -43,19 +53,40 @@ class SafetyEngine:
             # Load from provided data
             for rule_data in rules_data:
                 await self.add_rule(rule_data)
-        elif SAFETY_RULES_FILE.exists():
-            # Load from file
-            await self.load_rules_from_file()
         else:
-            # Create default rules for demo
-            await self.create_demo_rules()
+            # Try to load from repository (Supabase or JSON fallback)
+            await self.load_rules_from_repository()
 
         self._initialized = True
         logger.info(f"SafetyEngine initialized with {len(self.rules)} rules")
 
-    async def load_rules_from_file(self) -> None:
-        """Load safety rules from JSON file."""
+    async def load_rules_from_repository(self) -> None:
+        """Load safety rules from repository (Supabase or JSON fallback)."""
         try:
+            rules_data = self.repository.get_all()
+
+            if not rules_data:
+                logger.info("No rules found in repository, creating demo rules")
+                await self.create_demo_rules()
+                return
+
+            for rule_data in rules_data:
+                await self.add_rule(rule_data)
+
+            logger.info(f"Loaded {len(rules_data)} safety rules from repository")
+        except Exception as e:
+            logger.error(f"Failed to load safety rules from repository: {e}")
+            # Try JSON file as fallback
+            await self.load_rules_from_file()
+
+    async def load_rules_from_file(self) -> None:
+        """Load safety rules from JSON file (fallback)."""
+        try:
+            if not SAFETY_RULES_FILE.exists():
+                logger.info("No safety rules file found, creating demo rules")
+                await self.create_demo_rules()
+                return
+
             with open(SAFETY_RULES_FILE) as f:
                 rules_data = json.load(f)
 
@@ -69,15 +100,18 @@ class SafetyEngine:
             await self.create_demo_rules()
 
     async def save_rules_to_file(self) -> bool:
-        """Save safety rules to JSON file."""
+        """Save safety rules to storage (repository and JSON file)."""
         try:
             rules_data = [rule.to_dict() for rule in self.rules.values()]
+
+            # Save to JSON file as backup
             with open(SAFETY_RULES_FILE, 'w') as f:
                 json.dump(rules_data, f, indent=2)
+
             logger.info(f"Saved {len(rules_data)} safety rules to {SAFETY_RULES_FILE}")
             return True
         except Exception as e:
-            logger.error(f"Failed to save safety rules to file: {e}")
+            logger.error(f"Failed to save safety rules: {e}")
             return False
 
     async def create_demo_rules(self) -> None:

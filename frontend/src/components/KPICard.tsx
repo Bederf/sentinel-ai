@@ -79,6 +79,8 @@ export function KPICard({
         background: "var(--color-sentinel-bg-panel)",
         border: "1px solid var(--color-sentinel-border)",
         transition: "all 0.15s ease",
+        minHeight: "140px", // Ensure minimum height
+        maxHeight: "180px", // Limit maximum height
       }}
       onClick={onClick}
     >
@@ -88,9 +90,9 @@ export function KPICard({
         style={{ background: accentColors[accentColor] }}
       />
 
-      <div className="p-4 pt-5">
+      <div className="p-4 pt-5 flex flex-col justify-between h-full">
         {/* Header row with icon */}
-        <div className="flex items-start justify-between mb-3">
+        <div className="flex items-start justify-between mb-3 flex-shrink-0">
           <span
             className="text-xs font-medium uppercase tracking-wider"
             style={{ color: "var(--color-sentinel-text-secondary)" }}
@@ -99,7 +101,7 @@ export function KPICard({
           </span>
           {icon && (
             <div
-              className="p-2 rounded"
+              className="p-1.5 rounded flex-shrink-0"
               style={{
                 background: `${accentColors[accentColor]}20`,
                 color: accentColors[accentColor],
@@ -112,7 +114,7 @@ export function KPICard({
 
         {/* Main metric value */}
         <div
-          className="text-3xl font-medium mb-2"
+          className="text-2xl font-medium mb-auto flex-shrink-0"
           style={{
             color: "var(--color-sentinel-text-primary)",
             fontVariantNumeric: "tabular-nums",
@@ -124,7 +126,7 @@ export function KPICard({
 
         {/* Delta indicator */}
         {delta !== undefined && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0">
             <div
               className="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium"
               style={{
@@ -163,7 +165,7 @@ export function KPICard({
         {/* Subtitle (alternative to delta) */}
         {subtitle && delta === undefined && (
           <span
-            className="text-xs"
+            className="text-xs flex-shrink-0"
             style={{ color: "var(--color-sentinel-text-secondary)" }}
           >
             {subtitle}

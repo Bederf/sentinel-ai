@@ -9,7 +9,6 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from app.services.claude_service import claude_service
-from app.services.command_executor import command_executor
 from app.services.demo_cache import DemoCache
 from app.services.work_order_service import work_order_service
 from app.config.settings import settings
@@ -35,12 +34,13 @@ class ChatMetadata(BaseModel):
     citations: list[str] | None = None
 
 
-async def generate_sse_stream(user_message: str) -> AsyncGenerator[str, None]:
+async def generate_sse_stream(user_message: str, use_tools: bool = True) -> AsyncGenerator[str, None]:
     """
     Generate SSE-formatted stream from Claude response.
 
     Args:
         user_message: The user's message to send to Claude
+        use_tools: Whether to enable tool calling for device control
 
     Yields:
         SSE-formatted data chunks
@@ -48,9 +48,16 @@ async def generate_sse_stream(user_message: str) -> AsyncGenerator[str, None]:
     messages = [{"role": "user", "content": user_message}]
 
     try:
-        async for chunk in claude_service.stream_response(messages):
-            # Format as SSE data
-            yield f"data: {chunk}\n\n"
+        if use_tools:
+            # Use tool-enabled streaming for device control capabilities
+            async for chunk in claude_service.stream_response_with_tools(messages):
+                # Format as SSE data
+                yield f"data: {chunk}\n\n"
+        else:
+            # Use regular streaming without tools
+            async for chunk in claude_service.stream_response(messages):
+                # Format as SSE data
+                yield f"data: {chunk}\n\n"
 
         # Send completion sentinel
         yield "data: [DONE]\n\n"
@@ -88,9 +95,10 @@ async def chat(request: ChatRequest) -> StreamingResponse:
     Chat with Claude AI using Server-Sent Events streaming.
 
     The endpoint intelligently routes messages:
-    1. Control commands (temperature, lighting, emergency) -> Execute and return result
-    2. Work order requests (equipment issues) -> Create work order and return confirmation
-    3. General questions -> Query Claude with building context
+    1. Work order requests (equipment issues) -> Create work order and return confirmation
+    2. General questions and device control -> Query Claude with building context and tool calling
+       - Claude can control devices via list_devices, get_device_details, control_device tools
+       - All device controls go through safety validation and are logged to audit trail
 
     The response is streamed as SSE with:
     - `data: <text chunk>` for each piece of the response
@@ -108,29 +116,7 @@ async def chat(request: ChatRequest) -> StreamingResponse:
     user_message = request.message.strip()
     logger.info(f"Chat request: conversation_id={request.conversation_id}, message={user_message[:50]}...")
 
-    # 1. Check for control commands
-    command = command_executor.parse_command(user_message)
-    if command:
-        logger.info(f"Detected command: {command['type']}")
-        result = await command_executor.execute_command(command)
-
-        if result.success:
-            response_message = f"{result.message}"
-        else:
-            response_message = f"Command failed: {result.message}"
-
-        return StreamingResponse(
-            generate_static_sse(response_message),
-            media_type="text/event-stream",
-            headers={
-                "Cache-Control": "no-cache",
-                "Connection": "keep-alive",
-                "X-Accel-Buffering": "no",
-                "X-Response-Type": "command_executed",
-            },
-        )
-
-    # 2. Check for work order requests
+    # 1. Check for work order requests
     wo_detection = work_order_service.detect_work_order_request(user_message)
     if wo_detection and wo_detection.get("detected"):
         logger.info(f"Detected work order request: {wo_detection}")
@@ -156,7 +142,7 @@ async def chat(request: ChatRequest) -> StreamingResponse:
             },
         )
 
-    # 3. Check demo cache if DEMO_MODE is enabled
+    # 2. Check demo cache if DEMO_MODE is enabled
     demo_mode = os.getenv("DEMO_MODE", "false").lower() == "true"
     if demo_mode:
         demo_cache = DemoCache()
@@ -189,7 +175,7 @@ async def chat(request: ChatRequest) -> StreamingResponse:
                 },
             )
 
-    # 4. Regular AI chat with building context
+    # 3. Regular AI chat with building context and tool calling
     if not claude_service.is_configured():
         raise HTTPException(
             status_code=503,
@@ -217,10 +203,11 @@ async def chat_status():
         "demo_mode": demo_mode,
         "model": settings.claude_model,
         "features": {
-            "control_commands": True,
+            "device_control": True,  # AI can control devices via tool calling
             "work_orders": True,
             "building_context": True,
             "demo_cache": demo_mode,
+            "tool_calling": True,  # Claude tool use enabled
         },
     }
 

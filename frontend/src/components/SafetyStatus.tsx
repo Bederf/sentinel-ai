@@ -1,21 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Title, Text, Badge, Button, Grid, Select, SelectItem } from '@tremor/react';
-import { SafetyIndicator, SafetyStatus } from './SafetyIndicator';
-import { fetchApi } from '../lib/api';
-
-interface DeviceSafetyStatus {
-  device_id: string;
-  device_name: string;
-  overall_status: SafetyStatus;
-  point_statuses: Record<string, {
-    value: any;
-    allowed: boolean;
-    warnings: string[];
-    alarms: string[];
-  }>;
-  active_rule_count: number;
-  last_check: string;
-}
+import { SafetyIndicator } from './SafetyIndicator';
+import type { SafetyStatus } from './SafetyIndicator';
+import api from '../lib/api';
+import type { DeviceSafetyStatus } from '../lib/api';
 
 interface SafetyStatusPanelProps {
   siteId?: string;
@@ -44,28 +32,12 @@ export const SafetyStatusPanel: React.FC<SafetyStatusPanelProps> = ({
       setError(null);
 
       // First, get all devices
-      let devicesUrl = '/api/devices';
-      const params = new URLSearchParams();
-
-      if (siteId) {
-        params.append('site_id', siteId);
-      }
-      if (deviceType) {
-        params.append('device_type', deviceType);
-      }
-
-      if (params.toString()) {
-        devicesUrl += `?${params.toString()}`;
-      }
-
-      const devices = await fetchApi<Array<{ id: string; name: string }>>(devicesUrl);
+      const devices = await api.getDevices(siteId, deviceType);
 
       // Fetch safety status for each device
       const statusPromises = devices.map(async (device) => {
         try {
-          const status = await fetchApi<DeviceSafetyStatus>(
-            `/api/devices/${device.id}/safety-status`
-          );
+          const status = await api.getDeviceFullSafetyStatus(device.id);
           return status;
         } catch (err) {
           console.error(`Failed to fetch safety status for device ${device.id}:`, err);
@@ -349,12 +321,10 @@ export const CompactSafetyStatus: React.FC<CompactSafetyStatusProps> = ({ classN
     const fetchStats = async () => {
       try {
         // For compact version, just get a summary
-        const devices = await fetchApi<Array<{ id: string }>>('/api/devices');
+        const devices = await api.getDevices();
         const statusPromises = devices.slice(0, 10).map(async (device) => {
           try {
-            const status = await fetchApi<DeviceSafetyStatus>(
-              `/api/devices/${device.id}/safety-status`
-            );
+            const status = await api.getDeviceFullSafetyStatus(device.id);
             return status.overall_status;
           } catch {
             return 'unknown' as SafetyStatus;

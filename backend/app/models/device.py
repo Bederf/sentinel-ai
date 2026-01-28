@@ -78,7 +78,10 @@ class DevicePoint:
             if self.max_value is not None and value > self.max_value:
                 return False
         elif self.point_type in [PointType.BINARY_INPUT, PointType.BINARY_OUTPUT, PointType.BINARY_VALUE]:
-            if not isinstance(value, bool):
+            # Accept both boolean and integer 0/1 values for binary points
+            if not isinstance(value, (bool, int)):
+                return False
+            if isinstance(value, int) and value not in [0, 1]:
                 return False
         elif self.point_type in [PointType.MULTISTATE_INPUT, PointType.MULTISTATE_OUTPUT, PointType.MULTISTATE_VALUE]:
             if not isinstance(value, int):
@@ -233,6 +236,18 @@ def create_device_from_dict(data: Dict[str, Any]) -> Device:
     data.setdefault("id", str(uuid.uuid4()))
     data.setdefault("protocol", ProtocolType.MOCK.value)
     data.setdefault("status", DeviceStatus.ONLINE.value)
+
+    # Extract site_id from metadata.building_id if not provided directly
+    if "site_id" not in data and "metadata" in data:
+        metadata = data.get("metadata", {})
+        if "building_id" in metadata:
+            data["site_id"] = metadata["building_id"]
+
+    # Also set location from metadata if not provided
+    if "location" not in data and "metadata" in data:
+        metadata = data.get("metadata", {})
+        if "location" in metadata:
+            data["location"] = metadata["location"]
 
     # Convert string enums to Enum instances
     if isinstance(data.get("device_type"), str):

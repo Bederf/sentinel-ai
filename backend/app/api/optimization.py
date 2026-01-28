@@ -416,7 +416,14 @@ async def approve_optimization(
         Success/failure result with details
     """
     try:
-        logger.info(f"Approving optimization for site {body.site_id}")
+        logger.info(f"Approving optimization for site {body.site_id}, recommendation {body.recommendation_id}, setpoints: {len(body.setpoints_to_apply)}")
+        
+        # Validate setpoints array is not empty
+        if not body.setpoints_to_apply:
+            raise HTTPException(
+                status_code=422,
+                detail="setpoints_to_apply cannot be empty"
+            )
 
         # Extract user from headers
         user = request.headers.get("X-User-Id", "operator")

@@ -16,7 +16,6 @@ import {
   Settings as SettingsIcon,
   CheckCircle2,
   AlertTriangle,
-  XCircle,
   RefreshCw,
   Filter,
   ChevronRight,
@@ -25,7 +24,7 @@ import {
   DollarSign,
   Clock,
 } from "lucide-react";
-import api, { type Site, type OptimizationHistoryEntry } from "../lib/api";
+import api, { type Site } from "../lib/api";
 import { OptimizationStatusBadge, type OptimizationStatus } from "./OptimizationStatusBadge";
 import { OptimizationToggle } from "./OptimizationToggle";
 
@@ -87,7 +86,9 @@ export function OptimizationSettings({
   const [refreshing, setRefreshing] = useState(false);
   const [filterMode, setFilterMode] = useState<FilterMode>("all");
   const [expandedSite, setExpandedSite] = useState<string | null>(null);
-  const [showBulkConfirm, setShowBulkConfirm] = useState<"enable" | "disable" | null>(null);
+  // Reserved for future bulk operations
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [, setShowBulkConfirm] = useState<"enable" | "disable" | null>(null);
   const [stats, setStats] = useState({
     totalSites: 0,
     optimizedSites: 0,
@@ -221,50 +222,51 @@ export function OptimizationSettings({
 
   /**
    * Handle bulk enable/disable
+   * Reserved for future implementation
    */
-  const handleBulkAction = async (action: "enable" | "disable") => {
-    const sitesToUpdate = sites.filter((site) =>
-      action === "enable" ? !site.optimization_enabled : site.optimization_enabled
-    );
-
-    if (sitesToUpdate.length === 0) {
-      alert(`No sites to ${action}`);
-      setShowBulkConfirm(null);
-      return;
-    }
-
-    if (!confirm(`Are you sure you want to ${action} optimization for ${sitesToUpdate.length} sites?`)) {
-      return;
-    }
-
-    try {
-      for (const site of sitesToUpdate) {
-        await api.toggleOptimization(site.id, action === "enable");
-      }
-
-      // Update local state
-      setSites((prev) =>
-        prev.map((site) =>
-          sitesToUpdate.some((s) => s.id === site.id)
-            ? { ...site, optimization_enabled: action === "enable" }
-            : site
-        )
-      );
-
-      // Refresh optimization statuses
-      await fetchOptimizationStatuses();
-
-      // Notify parent
-      if (onSettingsChange) {
-        onSettingsChange();
-      }
-
-      setShowBulkConfirm(null);
-    } catch (err) {
-      console.error(`Failed to bulk ${action}:`, err);
-      alert(err instanceof Error ? err.message : `Failed to ${action} optimization`);
-    }
-  };
+  // const handleBulkAction = async (action: "enable" | "disable") => {
+  //   const sitesToUpdate = sites.filter((site) =>
+  //     action === "enable" ? !site.optimization_enabled : site.optimization_enabled
+  //   );
+  //
+  //   if (sitesToUpdate.length === 0) {
+  //     alert(`No sites to ${action}`);
+  //     setShowBulkConfirm(null);
+  //     return;
+  //   }
+  //
+  //   if (!confirm(`Are you sure you want to ${action} optimization for ${sitesToUpdate.length} sites?`)) {
+  //     return;
+  //   }
+  //
+  //   try {
+  //     for (const site of sitesToUpdate) {
+  //       await api.toggleOptimization(site.id, action === "enable");
+  //     }
+  //
+  //     // Update local state
+  //     setSites((prev) =>
+  //       prev.map((site) =>
+  //         sitesToUpdate.some((s) => s.id === site.id)
+  //           ? { ...site, optimization_enabled: action === "enable" }
+  //           : site
+  //       )
+  //     );
+  //
+  //     // Refresh optimization statuses
+  //     await fetchOptimizationStatuses();
+  //
+  //     // Notify parent
+  //     if (onSettingsChange) {
+  //       onSettingsChange();
+  //     }
+  //
+  //     setShowBulkConfirm(null);
+  //   } catch (err) {
+  //     console.error(`Failed to bulk ${action}:`, err);
+  //     alert(err instanceof Error ? err.message : `Failed to ${action} optimization`);
+  //   }
+  // };
 
   /**
    * Filter sites based on filter mode
@@ -449,7 +451,7 @@ export function OptimizationSettings({
                       <OptimizationToggle
                         siteId={site.id}
                         enabled={site.optimization_enabled || false}
-                        onToggle={handleToggleChange}
+                        onToggle={(enabled) => handleToggleChange(site.id, enabled)}
                       />
                     </div>
 

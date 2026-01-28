@@ -6,7 +6,7 @@ Provides filtering by time, device, action, user, and result.
 
 import logging
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Any
 
 from fastapi import APIRouter, Query, HTTPException
 from pydantic import BaseModel, Field
@@ -30,8 +30,8 @@ class AuditLogEntryResponse(BaseModel):
     user: str
     device_id: Optional[str] = None
     point_name: Optional[str] = None
-    old_value: Optional[any] = None
-    new_value: Optional[any] = None
+    old_value: Optional[Any] = None
+    new_value: Optional[Any] = None
     result: str
     safety_validation: Optional[dict] = None
     error_message: Optional[str] = None

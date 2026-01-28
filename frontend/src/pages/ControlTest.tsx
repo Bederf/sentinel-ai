@@ -14,7 +14,6 @@ import { DemoControlPanel } from "../components/DemoControlPanel";
 import { ControlStatus } from "../components/ControlStatus";
 import useDeviceControl from "../hooks/useDeviceControl";
 import { demoDevices } from "../data/demoControls";
-import type { Device } from "../lib/api";
 
 export function ControlTest() {
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>(demoDevices[0].id);
@@ -101,7 +100,9 @@ export function ControlTest() {
         {/* Demo Panel */}
         {showDemoPanel ? (
           <DemoControlPanel
-            onControl={handleControl}
+            onControl={async (deviceId, point, value) => {
+              await handleControl(deviceId, point, value);
+            }}
             onScenarioComplete={handleScenarioComplete}
           />
         ) : (
@@ -147,7 +148,9 @@ export function ControlTest() {
             {/* Control Panel */}
             <ControlPanel
               device={selectedDevice}
-              onControl={handleControl}
+              onControl={async (deviceId, point, value) => {
+                await handleControl(deviceId, point, value);
+              }}
               safetyStatus={deviceControl.safetyStatus}
               refreshInterval={10000}
             />
@@ -156,7 +159,11 @@ export function ControlTest() {
             <ControlStatus
               status={deviceControl.safetyStatus.status}
               message={deviceControl.safetyStatus.message}
-              rules={deviceControl.safetyStatus.rules}
+              rules={deviceControl.safetyStatus.rules?.map(rule => ({
+                rule: rule.rule,
+                status: rule.status as "warning" | "failed" | "passed",
+                description: (rule as any).description
+              }))}
               deviceType={selectedDevice.device_type}
               lastValidated={new Date().toISOString()}
             />

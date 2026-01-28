@@ -67,11 +67,12 @@ function getStatusConfig(status: OptimizationStatus): {
         pulse: false,
       };
     default:
+      // Default to INFO instead of UNKNOWN for better UX
       return {
-        color: "var(--color-sentinel-text-secondary)",
-        bg: "rgba(142, 142, 142, 0.15)",
+        color: "var(--color-sentinel-blue)",
+        bg: "rgba(59, 130, 246, 0.15)",
         icon: HelpCircle,
-        label: "UNKNOWN",
+        label: "INFO",
         pulse: false,
       };
   }
@@ -114,7 +115,7 @@ export function OptimizationStatusBadge({
   };
 
   const iconSizes = {
-    sm: "h-3 w-3",
+    sm: "h-3.5 w-3.5",
     md: "h-4 w-4",
   };
 
@@ -130,7 +131,7 @@ export function OptimizationStatusBadge({
         }}
       >
         <Icon className={iconSizes[size]} />
-        <span>{config.label}</span>
+        {status !== "recommendation_pending" && <span>{config.label}</span>}
       </div>
 
       {relativeTime && status === "optimized" && (

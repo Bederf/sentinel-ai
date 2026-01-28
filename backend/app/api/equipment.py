@@ -1,16 +1,25 @@
 """Equipment API endpoints."""
 
 import json
+import logging
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
 
+from app.database.repositories.equipment_repository import EquipmentRepository
+from app.database.repositories.sensor_repository import SensorRepository
+
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # Load data directory
 DATA_DIR = Path(__file__).parent.parent / "data"
+
+# Initialize Supabase repositories
+equipment_repo = EquipmentRepository()
+sensor_repo = SensorRepository()
 
 
 def load_equipment() -> list[dict]:
@@ -161,6 +170,192 @@ async def get_equipment(equipment_id: str) -> EquipmentResponse:
         sensor_count=len(eq_sensors),
         active_alerts=len(eq_alerts),
     )
+
+
+@router.get("/equipment/{equipment_id}/controls")
+async def get_equipment_controls(equipment_id: str):
+    """
+    Get equipment with control points from Supabase.
+
+    Args:
+        equipment_id: Equipment code (e.g., "eqp-079")
+
+    Returns:
+        Device-like structure with control points for ControlPanel.
+    """
+    try:
+        # Try to get from Supabase first
+        eq = equipment_repo.get_by_id(equipment_id)
+
+        if not eq:
+            raise HTTPException(status_code=404, detail=f"Equipment {equipment_id} not found")
+
+        # Get sensors for this equipment
+        sensors = sensor_repo.get_by_equipment(eq["id"])
+
+        # Convert sensors to control points format
+        points = {}
+        for sensor in sensors:
+            point_name = sensor.get("code", sensor.get("id"))
+            sensor_type = sensor.get("type", "temperature")
+
+            # Map sensor type to point type
+            point_type = "analog_value"  # default
+            if sensor_type in ["temperature", "pressure", "flow", "energy"]:
+                point_type = "analog_value"
+            elif sensor_type in ["vibration"]:
+                point_type = "binary_value"
+
+            points[point_name] = {
+                "point_type": point_type,
+                "description": f"{sensor_type.title()} - {sensor.get('location', 'Main')}",
+                "unit": sensor.get("unit", ""),
+                "min_value": float(sensor.get("min_value", 0)) if sensor.get("min_value") else 0,
+                "max_value": float(sensor.get("max_value", 100)) if sensor.get("max_value") else 100,
+                "default_value": float(sensor.get("current_value", 0)) if sensor.get("current_value") else 0,
+                "writable": True,
+            }
+
+        # Add common control points for HVAC equipment
+        eq_type = eq.get("type", "").lower()
+        if eq_type in ["hvac", "split_unit", "ahu", "chiller", "ac"]:
+            if "power" not in points and "power_switch" not in points:
+                points["power_switch"] = {
+                    "point_type": "binary_value",
+                    "description": "Power On/Off",
+                    "default_value": True,
+                    "writable": True,
+                }
+            if "setpoint" not in points and "setpoint_temp" not in points:
+                points["setpoint_temp"] = {
+                    "point_type": "analog_value",
+                    "description": "Temperature Setpoint",
+                    "unit": "°C",
+                    "min_value": 16,
+                    "max_value": 30,
+                    "default_value": 22,
+                    "writable": True,
+                }
+            if "fan_speed" not in points:
+                points["fan_speed"] = {
+                    "point_type": "multistate_value",
+                    "description": "Fan Speed",
+                    "states": ["Auto", "Low", "Medium", "High"],
+                    "default_value": 0,
+                    "writable": True,
+                }
+
+        # Return device-like structure
+        return {
+            "id": equipment_id,
+            "name": eq.get("name", equipment_id),
+            "device_type": eq.get("type", "unknown"),
+            "type": eq.get("type", "unknown"),
+            "protocol": "supabase",
+            "location": eq.get("location", ""),
+            "site_id": eq.get("building_id", ""),
+            "description": f"{eq.get('manufacturer', '')} {eq.get('model', '')}".strip() or eq.get("name", ""),
+            "points": points,
+            "status": eq.get("status", "normal"),
+            "safety_status": "warning" if eq.get("status") == "warning" else "critical" if eq.get("status") == "critical" else "safe",
+            "health_score": eq.get("health_score", 100),
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching equipment controls for {equipment_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/equipment/{equipment_id}/control")
+async def control_equipment(
+    equipment_id: str,
+    request: Request,
+):
+    """
+    Control an equipment point (write value to Supabase).
+
+    Args:
+        equipment_id: Equipment code (e.g., "eqp-004")
+        request body: {"point": "setpoint_temp", "value": 23, "priority": 8}
+
+    Returns:
+        Control result with success/failure status
+    """
+    from datetime import datetime
+    from app.database.repositories.audit_repository import AuditRepository
+
+    try:
+        body = await request.json()
+        point = body.get("point")
+        value = body.get("value")
+        priority = body.get("priority", 8)
+
+        if not point or value is None:
+            raise HTTPException(status_code=400, detail="Missing 'point' or 'value' in request body")
+
+        # Get equipment from Supabase
+        eq = equipment_repo.get_by_id(equipment_id)
+        if not eq:
+            raise HTTPException(status_code=404, detail=f"Equipment {equipment_id} not found")
+
+        # Get the sensor if it's a sensor point
+        sensor_value = None
+        old_value = None
+        if point.startswith("sensor-"):
+            sensors = sensor_repo.get_by_equipment(eq["id"])
+            sensor = next((s for s in sensors if s.get("code") == point), None)
+            if sensor:
+                old_value = sensor.get("current_value")
+                # Update sensor current_value in Supabase
+                try:
+                    from app.database.supabase_client import get_supabase_client
+                    client = get_supabase_client()
+                    client.table("sensors").update({
+                        "current_value": float(value),
+                        "updated_at": datetime.now().isoformat()
+                    }).eq("code", point).execute()
+                    sensor_value = value
+                except Exception as sensor_err:
+                    logger.warning(f"Could not update sensor value in Supabase: {sensor_err}")
+
+        # Log the control action to audit trail
+        try:
+            audit_repo = AuditRepository()
+            audit_repo.create({
+                "action": "equipment_control",
+                "user": body.get("user", "system"),
+                "device_id": eq["id"],
+                "point_name": point,
+                "old_value": old_value,
+                "new_value": value,
+                "result": "success",
+                "metadata": {
+                    "equipment_code": equipment_id,
+                    "equipment_name": eq.get("name"),
+                    "equipment_type": eq.get("type"),
+                    "priority": priority,
+                }
+            })
+        except Exception as audit_err:
+            logger.warning(f"Could not log audit entry: {audit_err}")
+
+        return {
+            "success": True,
+            "message": f"Control command sent to {equipment_id}",
+            "device_id": equipment_id,
+            "point": point,
+            "value": value,
+            "priority": priority,
+            "sensor_updated": sensor_value is not None,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error controlling equipment {equipment_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 class EquipmentTypeStats(BaseModel):

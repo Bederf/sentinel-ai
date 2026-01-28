@@ -87,7 +87,7 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
   const [optimizationStatus, setOptimizationStatus] = useState<OptimizationStatusType>("unknown");
   const [showRecommendationModal, setShowRecommendationModal] = useState(false);
   const [currentRecommendation, setCurrentRecommendation] = useState<OptimizationRecommendation | null>(null);
-  const [loadingRecommendation, setLoadingRecommendation] = useState(false);
+  const [, setLoadingRecommendation] = useState(false);
 
   const handleClick = () => {
     if (onClick) {
@@ -105,37 +105,48 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
         // Get devices for this site
         const devices = await api.getSiteDevices(site.id);
 
+        // If no devices from API, use equipment_count from site as fallback
         if (devices.length === 0) {
+          const totalAssets = site.equipment_count || 0;
+          const alertCount = site.alert_count || 0;
+          // Calculate safe assets as total - alert_count
+          // This gives us a reasonable estimate when device API returns no results
           setSafetySummary({
-            total: 0,
-            safe: 0,
+            total: totalAssets,
+            safe: Math.max(0, totalAssets - alertCount),
             warning: 0,
             blocked: 0,
-            alarm: 0,
-            overallStatus: 'unknown',
+            alarm: alertCount,
+            overallStatus: alertCount > 0 ? 'alarm' : 'safe',
           });
           return;
         }
 
-        // Fetch safety status for a sample of devices (limit to 5 for performance)
-        const sampleDevices = devices.slice(0, 5);
-        const statusPromises = sampleDevices.map(async (device) => {
-          try {
-            const status = await api.getDeviceSafetyStatus(device.id);
-            return status.overall_status;
-          } catch {
-            return 'unknown' as SafetyStatus;
-          }
-        });
-
-        const statuses = await Promise.all(statusPromises);
+        // Fetch safety status for all devices
+        // For performance, we'll check all devices but limit concurrent requests
+        const BATCH_SIZE = 10;
+        const allStatuses: SafetyStatus[] = [];
+        
+        for (let i = 0; i < devices.length; i += BATCH_SIZE) {
+          const batch = devices.slice(i, i + BATCH_SIZE);
+          const batchPromises = batch.map(async (device) => {
+            try {
+              const status = await api.getDeviceSafetyStatus(device.id);
+              return status.overall_status;
+            } catch {
+              return 'unknown' as SafetyStatus;
+            }
+          });
+          const batchStatuses = await Promise.all(batchPromises);
+          allStatuses.push(...batchStatuses);
+        }
 
         const summary: DeviceSafetySummary = {
           total: devices.length,
-          safe: statuses.filter((s) => s === 'safe').length,
-          warning: statuses.filter((s) => s === 'warning').length,
-          blocked: statuses.filter((s) => s === 'blocked').length,
-          alarm: statuses.filter((s) => s === 'alarm').length,
+          safe: allStatuses.filter((s) => s === 'safe').length,
+          warning: allStatuses.filter((s) => s === 'warning').length,
+          blocked: allStatuses.filter((s) => s === 'blocked').length,
+          alarm: allStatuses.filter((s) => s === 'alarm').length,
           overallStatus: 'unknown',
         };
 
@@ -153,7 +164,17 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
         setSafetySummary(summary);
       } catch (error) {
         console.error('Failed to fetch safety status:', error);
-        setSafetySummary(null);
+        // Fallback to equipment_count if API fails
+        const totalAssets = site.equipment_count || 0;
+        const alertCount = site.alert_count || 0;
+        setSafetySummary({
+          total: totalAssets,
+          safe: Math.max(0, totalAssets - alertCount),
+          warning: 0,
+          blocked: 0,
+          alarm: alertCount,
+          overallStatus: alertCount > 0 ? 'alarm' : 'safe',
+        });
       } finally {
         setLoadingSafety(false);
       }
@@ -241,7 +262,7 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
   };
 
   // Handle reject recommendation
-  const handleRejectRecommendation = async (recommendationId: string, reason?: string) => {
+  const handleRejectRecommendation = async (_recommendationId: string, _reason?: string) => {
     try {
       // Note: reject API endpoint doesn't exist yet, so we'll just update status
       // In production, this would call: api.rejectOptimization(site.id, recommendationId, reason)

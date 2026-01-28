@@ -11,7 +11,7 @@
  * Follows SENTINEL dark theme design.
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Building2,
   AlertTriangle,
@@ -20,30 +20,59 @@ import {
   Bell,
   DollarSign,
   RefreshCw,
-  Zap,
-  ArrowLeft,
-  ClipboardList,
-  ChevronRight,
 } from "lucide-react";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  horizontalListSortingStrategy,
+  verticalListSortingStrategy,
+  arrayMove,
+} from '@dnd-kit/sortable';
 import api from "../lib/api";
 import type { DashboardStats, Site, Prediction, EnergyDataPoint } from "../lib/api";
-import { KPICard } from "./KPICard";
+import { SortableKPICard } from "./SortableKPICard";
+import { DashboardSection } from "./DashboardSection";
 import { SiteCard } from "./SiteCard";
 import { SiteDetail } from "./SiteDetail";
-import { AlertFeed } from "./AlertFeed";
+// import { AlertFeed } from "./AlertFeed"; // Moved to header bell button
 import { EnergyChart } from "./EnergyChart";
 import { PredictionCard } from "./PredictionCard";
 import { PredictionDetail } from "./PredictionDetail";
 import { HeroPredictionCard } from "./HeroPredictionCard";
 import { ROISummaryCard } from "./ROISummaryCard";
-import { OptimizationPanel } from "./OptimizationPanel";
-import { OptimizationPage } from "../pages/OptimizationPage";
+import { type View } from "./Sidebar";
 
 // Time period options for energy chart
 const TIME_PERIODS = [7, 30, 90] as const;
 type TimePeriod = (typeof TIME_PERIODS)[number];
 
-export function Dashboard() {
+// Dashboard section and KPI card types
+type DashboardSectionId =
+  | 'kpi-row'
+  | 'site-protection'
+  | 'energy-analytics'
+  | 'risk-predictions';
+
+type KPICardId =
+  | 'kpi-protected-sites'
+  | 'kpi-monitored-assets'
+  | 'kpi-active-risks'
+  | 'kpi-potential-savings'
+  | 'kpi-risk-predictions';
+
+interface DashboardProps {
+  onViewChange: (view: View) => void;
+}
+
+export function Dashboard({ onViewChange }: DashboardProps) {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [sites, setSites] = useState<Site[]>([]);
   const [predictions, setPredictions] = useState<Prediction[]>([]);
@@ -57,14 +86,33 @@ export function Dashboard() {
   const [selectedPrediction, setSelectedPrediction] = useState<Prediction | null>(null);
   const [isPredictionDetailOpen, setIsPredictionDetailOpen] = useState(false);
 
-  // Optimization page state
-  const [showOptimizationPage, setShowOptimizationPage] = useState(false);
-
   // Energy chart state
   const [energyData, setEnergyData] = useState<EnergyDataPoint[]>([]);
   const [energyLoading, setEnergyLoading] = useState(false);
   const [energyFilterSiteId, setEnergyFilterSiteId] = useState<string | null>(null);
   const [selectedDays, setSelectedDays] = useState<TimePeriod>(30);
+
+  // Drag and drop state
+  const [sectionOrder, setSectionOrder] = useState<DashboardSectionId[]>([
+    'kpi-row',
+    'site-protection',
+    'energy-analytics',
+    'risk-predictions',
+  ]);
+
+  const [kpiOrder, setKpiOrder] = useState<KPICardId[]>([
+    'kpi-protected-sites',
+    'kpi-monitored-assets',
+    'kpi-active-risks',
+    'kpi-potential-savings',
+    'kpi-risk-predictions',
+  ]);
+
+  // DnD sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor)
+  );
 
   useEffect(() => {
     const loadDashboardData = async () => {
@@ -108,7 +156,7 @@ export function Dashboard() {
     loadEnergyData();
   }, [energyFilterSiteId, selectedDays]);
 
-  // Calculate site status counts for KPI
+  // Calculate site status counts for KPI - computed values used in render functions
   const normalSites = sites.filter((s) => s.status === "normal").length;
   const warningSites = sites.filter((s) => s.status === "warning").length;
 
@@ -150,6 +198,83 @@ export function Dashboard() {
     setIsPredictionDetailOpen(false);
     setSelectedPrediction(null);
   };
+
+  // Handle KPI card drag end
+  const handleKPIDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      setKpiOrder((items) => {
+        const oldIndex = items.indexOf(active.id as KPICardId);
+        const newIndex = items.indexOf(over.id as KPICardId);
+        return arrayMove(items, oldIndex, newIndex);
+      });
+    }
+  };
+
+  // Handle section drag end
+  const handleSectionDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      setSectionOrder((items) => {
+        const oldIndex = items.indexOf(active.id as DashboardSectionId);
+        const newIndex = items.indexOf(over.id as DashboardSectionId);
+        
+        // Only reorder if indices are valid
+        if (oldIndex !== -1 && newIndex !== -1) {
+          return arrayMove(items, oldIndex, newIndex);
+        }
+        return items;
+      });
+    }
+  };
+
+  // KPI card definitions - MUST be before early returns (Rules of Hooks)
+  const kpiCards = useMemo(() => {
+    if (!stats) return {};
+    
+    return {
+      'kpi-protected-sites': {
+        title: "Protected Sites",
+        value: stats.total_sites,
+        icon: <Building2 className="h-5 w-5" />,
+        subtitle: `${normalSites} protected, ${warningSites} elevated`,
+        accentColor: "blue" as const,
+      },
+      'kpi-monitored-assets': {
+        title: "Monitored Assets",
+        value: stats.total_equipment,
+        icon: <Cpu className="h-5 w-5" />,
+        delta: stats.uptime_percent ? stats.uptime_percent - 95 : 0,
+        deltaText: "vs 95% target",
+        accentColor: "cyan" as const,
+      },
+      'kpi-active-risks': {
+        title: "Active Risks",
+        value: stats.active_alerts || 0,
+        icon: <Bell className="h-5 w-5" />,
+        delta: stats.critical_alerts ? -(stats.critical_alerts * 10) : 0,
+        isInverseTrend: true,
+        deltaText: stats.critical_alerts ? `${stats.critical_alerts} critical` : undefined,
+        accentColor: "orange" as const,
+      },
+      'kpi-potential-savings': {
+        title: "Potential Savings",
+        value: formatZAR(totalPotentialSavings),
+        icon: <DollarSign className="h-5 w-5" />,
+        subtitle: "If all preventive actions taken",
+        accentColor: "green" as const,
+      },
+      'kpi-risk-predictions': {
+        title: "Risk Predictions",
+        value: predictions.length,
+        icon: <Shield className="h-5 w-5" />,
+        subtitle: "AI-detected risk events",
+        accentColor: "purple" as const,
+      },
+    };
+  }, [stats, normalSites, warningSites, totalPotentialSavings, predictions.length]);
 
   // Loading state
   if (loading) {
@@ -210,66 +335,39 @@ export function Dashboard() {
     );
   }
 
-  // Show optimization page if requested
-  if (showOptimizationPage) {
-    return <OptimizationPage />;
-  }
+  // Render KPI Row section
+  const renderKPIRow = () => (
+    <DashboardSection id="kpi-row">
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleKPIDragEnd}
+      >
+        <SortableContext items={kpiOrder} strategy={horizontalListSortingStrategy}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+            {kpiOrder.map((kpiId) => {
+              const cardProps = kpiCards[kpiId];
+              if (!cardProps) return null;
+              return (
+                <SortableKPICard
+                  key={kpiId}
+                  id={kpiId}
+                  {...cardProps}
+                />
+              );
+            })}
+          </div>
+        </SortableContext>
+      </DndContext>
+    </DashboardSection>
+  );
 
-  return (
-    <div
-      className="h-full overflow-y-auto p-4 md:p-6"
-      style={{ background: "var(--color-sentinel-bg-canvas)" }}
-    >
-      {/* KPI Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-        {stats && (
-          <>
-            <KPICard
-              title="Protected Sites"
-              value={stats.total_sites}
-              icon={<Building2 className="h-5 w-5" />}
-              subtitle={`${normalSites} protected, ${warningSites} elevated`}
-              accentColor="blue"
-            />
-            <KPICard
-              title="Monitored Assets"
-              value={stats.total_equipment}
-              icon={<Cpu className="h-5 w-5" />}
-              delta={stats.uptime_percent ? stats.uptime_percent - 95 : 0}
-              deltaText="vs 95% target"
-              accentColor="cyan"
-            />
-            <KPICard
-              title="Active Risks"
-              value={stats.active_alerts}
-              icon={<Bell className="h-5 w-5" />}
-              delta={stats.critical_alerts ? -(stats.critical_alerts * 10) : 0}
-              isInverseTrend={true}
-              deltaText={`${stats.critical_alerts} critical`}
-              accentColor="orange"
-            />
-            <KPICard
-              title="Potential Savings"
-              value={formatZAR(totalPotentialSavings)}
-              icon={<DollarSign className="h-5 w-5" />}
-              subtitle="If all preventive actions taken"
-              accentColor="green"
-            />
-            <KPICard
-              title="Risk Predictions"
-              value={predictions.length}
-              icon={<Shield className="h-5 w-5" />}
-              subtitle="AI-detected risk events"
-              accentColor="purple"
-            />
-          </>
-        )}
-      </div>
+  // Render Site Protection section
+  const renderSiteProtection = () => {
 
-      {/* Main Content Grid - Two Columns */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column - Site Protection Overview (2/3 width on large) */}
-        <div className="lg:col-span-2">
+    return (
+      <DashboardSection id="site-protection">
+        <div className="lg:col-span-3">
           <div
             className="rounded-md overflow-hidden"
             style={{
@@ -277,77 +375,77 @@ export function Dashboard() {
               border: "1px solid var(--color-sentinel-border)",
             }}
           >
-            {/* Panel Header */}
-            <div
-              className="p-4 flex items-center justify-between"
-              style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}
-            >
-              <div className="flex items-center gap-3">
-                <div
-                  className="p-2 rounded"
-                  style={{ background: "rgba(59, 130, 246, 0.15)" }}
-                >
-                  <Building2
-                    className="h-5 w-5"
-                    style={{ color: "var(--color-sentinel-blue)" }}
-                  />
-                </div>
-                <div>
-                  <h3
-                    className="font-medium text-sm"
-                    style={{ color: "var(--color-sentinel-text-primary)" }}
-                  >
-                    Site Protection Status
-                  </h3>
-                  <span
-                    className="text-xs"
-                    style={{ color: "var(--color-sentinel-text-secondary)" }}
-                  >
-                    {sites.length} sites under protection
-                  </span>
-                </div>
-              </div>
-              <span
-                className="text-xs px-2 py-1 rounded"
-                style={{
-                  background: "rgba(16, 185, 129, 0.15)",
-                  color: "var(--color-sentinel-green)",
-                }}
+          {/* Panel Header */}
+          <div
+            className="p-4 flex items-center justify-between"
+            style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}
+          >
+            <div className="flex items-center gap-3">
+              <div
+                className="p-2 rounded"
+                style={{ background: "rgba(59, 130, 246, 0.15)" }}
               >
-                {normalSites} protected
-              </span>
+                <Building2
+                  className="h-5 w-5"
+                  style={{ color: "var(--color-sentinel-blue)" }}
+                />
+              </div>
+              <div>
+                <h3
+                  className="font-medium text-sm"
+                  style={{ color: "var(--color-sentinel-text-primary)" }}
+                >
+                  Site Protection Status
+                </h3>
+                <span
+                  className="text-xs"
+                  style={{ color: "var(--color-sentinel-text-secondary)" }}
+                >
+                  {sites.length} sites under protection
+                </span>
+              </div>
             </div>
+            <span
+              className="text-xs px-2 py-1 rounded"
+              style={{
+                background: "rgba(16, 185, 129, 0.15)",
+                color: "var(--color-sentinel-green)",
+              }}
+            >
+              {normalSites} protected
+            </span>
+          </div>
 
-            {/* Sites Grid */}
-            <div className="p-4">
-              {sites.length === 0 ? (
-                <div className="text-center py-8">
-                  <Building2
-                    className="h-12 w-12 mx-auto mb-2"
-                    style={{ color: "var(--color-sentinel-text-disabled)" }}
-                  />
-                  <span style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                    No sites available
-                  </span>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                  {sites.map((site) => (
-                    <SiteCard key={site.id} site={site} onClick={handleSiteClick} showOptimizationStatus={true} />
-                  ))}
-                </div>
-              )}
-            </div>
+          {/* Sites Grid */}
+          <div className="p-4">
+            {sites.length === 0 ? (
+              <div className="text-center py-8">
+                <Building2
+                  className="h-12 w-12 mx-auto mb-2"
+                  style={{ color: "var(--color-sentinel-text-disabled)" }}
+                />
+                <span style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                  No sites available
+                </span>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {sites.map((site) => (
+                  <SiteCard key={site.id} site={site} onClick={handleSiteClick} showOptimizationStatus={true} />
+                ))}
+              </div>
+            )}
           </div>
         </div>
-
-        {/* Right Column - Alerts Feed (1/3 width on large) */}
-        <div className="lg:col-span-1">
-          <AlertFeed limit={10} refreshInterval={30000} />
-        </div>
       </div>
+    </DashboardSection>
+    );
+  };
 
-      {/* Energy Consumption Section */}
+
+  // Render Energy Analytics section
+  const renderEnergyAnalytics = () => (
+    <DashboardSection id="energy-analytics">
       <div className="mt-6">
         <div
           className="rounded-md overflow-hidden"
@@ -427,8 +525,12 @@ export function Dashboard() {
           </div>
         </div>
       </div>
+    </DashboardSection>
+  );
 
-      {/* AI Risk Predictions Section */}
+  // Render Risk Predictions section
+  const renderRiskPredictions = () => (
+    <DashboardSection id="risk-predictions">
       <div className="mt-6 space-y-6">
         {/* ROI Summary Card */}
         {predictions.length > 0 && <ROISummaryCard predictions={predictions} />}
@@ -537,210 +639,50 @@ export function Dashboard() {
           </div>
         </div>
       </div>
+    </DashboardSection>
+  );
 
-      {/* Load Shedding Optimization Section */}
-      <div className="mt-6">
-        <div
-          className="rounded-md overflow-hidden"
-          style={{
-            background: "var(--color-sentinel-bg-panel)",
-            border: "1px solid var(--color-sentinel-border)",
-          }}
-        >
-          {/* Panel Header */}
-          <div
-            className="p-4 flex items-center justify-between"
-            style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}
-          >
-            <div className="flex items-center gap-3">
-              <div
-                className="p-2 rounded"
-                style={{ background: "rgba(59, 130, 246, 0.15)" }}
-              >
-                <Zap className="h-5 w-5" style={{ color: "var(--color-sentinel-blue)" }} />
-              </div>
-              <div>
-                <h3
-                  className="font-medium text-sm"
-                  style={{ color: "var(--color-sentinel-text-primary)" }}
-                >
-                  Load Shedding Optimization
-                </h3>
-                <span
-                  className="text-xs"
-                  style={{ color: "var(--color-sentinel-text-secondary)" }}
-                >
-                  Optimize building comfort and energy use during outages
-                </span>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <div
-                className="px-2 py-1 rounded text-xs font-medium"
-                style={{
-                  background: "rgba(16, 185, 129, 0.15)",
-                  color: "var(--color-sentinel-green)",
-                }}
-              >
-                Active Monitoring
-              </div>
-              <button
-                className="px-3 py-1.5 text-xs rounded transition-colors"
-                style={{
-                  background: "var(--color-sentinel-bg-secondary)",
-                  color: "var(--color-sentinel-text-primary)",
-                  border: "1px solid var(--color-sentinel-border)",
-                }}
-                onClick={() => setShowOptimizationPage(true)}
-              >
-                View Details
-              </button>
-            </div>
-          </div>
+  // Section renderer map
+  const sectionRenderers: Record<DashboardSectionId, () => JSX.Element> = {
+    'kpi-row': renderKPIRow,
+    'site-protection': renderSiteProtection,
+    'energy-analytics': renderEnergyAnalytics,
+    'risk-predictions': renderRiskPredictions,
+  };
 
-          {/* Optimization Panel Content */}
-          <div className="p-4">
-            <OptimizationPanel compact={true} />
-          </div>
-        </div>
+  return (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragEnd={handleSectionDragEnd}
+    >
+      <div
+        className="h-full overflow-y-auto p-4 md:p-6"
+        style={{ background: "var(--color-sentinel-bg-canvas)" }}
+      >
+        <SortableContext items={sectionOrder} strategy={verticalListSortingStrategy}>
+          {sectionOrder.map((sectionId) => {
+            const renderer = sectionRenderers[sectionId];
+            if (!renderer) return null;
+            
+            // Site Protection and Alert Feed are no longer draggable
+            // Site Protection always renders at full width
+            // Render all sections normally
+            
+            return <div key={sectionId}>{renderer()}</div>;
+          })}
+        </SortableContext>
+
+        {/* Prediction Detail Modal */}
+        {selectedPrediction && (
+          <PredictionDetail
+            prediction={selectedPrediction}
+            isOpen={isPredictionDetailOpen}
+            onClose={closePredictionDetail}
+          />
+        )}
       </div>
-
-      {/* Control Audit Trail Info Card */}
-      <div className="mt-6">
-        <div
-          className="rounded-md overflow-hidden"
-          style={{
-            background: "var(--color-sentinel-bg-panel)",
-            border: "1px solid var(--color-sentinel-border)",
-          }}
-        >
-          {/* Info Card Header */}
-          <div
-            className="p-4 flex items-center justify-between"
-            style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}
-          >
-            <div className="flex items-center gap-3">
-              <div
-                className="p-2 rounded"
-                style={{ background: "rgba(139, 92, 246, 0.15)" }}
-              >
-                <ClipboardList
-                  className="h-5 w-5"
-                  style={{ color: "var(--color-sentinel-purple)" }}
-                />
-              </div>
-              <div>
-                <h3
-                  className="font-medium text-sm"
-                  style={{ color: "var(--color-sentinel-text-primary)" }}
-                >
-                  Control Audit Trail
-                </h3>
-                <span
-                  className="text-xs"
-                  style={{ color: "var(--color-sentinel-text-secondary)" }}
-                >
-                  Complete trail of all control actions and safety validations
-                </span>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <div
-                className="px-2 py-1 rounded text-xs font-medium"
-                style={{
-                  background: "rgba(139, 92, 246, 0.15)",
-                  color: "var(--color-sentinel-purple)",
-                }}
-              >
-                Available
-              </div>
-            </div>
-          </div>
-
-          {/* Info Card Content */}
-          <div className="p-6">
-            <div className="flex flex-col items-center justify-center text-center">
-              <div
-                className="p-4 rounded-full mb-4"
-                style={{ background: "rgba(139, 92, 246, 0.1)" }}
-              >
-                <ClipboardList
-                  className="h-8 w-8"
-                  style={{ color: "var(--color-sentinel-purple)" }}
-                />
-              </div>
-              <h4
-                className="text-lg font-medium mb-2"
-                style={{ color: "var(--color-sentinel-text-primary)" }}
-              >
-                Control System Audit Logs
-              </h4>
-              <p
-                className="text-sm mb-6 max-w-md"
-                style={{ color: "var(--color-sentinel-text-secondary)" }}
-              >
-                View detailed audit logs for all building control actions,
-                safety validations, and system events. Monitor compliance and
-                trace all control operations.
-              </p>
-              <div className="flex items-center gap-6 text-xs mb-6">
-                <div className="flex items-center gap-2">
-                  <div
-                    className="w-2 h-2 rounded-full"
-                    style={{ background: "var(--color-sentinel-green)" }}
-                  />
-                  <span style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                    Live monitoring
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div
-                    className="w-2 h-2 rounded-full"
-                    style={{ background: "var(--color-sentinel-amber)" }}
-                  />
-                  <span style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                    60s refresh
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div
-                    className="w-2 h-2 rounded-full"
-                    style={{ background: "var(--color-sentinel-blue)" }}
-                  />
-                  <span style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                    Full history
-                  </span>
-                </div>
-              </div>
-              <button
-                onClick={() => {
-                  // This would need to be passed as a prop or use a navigation context
-                  console.log("Navigate to Control Audit Trail tab");
-                }}
-                className="flex items-center gap-2 px-4 py-2 text-sm rounded-md transition-colors"
-                style={{
-                  background: "rgba(139, 92, 246, 0.15)",
-                  color: "var(--color-sentinel-purple)",
-                  border: "1px solid rgba(139, 92, 246, 0.3)",
-                }}
-              >
-                <span>View Audit Trail</span>
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Prediction Detail Modal */}
-      {selectedPrediction && (
-        <PredictionDetail
-          prediction={selectedPrediction}
-          isOpen={isPredictionDetailOpen}
-          onClose={closePredictionDetail}
-        />
-      )}
-    </div>
+    </DndContext>
   );
 }
 

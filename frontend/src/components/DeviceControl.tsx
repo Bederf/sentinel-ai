@@ -40,6 +40,7 @@ export function DeviceControl({
           value={value as number}
           min={point.min_value}
           max={point.max_value}
+          step={1}
           onChange={(val) => onChange(val)}
           disabled={disabled}
           error={error}

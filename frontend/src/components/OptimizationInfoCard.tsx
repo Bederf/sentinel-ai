@@ -13,22 +13,22 @@
 import { useState, useEffect } from "react";
 import {
   Brain,
-  Zap,
   TrendingUp,
   AlertTriangle,
   CheckCircle,
   XCircle,
   Clock,
-  Settings,
   Lightbulb,
 } from "lucide-react";
-import { OptimizationStatusBadge } from "./OptimizationStatusBadge";
 import { OptimizationToggle } from "./OptimizationToggle";
+import { OptimizationRecommendationModal } from "./OptimizationRecommendationModal";
 import api from "../lib/api";
 import type {
-  OptimizationStatusType,
+  OptimizationStatusResponse,
   OptimizationRecommendation,
 } from "../lib/api";
+
+type OptimizationStatusType = OptimizationStatusResponse['optimization_status'];
 
 interface OptimizationInfoCardProps {
   siteId: string;
@@ -188,7 +188,8 @@ export function OptimizationInfoCard({
     }
   };
 
-  const config = getStatusConfig(optimizationStatus);
+  // Status config for potential future use
+  void getStatusConfig(optimizationStatus);
 
   const formatRelativeTime = (timestamp: string | null) => {
     if (!timestamp) return "Never";
@@ -204,13 +205,49 @@ export function OptimizationInfoCard({
     return then.toLocaleDateString();
   };
 
-  const formatSavings = (recommendation: OptimizationRecommendation) => {
-    const savings = recommendation.projected_savings;
-    return {
-      energy: `${savings.energy_percent.toFixed(1)}%`,
-      cost: `R${savings.cost_zar.toFixed(0)}/hour`,
-      confidence: `${Math.round(savings.confidence * 100)}%`,
-    };
+  // Handle approve recommendation
+  const handleApproveRecommendation = async (_recommendationId: string) => {
+    try {
+      // Build setpoints array from recommendation
+      const setpointsToApply = currentRecommendation?.recommendations.map((rec) => ({
+        equipment_id: rec.equipment_id,
+        point: (rec as any).point_name || "setpoint", // Use point_name if available, fallback to "setpoint"
+        value: rec.recommended_value,
+      })) || [];
+
+      if (setpointsToApply.length === 0) {
+        console.error("No recommendations found to approve");
+        alert("No recommendations found to approve. Please ensure the recommendation has setpoints.");
+        return;
+      }
+
+      await api.approveOptimization(siteId, _recommendationId, setpointsToApply);
+
+      // Refresh optimization status after approve
+      const status = await api.getOptimizationStatus(siteId);
+      setOptimizationStatus(status.optimization_status);
+      setCurrentRecommendation(status.last_recommendation);
+
+      setShowRecommendationModal(false);
+    } catch (error) {
+      console.error('Failed to approve recommendation:', error);
+      throw error;
+    }
+  };
+
+  // Handle reject recommendation
+  const handleRejectRecommendation = async (_recommendationId: string, _reason?: string) => {
+    try {
+      // Refresh optimization status after reject
+      const status = await api.getOptimizationStatus(siteId);
+      setOptimizationStatus(status.optimization_status);
+      setCurrentRecommendation(status.last_recommendation);
+
+      setShowRecommendationModal(false);
+    } catch (error) {
+      console.error('Failed to reject recommendation:', error);
+      throw error;
+    }
   };
 
   return (
@@ -243,116 +280,26 @@ export function OptimizationInfoCard({
             </p>
           </div>
         </div>
-        <OptimizationToggle siteId={siteId} enabled={true} />
+        <div className="flex items-center gap-3">
+          {currentRecommendation && optimizationStatus === "recommendation_pending" && (
+            <button
+              onClick={() => setShowRecommendationModal(true)}
+              className="p-2 rounded transition-all hover:scale-110 animate-pulse"
+              style={{
+                background: "rgba(245, 158, 11, 0.2)",
+                border: "1px solid var(--color-sentinel-amber)",
+              }}
+              title="View recommendation"
+            >
+              <Lightbulb className="h-4 w-4" style={{ color: "var(--color-sentinel-amber)" }} />
+            </button>
+          )}
+          <OptimizationToggle siteId={siteId} enabled={true} />
+        </div>
       </div>
 
-      {/* Status */}
+      {/* Stats Row */}
       <div className="p-4">
-        <div
-          className="flex items-center gap-3 p-3 rounded-md mb-4"
-          style={{
-            background: config.bgColor,
-            border: `1px solid ${config.color}`,
-          }}
-        >
-          <div style={{ color: config.color }}>{config.icon}</div>
-          <div className="flex-1">
-            <div
-              className="font-medium"
-              style={{ color: config.color }}
-            >
-              {config.label}
-            </div>
-            <div
-              className="text-sm"
-              style={{ color: "var(--color-sentinel-text-secondary)" }}
-            >
-              {config.message}
-            </div>
-          </div>
-        </div>
-
-        {/* Recommendation Preview */}
-        {currentRecommendation &&
-          optimizationStatus === "recommendation_pending" && (
-            <div
-              className="p-4 rounded-md mb-4"
-              style={{
-                background: "rgba(139, 92, 246, 0.1)",
-                border: "1px solid var(--color-sentinel-purple)",
-              }}
-            >
-              <div className="flex items-center gap-2 mb-3">
-                <Zap className="h-4 w-4" style={{ color: "var(--color-sentinel-purple)" }} />
-                <span
-                  className="font-medium text-sm"
-                  style={{ color: "var(--color-sentinel-purple)" }}
-                >
-                  New Recommendation
-                </span>
-              </div>
-
-              <div className="grid grid-cols-3 gap-3 mb-3">
-                <div>
-                  <div
-                    className="text-xs mb-1"
-                    style={{ color: "var(--color-sentinel-text-secondary)" }}
-                  >
-                    Energy Savings
-                  </div>
-                  <div
-                    className="text-lg font-semibold"
-                    style={{ color: "var(--color-sentinel-green)" }}
-                  >
-                    {formatSavings(currentRecommendation).energy}
-                  </div>
-                </div>
-                <div>
-                  <div
-                    className="text-xs mb-1"
-                    style={{ color: "var(--color-sentinel-text-secondary)" }}
-                  >
-                    Cost Savings
-                  </div>
-                  <div
-                    className="text-lg font-semibold"
-                    style={{ color: "var(--color-sentinel-green)" }}
-                  >
-                    {formatSavings(currentRecommendation).cost}
-                  </div>
-                </div>
-                <div>
-                  <div
-                    className="text-xs mb-1"
-                    style={{ color: "var(--color-sentinel-text-secondary)" }}
-                  >
-                    Confidence
-                  </div>
-                  <div
-                    className="text-lg font-semibold"
-                    style={{ color: "var(--color-sentinel-blue)" }}
-                  >
-                    {formatSavings(currentRecommendation).confidence}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setShowRecommendationModal(true)}
-                  className="flex-1 py-2 px-3 rounded text-sm font-medium transition-colors"
-                  style={{
-                    background: "var(--color-sentinel-purple)",
-                    color: "white",
-                  }}
-                >
-                  View Details
-                </button>
-              </div>
-            </div>
-          )}
-
-        {/* Stats Row */}
         <div className="grid grid-cols-2 gap-3">
           <div
             className="p-3 rounded-md"
@@ -421,6 +368,17 @@ export function OptimizationInfoCard({
           </div>
         </div>
       </div>
+
+      {/* Recommendation Modal */}
+      {showRecommendationModal && currentRecommendation && (
+        <OptimizationRecommendationModal
+          isOpen={showRecommendationModal}
+          onClose={() => setShowRecommendationModal(false)}
+          recommendation={currentRecommendation}
+          onApprove={handleApproveRecommendation}
+          onReject={handleRejectRecommendation}
+        />
+      )}
     </div>
   );
 }

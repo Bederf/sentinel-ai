@@ -65,21 +65,13 @@ export function OptimizationToggle({
     : "var(--color-sentinel-text-secondary)";
 
   return (
-    <div className={`flex items-center justify-between ${className}`}>
-      <div className="flex flex-col">
-        <span
-          className="text-sm font-medium"
-          style={{ color: "var(--color-sentinel-text-primary)" }}
-        >
-          AI Optimization
-        </span>
-        <span
-          className="text-xs"
-          style={{ color: "var(--color-sentinel-text-secondary)" }}
-        >
-          {currentEnabled ? "Enabled" : "Disabled"}
-        </span>
-      </div>
+    <div className={`flex items-center gap-3 ${className}`}>
+      <span
+        className="text-xs whitespace-nowrap"
+        style={{ color: "var(--color-sentinel-text-secondary)" }}
+      >
+        {currentEnabled ? "Enabled" : "Disabled"}
+      </span>
 
       <button
         type="button"

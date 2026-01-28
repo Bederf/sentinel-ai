@@ -386,6 +386,11 @@ export interface ProjectedSavings {
   energy_kwh: number;
   cost_zar_per_hour: number;
   percentage_improvement: number;
+  // Legacy property names (for backwards compatibility)
+  energy_percent?: number;
+  cost_zar?: number;
+  comfort_impact?: string;
+  equipment_impact?: string;
 }
 
 // Optimization recommendation from AI analysis
@@ -440,6 +445,46 @@ export interface HealthThresholds {
   healthy: number;
   warning: number;
   critical: number;
+}
+
+// Safety rule interface
+export interface SafetyRule {
+  id: string;
+  name: string;
+  rule_type: 'temperature_range' | 'pressure_limit' | 'interlock' | 'runtime_limit' | 'brightness_limit' | 'custom';
+  severity: 'block' | 'warning' | 'alarm';
+  description: string;
+  device_type: string | null;
+  device_id: string | null;
+  point_name: string | null;
+  enabled: boolean;
+  created_at?: string;
+  updated_at?: string;
+  // Type-specific parameters
+  min_temp?: number;
+  max_temp?: number;
+  min_pressure?: number;
+  max_pressure?: number;
+  min_brightness?: number;
+  max_brightness?: number;
+  min_runtime_minutes?: number;
+  max_starts_per_hour?: number;
+  trigger_device_id?: string;
+  trigger_device_type?: string;
+  trigger_point?: string;
+  trigger_value?: any;
+  action?: string;
+  action_value?: any;
+  min_value?: number;
+  max_value?: number;
+  validation_logic?: string;
+  unit?: string;
+}
+
+// Safety rules response
+export interface SafetyRulesResponse {
+  rules: SafetyRule[];
+  count: number;
 }
 
 // Settings interface
@@ -701,6 +746,33 @@ export const api = {
       `/api/equipment${queryString ? `?${queryString}` : ""}`
     );
     return response.equipment;
+  },
+
+  /**
+   * Get equipment with control points from Supabase
+   * @param equipmentId - Equipment code (e.g., "eqp-079")
+   */
+  async getEquipmentControls(equipmentId: string): Promise<Device> {
+    return fetchApi<Device>(`/api/equipment/${equipmentId}/controls`);
+  },
+
+  /**
+   * Control an equipment point (write value to Supabase)
+   * @param equipmentId - Equipment code (e.g., "eqp-004")
+   * @param point - Point name to control
+   * @param value - Value to write
+   * @param priority - Write priority (1-16, default: 8)
+   */
+  async controlEquipment(
+    equipmentId: string,
+    point: string,
+    value: number | boolean,
+    priority: number = 8
+  ): Promise<DeviceControlResponse> {
+    return fetchApi<DeviceControlResponse>(`/api/equipment/${equipmentId}/control`, {
+      method: "POST",
+      body: JSON.stringify({ point, value, priority }),
+    });
   },
 
   /**
@@ -1240,6 +1312,210 @@ export const api = {
     return fetchApi<HealthThresholds>("/api/settings/health-thresholds", {
       method: "PUT",
       body: JSON.stringify(thresholds),
+    });
+  },
+
+  // ============= Safety Rules API Methods =============
+
+  /**
+   * Get all safety rules
+   * @param deviceType - Optional filter by device type
+   * @param enabled - Optional filter by enabled status
+   */
+  async getSafetyRules(deviceType?: string, enabled?: boolean): Promise<SafetyRulesResponse> {
+    const params = new URLSearchParams();
+    if (deviceType) params.append("device_type", deviceType);
+    if (enabled !== undefined) params.append("enabled", String(enabled));
+    const queryString = params.toString();
+    return fetchApi<SafetyRulesResponse>(`/api/safety/rules${queryString ? `?${queryString}` : ""}`);
+  },
+
+  /**
+   * Get a specific safety rule by ID
+   * @param ruleId - Rule ID
+   */
+  async getSafetyRule(ruleId: string): Promise<SafetyRule> {
+    return fetchApi<SafetyRule>(`/api/safety/rules/${ruleId}`);
+  },
+
+  /**
+   * Create a new safety rule
+   * @param ruleData - Rule data
+   */
+  async createSafetyRule(ruleData: Partial<SafetyRule>): Promise<{ success: boolean; rule: SafetyRule; message: string }> {
+    return fetchApi(`/api/safety/rules`, {
+      method: "POST",
+      body: JSON.stringify(ruleData),
+    });
+  },
+
+  /**
+   * Update an existing safety rule
+   * @param ruleId - Rule ID
+   * @param ruleData - Rule data to update
+   */
+  async updateSafetyRule(ruleId: string, ruleData: Partial<SafetyRule>): Promise<{ success: boolean; rule: SafetyRule; message: string }> {
+    return fetchApi(`/api/safety/rules/${ruleId}`, {
+      method: "PUT",
+      body: JSON.stringify(ruleData),
+    });
+  },
+
+  /**
+   * Delete a safety rule
+   * @param ruleId - Rule ID
+   */
+  async deleteSafetyRule(ruleId: string): Promise<{ success: boolean; message: string }> {
+    return fetchApi(`/api/safety/rules/${ruleId}`, {
+      method: "DELETE",
+    });
+  },
+
+  /**
+   * Toggle a safety rule's enabled status
+   * @param ruleId - Rule ID
+   * @param enabled - Whether to enable or disable
+   */
+  async toggleSafetyRule(ruleId: string, enabled: boolean): Promise<{ success: boolean; rule_id: string; enabled: boolean; message: string }> {
+    return fetchApi(`/api/safety/rules/${ruleId}/toggle`, {
+      method: "PATCH",
+      body: JSON.stringify({ enabled }),
+    });
+  },
+
+  /**
+   * Get safety health status
+   */
+  async getSafetyHealth(): Promise<{ status: string; initialized: boolean; rule_count: number }> {
+    return fetchApi(`/api/safety/health`);
+  },
+
+  // ============ Autonomous System APIs ============
+
+  /**
+   * Get autonomous system status
+   */
+  async getAutonomousStatus(): Promise<{
+    enabled: boolean;
+    active_decisions: number;
+    total_decisions_today: number;
+    success_rate: number;
+    current_escalation_level: number;
+    last_decision_time: string | null;
+    safety_score: number;
+  }> {
+    return fetchApi(`/api/autonomous/status`);
+  },
+
+  /**
+   * Enable autonomous mode
+   */
+  async enableAutonomousMode(): Promise<{ success: boolean; message: string }> {
+    return fetchApi(`/api/autonomous/enable`, {
+      method: "POST",
+    });
+  },
+
+  /**
+   * Disable autonomous mode
+   */
+  async disableAutonomousMode(): Promise<{
+    success: boolean;
+    message: string;
+    cancelled_decisions: number;
+  }> {
+    return fetchApi(`/api/autonomous/disable`, {
+      method: "POST",
+    });
+  },
+
+  /**
+   * Get autonomous decision history
+   * @param params - Optional filters (limit, device_id, status)
+   */
+  async getAutonomousDecisions(params?: {
+    limit?: number;
+    device_id?: string;
+    status?: string;
+  }): Promise<{ data: any[] }> {
+    const queryParams = new URLSearchParams();
+    if (params?.limit) queryParams.append("limit", params.limit.toString());
+    if (params?.device_id) queryParams.append("device_id", params.device_id);
+    if (params?.status) queryParams.append("status", params.status);
+
+    return fetchApi(`/api/autonomous/decisions?${queryParams.toString()}`);
+  },
+
+  /**
+   * Get current boundary status
+   * @param deviceId - Optional specific device ID
+   */
+  async getBoundaryStatus(deviceId?: string): Promise<{ data: any }> {
+    const url = deviceId
+      ? `/api/autonomous/boundaries?device_id=${deviceId}`
+      : `/api/autonomous/boundaries`;
+
+    return fetchApi(url);
+  },
+
+  /**
+   * Get escalation alerts
+   */
+  async getEscalationAlerts(): Promise<{ data: any[] }> {
+    return fetchApi(`/api/autonomous/escalation/status`);
+  },
+
+  /**
+   * Acknowledge an escalation alert
+   * @param escalationId - ID of the escalation to acknowledge
+   * @param comment - Optional comment
+   */
+  async acknowledgeEscalation(
+    escalationId: string,
+    acknowledgedBy: string,
+    comment?: string
+  ): Promise<{ success: boolean; message: string }> {
+    return fetchApi(`/api/safety/escalation/acknowledge`, {
+      method: "POST",
+      body: JSON.stringify({
+        escalation_id: escalationId,
+        acknowledged_by: acknowledgedBy,
+        comment,
+      }),
+    });
+  },
+
+  /**
+   * Execute emergency stop
+   */
+  async emergencyStop(): Promise<{
+    success: boolean;
+    emergency_id: string;
+    actions_taken: any[];
+    response_time_seconds: number;
+    devices_affected: number;
+    message: string;
+  }> {
+    return fetchApi(`/api/safety/escalation/emergency-stop`, {
+      method: "POST",
+    });
+  },
+
+  /**
+   * Test escalation notification
+   * @param deviceId - Device ID for test
+   * @param escalationLevel - Escalation level to test
+   */
+  async testEscalation(
+    deviceId: string,
+    escalationLevel: number
+  ): Promise<{ success: boolean; escalation_event: any; notifications_sent: any }> {
+    return fetchApi(`/api/safety/escalation/test`, {
+      method: "POST",
+      body: JSON.stringify({
+        device_id: deviceId,
+        escalation_level: escalationLevel,
+      }),
     });
   },
 };

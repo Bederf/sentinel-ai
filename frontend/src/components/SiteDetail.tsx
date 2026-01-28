@@ -35,6 +35,7 @@ import { PredictionCard } from "./PredictionCard";
 import { PredictionDetail } from "./PredictionDetail";
 import { OptimizationInfoCard } from "./OptimizationInfoCard";
 import { ControlPanel } from "./ControlPanel";
+import { useHealthThresholds } from "../hooks/useHealthThresholds";
 
 interface SiteDetailProps {
   siteId: string;
@@ -91,11 +92,16 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
 
   // Equipment control
   const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null);
+  const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [showEquipmentControl, setShowEquipmentControl] = useState(false);
+  const [loadingDevice, setLoadingDevice] = useState(false);
 
   // Prediction detail modal
   const [selectedPrediction, setSelectedPrediction] = useState<Prediction | null>(null);
   const [isPredictionDetailOpen, setIsPredictionDetailOpen] = useState(false);
+
+  // Health thresholds
+  const { thresholds } = useHealthThresholds();
 
   useEffect(() => {
     const loadSiteData = async () => {
@@ -209,21 +215,21 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
    */
   const generateMockMaintenanceDate = (equipmentId: string, healthScore: number): Date => {
     const seed = equipmentId.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    
+
     let monthsAgo: number;
-    if (healthScore >= 90) {
+    if (healthScore >= thresholds.healthy) {
       monthsAgo = 1 + (seed % 3);
-    } else if (healthScore >= 70) {
+    } else if (healthScore >= thresholds.warning) {
       monthsAgo = 3 + (seed % 4);
     } else {
       monthsAgo = 6 + (seed % 7);
     }
-    
+
     const date = new Date();
     date.setMonth(date.getMonth() - monthsAgo);
     const daysInMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
     date.setDate(1 + (seed % daysInMonth));
-    
+
     return date;
   };
 
@@ -255,26 +261,39 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
     return "N/A";
   };
 
-  const getHealthColor = (score: number) => {
-    if (score >= 90) return "var(--color-sentinel-green)";
-    if (score >= 70) return "var(--color-sentinel-amber)";
-    return "var(--color-sentinel-red)";
-  };
+  // Reserved for future use:
+  // const getHealthColor = (score: number) => {
+  //   if (score >= thresholds.healthy) return "var(--color-sentinel-green)";
+  //   if (score >= thresholds.warning) return "var(--color-sentinel-amber)";
+  //   return "var(--color-sentinel-red)";
+  // };
 
   const handleEquipmentClick = async (equip: Equipment) => {
     try {
-      // Fetch full device data from API
-      const device = await api.getDevice(equip.id);
       setSelectedEquipment(equip);
       setShowEquipmentControl(true);
+      setLoadingDevice(true);
+
+      // Try to fetch equipment controls from Supabase
+      try {
+        const deviceData = await api.getEquipmentControls(equip.id);
+        setSelectedDevice(deviceData);
+      } catch (deviceErr) {
+        console.warn("Could not load equipment controls:", deviceErr);
+        // Still show the modal with basic info, just no controls
+        setSelectedDevice(null);
+      }
     } catch (error) {
       console.error("Failed to load equipment details:", error);
+    } finally {
+      setLoadingDevice(false);
     }
   };
 
   const handleEquipmentControl = async (deviceId: string, point: string, value: number | boolean) => {
     try {
-      await api.controlDevice(deviceId, point, value);
+      // Use equipment control endpoint for Supabase equipment
+      await api.controlEquipment(deviceId, point, value);
       // Refresh equipment list after control action
       const equipmentData = await api.getEquipment(siteId);
       setEquipment(equipmentData as unknown as Equipment[]);
@@ -345,10 +364,10 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
     );
   }
 
-  // Calculate summary stats
-  const healthyEquipment = equipment.filter((e) => e.health_score >= 90).length;
-  const warningEquipment = equipment.filter((e) => e.health_score >= 70 && e.health_score < 90).length;
-  const criticalEquipment = equipment.filter((e) => e.health_score < 70).length;
+  // Calculate summary stats based on status field (matches what's shown in table)
+  const healthyEquipment = equipment.filter((e) => e.status === "normal" || e.status === "online").length;
+  const warningEquipment = equipment.filter((e) => e.status === "warning").length;
+  const criticalEquipment = equipment.filter((e) => e.status === "critical" || e.status === "offline").length;
   const avgHealth = equipment.length > 0
     ? Math.round(equipment.reduce((sum, e) => sum + e.health_score, 0) / equipment.length)
     : 0;
@@ -405,11 +424,22 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
                   style={{ color: "var(--color-sentinel-blue)" }}
                 />
                 <h1
-                  className="text-2xl font-semibold"
+                  className="text-2xl font-semibold flex-1"
                   style={{ color: "var(--color-sentinel-text-primary)" }}
                 >
                   {site.name}
                 </h1>
+                {/* Site Code */}
+                <span
+                  className="text-sm font-mono px-2 py-1 rounded"
+                  style={{
+                    background: "var(--color-sentinel-bg-secondary)",
+                    color: "var(--color-sentinel-text-secondary)",
+                    border: "1px solid var(--color-sentinel-border)",
+                  }}
+                >
+                  {site.id.slice(0, 8).toUpperCase()}
+                </span>
                 {statusConfig && (
                   <div
                     className="flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium"
@@ -478,7 +508,7 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
           title="Avg Health"
           value={`${avgHealth}%`}
           icon={<TrendingUp className="h-5 w-5" />}
-          accentColor={avgHealth >= 90 ? "green" : avgHealth >= 70 ? "orange" : "red"}
+          accentColor={avgHealth >= thresholds.healthy ? "green" : avgHealth >= thresholds.warning ? "orange" : "red"}
         />
         <KPICard
           title="Predictions"
@@ -769,7 +799,7 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
                                   className="h-full rounded-full"
                                   style={{
                                     width: `${item.health_score}%`,
-                                    background: getHealthColor(item.health_score),
+                                    background: getStatusColor(item.status),
                                   }}
                                 />
                               </div>
@@ -934,6 +964,7 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
           onClick={() => {
             setShowEquipmentControl(false);
             setSelectedEquipment(null);
+            setSelectedDevice(null);
           }}
         >
           <div
@@ -967,6 +998,7 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
                 onClick={() => {
                   setShowEquipmentControl(false);
                   setSelectedEquipment(null);
+                  setSelectedDevice(null);
                 }}
                 className="p-2 rounded transition-colors"
                 style={{ color: "var(--color-sentinel-text-secondary)" }}
@@ -977,21 +1009,42 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
 
             {/* Control Panel */}
             <div className="p-4 overflow-y-auto" style={{ maxHeight: "calc(90vh - 80px)" }}>
-              <ControlPanel
-                device={{
-                  id: selectedEquipment.id,
-                  name: selectedEquipment.name,
-                  type: selectedEquipment.type,
-                  site_id: siteId,
-                  points: {},
-                  status: selectedEquipment.status,
-                  health_score: selectedEquipment.health_score,
-                }}
-                onControl={handleEquipmentControl}
-                safetyStatus={{
-                  status: "safe",
-                }}
-              />
+              {loadingDevice ? (
+                <div className="flex items-center justify-center py-12">
+                  <div
+                    className="animate-spin h-8 w-8 border-4 rounded-full"
+                    style={{
+                      borderColor: "var(--color-sentinel-blue)",
+                      borderTopColor: "transparent",
+                    }}
+                  />
+                </div>
+              ) : selectedDevice ? (
+                <ControlPanel
+                  device={selectedDevice}
+                  onControl={handleEquipmentControl}
+                  safetyStatus={{
+                    status: selectedDevice.safety_status === "critical" ? "blocked" :
+                            selectedDevice.safety_status === "warning" ? "warning" : "safe",
+                  }}
+                />
+              ) : (
+                <div
+                  className="text-center py-12"
+                  style={{ color: "var(--color-sentinel-text-secondary)" }}
+                >
+                  <Cpu className="h-12 w-12 mx-auto mb-4" style={{ color: "var(--color-sentinel-text-disabled)" }} />
+                  <p className="text-lg font-medium mb-2" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                    {selectedEquipment.name}
+                  </p>
+                  <p className="text-sm mb-4">
+                    Health: {selectedEquipment.health_score}% • Status: {selectedEquipment.status}
+                  </p>
+                  <p className="text-xs">
+                    No control points available for this equipment.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>

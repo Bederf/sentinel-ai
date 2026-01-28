@@ -5,10 +5,12 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: {
+    port: 9096,
+    host: '0.0.0.0',
     allowedHosts: ['bms.aimthelaw.co.za', 'localhost'],
     proxy: {
       '/api': {
-        target: 'http://localhost:9097',
+        target: 'http://localhost:9095',
         changeOrigin: true,
       },
     },

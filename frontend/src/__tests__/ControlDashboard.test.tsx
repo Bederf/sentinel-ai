@@ -10,7 +10,7 @@
 
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ControlDashboard } from '../components/ControlDashboard';
-import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach } from 'vitest';
 import '@testing-library/jest-dom';
 
 // Mock the API client

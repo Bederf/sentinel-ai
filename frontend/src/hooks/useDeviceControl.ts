@@ -116,7 +116,7 @@ export function useDeviceControl(options: UseDeviceControlOptions = {}) {
   }, []);
 
   // Check safety status
-  const checkSafetyStatus = useCallback(async (id: string) => {
+  const checkSafetyStatus = useCallback(async (_id: string) => {
     try {
       // TODO: Integrate with safety API from Plan 6-02
       // For now, simulate safety status based on device type
@@ -244,7 +244,10 @@ export function useDeviceControl(options: UseDeviceControlOptions = {}) {
     if (!state.device) return [];
     return Object.entries(state.device.points)
       .filter(([_, point]) => point.writable)
-      .map(([name, point]) => ({ name, ...point }));
+      .map(([pointName, point]) => {
+        const { name, ...rest } = point;
+        return { name: pointName, ...rest };
+      });
   }, [state.device]);
 
   // Get readable points
@@ -252,7 +255,10 @@ export function useDeviceControl(options: UseDeviceControlOptions = {}) {
     if (!state.device) return [];
     return Object.entries(state.device.points)
       .filter(([_, point]) => !point.writable)
-      .map(([name, point]) => ({ name, ...point }));
+      .map(([pointName, point]) => {
+        const { name, ...rest } = point;
+        return { name: pointName, ...rest };
+      });
   }, [state.device]);
 
   return {

@@ -1,12 +1,14 @@
 """Claude AI service for building management intelligence."""
 
+import json
 import logging
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Any
 
 from anthropic import Anthropic, APIError, AuthenticationError, RateLimitError
 
 from app.config.settings import settings
 from app.services.fm_context import fm_context_service
+from app.services.chat_tools import CHAT_TOOLS, execute_tool
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +49,50 @@ When users ask about costs, savings, or financial implications ("What's the cost
 Example cost explanation:
 "Based on the analysis, if Gateway Chiller fails it would cost approximately R65,000 including emergency parts, overtime labour, and potential downtime. However, scheduling preventive maintenance now would cost R28,000 - saving you R37,000 (57% reduction). The savings come from avoiding the emergency premium on parts (+50% after hours), scheduled labour vs overtime rates, and preventing secondary damage to other equipment."
 
-Always be helpful, professional, and safety-conscious. If you identify a critical issue, emphasize the urgency appropriately."""
+Always be helpful, professional, and safety-conscious. If you identify a critical issue, emphasize the urgency appropriately.
+
+**BMS AI Agent Capabilities:**
+You are a proactive BMS (Building Management System) AI agent with real-time access to building data and device control. You should:
+
+1. **Provide Real-Time Intelligence:**
+   - Use get_system_status to show current alerts, equipment health, and recommendations
+   - Use get_alerts_and_anomalies to identify and explain active issues
+   - Use get_equipment_health to assess maintenance needs
+   - Use get_energy_analysis to find efficiency opportunities
+
+2. **Give Proactive Recommendations:**
+   - Use get_optimization_recommendations to suggest optimal HVAC setpoints
+   - Suggest energy-saving configurations based on current conditions
+   - Recommend maintenance actions based on equipment health
+   - Warn about predicted failures before they occur
+
+3. **Control Building Devices:**
+   - Use list_devices to discover available controllable equipment
+   - Use get_device_details to check current state before changes
+   - Use control_device to execute approved control actions
+   - All actions go through safety validation and audit logging
+
+**Proactive Agent Behavior:**
+- When asked about building status, ALWAYS use tools to get real-time data
+- Provide specific, actionable recommendations with cost/savings estimates
+- Reference device IDs, alert IDs, and equipment IDs for traceability
+- Explain the "why" behind recommendations (e.g., "Raising setpoint to 23°C will save R150/hour based on current energy rates")
+- Prioritize critical issues and safety concerns
+
+**Control Actions:**
+- Always confirm what action you're taking and on which device
+- Report results clearly with before/after values
+- If blocked by safety rules, explain the specific safety concern
+- Suggest alternative actions if the requested action isn't safe
+
+**Response Style:**
+- Be concise but thorough - building managers need quick answers
+- Use tables for comparing multiple items (equipment health, alerts, etc.)
+- Include cost estimates in ZAR when available
+- Highlight critical issues prominently
+
+**Protected Information:**
+When users ask about system methodology (how health scores are calculated, how predictions work, algorithm details), this is PROPRIETARY information. Use the get_system_methodology tool which requires a password. If no password is provided or it's incorrect, tell the user: "This is proprietary SENTINEL system information. Please provide the admin password to access methodology documentation." Do NOT make up or guess methodology details - only share what the tool returns."""
 
 # Citation format instructions
 CITATION_INSTRUCTIONS = """
@@ -180,6 +225,137 @@ class ClaudeService:
     def is_configured(self) -> bool:
         """Check if the service is properly configured."""
         return bool(self._api_key)
+
+    async def stream_response_with_tools(
+        self,
+        messages: list[dict],
+        system_prompt: str | None = None,
+        include_building_context: bool = True,
+    ) -> AsyncGenerator[str, None]:
+        """
+        Stream a response from Claude with tool calling support.
+
+        This method handles the tool use loop:
+        1. Call Claude with tools available
+        2. If Claude returns tool_use, execute the tools
+        3. Send tool_result back to Claude
+        4. Repeat until Claude returns a text response
+
+        Args:
+            messages: List of message dicts with 'role' and 'content'
+            system_prompt: Optional custom system prompt
+            include_building_context: Whether to include building data context
+
+        Yields:
+            Text chunks as they arrive from Claude's final response
+        """
+        # Build system prompt
+        if system_prompt:
+            system = system_prompt
+        elif include_building_context:
+            system = build_system_prompt_with_context()
+        else:
+            system = FM_SYSTEM_PROMPT_BASE
+
+        # Keep track of conversation with tool calls
+        conversation = list(messages)
+        max_tool_iterations = 10  # Safety limit
+
+        try:
+            for iteration in range(max_tool_iterations):
+                logger.debug(f"Tool iteration {iteration + 1}, messages: {len(conversation)}")
+
+                # Make API call with tools
+                response = self.client.messages.create(
+                    model=self._model,
+                    max_tokens=self._max_tokens,
+                    system=system,
+                    messages=conversation,
+                    tools=CHAT_TOOLS,
+                )
+
+                # Check stop reason
+                if response.stop_reason == "end_turn":
+                    # Claude finished with a text response - stream it
+                    for block in response.content:
+                        if block.type == "text":
+                            # Yield text in chunks to simulate streaming
+                            text = block.text
+                            chunk_size = 20  # Characters per chunk
+                            for i in range(0, len(text), chunk_size):
+                                yield text[i:i + chunk_size]
+                    return
+
+                elif response.stop_reason == "tool_use":
+                    # Claude wants to use tools
+                    tool_results = []
+
+                    # Process each tool use in the response
+                    for block in response.content:
+                        if block.type == "tool_use":
+                            tool_name = block.name
+                            tool_input = block.input
+                            tool_use_id = block.id
+
+                            logger.info(f"Executing tool: {tool_name} with input: {tool_input}")
+
+                            # Execute the tool
+                            result = await execute_tool(tool_name, tool_input)
+
+                            logger.debug(f"Tool {tool_name} result: {result}")
+
+                            tool_results.append({
+                                "type": "tool_result",
+                                "tool_use_id": tool_use_id,
+                                "content": json.dumps(result)
+                            })
+
+                    # Add assistant's response (with tool_use) to conversation
+                    conversation.append({
+                        "role": "assistant",
+                        "content": [
+                            {"type": block.type, **block.model_dump()}
+                            if block.type == "tool_use"
+                            else {"type": "text", "text": block.text}
+                            for block in response.content
+                        ]
+                    })
+
+                    # Add tool results to conversation
+                    conversation.append({
+                        "role": "user",
+                        "content": tool_results
+                    })
+
+                else:
+                    # Unexpected stop reason
+                    logger.warning(f"Unexpected stop reason: {response.stop_reason}")
+                    yield f"Unexpected response from AI: {response.stop_reason}"
+                    return
+
+            # If we hit max iterations
+            logger.warning("Hit max tool iterations limit")
+            yield "I apologize, but I encountered an issue processing your request. Please try again."
+
+        except AuthenticationError as e:
+            logger.error(f"Claude authentication error: {e}")
+            raise ValueError(
+                "Invalid ANTHROPIC_API_KEY. Please check your API key configuration."
+            ) from e
+
+        except RateLimitError as e:
+            logger.warning(f"Claude rate limit hit: {e}")
+            raise Exception(
+                "Claude API rate limit exceeded. Please try again in a moment."
+            ) from e
+
+        except APIError as e:
+            logger.error(f"Claude API error: {e}")
+            raise Exception(f"Claude API error: {e.message}") from e
+
+        except Exception as e:
+            logger.error(f"Unexpected error in Claude service with tools: {e}")
+            raise
 
 
 # Module-level service instance for dependency injection

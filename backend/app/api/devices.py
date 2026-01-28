@@ -8,7 +8,7 @@ device management.
 import json
 import logging
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Any, Union
 
 from fastapi import APIRouter, HTTPException, Query, Body, Request
 
@@ -150,7 +150,7 @@ async def control_device(
     request: Request,
     device_id: str,
     point: str = Body(..., embed=True, description="Point name to control"),
-    value: float = Body(..., embed=True, description="Value to write"),
+    value: Union[float, int, bool, str] = Body(..., embed=True, description="Value to write"),
     priority: int = Body(8, embed=True, description="Write priority (1-16, default: 8)")
 ) -> dict:
     """Write a value to a device point (control command)."""

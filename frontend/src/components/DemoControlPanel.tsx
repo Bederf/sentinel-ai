@@ -286,7 +286,7 @@ export function DemoControlPanel({
               <div className="space-y-2">
                 {demoScenarios.map((scenario) => {
                   const isCompleted = completedScenarios.includes(scenario.id);
-                  const isActive = activeScenario === scenario.id;
+                  // const _isActive = activeScenario === scenario.id; // Reserved for future use
                   const isSelected = selectedScenario.id === scenario.id;
 
                   return (

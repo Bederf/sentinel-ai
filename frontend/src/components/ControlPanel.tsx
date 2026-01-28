@@ -177,24 +177,43 @@ export function ControlPanel({
     ([_, point]) => !point.writable
   );
 
-  // Handle control request (shows confirmation modal)
-  const handleControlRequest = useCallback((
+  // Handle control request - direct action for toggles, confirmation for analog values
+  const handleControlRequest = useCallback(async (
     pointName: string,
     point: DevicePoint,
     newValue: number | boolean
   ) => {
     const currentValue = pointValues[pointName] ?? point.default_value;
 
-    // Don't show modal if value hasn't changed
+    // Don't act if value hasn't changed
     if (currentValue === newValue) return;
 
+    // For binary values (toggles), execute immediately without confirmation
+    if (point.point_type === "binary_value") {
+      if (onControl) {
+        try {
+          await onControl(device.id, pointName, newValue);
+          setPointValues((prev) => ({
+            ...prev,
+            [pointName]: newValue,
+          }));
+        } catch (err) {
+          console.error("Control action failed:", err);
+        }
+      } else {
+        await executeControl(device.id, pointName, newValue);
+      }
+      return;
+    }
+
+    // For analog/multistate values, show confirmation modal
     setPendingAction({
       pointName,
       point,
       currentValue,
       newValue,
     });
-  }, [pointValues]);
+  }, [pointValues, device.id, onControl, executeControl]);
 
   // Handle confirmation
   const handleConfirm = useCallback(async () => {

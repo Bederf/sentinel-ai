@@ -28,7 +28,6 @@ import {
 import api from "../lib/api";
 import type {
   AuditLogEntryResponse,
-  AuditLogsResponse,
   AuditStatsResponse,
 } from "../lib/api";
 import AuditLogDetail from "./AuditLogDetail";
@@ -194,7 +193,12 @@ export default function AuditTrail({
           result || undefined
         );
 
-        setLogs(response.entries);
+        // Deduplicate entries by ID to prevent React key warnings
+        const uniqueEntries = response.entries.filter(
+          (entry, index, self) => index === self.findIndex((e) => e.id === entry.id)
+        );
+
+        setLogs(uniqueEntries);
         setTotalCount(response.total_count);
         setHasMore(response.has_more);
         setError(null);

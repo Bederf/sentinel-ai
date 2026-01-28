@@ -25,14 +25,19 @@ import {
   Shield,
   ChevronDown,
   ChevronRight,
+  ChevronLeft,
   Info,
+  ClipboardList,
+  Settings as SettingsIcon,
+  Zap,
 } from "lucide-react";
 
-export type View = "dashboard" | "chat" | "upload";
+export type View = "dashboard" | "chat" | "control" | "control-audit" | "optimization" | "upload" | "settings";
 
 interface SidebarProps {
   currentView: View;
   onViewChange: (view: View) => void;
+  version?: string;
 }
 
 interface NavItem {
@@ -53,6 +58,10 @@ interface DataStatus {
 const navItems: NavItem[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, description: "System overview" },
   { id: "chat", label: "Chat", icon: MessageSquare, description: "AI Assistant" },
+  { id: "optimization", label: "Optimization", icon: Zap, description: "Load Shedding AI" },
+  { id: "control", label: "Control", icon: Shield, description: "Building Controls" },
+  { id: "control-audit", label: "Control Audit", icon: ClipboardList, description: "Control System Logs" },
+  { id: "settings", label: "Settings", icon: SettingsIcon, description: "System Configuration" },
 ];
 
 const uploadTypes = [
@@ -68,10 +77,11 @@ const uploadTypes = [
   { id: "pump_telemetry", label: "Pump", description: "Grundfos/KSB pump data" },
 ];
 
-export function Sidebar({ currentView, onViewChange }: SidebarProps) {
+export function Sidebar({ currentView, onViewChange, version = "1.0" }: SidebarProps) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true); // Start minimized
   const [uploadStatus, setUploadStatus] = useState<Record<string, "idle" | "uploading" | "success" | "error">>({});
   const [dataStatus, setDataStatus] = useState<DataStatus | null>(null);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
@@ -169,8 +179,8 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
       <aside
         className={`
           fixed md:relative inset-y-0 left-0 z-40
-          w-64 md:w-16 lg:w-56
-          transform transition-transform duration-200 ease-in-out
+          w-64 md:w-16 ${isCollapsed ? 'lg:w-16' : 'lg:w-56'}
+          transform transition-all duration-200 ease-in-out
           ${isMobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
           flex flex-col
         `}
@@ -179,19 +189,13 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
           borderRight: "1px solid var(--color-grafana-border)",
         }}
       >
-        {/* SENTINEL Logo area */}
+        {/* Sidebar Header */}
         <div
-          className="flex-none h-16 flex items-center px-4 md:justify-center lg:justify-start"
+          className="flex-none h-16 flex items-center justify-center px-4 mt-14 md:mt-0 relative"
           style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}
         >
-          <div className="flex items-center gap-3">
-            {/* SENTINEL Shield Logo */}
-            <div
-              className="w-9 h-9 rounded-lg flex items-center justify-center sentinel-shield sentinel-shield-active"
-            >
-              <Shield className="h-5 w-5" style={{ color: "var(--color-sentinel-amber)" }} />
-            </div>
-            <div className="md:hidden lg:block">
+          <div className={`flex items-center gap-3 w-full justify-center md:justify-center ${isCollapsed ? 'lg:hidden' : 'lg:flex lg:justify-start'}`}>
+            <div className={`md:hidden ${isCollapsed ? 'lg:hidden' : 'lg:block'}`}>
               <span
                 className="font-semibold text-sm tracking-wide"
                 style={{ color: "var(--color-sentinel-text-primary)" }}
@@ -206,13 +210,33 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
               </div>
             </div>
           </div>
+          {/* Toggle button - moves with sidebar state, only visible on large screens */}
+          <button
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className={`hidden lg:flex absolute top-1/2 transform -translate-y-1/2 p-1 rounded hover:bg-sentinel-bg-secondary transition-all duration-200 ${
+              isCollapsed 
+                ? 'left-1/2 -translate-x-1/2' 
+                : 'right-2'
+            }`}
+            style={{
+              background: "var(--color-sentinel-bg-secondary)",
+              border: "1px solid var(--color-sentinel-border)",
+            }}
+            aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            {isCollapsed ? (
+              <ChevronRight className="h-4 w-4" style={{ color: "var(--color-sentinel-text-secondary)" }} />
+            ) : (
+              <ChevronLeft className="h-4 w-4" style={{ color: "var(--color-sentinel-text-secondary)" }} />
+            )}
+          </button>
         </div>
 
         {/* Navigation items */}
         <nav className="flex-1 py-4 overflow-y-auto" role="navigation">
           <div className="px-3 mb-2">
             <span
-              className="text-xs font-medium uppercase tracking-wider md:hidden lg:block"
+              className={`text-xs font-medium uppercase tracking-wider md:hidden ${isCollapsed ? 'lg:hidden' : 'lg:block'}`}
               style={{ color: "var(--color-grafana-text-disabled)" }}
             >
               Menu
@@ -245,7 +269,7 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
                     color: isActive ? "var(--color-sentinel-amber)" : "var(--color-sentinel-text-secondary)",
                   }}
                 />
-                <div className="flex flex-col items-start md:hidden lg:flex">
+                <div className={`flex flex-col items-start md:hidden ${isCollapsed ? 'lg:hidden' : 'lg:flex'}`}>
                   <span className="font-medium text-sm">{item.label}</span>
                   {item.description && (
                     <span
@@ -267,7 +291,7 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
           >
             <button
               onClick={toggleUploadSection}
-              className="w-full flex items-center gap-3 px-1 py-2 transition-all duration-150 md:justify-center lg:justify-start"
+              className={`w-full flex items-center gap-3 px-1 py-2 transition-all duration-150 md:justify-center ${isCollapsed ? 'lg:justify-center' : 'lg:justify-start'}`}
               style={{
                 color: isUploadOpen
                   ? "var(--color-sentinel-text-primary)"
@@ -280,17 +304,17 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
                   color: isUploadOpen ? "var(--color-sentinel-blue)" : "var(--color-sentinel-text-secondary)",
                 }}
               />
-              <span className="font-medium text-sm md:hidden lg:block flex-1 text-left">Data Sources</span>
+              <span className={`font-medium text-sm md:hidden ${isCollapsed ? 'lg:hidden' : 'lg:block'} flex-1 text-left`}>Data Sources</span>
               {isUploadOpen ? (
-                <ChevronDown className="h-4 w-4 md:hidden lg:block" />
+                <ChevronDown className={`h-4 w-4 md:hidden ${isCollapsed ? 'lg:hidden' : 'lg:block'}`} />
               ) : (
-                <ChevronRight className="h-4 w-4 md:hidden lg:block" />
+                <ChevronRight className={`h-4 w-4 md:hidden ${isCollapsed ? 'lg:hidden' : 'lg:block'}`} />
               )}
             </button>
 
             {/* Expandable upload section */}
             {isUploadOpen && (
-              <div className="mt-2 space-y-1 md:hidden lg:block">
+              <div className={`mt-2 space-y-1 md:hidden ${isCollapsed ? 'lg:hidden' : 'lg:block'}`}>
                 {/* Data status summary */}
                 {dataStatus && (
                   <div
@@ -510,10 +534,10 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
           style={{ borderTop: "1px solid var(--color-sentinel-border)" }}
         >
           <div
-            className="text-xs text-center md:hidden lg:block"
+            className={`text-xs text-center md:hidden ${isCollapsed ? 'lg:hidden' : 'lg:block'}`}
             style={{ color: "var(--color-sentinel-text-disabled)" }}
           >
-            <span style={{ color: "var(--color-sentinel-amber)" }}>SENTINEL</span> v1.0
+            <span style={{ color: "var(--color-sentinel-amber)" }}>SENTINEL</span> v{version || "1.0"}
           </div>
           <div className="hidden md:flex lg:hidden justify-center">
             <div

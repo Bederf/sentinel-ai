@@ -186,8 +186,10 @@ class AuditMiddleware(BaseHTTPMiddleware):
                 body = b""
                 async for chunk in response.body_iterator:
                     body += chunk
-                # Reset iterator for downstream use
-                response.body_iterator = iter([body])
+                # Reset iterator for downstream use (must be async iterator)
+                async def body_iterator():
+                    yield body
+                response.body_iterator = body_iterator()
 
                 if body:
                     import json

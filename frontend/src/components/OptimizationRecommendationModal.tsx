@@ -207,12 +207,15 @@ export function OptimizationRecommendationModal({
     if (!recommendation) return null;
 
     const savings = recommendation.projected_savings;
+    const energyPercent = savings.energy_percent ?? savings.percentage_improvement ?? 0;
+    const costZar = savings.cost_zar ?? savings.cost_zar_per_hour ?? 0;
+    const monthlyCost = typeof costZar === 'number' ? costZar * 8 * 22 : 0;
 
     return {
-      energy: `${savings.percentage_improvement}% reduction (≈${formatCurrency(savings.cost_zar_per_hour * 8 * 22)}/month)`,
-      cost: formatCurrency(savings.cost_zar_per_hour * 8 * 22), // Assuming 8h/day, 22 days/month
-      comfort: "Within spec - no complaints expected",
-      equipment: "Reduces wear on equipment by extending optimal runtime",
+      energy: `${typeof energyPercent === 'number' ? energyPercent : 0}% reduction (≈${formatCurrency(monthlyCost)}/month)`,
+      cost: formatCurrency(monthlyCost), // Assuming 8h/day, 22 days/month
+      comfort: savings?.comfort_impact || "Within spec - no complaints expected",
+      equipment: savings?.equipment_impact || "Reduces wear on equipment by extending optimal runtime",
     };
   }, [recommendation]);
 
