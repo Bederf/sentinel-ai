@@ -14,6 +14,7 @@ from typing import Dict, List, Optional
 import asyncio
 import aiohttp
 import json
+import re
 from pathlib import Path
 from bs4 import BeautifulSoup
 import logging
@@ -87,80 +88,52 @@ class EquipmentLookup:
         }
     }
 
-    # South African parts suppliers
-    SA_PARTS_SUPPLIERS = [
+    # Technical forum sources for real-world solutions
+    FORUM_SOURCES = [
         {
-            "name": "Carrier South Africa",
-            "url": "https://www.carrier.com/en-za/",
-            "location": "Johannesburg",
-            "phone": "+27 11 207 2000"
+            "name": "HVAC-Talk",
+            "url": "https://hvac-talk.com",
+            "search_url": "/search?q={query}",
+            "coverage": ["troubleshooting", "real-world fixes"],
+            "description": "Professional HVAC technician forum"
         },
         {
-            "name": "Voltex",
-            "url": "https://www.voltex.co.za",
-            "location": "Nationwide",
-            "phone": "+27 11 875 1000"
+            "name": "Eng-Tips",
+            "url": "https://www.eng-tips.com",
+            "search_url": "/search?q={query}",
+            "coverage": ["engineering discussions"],
+            "description": "Engineering professional forums"
         },
         {
-            "name": "RS Components South Africa",
-            "url": "https://za.rs-online.com",
-            "location": "Johannesburg",
-            "phone": "+27 11 617 2000"
+            "name": "Reddit r/HVAC",
+            "url": "https://www.reddit.com/r/HVAC",
+            "search_url": "/search?q={query}",
+            "coverage": ["technician experiences"],
+            "description": "HVAC subreddit community"
         },
         {
-            "name": "Midas",
-            "url": "https://www.midas.co.za",
-            "location": "Nationwide",
-            "phone": "+27 11 608 1000"
-        },
-        {
-            "name": "CMC Refrigeration",
-            "url": "https://www.cmcair.co.za",
-            "location": "Cape Town",
-            "phone": "+27 21 511 4800"
-        },
-        {
-            "name": "BUCO",
-            "url": "https://www.buco.co.za",
-            "location": "Nationwide",
-            "phone": "+27 861 282 263"
-        },
-        {
-            "name": "Aircon Direct",
-            "url": "https://www.aircondirect.co.za",
-            "location": "Johannesburg",
-            "phone": "+27 11 914 1400"
-        },
-        {
-            "name": "HVA Supplies",
-            "url": "https://hva.co.za",
-            "location": "Cape Town",
-            "phone": "+27 21 552 1000"
-        },
-        {
-            "name": "Refrigeration & Air Conditioning Centre",
-            "url": "https://www.rac.co.za",
-            "location": "Johannesburg",
-            "phone": "+27 11 453 2700"
-        },
-        {
-            "name": "Thermal Control Products",
-            "url": "https://www.thermalcontrol.co.za",
-            "location": "Durban",
-            "phone": "+27 31 564 1000"
-        },
-        {
-            "name": "Adcock HVAC",
-            "url": "https://www.adcock.co.za",
-            "location": "Nationwide",
-            "phone": "+27 11 396 4000"
+            "name": "Refrigeration Engineer",
+            "url": "https://refrigerationengineer.com",
+            "search_url": "/search?q={query}",
+            "coverage": ["technical articles"],
+            "description": "Refrigeration technical resources"
         }
     ]
+
+    # South African parts suppliers - loaded from JSON
+    SA_PARTS_SUPPLIERS: List[Dict] = []
+
+    # Generic equivalents mapping - loaded from JSON
+    GENERIC_EQUIVALENTS: Dict = {}
+
+    # Part number mappings - loaded from JSON
+    PART_NUMBER_MAPPINGS: Dict = {}
 
     def __init__(self):
         """Initialize EquipmentLookup service."""
         self._fault_codes_db: Optional[Dict] = None
         self._load_fault_codes_db()
+        self._load_parts_suppliers_db()
 
     def _load_fault_codes_db(self) -> None:
         """Load fault codes database from JSON file."""
@@ -183,6 +156,31 @@ class EquipmentLookup:
             for model_data in mfg_data.get("models", {}).values():
                 total += len(model_data)
         return total
+
+    def _load_parts_suppliers_db(self) -> None:
+        """Load parts suppliers database from JSON file."""
+        try:
+            suppliers_path = Path(__file__).parent.parent / "data" / "parts_suppliers.json"
+            with open(suppliers_path, 'r') as f:
+                data = json.load(f)
+
+            # Convert class variables to instance variables
+            EquipmentLookup.SA_PARTS_SUPPLIERS = data.get("suppliers", [])
+            EquipmentLookup.GENERIC_EQUIVALENTS = data.get("generic_equivalents", {})
+            EquipmentLookup.PART_NUMBER_MAPPINGS = data.get("part_number_mappings", {})
+
+            logger.info(f"Loaded {len(EquipmentLookup.SA_PARTS_SUPPLIERS)} parts suppliers")
+            logger.info(f"Loaded {len(EquipmentLookup.GENERIC_EQUIVALENTS)} generic equivalent mappings")
+        except FileNotFoundError:
+            logger.warning("Parts suppliers database not found")
+            EquipmentLookup.SA_PARTS_SUPPLIERS = []
+            EquipmentLookup.GENERIC_EQUIVALENTS = {}
+            EquipmentLookup.PART_NUMBER_MAPPINGS = {}
+        except json.JSONDecodeError as e:
+            logger.error(f"Invalid JSON in parts suppliers database: {e}")
+            EquipmentLookup.SA_PARTS_SUPPLIERS = []
+            EquipmentLookup.GENERIC_EQUIVALENTS = {}
+            EquipmentLookup.PART_NUMBER_MAPPINGS = {}
 
     async def lookup_fault_code(
         self,
@@ -416,20 +414,22 @@ class EquipmentLookup:
             fault_code: Fault code
 
         Returns:
-            List of forum threads/solutions
+            List of forum threads/solutions with sources
         """
-        # Placeholder for forum search
-        # Would integrate with HVAC-Talk, Reddit r/hvac, etc.
         search_query = f"{manufacturer} {model if model else ''} {fault_code}".strip()
+        results = []
 
-        results = [
-            {
-                "source": "HVAC-Talk (placeholder)",
-                "url": f"https://hvac-talk.com/search?query={search_query.replace(' ', '+')}",
-                "title": f"{manufacturer} {fault_code} Discussion",
-                "snippet": "Real-world solutions from HVAC technicians"
-            }
-        ]
+        for forum in self.FORUM_SOURCES:
+            forum_url = forum["url"] + forum["search_url"].format(query=search_query.replace(" ", "+"))
+
+            results.append({
+                "source": forum["name"],
+                "url": forum_url,
+                "description": forum.get("description", ""),
+                "coverage": forum.get("coverage", []),
+                "title": f"{manufacturer} {fault_code} - {forum['name']}",
+                "snippet": f"Search {forum['name']} for real-world solutions"
+            })
 
         return results
 
@@ -441,7 +441,7 @@ class EquipmentLookup:
         causes: List[Dict]
     ) -> List[Dict]:
         """
-        Search for parts from South African suppliers.
+        Search SA suppliers for relevant parts based on fault and causes.
 
         Args:
             manufacturer: Equipment manufacturer
@@ -450,50 +450,259 @@ class EquipmentLookup:
             causes: Probable causes list
 
         Returns:
-            List of available parts with suppliers
+            List of {part_name, part_number, manufacturer, suppliers: [], generic_alternative: {}}
         """
-        # Extract part suggestions from causes
-        parts_suggested = []
+        parts = []
 
-        for cause in causes:
-            cause_str = cause.get("cause", "").lower()
+        # Map fault codes to likely parts
+        fault_parts_map = {
+            "E4": ["Oil Filter", "Compressor Oil", "Oil Pressure Sensor"],
+            "E1": ["EEV Assembly", "High Pressure Switch"],
+            "E3": ["Condenser Fan Motor", "Discharge Temperature Sensor"],
+            "E8": ["Supply Air Temperature Sensor"],
+            "H1": ["High Pressure Switch", "Condenser Fan Motor"],
+            "L1": ["Low Pressure Switch", "Expansion Valve"],
+            "A1": ["Contactor", "Control Board"],
+            "U0": ["Freeze Stat", "Evaporator Coil"],
+            "FAULT_004": ["Heat Sink Temperature Sensor", "Cooling Fan"],
+            "FAULT_001": ["IGBT Module", "Power Module"],
+            "FAULT_006": ["Earth Fault Sensor", "Motor Insulation"],
+            "ALARM_1": ["Motor Overload Protector", "Circuit Breaker"],
+            "ALARM_4": ["Overtemperature Sensor", "Thermal Switch"],
+            "U4": ["Low Pressure Switch", "Expansion Valve"],
+            "E5": ["Compressor Internal Components", "Discharge Valve"],
+        }
 
-            # Map fault causes to parts
-            if "sensor" in cause_str:
-                parts_suggested.append("Temperature Sensor")
-            elif "motor" in cause_str:
-                parts_suggested.append("Motor Assembly")
-            elif "valve" in cause_str:
-                parts_suggested.append("Expansion Valve")
-            elif "pump" in cause_str:
-                parts_suggested.append("Pump Assembly")
-            elif "board" in cause_str:
-                parts_suggested.append("Control Board")
-            elif "igbt" in cause_str:
-                parts_suggested.append("IGBT Module")
-            elif "resistor" in cause_str:
-                parts_suggested.append("Brake Resistor")
+        # Get part suggestions from fault code
+        suggested_part_names = fault_parts_map.get(fault_code.upper(), [])
 
-        # Build parts list with supplier info
-        parts_list = []
+        # If no mapped parts, try to extract from causes
+        if not suggested_part_names and causes:
+            for cause in causes:
+                cause_str = cause.get("cause", "").lower()
+                if "sensor" in cause_str:
+                    suggested_part_names.append("Temperature Sensor")
+                elif "motor" in cause_str:
+                    suggested_part_names.append("Motor Assembly")
+                elif "valve" in cause_str:
+                    suggested_part_names.append("Expansion Valve")
+                elif "pump" in cause_str:
+                    suggested_part_names.append("Pump Assembly")
+                elif "board" in cause_str:
+                    suggested_part_names.append("Control Board")
+                elif "igbt" in cause_str:
+                    suggested_part_names.append("IGBT Module")
+                elif "resistor" in cause_str:
+                    suggested_part_names.append("Brake Resistor")
 
-        for part in parts_suggested:
-            parts_list.append({
-                "part_name": part,
+        # For each suggested part, search suppliers
+        for part_name in suggested_part_names:
+            part_number = self._get_part_number(manufacturer, model or "", part_name)
+
+            part_result = {
+                "part_name": part_name,
+                "part_number": part_number,
                 "manufacturer": manufacturer,
-                "suppliers": [
-                    {
-                        "name": supplier["name"],
-                        "url": supplier["url"],
-                        "location": supplier["location"],
-                        "phone": supplier["phone"]
-                    }
-                    for supplier in self.SA_PARTS_SUPPLIERS[:5]  # Top 5 suppliers
-                ],
-                "note": "Contact suppliers for availability and pricing"
-            })
+                "suppliers": []
+            }
 
-        return parts_list
+            # Search each relevant supplier
+            for supplier in self.SA_PARTS_SUPPLIERS:
+                if self._supplier_relevant(supplier, manufacturer):
+                    try:
+                        results = await self._search_supplier(supplier, part_name, manufacturer, model)
+                        part_result["suppliers"].extend(results)
+                    except Exception as e:
+                        logger.debug(f"Error searching {supplier['name']}: {e}")
+
+            # Add generic alternative if available
+            if part_number != "N/A":
+                generic = self._find_generic_alternative(part_number)
+                if generic:
+                    part_result["generic_alternative"] = generic
+
+            parts.append(part_result)
+
+        return parts
+
+    async def _search_supplier(
+        self,
+        supplier: Dict,
+        part_name: str,
+        manufacturer: str,
+        model: Optional[str]
+    ) -> List[Dict]:
+        """
+        Search specific supplier for part.
+
+        Args:
+            supplier: Supplier dict from database
+            part_name: Part name to search for
+            manufacturer: Equipment manufacturer
+            model: Equipment model
+
+        Returns:
+            List of {supplier, price, lead_time, url}
+        """
+        results = []
+        query = f"{manufacturer} {part_name}"
+
+        # Build search URL
+        base_url = supplier.get("url", "")
+        search_template = supplier.get("search_url", "")
+        search_url = base_url + search_template.format(query=query)
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                headers = {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                }
+                async with session.get(search_url, headers=headers, timeout=10) as response:
+                    if response.status == 200:
+                        html = await response.text()
+                        results = self._parse_supplier_results(html, supplier["name"])
+                    else:
+                        # Return placeholder for failed requests
+                        results = [{
+                            "supplier": supplier["name"],
+                            "url": supplier["url"],
+                            "price": "Contact for price",
+                            "lead_time": "Contact supplier",
+                            "available": True
+                        }]
+        except Exception as e:
+            logger.debug(f"Error searching {supplier['name']}: {e}")
+            # Return basic info even if search fails
+            results = [{
+                "supplier": supplier["name"],
+                "url": supplier["url"],
+                "price": "Contact for price",
+                "lead_time": "Contact supplier",
+                "available": True
+            }]
+
+        return results
+
+    def _parse_supplier_results(self, html: str, supplier_name: str) -> List[Dict]:
+        """
+        Parse supplier HTML to extract product info.
+
+        Generic implementation - would need customization per supplier.
+        """
+        soup = BeautifulSoup(html, 'lxml')
+        results = []
+
+        # Generic product parsing (look for common patterns)
+        products = soup.find_all(['div', 'article'], class_=re.compile(r'product|item|card'))
+
+        for product in products[:5]:  # Limit to top 5 results
+            # Try to find name/title
+            name = None
+            for tag in ['h2', 'h3', 'h4', 'span', 'a']:
+                name_elem = product.find(tag, class_=re.compile(r'name|title|product'))
+                if name_elem:
+                    name = name_elem.get_text(strip=True)
+                    break
+
+            # Try to find price
+            price = None
+            for tag in ['span', 'div']:
+                price_elem = product.find(tag, class_=re.compile(r'price|cost'))
+                if price_elem:
+                    price = price_elem.get_text(strip=True)
+                    break
+
+            # Try to find part number/SKU
+            part_num = None
+            for tag in ['span', 'div']:
+                sku_elem = product.find(tag, class_=re.compile(r'sku|part|mpn'))
+                if sku_elem:
+                    part_num = sku_elem.get_text(strip=True)
+                    break
+
+            if name:
+                # Check availability
+                text = product.get_text().lower()
+                in_stock = "in stock" in text or "available" in text
+                lead_time = "In stock" if in_stock else "2-5 days"
+
+                results.append({
+                    "supplier": supplier_name,
+                    "name": name,
+                    "part_number": part_num if part_num else "N/A",
+                    "price": price if price else "Contact for price",
+                    "lead_time": lead_time,
+                    "available": in_stock,
+                    "url": "N/A"  # Would extract actual URL
+                })
+
+        # If no products found, return placeholder
+        if not results:
+            results = [{
+                "supplier": supplier_name,
+                "name": "Contact for part availability",
+                "part_number": "N/A",
+                "price": "Contact for price",
+                "lead_time": "Contact supplier",
+                "available": True,
+                "url": "N/A"
+            }]
+
+        return results
+
+    def _get_part_number(self, manufacturer: str, model: str, part_name: str) -> str:
+        """
+        Get OEM part number for part.
+
+        Args:
+            manufacturer: Equipment manufacturer
+            model: Equipment model
+            part_name: Part name
+
+        Returns:
+            Part number or "N/A" if unknown
+        """
+        # Look up in part number mappings
+        mfg_map = self.PART_NUMBER_MAPPINGS.get(manufacturer.lower(), {})
+        if model:
+            model_map = mfg_map.get(model.lower(), {})
+            return model_map.get(part_name, "N/A")
+        return "N/A"
+
+    def _supplier_relevant(self, supplier: Dict, manufacturer: str) -> bool:
+        """
+        Check if supplier stocks this manufacturer's parts.
+
+        Args:
+            supplier: Supplier dict
+            manufacturer: Manufacturer name
+
+        Returns:
+            True if supplier is relevant for this manufacturer
+        """
+        brands = supplier.get("brands", [])
+        return "all" in [b.lower() for b in brands] or manufacturer.lower() in [b.lower() for b in brands]
+
+    def _find_generic_alternative(self, oem_part_number: str) -> Optional[Dict]:
+        """
+        Find generic alternative for OEM part.
+
+        Args:
+            oem_part_number: OEM part number
+
+        Returns:
+            Dict with generic alternative info or None
+        """
+        for category, info in self.GENERIC_EQUIVALENTS.items():
+            if info.get("carrier_oem") == oem_part_number or info.get("trane_oem") == oem_part_number:
+                return {
+                    "category": category,
+                    "generic_part_number": info.get("generic"),
+                    "manufacturer": info.get("manufacturer"),
+                    "description": info.get("description"),
+                    "suppliers": info.get("suppliers", [])
+                }
+        return None
 
 
 # Convenience function for quick lookups

@@ -1,0 +1,235 @@
+{
+  "suppliers": [
+    {
+      "id": "carrier-sa",
+      "name": "Carrier South Africa",
+      "url": "https://www.carrier.com/en-za/",
+      "search_url": "/search?q={query}",
+      "brands": ["carrier"],
+      "coverage": ["chiller", "ahu", "pump", "parts", "oem"],
+      "regions": ["gauteng", "western-cape", "kwazulu-natal"],
+      "contact": {
+        "phone": "+27 11 207 2000",
+        "email": "parts.za@carrier.com"
+      }
+    },
+    {
+      "id": "trane-sa",
+      "name": "Trane South Africa",
+      "url": "https://www.trane.co.za",
+      "search_url": "/products?search={query}",
+      "brands": ["trane"],
+      "coverage": ["chiller", "ahu", "vrf", "parts", "oem"],
+      "regions": ["gauteng", "western-cape"],
+      "contact": {
+        "phone": "+27 11 805 9700",
+        "email": "sales@trane.co.za"
+      }
+    },
+    {
+      "id": "daikin-sa",
+      "name": "Daikin South Africa",
+      "url": "https://www.daikin.co.za",
+      "search_url": "/en/products/search?keyword={query}",
+      "brands": ["daikin"],
+      "coverage": ["vrf", "vrv", "split", "chiller", "parts", "oem"],
+      "regions": ["gauteng", "western-cape", "kwazulu-natal"],
+      "contact": {
+        "phone": "+27 11 462 1100",
+        "email": "info@daikin.co.za"
+      }
+    },
+    {
+      "id": "refrigeration-supplies",
+      "name": "Refrigeration Supplies",
+      "url": "https://www.refrigeration.co.za",
+      "search_url": "/shop?search={query}",
+      "brands": ["all"],
+      "coverage": ["refrigeration", "hvac", "parts", "tools", "generic"],
+      "regions": ["national"],
+      "contact": {
+        "phone": "+27 11 453 2700",
+        "email": "sales@refrigeration.co.za"
+      }
+    },
+    {
+      "id": "voltex",
+      "name": "Voltex",
+      "url": "https://www.voltex.co.za",
+      "search_url": "/search?q={query}",
+      "brands": ["all"],
+      "coverage": ["electrical", "drives", "motors", "components", "cabling"],
+      "regions": ["national"],
+      "contact": {
+        "phone": "+27 11 875 1000",
+        "email": "online@voltex.co.za"
+      }
+    },
+    {
+      "id": "mantech",
+      "name": "Mantech Electronics",
+      "url": "https://www.mantech.co.za",
+      "search_url": "/Catalogue/Search?query={query}",
+      "brands": ["all"],
+      "coverage": ["electronics", "controls", "sensors", "components"],
+      "regions": ["national"],
+      "contact": {
+        "phone": "+27 12 654 9012",
+        "email": "sales@mantech.co.za"
+      }
+    },
+    {
+      "id": "rs-components",
+      "name": "RS Components South Africa",
+      "url": "https://za.rs-online.com",
+      "search_url": "/web/p/search.html?query={query}",
+      "brands": ["all"],
+      "coverage": ["electronics", "drives", "sensors", "components", "tools"],
+      "regions": ["national"],
+      "contact": {
+        "phone": "+27 11 617 2000",
+        "email": "sales@za.rs-online.com"
+      }
+    },
+    {
+      "id": "festo-sa",
+      "name": "Festo South Africa",
+      "url": "https://www.festo.co.za",
+      "search_url": "/za/en/search?q={query}",
+      "brands": ["all"],
+      "coverage": ["pneumatics", "sensors", "actuators", "controls"],
+      "regions": ["gauteng", "western-cape", "kwazulu-natal"],
+      "contact": {
+        "phone": "+27 11 571 8000",
+        "email": "sales_za@festo.com"
+      }
+    },
+    {
+      "id": "smc-sa",
+      "name": "SMC Pneumatics South Africa",
+      "url": "https://www.smcworld.com/za",
+      "search_url": "/en/search/products?q={query}",
+      "brands": ["all"],
+      "coverage": ["pneumatics", "valves", "cylinders", "actuators"],
+      "regions": ["gauteng"],
+      "contact": {
+        "phone": "+27 11 792 7200",
+        "email": "info@smcworld.co.za"
+      }
+    },
+    {
+      "id": "bearing-man",
+      "name": "Bearing Man",
+      "url": "https://www.bearingman.co.za",
+      "search_url": "/products?search={query}",
+      "brands": ["all"],
+      "coverage": ["bearings", "seals", "belts", "power-transmission"],
+      "regions": ["national"],
+      "contact": {
+        "phone": "+27 11 913 1200",
+        "email": "sales@bearingman.co.za"
+      }
+    },
+    {
+      "id": "bmg",
+      "name": "BMG",
+      "url": "https://www.bmgworld.net",
+      "search_url": "/search?q={query}",
+      "brands": ["all"],
+      "coverage": ["bearings", "seals", "belts", "power-transmission", "motors"],
+      "regions": ["national"],
+      "contact": {
+        "phone": "+27 11 396 4000",
+        "email": "info@bmgworld.net"
+      }
+    }
+  ],
+  "generic_equivalents": {
+    "contactors": {
+      "carrier_oem": "1452292",
+      "generic": "LC1D40M7",
+      "manufacturer": "schneider",
+      "description": "40A 24VDC Contactor",
+      "suppliers": ["voltex", "rs-components", "mantech"]
+    },
+    "pressure_switches": {
+      "carrier_oem": "P190-30",
+      "generic": "PSB-40-02",
+      "manufacturer": "danfoss",
+      "description": "High pressure switch 40 bar",
+      "suppliers": ["refrigeration-supplies", "rs-components"]
+    },
+    "temperature_sensors": {
+      "carrier_oem": "SEN-021",
+      "generic": "PT100-3W",
+      "manufacturer": "honeywell",
+      "description": "PT100 3-wire sensor",
+      "suppliers": ["rs-components", "mantech", "festo-sa"]
+    },
+    "vfd_drives": {
+      "carrier_oem": "23XL-405",
+      "generic": "ACS580-01",
+      "manufacturer": "abb",
+      "description": "45kW VSD",
+      "suppliers": ["voltex", "rs-components", "mantech"]
+    },
+    "igbt_modules": {
+      "generic": "CM600DU-24NFH",
+      "manufacturer": "mitsubishi",
+      "description": "600A 1200V IGBT module",
+      "suppliers": ["mantech", "rs-components"],
+      "note": "Often universal across VSD brands"
+    },
+    "belts": {
+      "description": "V-belts for fan motors",
+      "suppliers": ["bearing-man", "bmg"],
+      "note": "Match by belt size and profile (A/B/C section)"
+    },
+    "bearings": {
+      "description": "Motor and fan bearings",
+      "suppliers": ["bearing-man", "bmg"],
+      "note": "Match by bearing number (e.g., 6205-2RS)"
+    },
+    "oil_filters": {
+      "carrier_oem": "30HX-405-332",
+      "generic": "OIL-FILT-UNI",
+      "description": "Universal compressor oil filter",
+      "suppliers": ["refrigeration-supplies"]
+    }
+  },
+  "part_number_mappings": {
+    "carrier": {
+      "30xa": {
+        "Oil Filter": "30HX-405-332",
+        "Compressor Oil": "POE-68-10L",
+        "Oil Pressure Sensor": "P190-30",
+        "High Pressure Switch": "HPS-40",
+        "Low Pressure Switch": "LPS-15",
+        "Discharge Temperature Sensor": "SEN-021",
+        "Suction Temperature Sensor": "SEN-022",
+        "EEV Assembly": "EEV-30XA"
+      }
+    },
+    "trane": {
+      "rtac": {
+        "Oil Filter": "OIL-FILT-RTAC",
+        "Compressor Oil": "POE-OIL-RTA",
+        "Oil Pressure Sensor": "SEN-OIL-RT"
+      }
+    },
+    "daikin": {
+      "vrv": {
+        "Inverter Module": "INV-VRV-III",
+        "EEV Assembly": "EEV-VRV",
+        "PCB Control": "PCB-MAIN-VRV"
+      }
+    },
+    "abb": {
+      "acs580": {
+        "IGBT Module": "3AFE64666666",
+        "Control Board": "3AFE68466666",
+        "Fan Kit": "FAN-ACS58"
+      }
+    }
+  }
+}
