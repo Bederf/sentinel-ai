@@ -275,3 +275,90 @@ CREATE TABLE sync_jobs (
 CREATE INDEX idx_sync_jobs_source ON sync_jobs(log_source_id);
 CREATE INDEX idx_sync_jobs_time ON sync_jobs(started_at DESC);
 CREATE INDEX idx_sync_jobs_status ON sync_jobs(status) WHERE status != 'success';
+
+-- CAFM synced assets (cached copy from client's CAFM)
+CREATE TABLE cafm_assets (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  building_id UUID NOT NULL REFERENCES buildings(id) ON DELETE CASCADE,
+  log_source_id UUID REFERENCES log_sources(id) ON DELETE SET NULL,
+
+  -- CAFM fields (flexible - different CAFM systems have different fields)
+  cafm_id TEXT NOT NULL,              -- ID in source CAFM system
+  asset_tag TEXT NOT NULL,
+  description TEXT,
+  category TEXT,
+  asset_type TEXT,
+  sub_type TEXT,
+
+  manufacturer TEXT,
+  model TEXT,
+  serial_number TEXT,
+
+  location_floor TEXT,
+  location_zone TEXT,
+  location_room TEXT,
+
+  install_date DATE,
+  condition TEXT,
+  criticality TEXT,
+
+  -- PPM info
+  ppm_frequency TEXT,
+  last_ppm_date DATE,
+  next_ppm_due DATE,
+
+  -- Additional CAFM fields stored as JSON
+  cafm_metadata JSONB,
+
+  -- Sync tracking
+  last_synced_at TIMESTAMPTZ DEFAULT NOW(),
+  cafm_updated_at TIMESTAMPTZ,        -- When it was updated in source CAFM
+
+  UNIQUE(building_id, cafm_id)
+);
+
+CREATE INDEX idx_cafm_assets_building ON cafm_assets(building_id);
+CREATE INDEX idx_cafm_assets_tag ON cafm_assets(asset_tag);
+CREATE INDEX idx_cafm_assets_type ON cafm_assets(category, asset_type);
+
+-- CAFM synced work orders (for pattern analysis)
+CREATE TABLE cafm_workorders (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  building_id UUID NOT NULL REFERENCES buildings(id) ON DELETE CASCADE,
+  log_source_id UUID REFERENCES log_sources(id) ON DELETE SET NULL,
+
+  cafm_id TEXT NOT NULL,              -- WO number in source CAFM
+  asset_id TEXT,                      -- Related asset
+
+  wo_type TEXT,                       -- 'corrective', 'preventive', 'emergency'
+  priority TEXT,
+  status TEXT,
+
+  description TEXT,
+  resolution TEXT,
+
+  created_at_source TIMESTAMPTZ,
+  completed_at_source TIMESTAMPTZ,
+
+  -- Cost info (if available)
+  labor_cost DECIMAL(10, 2),
+  parts_cost DECIMAL(10, 2),
+  total_cost DECIMAL(10, 2),
+
+  -- For NLP extraction
+  failure_codes TEXT[],
+  parts_used JSONB,
+
+  -- Additional fields as JSON
+  cafm_metadata JSONB,
+
+  -- Sync tracking
+  last_synced_at TIMESTAMPTZ DEFAULT NOW(),
+
+  UNIQUE(building_id, cafm_id)
+);
+
+CREATE INDEX idx_cafm_workorders_building ON cafm_workorders(building_id);
+CREATE INDEX idx_cafm_workorders_asset ON cafm_workorders(asset_id);
+CREATE INDEX idx_cafm_workorders_created ON cafm_workorders(created_at_source DESC);
+CREATE INDEX idx_cafm_workorders_type ON cafm_workorders(wo_type);
