@@ -1591,6 +1591,176 @@ export const api = {
       method: "POST",
     });
   },
+
+  // ============= Dashboard Preferences =============
+
+  /**
+   * Get user's dashboard preferences
+   * @param userId - Optional user ID (defaults to 'default-user')
+   */
+  async getDashboardPreferences(userId?: string): Promise<DashboardPreferencesResponse> {
+    const headers: Record<string, string> = {};
+    if (userId) headers["X-User-ID"] = userId;
+    return fetchApi("/api/preferences/dashboard", { headers });
+  },
+
+  /**
+   * Update user's dashboard preferences
+   * @param preferences - Dashboard preferences to save
+   * @param userId - Optional user ID
+   */
+  async updateDashboardPreferences(
+    preferences: DashboardPreferences,
+    userId?: string
+  ): Promise<DashboardPreferencesResponse> {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (userId) headers["X-User-ID"] = userId;
+    return fetchApi("/api/preferences/dashboard", {
+      method: "PUT",
+      headers,
+      body: JSON.stringify(preferences),
+    });
+  },
+
+  /**
+   * Reset dashboard preferences to defaults
+   * @param userId - Optional user ID
+   */
+  async resetDashboardPreferences(userId?: string): Promise<{ success: boolean; message: string }> {
+    const headers: Record<string, string> = {};
+    if (userId) headers["X-User-ID"] = userId;
+    return fetchApi("/api/preferences/dashboard", {
+      method: "DELETE",
+      headers,
+    });
+  },
+};
+
+// Dashboard Preferences interfaces
+export interface DashboardPreferences {
+  visible_kpi_cards: string[];
+  visible_sections: string[];
+  kpi_card_order: string[];
+  section_order: string[];
+  default_energy_period: number;
+  default_energy_site_id: string | null;
+}
+
+export interface DashboardPreferencesResponse {
+  user_id: string;
+  preferences: DashboardPreferences;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// ============= Integration API Interfaces (Phase 15) =============
+
+export interface FormatDetectionResult {
+  file_format: 'csv' | 'excel' | 'json';
+  delimiter: string;
+  vendor: string;
+  confidence: number;
+  suggested_mappings: Record<string, string>;
+  row_count: number;
+  sample_data?: Array<Record<string, any>>;
+}
+
+export interface ColumnMapping {
+  source_column: string;
+  target_field: string;
+  transform_type?: 'none' | 'date_parse' | 'number_parse' | 'boolean_parse';
+}
+
+export interface PointMatch {
+  bms_point_id: string;
+  bms_point_name: string;
+  asset_id?: string;
+  asset_tag?: string;
+  confidence: 'high' | 'medium' | 'low';
+  alternatives?: Array<{
+    asset_id: string;
+    asset_tag: string;
+    confidence: number;
+  }>;
+}
+
+// Integration API methods
+export const integrationApi = {
+  /**
+   * Detect format from uploaded BMS log file
+   * @param file - File to analyze
+   */
+  detectFormat: async (file: File): Promise<FormatDetectionResult> => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await fetch(`${API_BASE_URL}/api/integration/detect-format`, {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to detect format');
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Save column mappings for log source
+   * @param buildingId - Building ID
+   * @param logSourceId - Log source ID
+   * @param mappings - Column mappings to save
+   */
+  saveColumnMappings: async (buildingId: string, logSourceId: string, mappings: ColumnMapping[]): Promise<void> => {
+    const response = await fetch(`${API_BASE_URL}/api/integration/mappings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ building_id: buildingId, log_source_id: logSourceId, mappings })
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to save mappings');
+    }
+  },
+
+  /**
+   * Match BMS points to CAFM assets
+   * @param buildingId - Building ID
+   * @param logSourceId - Log source ID
+   * @param bmsPoints - List of BMS point IDs
+   */
+  matchPoints: async (buildingId: string, logSourceId: string, bmsPoints: string[]): Promise<PointMatch[]> => {
+    const response = await fetch(`${API_BASE_URL}/api/integration/match-points`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ building_id: buildingId, log_source_id: logSourceId, bms_points: bmsPoints })
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to match points');
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Ingest log file data
+   * @param buildingId - Building ID
+   * @param logSourceId - Log source ID
+   * @param dryRun - If true, validate without processing
+   */
+  ingestLogs: async (buildingId: string, logSourceId: string, dryRun: boolean = false): Promise<void> => {
+    const response = await fetch(`${API_BASE_URL}/api/integration/ingest`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ building_id: buildingId, log_source_id: logSourceId, dry_run: dryRun })
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to ingest logs');
+    }
+  }
 };
 
 export default api;
