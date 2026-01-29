@@ -316,8 +316,20 @@ async def control_equipment(
         if not point or value is None:
             raise HTTPException(status_code=400, detail="Missing 'point' or 'value' in request body")
 
-        # Get equipment from Supabase
-        eq = equipment_repo.get_by_id(equipment_id)
+        # Get equipment from Supabase with JSON fallback
+        eq = None
+        try:
+            eq = equipment_repo.get_by_id(equipment_id)
+        except Exception as supabase_err:
+            logger.debug(f"Supabase lookup failed for {equipment_id}: {supabase_err}")
+
+        # Fallback to JSON if not in Supabase
+        if not eq:
+            equipment_list = load_equipment()
+            eq = next((e for e in equipment_list if e.get("id") == equipment_id), None)
+            if eq:
+                eq["building_id"] = eq.get("site_id", "")
+
         if not eq:
             raise HTTPException(status_code=404, detail=f"Equipment {equipment_id} not found")
 
@@ -325,7 +337,15 @@ async def control_equipment(
         sensor_value = None
         old_value = None
         if point.startswith("sensor-"):
-            sensors = sensor_repo.get_by_equipment(eq["id"])
+            # Try Supabase first, fallback to JSON
+            sensors = []
+            try:
+                sensors = sensor_repo.get_by_equipment(eq["id"])
+            except Exception as sensor_err:
+                logger.debug(f"Supabase sensor lookup failed: {sensor_err}")
+            if not sensors:
+                all_sensors = load_sensors()
+                sensors = [s for s in all_sensors if s.get("equipment_id") == equipment_id]
             sensor = next((s for s in sensors if s.get("code") == point), None)
             if sensor:
                 old_value = sensor.get("current_value")
