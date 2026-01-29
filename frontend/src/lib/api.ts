@@ -104,6 +104,7 @@ export interface DevicePoint {
   min_value?: number;
   max_value?: number;
   default_value: number | boolean;
+  current_value?: number | boolean; // Actual current value from device adapter
   writable: boolean;
   priority?: number;
   metadata?: Record<string, any>;
@@ -1653,6 +1654,48 @@ export interface DashboardPreferencesResponse {
   updated_at?: string;
 }
 
+// ============= Validation Checklist Interfaces (Phase 17) =============
+
+// Building status enum
+export type BuildingStatus = 'draft' | 'pending_validation' | 'active' | 'suspended';
+
+// Checklist item from validation
+export interface ChecklistItem {
+  id: string;
+  category: string;
+  name: string;
+  description: string;
+  status: 'pass' | 'fail' | 'warning' | 'not_checked';
+  value?: any;
+  threshold?: any;
+  details?: string;
+}
+
+// Complete validation checklist
+export interface ValidationChecklist {
+  building_id: string;
+  building_name?: string;
+  status: BuildingStatus;
+  checked_at: string;
+  items: ChecklistItem[];
+  summary: {
+    passed: number;
+    failed: number;
+    warnings: number;
+  };
+  can_activate: boolean;
+  blocking_issues: string[];
+}
+
+// Activation result
+export interface ActivationResult {
+  success: boolean;
+  building_id: string;
+  new_status: BuildingStatus;
+  message: string;
+  validation_errors: string[];
+}
+
 // ============= Integration Monitoring Interfaces (Phase 16) =============
 
 export interface IntegrationHealthSummary {
@@ -1872,6 +1915,68 @@ export const integrationApi = {
       throw new Error('Failed to ingest logs');
     }
   }
+};
+
+// Validation API methods (Phase 17 - Go-Live Checklist)
+export const validationApi = {
+  /**
+   * Get validation checklist for a building
+   * @param buildingId - Building ID
+   */
+  getChecklist: async (buildingId: string): Promise<ValidationChecklist> => {
+    const response = await fetch(`${API_BASE_URL}/api/integration/buildings/${buildingId}/validation-checklist`);
+    if (!response.ok) throw new Error('Failed to fetch validation checklist');
+    return response.json();
+  },
+
+  /**
+   * Get current building status
+   * @param buildingId - Building ID
+   */
+  getStatus: async (buildingId: string): Promise<{ status: BuildingStatus; last_validated?: string }> => {
+    const response = await fetch(`${API_BASE_URL}/api/integration/buildings/${buildingId}/status`);
+    if (!response.ok) throw new Error('Failed to fetch building status');
+    return response.json();
+  },
+
+  /**
+   * Run validation and update building status
+   * @param buildingId - Building ID
+   */
+  validate: async (buildingId: string): Promise<ValidationChecklist> => {
+    const response = await fetch(`${API_BASE_URL}/api/integration/buildings/${buildingId}/validate`, {
+      method: 'POST',
+    });
+    if (!response.ok) throw new Error('Validation failed');
+    return response.json();
+  },
+
+  /**
+   * Activate a building after successful validation
+   * @param buildingId - Building ID
+   */
+  activate: async (buildingId: string): Promise<ActivationResult> => {
+    const response = await fetch(`${API_BASE_URL}/api/integration/buildings/${buildingId}/activate`, {
+      method: 'POST',
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Activation failed');
+    }
+    return response.json();
+  },
+
+  /**
+   * Suspend (deactivate) a building
+   * @param buildingId - Building ID
+   */
+  suspend: async (buildingId: string): Promise<{ status: BuildingStatus }> => {
+    const response = await fetch(`${API_BASE_URL}/api/integration/buildings/${buildingId}/suspend`, {
+      method: 'POST',
+    });
+    if (!response.ok) throw new Error('Suspend failed');
+    return response.json();
+  },
 };
 
 export default api;
