@@ -13,6 +13,7 @@ import { Sidebar, type View } from "./components/Sidebar";
 import { SplashScreen } from "./components/SplashScreen";
 import { AlertFeed } from "./components/AlertFeed";
 import { CalendarPicker } from "./components/CalendarPicker";
+import { IntegrationMonitoringPage } from "./components/IntegrationMonitoringPage";
 
 interface HealthStatus {
   status: string;
@@ -191,6 +192,7 @@ function App() {
                  currentView === "optimization" ? "Load Shedding Optimization" :
                  currentView === "settings" ? "Settings" :
                  currentView === "technician" ? "Technician Chat" :
+                 currentView === "integrations" ? "Integration Monitoring" :
                  "AI Assistant"}
               </h1>
             </div>
@@ -420,6 +422,8 @@ function App() {
             <div className="h-full">
               <TechnicianChat />
             </div>
+          ) : currentView === "integrations" ? (
+            <IntegrationMonitoringPage />
           ) : (
             <div className="h-full p-4 md:p-6">
               <div className="h-full max-w-4xl mx-auto">

@@ -30,9 +30,11 @@ import {
   ClipboardList,
   Settings as SettingsIcon,
   Zap,
+  Wrench,
+  Activity,
 } from "lucide-react";
 
-export type View = "dashboard" | "chat" | "control" | "control-audit" | "optimization" | "upload" | "settings";
+export type View = "dashboard" | "chat" | "technician" | "control" | "control-audit" | "optimization" | "upload" | "settings" | "integrations";
 
 interface SidebarProps {
   currentView: View;
@@ -58,10 +60,12 @@ interface DataStatus {
 const navItems: NavItem[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, description: "System overview" },
   { id: "chat", label: "Chat", icon: MessageSquare, description: "AI Assistant" },
+  { id: "technician", label: "Tech Chat", icon: Wrench, description: "Fault Diagnosis" },
   { id: "optimization", label: "Optimization", icon: Zap, description: "Load Shedding AI" },
   { id: "control", label: "Control", icon: Shield, description: "Building Controls" },
   { id: "control-audit", label: "Control Audit", icon: ClipboardList, description: "Control System Logs" },
   { id: "settings", label: "Settings", icon: SettingsIcon, description: "System Configuration" },
+  { id: "integrations", label: "Integrations", icon: Activity, description: "BMS Integration Health" },
 ];
 
 const uploadTypes = [
@@ -250,7 +254,10 @@ export function Sidebar({ currentView, onViewChange, version = "1.0" }: SidebarP
             return (
               <button
                 key={item.id}
-                onClick={() => handleNavClick(item.id)}
+                onClick={() => {
+                  // Always navigate to the selected view, even if already active
+                  handleNavClick(item.id);
+                }}
                 className={`
                   w-full flex items-center gap-3 px-4 py-2.5 mb-1 mx-auto
                   transition-all duration-150 ease-in-out
