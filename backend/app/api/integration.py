@@ -3,9 +3,11 @@
 import time
 import csv
 import io
-from typing import List, Optional
+from typing import List, Optional, Literal
+from datetime import datetime
 from fastapi import APIRouter, HTTPException, UploadFile, File, Query
 from fastapi.responses import PlainTextResponse
+from pydantic import BaseModel, Field
 
 from app.models.integration import (
     LogSource, LogSourceCreate, LogSourceUpdate,
@@ -14,6 +16,54 @@ from app.models.integration import (
     FormatDetectionResult, ParseResult, BulkMatchResult,
     ColumnMapping as CMModel,
 )
+
+
+# ==================== Monitoring Response Models ====================
+
+class IntegrationAlert(BaseModel):
+    """An alert from integration health monitoring."""
+    type: str  # 'stale_data', 'high_error_rate', 'low_match_coverage'
+    severity: str  # 'warning', 'critical'
+    message: str
+    value: Optional[float] = None
+    threshold: Optional[float] = None
+
+
+class IntegrationHealthSummary(BaseModel):
+    """Integration health summary for monitoring dashboard."""
+    sources_count: int
+    active_sources: int
+    last_sync: Optional[datetime] = None
+    total_records_ingested: int
+    total_points_mapped: int
+    unmatched_points: int
+    recent_errors_count: int
+    alerts: List[IntegrationAlert] = Field(default_factory=list)
+
+
+class DataQualityMetrics(BaseModel):
+    """Data quality metrics for a building."""
+    match_coverage: float = Field(..., ge=0, le=100, description="Percentage of points matched")
+    data_freshness_hours: float = Field(..., description="Hours since last sync")
+    error_rate: float = Field(..., ge=0, le=100, description="Percentage of failed sync jobs")
+    duplicate_rate: float = Field(..., ge=0, le=100, description="Percentage of skipped records")
+    overall_score: float = Field(..., ge=0, le=100, description="Weighted quality score")
+    trend: Literal['improving', 'stable', 'degrading']
+
+
+class SyncJobSummary(BaseModel):
+    """Summary of a sync job."""
+    id: str
+    log_source_id: str
+    status: str
+    records_processed: Optional[int] = None
+    records_inserted: Optional[int] = None
+    records_failed: Optional[int] = None
+    records_skipped: Optional[int] = None
+    processing_time_ms: Optional[int] = None
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    file_name: Optional[str] = None
 from app.database.repositories.integration_repository import IntegrationRepository
 from app.database.repositories.building_repository import BuildingRepository
 from app.database.repositories.equipment_repository import EquipmentRepository
@@ -410,3 +460,138 @@ async def get_recent_alarms(
 ):
     """Get recent ingested alarms for a building."""
     return integration_repo.get_recent_alarms(building_id, limit, severity)
+
+
+# ==================== Monitoring Endpoints ====================
+
+@router.get("/health", response_model=IntegrationHealthSummary)
+async def get_integration_health(
+    building_id: Optional[str] = Query(None, description="Filter by building ID"),
+):
+    """
+    Get integration health summary for monitoring dashboard.
+
+    Returns aggregate metrics on integration status including:
+    - Source counts (total and active)
+    - Last sync timestamp
+    - Total records ingested
+    - Point mapping status
+    - Recent errors
+    - Generated alerts for problematic conditions
+    """
+    health = integration_repo.get_integration_health(building_id)
+
+    # Generate alerts based on conditions
+    alerts: List[IntegrationAlert] = []
+
+    # Stale data alert (>24 hours since last sync)
+    if health['last_sync']:
+        try:
+            last_sync_str = health['last_sync']
+            if isinstance(last_sync_str, str):
+                last_sync = datetime.fromisoformat(last_sync_str.replace('Z', '+00:00').replace('+00:00', ''))
+            else:
+                last_sync = last_sync_str
+            hours_since_sync = (datetime.utcnow() - last_sync).total_seconds() / 3600
+            if hours_since_sync > 24:
+                alerts.append(IntegrationAlert(
+                    type='stale_data',
+                    severity='warning' if hours_since_sync < 48 else 'critical',
+                    message=f"Data is {int(hours_since_sync)} hours old. Last sync was {last_sync.strftime('%Y-%m-%d %H:%M')}.",
+                    value=round(hours_since_sync, 1),
+                    threshold=24,
+                ))
+        except (ValueError, TypeError):
+            pass
+
+    # High error rate alert (>10% of recent syncs failed)
+    if health['recent_errors_count'] > 0 and health['active_sources'] > 0:
+        # Approximate error rate based on active sources
+        error_ratio = health['recent_errors_count'] / health['active_sources']
+        if error_ratio > 0.1:
+            alerts.append(IntegrationAlert(
+                type='high_error_rate',
+                severity='warning' if error_ratio < 0.25 else 'critical',
+                message=f"{health['recent_errors_count']} sync failures in the last 24 hours.",
+                value=health['recent_errors_count'],
+                threshold=health['active_sources'] * 0.1,
+            ))
+
+    # Low match coverage alert (<50% of points matched)
+    if health['total_points_mapped'] > 0:
+        match_rate = (health['total_points_mapped'] - health['unmatched_points']) / health['total_points_mapped'] * 100
+        if match_rate < 50:
+            alerts.append(IntegrationAlert(
+                type='low_match_coverage',
+                severity='warning' if match_rate > 25 else 'critical',
+                message=f"Only {match_rate:.0f}% of points are matched to assets. {health['unmatched_points']} points unmatched.",
+                value=round(match_rate, 1),
+                threshold=50,
+            ))
+
+    return IntegrationHealthSummary(
+        sources_count=health['sources_count'],
+        active_sources=health['active_sources'],
+        last_sync=health['last_sync'],
+        total_records_ingested=health['total_records_ingested'],
+        total_points_mapped=health['total_points_mapped'],
+        unmatched_points=health['unmatched_points'],
+        recent_errors_count=health['recent_errors_count'],
+        alerts=alerts,
+    )
+
+
+@router.get("/quality-metrics/{building_id}", response_model=DataQualityMetrics)
+async def get_quality_metrics(building_id: str):
+    """
+    Get data quality metrics for a specific building.
+
+    Returns quality scores including:
+    - match_coverage: Percentage of BMS points matched to CAFM assets (0-100)
+    - data_freshness_hours: Hours since last successful sync
+    - error_rate: Percentage of failed sync jobs in last 7 days (0-100)
+    - duplicate_rate: Percentage of skipped/duplicate records (0-100)
+    - overall_score: Weighted quality score (0-100)
+    - trend: Quality trend ('improving', 'stable', 'degrading')
+    """
+    metrics = integration_repo.get_quality_metrics(building_id)
+
+    return DataQualityMetrics(
+        match_coverage=metrics['match_coverage'],
+        data_freshness_hours=metrics['data_freshness_hours'],
+        error_rate=metrics['error_rate'],
+        duplicate_rate=metrics['duplicate_rate'],
+        overall_score=metrics['overall_score'],
+        trend=metrics['trend'],
+    )
+
+
+@router.get("/sync-jobs", response_model=List[SyncJobSummary])
+async def get_sync_jobs_summary(
+    building_id: Optional[str] = Query(None, description="Filter by building ID"),
+    days: int = Query(7, ge=1, le=30, description="Number of days to look back"),
+):
+    """
+    Get sync job history for monitoring.
+
+    Returns list of sync jobs from the last N days (default 7, max 30).
+    Includes job status, record counts, processing time, and timestamps.
+    """
+    jobs = integration_repo.get_sync_jobs_summary(building_id, days)
+
+    return [
+        SyncJobSummary(
+            id=job['id'],
+            log_source_id=job['log_source_id'],
+            status=job['status'],
+            records_processed=job.get('records_processed'),
+            records_inserted=job.get('records_inserted'),
+            records_failed=job.get('records_failed'),
+            records_skipped=job.get('records_skipped'),
+            processing_time_ms=job.get('processing_time_ms'),
+            started_at=job.get('started_at'),
+            completed_at=job.get('completed_at'),
+            file_name=job.get('file_name'),
+        )
+        for job in jobs
+    ]
