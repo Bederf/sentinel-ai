@@ -12,6 +12,7 @@
  */
 
 import { useEffect, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import {
   X,
   AlertTriangle,
@@ -167,7 +168,7 @@ export function ControlConfirmModal({
 
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ background: "rgba(0, 0, 0, 0.75)" }}
@@ -412,7 +413,8 @@ export function ControlConfirmModal({
           </span>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

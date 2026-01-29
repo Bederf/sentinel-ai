@@ -227,13 +227,29 @@ async def get_equipment_controls(equipment_id: str):
             elif sensor_type in ["vibration"]:
                 point_type = "binary_value"
 
+            # Generate realistic default values based on sensor type
+            default_value = sensor.get("current_value")
+            if default_value is None:
+                sensor_defaults = {
+                    "temperature": 22.0,
+                    "humidity": 55.0,
+                    "pressure": 101.3,
+                    "flow": 150.0,
+                    "power": 45.0,
+                    "energy": 120.0,
+                    "vibration": 0.5,
+                    "battery_voltage": 54.0,
+                    "battery_runtime": 30.0,
+                }
+                default_value = sensor_defaults.get(sensor_type.lower(), 0)
+
             points[point_name] = {
                 "point_type": point_type,
                 "description": f"{sensor_type.title()} - {sensor.get('location', 'Main')}",
                 "unit": sensor.get("unit", ""),
                 "min_value": float(sensor.get("min_value", 0)) if sensor.get("min_value") else 0,
                 "max_value": float(sensor.get("max_value", 100)) if sensor.get("max_value") else 100,
-                "default_value": float(sensor.get("current_value", 0)) if sensor.get("current_value") else 0,
+                "default_value": float(default_value),
                 "writable": True,
             }
 
