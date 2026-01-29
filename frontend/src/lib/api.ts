@@ -1653,6 +1653,52 @@ export interface DashboardPreferencesResponse {
   updated_at?: string;
 }
 
+// ============= Integration Monitoring Interfaces (Phase 16) =============
+
+export interface IntegrationHealthSummary {
+  sources_count: number;
+  active_sources: number;
+  last_sync: string | null;
+  total_records_ingested: number;
+  total_points_mapped: number;
+  unmatched_points: number;
+  recent_errors_count: number;
+  alerts: IntegrationAlert[];
+}
+
+export interface IntegrationAlert {
+  id: string;
+  type: 'stale_data' | 'sync_failure' | 'high_error_rate' | 'low_match_coverage';
+  severity: 'critical' | 'warning' | 'info';
+  source_id?: string;
+  message: string;
+  timestamp: string;
+}
+
+export interface DataQualityMetrics {
+  match_coverage: number;
+  data_freshness_hours: number;
+  error_rate: number;
+  duplicate_rate: number;
+  overall_score: number;
+  trend: 'improving' | 'stable' | 'degrading';
+}
+
+export interface SyncJobSummary {
+  id: string;
+  log_source_id: string;
+  source_name?: string;
+  status: 'running' | 'success' | 'failed' | 'partial';
+  records_processed: number;
+  records_inserted: number;
+  records_skipped: number;
+  records_failed: number;
+  processing_time_ms: number;
+  started_at: string;
+  completed_at: string | null;
+  error_message?: string;
+}
+
 // ============= Integration API Interfaces (Phase 15) =============
 
 export interface FormatDetectionResult {
@@ -1683,6 +1729,71 @@ export interface PointMatch {
     confidence: number;
   }>;
 }
+
+// Integration Monitoring API methods (Phase 16)
+export const monitoringApi = {
+  /**
+   * Get integration health summary
+   * @param buildingId - Optional building ID filter
+   */
+  getIntegrationHealth: async (buildingId?: string): Promise<IntegrationHealthSummary> => {
+    const url = buildingId
+      ? `${API_BASE_URL}/api/integration/health?building_id=${buildingId}`
+      : `${API_BASE_URL}/api/integration/health`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Failed to fetch integration health');
+    return res.json();
+  },
+
+  /**
+   * Get data quality metrics for a building
+   * @param buildingId - Building ID (required)
+   */
+  getDataQualityMetrics: async (buildingId: string): Promise<DataQualityMetrics> => {
+    const res = await fetch(`${API_BASE_URL}/api/integration/quality-metrics/${buildingId}`);
+    if (!res.ok) throw new Error('Failed to fetch quality metrics');
+    return res.json();
+  },
+
+  /**
+   * Get sync job history
+   * @param buildingId - Optional building ID filter
+   * @param days - Number of days of history (default: 7)
+   */
+  getSyncJobs: async (buildingId?: string, days: number = 7): Promise<SyncJobSummary[]> => {
+    const params = new URLSearchParams({ days: days.toString() });
+    if (buildingId) params.set('building_id', buildingId);
+    const res = await fetch(`${API_BASE_URL}/api/integration/sync-jobs?${params}`);
+    if (!res.ok) throw new Error('Failed to fetch sync jobs');
+    return res.json();
+  },
+
+  /**
+   * Get unmatched points for point matching review
+   * @param buildingId - Building ID
+   * @param limit - Maximum number of points to return (default: 10)
+   * @param offset - Pagination offset (default: 0)
+   */
+  getUnmatchedPoints: async (buildingId?: string, limit: number = 10, offset: number = 0): Promise<{
+    points: Array<{
+      point_id: string;
+      point_name: string;
+      last_seen: string;
+      occurrence_count: number;
+    }>;
+    total: number;
+  }> => {
+    const params = new URLSearchParams({
+      confidence: 'unmatched',
+      limit: limit.toString(),
+      offset: offset.toString(),
+    });
+    if (buildingId) params.set('building_id', buildingId);
+    const res = await fetch(`${API_BASE_URL}/api/integration/point-mappings?${params}`);
+    if (!res.ok) throw new Error('Failed to fetch unmatched points');
+    return res.json();
+  },
+};
 
 // Integration API methods
 export const integrationApi = {
