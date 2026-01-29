@@ -7,6 +7,7 @@ from app.database.repositories.alert_repository import AlertRepository
 from app.database.repositories.audit_repository import AuditRepository
 from app.database.repositories.prediction_repository import PredictionRepository
 from app.database.repositories.safety_rules_repository import SafetyRulesRepository
+from app.database.repositories.integration_repository import IntegrationRepository
 
 __all__ = [
     'BuildingRepository',
@@ -16,4 +17,5 @@ __all__ = [
     'AuditRepository',
     'PredictionRepository',
     'SafetyRulesRepository',
+    'IntegrationRepository',
 ]
