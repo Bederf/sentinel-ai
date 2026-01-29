@@ -52,3 +52,25 @@ CREATE INDEX idx_log_sources_active ON log_sources(is_active) WHERE is_active = 
 
 CREATE TRIGGER update_log_sources_updated_at BEFORE UPDATE ON log_sources
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Column mappings (map source columns to SENTINEL fields)
+CREATE TABLE column_mappings (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  log_source_id UUID NOT NULL REFERENCES log_sources(id) ON DELETE CASCADE,
+
+  source_column TEXT NOT NULL,        -- Column name in source file
+  sentinel_field TEXT NOT NULL,       -- SENTINEL standard field
+  transform TEXT,                      -- Optional transform: 'uppercase', 'parse_date', 'extract_asset', etc.
+  transform_params JSONB,              -- Parameters for transform
+
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+
+  UNIQUE(log_source_id, sentinel_field)
+);
+
+CREATE INDEX idx_column_mappings_source ON column_mappings(log_source_id);
+
+-- Standard SENTINEL fields for alarms:
+-- timestamp, point_id, alarm_code, description, value, threshold, severity, state, acknowledged_by, notes
+-- Standard SENTINEL fields for trends:
+-- timestamp, point_id, value, unit, quality
