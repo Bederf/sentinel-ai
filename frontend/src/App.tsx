@@ -1,7 +1,9 @@
 import { useEffect, useState, useRef } from "react";
 import { Clock, Wifi, WifiOff, Bell, X } from "lucide-react";
+import { Toaster } from "sonner";
 import api from "./lib/api";
 import { Chat } from "./components/Chat";
+import TechnicianChat from "./components/TechnicianChat";
 import { Dashboard } from "./components/Dashboard";
 import { ControlDashboard } from "./components/ControlDashboard";
 import { ControlAuditTrail } from "./components/ControlAuditTrail";
@@ -10,6 +12,7 @@ import { Settings } from "./components/Settings";
 import { Sidebar, type View } from "./components/Sidebar";
 import { SplashScreen } from "./components/SplashScreen";
 import { AlertFeed } from "./components/AlertFeed";
+import { CalendarPicker } from "./components/CalendarPicker";
 
 interface HealthStatus {
   status: string;
@@ -24,9 +27,11 @@ function App() {
   const [currentView, setCurrentView] = useState<View>("dashboard");
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showAlertsPanel, setShowAlertsPanel] = useState(false);
+  const [showCalendar, setShowCalendar] = useState(false);
   const [unreadAlertCount, setUnreadAlertCount] = useState(0);
   const [lastViewedAlertTime, setLastViewedAlertTime] = useState<Date | null>(null);
   const alertsPanelRef = useRef<HTMLDivElement | null>(null);
+  const calendarButtonRef = useRef<HTMLDivElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Update time every second for Grafana-like time display
@@ -185,6 +190,7 @@ function App() {
                  currentView === "control-audit" ? "Control Audit Trail" :
                  currentView === "optimization" ? "Load Shedding Optimization" :
                  currentView === "settings" ? "Settings" :
+                 currentView === "technician" ? "Technician Chat" :
                  "AI Assistant"}
               </h1>
             </div>
@@ -343,32 +349,54 @@ function App() {
               )}
             </div>
 
-            {/* Time display */}
-            <div
-              className="hidden md:flex items-center gap-2 px-3 py-1 rounded"
-              style={{
-                background: "var(--color-sentinel-bg-secondary)",
-                border: "1px solid var(--color-sentinel-border)",
-              }}
-            >
-              <Clock
-                className="h-3.5 w-3.5"
-                style={{ color: "var(--color-sentinel-text-secondary)" }}
-              />
-              <div className="flex flex-col items-end">
-                <span
-                  className="text-xs font-mono"
-                  style={{ color: "var(--color-sentinel-text-primary)" }}
-                >
-                  {formatTime(currentTime)}
-                </span>
-                <span
-                  className="text-xs"
-                  style={{ color: "var(--color-sentinel-text-disabled)" }}
-                >
-                  {formatDate(currentTime)}
-                </span>
-              </div>
+            {/* Time display - Clickable Calendar */}
+            <div className="hidden md:block relative" ref={calendarButtonRef}>
+              <button
+                onClick={() => setShowCalendar(!showCalendar)}
+                className="flex items-center gap-2 px-3 py-1 rounded transition-colors hover:brightness-110 cursor-pointer"
+                style={{
+                  background: showCalendar
+                    ? "var(--color-sentinel-bg-panel)"
+                    : "var(--color-sentinel-bg-secondary)",
+                  border: "1px solid var(--color-sentinel-border)",
+                }}
+                aria-label="Open calendar"
+              >
+                <Clock
+                  className="h-3.5 w-3.5"
+                  style={{ color: "var(--color-sentinel-text-secondary)" }}
+                />
+                <div className="flex flex-col items-end">
+                  <span
+                    className="text-xs font-mono"
+                    style={{ color: "var(--color-sentinel-text-primary)" }}
+                  >
+                    {formatTime(currentTime)}
+                  </span>
+                  <span
+                    className="text-xs"
+                    style={{ color: "var(--color-sentinel-text-disabled)" }}
+                  >
+                    {formatDate(currentTime)}
+                  </span>
+                </div>
+              </button>
+
+              {/* Calendar Picker */}
+              {showCalendar && (
+                <CalendarPicker
+                  selectedDate={currentTime}
+                  onDateSelect={(date) => {
+                    // Update time but keep the current time of day
+                    const newDate = new Date(date);
+                    newDate.setHours(currentTime.getHours());
+                    newDate.setMinutes(currentTime.getMinutes());
+                    newDate.setSeconds(currentTime.getSeconds());
+                    setCurrentTime(newDate);
+                  }}
+                  onClose={() => setShowCalendar(false)}
+                />
+              )}
             </div>
           </div>
         </header>
@@ -388,6 +416,10 @@ function App() {
             <OptimizationPage onError={(error) => setError(error)} />
           ) : currentView === "settings" ? (
             <Settings onError={(error) => setError(error)} />
+          ) : currentView === "technician" ? (
+            <div className="h-full">
+              <TechnicianChat />
+            </div>
           ) : (
             <div className="h-full p-4 md:p-6">
               <div className="h-full max-w-4xl mx-auto">
@@ -397,6 +429,19 @@ function App() {
           )}
         </main>
       </div>
+
+      {/* Toast notifications */}
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          style: {
+            background: "var(--color-sentinel-bg-panel)",
+            border: "1px solid var(--color-sentinel-border)",
+            color: "var(--color-sentinel-text-primary)",
+          },
+        }}
+        theme="dark"
+      />
     </div>
   );
 }

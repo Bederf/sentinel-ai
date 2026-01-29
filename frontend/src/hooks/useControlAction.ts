@@ -22,6 +22,7 @@
  */
 
 import { useState, useCallback, useRef, useEffect } from "react";
+import { toast } from "sonner";
 import api from "../lib/api";
 import type { DeviceControlResponse } from "../lib/api";
 
@@ -185,6 +186,12 @@ export function useControlAction(
         setResult(controlResult);
         setIsExecuting(false);
 
+        // Show success toast
+        toast.success("Control Applied", {
+          description: `${point} set to ${value}`,
+          duration: 3000,
+        });
+
         // Trigger callback
         if (onSuccess) {
           onSuccess(controlResult);
@@ -200,6 +207,30 @@ export function useControlAction(
 
         setError(errorMessage);
         setIsExecuting(false);
+
+        // Show toast notification for safety violations
+        const isSafetyViolation =
+          errorMessage.toLowerCase().includes("safety") ||
+          errorMessage.toLowerCase().includes("outside") ||
+          errorMessage.toLowerCase().includes("limit") ||
+          errorMessage.toLowerCase().includes("range");
+
+        if (isSafetyViolation) {
+          toast.error("Safety Rule Violation", {
+            description: errorMessage.replace("API Error: ", ""),
+            duration: 6000,
+            style: {
+              background: "var(--color-sentinel-bg-panel)",
+              border: "1px solid var(--color-sentinel-red)",
+              color: "var(--color-sentinel-text-primary)",
+            },
+          });
+        } else {
+          toast.error("Control Action Failed", {
+            description: errorMessage.replace("API Error: ", ""),
+            duration: 5000,
+          });
+        }
 
         // Trigger callback
         if (onError) {
