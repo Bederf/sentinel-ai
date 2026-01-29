@@ -104,3 +104,74 @@ CREATE INDEX idx_point_mappings_unmatched ON point_asset_mappings(match_confiden
 
 CREATE TRIGGER update_point_asset_mappings_updated_at BEFORE UPDATE ON point_asset_mappings
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Alarm code mappings (normalize vendor codes to SENTINEL taxonomy)
+CREATE TABLE alarm_code_mappings (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  log_source_id UUID REFERENCES log_sources(id) ON DELETE CASCADE,
+
+  source_code TEXT NOT NULL,          -- Vendor alarm code: "HIGH", "HI_LIMIT", "OT"
+  sentinel_code TEXT NOT NULL,        -- SENTINEL standard: "TEMP-HI"
+  sentinel_category TEXT,             -- Category: "temperature", "pressure", "equipment"
+
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+
+  UNIQUE(log_source_id, source_code)
+);
+
+-- Default alarm code taxonomy (global, not per-source)
+CREATE TABLE alarm_taxonomy (
+  code TEXT PRIMARY KEY,              -- "TEMP-HI"
+  description TEXT NOT NULL,          -- "High temperature"
+  category TEXT NOT NULL,             -- "temperature"
+  default_severity TEXT,              -- "high"
+  common_source_codes TEXT[]          -- Array of common vendor codes that map here
+);
+
+-- Seed standard taxonomy
+INSERT INTO alarm_taxonomy (code, description, category, default_severity, common_source_codes) VALUES
+  ('TEMP-HI', 'High temperature', 'temperature', 'high', ARRAY['HIGH', 'HI_LIMIT', 'TEMP_HIGH', 'OT', 'HIGH_LIMIT']),
+  ('TEMP-LO', 'Low temperature', 'temperature', 'medium', ARRAY['LOW', 'LO_LIMIT', 'TEMP_LOW', 'UT', 'LOW_LIMIT']),
+  ('TEMP-FAIL', 'Temperature sensor failure', 'temperature', 'high', ARRAY['FAIL', 'SENSOR_FAULT', 'BAD_INPUT']),
+  ('PRESS-HI', 'High pressure', 'pressure', 'high', ARRAY['HI_PRESS', 'PRESSURE_HIGH', 'HP']),
+  ('PRESS-LO', 'Low pressure', 'pressure', 'critical', ARRAY['LO_PRESS', 'PRESSURE_LOW', 'LP']),
+  ('FLOW-HI', 'High flow', 'flow', 'medium', ARRAY['HI_FLOW', 'FLOW_HIGH']),
+  ('FLOW-LO', 'Low/no flow', 'flow', 'high', ARRAY['LO_FLOW', 'FLOW_LOW', 'NO_FLOW']),
+  ('VIB-HI', 'High vibration', 'vibration', 'high', ARRAY['VIB_ALARM', 'VIBRATION', 'VIB']),
+  ('VIB-CRIT', 'Critical vibration', 'vibration', 'critical', ARRAY['VIB_TRIP', 'VIB_CRITICAL']),
+  ('CURR-HI', 'High current/overload', 'electrical', 'high', ARRAY['OVERLOAD', 'OL', 'OVERCURRENT']),
+  ('TRIP', 'Equipment trip', 'equipment', 'critical', ARRAY['TRIP', 'TRIPPED', 'FAULT']),
+  ('START-FAIL', 'Failed to start', 'equipment', 'critical', ARRAY['FAIL_START', 'NO_START', 'FSF']),
+  ('COMM-FAIL', 'Communication failure', 'communication', 'high', ARRAY['OFFLINE', 'COMM_LOSS', 'NO_COMMS']),
+  ('MAINT-DUE', 'Maintenance due', 'maintenance', 'low', ARRAY['SERVICE', 'PPM_DUE', 'MAINT']),
+  ('GEN-RUN', 'Generator running', 'power', 'medium', ARRAY['GEN_ON', 'RUNNING', 'ON_GEN']),
+  ('GEN-FAIL', 'Generator failure', 'power', 'critical', ARRAY['GEN_FAULT', 'GEN_FAIL']),
+  ('MAINS-FAIL', 'Mains power failure', 'power', 'critical', ARRAY['POWER_FAIL', 'UTILITY_FAIL']),
+  ('FIRE', 'Fire alarm', 'life_safety', 'critical', ARRAY['FIRE', 'FA', 'SMOKE']);
+
+-- Severity mapping table
+CREATE TABLE severity_mappings (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  log_source_id UUID REFERENCES log_sources(id) ON DELETE CASCADE,
+
+  source_value TEXT NOT NULL,         -- "1", "URGENT", "CRITICAL"
+  sentinel_severity TEXT NOT NULL CHECK (sentinel_severity IN ('critical', 'high', 'medium', 'low')),
+
+  UNIQUE(log_source_id, source_value)
+);
+
+-- Default severity mappings (global)
+INSERT INTO severity_mappings (id, log_source_id, source_value, sentinel_severity) VALUES
+  (uuid_generate_v4(), NULL, '1', 'critical'),
+  (uuid_generate_v4(), NULL, '2', 'high'),
+  (uuid_generate_v4(), NULL, '3', 'medium'),
+  (uuid_generate_v4(), NULL, '4', 'low'),
+  (uuid_generate_v4(), NULL, 'CRITICAL', 'critical'),
+  (uuid_generate_v4(), NULL, 'URGENT', 'critical'),
+  (uuid_generate_v4(), NULL, 'EMERGENCY', 'critical'),
+  (uuid_generate_v4(), NULL, 'HIGH', 'high'),
+  (uuid_generate_v4(), NULL, 'MAJOR', 'high'),
+  (uuid_generate_v4(), NULL, 'MEDIUM', 'medium'),
+  (uuid_generate_v4(), NULL, 'NORMAL', 'medium'),
+  (uuid_generate_v4(), NULL, 'LOW', 'low'),
+  (uuid_generate_v4(), NULL, 'INFO', 'low');
