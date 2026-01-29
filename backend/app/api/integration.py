@@ -15,6 +15,7 @@ from app.models.integration import (
     PointAssetMapping, PointAssetMappingCreate,
     FormatDetectionResult, ParseResult, BulkMatchResult,
     ColumnMapping as CMModel,
+    BuildingStatus, ChecklistItem, ValidationChecklist,
 )
 
 
@@ -64,6 +65,33 @@ class SyncJobSummary(BaseModel):
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
     file_name: Optional[str] = None
+
+
+# ==================== Building Status Response Models ====================
+
+class BuildingStatusUpdate(BaseModel):
+    """Request to update building status."""
+    status: str  # BuildingStatus enum value
+    notes: Optional[str] = None
+
+
+class ActivationResult(BaseModel):
+    """Result of building activation attempt."""
+    success: bool
+    building_id: str
+    new_status: str  # BuildingStatus enum value
+    message: str
+    validation_errors: List[str] = Field(default_factory=list)
+
+
+class BuildingStatusResponse(BaseModel):
+    """Current building status."""
+    building_id: str
+    status: str  # BuildingStatus enum value
+    last_validated_at: Optional[datetime] = None
+    notes: Optional[str] = None
+
+
 from app.database.repositories.integration_repository import IntegrationRepository
 from app.database.repositories.building_repository import BuildingRepository
 from app.database.repositories.equipment_repository import EquipmentRepository

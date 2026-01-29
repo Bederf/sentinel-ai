@@ -221,3 +221,37 @@ class BulkMatchResult(BaseModel):
     matched_fuzzy: int
     unmatched: int
     matches: List[AssetMatchResult] = Field(default_factory=list)
+
+
+# ==================== Building Status / Go-Live Workflow ====================
+
+class BuildingStatus(str, Enum):
+    """Building activation status for go-live workflow."""
+    DRAFT = "draft"
+    PENDING_VALIDATION = "pending_validation"
+    ACTIVE = "active"
+    SUSPENDED = "suspended"
+
+
+class ChecklistItem(BaseModel):
+    """Single validation checklist item."""
+    id: str
+    category: str  # 'data_source', 'point_mapping', 'data_quality', 'configuration'
+    name: str
+    description: str
+    status: str  # 'pass', 'fail', 'warning', 'not_checked'
+    value: Optional[Any] = None
+    threshold: Optional[Any] = None
+    details: Optional[str] = None
+
+
+class ValidationChecklist(BaseModel):
+    """Complete go-live validation checklist."""
+    building_id: str
+    building_name: Optional[str] = None
+    status: BuildingStatus
+    checked_at: datetime
+    items: List[ChecklistItem]
+    summary: Dict[str, int]  # {passed: int, failed: int, warnings: int}
+    can_activate: bool
+    blocking_issues: List[str] = Field(default_factory=list)
