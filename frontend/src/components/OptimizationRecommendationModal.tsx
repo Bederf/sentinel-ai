@@ -12,6 +12,7 @@
  */
 
 import { useState, useEffect, useMemo } from "react";
+import { createPortal } from "react-dom";
 import {
   X,
   CheckCircle2,
@@ -142,12 +143,14 @@ export function OptimizationRecommendationModal({
       }));
 
       // Call parent callback or default API method
+      // Use timestamp as id if no id field exists
+      const recommendationId = recommendation.id || recommendation.timestamp || 'recommendation';
       if (onApprove) {
-        await onApprove(recommendation.id);
+        await onApprove(recommendationId);
       } else {
         await api.approveOptimization(
           recommendation.site_id,
-          recommendation.id,
+          recommendationId,
           setpointsToApply
         );
       }
@@ -174,8 +177,9 @@ export function OptimizationRecommendationModal({
 
     try {
       // Call parent callback or default API method
+      const rejectId = recommendation.id || recommendation.timestamp || 'recommendation';
       if (onReject) {
-        await onReject(recommendation.id, "Rejected by operator");
+        await onReject(rejectId, "Rejected by operator");
       } else {
         // Reject API doesn't exist yet, so we'll just close the modal
         // In production, this would call: api.rejectOptimization(recommendation.site_id, recommendation.id, reason)
@@ -226,7 +230,8 @@ export function OptimizationRecommendationModal({
 
   const confidenceColor = getConfidenceColor(recommendation.confidence);
 
-  return (
+  // Use portal to render at document body level (escapes parent overflow/positioning constraints)
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <div
         className="relative w-full max-w-3xl max-h-[90vh] overflow-auto rounded-lg shadow-2xl"
@@ -488,7 +493,8 @@ export function OptimizationRecommendationModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

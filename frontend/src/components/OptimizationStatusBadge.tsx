@@ -1,17 +1,17 @@
 /**
  * OptimizationStatusBadge Component - AI optimization status indicator
  *
- * Displays optimization status for a building with color-coded badges:
- * - Optimized: Green with checkmark
- * - Recommendation Pending: Amber with lightbulb icon (pulsing)
- * - Warning: Orange with alert triangle
- * - Error: Red with X icon
- * - Unknown: Gray with question mark
+ * Displays optimization status for a building with lightbulb icons:
+ * - Optimized (accepted): Green lightbulb, no pulse
+ * - Recommendation Pending: Amber lightbulb, pulsing
+ * - Rejected/Warning: Amber lightbulb, no pulse
+ * - Error: Red X icon
+ * - No recommendation: No badge shown
  *
  * Supports size variants and shows optional timestamp.
  */
 
-import { CheckCircle2, Lightbulb, AlertTriangle, XCircle, HelpCircle } from "lucide-react";
+import { Lightbulb, XCircle } from "lucide-react";
 import { useMemo } from "react";
 
 export type OptimizationStatus = "optimized" | "recommendation_pending" | "warning" | "error" | "unknown";
@@ -21,61 +21,7 @@ interface OptimizationStatusBadgeProps {
   size?: "sm" | "md";
   lastOptimization?: string | null | undefined;
   className?: string;
-}
-
-/**
- * Get status configuration for SENTINEL theme
- */
-function getStatusConfig(status: OptimizationStatus): {
-  color: string;
-  bg: string;
-  icon: typeof CheckCircle2;
-  label: string;
-  pulse: boolean;
-} {
-  switch (status) {
-    case "optimized":
-      return {
-        color: "var(--color-sentinel-green)",
-        bg: "rgba(16, 185, 129, 0.15)",
-        icon: CheckCircle2,
-        label: "OPTIMIZED",
-        pulse: false,
-      };
-    case "recommendation_pending":
-      return {
-        color: "var(--color-sentinel-amber)",
-        bg: "rgba(245, 158, 11, 0.15)",
-        icon: Lightbulb,
-        label: "ACTION NEEDED",
-        pulse: true,
-      };
-    case "warning":
-      return {
-        color: "var(--color-sentinel-orange)",
-        bg: "rgba(249, 115, 22, 0.15)",
-        icon: AlertTriangle,
-        label: "WARNING",
-        pulse: false,
-      };
-    case "error":
-      return {
-        color: "var(--color-sentinel-red)",
-        bg: "rgba(220, 38, 38, 0.15)",
-        icon: XCircle,
-        label: "ERROR",
-        pulse: false,
-      };
-    default:
-      // Default to INFO instead of UNKNOWN for better UX
-      return {
-        color: "var(--color-sentinel-blue)",
-        bg: "rgba(59, 130, 246, 0.15)",
-        icon: HelpCircle,
-        label: "INFO",
-        pulse: false,
-      };
-  }
+  hasRecommendation?: boolean;
 }
 
 /**
@@ -104,9 +50,8 @@ export function OptimizationStatusBadge({
   size = "md",
   lastOptimization,
   className = "",
+  hasRecommendation = false,
 }: OptimizationStatusBadgeProps) {
-  const config = useMemo(() => getStatusConfig(status), [status]);
-  const Icon = config.icon;
   const relativeTime = useMemo(() => formatRelativeTime(lastOptimization), [lastOptimization]);
 
   const sizeClasses = {
@@ -118,6 +63,76 @@ export function OptimizationStatusBadge({
     sm: "h-3.5 w-3.5",
     md: "h-4 w-4",
   };
+
+  // Determine what to show based on status and recommendation
+  const getBadgeConfig = () => {
+    // Error state - always show error icon
+    if (status === "error") {
+      return {
+        show: true,
+        icon: XCircle,
+        color: "var(--color-sentinel-red)",
+        bg: "rgba(220, 38, 38, 0.15)",
+        pulse: false,
+        showTime: false,
+      };
+    }
+
+    // Optimized (accepted) - green lightbulb, no pulse
+    if (status === "optimized") {
+      return {
+        show: true,
+        icon: Lightbulb,
+        color: "var(--color-sentinel-green)",
+        bg: "rgba(16, 185, 129, 0.15)",
+        pulse: false,
+        showTime: true,
+      };
+    }
+
+    // Has recommendation pending - amber lightbulb, pulsing
+    if (hasRecommendation && status === "recommendation_pending") {
+      return {
+        show: true,
+        icon: Lightbulb,
+        color: "var(--color-sentinel-amber)",
+        bg: "rgba(245, 158, 11, 0.15)",
+        pulse: true,
+        showTime: false,
+      };
+    }
+
+    // Has recommendation but warning/rejected - amber lightbulb, no pulse
+    if (hasRecommendation && (status === "warning" || status === "unknown")) {
+      return {
+        show: true,
+        icon: Lightbulb,
+        color: "var(--color-sentinel-amber)",
+        bg: "rgba(245, 158, 11, 0.15)",
+        pulse: false,
+        showTime: false,
+      };
+    }
+
+    // No recommendation and not optimized - don't show badge
+    return {
+      show: false,
+      icon: Lightbulb,
+      color: "",
+      bg: "",
+      pulse: false,
+      showTime: false,
+    };
+  };
+
+  const config = getBadgeConfig();
+
+  // Don't render if nothing to show
+  if (!config.show) {
+    return null;
+  }
+
+  const Icon = config.icon;
 
   return (
     <div className={`flex flex-col ${className}`}>
@@ -131,10 +146,9 @@ export function OptimizationStatusBadge({
         }}
       >
         <Icon className={iconSizes[size]} />
-        {status !== "recommendation_pending" && <span>{config.label}</span>}
       </div>
 
-      {relativeTime && status === "optimized" && (
+      {config.showTime && relativeTime && (
         <span
           className={`text-xs mt-1 ${size === "sm" ? "text-[10px]" : ""}`}
           style={{ color: "var(--color-sentinel-text-disabled)" }}

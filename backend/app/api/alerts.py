@@ -173,11 +173,16 @@ async def list_alerts(
     # Enrich with names
     result = []
     for alert in alerts:
+        # Get enriched names, preferring existing values in alert
+        equipment_name = alert.get("equipment_name") or eq_lookup.get(alert["equipment_id"])
+        site_name = alert.get("site_name") or site_lookup.get(alert["site_id"])
+        # Remove existing equipment_name/site_name to avoid duplicate kwargs
+        alert_copy = {k: v for k, v in alert.items() if k not in ("equipment_name", "site_name")}
         result.append(
             AlertResponse(
-                **alert,
-                equipment_name=eq_lookup.get(alert["equipment_id"]),
-                site_name=site_lookup.get(alert["site_id"]),
+                **alert_copy,
+                equipment_name=equipment_name,
+                site_name=site_name,
             )
         )
 
@@ -216,10 +221,16 @@ async def get_alert(alert_id: str) -> AlertResponse:
     eq_lookup = {eq["id"]: eq["name"] for eq in equipment}
     site_lookup = {s["id"]: s["name"] for s in sites}
 
+    # Get enriched names, preferring existing values in alert
+    equipment_name = alert.get("equipment_name") or eq_lookup.get(alert["equipment_id"])
+    site_name = alert.get("site_name") or site_lookup.get(alert["site_id"])
+    # Remove existing equipment_name/site_name to avoid duplicate kwargs
+    alert_copy = {k: v for k, v in alert.items() if k not in ("equipment_name", "site_name")}
+
     return AlertResponse(
-        **alert,
-        equipment_name=eq_lookup.get(alert["equipment_id"]),
-        site_name=site_lookup.get(alert["site_id"]),
+        **alert_copy,
+        equipment_name=equipment_name,
+        site_name=site_name,
     )
 
 

@@ -17,6 +17,7 @@ import { useState, useEffect } from "react";
 import api, { type Site, type OptimizationRecommendation } from "../lib/api";
 import { OptimizationStatusBadge } from "./OptimizationStatusBadge";
 import { OptimizationRecommendationModal } from "./OptimizationRecommendationModal";
+import { useHealthThresholds } from "../hooks/useHealthThresholds";
 
 interface SiteCardProps {
   site: Site;
@@ -79,12 +80,32 @@ function getStatusConfig(status: Site["status"]): {
   }
 }
 
+/**
+ * Get color for safe percentage based on thresholds
+ * Red: 0-49%, Amber: 50-79%, Green: 80-100%
+ */
+function getSafePercentageColor(safe: number, total: number): string {
+  if (total === 0) return "var(--color-sentinel-text-disabled)";
+  
+  const percentage = (safe / total) * 100;
+  
+  if (percentage < 50) {
+    return "var(--color-sentinel-red)"; // 0-49%
+  } else if (percentage < 80) {
+    return "var(--color-sentinel-amber)"; // 50-79%
+  } else {
+    return "var(--color-sentinel-green)"; // 80-100%
+  }
+}
+
 export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizationStatus = false }: SiteCardProps) {
   const statusConfig = getStatusConfig(site.status);
   const hasAlerts = site.alert_count > 0;
+  const _healthThresholds = useHealthThresholds(); // Available for future use
   const [safetySummary, setSafetySummary] = useState<DeviceSafetySummary | null>(null);
   const [loadingSafety, setLoadingSafety] = useState(false);
   const [optimizationStatus, setOptimizationStatus] = useState<OptimizationStatusType>("unknown");
+  const [hasRecommendation, setHasRecommendation] = useState(false);
   const [showRecommendationModal, setShowRecommendationModal] = useState(false);
   const [currentRecommendation, setCurrentRecommendation] = useState<OptimizationRecommendation | null>(null);
   const [, setLoadingRecommendation] = useState(false);
@@ -141,12 +162,22 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
           allStatuses.push(...batchStatuses);
         }
 
+        // Use site.equipment_count as the total, not devices.length
+        // This ensures consistency with the displayed total
+        const totalEquipment = site.equipment_count || devices.length;
+        
+        // Calculate safe count based on equipment_count - alert_count
+        // This gives accurate totals that match the displayed equipment_count
+        const alertCount = site.alert_count || 0;
+        const safeCount = Math.max(0, totalEquipment - alertCount);
+        
+        // Use device statuses to determine overall status, but use equipment_count for totals
         const summary: DeviceSafetySummary = {
-          total: devices.length,
-          safe: allStatuses.filter((s) => s === 'safe').length,
+          total: totalEquipment,
+          safe: safeCount,
           warning: allStatuses.filter((s) => s === 'warning').length,
           blocked: allStatuses.filter((s) => s === 'blocked').length,
-          alarm: allStatuses.filter((s) => s === 'alarm').length,
+          alarm: alertCount > 0 ? alertCount : allStatuses.filter((s) => s === 'alarm').length,
           overallStatus: 'unknown',
         };
 
@@ -191,9 +222,12 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
       try {
         const status = await api.getOptimizationStatus(site.id);
         setOptimizationStatus(status.optimization_status);
+        // Track if there's a recommendation available (for lightbulb icon)
+        setHasRecommendation(!!status.last_recommendation);
       } catch (error) {
         console.error('Failed to fetch optimization status:', error);
         setOptimizationStatus('error');
+        setHasRecommendation(false);
       }
     };
 
@@ -229,9 +263,10 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
     fetchRecommendation();
   }, [showRecommendationModal, site.id]);
 
-  // Handle optimization badge click
-  const handleOptimizationClick = () => {
-    if (optimizationStatus === "recommendation_pending") {
+  // Handle optimization badge click - show modal if there's a recommendation to review
+  const handleOptimizationClick = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent card click from firing
+    if (hasRecommendation) {
       setShowRecommendationModal(true);
     }
   };
@@ -240,9 +275,10 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
   const handleApproveRecommendation = async (recommendationId: string) => {
     try {
       // Build setpoints array from recommendation
+      // Map equipment_id to device_id for backend compatibility
       const setpointsToApply = currentRecommendation?.recommendations.map((rec) => ({
-        equipment_id: rec.equipment_id,
-        point: "setpoint",
+        device_id: rec.equipment_id,
+        point_name: "setpoint",
         value: rec.recommended_value,
       })) || [];
 
@@ -328,14 +364,15 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
             {/* Optimization badge (if enabled) */}
             {showOptimizationStatus && site.optimization_enabled && (
               <div
-                className={optimizationStatus === "recommendation_pending" ? "cursor-pointer hover:opacity-80 transition-opacity" : ""}
+                className={hasRecommendation ? "cursor-pointer hover:opacity-80 transition-opacity" : ""}
                 onClick={handleOptimizationClick}
-                title={optimizationStatus === "recommendation_pending" ? "Click to view recommendation" : undefined}
+                title={hasRecommendation ? "Click to view recommendation" : undefined}
               >
                 <OptimizationStatusBadge
                   status={optimizationStatus}
                   size="sm"
                   lastOptimization={site.last_optimization}
+                  hasRecommendation={hasRecommendation}
                 />
               </div>
             )}
@@ -404,13 +441,12 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
               <Shield
                 className="h-4 w-4"
                 style={{
-                  color: safetySummary?.overallStatus === 'safe'
-                    ? "var(--color-sentinel-green)"
-                    : safetySummary?.overallStatus === 'warning'
-                    ? "var(--color-sentinel-amber)"
-                    : safetySummary?.overallStatus === 'blocked' || safetySummary?.overallStatus === 'alarm'
-                    ? "var(--color-sentinel-red)"
-                    : "var(--color-sentinel-text-disabled)",
+                  color: safetySummary
+                    ? getSafePercentageColor(safetySummary.safe, safetySummary.total)
+                    : getSafePercentageColor(
+                        Math.max(0, (site.equipment_count || 0) - (site.alert_count || 0)),
+                        site.equipment_count || 0
+                      ),
                 }}
               />
               <div className="text-right">
@@ -429,17 +465,11 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
                     <div
                       className="text-lg font-medium"
                       style={{
-                        color: safetySummary.overallStatus === 'safe'
-                          ? "var(--color-sentinel-green)"
-                          : safetySummary.overallStatus === 'warning'
-                          ? "var(--color-sentinel-amber)"
-                          : safetySummary.overallStatus === 'blocked' || safetySummary.overallStatus === 'alarm'
-                          ? "var(--color-sentinel-red)"
-                          : "var(--color-sentinel-text-primary)",
+                        color: getSafePercentageColor(safetySummary.safe, safetySummary.total),
                         fontVariantNumeric: "tabular-nums",
                       }}
                     >
-                      {safetySummary.safe}/{safetySummary.total}
+                      {safetySummary.safe}/{site.equipment_count}
                     </div>
                     <div
                       className="text-xs"
@@ -449,12 +479,26 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
                     </div>
                   </>
                 ) : (
-                  <div
-                    className="text-xs"
-                    style={{ color: "var(--color-sentinel-text-disabled)" }}
-                  >
-                    No data
-                  </div>
+                  <>
+                    <div
+                      className="text-lg font-medium"
+                      style={{
+                        color: getSafePercentageColor(
+                          Math.max(0, (site.equipment_count || 0) - (site.alert_count || 0)),
+                          site.equipment_count || 0
+                        ),
+                        fontVariantNumeric: "tabular-nums",
+                      }}
+                    >
+                      {Math.max(0, (site.equipment_count || 0) - (site.alert_count || 0))}/{site.equipment_count || 0}
+                    </div>
+                    <div
+                      className="text-xs"
+                      style={{ color: "var(--color-sentinel-text-disabled)" }}
+                    >
+                      Safe
+                    </div>
+                  </>
                 )}
               </div>
             </div>

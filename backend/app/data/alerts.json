@@ -45,7 +45,7 @@
     "equipment_id": "eqp-095",
     "site_id": "site-011",
     "type": "predictive_maintenance",
-    "severity": "critical",
+    "severity": "warning",
     "status": "active",
     "title": "CRITICAL: UPS Battery Runtime Critical - Umhlanga",
     "message": "Battery runtime has dropped to 11 minutes. Immediate replacement required to maintain server room protection.",
@@ -57,7 +57,8 @@
     "priority": 1,
     "category": "electrical",
     "estimated_cost_zar": 145000,
-    "potential_damage_zar": 1850000
+    "potential_damage_zar": 1850000,
+    "equipment_name": "UPS-1"
   },
   {
     "id": "alert-004",

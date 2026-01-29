@@ -175,7 +175,7 @@ async def get_equipment(equipment_id: str) -> EquipmentResponse:
 @router.get("/equipment/{equipment_id}/controls")
 async def get_equipment_controls(equipment_id: str):
     """
-    Get equipment with control points from Supabase.
+    Get equipment with control points from Supabase or JSON fallback.
 
     Args:
         equipment_id: Equipment code (e.g., "eqp-079")
@@ -185,13 +185,34 @@ async def get_equipment_controls(equipment_id: str):
     """
     try:
         # Try to get from Supabase first
-        eq = equipment_repo.get_by_id(equipment_id)
+        eq = None
+        try:
+            eq = equipment_repo.get_by_id(equipment_id)
+        except Exception as supabase_err:
+            logger.debug(f"Supabase lookup failed for {equipment_id}: {supabase_err}")
+
+        # Fallback to JSON if not in Supabase or Supabase errored
+        if not eq:
+            equipment_list = load_equipment()
+            eq = next((e for e in equipment_list if e.get("id") == equipment_id), None)
+            # Map JSON fields to expected format
+            if eq:
+                eq["building_id"] = eq.get("site_id", "")
 
         if not eq:
             raise HTTPException(status_code=404, detail=f"Equipment {equipment_id} not found")
 
         # Get sensors for this equipment
-        sensors = sensor_repo.get_by_equipment(eq["id"])
+        sensors = []
+        try:
+            sensors = sensor_repo.get_by_equipment(eq["id"])
+        except Exception as sensor_err:
+            logger.debug(f"Supabase sensor lookup failed for {eq['id']}: {sensor_err}")
+
+        # Fallback to JSON sensors if none from Supabase
+        if not sensors:
+            all_sensors = load_sensors()
+            sensors = [s for s in all_sensors if s.get("equipment_id") == equipment_id]
 
         # Convert sensors to control points format
         points = {}

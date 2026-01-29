@@ -36,6 +36,30 @@ export function SelectorControl({
 }: SelectorControlProps) {
   const [isOpen, setIsOpen] = useState(false);
 
+  // Guard against empty options
+  if (!options || options.length === 0) {
+    return (
+      <div
+        className="p-4 rounded"
+        style={{
+          background: "var(--color-sentinel-bg-secondary)",
+          border: "1px solid var(--color-sentinel-border)",
+          opacity: 0.6,
+        }}
+      >
+        <div className="flex items-center gap-2 mb-2">
+          <Settings className="h-4 w-4" style={{ color: "var(--color-sentinel-text-disabled)" }} />
+          <span className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>
+            {label}
+          </span>
+        </div>
+        <div className="text-sm" style={{ color: "var(--color-sentinel-text-disabled)" }}>
+          No options available
+        </div>
+      </div>
+    );
+  }
+
   // Find current option
   const currentOption = options.find((opt) => opt.value === value) || options[0];
 

@@ -209,11 +209,15 @@ export function OptimizationInfoCard({
   const handleApproveRecommendation = async (_recommendationId: string) => {
     try {
       // Build setpoints array from recommendation
+      // Note: recommendation uses device_id and point_name fields
+      console.log("[OptimizationInfoCard] Current recommendation:", currentRecommendation);
       const setpointsToApply = currentRecommendation?.recommendations.map((rec) => ({
-        equipment_id: rec.equipment_id,
-        point: (rec as any).point_name || "setpoint", // Use point_name if available, fallback to "setpoint"
+        device_id: (rec as any).device_id,
+        point_name: (rec as any).point_name || "setpoint",
         value: rec.recommended_value,
       })) || [];
+
+      console.log("[OptimizationInfoCard] Setpoints to apply:", setpointsToApply);
 
       if (setpointsToApply.length === 0) {
         console.error("No recommendations found to approve");
@@ -281,7 +285,7 @@ export function OptimizationInfoCard({
           </div>
         </div>
         <div className="flex items-center gap-3">
-          {currentRecommendation && optimizationStatus === "recommendation_pending" && (
+          {currentRecommendation && (
             <button
               onClick={() => setShowRecommendationModal(true)}
               className="p-2 rounded transition-all hover:scale-110 animate-pulse"

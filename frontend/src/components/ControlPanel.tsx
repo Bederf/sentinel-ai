@@ -275,11 +275,17 @@ export function ControlPanel({
         );
 
       case "multistate_value":
-        const states = point.metadata?.states || {};
-        const options = Object.entries(states).map(([key, label]) => ({
-          value: parseInt(key),
-          label: String(label),
-        }));
+        // Handle states as array (from backend) or object (legacy)
+        const statesData = (point as any).states || point.metadata?.states || [];
+        const options = Array.isArray(statesData)
+          ? statesData.map((label: string, index: number) => ({
+              value: index,
+              label: String(label),
+            }))
+          : Object.entries(statesData).map(([key, label]) => ({
+              value: parseInt(key),
+              label: String(label),
+            }));
 
         return (
           <SelectorControl

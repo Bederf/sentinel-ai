@@ -395,7 +395,7 @@ export interface ProjectedSavings {
 
 // Optimization recommendation from AI analysis
 export interface OptimizationRecommendation {
-  id: string;
+  id?: string; // Optional - may use timestamp as fallback
   site_id: string;
   timestamp: string;
   recommendations: OptimizationAction[];
@@ -597,7 +597,14 @@ async function fetchApi<T>(
     let errorMessage = response.statusText;
     try {
       const errorData = await response.json();
-      errorMessage = errorData.detail || errorData.message || JSON.stringify(errorData);
+      // Handle Pydantic validation errors (detail is an array)
+      if (Array.isArray(errorData.detail)) {
+        errorMessage = errorData.detail.map((e: { msg?: string; loc?: string[] }) =>
+          `${e.loc?.join('.') || 'field'}: ${e.msg || 'invalid'}`
+        ).join(', ');
+      } else {
+        errorMessage = errorData.detail || errorData.message || JSON.stringify(errorData);
+      }
     } catch {
       // If response isn't JSON, use statusText
     }
@@ -939,21 +946,23 @@ export const api = {
   async approveOptimization(
     siteId: string,
     recommendationId: string,
-    setpointsToApply: Array<{ equipment_id: string; point: string; value: number }>
+    setpointsToApply: Array<{ device_id?: string; equipment_id?: string; point_name?: string; point?: string; value: number }>
   ): Promise<{ success: boolean; results: any[] }> {
     // Validate setpoints array is not empty
     if (!setpointsToApply || setpointsToApply.length === 0) {
       throw new Error("Cannot approve optimization: no setpoints to apply");
     }
-    
-    // Map frontend field names to backend expected field names
+
+    // Map frontend field names to backend expected field names (accept either format)
     const mappedSetpoints = setpointsToApply.map(sp => {
-      if (!sp.equipment_id || !sp.point || sp.value === undefined) {
-        throw new Error(`Invalid setpoint: missing required fields (equipment_id: ${sp.equipment_id}, point: ${sp.point}, value: ${sp.value})`);
+      const deviceId = sp.device_id || sp.equipment_id;
+      const pointName = sp.point_name || sp.point;
+      if (!deviceId || !pointName || sp.value === undefined) {
+        throw new Error(`Invalid setpoint: missing required fields (device_id: ${deviceId}, point_name: ${pointName}, value: ${sp.value})`);
       }
       return {
-        device_id: sp.equipment_id,
-        point_name: sp.point,
+        device_id: deviceId,
+        point_name: pointName,
         value: sp.value,
       };
     });
@@ -1516,6 +1525,70 @@ export const api = {
         device_id: deviceId,
         escalation_level: escalationLevel,
       }),
+    });
+  },
+
+  // ============= Equipment Lookup API Methods (Phase 19) =============
+
+  /**
+   * Look up fault code for equipment
+   * @param manufacturer - Equipment manufacturer (e.g., "Carrier", "Trane")
+   * @param faultCode - Fault code (e.g., "E4", "FAULT_001")
+   * @param model - Equipment model (optional)
+   * @param equipmentType - Equipment type (optional)
+   */
+  async lookupFaultCode(
+    manufacturer: string,
+    faultCode: string,
+    model?: string,
+    equipmentType?: string
+  ): Promise<any> {
+    const params = new URLSearchParams();
+    params.append("manufacturer", manufacturer);
+    params.append("fault_code", faultCode);
+    if (model) params.append("model", model);
+    if (equipmentType) params.append("equipment_type", equipmentType);
+    return fetchApi(`/api/equipment-lookup/fault-code?${params.toString()}`);
+  },
+
+  /**
+   * Search for parts across South African suppliers
+   * @param partNumber - OEM or generic part number
+   * @param partDescription - Part description to search
+   * @param manufacturer - Filter by manufacturer
+   * @param includeAlternatives - Include generic alternatives (default: true)
+   */
+  async searchParts(
+    partNumber?: string,
+    partDescription?: string,
+    manufacturer?: string,
+    includeAlternatives: boolean = true
+  ): Promise<any[]> {
+    const params = new URLSearchParams();
+    if (partNumber) params.append("part_number", partNumber);
+    if (partDescription) params.append("part_description", partDescription);
+    if (manufacturer) params.append("manufacturer", manufacturer);
+    params.append("include_alternatives", String(includeAlternatives));
+    return fetchApi(`/api/equipment-lookup/parts?${params.toString()}`);
+  },
+
+  /**
+   * Natural language search for equipment issues
+   * @param query - Natural language search query
+   * @param manufacturer - Filter by manufacturer (optional)
+   * @param model - Filter by model (optional)
+   */
+  async searchEquipmentIssue(
+    query: string,
+    manufacturer?: string,
+    model?: string
+  ): Promise<any> {
+    const params = new URLSearchParams();
+    params.append("query", query);
+    if (manufacturer) params.append("manufacturer", manufacturer);
+    if (model) params.append("model", model);
+    return fetchApi(`/api/equipment-lookup/search?${params.toString()}`, {
+      method: "POST",
     });
   },
 };
