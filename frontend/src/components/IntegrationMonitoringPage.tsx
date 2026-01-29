@@ -17,15 +17,14 @@ import {
   Link as LinkIcon,
   AlertTriangle,
   CheckCircle,
-  XCircle,
-  Clock,
   RefreshCw,
   ChevronRight,
   Server,
   Zap,
 } from "lucide-react";
-import { Card, Title, Text, Badge, Callout } from "@tremor/react";
+import { Badge, Callout, Title } from "@tremor/react";
 import { monitoringApi } from "../lib/api";
+import { GoLiveChecklist } from "./GoLiveChecklist";
 import type {
   IntegrationHealthSummary,
   IntegrationAlert,
@@ -836,6 +835,14 @@ export function IntegrationMonitoringPage() {
           )}
         </div>
       </div>
+
+      {/* Section 5: Go-Live Validation */}
+      {selectedBuildingId && (
+        <div className="mt-6">
+          <Title className="mb-4">Go-Live Validation</Title>
+          <GoLiveChecklist buildingId={selectedBuildingId} />
+        </div>
+      )}
     </div>
   );
 }
