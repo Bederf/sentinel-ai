@@ -175,3 +175,103 @@ INSERT INTO severity_mappings (id, log_source_id, source_value, sentinel_severit
   (uuid_generate_v4(), NULL, 'NORMAL', 'medium'),
   (uuid_generate_v4(), NULL, 'LOW', 'low'),
   (uuid_generate_v4(), NULL, 'INFO', 'low');
+
+-- Ingested alarms (normalized alarm history)
+CREATE TABLE ingested_alarms (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  log_source_id UUID NOT NULL REFERENCES log_sources(id) ON DELETE CASCADE,
+  building_id UUID NOT NULL REFERENCES buildings(id) ON DELETE CASCADE,
+
+  -- Normalized fields
+  occurred_at TIMESTAMPTZ NOT NULL,
+  point_id TEXT NOT NULL,             -- Original BMS point ID
+  asset_id TEXT,                      -- Matched CAFM asset (via point_asset_mappings)
+
+  alarm_code TEXT,                    -- Original vendor code
+  sentinel_code TEXT,                 -- Normalized SENTINEL code
+  description TEXT,
+
+  value DECIMAL(12, 4),
+  threshold DECIMAL(12, 4),
+  unit TEXT,
+
+  severity TEXT CHECK (severity IN ('critical', 'high', 'medium', 'low')),
+  state TEXT CHECK (state IN ('active', 'acknowledged', 'cleared')),
+
+  acknowledged_by TEXT,
+  acknowledged_at TIMESTAMPTZ,
+  cleared_at TIMESTAMPTZ,
+  notes TEXT,
+
+  -- Metadata
+  raw_data JSONB,                     -- Original record for debugging
+  ingested_at TIMESTAMPTZ DEFAULT NOW(),
+
+  -- Deduplication
+  source_hash TEXT,                   -- Hash of key fields for duplicate detection
+
+  UNIQUE(log_source_id, source_hash)
+);
+
+CREATE INDEX idx_ingested_alarms_building ON ingested_alarms(building_id);
+CREATE INDEX idx_ingested_alarms_asset ON ingested_alarms(asset_id);
+CREATE INDEX idx_ingested_alarms_time ON ingested_alarms(occurred_at DESC);
+CREATE INDEX idx_ingested_alarms_severity ON ingested_alarms(severity, state);
+CREATE INDEX idx_ingested_alarms_code ON ingested_alarms(sentinel_code);
+
+-- Ingested trends (normalized telemetry history)
+CREATE TABLE ingested_trends (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  log_source_id UUID NOT NULL REFERENCES log_sources(id) ON DELETE CASCADE,
+  building_id UUID NOT NULL REFERENCES buildings(id) ON DELETE CASCADE,
+
+  -- Normalized fields
+  recorded_at TIMESTAMPTZ NOT NULL,
+  point_id TEXT NOT NULL,
+  asset_id TEXT,                      -- Matched CAFM asset
+  parameter_name TEXT,                -- "SAT", "RAT", "FanSpd", etc.
+
+  value DECIMAL(12, 4) NOT NULL,
+  unit TEXT,
+  quality TEXT CHECK (quality IN ('good', 'bad', 'uncertain')),
+
+  -- Metadata
+  ingested_at TIMESTAMPTZ DEFAULT NOW(),
+
+  -- For time-series optimization
+  UNIQUE(log_source_id, point_id, recorded_at)
+);
+
+CREATE INDEX idx_ingested_trends_building ON ingested_trends(building_id);
+CREATE INDEX idx_ingested_trends_asset ON ingested_trends(asset_id);
+CREATE INDEX idx_ingested_trends_time ON ingested_trends(recorded_at DESC);
+CREATE INDEX idx_ingested_trends_point ON ingested_trends(point_id, recorded_at DESC);
+
+-- Sync jobs (track each ingestion run)
+CREATE TABLE sync_jobs (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  log_source_id UUID NOT NULL REFERENCES log_sources(id) ON DELETE CASCADE,
+
+  started_at TIMESTAMPTZ DEFAULT NOW(),
+  completed_at TIMESTAMPTZ,
+  status TEXT CHECK (status IN ('running', 'success', 'partial', 'failed')),
+
+  -- Metrics
+  records_processed INTEGER DEFAULT 0,
+  records_inserted INTEGER DEFAULT 0,
+  records_skipped INTEGER DEFAULT 0,  -- Duplicates
+  records_failed INTEGER DEFAULT 0,
+
+  -- Details
+  file_name TEXT,
+  file_size_bytes INTEGER,
+  error_message TEXT,
+  error_details JSONB,
+
+  -- Performance
+  processing_time_ms INTEGER
+);
+
+CREATE INDEX idx_sync_jobs_source ON sync_jobs(log_source_id);
+CREATE INDEX idx_sync_jobs_time ON sync_jobs(started_at DESC);
+CREATE INDEX idx_sync_jobs_status ON sync_jobs(status) WHERE status != 'success';
