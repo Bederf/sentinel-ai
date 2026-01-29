@@ -623,3 +623,187 @@ async def get_sync_jobs_summary(
         )
         for job in jobs
     ]
+
+
+# ==================== Building Status / Go-Live Workflow ====================
+
+@router.get("/buildings/{building_id}/validation-checklist", response_model=ValidationChecklist)
+async def get_validation_checklist(building_id: str):
+    """
+    Get go-live validation checklist for a building.
+
+    Runs all validation checks and returns a checklist with pass/fail/warning status.
+    Checks include:
+    - Data source configuration and activity
+    - Point mapping coverage
+    - Data quality metrics
+    - Configuration completeness
+    """
+    checklist = integration_repo.get_validation_checklist(building_id)
+
+    # Get building name from building_repo if available
+    try:
+        building = building_repo.get_by_uuid(building_id)
+        if building:
+            checklist['building_name'] = building.get('name')
+    except Exception:
+        pass
+
+    # Get current building status
+    status_record = integration_repo.get_building_status(building_id)
+    current_status = BuildingStatus(status_record['status']) if status_record else BuildingStatus.DRAFT
+
+    return ValidationChecklist(
+        building_id=building_id,
+        building_name=checklist.get('building_name'),
+        status=current_status,
+        checked_at=datetime.utcnow(),
+        items=checklist['items'],
+        summary=checklist['summary'],
+        can_activate=checklist['can_activate'],
+        blocking_issues=checklist['blocking_issues'],
+    )
+
+
+@router.get("/buildings/{building_id}/status", response_model=BuildingStatusResponse)
+async def get_building_status(building_id: str):
+    """
+    Get current building status.
+
+    Returns the activation status (draft, pending_validation, active, suspended).
+    If no status record exists, returns DRAFT.
+    """
+    status_record = integration_repo.get_building_status(building_id)
+
+    if not status_record:
+        return BuildingStatusResponse(
+            building_id=building_id,
+            status=BuildingStatus.DRAFT.value,
+        )
+
+    return BuildingStatusResponse(
+        building_id=building_id,
+        status=status_record['status'],
+        last_validated_at=status_record.get('last_validated_at'),
+        notes=status_record.get('notes'),
+    )
+
+
+@router.post("/buildings/{building_id}/validate", response_model=ValidationChecklist)
+async def validate_building(building_id: str):
+    """
+    Validate building configuration for go-live.
+
+    Runs validation checklist and updates building status to PENDING_VALIDATION
+    if all critical checks pass. Returns the validation checklist.
+    """
+    # Run validation checklist
+    checklist = integration_repo.get_validation_checklist(building_id)
+
+    # Get building name if available
+    try:
+        building = building_repo.get_by_uuid(building_id)
+        if building:
+            checklist['building_name'] = building.get('name')
+    except Exception:
+        pass
+
+    # Determine new status based on validation
+    if checklist['can_activate']:
+        new_status = BuildingStatus.PENDING_VALIDATION
+        integration_repo.update_building_status(
+            building_id,
+            new_status.value,
+            notes="Passed validation - ready for activation",
+        )
+    else:
+        # Stay in DRAFT or current status if validation fails
+        current = integration_repo.get_building_status(building_id)
+        new_status = BuildingStatus(current['status']) if current else BuildingStatus.DRAFT
+
+    return ValidationChecklist(
+        building_id=building_id,
+        building_name=checklist.get('building_name'),
+        status=new_status,
+        checked_at=datetime.utcnow(),
+        items=checklist['items'],
+        summary=checklist['summary'],
+        can_activate=checklist['can_activate'],
+        blocking_issues=checklist['blocking_issues'],
+    )
+
+
+@router.post("/buildings/{building_id}/activate", response_model=ActivationResult)
+async def activate_building(building_id: str):
+    """
+    Activate a building after successful validation.
+
+    Requirements:
+    - Current status must be PENDING_VALIDATION
+    - All critical validation checks must pass
+
+    Returns activation result with success/failure and any validation errors.
+    """
+    # Check current status
+    current = integration_repo.get_building_status(building_id)
+    if not current or current['status'] != BuildingStatus.PENDING_VALIDATION.value:
+        return ActivationResult(
+            success=False,
+            building_id=building_id,
+            new_status=current['status'] if current else BuildingStatus.DRAFT.value,
+            message="Building must be in PENDING_VALIDATION status to activate. Run /validate first.",
+            validation_errors=["Status is not PENDING_VALIDATION"],
+        )
+
+    # Run validation again to confirm
+    checklist = integration_repo.get_validation_checklist(building_id)
+
+    if not checklist['can_activate']:
+        return ActivationResult(
+            success=False,
+            building_id=building_id,
+            new_status=BuildingStatus.PENDING_VALIDATION.value,
+            message="Activation blocked by failed validation checks.",
+            validation_errors=checklist['blocking_issues'],
+        )
+
+    # Activate the building
+    integration_repo.update_building_status(
+        building_id,
+        BuildingStatus.ACTIVE.value,
+        notes="Activated after successful validation",
+    )
+
+    return ActivationResult(
+        success=True,
+        building_id=building_id,
+        new_status=BuildingStatus.ACTIVE.value,
+        message="Building successfully activated.",
+        validation_errors=[],
+    )
+
+
+@router.post("/buildings/{building_id}/suspend", response_model=BuildingStatusResponse)
+async def suspend_building(
+    building_id: str,
+    body: BuildingStatusUpdate = None,
+):
+    """
+    Suspend a building (deactivate).
+
+    Sets the building status to SUSPENDED. Can be used to temporarily
+    disable a building without losing configuration.
+    """
+    notes = body.notes if body else None
+    integration_repo.update_building_status(
+        building_id,
+        BuildingStatus.SUSPENDED.value,
+        notes=notes or "Manually suspended",
+    )
+
+    return BuildingStatusResponse(
+        building_id=building_id,
+        status=BuildingStatus.SUSPENDED.value,
+        last_validated_at=datetime.utcnow(),
+        notes=notes or "Manually suspended",
+    )

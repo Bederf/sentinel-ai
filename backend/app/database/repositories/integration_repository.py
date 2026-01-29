@@ -539,3 +539,268 @@ class IntegrationRepository:
         except Exception:
             # Tables don't exist - return empty list
             return []
+
+    # ==================== Building Status / Go-Live Workflow ====================
+
+    # In-memory storage for building status (MVP - no new migration needed)
+    _building_status_store: Dict[str, Dict[str, Any]] = {}
+
+    def get_building_status(self, building_id: str) -> Optional[Dict[str, Any]]:
+        """Get building status record."""
+        return self._building_status_store.get(building_id)
+
+    def update_building_status(
+        self,
+        building_id: str,
+        status: str,
+        notes: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Update building status (upsert)."""
+        record = {
+            'building_id': building_id,
+            'status': status,
+            'last_validated_at': datetime.utcnow().isoformat(),
+            'notes': notes,
+            'updated_at': datetime.utcnow().isoformat(),
+        }
+        self._building_status_store[building_id] = record
+        return record
+
+    def get_validation_checklist(self, building_id: str) -> Dict[str, Any]:
+        """
+        Run all validation checks and return a checklist.
+
+        Returns:
+        - items: List of ChecklistItem dicts
+        - summary: {passed: int, failed: int, warnings: int}
+        - can_activate: bool (True if no 'fail' status)
+        - blocking_issues: List of failed check names
+        """
+        items = []
+        blocking_issues = []
+
+        # ==================== Data Source Checks ====================
+
+        # Check 1: data_source_configured
+        try:
+            sources = self.get_log_sources(building_id=building_id)
+        except Exception:
+            sources = []
+
+        has_source = len(sources) > 0
+        items.append({
+            'id': 'data_source_configured',
+            'category': 'data_source',
+            'name': 'Data Source Configured',
+            'description': 'At least one log source exists for the building',
+            'status': 'pass' if has_source else 'fail',
+            'value': len(sources),
+            'threshold': 1,
+            'details': f"{len(sources)} log source(s) configured" if has_source else "No log sources configured",
+        })
+        if not has_source:
+            blocking_issues.append('data_source_configured')
+
+        # Check 2: data_source_active
+        active_sources = [s for s in sources if s.get('is_active')]
+        has_active = len(active_sources) > 0
+        items.append({
+            'id': 'data_source_active',
+            'category': 'data_source',
+            'name': 'Active Data Source',
+            'description': 'At least one log source is active',
+            'status': 'pass' if has_active else 'fail',
+            'value': len(active_sources),
+            'threshold': 1,
+            'details': f"{len(active_sources)} active source(s)" if has_active else "No active sources",
+        })
+        if not has_active:
+            blocking_issues.append('data_source_active')
+
+        # Check 3: recent_sync
+        last_sync = None
+        for source in sources:
+            sync_at = source.get('last_sync_at')
+            if sync_at and (last_sync is None or sync_at > last_sync):
+                last_sync = sync_at
+
+        hours_since_sync = float('inf')
+        if last_sync:
+            try:
+                if isinstance(last_sync, str):
+                    sync_time = datetime.fromisoformat(last_sync.replace('Z', '+00:00').replace('+00:00', ''))
+                else:
+                    sync_time = last_sync
+                hours_since_sync = (datetime.utcnow() - sync_time).total_seconds() / 3600
+            except (ValueError, TypeError):
+                pass
+
+        recent_sync = hours_since_sync < 24
+        items.append({
+            'id': 'recent_sync',
+            'category': 'data_source',
+            'name': 'Recent Sync',
+            'description': 'Successful sync within last 24 hours',
+            'status': 'pass' if recent_sync else ('warning' if hours_since_sync < 48 else 'fail'),
+            'value': round(hours_since_sync, 1) if hours_since_sync != float('inf') else None,
+            'threshold': 24,
+            'details': f"Last sync {round(hours_since_sync, 1)} hours ago" if hours_since_sync != float('inf') else "Never synced",
+        })
+        if hours_since_sync >= 48:
+            blocking_issues.append('recent_sync')
+
+        # ==================== Point Mapping Checks ====================
+
+        try:
+            mappings = self.get_point_mappings(building_id)
+        except Exception:
+            mappings = []
+
+        total_points = len(mappings)
+        matched_points = len([m for m in mappings if m.get('match_confidence') != 'unmatched'])
+        high_confidence = len([m for m in mappings if m.get('match_confidence') in ['exact', 'manual']])
+
+        # Check 4: points_discovered
+        has_points = total_points > 0
+        items.append({
+            'id': 'points_discovered',
+            'category': 'point_mapping',
+            'name': 'Points Discovered',
+            'description': 'Points have been discovered from log files',
+            'status': 'pass' if has_points else 'fail',
+            'value': total_points,
+            'threshold': 1,
+            'details': f"{total_points} points discovered" if has_points else "No points discovered",
+        })
+        if not has_points:
+            blocking_issues.append('points_discovered')
+
+        # Check 5: match_coverage
+        match_coverage = (matched_points / total_points * 100) if total_points > 0 else 0
+        match_status = 'pass' if match_coverage >= 75 else ('warning' if match_coverage >= 50 else 'fail')
+        items.append({
+            'id': 'match_coverage',
+            'category': 'point_mapping',
+            'name': 'Match Coverage',
+            'description': 'Match coverage >= 50% (warning if <75%)',
+            'status': match_status,
+            'value': round(match_coverage, 1),
+            'threshold': 50,
+            'details': f"{round(match_coverage, 1)}% of points matched to assets",
+        })
+        if match_coverage < 50:
+            blocking_issues.append('match_coverage')
+
+        # Check 6: high_confidence_matches
+        high_confidence_pct = (high_confidence / total_points * 100) if total_points > 0 else 0
+        items.append({
+            'id': 'high_confidence_matches',
+            'category': 'point_mapping',
+            'name': 'High Confidence Matches',
+            'description': 'At least 25% of matches are high confidence',
+            'status': 'pass' if high_confidence_pct >= 25 else 'warning',
+            'value': round(high_confidence_pct, 1),
+            'threshold': 25,
+            'details': f"{round(high_confidence_pct, 1)}% high confidence matches ({high_confidence} of {total_points})",
+        })
+
+        # ==================== Data Quality Checks ====================
+
+        quality_metrics = self.get_quality_metrics(building_id)
+
+        # Check 7: error_rate
+        error_rate = quality_metrics.get('error_rate', 0)
+        items.append({
+            'id': 'error_rate',
+            'category': 'data_quality',
+            'name': 'Error Rate',
+            'description': 'Error rate < 10%',
+            'status': 'pass' if error_rate < 10 else ('warning' if error_rate < 25 else 'fail'),
+            'value': error_rate,
+            'threshold': 10,
+            'details': f"{error_rate}% of sync jobs failed",
+        })
+        if error_rate >= 25:
+            blocking_issues.append('error_rate')
+
+        # Check 8: duplicate_rate
+        duplicate_rate = quality_metrics.get('duplicate_rate', 0)
+        items.append({
+            'id': 'duplicate_rate',
+            'category': 'data_quality',
+            'name': 'Duplicate Rate',
+            'description': 'Duplicate rate < 20%',
+            'status': 'pass' if duplicate_rate < 20 else 'warning',
+            'value': duplicate_rate,
+            'threshold': 20,
+            'details': f"{duplicate_rate}% of records were duplicates",
+        })
+
+        # Check 9: quality_score
+        quality_score = quality_metrics.get('overall_score', 0)
+        items.append({
+            'id': 'quality_score',
+            'category': 'data_quality',
+            'name': 'Quality Score',
+            'description': 'Overall quality score >= 60 (warning if <75)',
+            'status': 'pass' if quality_score >= 75 else ('warning' if quality_score >= 60 else 'fail'),
+            'value': quality_score,
+            'threshold': 60,
+            'details': f"Quality score: {quality_score}/100",
+        })
+        if quality_score < 60:
+            blocking_issues.append('quality_score')
+
+        # ==================== Configuration Checks ====================
+
+        # Check 10: column_mappings
+        has_mappings = False
+        for source in active_sources:
+            try:
+                col_mappings = self.get_column_mappings(source['id'])
+                if col_mappings:
+                    has_mappings = True
+                    break
+            except Exception:
+                pass
+
+        items.append({
+            'id': 'column_mappings',
+            'category': 'configuration',
+            'name': 'Column Mappings',
+            'description': 'Column mappings configured for active sources',
+            'status': 'pass' if has_mappings else ('fail' if active_sources else 'not_checked'),
+            'value': 1 if has_mappings else 0,
+            'threshold': 1,
+            'details': "Column mappings configured" if has_mappings else "No column mappings found",
+        })
+        if active_sources and not has_mappings:
+            blocking_issues.append('column_mappings')
+
+        # Check 11: sync_settings (always pass for MVP since we use defaults)
+        items.append({
+            'id': 'sync_settings',
+            'category': 'configuration',
+            'name': 'Sync Settings',
+            'description': 'Sync frequency and retention configured',
+            'status': 'pass',
+            'value': True,
+            'threshold': None,
+            'details': "Default sync settings applied",
+        })
+
+        # Calculate summary
+        passed = len([i for i in items if i['status'] == 'pass'])
+        failed = len([i for i in items if i['status'] == 'fail'])
+        warnings = len([i for i in items if i['status'] == 'warning'])
+
+        return {
+            'items': items,
+            'summary': {
+                'passed': passed,
+                'failed': failed,
+                'warnings': warnings,
+            },
+            'can_activate': failed == 0,
+            'blocking_issues': blocking_issues,
+        }
