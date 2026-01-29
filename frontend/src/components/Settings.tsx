@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Settings as SettingsIcon, Bell, Monitor, Shield } from "lucide-react";
+import { Settings as SettingsIcon, Bell, Monitor, Shield, Lock, Unlock } from "lucide-react";
 import { useHealthThresholds } from "../hooks/useHealthThresholds";
 import { ThresholdEditor } from "./ThresholdEditor";
 import { SafetyRulesEditor } from "./SafetyRulesEditor";
+import { PasswordModal } from "./PasswordModal";
 
 interface SettingsProps {
   onError?: (error: string) => void;
@@ -11,6 +12,8 @@ interface SettingsProps {
 export function Settings({ onError }: SettingsProps) {
   const { thresholds, loading, error, updateThresholds } = useHealthThresholds();
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [safetyRulesUnlocked, setSafetyRulesUnlocked] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
 
   const handleSaveThresholds = async (newThresholds: {
     healthy: number;
@@ -145,33 +148,84 @@ export function Settings({ onError }: SettingsProps) {
           className="rounded-md overflow-hidden"
           style={{
             background: "var(--color-sentinel-bg-panel)",
-            border: "1px solid var(--color-sentinel-border)",
+            border: `1px solid ${safetyRulesUnlocked ? "var(--color-sentinel-amber)" : "var(--color-sentinel-border)"}`,
           }}
         >
           <div className="p-4 border-b" style={{ borderColor: "var(--color-sentinel-border)" }}>
-            <div className="flex items-center gap-3">
-              <div
-                className="p-2 rounded"
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div
+                  className="p-2 rounded"
+                  style={{
+                    background: "rgba(220, 38, 38, 0.15)",
+                    color: "var(--color-sentinel-red)",
+                  }}
+                >
+                  <Shield className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2
+                    className="text-lg font-semibold"
+                    style={{ color: "var(--color-sentinel-text-primary)" }}
+                  >
+                    Safety Rules
+                  </h2>
+                  <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                    Configure safety interlocks and validation rules for device control
+                  </p>
+                </div>
+              </div>
+
+              {/* Lock/Unlock button */}
+              <button
+                onClick={() => {
+                  if (safetyRulesUnlocked) {
+                    setSafetyRulesUnlocked(false);
+                  } else {
+                    setShowPasswordModal(true);
+                  }
+                }}
+                className="flex items-center gap-2 px-3 py-2 rounded text-sm font-medium transition-colors hover:brightness-110"
                 style={{
-                  background: "rgba(220, 38, 38, 0.15)",
-                  color: "var(--color-sentinel-red)",
+                  background: safetyRulesUnlocked
+                    ? "rgba(245, 158, 11, 0.15)"
+                    : "rgba(220, 38, 38, 0.15)",
+                  color: safetyRulesUnlocked
+                    ? "var(--color-sentinel-amber)"
+                    : "var(--color-sentinel-red)",
+                  border: `1px solid ${safetyRulesUnlocked ? "rgba(245, 158, 11, 0.3)" : "rgba(220, 38, 38, 0.3)"}`,
                 }}
               >
-                <Shield className="h-5 w-5" />
-              </div>
-              <div>
-                <h2
-                  className="text-lg font-semibold"
-                  style={{ color: "var(--color-sentinel-text-primary)" }}
-                >
-                  Safety Rules
-                </h2>
-                <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                  Configure safety interlocks and validation rules for device control
-                </p>
-              </div>
+                {safetyRulesUnlocked ? (
+                  <>
+                    <Unlock className="h-4 w-4" />
+                    Lock Settings
+                  </>
+                ) : (
+                  <>
+                    <Lock className="h-4 w-4" />
+                    Unlock to Edit
+                  </>
+                )}
+              </button>
             </div>
           </div>
+
+          {/* Unlocked warning banner */}
+          {safetyRulesUnlocked && (
+            <div
+              className="px-4 py-2 flex items-center gap-2"
+              style={{
+                background: "rgba(245, 158, 11, 0.15)",
+                borderBottom: "1px solid rgba(245, 158, 11, 0.3)",
+              }}
+            >
+              <Unlock className="h-4 w-4" style={{ color: "var(--color-sentinel-amber)" }} />
+              <span className="text-sm" style={{ color: "var(--color-sentinel-amber)" }}>
+                Safety Rules editing is unlocked. Click "Lock Settings" when finished.
+              </span>
+            </div>
+          )}
 
           <div className="p-4">
             <SafetyRulesEditor
@@ -180,7 +234,7 @@ export function Settings({ onError }: SettingsProps) {
                 setSaveSuccess(true);
                 setTimeout(() => setSaveSuccess(false), 3000);
               }}
-              readOnly={true}
+              readOnly={!safetyRulesUnlocked}
             />
           </div>
         </div>
@@ -279,6 +333,15 @@ export function Settings({ onError }: SettingsProps) {
           </div>
         </div>
       </div>
+
+      {/* Password Modal for Safety Rules */}
+      <PasswordModal
+        isOpen={showPasswordModal}
+        onClose={() => setShowPasswordModal(false)}
+        onSuccess={() => setSafetyRulesUnlocked(true)}
+        title="Unlock Safety Rules"
+        description="Safety rules control critical device limits. Enter the admin password to modify these settings."
+      />
     </div>
   );
 }

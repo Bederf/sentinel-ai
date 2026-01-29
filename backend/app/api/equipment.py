@@ -49,6 +49,89 @@ def load_alerts() -> list[dict]:
     return []
 
 
+def load_safety_rules() -> list[dict]:
+    """Load safety rules from JSON file."""
+    rules_file = DATA_DIR / "safety_rules.json"
+    if rules_file.exists():
+        with open(rules_file) as f:
+            return json.load(f)
+    return []
+
+
+def get_safety_limits_for_point(
+    device_type: str, point_name: str, safety_rules: list[dict]
+) -> dict | None:
+    """
+    Find applicable safety rule limits for a device type and point name.
+
+    Args:
+        device_type: The equipment type (e.g., "hvac", "lighting", "ahu")
+        point_name: The point/sensor name (e.g., "setpoint_temp", "brightness")
+        safety_rules: List of safety rules
+
+    Returns:
+        Dict with min_value and max_value if found, None otherwise
+    """
+    # Normalize device type for matching
+    normalized_type = device_type.lower()
+    hvac_types = ["hvac", "ahu", "chiller", "split_unit", "ac", "vav"]
+
+    for rule in safety_rules:
+        if not rule.get("enabled", True):
+            continue
+
+        rule_device_type = rule.get("device_type", "").lower()
+        rule_point_name = rule.get("point_name")
+
+        # Check device type match (or rule applies to all)
+        device_match = (
+            not rule_device_type or
+            rule_device_type == normalized_type or
+            (rule_device_type == "hvac" and normalized_type in hvac_types)
+        )
+
+        # Check point name match (flexible matching)
+        point_match = False
+        if rule_point_name:
+            # Direct match
+            if rule_point_name.lower() == point_name.lower():
+                point_match = True
+            # Partial match for setpoints
+            elif "setpoint" in point_name.lower() and "setpoint" in rule_point_name.lower():
+                point_match = True
+            # Temperature setpoint matching
+            elif "temp" in point_name.lower() and "temp" in rule_point_name.lower():
+                point_match = True
+        elif rule.get("rule_type") == "temperature_range" and "temp" in point_name.lower():
+            # Generic temperature rule without specific point applies to temp setpoints
+            point_match = True
+
+        if device_match and point_match:
+            # Extract limits based on rule type
+            rule_type = rule.get("rule_type", "")
+
+            if rule_type == "temperature_range":
+                return {
+                    "min_value": rule.get("min_temp", 16.0),
+                    "max_value": rule.get("max_temp", 28.0),
+                    "unit": rule.get("unit", "°C"),
+                }
+            elif rule_type == "brightness_limit":
+                return {
+                    "min_value": rule.get("min_brightness", 0),
+                    "max_value": rule.get("max_brightness", 100),
+                    "unit": "%",
+                }
+            elif rule_type == "pressure_limit":
+                return {
+                    "min_value": rule.get("min_pressure", 0),
+                    "max_value": rule.get("max_pressure", 1200),
+                    "unit": rule.get("unit", "kPa"),
+                }
+
+    return None
+
+
 class EquipmentBase(BaseModel):
     """Base equipment model."""
 
@@ -202,6 +285,9 @@ async def get_equipment_controls(equipment_id: str):
         if not eq:
             raise HTTPException(status_code=404, detail=f"Equipment {equipment_id} not found")
 
+        # Load safety rules for limit enforcement
+        safety_rules = load_safety_rules()
+
         # Get sensors for this equipment
         sensors = []
         try:
@@ -258,12 +344,28 @@ async def get_equipment_controls(equipment_id: str):
             if "setpoint" in sensor_name or "setpoint" in sensor_location:
                 is_writable = True
 
+            # Determine min/max values
+            min_val = float(sensor.get("min_value", 0)) if sensor.get("min_value") else 0
+            max_val = float(sensor.get("max_value", 100)) if sensor.get("max_value") else 100
+            point_unit = sensor.get("unit", "")
+
+            # For writable points, apply safety rule limits if available
+            if is_writable:
+                eq_type = eq.get("type", "")
+                safety_limits = get_safety_limits_for_point(eq_type, point_name, safety_rules)
+                if safety_limits:
+                    min_val = safety_limits["min_value"]
+                    max_val = safety_limits["max_value"]
+                    if safety_limits.get("unit"):
+                        point_unit = safety_limits["unit"]
+                    logger.debug(f"Applied safety limits to {point_name}: {min_val}-{max_val}")
+
             points[point_name] = {
                 "point_type": point_type,
                 "description": f"{sensor_type.title()} - {sensor.get('location', 'Main')}",
-                "unit": sensor.get("unit", ""),
-                "min_value": float(sensor.get("min_value", 0)) if sensor.get("min_value") else 0,
-                "max_value": float(sensor.get("max_value", 100)) if sensor.get("max_value") else 100,
+                "unit": point_unit,
+                "min_value": min_val,
+                "max_value": max_val,
                 "default_value": float(default_value),
                 "writable": is_writable,
             }
@@ -279,12 +381,18 @@ async def get_equipment_controls(equipment_id: str):
                     "writable": True,
                 }
             if "setpoint" not in points and "setpoint_temp" not in points:
+                # Get safety limits for temperature setpoint
+                temp_limits = get_safety_limits_for_point(eq_type, "setpoint_temp", safety_rules)
+                temp_min = temp_limits["min_value"] if temp_limits else 16
+                temp_max = temp_limits["max_value"] if temp_limits else 28
+                temp_unit = temp_limits.get("unit", "°C") if temp_limits else "°C"
+
                 points["setpoint_temp"] = {
                     "point_type": "analog_value",
                     "description": "Temperature Setpoint",
-                    "unit": "°C",
-                    "min_value": 16,
-                    "max_value": 30,
+                    "unit": temp_unit,
+                    "min_value": temp_min,
+                    "max_value": temp_max,
                     "default_value": 22,
                     "writable": True,
                 }
@@ -347,6 +455,9 @@ async def control_equipment(
         if not point or value is None:
             raise HTTPException(status_code=400, detail="Missing 'point' or 'value' in request body")
 
+        # Load safety rules for validation
+        safety_rules = load_safety_rules()
+
         # Get equipment from Supabase with JSON fallback
         eq = None
         try:
@@ -363,6 +474,19 @@ async def control_equipment(
 
         if not eq:
             raise HTTPException(status_code=404, detail=f"Equipment {equipment_id} not found")
+
+        # Validate value against safety rules for writable points
+        eq_type = eq.get("type", "")
+        safety_limits = get_safety_limits_for_point(eq_type, point, safety_rules)
+        if safety_limits and isinstance(value, (int, float)):
+            min_val = safety_limits["min_value"]
+            max_val = safety_limits["max_value"]
+            if value < min_val or value > max_val:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Value {value} is outside safety limits ({min_val}-{max_val}). "
+                           f"Please adjust within the allowed range."
+                )
 
         # Get the sensor if it's a sensor point
         sensor_value = None
