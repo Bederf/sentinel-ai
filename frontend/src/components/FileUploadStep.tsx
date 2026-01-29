@@ -1,6 +1,6 @@
 // FileUploadStep.tsx
 import { useState, useCallback } from 'react';
-import { Alert, Button, Callout, Title, Text } from '@tremor/react';
+import { Button, Callout, Title, Text } from '@tremor/react';
 import { Upload } from 'lucide-react';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "";
@@ -125,7 +125,7 @@ export function FileUploadStep({
 
       {/* Detection result */}
       {result && (
-        <Alert title="Format Detected" color="success">
+        <Callout title="Format Detected" color="teal">
           <div className="mt-4 space-y-2">
             <p><strong>Format:</strong> {result.file_format.toUpperCase()}</p>
             <p><strong>Delimiter:</strong> "{result.delimiter}"</p>
@@ -133,12 +133,12 @@ export function FileUploadStep({
             <p><strong>Confidence:</strong> {(result.confidence * 100).toFixed(0)}%</p>
             <p><strong>Rows:</strong> {result.row_count.toLocaleString()}</p>
           </div>
-        </Alert>
+        </Callout>
       )}
 
       {/* Error */}
       {error && (
-        <Alert title="Error" color="red">{error}</Alert>
+        <Callout title="Error" color="rose">{error}</Callout>
       )}
 
       {/* Actions */}
