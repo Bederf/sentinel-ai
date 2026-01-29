@@ -479,10 +479,11 @@ export function ControlPanel({
               {readablePoints.length > 0 && (
                 <div>
                   <h4
-                    className="font-medium text-xs mb-3 uppercase tracking-wider"
-                    style={{ color: "var(--color-sentinel-text-secondary)" }}
+                    className="font-medium text-xs mb-3 uppercase tracking-wider flex items-center gap-2"
+                    style={{ color: "var(--color-sentinel-amber)" }}
                   >
-                    Monitoring
+                    <span className="w-2 h-2 rounded-full" style={{ background: "var(--color-sentinel-amber)" }} />
+                    Live Readings (Read Only)
                   </h4>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                     {readablePoints.map(([pointName, point]) => {
@@ -492,20 +493,21 @@ export function ControlPanel({
                           key={pointName}
                           className="p-3 rounded"
                           style={{
-                            background: "var(--color-sentinel-bg-secondary)",
-                            border: "1px solid var(--color-sentinel-border)",
+                            background: "rgba(245, 158, 11, 0.1)",
+                            border: "1px solid rgba(245, 158, 11, 0.3)",
                           }}
                         >
                           <div
-                            className="text-xs mb-1"
-                            style={{ color: "var(--color-sentinel-text-disabled)" }}
+                            className="text-xs mb-1 flex items-center gap-1"
+                            style={{ color: "var(--color-sentinel-amber)" }}
                           >
+                            <span className="w-1.5 h-1.5 rounded-full bg-current" />
                             {point.description}
                           </div>
                           <div
                             className="text-lg font-medium"
                             style={{
-                              color: "var(--color-sentinel-text-primary)",
+                              color: "var(--color-sentinel-amber)",
                               fontVariantNumeric: "tabular-nums",
                             }}
                           >
@@ -513,7 +515,7 @@ export function ControlPanel({
                             {point.unit && (
                               <span
                                 className="text-xs ml-1"
-                                style={{ color: "var(--color-sentinel-text-disabled)" }}
+                                style={{ color: "var(--color-sentinel-amber)", opacity: 0.7 }}
                               >
                                 {point.unit}
                               </span>

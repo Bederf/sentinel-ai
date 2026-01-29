@@ -243,6 +243,21 @@ async def get_equipment_controls(equipment_id: str):
                 }
                 default_value = sensor_defaults.get(sensor_type.lower(), 0)
 
+            # Determine if sensor is writable (controllable) or read-only (monitoring)
+            # Most sensors are read-only monitoring values
+            # Only setpoints and control outputs are writable
+            read_only_types = [
+                "temperature", "humidity", "pressure", "flow", "power", "energy",
+                "vibration", "battery_voltage", "battery_runtime", "current",
+                "voltage", "frequency", "speed", "level", "status"
+            ]
+            is_writable = sensor_type.lower() not in read_only_types
+            # Check sensor name/location for setpoint indicators
+            sensor_name = sensor.get("name", "").lower()
+            sensor_location = sensor.get("location", "").lower()
+            if "setpoint" in sensor_name or "setpoint" in sensor_location:
+                is_writable = True
+
             points[point_name] = {
                 "point_type": point_type,
                 "description": f"{sensor_type.title()} - {sensor.get('location', 'Main')}",
@@ -250,7 +265,7 @@ async def get_equipment_controls(equipment_id: str):
                 "min_value": float(sensor.get("min_value", 0)) if sensor.get("min_value") else 0,
                 "max_value": float(sensor.get("max_value", 100)) if sensor.get("max_value") else 100,
                 "default_value": float(default_value),
-                "writable": True,
+                "writable": is_writable,
             }
 
         # Add common control points for HVAC equipment
