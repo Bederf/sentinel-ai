@@ -5,7 +5,14 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config.settings import settings
 from app.api import health, sites, equipment, sensors, alerts, stats, chat, energy, predictions, optimization, devices, audit, safety, autonomous
-from app.api import settings as settings_api
+from app.api import settings as settings_api  # JSON-based (deprecated)
+from app.api import settings_db  # Supabase-based (new)
+from app.api import hybrid_chat  # Hybrid AI (Ollama + Claude)
+from app.api import equipment_lookup  # Fault code & parts lookup
+from app.api import diagnosis  # Guided diagnosis flows
+from app.api import vision  # AI vision for equipment photos
+from app.api import preferences  # Dashboard preferences
+from app.api import integration  # BMS/CAFM integration
 from app.middleware.audit_middleware import AuditMiddleware
 from app.services.background_scheduler import scheduler_service
 
@@ -42,7 +49,14 @@ app.include_router(devices.router, prefix="/api", tags=["devices"])
 app.include_router(safety.router, tags=["safety"])
 app.include_router(autonomous.router, tags=["autonomous"])
 app.include_router(audit.router, tags=["audit"])
-app.include_router(settings_api.router, prefix="/api", tags=["settings"])
+app.include_router(settings_api.router, prefix="/api", tags=["settings"])  # JSON-based (deprecated)
+app.include_router(settings_db.router, prefix="/api/db", tags=["settings-db"])  # Supabase-based
+app.include_router(hybrid_chat.router, tags=["hybrid-chat"])  # Hybrid AI (Ollama + Claude)
+app.include_router(equipment_lookup.router, prefix="/api", tags=["equipment-lookup"])  # Fault code & parts
+app.include_router(diagnosis.router, prefix="/api", tags=["diagnosis"])  # Guided diagnosis flows
+app.include_router(vision.router, prefix="/api", tags=["vision"])  # AI vision for equipment photos
+app.include_router(preferences.router, prefix="/api", tags=["preferences"])  # Dashboard preferences
+app.include_router(integration.router)  # BMS/CAFM integration
 
 
 @app.on_event("startup")
