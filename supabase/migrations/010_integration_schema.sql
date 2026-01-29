@@ -74,3 +74,33 @@ CREATE INDEX idx_column_mappings_source ON column_mappings(log_source_id);
 -- timestamp, point_id, alarm_code, description, value, threshold, severity, state, acknowledged_by, notes
 -- Standard SENTINEL fields for trends:
 -- timestamp, point_id, value, unit, quality
+
+-- Point to asset mappings (link BMS points to CAFM assets)
+CREATE TABLE point_asset_mappings (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  building_id UUID NOT NULL REFERENCES buildings(id) ON DELETE CASCADE,
+
+  bms_point_id TEXT NOT NULL,         -- Raw point ID from BMS: "NAE01/AHU-L12-001.SAT"
+  extracted_asset_id TEXT,            -- Extracted: "AHU-L12-001"
+  cafm_asset_id TEXT,                 -- Matched CAFM asset tag
+  cafm_asset_uuid UUID,               -- If we have UUID reference
+
+  parameter_name TEXT,                -- Extracted parameter: "SAT" (Supply Air Temp)
+  parameter_type TEXT,                -- Classified: 'temperature', 'pressure', 'status', etc.
+
+  match_confidence TEXT CHECK (match_confidence IN ('exact', 'fuzzy', 'manual', 'unmatched')),
+  is_verified BOOLEAN DEFAULT FALSE,  -- Human verified the match
+
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+
+  UNIQUE(building_id, bms_point_id)
+);
+
+CREATE INDEX idx_point_mappings_building ON point_asset_mappings(building_id);
+CREATE INDEX idx_point_mappings_asset ON point_asset_mappings(cafm_asset_id);
+CREATE INDEX idx_point_mappings_unmatched ON point_asset_mappings(match_confidence)
+  WHERE match_confidence = 'unmatched';
+
+CREATE TRIGGER update_point_asset_mappings_updated_at BEFORE UPDATE ON point_asset_mappings
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
