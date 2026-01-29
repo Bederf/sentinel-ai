@@ -1,5 +1,5 @@
 // PointMatchingStep.tsx - Placeholder for Task 2
-export function PointMatchingStep({ columnMappings, onNext, onBack }: {
+export function PointMatchingStep({ columnMappings: _columnMappings, onNext, onBack: _onBack }: {
   buildingId: string;
   columnMappings: any;
   onNext: (data: any) => void;

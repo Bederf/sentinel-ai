@@ -1,7 +1,7 @@
 // FileUploadStep.tsx
 import { useState, useCallback } from 'react';
-import { Alert, Button, Callout, Card, Title, Text } from '@tremor/react';
-import { UploadIcon } from '@heroicons/react/outline';
+import { Alert, Button, Callout, Title, Text } from '@tremor/react';
+import { Upload } from 'lucide-react';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "";
 
@@ -15,7 +15,7 @@ interface FormatDetectionResult {
 }
 
 export function FileUploadStep({
-  buildingId,
+  buildingId: _buildingId,
   onNext
 }: {
   buildingId: string;
@@ -103,7 +103,7 @@ export function FileUploadStep({
           id="file-upload"
         />
         <label htmlFor="file-upload" className="cursor-pointer">
-          <UploadIcon className="w-12 h-12 mx-auto text-gray-400 mb-4" />
+          <Upload className="w-12 h-12 mx-auto text-gray-400 mb-4" />
           <p className="text-lg font-medium text-gray-700">
             Drop file here or click to upload
           </p>

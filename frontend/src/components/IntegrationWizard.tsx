@@ -5,16 +5,31 @@ import { FileUploadStep } from './FileUploadStep';
 import { ColumnMappingStep } from './ColumnMappingStep';
 import { PointMatchingStep } from './PointMatchingStep';
 
+interface FormatDetectionResult {
+  file_format: 'csv' | 'excel' | 'json';
+  delimiter: string;
+  vendor: string;
+  confidence: number;
+  suggested_mappings: Record<string, string>;
+  row_count: number;
+}
+
 type WizardStep = 'upload' | 'mapping' | 'matching' | 'review';
 
-export function IntegrationWizard({ buildingId, onClose, onComplete }: {
+export function IntegrationWizard({ buildingId, onClose, onComplete: _onComplete }: {
   buildingId: string;
   onClose: () => void;
   onComplete: () => void;
 }) {
   const [currentStep, setCurrentStep] = useState<WizardStep>('upload');
-  const [wizardData, setWizardData] = useState({
-    file: null as File | null,
+  const [wizardData, setWizardData] = useState<{
+    file: File | null;
+    formatDetection: FormatDetectionResult | null;
+    columnMappings: Record<string, any>;
+    pointMatches: any[];
+    syncSettings: Record<string, any>;
+  }>({
+    file: null,
     formatDetection: null,
     columnMappings: {},
     pointMatches: [],

@@ -1,5 +1,5 @@
 // ColumnMappingStep.tsx - Placeholder for Task 2
-export function ColumnMappingStep({ formatDetection, onNext, onBack }: {
+export function ColumnMappingStep({ formatDetection: _formatDetection, onNext, onBack: _onBack }: {
   buildingId: string;
   formatDetection: any;
   onNext: (data: any) => void;
