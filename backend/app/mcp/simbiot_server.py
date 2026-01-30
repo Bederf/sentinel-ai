@@ -15,8 +15,10 @@ Usage:
 from typing import Optional, Dict, List, Any
 import logging
 import json
+import re
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
+from collections import defaultdict
 
 from app.services.device_abstraction import device_manager
 from app.models.device import DeviceStatus
@@ -27,6 +29,7 @@ logger = logging.getLogger(__name__)
 DATA_DIR = Path(__file__).parent.parent / "data"
 SITES_FILE = DATA_DIR / "sites.json"
 DEVICES_FILE = DATA_DIR / "mock_devices.json"
+ALERTS_FILE = DATA_DIR / "alerts.json"
 
 
 def _load_sites() -> List[Dict[str, Any]]:
@@ -46,6 +49,16 @@ def _load_devices() -> List[Dict[str, Any]]:
             return json.load(f)
     except Exception as e:
         logger.error(f"Failed to load devices: {e}")
+        return []
+
+
+def _load_alerts() -> List[Dict[str, Any]]:
+    """Load alerts from JSON file."""
+    try:
+        with open(ALERTS_FILE, 'r') as f:
+            return json.load(f)
+    except Exception as e:
+        logger.error(f"Failed to load alerts: {e}")
         return []
 
 
@@ -605,6 +618,279 @@ async def write_device_point_tool(
     }
 
 
+async def get_alarms_tool(
+    building_id: Optional[str] = None,
+    asset_id: Optional[str] = None,
+    severity: Optional[List[str]] = None,
+    state: str = "all",
+    from_time: Optional[str] = None,
+    to_time: Optional[str] = None,
+    limit: int = 50
+) -> Dict[str, Any]:
+    """
+    Get alarms with filtering.
+
+    MCP Tool: get_alarms
+
+    Args:
+        building_id: Filter by building/site ID
+        asset_id: Filter by asset/equipment ID
+        severity: Filter by severity levels (array of: critical, warning, info)
+        state: Filter by alarm state - active, acknowledged, cleared, all (default)
+        from_time: Start time (ISO format)
+        to_time: End time (ISO format)
+        limit: Maximum number of alarms to return (default 50)
+
+    Returns:
+        Dictionary with:
+        - alarms: Array of alarm objects
+        - total: Total alarms matching filters
+        - filtered: Number returned (may be limited)
+    """
+    alerts = _load_alerts()
+
+    # Parse time filters
+    from_dt = None
+    to_dt = None
+    if from_time:
+        try:
+            from_dt = datetime.fromisoformat(from_time.replace('Z', '+00:00'))
+        except ValueError:
+            pass
+    if to_time:
+        try:
+            to_dt = datetime.fromisoformat(to_time.replace('Z', '+00:00'))
+        except ValueError:
+            pass
+
+    filtered_alarms = []
+    for alert in alerts:
+        # Apply building_id filter
+        if building_id and alert.get("site_id") != building_id:
+            continue
+
+        # Apply asset_id filter
+        if asset_id and alert.get("equipment_id") != asset_id:
+            continue
+
+        # Apply severity filter
+        if severity and alert.get("severity") not in severity:
+            continue
+
+        # Apply state filter
+        alert_status = alert.get("status", "active")
+        if state == "active" and alert_status != "active":
+            continue
+        elif state == "acknowledged" and not alert.get("acknowledged", False):
+            continue
+        elif state == "cleared" and alert_status != "cleared":
+            continue
+
+        # Apply time filters
+        alert_time = alert.get("created_at")
+        if alert_time:
+            try:
+                alert_dt = datetime.fromisoformat(alert_time.replace('Z', '+00:00'))
+                if from_dt and alert_dt < from_dt:
+                    continue
+                if to_dt and alert_dt > to_dt:
+                    continue
+            except ValueError:
+                pass
+
+        # Map to alarm response format
+        alarm = {
+            "id": alert.get("id"),
+            "timestamp": alert.get("created_at"),
+            "asset_tag": alert.get("equipment_id"),
+            "asset_name": alert.get("equipment_name"),
+            "code": alert.get("type"),
+            "title": alert.get("title"),
+            "description": alert.get("message"),
+            "severity": alert.get("severity"),
+            "state": "acknowledged" if alert.get("acknowledged") else alert.get("status", "active"),
+            "priority": alert.get("priority"),
+            "category": alert.get("category"),
+            "site_id": alert.get("site_id"),
+            "estimated_cost_zar": alert.get("estimated_cost_zar"),
+            "potential_damage_zar": alert.get("potential_damage_zar")
+        }
+        filtered_alarms.append(alarm)
+
+    # Sort by timestamp (most recent first)
+    filtered_alarms.sort(key=lambda x: x.get("timestamp") or "", reverse=True)
+
+    total = len(filtered_alarms)
+    limited_alarms = filtered_alarms[:limit]
+
+    return {
+        "alarms": limited_alarms,
+        "total": total,
+        "filtered": len(limited_alarms)
+    }
+
+
+async def search_alarms_tool(
+    query: str,
+    building_id: Optional[str] = None,
+    limit: int = 20
+) -> Dict[str, Any]:
+    """
+    Natural language alarm search with pattern analysis.
+
+    MCP Tool: search_alarms
+
+    Parses natural language queries to find relevant alarms and identify patterns.
+
+    Args:
+        query: Natural language search query (e.g., "chiller alarms", "temperature issues")
+        building_id: Optional building/site ID filter
+        limit: Maximum number of results (default 20)
+
+    Returns:
+        Dictionary with:
+        - interpretation: How the query was interpreted
+        - results: Array of matching alarm groups with pattern analysis
+        - keywords_matched: Keywords found in query
+    """
+    alerts = _load_alerts()
+
+    # Define keyword mappings for search
+    keyword_mappings = {
+        "chiller": ["chiller", "CH-", "refrigerant", "compressor"],
+        "ahu": ["ahu", "AHU-", "air handling", "supply air"],
+        "temperature": ["temperature", "temp", "hot", "cold", "overheat"],
+        "pressure": ["pressure", "high pressure", "low pressure"],
+        "trip": ["trip", "tripped", "fault", "failure", "fail"],
+        "generator": ["generator", "GEN-", "diesel", "power", "fuel"],
+        "battery": ["battery", "UPS", "runtime"],
+        "vibration": ["vibration", "bearing", "motor"],
+        "maintenance": ["maintenance", "service", "overdue"],
+        "hvac": ["hvac", "cooling", "heating", "ventilation"],
+        "electrical": ["electrical", "power", "voltage", "current"]
+    }
+
+    # Parse query for keywords
+    query_lower = query.lower()
+    matched_keywords = []
+    search_terms = []
+
+    for category, terms in keyword_mappings.items():
+        for term in terms:
+            if term.lower() in query_lower:
+                matched_keywords.append(category)
+                search_terms.extend(terms)
+                break
+
+    # If no keywords matched, use the whole query
+    if not search_terms:
+        search_terms = query_lower.split()
+
+    # Build interpretation
+    interpretation_parts = []
+    if matched_keywords:
+        interpretation_parts.append(f"Searching for {', '.join(set(matched_keywords))} alarms")
+    else:
+        interpretation_parts.append(f"Searching for alarms matching: {query}")
+
+    if building_id:
+        interpretation_parts.append(f"in building {building_id}")
+
+    # Time detection
+    time_range_days = 14  # Default
+    if "today" in query_lower:
+        time_range_days = 1
+    elif "week" in query_lower:
+        time_range_days = 7
+    elif "month" in query_lower:
+        time_range_days = 30
+
+    interpretation_parts.append(f"in last {time_range_days} days")
+
+    interpretation = " ".join(interpretation_parts)
+
+    # Filter and search alerts
+    matched_alerts = []
+    for alert in alerts:
+        # Apply building filter
+        if building_id and alert.get("site_id") != building_id:
+            continue
+
+        # Search in title and message
+        alert_text = f"{alert.get('title', '')} {alert.get('message', '')} {alert.get('category', '')}".lower()
+
+        # Check if any search term matches
+        if any(term.lower() in alert_text for term in search_terms):
+            matched_alerts.append(alert)
+
+    # Group by asset for pattern analysis
+    asset_groups: Dict[str, List[Dict]] = defaultdict(list)
+    for alert in matched_alerts:
+        asset_key = alert.get("equipment_id") or alert.get("equipment_name") or "unknown"
+        asset_groups[asset_key].append(alert)
+
+    # Build results with pattern analysis
+    results = []
+    for asset_tag, asset_alerts in asset_groups.items():
+        # Sort by date
+        asset_alerts.sort(key=lambda x: x.get("created_at") or "", reverse=True)
+
+        # Extract dates
+        dates = []
+        for a in asset_alerts:
+            if a.get("created_at"):
+                try:
+                    dt = datetime.fromisoformat(a["created_at"].replace('Z', '+00:00'))
+                    dates.append(dt.strftime("%Y-%m-%d"))
+                except ValueError:
+                    pass
+
+        # Detect pattern
+        pattern = "Single occurrence"
+        if len(asset_alerts) >= 3:
+            pattern = f"Recurring - {len(asset_alerts)} occurrences"
+            # Calculate average interval if multiple dates
+            if len(dates) >= 2:
+                try:
+                    date_objs = [datetime.strptime(d, "%Y-%m-%d") for d in dates[:5]]
+                    if len(date_objs) >= 2:
+                        intervals = [(date_objs[i] - date_objs[i+1]).days for i in range(len(date_objs)-1)]
+                        avg_interval = sum(intervals) / len(intervals) if intervals else 0
+                        if avg_interval > 0:
+                            pattern = f"Recurring every {int(avg_interval)} days"
+                except ValueError:
+                    pass
+        elif len(asset_alerts) == 2:
+            pattern = "Multiple occurrences"
+
+        result = {
+            "asset_tag": asset_tag,
+            "asset_name": asset_alerts[0].get("equipment_name"),
+            "site_id": asset_alerts[0].get("site_id"),
+            "alarm_count": len(asset_alerts),
+            "dates": dates[:5],  # Last 5 dates
+            "severities": list(set(a.get("severity") for a in asset_alerts if a.get("severity"))),
+            "pattern": pattern,
+            "latest_alarm": {
+                "title": asset_alerts[0].get("title"),
+                "severity": asset_alerts[0].get("severity"),
+                "timestamp": asset_alerts[0].get("created_at")
+            }
+        }
+        results.append(result)
+
+    # Sort by alarm count (most active first)
+    results.sort(key=lambda x: x["alarm_count"], reverse=True)
+
+    return {
+        "interpretation": interpretation,
+        "results": results[:limit],
+        "keywords_matched": list(set(matched_keywords)),
+        "total_matches": len(matched_alerts),
+        "assets_affected": len(results)
+    }
+
+
 # ============================================================================
 # MCP Tool Definitions (JSON Schema)
 # ============================================================================
@@ -736,6 +1022,75 @@ MCP_TOOLS = [
                 }
             },
             "required": ["device_id", "point_name", "value"]
+        }
+    },
+    {
+        "name": "get_alarms",
+        "description": "Get alarms with filtering. Returns alarm history with support for filtering by building, asset, severity, state, and time range.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "building_id": {
+                    "type": "string",
+                    "description": "Filter by building/site ID"
+                },
+                "asset_id": {
+                    "type": "string",
+                    "description": "Filter by asset/equipment ID"
+                },
+                "severity": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "enum": ["critical", "warning", "info"]
+                    },
+                    "description": "Filter by severity levels"
+                },
+                "state": {
+                    "type": "string",
+                    "enum": ["active", "acknowledged", "cleared", "all"],
+                    "description": "Filter by alarm state (default: all)"
+                },
+                "from_time": {
+                    "type": "string",
+                    "description": "Start time in ISO format (e.g., 2026-01-01T00:00:00)"
+                },
+                "to_time": {
+                    "type": "string",
+                    "description": "End time in ISO format"
+                },
+                "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 500,
+                    "description": "Maximum alarms to return (default: 50)"
+                }
+            },
+            "required": []
+        }
+    },
+    {
+        "name": "search_alarms",
+        "description": "Natural language alarm search with pattern analysis. Parses queries to find relevant alarms and identify recurring patterns. Use this for investigating equipment issues.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Natural language search query (e.g., 'chiller alarms', 'temperature issues last week')"
+                },
+                "building_id": {
+                    "type": "string",
+                    "description": "Optional building/site ID filter"
+                },
+                "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100,
+                    "description": "Maximum results (default: 20)"
+                }
+            },
+            "required": ["query"]
         }
     }
 ]
