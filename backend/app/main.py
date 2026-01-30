@@ -15,6 +15,7 @@ from app.api import preferences  # Dashboard preferences
 from app.api import integration  # BMS/CAFM integration
 from app.api import concept  # Concept Evolution CAFM data
 from app.api import dali  # DALI-2 lighting integration
+from app.api import complaints  # Comfort complaint handling
 from app.middleware.audit_middleware import AuditMiddleware
 from app.services.background_scheduler import scheduler_service
 from app.api.simulation import simulation_service  # BMS simulation service
@@ -63,6 +64,7 @@ app.include_router(integration.router)  # BMS/CAFM integration
 app.include_router(concept.router, tags=["concept-cafm"])  # Concept Evolution CAFM data
 app.include_router(simulation.router, prefix="/api", tags=["simulation"])  # BMS simulation
 app.include_router(dali.router, tags=["dali-lighting"])  # DALI-2 lighting integration
+app.include_router(complaints.router, tags=["comfort-complaints"])  # Comfort complaint handling
 
 
 @app.on_event("startup")
