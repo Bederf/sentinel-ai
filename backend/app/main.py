@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config.settings import settings
-from app.api import health, sites, equipment, sensors, alerts, stats, chat, energy, predictions, optimization, devices, audit, safety, autonomous
+from app.api import health, sites, equipment, sensors, alerts, stats, chat, energy, predictions, optimization, devices, audit, safety, autonomous, simulation
 from app.api import settings as settings_api  # JSON-based (deprecated)
 from app.api import settings_db  # Supabase-based (new)
 from app.api import hybrid_chat  # Hybrid AI (Ollama + Claude)
@@ -13,8 +13,11 @@ from app.api import diagnosis  # Guided diagnosis flows
 from app.api import vision  # AI vision for equipment photos
 from app.api import preferences  # Dashboard preferences
 from app.api import integration  # BMS/CAFM integration
+from app.api import concept  # Concept Evolution CAFM data
+from app.api import dali  # DALI-2 lighting integration
 from app.middleware.audit_middleware import AuditMiddleware
 from app.services.background_scheduler import scheduler_service
+from app.api.simulation import simulation_service  # BMS simulation service
 
 app = FastAPI(
     title=settings.app_name,
@@ -57,6 +60,9 @@ app.include_router(diagnosis.router, prefix="/api", tags=["diagnosis"])  # Guide
 app.include_router(vision.router, prefix="/api", tags=["vision"])  # AI vision for equipment photos
 app.include_router(preferences.router, prefix="/api", tags=["preferences"])  # Dashboard preferences
 app.include_router(integration.router)  # BMS/CAFM integration
+app.include_router(concept.router, tags=["concept-cafm"])  # Concept Evolution CAFM data
+app.include_router(simulation.router, prefix="/api", tags=["simulation"])  # BMS simulation
+app.include_router(dali.router, tags=["dali-lighting"])  # DALI-2 lighting integration
 
 
 @app.on_event("startup")
@@ -67,6 +73,13 @@ async def startup_event():
 
     # Generate initial demo data and schedule periodic updates (60 seconds)
     scheduler_service.add_demo_data_job(interval_seconds=60)
+
+    # Start BMS simulation service
+    try:
+        await simulation_service.start_simulation()
+        print("BMS Simulation service started successfully")
+    except Exception as e:
+        print(f"Failed to start simulation service: {e}")
 
 
 @app.on_event("shutdown")
