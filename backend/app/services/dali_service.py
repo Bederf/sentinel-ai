@@ -36,19 +36,105 @@ class DALIService:
         if data_path.exists():
             with open(data_path) as f:
                 data = json.load(f)
-                # Parse into models
+                # Parse controllers - adapt field names
                 for c in data.get("controllers", []):
-                    self._controllers[c["controller_id"]] = DALIController(**c)
+                    ctrl = self._adapt_controller(c)
+                    self._controllers[ctrl.controller_id] = ctrl
+                # Parse sensors - adapt field names
                 for s in data.get("sensors", []):
-                    self._sensors[s["sensor_id"]] = DALISensor(**s)
+                    sensor = self._adapt_sensor(s)
+                    self._sensors[sensor.sensor_id] = sensor
+                # Parse luminaires - adapt field names
                 for l in data.get("luminaires", []):
-                    self._luminaires[l["luminaire_id"]] = DALILuminaire(**l)
+                    lum = self._adapt_luminaire(l)
+                    self._luminaires[lum.luminaire_id] = lum
+                # Parse zones
                 for z in data.get("zones", []):
                     self._zones[z["zone_id"]] = z
             logger.info(f"Loaded DALI data: {len(self._controllers)} controllers, "
                        f"{len(self._sensors)} sensors, {len(self._luminaires)} luminaires")
         else:
             logger.warning(f"DALI mock data not found at {data_path}")
+
+    def _adapt_controller(self, data: dict) -> DALIController:
+        """Adapt controller data from various formats to model."""
+        # Extract floor from controller_id (e.g., DALI-L12-01 -> L12)
+        controller_id = data.get("controller_id", "")
+        floor = ""
+        if "-L" in controller_id:
+            parts = controller_id.split("-")
+            for p in parts:
+                if p.startswith("L") and len(p) <= 3:
+                    floor = p
+                    break
+
+        return DALIController(
+            controller_id=controller_id,
+            name=data.get("name", ""),
+            site_id=data.get("site_id", ""),
+            building=data.get("building", data.get("location", "")),
+            floor=data.get("floor", floor),
+            ip_address=data.get("ip_address", ""),
+            mac_address=data.get("mac_address", ""),
+            firmware_version=data.get("firmware_version", ""),
+            status=data.get("status", "online"),
+            channel_count=data.get("channel_count", data.get("channels", 64)),
+            sensors_connected=data.get("sensors_connected", 0),
+            luminaires_connected=data.get("luminaires_connected", 0),
+            last_poll=data.get("last_poll"),
+            created_at=data.get("created_at"),
+        )
+
+    def _adapt_sensor(self, data: dict) -> DALISensor:
+        """Adapt sensor data from various formats to model."""
+        # Derive sensor type from has_pir/has_daylight
+        has_pir = data.get("has_pir", True)
+        has_daylight = data.get("has_daylight", True)
+        if has_pir and has_daylight:
+            sensor_type = "pir_daylight"
+        elif has_pir:
+            sensor_type = "pir"
+        elif has_daylight:
+            sensor_type = "daylight"
+        else:
+            sensor_type = "switch"
+
+        return DALISensor(
+            sensor_id=data.get("sensor_id", ""),
+            name=data.get("name", data.get("location", "")),
+            controller_id=data.get("controller_id", ""),
+            zone_id=data.get("zone_id", ""),
+            sensor_type=data.get("sensor_type", sensor_type),
+            dali_address=data.get("dali_address", 0),
+            occupancy=data.get("occupancy", False),
+            lux_level=data.get("lux_level", 0.0),
+            has_daylight=has_daylight,
+            desk_id=data.get("desk_id"),
+            x_coord=data.get("x_coord"),
+            y_coord=data.get("y_coord"),
+            last_updated=data.get("last_updated"),
+        )
+
+    def _adapt_luminaire(self, data: dict) -> DALILuminaire:
+        """Adapt luminaire data from various formats to model."""
+        return DALILuminaire(
+            luminaire_id=data.get("luminaire_id", ""),
+            name=data.get("name", ""),
+            controller_id=data.get("controller_id", ""),
+            zone_id=data.get("zone_id", ""),
+            luminaire_type=data.get("luminaire_type", "led_panel"),
+            dali_address=data.get("dali_address", 0),
+            current_level=data.get("current_level", 0),
+            target_level=data.get("target_level", data.get("current_level", 0)),
+            min_level=data.get("min_level", 10),
+            max_level=data.get("max_level", 254),
+            power_consumption=data.get("power_consumption", 0.0),
+            rated_power=data.get("rated_power", data.get("wattage", 40.0)),
+            fault_status=data.get("fault_status", False),
+            fault_code=data.get("fault_code"),
+            lamp_hours=data.get("lamp_hours", data.get("operating_hours", 0)),
+            last_updated=data.get("last_updated"),
+        )
 
     # === Controller Operations ===
 
