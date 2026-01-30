@@ -50,6 +50,7 @@ import { PredictionDetail } from "./PredictionDetail";
 import { HeroPredictionCard } from "./HeroPredictionCard";
 import { ROISummaryCard } from "./ROISummaryCard";
 import { OccupancyPanel } from "./OccupancyPanel";
+import ComfortComplaintPanel from "./ComfortComplaintPanel";
 import { type View } from "./Sidebar";
 import CardLibrary from "./CardLibrary";
 import { DEFAULT_KPI_CARDS, DEFAULT_SECTIONS } from "../lib/cardDefinitions";
@@ -64,6 +65,7 @@ type DashboardSectionId =
   | 'site-protection'
   | 'energy-analytics'
   | 'risk-predictions'
+  | 'comfort-assistant'
   | 'occupancy-dashboard';
 
 type KPICardId =
@@ -103,6 +105,7 @@ export function Dashboard({ onViewChange }: DashboardProps) {
     'site-protection',
     'energy-analytics',
     'risk-predictions',
+    'comfort-assistant',
     'occupancy-dashboard',
   ]);
 
@@ -759,6 +762,15 @@ export function Dashboard({ onViewChange }: DashboardProps) {
     </DashboardSection>
   );
 
+  // Render Comfort Assistant section
+  const renderComfortAssistant = () => (
+    <DashboardSection id="comfort-assistant">
+      <div className="mt-6">
+        <ComfortComplaintPanel compact={true} />
+      </div>
+    </DashboardSection>
+  );
+
   // Render Occupancy Dashboard section
   const renderOccupancyDashboard = () => (
     <DashboardSection id="occupancy-dashboard">
@@ -777,6 +789,7 @@ export function Dashboard({ onViewChange }: DashboardProps) {
     'site-protection': renderSiteProtection,
     'energy-analytics': renderEnergyAnalytics,
     'risk-predictions': renderRiskPredictions,
+    'comfort-assistant': renderComfortAssistant,
     'occupancy-dashboard': renderOccupancyDashboard,
   };
 
