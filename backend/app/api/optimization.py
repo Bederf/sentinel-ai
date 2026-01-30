@@ -292,6 +292,13 @@ class AnalyzeRequest(BaseModel):
     energy_prices: Optional[Dict[str, Any]] = None
 
 
+class LoadSheddingAnalyzeRequest(BaseModel):
+    """Request model for load shedding analysis endpoint."""
+    site_id: str
+    load_shedding_stage: int  # 1-4, higher = more severe
+    current_conditions: Optional[Dict[str, Any]] = None
+
+
 class ApproveRequest(BaseModel):
     """Request model for approve endpoint."""
     recommendation_id: str
@@ -395,6 +402,71 @@ async def analyze_optimization(request: AnalyzeRequest) -> Dict[str, Any]:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         logger.error(f"Error analyzing optimization: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/optimization/analyze-load-shedding")
+async def analyze_load_shedding(request: LoadSheddingAnalyzeRequest) -> Dict[str, Any]:
+    """
+    Analyze building optimization with load shedding stage awareness.
+
+    During load shedding, the optimizer prioritizes critical zones (P1-P2)
+    while allowing more aggressive optimization in lower-priority zones.
+
+    Zone Priority Behavior by Stage:
+    - Stage 1: Maintain P1-P4 normally, aggressive optimization on P5
+    - Stage 2: Maintain P1-P3 normally, aggressive optimization on P4-P5
+    - Stage 3: Maintain P1-P2 normally, aggressive optimization on P3-P5
+    - Stage 4: Maintain P1 only (executive, server rooms), aggressive on all else
+
+    Args:
+        request: Analysis request with site_id, load_shedding_stage (1-4), and optional conditions
+
+    Returns:
+        OptimizationRecommendation with zone-priority-aware recommendations
+    """
+    try:
+        # Validate stage
+        if request.load_shedding_stage < 1 or request.load_shedding_stage > 4:
+            raise HTTPException(
+                status_code=400,
+                detail="load_shedding_stage must be between 1 and 4"
+            )
+
+        logger.info(f"Analyzing load shedding optimization for site {request.site_id}, stage {request.load_shedding_stage}")
+
+        # Call AI optimizer service with load shedding awareness
+        recommendation = await ai_optimizer_service.analyze_building_load_shedding(
+            site_id=request.site_id,
+            load_shedding_stage=request.load_shedding_stage,
+            current_conditions=request.current_conditions,
+        )
+
+        # Validate recommendation against safety rules
+        validation = await ai_optimizer_service.validate_recommendation(
+            request.site_id, recommendation
+        )
+
+        return {
+            "success": True,
+            "load_shedding_stage": request.load_shedding_stage,
+            "recommendation": recommendation.to_dict(),
+            "validation": validation,
+            "zone_priority_info": {
+                1: "Stage 1: Maintain P1-P4, shed P5 (parking, plant rooms)",
+                2: "Stage 2: Maintain P1-P3, shed P4-P5 (+ lobby)",
+                3: "Stage 3: Maintain P1-P2, shed P3-P5 (executive/server/meeting only)",
+                4: "Stage 4: Maintain P1 only (executive/server rooms only)",
+            }.get(request.load_shedding_stage, ""),
+        }
+
+    except ValueError as e:
+        logger.error(f"Site not found: {e}")
+        raise HTTPException(status_code=404, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error analyzing load shedding optimization: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -503,6 +575,8 @@ async def approve_optimization(
             if all_success:
                 site["optimization_status"] = OptimizationStatus.OPTIMIZED.value
                 site["last_optimization"] = datetime.now().isoformat()
+                # Clear the recommendation after successful approval
+                site["last_recommendation"] = None
 
                 # Add to history
                 if "optimization_history" not in site:

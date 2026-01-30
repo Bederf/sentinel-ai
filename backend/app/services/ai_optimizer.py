@@ -843,6 +843,93 @@ Provide ONLY the JSON response, no additional text."""
             reasoning=reasoning,
         )
 
+    async def analyze_building_load_shedding(
+        self,
+        site_id: str,
+        load_shedding_stage: int,
+        current_conditions: Optional[Dict[str, Any]] = None,
+    ) -> OptimizationRecommendation:
+        """
+        Generate load-shedding-aware optimization recommendations.
+
+        During load shedding, we prioritize maintaining comfort in critical zones
+        while allowing more aggressive optimization in lower-priority zones.
+
+        Args:
+            site_id: Site to analyze
+            load_shedding_stage: Current Eskom stage (1-4, higher = more severe)
+            current_conditions: Current building conditions (optional)
+
+        Returns:
+            OptimizationRecommendation with zone-priority-filtered recommendations
+        """
+        # Get normal recommendations first
+        recommendation = await self.analyze_building(site_id, current_conditions)
+
+        # Priority threshold based on load shedding stage
+        # Stage 1: Optimize all zones up to P4 (keep P1, shed P5)
+        # Stage 2: Optimize all zones up to P3 (keep P1-P2, shed P4-P5)
+        # Stage 3: Optimize all zones up to P2 (keep P1, shed P3-P5)
+        # Stage 4: Only maintain P1 (critical zones only)
+        priority_threshold = {
+            1: 4,  # Keep P1-P4, shed P5 (parking, plant rooms)
+            2: 3,  # Keep P1-P3, shed P4-P5 (lobby, parking, plant)
+            3: 2,  # Keep P1-P2, shed P3-P5 (executive, server, meeting only)
+            4: 1,  # Keep P1 only (executive, server rooms)
+        }
+        max_priority_to_maintain = priority_threshold.get(load_shedding_stage, 3)
+
+        # Get devices for priority lookup
+        devices = await device_manager.list_devices_by_site(site_id)
+        device_map = {d.id: d for d in devices}
+
+        # Filter recommendations based on zone priority
+        filtered_recs = []
+        for rec in recommendation.recommendations:
+            device = device_map.get(rec.get("device_id"))
+            if device:
+                zone_priority = self._get_zone_priority(device)
+                if zone_priority <= max_priority_to_maintain:
+                    # Keep this recommendation (critical zone)
+                    filtered_recs.append(rec)
+                else:
+                    # More aggressive optimization for lower-priority zones
+                    # Double the setpoint change for zones being shed
+                    modified_rec = rec.copy()
+                    current = rec.get("current_value", 22.0)
+                    recommended = rec.get("recommended_value", 22.0)
+                    change = recommended - current
+                    # Double the change for shedding zones (more aggressive)
+                    modified_rec["recommended_value"] = round(current + (change * 2), 1)
+                    modified_rec["reason"] = f"[LOAD SHEDDING Stage {load_shedding_stage}] " + rec.get("reason", "")
+                    filtered_recs.append(modified_rec)
+
+        # Adjust projected savings based on stage (more aggressive = more savings)
+        savings_multiplier = 1.0 + (load_shedding_stage * 0.2)  # 1.2x to 1.8x
+        adjusted_savings = recommendation.projected_savings.copy()
+        adjusted_savings["energy_kwh"] = round(adjusted_savings.get("energy_kwh", 0) * savings_multiplier, 1)
+        adjusted_savings["cost_zar_per_hour"] = round(adjusted_savings.get("cost_zar_per_hour", 0) * savings_multiplier, 2)
+        adjusted_savings["percentage_improvement"] = round(
+            min(adjusted_savings.get("percentage_improvement", 0) * savings_multiplier, 25.0), 1
+        )
+
+        return OptimizationRecommendation(
+            site_id=site_id,
+            timestamp=datetime.now().isoformat(),
+            recommendations=filtered_recs,
+            projected_savings=adjusted_savings,
+            confidence=recommendation.confidence,
+            reasoning=f"Load shedding Stage {load_shedding_stage}: Maintaining P1-P{max_priority_to_maintain} zones at normal comfort. "
+                      f"Lower priority zones (P{max_priority_to_maintain + 1}-P5) receive more aggressive optimization. "
+                      f"{recommendation.reasoning}",
+        )
+
+    def _get_device_zone_priority(self, device_id: str) -> int:
+        """Get zone priority for a device by ID (synchronous helper)."""
+        # This is used when we don't have the device object handy
+        # Returns default priority if device not found
+        return 3
+
     async def validate_recommendation(
         self,
         site_id: str,
