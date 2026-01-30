@@ -41,6 +41,27 @@ class ProtocolType(Enum):
     MQTT = "mqtt"
 
 
+class ZoneType(Enum):
+    """Types of building zones for optimization prioritization."""
+    EXECUTIVE = "executive"          # Priority 1 - always comfortable
+    SERVER_ROOM = "server_room"      # Priority 1 - critical cooling
+    MEETING_ROOM = "meeting_room"    # Priority 2 - when occupied
+    OPEN_OFFICE = "open_office"      # Priority 3 - standard comfort
+    LOBBY = "lobby"                  # Priority 4 - public facing
+    PLANT_ROOM = "plant_room"        # Priority 5 - equipment only
+    PARKING = "parking"              # Priority 6 - minimal HVAC
+    BANKING_HALL = "banking_hall"    # Priority 2 - customer facing
+
+
+class ExposureDirection(Enum):
+    """Exterior exposure direction for solar heat gain calculations."""
+    NORTH = "north"           # Minimal solar gain (Southern Hemisphere)
+    SOUTH = "south"           # Maximum solar gain (Southern Hemisphere)
+    EAST = "east"             # Morning solar gain
+    WEST = "west"             # Afternoon solar gain
+    INTERIOR = "interior"     # No exterior exposure
+
+
 class PointType(Enum):
     """Types of data points on devices."""
     ANALOG_INPUT = "analog_input"
@@ -116,18 +137,119 @@ class DeviceValue:
 
 
 @dataclass
+class DeviceLocation:
+    """Physical location of a device for technician navigation."""
+    building: str  # Full building name
+    floor: str  # FL1, FL2, Basement, Roof, Ground
+    zone: str  # Q1-Q4 or directional (North, South, East, West)
+    room: str  # MR4 (Mechanical Room 4), ER1, OR12, etc.
+    description: str  # Human-readable location string
+    # Zone-aware optimization fields
+    zone_type: Optional['ZoneType'] = None  # Type of zone for optimization priority
+    exposure: Optional['ExposureDirection'] = None  # Exterior exposure for solar gain
+    zone_priority: int = 3  # 1=critical (always maintain), 5=lowest (shed first)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for API response."""
+        return {
+            "building": self.building,
+            "floor": self.floor,
+            "zone": self.zone,
+            "room": self.room,
+            "description": self.description,
+            "zone_type": self.zone_type.value if self.zone_type else None,
+            "exposure": self.exposure.value if self.exposure else None,
+            "zone_priority": self.zone_priority
+        }
+
+    def compact_display(self) -> str:
+        """Return compact location format: FL2/Q3/MR4"""
+        return f"{self.floor}/{self.zone}/{self.room}"
+
+    def full_display(self) -> str:
+        """Return full location format: Building, Floor X, Zone Y, Room Z"""
+        return f"{self.building}, {self.floor_description}, {self.zone_description}, {self.room_description}"
+
+    @property
+    def floor_description(self) -> str:
+        """Get human-readable floor description."""
+        if self.floor.startswith("FL"):
+            return f"Floor {self.floor[2:]}"
+        return self.floor
+
+    @property
+    def zone_description(self) -> str:
+        """Get human-readable zone description."""
+        if self.zone.startswith("Q"):
+            return f"Quadrant {self.zone[1:]}"
+        return self.zone
+
+    @property
+    def room_description(self) -> str:
+        """Get human-readable room description."""
+        # Room type codes
+        room_types = {
+            "MR": "Mechanical Room",
+            "ER": "Electrical Room",
+            "OR": "Office Room",
+            "SR": "Server Room",
+            "WR": "Washroom",
+            "KR": "Kitchen",
+            "LR": "Lobby/Reception",
+            "ST": "Storage"
+        }
+        # Extract room type code (letters before numbers)
+        import re
+        match = re.match(r"([A-Z]+)(\d+)", self.room)
+        if match:
+            code, number = match.groups()
+            room_type = room_types.get(code, "Room")
+            return f"{room_type} {number}"
+        return self.room
+
+
+@dataclass
+class DeviceEquipment:
+    """Equipment make, model, and specifications."""
+    manufacturer: str  # Manufacturer name
+    model: str  # Model number/name
+    serial_number: Optional[str] = None  # Asset serial number
+    installation_year: Optional[int] = None  # Year installed
+    capacity_kw: Optional[float] = None  # Capacity in kW (for HVAC)
+    specifications: Dict[str, Any] = field(default_factory=dict)  # Additional specs
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for API response."""
+        return {
+            "manufacturer": self.manufacturer,
+            "model": self.model,
+            "serial_number": self.serial_number,
+            "installation_year": self.installation_year,
+            "capacity_kw": self.capacity_kw,
+            "specifications": self.specifications
+        }
+
+
+@dataclass
 class Device:
     """Base device model."""
     id: str
     name: str
     device_type: DeviceType
     protocol: ProtocolType
-    location: str
     site_id: str
+
+    # New structured location and equipment (recommended)
+    device_location: DeviceLocation
+    equipment: DeviceEquipment
+
+    # Legacy fields for backward compatibility (deprecated)
+    location: str = ""  # Use device_location instead
+    manufacturer: str = ""  # Use equipment.manufacturer instead
+    model: str = ""  # Use equipment.model instead
+
     status: DeviceStatus = DeviceStatus.ONLINE
     description: str = ""
-    manufacturer: str = ""
-    model: str = ""
     points: Dict[str, DevicePoint] = field(default_factory=dict)
     metadata: Dict[str, Any] = field(default_factory=dict)
     last_seen: str = ""
@@ -135,6 +257,15 @@ class Device:
     updated_at: str = ""
 
     def __post_init__(self):
+        # Sync legacy fields with new structured fields
+        if self.device_location and not self.location:
+            self.location = self.device_location.compact_display()
+        if self.equipment:
+            if not self.manufacturer:
+                self.manufacturer = self.equipment.manufacturer
+            if not self.model:
+                self.model = self.equipment.model
+
         if not self.last_seen:
             self.last_seen = datetime.now().isoformat()
         if not self.created_at:
@@ -149,12 +280,14 @@ class Device:
             "name": self.name,
             "device_type": self.device_type.value,
             "protocol": self.protocol.value,
-            "location": self.location,
             "site_id": self.site_id,
+            "location": self.location,  # Legacy compact format
+            "device_location": self.device_location.to_dict(),  # New structured format
+            "equipment": self.equipment.to_dict(),  # New structured format
+            "manufacturer": self.manufacturer,  # Legacy (kept for backward compatibility)
+            "model": self.model,  # Legacy (kept for backward compatibility)
             "status": self.status.value,
             "description": self.description,
-            "manufacturer": self.manufacturer,
-            "model": self.model,
             "points": {name: self._point_to_dict(point) for name, point in self.points.items()},
             "metadata": self.metadata,
             "last_seen": self.last_seen,
@@ -243,7 +376,45 @@ def create_device_from_dict(data: Dict[str, Any]) -> Device:
         if "building_id" in metadata:
             data["site_id"] = metadata["building_id"]
 
-    # Also set location from metadata if not provided
+    # Handle device_location (new structured format)
+    if "device_location" in data and isinstance(data["device_location"], dict):
+        loc_data = data["device_location"]
+        # Convert zone_type and exposure strings to enums if present
+        if "zone_type" in loc_data and isinstance(loc_data["zone_type"], str):
+            loc_data["zone_type"] = ZoneType(loc_data["zone_type"])
+        if "exposure" in loc_data and isinstance(loc_data["exposure"], str):
+            loc_data["exposure"] = ExposureDirection(loc_data["exposure"])
+        data["device_location"] = DeviceLocation(**loc_data)
+    elif "location" in data and isinstance(data["location"], str):
+        # Legacy string location - create basic DeviceLocation
+        data["device_location"] = DeviceLocation(
+            building=data.get("name", "Unknown"),
+            floor="Ground",
+            zone="Q1",
+            room=data["location"],
+            description=data["location"]
+        )
+    else:
+        # Default location
+        data["device_location"] = DeviceLocation(
+            building=data.get("name", "Unknown"),
+            floor="Ground",
+            zone="Q1",
+            room="Unknown",
+            description="Unknown location"
+        )
+
+    # Handle equipment (new structured format)
+    if "equipment" in data and isinstance(data["equipment"], dict):
+        data["equipment"] = DeviceEquipment(**data["equipment"])
+    else:
+        # Create equipment from legacy manufacturer/model fields
+        data["equipment"] = DeviceEquipment(
+            manufacturer=data.get("manufacturer", ""),
+            model=data.get("model", "")
+        )
+
+    # Also set location string from metadata if not provided (backward compatibility)
     if "location" not in data and "metadata" in data:
         metadata = data.get("metadata", {})
         if "location" in metadata:
