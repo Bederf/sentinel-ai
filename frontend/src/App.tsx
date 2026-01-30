@@ -14,6 +14,7 @@ import { SplashScreen } from "./components/SplashScreen";
 import { AlertFeed } from "./components/AlertFeed";
 import { CalendarPicker } from "./components/CalendarPicker";
 import { IntegrationMonitoringPage } from "./components/IntegrationMonitoringPage";
+import { OccupancyPanel } from "./components/OccupancyPanel";
 
 interface HealthStatus {
   status: string;
@@ -193,6 +194,7 @@ function App() {
                  currentView === "settings" ? "Settings" :
                  currentView === "technician" ? "Technician Chat" :
                  currentView === "integrations" ? "Integration Monitoring" :
+                 currentView === "occupancy" ? "DALI Occupancy" :
                  "AI Assistant"}
               </h1>
             </div>
@@ -424,6 +426,10 @@ function App() {
             </div>
           ) : currentView === "integrations" ? (
             <IntegrationMonitoringPage />
+          ) : currentView === "occupancy" ? (
+            <div className="h-full overflow-y-auto p-4 md:p-6">
+              <OccupancyPanel compact={false} />
+            </div>
           ) : (
             <div className="h-full p-4 md:p-6">
               <div className="h-full max-w-4xl mx-auto">

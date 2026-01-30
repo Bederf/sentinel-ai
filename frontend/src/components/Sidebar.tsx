@@ -4,24 +4,18 @@
  * Features:
  * - SENTINEL shield logo with amber accent
  * - Dark panel design with amber accent indicators
- * - Navigation items: Dashboard, Chat
- * - Data Upload section for CSV files
+ * - Navigation items: Dashboard, Chat, Integrations, etc.
  * - Lucide icons with SENTINEL styling
  * - Collapsible on mobile (hamburger menu)
  * - Active view highlighting with left border accent
  */
 
-import { useState, useRef } from "react";
+import { useState } from "react";
 import {
   MessageSquare,
   LayoutDashboard,
   Menu,
   X,
-  Upload,
-  FileUp,
-  Check,
-  AlertCircle,
-  Database,
   Shield,
   ChevronDown,
   ChevronRight,
@@ -32,9 +26,10 @@ import {
   Zap,
   Wrench,
   Activity,
+  Users,
 } from "lucide-react";
 
-export type View = "dashboard" | "chat" | "technician" | "control" | "control-audit" | "optimization" | "upload" | "settings" | "integrations";
+export type View = "dashboard" | "chat" | "technician" | "control" | "control-audit" | "optimization" | "settings" | "integrations" | "occupancy";
 
 interface SidebarProps {
   currentView: View;
@@ -49,105 +44,26 @@ interface NavItem {
   description?: string;
 }
 
-interface DataStatus {
-  work_orders: number;
-  assets: number;
-  sites: number;
-  total_cost: number;
-  total_contract_value: number;
-}
-
 const navItems: NavItem[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, description: "System overview" },
   { id: "chat", label: "Chat", icon: MessageSquare, description: "AI Assistant" },
   { id: "technician", label: "Tech Chat", icon: Wrench, description: "Fault Diagnosis" },
   { id: "optimization", label: "Optimization", icon: Zap, description: "Load Shedding AI" },
+  { id: "occupancy", label: "Occupancy", icon: Users, description: "DALI Lighting" },
   { id: "control", label: "Control", icon: Shield, description: "Building Controls" },
   { id: "control-audit", label: "Control Audit", icon: ClipboardList, description: "Control System Logs" },
   { id: "settings", label: "Settings", icon: SettingsIcon, description: "System Configuration" },
   { id: "integrations", label: "Integrations", icon: Activity, description: "BMS Integration Health" },
 ];
 
-const uploadTypes = [
-  { id: "work_orders", label: "Work Orders", description: "CAFM work order history" },
-  { id: "assets", label: "Assets", description: "Asset register with lifecycle" },
-  { id: "sites", label: "Sites", description: "Site information & contracts" },
-  { id: "alarms", label: "Alarms", description: "BCC alarm history" },
-  { id: "energy_readings", label: "Energy", description: "Utility consumption data" },
-  { id: "generator_telemetry", label: "Generator", description: "DeepSea controller data" },
-  { id: "hvac_telemetry", label: "HVAC", description: "BACnet AHU/chiller data" },
-  { id: "vsd_telemetry", label: "VSD", description: "Danfoss/ABB drive data" },
-  { id: "chiller_telemetry", label: "Chiller", description: "York/Carrier/Trane data" },
-  { id: "pump_telemetry", label: "Pump", description: "Grundfos/KSB pump data" },
-];
-
 export function Sidebar({ currentView, onViewChange, version = "1.0" }: SidebarProps) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(true); // Start minimized
-  const [uploadStatus, setUploadStatus] = useState<Record<string, "idle" | "uploading" | "success" | "error">>({});
-  const [dataStatus, setDataStatus] = useState<DataStatus | null>(null);
-  const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const handleNavClick = (view: View) => {
     onViewChange(view);
     setIsMobileOpen(false);
-  };
-
-  const fetchDataStatus = async () => {
-    try {
-      const response = await fetch("/api/data-status");
-      if (response.ok) {
-        const data = await response.json();
-        setDataStatus(data);
-      }
-    } catch (error) {
-      console.error("Failed to fetch data status:", error);
-    }
-  };
-
-  const handleUploadClick = (typeId: string) => {
-    fileInputRefs.current[typeId]?.click();
-  };
-
-  const handleFileChange = async (typeId: string, event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    setUploadStatus((prev) => ({ ...prev, [typeId]: "uploading" }));
-
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-
-      const response = await fetch(`/api/upload/${typeId}`, {
-        method: "POST",
-        body: formData,
-      });
-
-      if (response.ok) {
-        setUploadStatus((prev) => ({ ...prev, [typeId]: "success" }));
-        fetchDataStatus();
-        setTimeout(() => {
-          setUploadStatus((prev) => ({ ...prev, [typeId]: "idle" }));
-        }, 3000);
-      } else {
-        setUploadStatus((prev) => ({ ...prev, [typeId]: "error" }));
-      }
-    } catch (error) {
-      console.error("Upload failed:", error);
-      setUploadStatus((prev) => ({ ...prev, [typeId]: "error" }));
-    }
-
-    event.target.value = "";
-  };
-
-  const toggleUploadSection = () => {
-    setIsUploadOpen(!isUploadOpen);
-    if (!isUploadOpen) {
-      fetchDataStatus();
-    }
   };
 
   return (
@@ -290,156 +206,6 @@ export function Sidebar({ currentView, onViewChange, version = "1.0" }: SidebarP
               </button>
             );
           })}
-
-          {/* Data Upload Section */}
-          <div
-            className="mt-4 pt-4 mx-3"
-            style={{ borderTop: "1px solid var(--color-grafana-border)" }}
-          >
-            <button
-              onClick={toggleUploadSection}
-              className={`w-full flex items-center gap-3 px-1 py-2 transition-all duration-150 md:justify-center ${isCollapsed ? 'lg:justify-center' : 'lg:justify-start'}`}
-              style={{
-                color: isUploadOpen
-                  ? "var(--color-sentinel-text-primary)"
-                  : "var(--color-sentinel-text-secondary)",
-              }}
-            >
-              <Database
-                className="h-5 w-5 flex-shrink-0"
-                style={{
-                  color: isUploadOpen ? "var(--color-sentinel-blue)" : "var(--color-sentinel-text-secondary)",
-                }}
-              />
-              <span className={`font-medium text-sm md:hidden ${isCollapsed ? 'lg:hidden' : 'lg:block'} flex-1 text-left`}>Data Sources</span>
-              {isUploadOpen ? (
-                <ChevronDown className={`h-4 w-4 md:hidden ${isCollapsed ? 'lg:hidden' : 'lg:block'}`} />
-              ) : (
-                <ChevronRight className={`h-4 w-4 md:hidden ${isCollapsed ? 'lg:hidden' : 'lg:block'}`} />
-              )}
-            </button>
-
-            {/* Expandable upload section */}
-            {isUploadOpen && (
-              <div className={`mt-2 space-y-1 md:hidden ${isCollapsed ? 'lg:hidden' : 'lg:block'}`}>
-                {/* Data status summary */}
-                {dataStatus && (
-                  <div
-                    className="rounded p-3 text-xs space-y-1 mb-3"
-                    style={{
-                      background: "var(--color-sentinel-bg-secondary)",
-                      border: "1px solid var(--color-sentinel-border)",
-                    }}
-                  >
-                    <div
-                      className="font-medium mb-2"
-                      style={{ color: "var(--color-sentinel-text-primary)" }}
-                    >
-                      Current Data
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <span style={{ color: "var(--color-sentinel-text-disabled)" }}>Work Orders</span>
-                        <div style={{ color: "var(--color-sentinel-blue)" }}>{dataStatus.work_orders}</div>
-                      </div>
-                      <div>
-                        <span style={{ color: "var(--color-sentinel-text-disabled)" }}>Assets</span>
-                        <div style={{ color: "var(--color-sentinel-blue)" }}>{dataStatus.assets}</div>
-                      </div>
-                      <div>
-                        <span style={{ color: "var(--color-sentinel-text-disabled)" }}>Sites</span>
-                        <div style={{ color: "var(--color-sentinel-blue)" }}>{dataStatus.sites}</div>
-                      </div>
-                      <div>
-                        <span style={{ color: "var(--color-sentinel-text-disabled)" }}>Total Cost</span>
-                        <div style={{ color: "var(--color-sentinel-green)" }}>
-                          R{dataStatus.total_cost.toLocaleString()}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Upload buttons - Compact grid */}
-                <div className="grid grid-cols-2 gap-1">
-                  {uploadTypes.map((type) => {
-                    const status = uploadStatus[type.id] || "idle";
-
-                    return (
-                      <div key={type.id} className="relative">
-                        <input
-                          type="file"
-                          accept=".csv"
-                          className="hidden"
-                          ref={(el) => (fileInputRefs.current[type.id] = el)}
-                          onChange={(e) => handleFileChange(type.id, e)}
-                        />
-                        <button
-                          onClick={() => handleUploadClick(type.id)}
-                          disabled={status === "uploading"}
-                          className="w-full flex items-center gap-1.5 px-2 py-1.5 rounded text-xs transition-all duration-150"
-                          style={{
-                            background:
-                              status === "success"
-                                ? "rgba(115, 191, 105, 0.15)"
-                                : status === "error"
-                                  ? "rgba(242, 73, 92, 0.15)"
-                                  : status === "uploading"
-                                    ? "rgba(50, 116, 217, 0.15)"
-                                    : "var(--color-grafana-bg-secondary)",
-                            border: `1px solid ${
-                              status === "success"
-                                ? "rgba(115, 191, 105, 0.3)"
-                                : status === "error"
-                                  ? "rgba(242, 73, 92, 0.3)"
-                                  : status === "uploading"
-                                    ? "rgba(50, 116, 217, 0.3)"
-                                    : "var(--color-grafana-border)"
-                            }`,
-                            color:
-                              status === "success"
-                                ? "var(--color-status-success)"
-                                : status === "error"
-                                  ? "var(--color-status-error)"
-                                  : status === "uploading"
-                                    ? "var(--color-grafana-blue)"
-                                    : "var(--color-grafana-text-secondary)",
-                          }}
-                        >
-                          {status === "success" ? (
-                            <Check className="h-3 w-3" />
-                          ) : status === "error" ? (
-                            <AlertCircle className="h-3 w-3" />
-                          ) : status === "uploading" ? (
-                            <Upload className="h-3 w-3 animate-pulse" />
-                          ) : (
-                            <FileUp className="h-3 w-3" />
-                          )}
-                          <span className="truncate">{type.label}</span>
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* Reload data button */}
-                <button
-                  onClick={async () => {
-                    await fetch("/api/reload-data", { method: "POST" });
-                    fetchDataStatus();
-                  }}
-                  className="w-full mt-2 px-3 py-2 text-xs rounded transition-colors"
-                  style={{
-                    color: "var(--color-grafana-text-disabled)",
-                    background: "transparent",
-                    border: "1px dashed var(--color-grafana-border)",
-                  }}
-                >
-                  Reload All Data
-                </button>
-              </div>
-            )}
-          </div>
 
           {/* About Section */}
           <div

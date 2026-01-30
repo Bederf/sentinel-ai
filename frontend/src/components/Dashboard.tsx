@@ -20,6 +20,7 @@ import {
   Bell,
   DollarSign,
   RefreshCw,
+  LayoutGrid,
 } from "lucide-react";
 import {
   DndContext,
@@ -48,7 +49,10 @@ import { PredictionCard } from "./PredictionCard";
 import { PredictionDetail } from "./PredictionDetail";
 import { HeroPredictionCard } from "./HeroPredictionCard";
 import { ROISummaryCard } from "./ROISummaryCard";
+import { OccupancyPanel } from "./OccupancyPanel";
 import { type View } from "./Sidebar";
+import CardLibrary from "./CardLibrary";
+import { DEFAULT_KPI_CARDS, DEFAULT_SECTIONS } from "../lib/cardDefinitions";
 
 // Time period options for energy chart
 const TIME_PERIODS = [7, 30, 90] as const;
@@ -59,7 +63,8 @@ type DashboardSectionId =
   | 'kpi-row'
   | 'site-protection'
   | 'energy-analytics'
-  | 'risk-predictions';
+  | 'risk-predictions'
+  | 'occupancy-dashboard';
 
 type KPICardId =
   | 'kpi-protected-sites'
@@ -98,6 +103,7 @@ export function Dashboard({ onViewChange }: DashboardProps) {
     'site-protection',
     'energy-analytics',
     'risk-predictions',
+    'occupancy-dashboard',
   ]);
 
   const [kpiOrder, setKpiOrder] = useState<KPICardId[]>([
@@ -107,6 +113,12 @@ export function Dashboard({ onViewChange }: DashboardProps) {
     'kpi-potential-savings',
     'kpi-risk-predictions',
   ]);
+
+  // Card visibility state
+  const [visibleKpiCards, setVisibleKpiCards] = useState<string[]>(DEFAULT_KPI_CARDS);
+  const [visibleSections, setVisibleSections] = useState<string[]>(DEFAULT_SECTIONS);
+  const [isCardLibraryOpen, setIsCardLibraryOpen] = useState(false);
+  const [isSavingPreferences, setIsSavingPreferences] = useState(false);
 
   // DnD sensors
   const sensors = useSensors(
@@ -136,6 +148,29 @@ export function Dashboard({ onViewChange }: DashboardProps) {
     };
 
     loadDashboardData();
+  }, []);
+
+  // Load dashboard preferences on mount
+  useEffect(() => {
+    const loadPreferences = async () => {
+      try {
+        const response = await api.getDashboardPreferences();
+        if (response.preferences) {
+          setVisibleKpiCards(response.preferences.visible_kpi_cards);
+          setVisibleSections(response.preferences.visible_sections);
+          setKpiOrder(response.preferences.kpi_card_order as KPICardId[]);
+          setSectionOrder(response.preferences.section_order as DashboardSectionId[]);
+          if (response.preferences.default_energy_period) {
+            setSelectedDays(response.preferences.default_energy_period as TimePeriod);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load dashboard preferences:", err);
+        // Use defaults on error
+      }
+    };
+
+    loadPreferences();
   }, []);
 
   // Load energy data when filters change
@@ -182,8 +217,11 @@ export function Dashboard({ onViewChange }: DashboardProps) {
     setSelectedSiteId(site.id);
   };
 
-  // Handle back from site detail view
+  // Handle back from site detail view - navigate to dashboard
   const handleSiteDetailBack = () => {
+    // First ensure we're on the dashboard view
+    onViewChange("dashboard");
+    // Then clear the selected site to show dashboard content
     setSelectedSiteId(null);
   };
 
@@ -220,13 +258,69 @@ export function Dashboard({ onViewChange }: DashboardProps) {
       setSectionOrder((items) => {
         const oldIndex = items.indexOf(active.id as DashboardSectionId);
         const newIndex = items.indexOf(over.id as DashboardSectionId);
-        
+
         // Only reorder if indices are valid
         if (oldIndex !== -1 && newIndex !== -1) {
           return arrayMove(items, oldIndex, newIndex);
         }
         return items;
       });
+    }
+  };
+
+  // Save preferences helper
+  const savePreferences = async (updates: Partial<{
+    visible_kpi_cards: string[];
+    visible_sections: string[];
+    kpi_card_order: string[];
+    section_order: string[];
+  }>) => {
+    setIsSavingPreferences(true);
+    try {
+      await api.updateDashboardPreferences({
+        visible_kpi_cards: updates.visible_kpi_cards ?? visibleKpiCards,
+        visible_sections: updates.visible_sections ?? visibleSections,
+        kpi_card_order: updates.kpi_card_order ?? kpiOrder,
+        section_order: updates.section_order ?? sectionOrder,
+        default_energy_period: selectedDays,
+        default_energy_site_id: energyFilterSiteId,
+      });
+    } catch (err) {
+      console.error("Failed to save preferences:", err);
+    } finally {
+      setIsSavingPreferences(false);
+    }
+  };
+
+  // Handle KPI card visibility change
+  const handleKpiVisibilityChange = (cardId: string, visible: boolean) => {
+    const newVisible = visible
+      ? [...visibleKpiCards, cardId]
+      : visibleKpiCards.filter(id => id !== cardId);
+    setVisibleKpiCards(newVisible);
+    savePreferences({ visible_kpi_cards: newVisible });
+  };
+
+  // Handle section visibility change
+  const handleSectionVisibilityChange = (sectionId: string, visible: boolean) => {
+    const newVisible = visible
+      ? [...visibleSections, sectionId]
+      : visibleSections.filter(id => id !== sectionId);
+    setVisibleSections(newVisible);
+    savePreferences({ visible_sections: newVisible });
+  };
+
+  // Reset preferences to defaults
+  const handleResetToDefaults = async () => {
+    setVisibleKpiCards(DEFAULT_KPI_CARDS);
+    setVisibleSections(DEFAULT_SECTIONS);
+    setKpiOrder(DEFAULT_KPI_CARDS as KPICardId[]);
+    setSectionOrder(DEFAULT_SECTIONS as DashboardSectionId[]);
+
+    try {
+      await api.resetDashboardPreferences();
+    } catch (err) {
+      console.error("Failed to reset preferences:", err);
     }
   };
 
@@ -246,17 +340,27 @@ export function Dashboard({ onViewChange }: DashboardProps) {
         title: "Monitored Assets",
         value: stats.total_equipment,
         icon: <Cpu className="h-5 w-5" />,
-        delta: stats.uptime_percent ? stats.uptime_percent - 95 : 0,
-        deltaText: "vs 95% target",
+        // Only show delta if uptime_percent exists and is not null/undefined
+        delta: (stats as any).uptime_percent !== undefined && (stats as any).uptime_percent !== null 
+          ? (stats as any).uptime_percent - 95 
+          : undefined,
+        deltaText: (stats as any).uptime_percent !== undefined && (stats as any).uptime_percent !== null 
+          ? "vs 95% target" 
+          : undefined,
         accentColor: "cyan" as const,
       },
       'kpi-active-risks': {
         title: "Active Risks",
         value: stats.active_alerts || 0,
         icon: <Bell className="h-5 w-5" />,
-        delta: stats.critical_alerts ? -(stats.critical_alerts * 10) : 0,
+        // Only show delta if critical_alerts exists and is greater than 0
+        delta: (stats as any).critical_alerts !== undefined && (stats as any).critical_alerts !== null && (stats as any).critical_alerts > 0 
+          ? -((stats as any).critical_alerts * 10) 
+          : undefined,
         isInverseTrend: true,
-        deltaText: stats.critical_alerts ? `${stats.critical_alerts} critical` : undefined,
+        deltaText: (stats as any).critical_alerts !== undefined && (stats as any).critical_alerts !== null && (stats as any).critical_alerts > 0 
+          ? `${(stats as any).critical_alerts} critical` 
+          : undefined,
         accentColor: "orange" as const,
       },
       'kpi-potential-savings': {
@@ -336,31 +440,44 @@ export function Dashboard({ onViewChange }: DashboardProps) {
   }
 
   // Render KPI Row section
-  const renderKPIRow = () => (
-    <DashboardSection id="kpi-row">
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragEnd={handleKPIDragEnd}
-      >
-        <SortableContext items={kpiOrder} strategy={horizontalListSortingStrategy}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-            {kpiOrder.map((kpiId) => {
-              const cardProps = kpiCards[kpiId];
-              if (!cardProps) return null;
-              return (
-                <SortableKPICard
-                  key={kpiId}
-                  id={kpiId}
-                  {...cardProps}
-                />
-              );
-            })}
-          </div>
-        </SortableContext>
-      </DndContext>
-    </DashboardSection>
-  );
+  const renderKPIRow = () => {
+    // Filter to only visible KPI cards
+    const visibleKpiOrder = kpiOrder.filter(id => visibleKpiCards.includes(id));
+    if (visibleKpiOrder.length === 0) return null;
+
+    // Calculate grid columns based on visible card count
+    const gridCols = visibleKpiOrder.length <= 3
+      ? `lg:grid-cols-${visibleKpiOrder.length}`
+      : visibleKpiOrder.length === 4
+      ? 'lg:grid-cols-4'
+      : 'lg:grid-cols-5';
+
+    return (
+      <DashboardSection id="kpi-row">
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleKPIDragEnd}
+        >
+          <SortableContext items={visibleKpiOrder} strategy={horizontalListSortingStrategy}>
+            <div className={`grid grid-cols-1 sm:grid-cols-2 ${gridCols} gap-4 mb-6`}>
+              {visibleKpiOrder.map((kpiId) => {
+                const cardProps = kpiCards[kpiId];
+                if (!cardProps) return null;
+                return (
+                  <SortableKPICard
+                    key={kpiId}
+                    id={kpiId}
+                    {...cardProps}
+                  />
+                );
+              })}
+            </div>
+          </SortableContext>
+        </DndContext>
+      </DashboardSection>
+    );
+  };
 
   // Render Site Protection section
   const renderSiteProtection = () => {
@@ -642,13 +759,29 @@ export function Dashboard({ onViewChange }: DashboardProps) {
     </DashboardSection>
   );
 
+  // Render Occupancy Dashboard section
+  const renderOccupancyDashboard = () => (
+    <DashboardSection id="occupancy-dashboard">
+      <div className="mt-6">
+        <OccupancyPanel
+          compact={true}
+          onViewDetails={() => onViewChange("occupancy")}
+        />
+      </div>
+    </DashboardSection>
+  );
+
   // Section renderer map
-  const sectionRenderers: Record<DashboardSectionId, () => JSX.Element> = {
+  const sectionRenderers: Record<DashboardSectionId, () => JSX.Element | null> = {
     'kpi-row': renderKPIRow,
     'site-protection': renderSiteProtection,
     'energy-analytics': renderEnergyAnalytics,
     'risk-predictions': renderRiskPredictions,
+    'occupancy-dashboard': renderOccupancyDashboard,
   };
+
+  // Filter to only visible sections
+  const visibleSectionOrder = sectionOrder.filter(id => visibleSections.includes(id));
 
   return (
     <DndContext
@@ -660,16 +793,31 @@ export function Dashboard({ onViewChange }: DashboardProps) {
         className="h-full overflow-y-auto p-4 md:p-6"
         style={{ background: "var(--color-sentinel-bg-canvas)" }}
       >
-        <SortableContext items={sectionOrder} strategy={verticalListSortingStrategy}>
-          {sectionOrder.map((sectionId) => {
+        {/* Customize Dashboard Button */}
+        <div className="flex justify-end mb-4">
+          <button
+            onClick={() => setIsCardLibraryOpen(true)}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors hover:opacity-80"
+            style={{
+              background: "var(--color-sentinel-bg-panel)",
+              border: "1px solid var(--color-sentinel-border)",
+              color: "var(--color-sentinel-text-secondary)",
+            }}
+          >
+            <LayoutGrid className="w-4 h-4" />
+            Customize
+          </button>
+        </div>
+
+        <SortableContext items={visibleSectionOrder} strategy={verticalListSortingStrategy}>
+          {visibleSectionOrder.map((sectionId) => {
             const renderer = sectionRenderers[sectionId];
             if (!renderer) return null;
-            
-            // Site Protection and Alert Feed are no longer draggable
-            // Site Protection always renders at full width
-            // Render all sections normally
-            
-            return <div key={sectionId}>{renderer()}</div>;
+
+            const content = renderer();
+            if (!content) return null;
+
+            return <div key={sectionId}>{content}</div>;
           })}
         </SortableContext>
 
@@ -681,6 +829,18 @@ export function Dashboard({ onViewChange }: DashboardProps) {
             onClose={closePredictionDetail}
           />
         )}
+
+        {/* Card Library Panel */}
+        <CardLibrary
+          isOpen={isCardLibraryOpen}
+          onClose={() => setIsCardLibraryOpen(false)}
+          visibleKpiCards={visibleKpiCards}
+          visibleSections={visibleSections}
+          onKpiVisibilityChange={handleKpiVisibilityChange}
+          onSectionVisibilityChange={handleSectionVisibilityChange}
+          onResetToDefaults={handleResetToDefaults}
+          isSaving={isSavingPreferences}
+        />
       </div>
     </DndContext>
   );
