@@ -124,8 +124,8 @@ export function KPICard({
           {typeof value === "number" ? value.toLocaleString() : value}
         </div>
 
-        {/* Delta indicator */}
-        {delta !== undefined && (
+        {/* Delta indicator - only show if delta is defined and not zero */}
+        {delta !== undefined && delta !== 0 && (
           <div className="flex items-center gap-2 flex-shrink-0">
             <div
               className="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium"

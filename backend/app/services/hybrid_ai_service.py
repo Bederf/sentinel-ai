@@ -1,0 +1,345 @@
+"""Hybrid AI Service - Routes between Ollama (local) and Claude (cloud)."""
+
+import logging
+import re
+import time
+from typing import AsyncGenerator, Dict, Any
+
+from app.services.claude_service import claude_service
+from app.config.settings import settings
+from anthropic import RateLimitError
+
+logger = logging.getLogger(__name__)
+
+
+class HybridAIService:
+    """
+    Routes AI requests to Ollama (local) or Claude (cloud) based on task complexity.
+
+    Simple tasks → Ollama (FREE, fast)
+    Complex tasks → Claude (paid, smart)
+    """
+
+    def __init__(self):
+        """Initialize hybrid AI service."""
+        self.ollama_url = "http://localhost:11434/api/generate"
+        self.ollama_models = {
+            "fast": "llama3.2:1b",
+            "balanced": "phi3:mini"
+        }
+        # Rate limit tracking
+        self.claude_rate_limited = False
+        self.rate_limit_time = 0
+        self.cooldown_period = 60  # Wait 60 seconds after rate limit
+
+    def classify_task(self, message: str) -> Dict[str, Any]:
+        """
+        Classify task complexity and route to appropriate model.
+
+        Returns:
+            Dict with 'provider', 'model', 'reason', 'estimated_cost'
+        """
+        message_lower = message.lower()
+
+        # Tier 1: Simple lookups (Ollama - FREE)
+        simple_patterns = [
+            r'^what does error code',
+            r'^what\'?s? the status of',
+            r'^who stocks',
+            r'^list (all )?equipment',
+            r'^show me',
+            r'^get (me )?(the )?health',
+            r'^how many',
+            r'^(all|every) equipment',
+        ]
+
+        if any(re.match(pattern, message_lower) for pattern in simple_patterns):
+            return {
+                "provider": "ollama",
+                "model": self.ollama_models["fast"],
+                "reason": "Simple lookup/retrieval",
+                "estimated_cost": 0.0,
+                "tier": 1
+            }
+
+        # Tier 1: Data queries (Ollama - FREE)
+        data_patterns = [
+            r'^get ',
+            r'^show ',
+            r'^list ',
+            r'^check ',
+            r'^(all|every) (equipment|devices|alerts)',
+            r'^health (score|status)',
+            r'^temperature',
+            r'^alarm'
+        ]
+
+        if any(re.search(pattern, message_lower) for pattern in data_patterns):
+            return {
+                "provider": "ollama",
+                "model": self.ollama_models["balanced"],
+                "reason": "Data query/retrieval",
+                "estimated_cost": 0.0,
+                "tier": 1
+            }
+
+        # Tier 2: Complex reasoning (Claude - paid)
+        complex_patterns = [
+            r'^why (is|does|are)',
+            r'^diagnose',
+            r'^analyze',
+            r'^recommend',
+            r'^optimize',
+            r'^predict',
+            r'^troubleshoot',
+            r'root cause',
+            r'^too hot',
+            r'^too cold',
+            r'^unusual',
+            r'what should i do',
+            r'help me (understand|decide)',
+        ]
+
+        if any(re.search(pattern, message_lower) for pattern in complex_patterns):
+            return {
+                "provider": "anthropic",
+                "model": settings.claude_model,
+                "reason": "Complex reasoning required",
+                "estimated_cost": 0.0105,  # Average cost per query
+                "tier": 2
+            }
+
+        # Tier 2: Control actions (Claude - paid, safety critical)
+        control_patterns = [
+            r'^turn (on|off)',
+            r'^set .* to',
+            r'^adjust ',
+            r'^change ',
+            r'^control ',
+            r'^boost',
+            r'^lower',
+            r'^raise',
+        ]
+
+        if any(re.search(pattern, message_lower) for pattern in control_patterns):
+            return {
+                "provider": "anthropic",
+                "model": settings.claude_model,
+                "reason": "Control action (safety critical)",
+                "estimated_cost": 0.0105,
+                "tier": 2
+            }
+
+        # Default: Try Ollama first (can escalate if needed)
+        return {
+            "provider": "ollama",
+            "model": self.ollama_models["balanced"],
+            "reason": "Default to local (can escalate)",
+            "estimated_cost": 0.0,
+            "tier": 1
+        }
+
+    def _should_use_claude(self) -> bool:
+        """
+        Check if Claude is available (not in cooldown from rate limit).
+
+        Returns:
+            True if Claude can be used, False if in cooldown
+        """
+        if not self.claude_rate_limited:
+            return True
+
+        time_since_limit = time.time() - self.rate_limit_time
+        if time_since_limit > self.cooldown_period:
+            logger.info("Rate limit cooldown expired, attempting Claude again")
+            self.claude_rate_limited = False
+            return True
+
+        logger.info(f"Claude in cooldown for {self.cooldown_period - int(time_since_limit)}s more")
+        return False
+
+    async def query_ollama(self, message: str, model: str = "llama3.2:1b", escalate_on_fail: bool = True) -> str:
+        """
+        Query local Ollama model.
+
+        Args:
+            message: User message
+            model: Ollama model name
+            escalate_on_fail: Whether to escalate to Claude if Ollama fails
+
+        Returns:
+            AI response text
+        """
+        import httpx
+
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(
+                    self.ollama_url,
+                    json={
+                        "model": model,
+                        "prompt": message,
+                        "stream": False,
+                        "options": {
+                            "num_predict": 500,  # Limit response length
+                            "temperature": 0.5,
+                        }
+                    }
+                )
+                response.raise_for_status()
+                result = response.json()
+                return result.get("response", "")
+
+        except Exception as e:
+            logger.error(f"Ollama query failed: {e}")
+            if escalate_on_fail:
+                # Escalate to Claude
+                logger.info("Escalating to Claude due to Ollama failure")
+                return await self._query_claude_fallback(message)
+            else:
+                # Don't escalate, just re-raise
+                raise
+
+    async def _query_claude_fallback(self, message: str) -> str:
+        """Fallback to Claude when Ollama fails."""
+        try:
+            response_chunks = []
+            async for chunk in claude_service.stream_response(
+                [{"role": "user", "content": message}],
+                include_building_context=False
+            ):
+                response_chunks.append(chunk)
+            return "".join(response_chunks)
+        except Exception as e:
+            logger.error(f"Claude fallback also failed: {e}")
+            return "I'm sorry, I'm having trouble processing your request right now. Please try again."
+
+    async def _try_claude_with_fallback(
+        self,
+        message: str,
+        include_building_context: bool = True
+    ) -> AsyncGenerator[str, None]:
+        """
+        Try Claude with automatic fallback to Ollama on rate limit.
+
+        Args:
+            message: User message
+            include_building_context: Whether to include building context
+
+        Yields:
+            Response text chunks
+        """
+        try:
+            # Try Claude first
+            async for chunk in claude_service.stream_response(
+                [{"role": "user", "content": message}],
+                include_building_context=include_building_context
+            ):
+                yield chunk
+
+        except RateLimitError as e:
+            # Handle rate limit - fallback to Ollama
+            logger.warning(f"Claude rate limit hit: {e}")
+            self.claude_rate_limited = True
+            self.rate_limit_time = time.time()
+
+            logger.info("Falling back to Ollama due to rate limit")
+            routing = self.classify_task(message)
+
+            # Use Ollama instead
+            if routing["tier"] == 1:
+                # Use the fast model for simple queries
+                model = self.ollama_models["fast"]
+            else:
+                # Use balanced model for complex queries
+                model = self.ollama_models["balanced"]
+
+            response = await self.query_ollama(
+                message,
+                model=model,
+                escalate_on_fail=False  # Don't escalate back to Claude
+            )
+
+            # Prefix with rate limit notice
+            yield f"[Claude rate limited - using {model}] {response}"
+
+        except Exception as e:
+            # Other errors, log and re-raise
+            logger.error(f"Claude error (not rate limit): {e}")
+            raise
+
+    async def stream_response(
+        self,
+        message: str,
+        use_tools: bool = False
+    ) -> AsyncGenerator[str, None]:
+        """
+        Stream response from appropriate AI model.
+
+        Args:
+            message: User message
+            use_tools: Whether to enable tool calling (Claude only)
+
+        Yields:
+            Response text chunks
+        """
+        # Classify task
+        routing = self.classify_task(message)
+
+        logger.info(
+            f"Routing decision: provider={routing['provider']}, "
+            f"model={routing['model']}, "
+            f"reason={routing['reason']}, "
+            f"tier={routing['tier']}"
+        )
+
+        # Force Claude for tool calling (bypasses rate limit check for safety)
+        if use_tools:
+            logger.info("Tool calling enabled, using Claude (bypassing rate limit check)")
+            try:
+                async for chunk in claude_service.stream_response_with_tools(
+                    [{"role": "user", "content": message}]
+                ):
+                    yield chunk
+                return
+            except RateLimitError as e:
+                logger.warning(f"Claude rate limit hit during tool calling: {e}")
+                self.claude_rate_limited = True
+                self.rate_limit_time = time.time()
+                yield "[Claude rate limited] Cannot perform tool-based actions right now. Please try a simpler query."
+                return
+
+        # Check if Claude is in cooldown period
+        if routing["provider"] == "anthropic" and not self._should_use_claude():
+            logger.info("Claude is rate limited, forcing Ollama fallback")
+            routing["provider"] = "ollama"
+            routing["model"] = self.ollama_models["balanced"]
+            routing["reason"] += " (Claude rate limited in cooldown)"
+
+        # Route to appropriate provider
+        if routing["provider"] == "ollama":
+            # Use local Ollama
+            try:
+                response = await self.query_ollama(
+                    message,
+                    routing["model"],
+                    escalate_on_fail=True  # Can escalate to Claude if Ollama fails
+                )
+                yield response
+            except Exception as e:
+                logger.error(f"Ollama routing failed: {e}")
+                yield "I'm having trouble with the local AI. Please try again."
+
+        else:
+            # Use Claude (cloud) with rate limit fallback
+            logger.info("Using Claude with rate limit fallback")
+            async for chunk in self._try_claude_with_fallback(
+                message,
+                include_building_context=True
+            ):
+                yield chunk
+
+
+# Singleton instance
+hybrid_ai_service = HybridAIService()
+hybrid_ai_service = HybridAIService()

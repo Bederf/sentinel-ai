@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import api from "../lib/api";
 import type { Alert, Prediction, EnergyDataPoint, Device } from "../lib/api";
+import { formatDateTime, getTimezoneAbbreviation, isDifferentTimezone } from "../lib/timeFormat";
 import { KPICard } from "./KPICard";
 import { EnergyChart } from "./EnergyChart";
 import { PredictionCard } from "./PredictionCard";
@@ -53,6 +54,7 @@ interface SiteDetailData {
   floors?: number;
   year_built?: number;
   operating_hours?: { start: string; end: string };
+  timezone?: string; // IANA timezone (e.g., "Africa/Johannesburg")
   occupancy_pattern?: string;
   contact_email?: string;
   contact_phone?: string;
@@ -148,6 +150,19 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
   const handlePredictionClick = (prediction: Prediction) => {
     setSelectedPrediction(prediction);
     setIsPredictionDetailOpen(true);
+  };
+
+  // Handle click on equipment status badge (warning/critical) to open prediction detail
+  const handleEquipmentRiskClick = (equip: Equipment, e: React.MouseEvent) => {
+    e.stopPropagation(); // Don't trigger row click
+    // Find prediction for this equipment by matching equipment_id or name
+    const prediction = predictions.find(
+      (p) => p.equipment_id === equip.id || p.equipment_name === equip.name
+    );
+    if (prediction) {
+      setSelectedPrediction(prediction);
+      setIsPredictionDetailOpen(true);
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -350,8 +365,12 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
             {error}
           </p>
           <button
-            onClick={onBack}
-            className="px-4 py-2 rounded transition-colors"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onBack();
+            }}
+            className="px-4 py-2 rounded transition-colors cursor-pointer"
             style={{
               background: "var(--color-sentinel-blue)",
               color: "white",
@@ -399,8 +418,13 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
     >
       {/* Back Button */}
       <button
-        onClick={onBack}
-        className="flex items-center gap-2 mb-6 transition-colors"
+        type="button"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onBack();
+        }}
+        className="flex items-center gap-2 mb-6 transition-colors cursor-pointer hover:brightness-110"
         style={{ color: "var(--color-sentinel-text-secondary)" }}
       >
         <ArrowLeft className="h-5 w-5" />
@@ -475,6 +499,18 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
                     <Clock className="h-4 w-4" />
                     <span className="text-sm">
                       {site.operating_hours.start || "N/A"} - {site.operating_hours.end || "N/A"}
+                      {isDifferentTimezone(site.timezone) && site.timezone && (
+                        <span
+                          className="ml-1.5 px-1.5 py-0.5 rounded text-xs font-medium"
+                          style={{
+                            background: "rgba(59, 130, 246, 0.15)",
+                            color: "var(--color-sentinel-blue)",
+                          }}
+                          title={`Building timezone: ${site.timezone}`}
+                        >
+                          {getTimezoneAbbreviation(site.timezone)}
+                        </span>
+                      )}
                     </span>
                   </div>
                 )}
@@ -782,15 +818,30 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
                             </div>
                           </td>
                           <td className="py-3 px-4">
-                            <div
-                              className="inline-block px-2 py-1 rounded text-xs font-medium"
-                              style={{
-                                background: getStatusColor(item.status) + "20",
-                                color: getStatusColor(item.status),
-                              }}
-                            >
-                              {item.status}
-                            </div>
+                            {item.status === "warning" || item.status === "critical" ? (
+                              <button
+                                onClick={(e) => handleEquipmentRiskClick(item, e)}
+                                className="inline-block px-2 py-1 rounded text-xs font-medium cursor-pointer hover:opacity-80 transition-opacity"
+                                style={{
+                                  background: getStatusColor(item.status) + "20",
+                                  color: getStatusColor(item.status),
+                                  border: "none",
+                                }}
+                                title="Click to view prediction details"
+                              >
+                                {item.status}
+                              </button>
+                            ) : (
+                              <div
+                                className="inline-block px-2 py-1 rounded text-xs font-medium"
+                                style={{
+                                  background: getStatusColor(item.status) + "20",
+                                  color: getStatusColor(item.status),
+                                }}
+                              >
+                                {item.status}
+                              </div>
+                            )}
                           </td>
                           <td className="py-3 px-4">
                             <div className="flex items-center gap-2">
@@ -878,7 +929,7 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
                               </div>
                             </div>
                             <p className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>
-                              {new Date(alert.created_at).toLocaleString("en-ZA")}
+                              {formatDateTime(alert.created_at)}
                             </p>
                           </div>
                         </div>

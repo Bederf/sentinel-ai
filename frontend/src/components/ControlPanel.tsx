@@ -183,7 +183,8 @@ export function ControlPanel({
     point: DevicePoint,
     newValue: number | boolean
   ) => {
-    const currentValue = pointValues[pointName] ?? point.default_value;
+    // Priority: local state > current_value from adapter > default_value
+    const currentValue = pointValues[pointName] ?? point.current_value ?? point.default_value;
 
     // Don't act if value hasn't changed
     if (currentValue === newValue) return;
@@ -245,7 +246,8 @@ export function ControlPanel({
 
   // Render control widget based on point type
   const renderControlWidget = (pointName: string, point: DevicePoint) => {
-    const currentValue = pointValues[pointName] ?? point.default_value;
+    // Priority: local state > current_value from adapter > default_value
+    const currentValue = pointValues[pointName] ?? point.current_value ?? point.default_value;
     const disabled = isExecuting || safetyStatus?.status === "blocked";
 
     switch (point.point_type) {

@@ -83,6 +83,7 @@ def db_to_site_dict(db_building: dict, equipment_count: int = 0, alert_count: in
         "floors": db_building.get("floors", 1),
         "year_built": db_building.get("year_built", 2020),
         "operating_hours": operating_hours if operating_hours else {"start": "08:00", "end": "18:00"},
+        "timezone": db_building.get("timezone", "Africa/Johannesburg"),
         "occupancy_pattern": db_building.get("occupancy_pattern", "office"),
         "latitude": float(db_building.get("latitude", 0)) if db_building.get("latitude") else 0.0,
         "longitude": float(db_building.get("longitude", 0)) if db_building.get("longitude") else 0.0,
@@ -90,6 +91,8 @@ def db_to_site_dict(db_building: dict, equipment_count: int = 0, alert_count: in
         "contact_phone": db_building.get("contact_phone", ""),
         "optimization_enabled": db_building.get("optimization_enabled", False),
         "optimization_status": db_building.get("optimization_status") or "unknown",
+        "control_enabled": db_building.get("control_enabled", False),
+        "control_note": db_building.get("control_note"),
         "equipment_count": equipment_count or db_building.get("equipment_count", 0),
         "alert_count": alert_count,
         "active_alerts": alert_count,
@@ -113,6 +116,7 @@ class SiteBase(BaseModel):
     floors: int
     year_built: int
     operating_hours: OperatingHours
+    timezone: str = "Africa/Johannesburg"  # IANA timezone
     occupancy_pattern: str
     latitude: float
     longitude: float
@@ -129,6 +133,8 @@ class SiteResponse(SiteBase):
     status: Literal["normal", "warning", "critical"] = "normal"
     optimization_enabled: bool = False
     optimization_status: str = "unknown"
+    control_enabled: bool = False
+    control_note: Optional[str] = None
 
 
 class SiteListResponse(BaseModel):

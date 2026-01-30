@@ -12,12 +12,13 @@
  * Follows SENTINEL dark theme design.
  */
 
-import { Building2, Cpu, AlertTriangle, MapPin, Shield } from "lucide-react";
+import { Building2, Cpu, AlertTriangle, MapPin, Shield, Clock } from "lucide-react";
 import { useState, useEffect } from "react";
 import api, { type Site, type OptimizationRecommendation } from "../lib/api";
 import { OptimizationStatusBadge } from "./OptimizationStatusBadge";
 import { OptimizationRecommendationModal } from "./OptimizationRecommendationModal";
 import { useHealthThresholds } from "../hooks/useHealthThresholds";
+import { getTimezoneAbbreviation, isDifferentTimezone } from "../lib/timeFormat";
 
 interface SiteCardProps {
   site: Site;
@@ -278,7 +279,7 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
       // Map equipment_id to device_id for backend compatibility
       const setpointsToApply = currentRecommendation?.recommendations.map((rec) => ({
         device_id: rec.equipment_id,
-        point_name: "setpoint",
+        point_name: rec.point_name || "setpoint",
         value: rec.recommended_value,
       })) || [];
 
@@ -380,7 +381,7 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
         </div>
 
         {/* Location */}
-        <div className="flex items-center gap-1.5 mb-3">
+        <div className="flex items-center gap-1.5 mb-2">
           <MapPin
             className="h-3 w-3"
             style={{ color: "var(--color-sentinel-text-disabled)" }}
@@ -392,6 +393,34 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
             {site.location}
           </span>
         </div>
+
+        {/* Operating Hours */}
+        {site.operating_hours && (
+          <div className="flex items-center gap-1.5 mb-3">
+            <Clock
+              className="h-3 w-3"
+              style={{ color: "var(--color-sentinel-text-disabled)" }}
+            />
+            <span
+              className="text-xs"
+              style={{ color: "var(--color-sentinel-text-secondary)" }}
+            >
+              {site.operating_hours.start} - {site.operating_hours.end}
+              {isDifferentTimezone(site.timezone) && site.timezone && (
+                <span
+                  className="ml-1.5 px-1 py-0.5 rounded text-xs font-medium"
+                  style={{
+                    background: "rgba(59, 130, 246, 0.15)",
+                    color: "var(--color-sentinel-blue)",
+                  }}
+                  title={`Building timezone: ${site.timezone}`}
+                >
+                  {getTimezoneAbbreviation(site.timezone)}
+                </span>
+              )}
+            </span>
+          </div>
+        )}
 
         {/* Type badge */}
         <div

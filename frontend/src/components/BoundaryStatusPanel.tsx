@@ -65,7 +65,7 @@ export const BoundaryStatusPanel: React.FC<BoundaryStatusPanelProps> = ({
   };
 
   return (
-    <Card className="p-6 bg-white dark:bg-gray-900 border rounded-lg">
+    <Card className="p-6 rounded-lg">
       <div className="mb-4">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
           Safety Boundary Status

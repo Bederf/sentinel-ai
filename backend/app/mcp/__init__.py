@@ -35,6 +35,11 @@ from app.mcp.simbiot_server import (
     MCP_TOOLS as SIMBIOT_MCP_TOOLS
 )
 
+from app.mcp.simbiot_stdio import (
+    MCPServerStdio,
+    main as simbiot_stdio_main
+)
+
 __all__ = [
     # Equipment MCP
     "EquipmentMCPServer",
@@ -60,5 +65,8 @@ __all__ = [
     # Work order tools
     "get_work_orders_tool",
     "create_work_order_tool",
-    "SIMBIOT_MCP_TOOLS"
+    "SIMBIOT_MCP_TOOLS",
+    # SIMBIOT stdio transport
+    "MCPServerStdio",
+    "simbiot_stdio_main"
 ]

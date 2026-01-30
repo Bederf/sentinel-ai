@@ -99,18 +99,30 @@ export const SafetyStatusPanel: React.FC<SafetyStatusPanelProps> = ({
   // Format time
   const formatTime = (isoString: string) => {
     const date = new Date(isoString);
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
   };
 
   if (loading && safetyStatuses.length === 0) {
     return (
       <Card className={className}>
         <div className="animate-pulse">
-          <div className="h-6 bg-gray-200 rounded w-1/3 mb-4"></div>
+          <div
+            className="h-6 rounded w-1/3 mb-4"
+            style={{ background: "var(--color-sentinel-bg-secondary)" }}
+          />
           <div className="space-y-3">
-            <div className="h-4 bg-gray-200 rounded"></div>
-            <div className="h-4 bg-gray-200 rounded"></div>
-            <div className="h-4 bg-gray-200 rounded"></div>
+            <div
+              className="h-4 rounded"
+              style={{ background: "var(--color-sentinel-bg-secondary)" }}
+            />
+            <div
+              className="h-4 rounded"
+              style={{ background: "var(--color-sentinel-bg-secondary)" }}
+            />
+            <div
+              className="h-4 rounded"
+              style={{ background: "var(--color-sentinel-bg-secondary)" }}
+            />
           </div>
         </div>
       </Card>
@@ -354,11 +366,23 @@ export const CompactSafetyStatus: React.FC<CompactSafetyStatusProps> = ({ classN
     return (
       <Card className={className}>
         <div className="animate-pulse">
-          <div className="h-4 bg-gray-200 rounded w-1/2 mb-4"></div>
+          <div
+            className="h-4 rounded w-1/2 mb-4"
+            style={{ background: "var(--color-sentinel-bg-secondary)" }}
+          />
           <div className="flex gap-4">
-            <div className="h-8 bg-gray-200 rounded flex-1"></div>
-            <div className="h-8 bg-gray-200 rounded flex-1"></div>
-            <div className="h-8 bg-gray-200 rounded flex-1"></div>
+            <div
+              className="h-8 rounded flex-1"
+              style={{ background: "var(--color-sentinel-bg-secondary)" }}
+            />
+            <div
+              className="h-8 rounded flex-1"
+              style={{ background: "var(--color-sentinel-bg-secondary)" }}
+            />
+            <div
+              className="h-8 rounded flex-1"
+              style={{ background: "var(--color-sentinel-bg-secondary)" }}
+            />
           </div>
         </div>
       </Card>

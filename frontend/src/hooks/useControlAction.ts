@@ -186,9 +186,21 @@ export function useControlAction(
         setResult(controlResult);
         setIsExecuting(false);
 
+        // Format point name for display (e.g., "pump_speed" -> "Pump Speed")
+        const formatPointName = (name: string) =>
+          name.split("_").map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
+
+        const pointDisplay = formatPointName(point);
+
+        // Format value for display
+        const formatValue = (val: number | boolean) => {
+          if (typeof val === "boolean") return val ? "ON" : "OFF";
+          return String(val);
+        };
+
         // Show success toast
-        toast.success("Control Applied", {
-          description: `${point} set to ${value}`,
+        toast.success(`${pointDisplay} Updated`, {
+          description: `Successfully set to ${formatValue(value)}`,
           duration: 3000,
         });
 
@@ -208,6 +220,15 @@ export function useControlAction(
         setError(errorMessage);
         setIsExecuting(false);
 
+        // Parse the error message for better user feedback
+        const cleanError = errorMessage.replace("API Error: ", "").replace("Safety violation: ", "");
+
+        // Format point name for display (e.g., "pump_speed" -> "Pump Speed")
+        const formatPointName = (name: string) =>
+          name.split("_").map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
+
+        const pointDisplay = formatPointName(point);
+
         // Show toast notification for safety violations
         const isSafetyViolation =
           errorMessage.toLowerCase().includes("safety") ||
@@ -216,8 +237,14 @@ export function useControlAction(
           errorMessage.toLowerCase().includes("range");
 
         if (isSafetyViolation) {
-          toast.error("Safety Rule Violation", {
-            description: errorMessage.replace("API Error: ", ""),
+          // Extract allowed range from error message if present
+          const rangeMatch = cleanError.match(/\(([^)]+)\)/);
+          const allowedRange = rangeMatch ? rangeMatch[1] : null;
+
+          toast.error(`Cannot Set ${pointDisplay}`, {
+            description: allowedRange
+              ? `Value ${value} is outside the allowed range (${allowedRange}). Please select a value within the safe operating limits.`
+              : cleanError,
             duration: 6000,
             style: {
               background: "var(--color-sentinel-bg-panel)",
@@ -226,8 +253,8 @@ export function useControlAction(
             },
           });
         } else {
-          toast.error("Control Action Failed", {
-            description: errorMessage.replace("API Error: ", ""),
+          toast.error(`Failed to Set ${pointDisplay}`, {
+            description: cleanError || "An unexpected error occurred. Please try again.",
             duration: 5000,
           });
         }

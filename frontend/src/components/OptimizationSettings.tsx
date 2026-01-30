@@ -25,6 +25,7 @@ import {
   Clock,
 } from "lucide-react";
 import api, { type Site } from "../lib/api";
+import { formatDateTime } from "../lib/timeFormat";
 import { OptimizationStatusBadge, type OptimizationStatus } from "./OptimizationStatusBadge";
 import { OptimizationToggle } from "./OptimizationToggle";
 
@@ -492,7 +493,7 @@ export function OptimizationSettings({
                         <div className="text-xs text-gray-400 mb-1">Last Optimization</div>
                         <div className="text-sm text-gray-200">
                           {site.last_optimization
-                            ? new Date(site.last_optimization).toLocaleString()
+                            ? formatDateTime(site.last_optimization)
                             : "Never"}
                         </div>
                       </div>

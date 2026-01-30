@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { Clock, Wifi, WifiOff, Bell, X } from "lucide-react";
 import { Toaster } from "sonner";
+import { formatTime } from "./lib/timeFormat";
 import api from "./lib/api";
 import { Chat } from "./components/Chat";
 import TechnicianChat from "./components/TechnicianChat";
@@ -11,6 +12,7 @@ import { OptimizationPage } from "./pages/OptimizationPage";
 import { Settings } from "./components/Settings";
 import { Sidebar, type View } from "./components/Sidebar";
 import { SplashScreen } from "./components/SplashScreen";
+import { PinEntry } from "./components/PinEntry";
 import { AlertFeed } from "./components/AlertFeed";
 import { CalendarPicker } from "./components/CalendarPicker";
 import { IntegrationMonitoringPage } from "./components/IntegrationMonitoringPage";
@@ -23,6 +25,10 @@ interface HealthStatus {
 
 function App() {
   const [showSplash, setShowSplash] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    // Check if already authenticated in this session
+    return sessionStorage.getItem("sentinel_authenticated") === "true";
+  });
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -94,15 +100,6 @@ function App() {
     setUnreadAlertCount(0); // Reset count when opened
   };
 
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString("en-ZA", {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: false,
-    });
-  };
-
   const formatDate = (date: Date) => {
     return date.toLocaleDateString("en-ZA", {
       year: "numeric",
@@ -146,6 +143,11 @@ function App() {
   // Show splash screen on initial load
   if (showSplash) {
     return <SplashScreen onComplete={() => setShowSplash(false)} />;
+  }
+
+  // Show PIN entry after splash if not authenticated
+  if (!isAuthenticated) {
+    return <PinEntry onSuccess={() => setIsAuthenticated(true)} />;
   }
 
   return (

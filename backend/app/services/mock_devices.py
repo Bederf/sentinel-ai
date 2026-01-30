@@ -8,7 +8,9 @@ or network connections.
 import asyncio
 import random
 import logging
+import json
 from datetime import datetime
+from pathlib import Path
 from typing import Dict, Any, Optional
 
 from app.models.device import (
@@ -19,6 +21,41 @@ from app.services.device_abstraction import DeviceAdapter
 
 logger = logging.getLogger(__name__)
 
+# State persistence file
+STATE_FILE = Path(__file__).parent.parent / "data" / "mock_device_state.json"
+
+# Global state cache for all mock devices
+_global_state_cache: Dict[str, Dict[str, Any]] = {}
+_state_loaded = False
+
+
+def _load_global_state() -> None:
+    """Load persisted state from file."""
+    global _global_state_cache, _state_loaded
+    if _state_loaded:
+        return
+
+    if STATE_FILE.exists():
+        try:
+            with open(STATE_FILE, "r") as f:
+                _global_state_cache = json.load(f)
+            logger.info(f"Loaded mock device state for {len(_global_state_cache)} devices")
+        except Exception as e:
+            logger.warning(f"Failed to load mock device state: {e}")
+            _global_state_cache = {}
+    _state_loaded = True
+
+
+def _save_global_state() -> None:
+    """Save state to file."""
+    global _global_state_cache
+    try:
+        with open(STATE_FILE, "w") as f:
+            json.dump(_global_state_cache, f, indent=2)
+        logger.debug(f"Saved mock device state for {len(_global_state_cache)} devices")
+    except Exception as e:
+        logger.error(f"Failed to save mock device state: {e}")
+
 
 class MockDeviceAdapter(DeviceAdapter):
     """Mock device adapter for demo and testing.
@@ -26,34 +63,58 @@ class MockDeviceAdapter(DeviceAdapter):
     Simulates realistic device behavior including:
     - Network latency (50-200ms)
     - Occasional errors
-    - State persistence (in-memory)
+    - State persistence (file-backed)
     - Realistic value ranges and validation
     """
 
     def __init__(self, device: Device):
         super().__init__(device)
-        self._state: Dict[str, Any] = {}
         self._error_rate = 0.05  # 5% chance of error
         self._initialize_state()
 
-    def _initialize_state(self) -> None:
-        """Initialize device state from points configuration."""
-        for point_name, point in self.device.points.items():
-            if point.default_value is not None:
-                self._state[point_name] = point.default_value
-            else:
-                # Set reasonable defaults based on point type
-                if point.point_type in [PointType.ANALOG_INPUT, PointType.ANALOG_OUTPUT, PointType.ANALOG_VALUE]:
-                    if point.min_value is not None and point.max_value is not None:
-                        self._state[point_name] = (point.min_value + point.max_value) / 2
-                    else:
-                        self._state[point_name] = 0.0
-                elif point.point_type in [PointType.BINARY_INPUT, PointType.BINARY_OUTPUT, PointType.BINARY_VALUE]:
-                    self._state[point_name] = False
-                elif point.point_type in [PointType.MULTISTATE_INPUT, PointType.MULTISTATE_OUTPUT, PointType.MULTISTATE_VALUE]:
-                    self._state[point_name] = 0
+    @property
+    def _state(self) -> Dict[str, Any]:
+        """Get device state from global cache."""
+        _load_global_state()
+        if self.device.id not in _global_state_cache:
+            _global_state_cache[self.device.id] = {}
+        return _global_state_cache[self.device.id]
 
-        logger.debug(f"Initialized mock state for device {self.device.id}: {self._state}")
+    def _initialize_state(self) -> None:
+        """Initialize device state from points configuration or persisted state."""
+        _load_global_state()
+
+        # Check if we have persisted state
+        if self.device.id in _global_state_cache and _global_state_cache[self.device.id]:
+            logger.debug(f"Using persisted state for device {self.device.id}")
+            # Ensure all points have values (for new points added after state was saved)
+            for point_name, point in self.device.points.items():
+                if point_name not in _global_state_cache[self.device.id]:
+                    _global_state_cache[self.device.id][point_name] = self._get_default_value(point)
+            return
+
+        # Initialize from defaults
+        _global_state_cache[self.device.id] = {}
+        for point_name, point in self.device.points.items():
+            _global_state_cache[self.device.id][point_name] = self._get_default_value(point)
+
+        logger.debug(f"Initialized mock state for device {self.device.id}: {_global_state_cache[self.device.id]}")
+
+    def _get_default_value(self, point: DevicePoint) -> Any:
+        """Get default value for a point based on its type."""
+        if point.default_value is not None:
+            return point.default_value
+
+        # Set reasonable defaults based on point type
+        if point.point_type in [PointType.ANALOG_INPUT, PointType.ANALOG_OUTPUT, PointType.ANALOG_VALUE]:
+            if point.min_value is not None and point.max_value is not None:
+                return (point.min_value + point.max_value) / 2
+            return 0.0
+        elif point.point_type in [PointType.BINARY_INPUT, PointType.BINARY_OUTPUT, PointType.BINARY_VALUE]:
+            return False
+        elif point.point_type in [PointType.MULTISTATE_INPUT, PointType.MULTISTATE_OUTPUT, PointType.MULTISTATE_VALUE]:
+            return 0
+        return None
 
     async def _simulate_network_delay(self, min_ms: float = 50, max_ms: float = 200) -> None:
         """Simulate network latency."""
@@ -118,9 +179,8 @@ class MockDeviceAdapter(DeviceAdapter):
         """Mock write implementation with validation and simulation."""
         await self._simulate_network_delay(100, 300)
 
-        if await self._simulate_error():
-            logger.warning(f"Mock write error on point {point_name}")
-            return False
+        # Note: We don't simulate random errors on writes for demo reliability
+        # Real device communication errors would be handled by the actual protocol adapter
 
         point = self.device.get_point(point_name)
         if not point:
@@ -132,16 +192,17 @@ class MockDeviceAdapter(DeviceAdapter):
         if not point.validate_value(value):
             raise ValueError(f"Value {value} invalid for point {point_name}")
 
-        # Special safety checks for critical devices
+        # Log test_mode changes for fire safety devices (but don't block in demo)
         if self.device.metadata.get("life_safety") and point_name == "test_mode":
-            # Fire safety devices have special restrictions
-            if value and not self._validate_safety_test_conditions():
-                logger.error(f"Safety test conditions not met for {self.device.id}")
-                return False
+            if value:
+                logger.info(f"Fire safety test mode enabled for {self.device.id}")
 
         # Apply the write
         old_value = self._state.get(point_name)
-        self._state[point_name] = value
+        _global_state_cache[self.device.id][point_name] = value
+
+        # Persist state to file
+        _save_global_state()
 
         # Log the change
         logger.info(
@@ -173,9 +234,17 @@ class MockDeviceAdapter(DeviceAdapter):
         """Get current mock device state (for testing)."""
         return self._state.copy()
 
-    def set_state(self, point_name: str, value: Any) -> None:
-        """Set mock device state (for testing)."""
-        self._state[point_name] = value
+    def set_state(self, point_name: str, value: Any, persist: bool = False) -> None:
+        """Set mock device state (for testing).
+
+        Args:
+            point_name: The point to set
+            value: The value to set
+            persist: If True, save state to file (default False for test scenarios)
+        """
+        _global_state_cache[self.device.id][point_name] = value
+        if persist:
+            _save_global_state()
 
 
 class MockDeviceManager:

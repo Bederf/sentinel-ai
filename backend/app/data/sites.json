@@ -1,505 +1,918 @@
 [
   {
     "id": "site-001",
-    "name": "Sandton City",
-    "address": "Sandton City Complex, 83 Rivonia Road, Sandton",
+    "name": "Rosebank Towers",
+    "address": "Rosebank Corner, 191 Jan Smuts Ave, Rosebank",
     "region": "Gauteng",
     "type": "regional_office",
-    "sqm": 4500,
-    "floors": 3,
-    "year_built": 2015,
+    "sqm": 5200,
+    "floors": 8,
+    "year_built": 2018,
     "operating_hours": {
       "start": "07:00",
       "end": "19:00"
     },
+    "timezone": "Africa/Johannesburg",
+    "occupancy_pattern": "office",
+    "latitude": -26.1455,
+    "longitude": 28.0436,
+    "contact_email": "rosebanktowers.facilities@gmail.com",
+    "contact_phone": "+27 11 788 4500",
+    "control_enabled": true,
+    "control_note": "Remote control enabled - Full HVAC suite",
+    "optimization_enabled": true,
+    "optimization_status": "recommendation_pending",
+    "optimization_settings": {
+      "mode": "supervised",
+      "last_analysis": "2026-01-30T15:45:56.528820",
+      "analysis_interval_minutes": 15
+    },
+    "last_optimization": null,
+    "optimization_history": [
+      {
+        "timestamp": "2026-01-30T15:30:57.713925",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.92,
+          "validation_passed": true,
+          "recommendations_count": 5
+        }
+      },
+      {
+        "timestamp": "2026-01-30T15:45:56.528853",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.92,
+          "validation_passed": true,
+          "recommendations_count": 5
+        }
+      }
+    ],
+    "last_recommendation": {
+      "site_id": "site-001",
+      "timestamp": "2026-01-30T15:45:56.526020",
+      "recommendations": [
+        {
+          "device_id": "001-gwc-chiller-001",
+          "device_name": "Gateway Chiller",
+          "point_name": "chw_supply_temp_setpoint",
+          "current_value": 6.0,
+          "recommended_value": 8.0,
+          "reason": "Raise CHW supply from 6\u00b0C to 8\u00b0C - current 6.9\u00b0C indoor temp indicates overcooling with 28\u00b0C outdoor conditions"
+        },
+        {
+          "device_id": "001-gwc-chw-001",
+          "device_name": "Chilled Water System - Primary Loop",
+          "point_name": "chw_supply_temp_setpoint",
+          "current_value": 6.0,
+          "recommended_value": 8.0,
+          "reason": "Align primary loop CHW supply with chiller setpoint for system efficiency"
+        },
+        {
+          "device_id": "001-gwc-zone-001",
+          "device_name": "Main Zone Controller - Floors 1-3",
+          "point_name": "zone_cooling_setpoint",
+          "current_value": 22.0,
+          "recommended_value": 23.0,
+          "reason": "Raise cooling setpoint for open office zone from 22\u00b0C to 23\u00b0C given extreme current indoor overcooling (6.9\u00b0C)"
+        },
+        {
+          "device_id": "001-gwc-vav-001",
+          "device_name": "Office VAV - CTO Suite",
+          "point_name": "room_temp_setpoint",
+          "current_value": 21.0,
+          "recommended_value": 22.0,
+          "reason": "Executive zone requires tighter comfort band but can increase from 21\u00b0C to 22\u00b0C given severe overcooling condition"
+        },
+        {
+          "device_id": "001-gwc-chw-001",
+          "device_name": "Chilled Water System - Primary Loop",
+          "point_name": "pump_speed",
+          "current_value": 80,
+          "recommended_value": 70,
+          "reason": "Reduce pump speed from 80% to 70% due to lower cooling demand with raised CHW temperatures"
+        }
+      ],
+      "projected_savings": {
+        "energy_kwh": 28.5,
+        "cost_zar_per_hour": 71.25,
+        "percentage_improvement": 35.2
+      },
+      "confidence": 0.92,
+      "reasoning": "Critical overcooling detected - indoor temp at 6.9\u00b0C with 28\u00b0C outdoor conditions indicates massive energy waste. Raising CHW supply from 6\u00b0C to 8\u00b0C and zone setpoints will dramatically reduce chiller energy consumption while maintaining comfort. High outdoor temperature (28-30\u00b0C forecast) supports aggressive optimization. Standard energy pricing allows for significant savings without peak rate concerns."
+    }
+  },
+  {
+    "id": "site-002",
+    "name": "Sandton City Office Tower",
+    "address": "Sandton City Complex, 83 Rivonia Road, Sandton",
+    "region": "Gauteng",
+    "type": "regional_office",
+    "sqm": 4500,
+    "floors": 12,
+    "year_built": 2016,
+    "operating_hours": {
+      "start": "07:00",
+      "end": "19:00"
+    },
+    "timezone": "Africa/Johannesburg",
     "occupancy_pattern": "office",
     "latitude": -26.1076,
     "longitude": 28.0567,
     "contact_email": "sandton.facilities@gmail.com",
     "contact_phone": "+27 11 350 4000",
     "control_enabled": true,
-    "control_note": "Remote control enabled 2026-01-28 - AHU, Chiller, FCU, Zone Controller",
+    "control_note": "Remote control enabled - Lifts, HVAC",
     "optimization_enabled": true,
-    "optimization_status": "unknown",
+    "optimization_status": "recommendation_pending",
     "optimization_settings": {
       "mode": "supervised",
-      "last_analysis": "2026-01-27T19:27:22.037365",
+      "last_analysis": "2026-01-30T15:46:07.007825",
       "analysis_interval_minutes": 15
     },
-    "last_optimization": "2026-01-29T09:27:48.956291",
+    "last_optimization": null,
     "optimization_history": [
       {
-        "timestamp": "2026-01-27T19:27:22.037365",
-        "action": "analyzed",
-        "result": "warning",
-        "user": "system",
-        "details": {
-          "confidence": 0.82,
-          "validation_passed": false
-        }
-      },
-      {
-        "timestamp": "2026-01-28T12:58:32.020018",
-        "action": "analyzed",
-        "result": "warning",
-        "user": "system",
-        "details": {
-          "confidence": 0.82,
-          "validation_passed": false
-        }
-      },
-      {
-        "timestamp": "2026-01-28T13:22:16.996918",
-        "action": "analyzed",
-        "result": "warning",
-        "user": "system",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": false
-        }
-      },
-      {
-        "timestamp": "2026-01-28T13:29:35.363506",
-        "action": "analyzed",
-        "result": "warning",
-        "user": "system",
-        "details": {
-          "confidence": 0.75,
-          "validation_passed": false
-        }
-      },
-      {
-        "timestamp": "2026-01-28T13:38:06.211401",
+        "timestamp": "2026-01-30T15:31:07.000083",
         "action": "analyzed",
         "result": "success",
-        "user": "system",
+        "user": "scheduler",
         "details": {
-          "confidence": 0.75,
-          "validation_passed": true
+          "confidence": 0.88,
+          "validation_passed": true,
+          "recommendations_count": 4
         }
       },
       {
-        "timestamp": "2026-01-28T13:38:17.429213",
+        "timestamp": "2026-01-30T15:46:07.007847",
         "action": "analyzed",
-        "result": "warning",
-        "user": "system",
-        "details": {
-          "confidence": 0.85,
-          "validation_passed": false
-        }
-      },
-      {
-        "timestamp": "2026-01-29T09:27:48.956315",
-        "action": "approved",
         "result": "success",
-        "user": "operator",
+        "user": "scheduler",
         "details": {
-          "recommendation_id": "test",
-          "setpoints_applied": 1
+          "confidence": 0.88,
+          "validation_passed": true,
+          "recommendations_count": 4
         }
       }
     ],
-    "last_recommendation": null,
-    "error_message": "Recommendation failed safety validation"
-  },
-  {
-    "id": "site-002",
-    "name": "Rosebank",
-    "address": "The Zone @ Rosebank, 177 Oxford Road, Rosebank",
-    "region": "Gauteng",
-    "type": "branch",
-    "sqm": 1200,
-    "floors": 1,
-    "year_built": 2018,
-    "operating_hours": {
-      "start": "08:00",
-      "end": "17:00"
-    },
-    "occupancy_pattern": "retail",
-    "latitude": -26.1455,
-    "longitude": 28.0436,
-    "contact_email": "rosebank.facilities@gmail.com",
-    "contact_phone": "+27 11 788 4500",
-    "control_enabled": true,
-    "control_note": "Remote control enabled 2026-01-28 - AHU, Split unit",
-    "optimization_enabled": true,
-    "optimization_status": "unknown",
-    "optimization_settings": {
-      "mode": "supervised",
-      "last_analysis": null,
-      "analysis_interval_minutes": 15
-    },
-    "last_optimization": null,
-    "optimization_history": []
+    "last_recommendation": {
+      "site_id": "site-002",
+      "timestamp": "2026-01-30T15:46:07.005570",
+      "recommendations": [
+        {
+          "device_id": "011-stc-zone-001",
+          "device_name": "Sandton Zone Controller",
+          "point_name": "zone_cooling_setpoint",
+          "current_value": 22.8,
+          "recommended_value": 24.0,
+          "reason": "Raise setpoint for south-facing zone with rising outdoor temps (28-30\u00b0C forecast) and high occupancy heat gain"
+        },
+        {
+          "device_id": "011-stc-fcu-001",
+          "device_name": "Sandton FCU Floor 1",
+          "point_name": "room_temp_setpoint",
+          "current_value": 22.8,
+          "recommended_value": 23.5,
+          "reason": "North-facing zone can accept higher setpoint with moderate solar gain and current comfort margin"
+        },
+        {
+          "device_id": "011-stc-chiller-001",
+          "device_name": "Sandton Chiller CH-1",
+          "point_name": "chw_supply_temp_setpoint",
+          "current_value": 7.0,
+          "recommended_value": 8.5,
+          "reason": "Increase CHW temperature to reduce chiller energy while maintaining adequate cooling capacity for rising ambient"
+        },
+        {
+          "device_id": "011-stc-ahu-001",
+          "device_name": "Sandton AHU-1",
+          "point_name": "fan_speed",
+          "current_value": 75,
+          "recommended_value": 65,
+          "reason": "Reduce fan speed as higher zone setpoints require less air circulation, cubic power savings"
+        }
+      ],
+      "projected_savings": {
+        "energy_kwh": 18.3,
+        "cost_zar_per_hour": 45.75,
+        "percentage_improvement": 12.2
+      },
+      "confidence": 0.88,
+      "reasoning": "Rising outdoor temperature (28-30\u00b0C forecast) allows for higher zone setpoints without comfort impact. South-facing zone gets priority adjustment for afternoon heat gain. CHW temperature increase reduces chiller load significantly. Fan speed reduction provides cubic power savings. All changes within comfort limits for open office zones (P3 priority)."
+    }
   },
   {
     "id": "site-003",
-    "name": "Menlyn Maine",
-    "address": "Menlyn Maine Central Square, Pretoria",
-    "region": "Gauteng",
-    "type": "branch",
-    "sqm": 1800,
-    "floors": 2,
-    "year_built": 2019,
-    "operating_hours": {
-      "start": "08:00",
-      "end": "18:00"
-    },
-    "occupancy_pattern": "retail",
-    "latitude": -25.7825,
-    "longitude": 28.2754,
-    "contact_email": "menlyn.facilities@gmail.com",
-    "contact_phone": "+27 12 348 2000",
-    "optimization_enabled": true,
-    "optimization_status": "unknown",
-    "optimization_settings": {
-      "mode": "supervised",
-      "last_analysis": "2026-01-28T18:00:00.000000",
-      "analysis_interval_minutes": 15
-    },
-    "last_optimization": null,
-    "optimization_history": [],
-    "control_enabled": true,
-    "control_note": "Remote control enabled 2026-01-28 - FCUs, AHU, Chiller"
-  },
-  {
-    "id": "site-004",
-    "name": "Centurion",
+    "name": "Centurion Mall",
     "address": "Centurion Gate, 124 Akkerboom Road, Centurion",
     "region": "Gauteng",
-    "type": "branch",
-    "sqm": 950,
-    "floors": 1,
-    "year_built": 2012,
+    "type": "retail",
+    "sqm": 8500,
+    "floors": 2,
+    "year_built": 2005,
     "operating_hours": {
-      "start": "08:30",
-      "end": "16:30"
+      "start": "09:00",
+      "end": "21:00"
     },
+    "timezone": "Africa/Johannesburg",
     "occupancy_pattern": "retail",
     "latitude": -25.8603,
     "longitude": 28.1894,
     "contact_email": "centurion.facilities@gmail.com",
     "contact_phone": "+27 12 663 1000",
+    "control_enabled": true,
+    "control_note": "Remote control enabled - AHUs, Generator",
     "optimization_enabled": true,
-    "optimization_status": "unknown",
+    "optimization_status": "recommendation_pending",
     "optimization_settings": {
       "mode": "supervised",
-      "last_analysis": null,
+      "last_analysis": "2026-01-30T15:46:15.970853",
       "analysis_interval_minutes": 15
     },
     "last_optimization": null,
-    "optimization_history": []
+    "optimization_history": [
+      {
+        "timestamp": "2026-01-30T15:31:16.983716",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.88,
+          "validation_passed": true,
+          "recommendations_count": 3
+        }
+      },
+      {
+        "timestamp": "2026-01-30T15:46:15.970880",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.88,
+          "validation_passed": true,
+          "recommendations_count": 3
+        }
+      }
+    ],
+    "last_recommendation": {
+      "site_id": "site-003",
+      "timestamp": "2026-01-30T15:46:15.969325",
+      "recommendations": [
+        {
+          "device_id": "002-rbk-split-001",
+          "device_name": "Rosebank AC-1 Banking Hall",
+          "point_name": "room_temp_setpoint",
+          "current_value": 23.2,
+          "recommended_value": 24.0,
+          "reason": "East-facing P2 zone can accept 0.8\u00b0C increase with high occupancy providing thermal mass, saving energy before peak rates"
+        },
+        {
+          "device_id": "002-rbk-split-001",
+          "device_name": "Rosebank AC-1 Banking Hall",
+          "point_name": "fan_speed",
+          "current_value": "auto",
+          "recommended_value": "medium",
+          "reason": "Fixed medium speed more efficient than auto cycling during stable high occupancy period"
+        },
+        {
+          "device_id": "002-rbk-ahu-001",
+          "device_name": "Rosebank AHU-1",
+          "point_name": "fan_speed",
+          "current_value": 75,
+          "recommended_value": 65,
+          "reason": "P5 plant room can accept reduced airflow, outdoor temp rising but not critical yet"
+        }
+      ],
+      "projected_savings": {
+        "energy_kwh": 8.2,
+        "cost_zar_per_hour": 20.5,
+        "percentage_improvement": 12.3
+      },
+      "confidence": 0.88,
+      "reasoning": "Rising outdoor temps (28\u00b0C\u219230\u00b0C) with standard energy rates allows moderate optimization. Banking hall east exposure gets morning sun relief, enabling 0.8\u00b0C setpoint increase. High occupancy provides thermal stability. Plant room P5 priority allows AHU reduction. Changes stay within P2 comfort limits and prepare for peak rate period."
+    }
   },
   {
-    "id": "site-005",
-    "name": "Midrand Data Centre",
-    "address": "Allandale Road, Midrand Business Park",
-    "region": "Gauteng",
-    "type": "data_center",
-    "sqm": 2800,
-    "floors": 2,
-    "year_built": 2020,
-    "operating_hours": {
-      "start": "00:00",
-      "end": "23:59"
-    },
-    "occupancy_pattern": "24x7",
-    "latitude": -25.9867,
-    "longitude": 28.1279,
-    "contact_email": "midrand.dc@gmail.com",
-    "contact_phone": "+27 11 315 8000",
-    "optimization_enabled": true,
-    "optimization_status": "unknown",
-    "optimization_settings": {
-      "mode": "supervised",
-      "last_analysis": null,
-      "analysis_interval_minutes": 15
-    },
-    "last_optimization": null,
-    "optimization_history": []
-  },
-  {
-    "id": "site-006",
-    "name": "V&A Waterfront",
+    "id": "site-004",
+    "name": "V&A Waterfront Retail",
     "address": "V&A Waterfront, Dock Road, Cape Town",
     "region": "Western Cape",
-    "type": "regional_office",
-    "sqm": 3200,
+    "type": "retail",
+    "sqm": 6200,
     "floors": 2,
-    "year_built": 2016,
+    "year_built": 2013,
     "operating_hours": {
-      "start": "07:30",
-      "end": "18:30"
+      "start": "09:00",
+      "end": "21:00"
     },
-    "occupancy_pattern": "office",
+    "timezone": "Africa/Johannesburg",
+    "occupancy_pattern": "retail",
     "latitude": -33.9036,
     "longitude": 18.4205,
     "contact_email": "waterfront.facilities@gmail.com",
     "contact_phone": "+27 21 405 3000",
     "control_enabled": true,
-    "control_note": "Remote control enabled 2026-01-28 - AHU, Chiller, FCU",
+    "control_note": "Remote control enabled - AHU, Cooling Tower",
     "optimization_enabled": true,
-    "optimization_status": "unknown",
+    "optimization_status": "recommendation_pending",
     "optimization_settings": {
       "mode": "supervised",
-      "last_analysis": null,
+      "last_analysis": "2026-01-30T15:46:26.414564",
       "analysis_interval_minutes": 15
     },
     "last_optimization": null,
-    "optimization_history": []
+    "optimization_history": [
+      {
+        "timestamp": "2026-01-30T15:32:04.403609",
+        "action": "analyzed",
+        "result": "warning",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.94,
+          "validation_passed": false,
+          "recommendations_count": 5
+        }
+      },
+      {
+        "timestamp": "2026-01-30T15:46:26.414616",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.95,
+          "validation_passed": true,
+          "recommendations_count": 5
+        }
+      }
+    ],
+    "last_recommendation": {
+      "site_id": "site-004",
+      "timestamp": "2026-01-30T15:46:26.412335",
+      "recommendations": [
+        {
+          "device_id": "003-mmc-fcu-001",
+          "device_name": "Menlyn FCU-001",
+          "point_name": "room_temp_setpoint",
+          "current_value": 6.9,
+          "recommended_value": 22.0,
+          "reason": "Critical temperature correction - current 6.9\u00b0C is dangerously low and wasting massive energy"
+        },
+        {
+          "device_id": "003-mmc-fcu-002",
+          "device_name": "Menlyn FCU-002",
+          "point_name": "room_temp_setpoint",
+          "current_value": 6.9,
+          "recommended_value": 22.5,
+          "reason": "West-facing zone requires slightly higher setpoint due to afternoon solar gains"
+        },
+        {
+          "device_id": "003-mmc-chiller-001",
+          "device_name": "Menlyn Chiller",
+          "point_name": "chw_supply_temp_setpoint",
+          "current_value": 7.0,
+          "recommended_value": 9.0,
+          "reason": "Raise CHW temperature for significant energy savings while maintaining adequate cooling capacity"
+        },
+        {
+          "device_id": "003-mmc-fcu-001",
+          "device_name": "Menlyn FCU-001",
+          "point_name": "fan_speed",
+          "current_value": 100,
+          "recommended_value": 75,
+          "reason": "Reduce fan speed to save energy while maintaining comfort after temperature correction"
+        },
+        {
+          "device_id": "003-mmc-fcu-002",
+          "device_name": "Menlyn FCU-002",
+          "point_name": "fan_speed",
+          "current_value": 100,
+          "recommended_value": 75,
+          "reason": "Reduce fan speed to save energy while maintaining comfort after temperature correction"
+        }
+      ],
+      "projected_savings": {
+        "energy_kwh": 85.4,
+        "cost_zar_per_hour": 213.5,
+        "percentage_improvement": 78.2
+      },
+      "confidence": 0.95,
+      "reasoning": "Current 6.9\u00b0C indoor temperature is extremely inefficient and uncomfortable for retail space. Major energy waste from overcooling during high outdoor temperatures (28\u00b0C). Correcting to proper comfort range (22-22.5\u00b0C) and optimizing chiller setpoint will deliver massive savings while improving occupant comfort. Rising outdoor temperatures require immediate action to prevent further energy waste."
+    }
+  },
+  {
+    "id": "site-005",
+    "name": "Gateway Theatre of Shopping",
+    "address": "1 Palm Boulevard, Umhlanga Ridge, Durban",
+    "region": "KwaZulu-Natal",
+    "type": "retail",
+    "sqm": 12000,
+    "floors": 3,
+    "year_built": 2012,
+    "operating_hours": {
+      "start": "09:00",
+      "end": "21:00"
+    },
+    "timezone": "Africa/Johannesburg",
+    "occupancy_pattern": "retail",
+    "latitude": -29.7284,
+    "longitude": 31.0652,
+    "contact_email": "gateway.facilities@gmail.com",
+    "contact_phone": "+27 31 566 2000",
+    "control_enabled": true,
+    "control_note": "Remote control enabled - Chiller, Cooling Tower",
+    "optimization_enabled": true,
+    "optimization_status": "warning",
+    "optimization_settings": {
+      "mode": "supervised",
+      "last_analysis": "2026-01-30T15:46:48.234660",
+      "analysis_interval_minutes": 15
+    },
+    "last_optimization": null,
+    "optimization_history": [
+      {
+        "timestamp": "2026-01-30T15:32:09.543103",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.0,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-30T15:46:48.234688",
+        "action": "analyzed",
+        "result": "warning",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.88,
+          "validation_passed": false,
+          "recommendations_count": 4
+        }
+      }
+    ],
+    "last_recommendation": {
+      "site_id": "site-005",
+      "timestamp": "2026-01-30T15:46:48.233133",
+      "recommendations": [
+        {
+          "device_id": "ahu-mall-01",
+          "device_name": "Main Mall AHU 01",
+          "point_name": "supply_air_temp_setpoint",
+          "current_value": 18.0,
+          "recommended_value": 19.5,
+          "reason": "Increase supply air temp for energy savings - outdoor conditions allow higher setpoint"
+        },
+        {
+          "device_id": "ahu-mall-02",
+          "device_name": "Main Mall AHU 02",
+          "point_name": "supply_air_temp_setpoint",
+          "current_value": 18.5,
+          "recommended_value": 20.0,
+          "reason": "Optimize for rising outdoor temps - maintain comfort with higher supply temp"
+        },
+        {
+          "device_id": "chiller-01",
+          "device_name": "Gateway Chiller 01",
+          "point_name": "chw_supply_temp_setpoint",
+          "current_value": 6.5,
+          "recommended_value": 8.0,
+          "reason": "Increase CHW temp for compressor efficiency gains - well within safety limits"
+        },
+        {
+          "device_id": "vav-food-court",
+          "device_name": "Food Court VAV",
+          "point_name": "zone_temp_setpoint",
+          "current_value": 22.0,
+          "recommended_value": 23.0,
+          "reason": "Retail zone can accept higher setpoint during high occupancy - body heat contributes to cooling"
+        }
+      ],
+      "projected_savings": {
+        "energy_kwh": 18.5,
+        "cost_zar_per_hour": 46.25,
+        "percentage_improvement": 12.2
+      },
+      "confidence": 0.88,
+      "reasoning": "Rising outdoor temperatures (28\u00b0C to 30\u00b0C forecast) with high occupancy allows for strategic setpoint increases. Retail zones can tolerate higher temps due to body heat contribution. CHW optimization provides significant compressor efficiency gains. Total savings of R46.25/hour achievable while maintaining comfort standards."
+    }
+  },
+  {
+    "id": "site-006",
+    "name": "Mediclinic Sandton",
+    "address": "Peter Place, Bryanston, Sandton",
+    "region": "Gauteng",
+    "type": "hospital",
+    "sqm": 8500,
+    "floors": 4,
+    "year_built": 2019,
+    "operating_hours": {
+      "start": "00:00",
+      "end": "23:59"
+    },
+    "timezone": "Africa/Johannesburg",
+    "occupancy_pattern": "24x7",
+    "latitude": -26.0614,
+    "longitude": 28.0277,
+    "contact_email": "mediclinic.sandton@gmail.com",
+    "contact_phone": "+27 11 709 2000",
+    "control_enabled": true,
+    "control_note": "Hospital critical - Chiller, Generator, UPS",
+    "optimization_enabled": true,
+    "optimization_status": "warning",
+    "optimization_settings": {
+      "mode": "supervised",
+      "last_analysis": "2026-01-30T15:47:13.191468",
+      "analysis_interval_minutes": 15
+    },
+    "last_optimization": null,
+    "optimization_history": [
+      {
+        "timestamp": "2026-01-30T15:32:33.869304",
+        "action": "analyzed",
+        "result": "warning",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.89,
+          "validation_passed": false,
+          "recommendations_count": 4
+        }
+      },
+      {
+        "timestamp": "2026-01-30T15:47:13.191498",
+        "action": "analyzed",
+        "result": "warning",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.92,
+          "validation_passed": false,
+          "recommendations_count": 3
+        }
+      }
+    ],
+    "last_recommendation": {
+      "site_id": "site-006",
+      "timestamp": "2026-01-30T15:47:13.190326",
+      "recommendations": [
+        {
+          "device_id": "CHILLER-02",
+          "device_name": "Main Chiller 02",
+          "point_name": "chilled_water_setpoint",
+          "current_value": 6.5,
+          "recommended_value": 7.5,
+          "reason": "Chiller at 98% capacity - 1\u00b0C increase reduces load while outdoor temp rising to 30\u00b0C justifies optimization"
+        },
+        {
+          "device_id": "AHU-ICU-01",
+          "device_name": "ICU Air Handler 01",
+          "point_name": "supply_air_temp",
+          "current_value": 13.0,
+          "recommended_value": 14.0,
+          "reason": "Higher supply air temp reduces cooling load by 15% while maintaining critical ICU temperature requirements"
+        },
+        {
+          "device_id": "AHU-WARD-03",
+          "device_name": "Ward Air Handler 03",
+          "point_name": "zone_setpoint",
+          "current_value": 22.0,
+          "recommended_value": 23.0,
+          "reason": "General ward can accept 1\u00b0C increase during high occupancy - outdoor temps rising to 30\u00b0C support this adjustment"
+        }
+      ],
+      "projected_savings": {
+        "energy_kwh": 56.5,
+        "cost_zar_per_hour": 141.25,
+        "percentage_improvement": 12.6
+      },
+      "confidence": 0.92,
+      "reasoning": "Critical chiller operating at maximum capacity requires immediate optimization. Rising outdoor temperatures (28\u00b0C\u219230\u00b0C) and high occupancy justify conservative setpoint increases. Hospital zones prioritized: ICU maintains critical cooling while general wards accept comfort adjustment. Total savings R141.25/hour while maintaining patient safety standards."
+    }
   },
   {
     "id": "site-007",
-    "name": "Century City",
-    "address": "Canal Walk, Century City, Cape Town",
+    "name": "Mediclinic Constantiaberg",
+    "address": "Burnham Road, Constantia, Cape Town",
     "region": "Western Cape",
-    "type": "branch",
-    "sqm": 1400,
-    "floors": 1,
-    "year_built": 2017,
+    "type": "hospital",
+    "sqm": 6200,
+    "floors": 3,
+    "year_built": 2010,
     "operating_hours": {
-      "start": "09:00",
-      "end": "18:00"
+      "start": "00:00",
+      "end": "23:59"
     },
-    "occupancy_pattern": "retail",
-    "latitude": -33.8937,
-    "longitude": 18.5124,
-    "contact_email": "centurycity.facilities@gmail.com",
-    "contact_phone": "+27 21 551 2000",
+    "timezone": "Africa/Johannesburg",
+    "occupancy_pattern": "24x7",
+    "latitude": -34.0225,
+    "longitude": 18.4304,
+    "contact_email": "mediclinic.constantiaberg@gmail.com",
+    "contact_phone": "+27 21 799 2911",
+    "control_enabled": true,
+    "control_note": "Hospital critical - AHU, HVAC",
     "optimization_enabled": true,
-    "optimization_status": "unknown",
+    "optimization_status": "recommendation_pending",
     "optimization_settings": {
       "mode": "supervised",
-      "last_analysis": null,
+      "last_analysis": "2026-01-30T15:47:23.669092",
       "analysis_interval_minutes": 15
     },
     "last_optimization": null,
-    "optimization_history": []
+    "optimization_history": [
+      {
+        "timestamp": "2026-01-30T15:32:43.891040",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.88,
+          "validation_passed": true,
+          "recommendations_count": 3
+        }
+      },
+      {
+        "timestamp": "2026-01-30T15:47:23.669110",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.88,
+          "validation_passed": true,
+          "recommendations_count": 3
+        }
+      }
+    ],
+    "last_recommendation": {
+      "site_id": "site-007",
+      "timestamp": "2026-01-30T15:47:23.667917",
+      "recommendations": [
+        {
+          "device_id": "006-vaw-chiller-001",
+          "device_name": "V&A Chiller CH-1",
+          "point_name": "chw_supply_temp_setpoint",
+          "current_value": 7.0,
+          "recommended_value": 8.5,
+          "reason": "Increase CHW temp by 1.5\u00b0C to reduce chiller energy consumption while maintaining adequate cooling capacity for rising outdoor temps"
+        },
+        {
+          "device_id": "006-vaw-fcu-001",
+          "device_name": "V&A FCU Floor 1",
+          "point_name": "room_temp_setpoint",
+          "current_value": 21.0,
+          "recommended_value": 22.5,
+          "reason": "Raise setpoint 1.5\u00b0C for west-facing open office zone - still within comfort range but reduces cooling load as outdoor temp rises to 30\u00b0C"
+        },
+        {
+          "device_id": "006-vaw-ahu-001",
+          "device_name": "V&A AHU-1",
+          "point_name": "fan_speed",
+          "current_value": 85,
+          "recommended_value": 75,
+          "reason": "Reduce AHU fan speed 10% in plant room zone (P5 priority) to save fan energy while maintaining adequate air circulation"
+        }
+      ],
+      "projected_savings": {
+        "energy_kwh": 18.2,
+        "cost_zar_per_hour": 45.5,
+        "percentage_improvement": 12.3
+      },
+      "confidence": 0.88,
+      "reasoning": "Hospital requires continuous operation but allows optimization in non-critical zones. Rising outdoor temps (28\u00b0C to 30\u00b0C) and standard energy rates (R2.50/kWh) justify moderate setpoint adjustments. West-facing zone gets +1.5\u00b0C adjustment for solar gain. Plant room equipment (P5 priority) can accept wider operating ranges. All changes maintain hospital comfort standards while reducing cooling load during temperature rise."
+    }
   },
   {
     "id": "site-008",
-    "name": "Stellenbosch",
-    "address": "Eikestad Mall, Bird Street, Stellenbosch",
-    "region": "Western Cape",
-    "type": "branch",
-    "sqm": 680,
-    "floors": 1,
-    "year_built": 2010,
+    "name": "Standard Bank Centre",
+    "address": "5 Simmonds Street, Johannesburg CBD",
+    "region": "Gauteng",
+    "type": "regional_office",
+    "sqm": 15000,
+    "floors": 20,
+    "year_built": 2015,
     "operating_hours": {
-      "start": "08:30",
-      "end": "16:30"
+      "start": "07:00",
+      "end": "19:00"
     },
-    "occupancy_pattern": "retail",
-    "latitude": -33.9346,
-    "longitude": 18.8602,
-    "contact_email": "stellenbosch.facilities@gmail.com",
-    "contact_phone": "+27 21 887 1200",
+    "timezone": "Africa/Johannesburg",
+    "occupancy_pattern": "office",
+    "latitude": -26.2041,
+    "longitude": 28.0473,
+    "contact_email": "sbcentre.facilities@gmail.com",
+    "contact_phone": "+27 11 636 9111",
+    "control_enabled": true,
+    "control_note": "Data centre - DB Board, UPS",
     "optimization_enabled": true,
-    "optimization_status": "unknown",
+    "optimization_status": "recommendation_pending",
     "optimization_settings": {
       "mode": "supervised",
-      "last_analysis": null,
+      "last_analysis": "2026-01-30T15:47:28.820879",
       "analysis_interval_minutes": 15
     },
     "last_optimization": null,
-    "optimization_history": []
+    "optimization_history": [
+      {
+        "timestamp": "2026-01-30T15:32:49.309134",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.0,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-30T15:47:28.820901",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.0,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      }
+    ],
+    "last_recommendation": {
+      "site_id": "site-008",
+      "timestamp": "2026-01-30T15:47:28.819456",
+      "recommendations": [],
+      "projected_savings": {
+        "energy_kwh": 0,
+        "cost_zar_per_hour": 0,
+        "percentage_improvement": 0
+      },
+      "confidence": 0.0,
+      "reasoning": "No HVAC equipment or control points found for Standard Bank Centre (site-008). The system reports 0 devices available for control. Without accessible HVAC control points, no setpoint optimizations can be implemented. To enable optimization, the following steps are needed: 1) Verify BMS connectivity to HVAC controllers, 2) Configure control points in the system, 3) Ensure proper device commissioning. Current conditions (22\u00b0C indoor, 28\u00b0C outdoor, high occupancy) suggest the space would benefit from optimization once control points are available."
+    }
   },
   {
     "id": "site-009",
-    "name": "Paarl",
-    "address": "Paarl Mall, Cecelia Street, Paarl",
-    "region": "Western Cape",
+    "name": "Standard Bank Rosebank",
+    "address": "30 Baker Street, Rosebank",
+    "region": "Gauteng",
     "type": "branch",
-    "sqm": 520,
-    "floors": 1,
-    "year_built": 2008,
+    "sqm": 1200,
+    "floors": 2,
+    "year_built": 2019,
     "operating_hours": {
-      "start": "08:30",
-      "end": "16:30"
+      "start": "08:00",
+      "end": "17:00"
     },
+    "timezone": "Africa/Johannesburg",
     "occupancy_pattern": "retail",
-    "latitude": -33.7314,
-    "longitude": 18.9621,
-    "contact_email": "paarl.facilities@gmail.com",
-    "contact_phone": "+27 21 872 3500",
+    "latitude": -26.1455,
+    "longitude": 28.0436,
+    "contact_email": "rosebank.branch@gmail.com",
+    "contact_phone": "+27 11 788 5000",
+    "control_enabled": true,
+    "control_note": "Branch office - FCU",
     "optimization_enabled": true,
-    "optimization_status": "unknown",
+    "optimization_status": "recommendation_pending",
     "optimization_settings": {
       "mode": "supervised",
-      "last_analysis": null,
+      "last_analysis": "2026-01-30T15:47:32.800345",
       "analysis_interval_minutes": 15
     },
     "last_optimization": null,
-    "optimization_history": []
+    "optimization_history": [
+      {
+        "timestamp": "2026-01-30T15:32:54.014175",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.0,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-30T15:47:32.800379",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.0,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      }
+    ],
+    "last_recommendation": {
+      "site_id": "site-009",
+      "timestamp": "2026-01-30T15:47:32.799077",
+      "recommendations": [],
+      "projected_savings": {
+        "energy_kwh": 0,
+        "cost_zar_per_hour": 0,
+        "percentage_improvement": 0
+      },
+      "confidence": 0.0,
+      "reasoning": "No HVAC equipment or control points are available for optimization at this site. The building data shows 0 HVAC devices and no available control points. Without controllable HVAC equipment, no setpoint adjustments can be made to achieve energy savings. Recommend verifying BMS connectivity or equipment commissioning status."
+    }
   },
   {
     "id": "site-010",
-    "name": "Bellville",
-    "address": "Tyger Valley Centre, Willie van Schoor Ave, Bellville",
-    "region": "Western Cape",
-    "type": "branch",
-    "sqm": 1100,
-    "floors": 1,
-    "year_built": 2014,
-    "operating_hours": {
-      "start": "09:00",
-      "end": "17:00"
-    },
-    "occupancy_pattern": "retail",
-    "latitude": -33.8714,
-    "longitude": 18.6328,
-    "contact_email": "bellville.facilities@gmail.com",
-    "contact_phone": "+27 21 914 2800",
-    "optimization_enabled": true,
-    "optimization_status": "unknown",
-    "optimization_settings": {
-      "mode": "supervised",
-      "last_analysis": null,
-      "analysis_interval_minutes": 15
-    },
-    "last_optimization": null,
-    "optimization_history": []
-  },
-  {
-    "id": "site-011",
-    "name": "Umhlanga Ridge",
-    "address": "Gateway Theatre of Shopping, 1 Palm Boulevard, Umhlanga",
+    "name": "Standard Bank Durban Regional",
+    "address": "19 Kingsmead Way, Durban",
     "region": "KwaZulu-Natal",
     "type": "regional_office",
-    "sqm": 2600,
-    "floors": 2,
-    "year_built": 2017,
+    "sqm": 3500,
+    "floors": 5,
+    "year_built": 2021,
     "operating_hours": {
       "start": "07:30",
       "end": "18:00"
     },
+    "timezone": "Africa/Johannesburg",
     "occupancy_pattern": "office",
-    "latitude": -29.7299,
-    "longitude": 31.0678,
-    "contact_email": "umhlanga.facilities@gmail.com",
-    "contact_phone": "+27 31 566 3000",
-    "control_enabled": true,
-    "control_note": "Remote control enabled 2026-01-28 - AHU, Chiller, FCU x2",
-    "optimization_enabled": true,
-    "optimization_status": "unknown",
-    "optimization_settings": {
-      "mode": "supervised",
-      "last_analysis": null,
-      "analysis_interval_minutes": 15
-    },
-    "last_optimization": null,
-    "optimization_history": []
-  },
-  {
-    "id": "site-012",
-    "name": "Durban CBD",
-    "address": "320 Smith Street, Durban Central",
-    "region": "KwaZulu-Natal",
-    "type": "branch",
-    "sqm": 1600,
-    "floors": 2,
-    "year_built": 2005,
-    "operating_hours": {
-      "start": "08:00",
-      "end": "16:00"
-    },
-    "occupancy_pattern": "retail",
     "latitude": -29.8587,
     "longitude": 31.0218,
-    "contact_email": "durbancbd.facilities@gmail.com",
+    "contact_email": "durban.regional@gmail.com",
     "contact_phone": "+27 31 361 8000",
+    "control_enabled": true,
+    "control_note": "Regional office - Generator",
     "optimization_enabled": true,
-    "optimization_status": "unknown",
+    "optimization_status": "warning",
     "optimization_settings": {
       "mode": "supervised",
-      "last_analysis": null,
+      "last_analysis": "2026-01-30T15:48:00.290227",
       "analysis_interval_minutes": 15
     },
     "last_optimization": null,
-    "optimization_history": []
-  },
-  {
-    "id": "site-013",
-    "name": "Ballito",
-    "address": "Ballito Junction, Ballito Drive, Ballito",
-    "region": "KwaZulu-Natal",
-    "type": "branch",
-    "sqm": 780,
-    "floors": 1,
-    "year_built": 2019,
-    "operating_hours": {
-      "start": "09:00",
-      "end": "17:00"
-    },
-    "occupancy_pattern": "retail",
-    "latitude": -29.539,
-    "longitude": 31.2134,
-    "contact_email": "ballito.facilities@gmail.com",
-    "contact_phone": "+27 32 946 1500",
-    "optimization_enabled": true,
-    "optimization_status": "unknown",
-    "optimization_settings": {
-      "mode": "supervised",
-      "last_analysis": null,
-      "analysis_interval_minutes": 15
-    },
-    "last_optimization": null,
-    "optimization_history": []
-  },
-  {
-    "id": "site-014",
-    "name": "Pietermaritzburg",
-    "address": "Liberty Midlands Mall, 50 Sanctuary Road, PMB",
-    "region": "KwaZulu-Natal",
-    "type": "branch",
-    "sqm": 920,
-    "floors": 1,
-    "year_built": 2013,
-    "operating_hours": {
-      "start": "08:30",
-      "end": "17:00"
-    },
-    "occupancy_pattern": "retail",
-    "latitude": -29.5534,
-    "longitude": 30.3415,
-    "contact_email": "pmb.facilities@gmail.com",
-    "contact_phone": "+27 33 345 6000",
-    "optimization_enabled": true,
-    "optimization_status": "unknown",
-    "optimization_settings": {
-      "mode": "supervised",
-      "last_analysis": null,
-      "analysis_interval_minutes": 15
-    },
-    "last_optimization": null,
-    "optimization_history": []
-  },
-  {
-    "id": "site-015",
-    "name": "Richards Bay",
-    "address": "Boardwalk Inkwazi Shopping Centre, Mark Sobukwe Road",
-    "region": "KwaZulu-Natal",
-    "type": "branch",
-    "sqm": 650,
-    "floors": 1,
-    "year_built": 2011,
-    "operating_hours": {
-      "start": "08:30",
-      "end": "16:30"
-    },
-    "occupancy_pattern": "retail",
-    "latitude": -28.7828,
-    "longitude": 32.0628,
-    "contact_email": "richardsbay.facilities@gmail.com",
-    "contact_phone": "+27 35 789 2200",
-    "optimization_enabled": true,
-    "optimization_status": "unknown",
-    "optimization_settings": {
-      "mode": "supervised",
-      "last_analysis": null,
-      "analysis_interval_minutes": 15
-    },
-    "last_optimization": null,
-    "optimization_history": []
+    "optimization_history": [
+      {
+        "timestamp": "2026-01-30T15:33:06.825201",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.0,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-30T15:48:00.290253",
+        "action": "analyzed",
+        "result": "warning",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.89,
+          "validation_passed": false,
+          "recommendations_count": 4
+        }
+      }
+    ],
+    "last_recommendation": {
+      "site_id": "site-010",
+      "timestamp": "2026-01-30T15:48:00.289265",
+      "recommendations": [
+        {
+          "device_id": "ahu-main-01",
+          "device_name": "Main AHU Level 1",
+          "point_name": "discharge_air_temp_setpoint",
+          "current_value": 22.0,
+          "recommended_value": 23.0,
+          "reason": "Mild outdoor conditions and high occupancy allow 1\u00b0C increase while maintaining comfort"
+        },
+        {
+          "device_id": "ahu-main-02",
+          "device_name": "Main AHU Level 2",
+          "point_name": "discharge_air_temp_setpoint",
+          "current_value": 22.0,
+          "recommended_value": 23.0,
+          "reason": "Optimize for rising outdoor temps (28-30\u00b0C forecast) while maintaining comfort in general zones"
+        },
+        {
+          "device_id": "ahu-exec-01",
+          "device_name": "Executive AHU",
+          "point_name": "discharge_air_temp_setpoint",
+          "current_value": 21.5,
+          "recommended_value": 22.0,
+          "reason": "Conservative adjustment for executive zone - maintains tighter comfort band (P1 priority)"
+        },
+        {
+          "device_id": "chiller-main",
+          "device_name": "Primary Chiller",
+          "point_name": "chw_supply_temp_setpoint",
+          "current_value": 6.5,
+          "recommended_value": 7.0,
+          "reason": "Higher CHW temperature reduces compressor energy while adequate for 28-30\u00b0C outdoor conditions"
+        }
+      ],
+      "projected_savings": {
+        "energy_kwh": 18.7,
+        "cost_zar_per_hour": 46.75,
+        "percentage_improvement": 12.3
+      },
+      "confidence": 0.89,
+      "reasoning": "With outdoor temperatures rising from 28\u00b0C to 30\u00b0C over next 4 hours and current standard energy rates (R2.50/kWh), these conservative setpoint adjustments optimize energy consumption while maintaining comfort. Executive zones get minimal adjustment due to P1 priority. CHW temperature increase provides largest savings by reducing chiller compressor load during moderate outdoor conditions."
+    }
   }
 ]

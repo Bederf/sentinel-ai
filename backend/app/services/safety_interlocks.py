@@ -261,26 +261,65 @@ class SafetyEngine:
         return rules
 
     async def get_rules_for_device(self, device: Device, point_name: Optional[str] = None) -> List[SafetyRule]:
-        """Get safety rules applicable to a specific device (and optionally point)."""
-        applicable_rules = []
+        """Get safety rules applicable to a specific device (and optionally point).
 
+        When a specific rule exists for a point (rule.point_name matches point_name),
+        generic rules of the same type (rule.point_name is None) are excluded to
+        prevent conflicts (e.g., chiller chw_setpoint 5-12°C vs generic HVAC 16-28°C).
+        """
+        applicable_rules = []
+        specific_rule_types = set()  # Track rule types that have specific point rules
+
+        logger.debug(f"get_rules_for_device called: device={device.id}, device_type={device.device_type}, point={point_name}")
+        logger.debug(f"Total rules in engine: {len(self.rules)}")
+
+        # First pass: collect all matching rules and identify specific rules
         for rule in self.rules.values():
+            logger.debug(f"Checking rule {rule.id}: enabled={rule.enabled}, rule_device_type={rule.device_type}, rule_point={rule.point_name}")
+
             if not rule.enabled:
+                logger.debug(f"  -> Skipped: rule disabled")
                 continue
 
             # Check device type match
             if rule.device_type and rule.device_type != device.device_type.value:
+                logger.debug(f"  -> Skipped: device_type mismatch ({rule.device_type} != {device.device_type.value})")
                 continue
 
             # Check device ID match (if specified)
             if rule.device_id and rule.device_id != device.id:
+                logger.debug(f"  -> Skipped: device_id mismatch ({rule.device_id} != {device.id})")
                 continue
 
             # Check point name match (if specified)
             if point_name and rule.point_name and rule.point_name != point_name:
+                logger.debug(f"  -> Skipped: point_name mismatch ({rule.point_name} != {point_name})")
                 continue
 
+            # Track if this is a specific rule for the requested point
+            if point_name and rule.point_name == point_name:
+                specific_rule_types.add(rule.rule_type)
+                logger.debug(f"  -> SPECIFIC rule for point {point_name}")
+
             applicable_rules.append(rule)
+            logger.debug(f"  -> MATCHED: added to applicable_rules")
+
+        logger.debug(f"First pass: {len(applicable_rules)} applicable rules, specific_rule_types={specific_rule_types}")
+
+        # Second pass: filter out generic rules when specific rules exist for same type
+        if specific_rule_types:
+            filtered_rules = []
+            for rule in applicable_rules:
+                # Keep the rule if:
+                # 1. It has a specific point_name (not generic), OR
+                # 2. Its rule_type doesn't have a specific rule that would conflict
+                if rule.point_name is not None or rule.rule_type not in specific_rule_types:
+                    filtered_rules.append(rule)
+                    logger.debug(f"  -> Keeping rule {rule.id} (point_name={rule.point_name})")
+                else:
+                    logger.debug(f"  -> Filtering out generic rule {rule.id}")
+            logger.debug(f"Second pass: {len(filtered_rules)} rules after filtering generics")
+            return filtered_rules
 
         return applicable_rules
 
@@ -308,6 +347,7 @@ class SafetyEngine:
                 "allowed": True,
                 "reasons": [],
                 "warnings": [],
+                "alarms": [],
                 "rule_results": [],
                 "message": "No safety rules apply to this control action",
             }
@@ -371,12 +411,34 @@ class SafetyEngine:
             # Validate current value
             validation = await self.validate_control(device, point_name, current_value)
 
-            point_statuses[point_name] = {
+            # Get applicable rules to extract min/max from TemperatureRangeRule
+            applicable_rules = await self.get_rules_for_device(device, point_name)
+            min_value = None
+            max_value = None
+            logger.debug(f"Checking {len(applicable_rules)} rules for point {point_name}")
+            for rule in applicable_rules:
+                logger.debug(f"Rule {rule.id}: type={type(rule).__name__}, point_name={rule.point_name}")
+                if isinstance(rule, TemperatureRangeRule) and rule.point_name == point_name:
+                    min_value = rule.min_temp
+                    max_value = rule.max_temp
+                    logger.debug(f"Found TemperatureRangeRule for {point_name}: min={min_value}, max={max_value}")
+                    # Take the first matching rule (most specific)
+                    break
+
+            point_status = {
                 "value": current_value,
                 "allowed": validation["allowed"],
                 "warnings": validation["warnings"],
                 "alarms": validation["alarms"],
             }
+
+            # Add min/max if available
+            if min_value is not None:
+                point_status["min_value"] = min_value
+            if max_value is not None:
+                point_status["max_value"] = max_value
+
+            point_statuses[point_name] = point_status
 
         # Determine overall status
         has_blocked = any(not status["allowed"] for status in point_statuses.values())

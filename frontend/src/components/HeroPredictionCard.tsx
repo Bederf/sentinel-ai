@@ -17,19 +17,31 @@ interface HeroPredictionCardProps {
 }
 
 export function HeroPredictionCard({ prediction, onClick }: HeroPredictionCardProps) {
-  // Format currency
-  const formatZAR = (amount: number) =>
-    new Intl.NumberFormat("en-ZA", {
+  // Format currency with better readability
+  const formatZAR = (amount: number) => {
+    // Use en-ZA locale for proper South African Rand formatting
+    return new Intl.NumberFormat("en-ZA", {
       style: "currency",
       currency: "ZAR",
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
+      notation: "standard",
     }).format(amount);
+  };
 
-  // Calculate preventive cost (repair cost + labor)
-  const preventiveCost = prediction.financial_impact.repair_cost_zar;
+  // Calculate costs and savings
+  // Failure Cost = total cost if failure occurs (potential_loss_zar includes repair + downtime)
+  // Preventive Cost = cost to prevent failure (repair_cost_zar)
+  // Savings = how much you save by doing preventive maintenance
   const failureCost = prediction.financial_impact.potential_loss_zar;
+  const preventiveCost = prediction.financial_impact.repair_cost_zar;
+  
+  // Calculate savings: failure cost - preventive cost
+  // If preventive cost is higher, there's no savings (edge case in data)
   const savings = failureCost - preventiveCost;
+  
+  // Ensure we show positive savings only (if preventive > failure, show 0)
+  const displaySavings = Math.max(0, savings);
 
   // Severity colors
   const getSeverityColor = (severity: string) => {
@@ -171,72 +183,87 @@ export function HeroPredictionCard({ prediction, onClick }: HeroPredictionCardPr
           </div>
 
           {/* Center: Cost Comparison Trio */}
-          <div className="flex flex-col justify-center">
+          <div className="flex flex-col justify-center px-2">
             <h4
-              className="text-xs font-semibold uppercase tracking-wider mb-4 text-center"
+              className="text-xs font-semibold uppercase tracking-wider mb-5 text-center"
               style={{ color: "var(--color-grafana-text-secondary)" }}
             >
               Cost Impact Analysis
             </h4>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-3 gap-3 lg:gap-5">
               {/* Failure Cost */}
-              <div className="text-center">
+              <div className="text-center flex flex-col items-center">
                 <div
-                  className="text-xl lg:text-2xl font-bold mb-1"
-                  style={{ color: "var(--color-status-error)" }}
+                  className="text-lg lg:text-xl xl:text-2xl font-bold mb-2 leading-tight"
+                  style={{ 
+                    color: "var(--color-status-error)",
+                    fontVariantNumeric: "tabular-nums",
+                    letterSpacing: "-0.02em"
+                  }}
                 >
                   {formatZAR(failureCost)}
                 </div>
                 <div
-                  className="text-xs uppercase tracking-wider"
+                  className="text-[10px] lg:text-xs uppercase tracking-wider font-medium mb-2"
                   style={{ color: "var(--color-grafana-text-secondary)" }}
                 >
                   Failure Cost
                 </div>
                 <div
-                  className="h-1 mt-2 rounded-full"
+                  className="h-1 w-full rounded-full"
                   style={{ background: "var(--color-status-error)" }}
                 />
               </div>
 
               {/* Preventive Cost */}
-              <div className="text-center">
+              <div className="text-center flex flex-col items-center">
                 <div
-                  className="text-xl lg:text-2xl font-bold mb-1"
-                  style={{ color: "var(--color-grafana-blue)" }}
+                  className="text-lg lg:text-xl xl:text-2xl font-bold mb-2 leading-tight"
+                  style={{ 
+                    color: "var(--color-grafana-blue)",
+                    fontVariantNumeric: "tabular-nums",
+                    letterSpacing: "-0.02em"
+                  }}
                 >
                   {formatZAR(preventiveCost)}
                 </div>
                 <div
-                  className="text-xs uppercase tracking-wider"
+                  className="text-[10px] lg:text-xs uppercase tracking-wider font-medium mb-2"
                   style={{ color: "var(--color-grafana-text-secondary)" }}
                 >
                   Preventive Cost
                 </div>
                 <div
-                  className="h-1 mt-2 rounded-full"
+                  className="h-1 w-full rounded-full"
                   style={{ background: "var(--color-grafana-blue)" }}
                 />
               </div>
 
               {/* Savings */}
-              <div className="text-center">
+              <div className="text-center flex flex-col items-center">
                 <div
-                  className="text-xl lg:text-2xl font-bold mb-1"
-                  style={{ color: "var(--color-status-success)" }}
+                  className="text-lg lg:text-xl xl:text-2xl font-bold mb-2 leading-tight"
+                  style={{ 
+                    color: displaySavings > 0 ? "var(--color-status-success)" : "var(--color-grafana-text-secondary)",
+                    fontVariantNumeric: "tabular-nums",
+                    letterSpacing: "-0.02em"
+                  }}
                 >
-                  {formatZAR(savings)}
+                  {displaySavings > 0 ? formatZAR(displaySavings) : formatZAR(0)}
                 </div>
                 <div
-                  className="text-xs uppercase tracking-wider"
+                  className="text-[10px] lg:text-xs uppercase tracking-wider font-medium mb-2"
                   style={{ color: "var(--color-grafana-text-secondary)" }}
                 >
                   Savings
                 </div>
                 <div
-                  className="h-1 mt-2 rounded-full"
-                  style={{ background: "var(--color-status-success)" }}
+                  className="h-1 w-full rounded-full"
+                  style={{ 
+                    background: displaySavings > 0 ? "var(--color-status-success)" : "var(--color-grafana-text-secondary)",
+                    opacity: displaySavings > 0 ? 1 : 0.3
+                  }}
                 />
               </div>
             </div>

@@ -19,6 +19,9 @@ from app.models.device import DeviceStatus
 
 logger = logging.getLogger(__name__)
 
+# Sandton building - the one with DALI integration
+SANDTON_SITE_ID = "site-002"  # Sandton City in sites.json
+
 # Data directory for building data
 DATA_DIR = Path(__file__).parent.parent / "data"
 
@@ -671,6 +674,324 @@ async def get_energy_analysis(site_id: str) -> dict[str, Any]:
         return {"success": False, "error": str(e)}
 
 
+async def lookup_desk(desk_id: str, building: str | None = None) -> dict[str, Any]:
+    """
+    Look up a desk and return its zone, HVAC, and sensor context.
+
+    For Sandton (FNB Fairlands) which has DALI integration, this returns
+    detailed occupancy and lighting data from PIR sensors.
+
+    Args:
+        desk_id: Desk identifier (e.g., "201", "L12-25", "Desk 25")
+        building: Optional building name. If not provided and multiple buildings
+                  have desks, will return a prompt asking for clarification.
+
+    Returns:
+        Dictionary with desk info, zone, HVAC status, and DALI sensor data
+    """
+    try:
+        # Load desk and zone data
+        desks = load_json("desks.json")
+        zones = load_json("hvac_zones.json")
+
+        if not desks:
+            return {
+                "success": False,
+                "error": "Desk data not available",
+                "prompt_user": "I don't have desk mapping data loaded. Which building and zone is the user in?"
+            }
+
+        # Normalize desk ID - extract number from various formats
+        import re
+        desk_num = re.sub(r'[^0-9]', '', str(desk_id))
+        if not desk_num:
+            return {
+                "success": False,
+                "error": f"Invalid desk ID format: {desk_id}",
+                "prompt_user": f"I couldn't parse desk ID '{desk_id}'. Can you provide just the desk number (e.g., 201, 25)?"
+            }
+
+        # Find desk - try exact match first, then partial
+        desk = None
+        for d in desks:
+            d_num = re.sub(r'[^0-9]', '', str(d.get('desk_id', '')))
+            if d_num == desk_num:
+                desk = d
+                break
+
+        if not desk:
+            # Desk not found - prompt for more info
+            available_desks = [d.get('desk_id') for d in desks[:10]]
+            return {
+                "success": False,
+                "error": f"Desk {desk_id} not found in mapping",
+                "prompt_user": f"I don't have desk {desk_id} in my database. Can you confirm the desk number? Available desks include: {', '.join(available_desks)}...",
+                "available_sample": available_desks
+            }
+
+        # Get zone info
+        zone_id = desk.get('zone_id')
+        zone = next((z for z in zones if z.get('zone_id') == zone_id), None)
+
+        # Get DALI/occupancy context for Sandton
+        dali_context = {}
+        try:
+            from app.services.cross_system_analyzer import get_cross_system_analyzer
+            analyzer = get_cross_system_analyzer()
+
+            # Get zone occupancy from DALI sensors
+            if zone_id:
+                zone_analysis = analyzer.dali.get_zone_analysis(zone_id)
+                dali_context = {
+                    "occupancy_percent": zone_analysis.get('occupancy_percent', 0),
+                    "avg_lux": zone_analysis.get('average_lux', 0),
+                    "sensors_active": zone_analysis.get('occupied_count', 0),
+                    "total_sensors": zone_analysis.get('total_sensors', 0),
+                    "high_daylight": zone_analysis.get('average_lux', 0) > 800,
+                }
+        except Exception as e:
+            logger.warning(f"Could not get DALI context: {e}")
+            dali_context = {"available": False, "reason": str(e)}
+
+        # Build response
+        response = {
+            "success": True,
+            "desk": {
+                "desk_id": desk.get('desk_id'),
+                "floor": desk.get('floor'),
+                "building": desk.get('building', 'Sandton'),
+                "zone_id": zone_id,
+                "near_window": desk.get('near_window', False),
+                "near_diffuser": desk.get('near_diffuser', False),
+                "near_printer": desk.get('near_printer', False),
+            },
+            "zone": None,
+            "hvac": None,
+            "dali": dali_context,
+            "context_flags": []
+        }
+
+        # Add context flags for diagnosis
+        if desk.get('near_window'):
+            response["context_flags"].append("NEAR_WINDOW - Check for solar heat gain")
+        if desk.get('near_diffuser'):
+            response["context_flags"].append("NEAR_DIFFUSER - May experience direct airflow")
+        if desk.get('near_printer'):
+            response["context_flags"].append("NEAR_PRINTER - Local heat source")
+        if dali_context.get('high_daylight'):
+            response["context_flags"].append("HIGH_DAYLIGHT - Solar gain likely")
+
+        # Add zone info if available
+        if zone:
+            response["zone"] = {
+                "zone_id": zone.get('zone_id'),
+                "zone_name": zone.get('zone_name'),
+                "floor": zone.get('floor'),
+                "setpoint": zone.get('setpoint'),
+                "current_temp": zone.get('current_temp'),
+                "status": zone.get('status'),
+            }
+            response["hvac"] = {
+                "fcu_id": zone.get('fcu_id'),
+                "vav_id": zone.get('vav_id'),
+                "sensors": zone.get('sensors', []),
+            }
+
+        return response
+
+    except Exception as e:
+        logger.error(f"Error looking up desk {desk_id}: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "prompt_user": "I encountered an error looking up that desk. Can you provide more details about the location?"
+        }
+
+
+async def diagnose_comfort_complaint(
+    desk_id: str,
+    complaint_type: str,
+    building: str | None = None,
+    additional_info: str | None = None
+) -> dict[str, Any]:
+    """
+    Diagnose a comfort complaint for a specific desk.
+
+    Uses desk location, HVAC zone data, and DALI sensors to determine
+    the root cause and suggest actions.
+
+    Args:
+        desk_id: Desk identifier (e.g., "201", "L12-25")
+        complaint_type: Type of complaint: "too_hot", "too_cold", "stuffy", "drafty"
+        building: Optional building name for disambiguation
+        additional_info: Any additional context from the technician
+
+    Returns:
+        Dictionary with diagnosis, root cause, confidence, and suggested actions
+    """
+    try:
+        # First look up the desk
+        desk_info = await lookup_desk(desk_id, building)
+
+        if not desk_info.get("success"):
+            return desk_info  # Pass through the error/prompt
+
+        # Get current time for solar analysis
+        from datetime import datetime
+        current_hour = datetime.now().hour
+        is_afternoon = 12 <= current_hour <= 18
+
+        # Analyze based on complaint type and context
+        diagnosis = {
+            "success": True,
+            "desk_id": desk_id,
+            "complaint_type": complaint_type,
+            "desk_info": desk_info.get("desk"),
+            "zone_info": desk_info.get("zone"),
+            "hvac_info": desk_info.get("hvac"),
+            "dali_info": desk_info.get("dali"),
+            "diagnosis": None,
+            "root_cause": None,
+            "confidence": "medium",
+            "suggested_actions": [],
+            "auto_actions_taken": [],
+            "dispatch_required": False,
+        }
+
+        context_flags = desk_info.get("context_flags", [])
+        zone = desk_info.get("zone", {}) or {}
+        dali = desk_info.get("dali", {}) or {}
+        desk = desk_info.get("desk", {}) or {}
+
+        current_temp = zone.get("current_temp", 22)
+        setpoint = zone.get("setpoint", 22)
+        temp_diff = current_temp - setpoint if current_temp and setpoint else 0
+
+        # Diagnose based on complaint type
+        if complaint_type in ["too_hot", "hot"]:
+            if desk.get("near_window") and is_afternoon:
+                diagnosis["root_cause"] = "Solar heat gain from window"
+                diagnosis["confidence"] = "high"
+                diagnosis["diagnosis"] = f"Desk {desk_id} is near a window and it's {current_hour}:00 (afternoon). Solar radiation is likely causing localized heating despite HVAC working correctly."
+                diagnosis["suggested_actions"] = [
+                    "Close blinds/shades near the desk",
+                    "Temporarily boost zone cooling by 2°C for 2 hours",
+                    f"Offer to relocate user to shaded desk (away from windows)",
+                ]
+            elif dali.get("high_daylight"):
+                diagnosis["root_cause"] = "High daylight/solar gain detected by DALI sensors"
+                diagnosis["confidence"] = "high"
+                diagnosis["diagnosis"] = f"DALI sensors show {dali.get('avg_lux', 0)} lux at this location - significantly above normal. This indicates direct sunlight causing heat gain."
+                diagnosis["suggested_actions"] = [
+                    "Reduce lighting levels (daylight harvesting)",
+                    "Close blinds to reduce solar load",
+                    "Boost cooling temporarily",
+                ]
+            elif temp_diff > 1.5:
+                diagnosis["root_cause"] = "Zone temperature above setpoint"
+                diagnosis["confidence"] = "high"
+                diagnosis["diagnosis"] = f"Zone is {temp_diff:.1f}°C above setpoint ({current_temp}°C vs {setpoint}°C target). HVAC may be undersized or equipment fault."
+                diagnosis["suggested_actions"] = [
+                    f"Check FCU {zone.get('fcu_id', 'unknown')} for faults",
+                    "Verify supply air temperature",
+                    "Check if zone is overcrowded",
+                ]
+                diagnosis["dispatch_required"] = True
+            elif desk.get("near_printer"):
+                diagnosis["root_cause"] = "Local heat source (printer/equipment)"
+                diagnosis["confidence"] = "medium"
+                diagnosis["diagnosis"] = f"Desk {desk_id} is near a printer or other heat-generating equipment. This creates a localized hot spot."
+                diagnosis["suggested_actions"] = [
+                    "Relocate printer or add local extraction",
+                    "Consider desk relocation",
+                    "Add small desk fan as temporary measure",
+                ]
+            else:
+                diagnosis["root_cause"] = "Unknown - requires investigation"
+                diagnosis["confidence"] = "low"
+                diagnosis["diagnosis"] = f"No obvious cause found. Zone temp is {current_temp}°C (setpoint {setpoint}°C). May need on-site inspection."
+                diagnosis["suggested_actions"] = [
+                    "Check for blocked diffusers near desk",
+                    "Verify VAV damper position",
+                    "Check occupancy levels in zone",
+                ]
+                diagnosis["dispatch_required"] = True
+
+        elif complaint_type in ["too_cold", "cold", "freezing"]:
+            if desk.get("near_diffuser"):
+                diagnosis["root_cause"] = "Direct airflow from supply diffuser"
+                diagnosis["confidence"] = "high"
+                diagnosis["diagnosis"] = f"Desk {desk_id} is directly under or near a supply diffuser. Cold supply air is causing discomfort."
+                diagnosis["suggested_actions"] = [
+                    f"Adjust VAV damper {zone.get('vav_id', 'unknown')} to reduce airflow",
+                    "Install diffuser deflector",
+                    "Relocate user away from direct airflow",
+                ]
+                diagnosis["dispatch_required"] = True
+            elif temp_diff < -1.5:
+                diagnosis["root_cause"] = "Zone overcooling"
+                diagnosis["confidence"] = "high"
+                diagnosis["diagnosis"] = f"Zone is {abs(temp_diff):.1f}°C below setpoint ({current_temp}°C vs {setpoint}°C). Possible control issue."
+                diagnosis["suggested_actions"] = [
+                    "Raise zone setpoint by 1-2°C",
+                    "Check cooling valve position",
+                    "Verify temperature sensor calibration",
+                ]
+            else:
+                diagnosis["root_cause"] = "Personal comfort preference"
+                diagnosis["confidence"] = "medium"
+                diagnosis["diagnosis"] = f"Zone temperature ({current_temp}°C) is close to setpoint ({setpoint}°C). May be personal preference."
+                diagnosis["suggested_actions"] = [
+                    "Offer desk heater (temporary)",
+                    "Check for drafts from windows/doors",
+                    "Consider desk relocation to warmer area",
+                ]
+
+        elif complaint_type in ["stuffy", "poor_air", "stale"]:
+            if dali.get("occupancy_percent", 0) > 70:
+                diagnosis["root_cause"] = "High occupancy causing CO2 buildup"
+                diagnosis["confidence"] = "high"
+                diagnosis["diagnosis"] = f"Zone occupancy is {dali.get('occupancy_percent', 0):.0f}% - high density is likely causing poor air quality."
+                diagnosis["suggested_actions"] = [
+                    "Increase fresh air damper on AHU",
+                    "Check CO2 sensor readings",
+                    "Consider temporary portable air purifier",
+                ]
+            else:
+                diagnosis["root_cause"] = "Insufficient ventilation"
+                diagnosis["confidence"] = "medium"
+                diagnosis["diagnosis"] = "Air quality complaint despite normal occupancy. May be ventilation equipment issue."
+                diagnosis["suggested_actions"] = [
+                    f"Check FCU {zone.get('fcu_id', 'unknown')} fan status",
+                    "Verify fresh air damper position",
+                    "Check for blocked return air grilles",
+                ]
+                diagnosis["dispatch_required"] = True
+
+        elif complaint_type in ["drafty", "draft", "windy"]:
+            diagnosis["root_cause"] = "Excessive airflow or infiltration"
+            diagnosis["confidence"] = "medium"
+            diagnosis["diagnosis"] = f"Draft complaint at desk {desk_id}. Could be supply diffuser, window seals, or door proximity."
+            diagnosis["suggested_actions"] = [
+                "Check nearby diffuser airflow direction",
+                "Inspect window seals for gaps",
+                "Install draft deflector if near diffuser",
+            ]
+            if desk.get("near_diffuser"):
+                diagnosis["confidence"] = "high"
+                diagnosis["root_cause"] = "Supply diffuser causing draft"
+
+        return diagnosis
+
+    except Exception as e:
+        logger.error(f"Error diagnosing comfort complaint for desk {desk_id}: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "prompt_user": "I encountered an error during diagnosis. Can you provide more details about the complaint?"
+        }
+
+
 # Password for accessing proprietary system methodology
 METHODOLOGY_PASSWORD = "Open says me"
 
@@ -956,6 +1277,51 @@ CHAT_TOOLS = [
             },
             "required": ["password"]
         }
+    },
+    {
+        "name": "lookup_desk",
+        "description": "Look up a desk location and get its HVAC zone, temperature, and sensor data. Use this when a technician reports a comfort complaint from a user at a specific desk. Returns zone info, HVAC equipment IDs, and DALI sensor data (for Sandton/FNB Fairlands which has DALI integration). If the desk isn't found, ask the technician for clarification.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "desk_id": {
+                    "type": "string",
+                    "description": "The desk identifier. Can be formats like '201', 'L12-25', 'Desk 25', or just '25'"
+                },
+                "building": {
+                    "type": "string",
+                    "description": "Optional building name if working across multiple sites. For Sandton/FNB Fairlands (which has DALI), this is automatic."
+                }
+            },
+            "required": ["desk_id"]
+        }
+    },
+    {
+        "name": "diagnose_comfort_complaint",
+        "description": "Diagnose a comfort complaint (too hot, too cold, stuffy, drafty) for a specific desk. Analyzes desk location, HVAC zone, DALI sensors (occupancy, daylight), and context (near window, diffuser, printer) to determine root cause and suggest actions. Use this when a technician says something like 'user at desk 201 says it's too hot'. Returns diagnosis with confidence level and recommended actions.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "desk_id": {
+                    "type": "string",
+                    "description": "The desk identifier (e.g., '201', 'L12-25', 'Desk 25')"
+                },
+                "complaint_type": {
+                    "type": "string",
+                    "description": "Type of comfort complaint",
+                    "enum": ["too_hot", "too_cold", "stuffy", "drafty"]
+                },
+                "building": {
+                    "type": "string",
+                    "description": "Optional building name if technician is working across multiple sites"
+                },
+                "additional_info": {
+                    "type": "string",
+                    "description": "Any additional context from the technician (e.g., 'user says it's been like this all morning')"
+                }
+            },
+            "required": ["desk_id", "complaint_type"]
+        }
     }
 ]
 
@@ -971,6 +1337,8 @@ TOOL_HANDLERS = {
     "get_alerts_and_anomalies": get_alerts_and_anomalies,
     "get_energy_analysis": get_energy_analysis,
     "get_system_methodology": get_system_methodology,
+    "lookup_desk": lookup_desk,
+    "diagnose_comfort_complaint": diagnose_comfort_complaint,
 }
 
 

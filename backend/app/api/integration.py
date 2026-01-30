@@ -297,6 +297,29 @@ async def verify_point_mapping(mapping_id: str, cafm_asset_id: str):
     return integration_repo.verify_point_mapping(mapping_id, cafm_asset_id)
 
 
+@router.get("/point-mappings")
+async def get_all_point_mappings(
+    building_id: Optional[str] = Query(None, description="Filter by building ID"),
+    confidence: Optional[str] = Query(None, description="Filter by confidence level (high, medium, low, unmatched)"),
+    verified_only: bool = Query(False, description="Only return verified mappings"),
+    limit: int = Query(100, ge=1, le=500, description="Maximum number of results"),
+    offset: int = Query(0, ge=0, description="Pagination offset"),
+):
+    """
+    Get point-to-asset mappings across all buildings or for a specific building.
+
+    Use this endpoint for monitoring dashboard overviews.
+    For building-specific operations, use /buildings/{building_id}/point-mappings instead.
+    """
+    return integration_repo.get_all_point_mappings(
+        building_id=building_id,
+        confidence=confidence,
+        verified_only=verified_only,
+        limit=limit,
+        offset=offset,
+    )
+
+
 @router.get("/buildings/{building_id}/point-mappings", response_model=List[PointAssetMapping])
 async def get_point_mappings(
     building_id: str,

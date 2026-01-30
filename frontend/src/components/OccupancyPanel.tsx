@@ -14,9 +14,10 @@
  */
 
 import { useState, useEffect, useCallback } from "react";
-import { RefreshCw, Users, Lightbulb, AlertTriangle, Cpu, Eye, Zap } from "lucide-react";
+import { RefreshCw, Users, Lightbulb, AlertTriangle, Cpu, Eye, Zap, Building2, ChevronDown } from "lucide-react";
 import { OccupancyHeatmap } from "./OccupancyHeatmap";
-import type { BuildingOccupancy, DALIStats, FloorSummary, ZoneLighting } from "../lib/api";
+import { api } from "../lib/api";
+import type { BuildingOccupancy, DALIStats, FloorSummary, ZoneLighting, Site } from "../lib/api";
 
 // Mock data for development until backend API is ready
 const mockBuildingOccupancy: BuildingOccupancy = {
@@ -141,6 +142,9 @@ interface OccupancyPanelProps {
   onViewDetails?: () => void;
 }
 
+// Sites with DALI-2 lighting integration installed
+const DALI_ENABLED_SITES = ["site-002"]; // Sandton City
+
 export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPanelProps) {
   const [buildingOccupancy, setBuildingOccupancy] = useState<BuildingOccupancy | null>(null);
   const [daliStats, setDaliStats] = useState<DALIStats | null>(null);
@@ -149,6 +153,11 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
   const [error, setError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [sites, setSites] = useState<Site[]>([]);
+  const [selectedSiteId, setSelectedSiteId] = useState<string>("site-002"); // Default to Sandton City
+
+  // Filter sites to only show DALI-enabled buildings
+  const daliSites = sites.filter(site => DALI_ENABLED_SITES.includes(site.id));
 
   const fetchData = useCallback(async (showRefreshing = false) => {
     try {
@@ -177,6 +186,19 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
       setLoading(false);
       setIsRefreshing(false);
     }
+  }, []);
+
+  // Fetch sites on mount
+  useEffect(() => {
+    async function loadSites() {
+      try {
+        const sitesData = await api.getSites();
+        setSites(sitesData);
+      } catch (err) {
+        console.error("Failed to fetch sites:", err);
+      }
+    }
+    loadSites();
   }, []);
 
   // Initial fetch
@@ -406,14 +428,43 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
     return (
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="font-medium text-base mb-1" style={{ color: "var(--color-sentinel-text-primary)" }}>
-              Building Occupancy
-            </h2>
-            <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-              {daliStats.total_sensors} DALI-2 sensors • {daliStats.total_luminaires} luminaires
-            </p>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            {/* Building Selector */}
+            <div className="relative min-w-[200px]">
+              <Building2
+                className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4"
+                style={{ color: "var(--color-sentinel-text-secondary)" }}
+              />
+              <select
+                value={selectedSiteId}
+                onChange={(e) => setSelectedSiteId(e.target.value)}
+                className="w-full pl-9 pr-8 py-2 text-sm rounded appearance-none cursor-pointer"
+                style={{
+                  background: "var(--color-sentinel-bg-secondary)",
+                  border: "1px solid var(--color-sentinel-border)",
+                  color: "var(--color-sentinel-text-primary)",
+                }}
+              >
+                {daliSites.map((site) => (
+                  <option key={site.id} value={site.id}>
+                    {site.name}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 pointer-events-none"
+                style={{ color: "var(--color-sentinel-text-secondary)" }}
+              />
+            </div>
+            <div>
+              <h2 className="font-medium text-base mb-1" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                DALI Occupancy
+              </h2>
+              <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                {daliStats.total_sensors} DALI-2 sensors • {daliStats.total_luminaires} luminaires
+              </p>
+            </div>
           </div>
           <div className="flex items-center gap-3">
             {lastUpdated && (

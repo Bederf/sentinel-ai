@@ -83,6 +83,9 @@ class StatsResponse(BaseModel):
     
     # Alerts
     alerts: AlertSummary
+    # Flattened alert counts for frontend compatibility
+    active_alerts: int
+    critical_alerts: int
     
     # Anomalies
     anomalies: AnomalySummary
@@ -96,6 +99,10 @@ class StatsResponse(BaseModel):
     # Coverage
     total_sqm: int
     data_range_days: int
+    
+    # Optional fields for frontend compatibility
+    uptime_percent: Optional[float] = None
+    pending_anomalies: int = 0
 
 
 @router.get("/stats", response_model=StatsResponse)
@@ -233,9 +240,13 @@ async def get_stats() -> StatsResponse:
         equipment_warning_count=warning_count,
         equipment_critical_count=critical_count,
         alerts=alert_summary,
+        active_alerts=alert_summary.total,
+        critical_alerts=alert_summary.critical,
         anomalies=anomaly_summary,
+        pending_anomalies=len(anomalies),
         by_region=by_region,
         by_equipment_type=by_equipment_type,
         total_sqm=total_sqm,
         data_range_days=date_range,
+        uptime_percent=None,  # Not calculated yet, can be added later
     )

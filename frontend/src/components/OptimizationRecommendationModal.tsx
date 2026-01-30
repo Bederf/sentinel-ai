@@ -25,6 +25,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import api, { type OptimizationRecommendation } from "../lib/api";
+import { formatDateTime } from "../lib/timeFormat";
 
 interface OptimizationRecommendationModalProps {
   isOpen: boolean;
@@ -232,17 +233,18 @@ export function OptimizationRecommendationModal({
 
   // Use portal to render at document body level (escapes parent overflow/positioning constraints)
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
       <div
-        className="relative w-full max-w-3xl max-h-[90vh] overflow-auto rounded-lg shadow-2xl"
+        className="relative w-full max-w-3xl my-4 rounded-lg shadow-2xl flex flex-col"
         style={{
           background: "var(--color-sentinel-bg-panel)",
           border: "1px solid var(--color-sentinel-border)",
+          maxHeight: "calc(100vh - 2rem)",
         }}
       >
         {/* Header */}
-        <div className="sticky top-0 z-10 px-6 py-4 border-b backdrop-blur-md"
-          style={{ borderColor: "var(--color-sentinel-border)", background: "rgba(17, 24, 39, 0.95)" }}
+        <div className="flex-shrink-0 px-6 py-4 border-b"
+          style={{ borderColor: "var(--color-sentinel-border)", background: "var(--color-sentinel-bg-panel)" }}
         >
           <div className="flex items-start justify-between">
             <div className="flex-1">
@@ -273,8 +275,8 @@ export function OptimizationRecommendationModal({
           </div>
         </div>
 
-        {/* Content */}
-        <div className="px-6 py-4 space-y-6">
+        {/* Content - scrollable */}
+        <div className="px-6 py-4 space-y-6 overflow-y-auto flex-1">
           {/* Success Message */}
           {success && (
             <div className="flex items-center gap-2 p-3 rounded bg-green-900/20 border border-green-800 text-green-300">
@@ -451,14 +453,14 @@ export function OptimizationRecommendationModal({
           <div className="flex items-center justify-between text-xs pt-2 border-t"
             style={{ borderColor: "var(--color-sentinel-border)", color: "var(--color-sentinel-text-disabled)" }}
           >
-            <span>Based on analysis at {new Date(recommendation.timestamp).toLocaleString()}</span>
+            <span>Based on analysis at {formatDateTime(recommendation.timestamp)}</span>
             <span>Valid for 15 minutes • Auto-dismiss in {timeRemaining}s</span>
           </div>
         </div>
 
         {/* Action Buttons */}
-        <div className="sticky bottom-0 px-6 py-4 border-t backdrop-blur-md flex gap-3"
-          style={{ borderColor: "var(--color-sentinel-border)", background: "rgba(17, 24, 39, 0.95)" }}
+        <div className="flex-shrink-0 px-6 py-4 border-t flex gap-3"
+          style={{ borderColor: "var(--color-sentinel-border)", background: "var(--color-sentinel-bg-panel)" }}
         >
           <button
             onClick={handleApprove}

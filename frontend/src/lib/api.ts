@@ -32,6 +32,7 @@ export interface Site {
   floors?: number;
   year_built?: number;
   operating_hours?: { start: string; end: string };
+  timezone?: string; // IANA timezone (e.g., "Africa/Johannesburg")
   occupancy_pattern?: string;
   contact_email?: string;
   contact_phone?: string;
@@ -376,6 +377,7 @@ export interface OptimizationScenario {
 export interface OptimizationAction {
   equipment_id: string;
   equipment_name: string;
+  point_name: string;
   current_value: number;
   recommended_value: number;
   unit: string;
@@ -560,8 +562,31 @@ export interface Prediction {
     estimated_repair_hours: number;
     potential_loss_zar: number;
   };
+  cost_impact?: {
+    preventive_breakdown: {
+      labor_cost_zar: number;
+      parts_cost_zar: number;
+      downtime_hours: number;
+      total_zar: number;
+    };
+    failure_breakdown: {
+      emergency_repair_zar: number;
+      downtime_loss_zar: number;
+      downtime_hours: number;
+      total_zar: number;
+    };
+    potential_savings_zar: number;
+    savings_percent: number;
+    roi_message: string;
+  };
   recommended_action: string;
-  parts_required: string[];
+  parts_required: Array<{
+    part_number: string;
+    name: string;
+    quantity: number;
+    cost_zar: number;
+    lead_time_days: number;
+  }> | string[];
   urgency: string;
 }
 

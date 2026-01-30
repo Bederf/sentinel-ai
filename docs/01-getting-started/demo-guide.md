@@ -1,3 +1,19 @@
+---
+title: "Demo Script Guide"
+type: "tutorial"
+status: "approved"
+version: "1.0.0"
+created: "2026-01-30"
+updated: "2026-01-30"
+author: "Sentinel Development Team"
+tags: ["demo", "presentation", "walkthrough"]
+related: ["quick-start.md", "../02-architecture/system-overview.md"]
+domain: "general"
+audience: "all"
+complexity: "beginner"
+estimated_read_time: 10
+---
+
 # BMS Intelligence Demo Script
 
 **Target Audience:** Bidvest FM CTO / Technical Leadership

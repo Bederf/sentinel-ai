@@ -1,0 +1,177 @@
+{
+  "001-gwc-chiller-001": {
+    "chw_supply_temp": 7.2,
+    "chw_return_temp": 12.5,
+    "chiller_status": 1,
+    "chw_supply_temp_setpoint": 8.5,
+    "compressor_pressure": 12.5
+  },
+  "001-gwc-ahu-001": {
+    "supply_air_temp": 18.5,
+    "return_air_temp": 24.5,
+    "fan_status": true,
+    "damper_position": 30,
+    "filter_pressure": 250
+  },
+  "001-gwc-vav-001": {
+    "room_temp": 26.0,
+    "room_temp_setpoint": 24.0,
+    "damper_position": 85,
+    "occupancy": true,
+    "reheat_status": false
+  },
+  "001-gwc-light-001": {
+    "circuit1_level": 75,
+    "circuit2_level": 100,
+    "emergency_lighting": false,
+    "occupancy_sensor": true,
+    "light_level": 450
+  },
+  "001-gwc-acc-001": {
+    "door_status": false,
+    "lock_status": true,
+    "access_granted": true,
+    "tamper_alarm": false,
+    "reader_battery": 92
+  },
+  "001-gwc-fire-001": {
+    "pump_status": 0,
+    "system_pressure": 4.2,
+    "jockey_pump_status": false,
+    "test_mode": true,
+    "battery_voltage": 24.5
+  },
+  "001-gwc-zone-001": {
+    "zone_temp": 23.2,
+    "zone_cooling_setpoint": 24,
+    "zone_heating_setpoint": 20.0,
+    "humidity_setpoint": 55.0,
+    "zone_humidity": 52.0,
+    "mode": 1,
+    "occupancy_mode": 1
+  },
+  "001-gwc-chw-001": {
+    "chw_supply_temp": 7.0,
+    "chw_return_temp": 12.0,
+    "chw_supply_temp_setpoint": 7.0,
+    "pump_speed": 75,
+    "differential_pressure": 85,
+    "flow_rate": 32.5
+  },
+  "003-mmc-fcu-001": {
+    "room_temp": 18.6,
+    "room_temp_setpoint": 22.0,
+    "fan_speed": 2,
+    "valve_position": 85
+  },
+  "003-mmc-fcu-002": {
+    "room_temp": 18.5,
+    "room_temp_setpoint": 22.0,
+    "fan_speed": 2,
+    "valve_position": 80
+  },
+  "003-mmc-ahu-001": {
+    "supply_air_temp": 14.5,
+    "return_air_temp": 21.0,
+    "fan_status": true,
+    "fan_speed": 75,
+    "damper_position": 25,
+    "filter_pressure": 145
+  },
+  "003-mmc-chiller-001": {
+    "chw_supply_temp": 6.8,
+    "chw_return_temp": 11.5,
+    "chw_supply_temp_setpoint": 7.0,
+    "chiller_status": 1,
+    "compressor_amps": 85,
+    "condenser_pressure": 14.2
+  },
+  "011-stc-ahu-001": {
+    "supply_air_temp": 15.2,
+    "return_air_temp": 23.5,
+    "fan_status": true,
+    "fan_speed": 70,
+    "damper_position": 30,
+    "filter_pressure": 125
+  },
+  "011-stc-chiller-001": {
+    "chw_supply_temp": 7.0,
+    "chw_return_temp": 12.0,
+    "chw_supply_temp_setpoint": 7.0,
+    "chiller_status": 1,
+    "compressor_amps": 145
+  },
+  "011-stc-fcu-001": {
+    "room_temp": 22.8,
+    "room_temp_setpoint": 22.0,
+    "fan_speed": 2,
+    "valve_position": 45
+  },
+  "011-stc-zone-001": {
+    "zone_temp": 22.5,
+    "zone_cooling_setpoint": 22.0,
+    "zone_heating_setpoint": 20.0,
+    "mode": 1
+  },
+  "002-rbk-ahu-001": {
+    "supply_air_temp": 16.0,
+    "return_air_temp": 24.0,
+    "fan_status": false,
+    "fan_speed": 65,
+    "damper_position": 20
+  },
+  "002-rbk-split-001": {
+    "room_temp": 23.0,
+    "room_temp_setpoint": 22.0,
+    "mode": 1,
+    "fan_speed": 4
+  },
+  "006-vaw-ahu-001": {
+    "supply_air_temp": 15.5,
+    "return_air_temp": 22.0,
+    "fan_status": true,
+    "fan_speed": 72,
+    "damper_position": 35,
+    "filter_pressure": 180
+  },
+  "006-vaw-chiller-001": {
+    "chw_supply_temp": 7.2,
+    "chw_return_temp": 12.5,
+    "chw_supply_temp_setpoint": 7.0,
+    "chiller_status": 1,
+    "compressor_amps": 120
+  },
+  "006-vaw-fcu-001": {
+    "room_temp": 21.5,
+    "room_temp_setpoint": 22.0,
+    "fan_speed": 2,
+    "valve_position": 55
+  },
+  "011-umh-ahu-001": {
+    "supply_air_temp": 16.5,
+    "return_air_temp": 24.5,
+    "fan_status": true,
+    "fan_speed": 78,
+    "damper_position": 40,
+    "filter_pressure": 110
+  },
+  "011-umh-chiller-001": {
+    "chw_supply_temp": 6.5,
+    "chw_return_temp": 11.8,
+    "chw_supply_temp_setpoint": 6.5,
+    "chiller_status": 1,
+    "compressor_amps": 95
+  },
+  "011-umh-fcu-001": {
+    "room_temp": 23.5,
+    "room_temp_setpoint": 23.0,
+    "fan_speed": 3,
+    "valve_position": 70
+  },
+  "011-umh-fcu-002": {
+    "room_temp": 24.0,
+    "room_temp_setpoint": 23.0,
+    "fan_speed": 3,
+    "valve_position": 75
+  }
+}

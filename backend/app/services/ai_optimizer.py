@@ -257,11 +257,12 @@ class AIOptimizerService:
 {{
   "recommendations": [
     {{
-      "device_id": "device-id",
-      "device_name": "Device Name",
+      "equipment_id": "device-id",
+      "equipment_name": "Device Name",
       "point_name": "setpoint",
       "current_value": 22.0,
       "recommended_value": 23.0,
+      "unit": "°C",
       "reason": "Brief explanation"
     }}
   ],
@@ -495,7 +496,7 @@ Provide ONLY the JSON response, no additional text."""
         device_map = {d.id: d for d in hvac_devices}
 
         def get_priority(rec: Dict) -> int:
-            device = device_map.get(rec.get("device_id"))
+            device = device_map.get(rec.get("equipment_id"))
             if device:
                 return self._get_zone_priority(device)
             return 3  # Default priority
@@ -654,11 +655,12 @@ Provide ONLY the JSON response, no additional text."""
             if pair not in recommended_pairs:
                 recommended_pairs.add(pair)
                 recommendations.append({
-                    "device_id": device.id,
-                    "device_name": device.name,
+                    "equipment_id": device.id,
+                    "equipment_name": device.name,
                     "point_name": point_name,
                     "current_value": current_value,
                     "recommended_value": recommended_value,
+                    "unit": "°C",
                     "reason": reason,
                 })
 
@@ -817,7 +819,7 @@ Provide ONLY the JSON response, no additional text."""
         # Add zone-aware context to reasoning
         zone_context = []
         for rec in recommendations:
-            device = next((d for d in hvac_devices if d.id == rec["device_id"]), None)
+            device = next((d for d in hvac_devices if d.id == rec["equipment_id"]), None)
             if device:
                 zone_type = self._get_zone_type(device)
                 if zone_type and zone_type.value not in zone_context:
@@ -886,7 +888,7 @@ Provide ONLY the JSON response, no additional text."""
         # Filter recommendations based on zone priority
         filtered_recs = []
         for rec in recommendation.recommendations:
-            device = device_map.get(rec.get("device_id"))
+            device = device_map.get(rec.get("equipment_id"))
             if device:
                 zone_priority = self._get_zone_priority(device)
                 if zone_priority <= max_priority_to_maintain:
@@ -952,18 +954,18 @@ Provide ONLY the JSON response, no additional text."""
             validation_results = []
 
             for rec in recommendation.recommendations:
-                device_id = rec.get("device_id")
+                equipment_id = rec.get("equipment_id")
                 point_name = rec.get("point_name")
                 value = rec.get("recommended_value")
 
                 # Find device
-                device = next((d for d in devices if d.id == device_id), None)
+                device = next((d for d in devices if d.id == equipment_id), None)
                 if not device:
                     validation_results.append({
-                        "device_id": device_id,
+                        "equipment_id": equipment_id,
                         "point_name": point_name,
                         "allowed": False,
-                        "reason": f"Device {device_id} not found",
+                        "reason": f"Device {equipment_id} not found",
                     })
                     all_allowed = False
                     continue
@@ -975,7 +977,7 @@ Provide ONLY the JSON response, no additional text."""
                 safety_result = await safety_engine.validate_control(device, point_name, value)
 
                 validation_results.append({
-                    "device_id": device_id,
+                    "equipment_id": equipment_id,
                     "point_name": point_name,
                     "allowed": safety_result["allowed"],
                     "reason": safety_result.get("message", ""),

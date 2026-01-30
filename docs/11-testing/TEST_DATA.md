@@ -1,3 +1,19 @@
+---
+title: "Test Data Management Guide"
+type: "guide"
+status: "approved"
+version: "1.0.0"
+created: "2026-01-30"
+updated: "2026-01-30"
+author: "Sentinel Development Team"
+tags: ["testing", "test-data", "factories", "fixtures"]
+related: ["testing-strategy.md", "e2e-testing.md"]
+domain: "general"
+audience: "developers"
+complexity: "beginner"
+estimated_read_time: 8
+---
+
 # Test Data Management Guide
 
 ## Overview

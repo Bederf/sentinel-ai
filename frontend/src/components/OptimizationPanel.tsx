@@ -10,7 +10,7 @@
  */
 
 import { useState, useEffect } from "react";
-import { Card, Title, Text, Badge, Button } from "@tremor/react";
+import { Button } from "@tremor/react";
 import { Zap, Clock, Thermometer, CheckCircle, Play, Eye } from "lucide-react";
 import { ThermalRunwayChart } from "./ThermalRunwayChart";
 import type {
@@ -18,6 +18,66 @@ import type {
   SiteScheduleResponse,
   ThermalRunwayResponse
 } from "../lib/api";
+
+// Sentinel-styled Badge component
+interface SentinelBadgeProps {
+  children: React.ReactNode;
+  variant?: "success" | "warning" | "error" | "info" | "neutral";
+  size?: "sm" | "md" | "lg";
+  className?: string;
+}
+
+function SentinelBadge({ children, variant = "neutral", size = "md", className = "" }: SentinelBadgeProps) {
+  const variantStyles = {
+    success: {
+      bg: "rgba(16, 185, 129, 0.15)",
+      color: "var(--color-sentinel-green)",
+      border: "rgba(16, 185, 129, 0.3)",
+    },
+    warning: {
+      bg: "rgba(245, 158, 11, 0.15)",
+      color: "var(--color-sentinel-amber)",
+      border: "rgba(245, 158, 11, 0.3)",
+    },
+    error: {
+      bg: "rgba(220, 38, 38, 0.15)",
+      color: "var(--color-sentinel-red)",
+      border: "rgba(220, 38, 38, 0.3)",
+    },
+    info: {
+      bg: "rgba(59, 130, 246, 0.15)",
+      color: "var(--color-sentinel-blue)",
+      border: "rgba(59, 130, 246, 0.3)",
+    },
+    neutral: {
+      bg: "rgba(142, 142, 142, 0.15)",
+      color: "var(--color-sentinel-text-secondary)",
+      border: "rgba(142, 142, 142, 0.3)",
+    },
+  };
+
+  const sizeStyles = {
+    sm: "text-xs px-2 py-0.5",
+    md: "text-sm px-2.5 py-0.5",
+    lg: "text-sm px-3 py-1",
+  };
+
+  const style = variantStyles[variant];
+  const sizeStyle = sizeStyles[size];
+
+  return (
+    <span
+      className={`inline-flex items-center justify-center rounded font-medium whitespace-nowrap ${sizeStyle} ${className}`}
+      style={{
+        background: style.bg,
+        color: style.color,
+        border: `1px solid ${style.border}`,
+      }}
+    >
+      {children}
+    </span>
+  );
+}
 
 interface OptimizationPanelProps {
   siteId?: string;
@@ -89,12 +149,12 @@ const mockGeneratorReadiness = [
   { check: "Fuel level", status: "85%", time: "Current" }
 ];
 
-// Get stage badge color
-function getStageColor(stage: number): string {
-  if (stage === 0) return "emerald";
-  if (stage <= 2) return "yellow";
-  if (stage <= 4) return "orange";
-  return "red";
+// Get stage badge variant
+function getStageVariant(stage: number): "success" | "warning" | "error" | "info" {
+  if (stage === 0) return "success";
+  if (stage <= 2) return "warning";
+  if (stage <= 4) return "error";
+  return "error";
 }
 
 export function OptimizationPanel({ siteId = "site-001", scenarioId, compact = false }: OptimizationPanelProps) {
@@ -117,140 +177,220 @@ export function OptimizationPanel({ siteId = "site-001", scenarioId, compact = f
 
   if (loading) {
     return (
-      <Card className="mt-6">
-        <div className="animate-pulse space-y-4">
-          <div className="h-4 bg-gray-700 rounded w-1/4"></div>
-          <div className="h-32 bg-gray-800 rounded"></div>
+      <div
+        className="rounded-md overflow-hidden mt-6"
+        style={{
+          background: "var(--color-sentinel-bg-panel)",
+          border: "1px solid var(--color-sentinel-border)",
+        }}
+      >
+        <div className="p-4">
+          <div className="animate-pulse space-y-4">
+            <div className="h-4 rounded w-1/4" style={{ background: "var(--color-sentinel-bg-secondary)" }}></div>
+            <div className="h-32 rounded" style={{ background: "var(--color-sentinel-bg-secondary)" }}></div>
+          </div>
         </div>
-      </Card>
+      </div>
     );
   }
 
   if (compact) {
     return (
-      <Card className="mt-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Zap className="h-5 w-5 text-blue-400" />
-            <Title>Load Shedding Optimization</Title>
+      <div
+        className="rounded-md overflow-hidden mt-6"
+        style={{
+          background: "var(--color-sentinel-bg-panel)",
+          border: "1px solid var(--color-sentinel-border)",
+        }}
+      >
+        <div className="p-4">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Zap className="h-5 w-5" style={{ color: "var(--color-sentinel-blue)" }} />
+              <span className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                Load Shedding Optimization
+              </span>
+            </div>
+            <SentinelBadge variant="success">Active</SentinelBadge>
           </div>
-          <Badge color="emerald">Active</Badge>
+
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                Current Stage
+              </span>
+              <SentinelBadge variant={getStageVariant(eskomStatus?.current_stage || 0)} size="lg">
+                Stage {eskomStatus?.current_stage || 0}
+              </SentinelBadge>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <span className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                Next Outage
+              </span>
+              <span className="text-sm font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                {siteSchedule?.next_outage ?
+                  `${siteSchedule.next_outage.start_time} - ${siteSchedule.next_outage.end_time}` :
+                  "None scheduled"}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <span className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                Thermal Runway
+              </span>
+              <span className="text-sm font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                {thermalRunway?.thermal_runway_minutes || 0} min
+              </span>
+            </div>
+
+            <Button size="xs" variant="secondary" icon={Eye}>
+              View Details
+            </Button>
+          </div>
         </div>
-
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <Text>Current Stage</Text>
-            <Badge color={getStageColor(eskomStatus?.current_stage || 0)} size="lg">
-              Stage {eskomStatus?.current_stage || 0}
-            </Badge>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <Text>Next Outage</Text>
-            <Text className="font-medium">
-              {siteSchedule?.next_outage ?
-                `${siteSchedule.next_outage.start_time} - ${siteSchedule.next_outage.end_time}` :
-                "None scheduled"}
-            </Text>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <Text>Thermal Runway</Text>
-            <Text className="font-medium">
-              {thermalRunway?.thermal_runway_minutes || 0} min
-            </Text>
-          </div>
-
-          <Button size="xs" variant="secondary" icon={Eye}>
-            View Details
-          </Button>
-        </div>
-      </Card>
+      </div>
     );
   }
 
   return (
     <div className="mt-6 space-y-6">
+      {/* Header Section */}
       <div className="flex items-center justify-between">
         <div>
-          <Title>Load Shedding Optimization</Title>
-          <Text>Optimize building comfort and energy use during load shedding</Text>
+          <h2 className="font-medium text-base mb-1" style={{ color: "var(--color-sentinel-text-primary)" }}>
+            Load Shedding Optimization
+          </h2>
+          <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+            Optimize building comfort and energy use during load shedding
+          </p>
         </div>
         <div className="flex items-center gap-2">
-          <Badge color="emerald" size="lg">
+          <SentinelBadge variant="success" size="lg">
             Active Monitoring
-          </Badge>
+          </SentinelBadge>
           <Button size="xs" variant="secondary" icon={Play}>
             Start Pre-cool
           </Button>
         </div>
       </div>
 
+      {/* Three Column Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* Left Column: Eskom Status */}
-        <Card>
-          <div className="flex items-center justify-between mb-4">
+        <div
+          className="rounded-md overflow-hidden"
+          style={{
+            background: "var(--color-sentinel-bg-panel)",
+            border: "1px solid var(--color-sentinel-border)",
+          }}
+        >
+          {/* Card Header */}
+          <div
+            className="p-4 flex items-center justify-between"
+            style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}
+          >
             <div className="flex items-center gap-2">
-              <Zap className="h-5 w-5 text-blue-400" />
-              <Title className="text-lg">Eskom Status</Title>
+              <div
+                className="p-2 rounded"
+                style={{ background: "rgba(59, 130, 246, 0.15)" }}
+              >
+                <Zap className="h-5 w-5" style={{ color: "var(--color-sentinel-blue)" }} />
+              </div>
+              <span className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                Eskom Status
+              </span>
             </div>
-            <Badge color={getStageColor(eskomStatus?.current_stage || 0)} size="lg">
+            <SentinelBadge variant={getStageVariant(eskomStatus?.current_stage || 0)} size="lg">
               Stage {eskomStatus?.current_stage || 0}
-            </Badge>
+            </SentinelBadge>
           </div>
 
-          <div className="space-y-4">
+          {/* Card Content */}
+          <div className="p-4 space-y-4">
             <div>
-              <Text className="font-medium mb-2">Next Outages</Text>
+              <span className="text-sm font-medium mb-2 block" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                Next Outages
+              </span>
               <div className="space-y-2">
                 {siteSchedule?.schedules?.map((schedule, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-2 bg-gray-800 rounded">
+                  <div
+                    key={idx}
+                    className="flex items-center justify-between p-2 rounded"
+                    style={{ background: "var(--color-sentinel-bg-secondary)" }}
+                  >
                     <div className="flex items-center gap-2">
-                      <Clock className="h-4 w-4 text-gray-400" />
-                      <Text>{schedule.start_time} - {schedule.end_time}</Text>
+                      <Clock className="h-4 w-4" style={{ color: "var(--color-sentinel-text-disabled)" }} />
+                      <span className="text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                        {schedule.start_time} - {schedule.end_time}
+                      </span>
                     </div>
-                    <Badge color={getStageColor(schedule.stage)} size="sm">
+                    <SentinelBadge variant={getStageVariant(schedule.stage)} size="sm">
                       Stage {schedule.stage}
-                    </Badge>
+                    </SentinelBadge>
                   </div>
                 ))}
               </div>
             </div>
 
             <div>
-              <Text className="font-medium mb-2">Area Status</Text>
-              <div className="p-3 bg-gray-800 rounded">
-                <Text className="font-medium">{siteSchedule?.site_name}</Text>
-                <Text className="text-sm text-gray-400">
+              <span className="text-sm font-medium mb-2 block" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                Area Status
+              </span>
+              <div className="p-3 rounded" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                <span className="text-sm font-medium block mb-1" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                  {siteSchedule?.site_name}
+                </span>
+                <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                   {siteSchedule?.next_outage ?
                     `Next outage: ${siteSchedule.next_outage.start_time}-${siteSchedule.next_outage.end_time}` :
                     "No outages scheduled"}
-                </Text>
+                </span>
               </div>
             </div>
 
-            <div className="pt-2 border-t border-gray-700">
-              <Text className="text-sm text-gray-400">
+            <div className="pt-2" style={{ borderTop: "1px solid var(--color-sentinel-border)" }}>
+              <span className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>
                 Updated: {new Date(eskomStatus?.updated_at || "").toLocaleTimeString()}
-              </Text>
+              </span>
             </div>
           </div>
-        </Card>
+        </div>
 
         {/* Middle Column: Thermal Runway */}
-        <Card>
-          <div className="flex items-center justify-between mb-4">
+        <div
+          className="rounded-md overflow-hidden"
+          style={{
+            background: "var(--color-sentinel-bg-panel)",
+            border: "1px solid var(--color-sentinel-border)",
+          }}
+        >
+          {/* Card Header */}
+          <div
+            className="p-4 flex items-center justify-between"
+            style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}
+          >
             <div className="flex items-center gap-2">
-              <Thermometer className="h-5 w-5 text-orange-400" />
-              <Title className="text-lg">Thermal Runway</Title>
+              <div
+                className="p-2 rounded"
+                style={{ background: "rgba(245, 158, 11, 0.15)" }}
+              >
+                <Thermometer className="h-5 w-5" style={{ color: "var(--color-sentinel-amber)" }} />
+              </div>
+              <span className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                Thermal Runway
+              </span>
             </div>
-            <Badge color={thermalRunway?.thermal_runway_minutes && thermalRunway.thermal_runway_minutes > 60 ? "emerald" : "orange"}>
+            <SentinelBadge
+              variant={thermalRunway?.thermal_runway_minutes && thermalRunway.thermal_runway_minutes > 60 ? "success" : "warning"}
+            >
               {thermalRunway?.thermal_runway_minutes || 0} min
-            </Badge>
+            </SentinelBadge>
           </div>
 
+          {/* Card Content */}
           {thermalRunway && (
-            <div className="space-y-4">
+            <div className="p-4 space-y-4">
               <ThermalRunwayChart
                 data={{
                   time_points: ["14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00", "18:30"],
@@ -267,47 +407,93 @@ export function OptimizationPanel({ siteId = "site-001", scenarioId, compact = f
               />
 
               <div className="grid grid-cols-2 gap-4">
-                <div className="p-3 bg-gray-800 rounded">
-                  <Text className="text-sm text-gray-400">Without Pre-cooling</Text>
-                  <Text className="text-xl font-bold">52 min</Text>
-                  <Text className="text-sm text-gray-400">Breach at 16:52</Text>
+                <div className="p-3 rounded" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                  <span className="text-xs block mb-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                    Without Pre-cooling
+                  </span>
+                  <span className="text-xl font-bold block mb-1" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                    52 min
+                  </span>
+                  <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                    Breach at 16:52
+                  </span>
                 </div>
-                <div className="p-3 bg-blue-900/30 rounded border border-blue-700/50">
-                  <Text className="text-sm text-blue-300">With SENTINEL</Text>
-                  <Text className="text-xl font-bold text-blue-300">1h 48min</Text>
-                  <Text className="text-sm text-blue-300/80">Comfort maintained</Text>
+                <div
+                  className="p-3 rounded"
+                  style={{
+                    background: "rgba(59, 130, 246, 0.15)",
+                    border: "1px solid rgba(59, 130, 246, 0.3)",
+                  }}
+                >
+                  <span className="text-xs block mb-1" style={{ color: "var(--color-sentinel-blue)" }}>
+                    With SENTINEL
+                  </span>
+                  <span className="text-xl font-bold block mb-1" style={{ color: "var(--color-sentinel-blue)" }}>
+                    1h 48min
+                  </span>
+                  <span className="text-xs" style={{ color: "var(--color-sentinel-blue)", opacity: 0.8 }}>
+                    Comfort maintained
+                  </span>
                 </div>
               </div>
             </div>
           )}
-        </Card>
+        </div>
 
         {/* Right Column: Pre-cooling Schedule */}
-        <Card>
-          <div className="flex items-center justify-between mb-4">
+        <div
+          className="rounded-md overflow-hidden"
+          style={{
+            background: "var(--color-sentinel-bg-panel)",
+            border: "1px solid var(--color-sentinel-border)",
+          }}
+        >
+          {/* Card Header */}
+          <div
+            className="p-4 flex items-center justify-between"
+            style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}
+          >
             <div className="flex items-center gap-2">
-              <Clock className="h-5 w-5 text-green-400" />
-              <Title className="text-lg">Pre-cooling Schedule</Title>
+              <div
+                className="p-2 rounded"
+                style={{ background: "rgba(16, 185, 129, 0.15)" }}
+              >
+                <Clock className="h-5 w-5" style={{ color: "var(--color-sentinel-green)" }} />
+              </div>
+              <span className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                Pre-cooling Schedule
+              </span>
             </div>
             <Button size="xs" variant="primary" icon={Play}>
               Start Now
             </Button>
           </div>
 
-          <div className="space-y-4">
+          {/* Card Content */}
+          <div className="p-4 space-y-4">
             <div>
-              <Text className="font-medium mb-2">Timeline</Text>
+              <span className="text-sm font-medium mb-2 block" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                Timeline
+              </span>
               <div className="space-y-2">
                 {mockPrecoolingSchedule.actions.map((action, idx) => (
-                  <div key={idx} className="flex items-start gap-3 p-2 bg-gray-800 rounded">
+                  <div
+                    key={idx}
+                    className="flex items-start gap-3 p-2 rounded"
+                    style={{ background: "var(--color-sentinel-bg-secondary)" }}
+                  >
                     <div className="flex-shrink-0 w-12">
-                      <Badge color="blue" size="sm">
+                      <SentinelBadge variant="info" size="sm">
                         {action.time}
-                      </Badge>
+                      </SentinelBadge>
                     </div>
                     <div className="flex-grow">
-                      <Text className="font-medium">{action.action}</Text>
-                      <Text className="text-sm text-gray-400">{action.value} • {action.description}</Text>
+                      <span className="text-sm font-medium block mb-1" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                        {action.action}
+                      </span>
+                      <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                        {action.value} • {action.description}
+                      </span>
                     </div>
                   </div>
                 ))}
@@ -315,34 +501,50 @@ export function OptimizationPanel({ siteId = "site-001", scenarioId, compact = f
             </div>
 
             <div>
-              <Text className="font-medium mb-2">Generator Readiness</Text>
+              <span className="text-sm font-medium mb-2 block" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                Generator Readiness
+              </span>
               <div className="space-y-2">
                 {mockGeneratorReadiness.map((check, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-2 bg-gray-800 rounded">
+                  <div
+                    key={idx}
+                    className="flex items-center justify-between p-2 rounded"
+                    style={{ background: "var(--color-sentinel-bg-secondary)" }}
+                  >
                     <div className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-emerald-400" />
-                      <Text>{check.check}</Text>
+                      <CheckCircle className="h-4 w-4" style={{ color: "var(--color-sentinel-green)" }} />
+                      <span className="text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                        {check.check}
+                      </span>
                     </div>
                     <div className="text-right">
-                      <Text className="font-medium">{check.status}</Text>
-                      <Text className="text-xs text-gray-400">{check.time}</Text>
+                      <span className="text-sm font-medium block" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                        {check.status}
+                      </span>
+                      <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                        {check.time}
+                      </span>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className="pt-2 border-t border-gray-700">
-              <div className="flex items-center justify-between">
-                <Text className="text-sm">Energy Impact</Text>
-                <Text className="font-medium">+85 kWh (+12%)</Text>
+            <div className="pt-2" style={{ borderTop: "1px solid var(--color-sentinel-border)" }}>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                  Energy Impact
+                </span>
+                <span className="text-sm font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                  +85 kWh (+12%)
+                </span>
               </div>
-              <Text className="text-sm text-gray-400">
+              <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                 Pre-cooling uses extra energy now to save generator fuel later
-              </Text>
+              </span>
             </div>
           </div>
-        </Card>
+        </div>
       </div>
     </div>
   );

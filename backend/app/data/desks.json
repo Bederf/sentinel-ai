@@ -1,5 +1,53 @@
 [
   {
+    "desk_id": "201",
+    "floor": "Level 12",
+    "building": "FNB Fairlands (Sandton)",
+    "zone_id": "Zone-L12-N",
+    "near_window": true,
+    "near_diffuser": null,
+    "near_printer": false,
+    "department": "Executive",
+    "x_coord": 20.0,
+    "y_coord": 5.0
+  },
+  {
+    "desk_id": "202",
+    "floor": "Level 12",
+    "building": "FNB Fairlands (Sandton)",
+    "zone_id": "Zone-L12-N",
+    "near_window": true,
+    "near_diffuser": null,
+    "near_printer": false,
+    "department": "Executive",
+    "x_coord": 22.0,
+    "y_coord": 5.0
+  },
+  {
+    "desk_id": "203",
+    "floor": "Level 12",
+    "building": "FNB Fairlands (Sandton)",
+    "zone_id": "Zone-L12-S",
+    "near_window": false,
+    "near_diffuser": "DIFF-203",
+    "near_printer": false,
+    "department": "Operations",
+    "x_coord": 10.0,
+    "y_coord": 20.0
+  },
+  {
+    "desk_id": "204",
+    "floor": "Level 11",
+    "building": "FNB Fairlands (Sandton)",
+    "zone_id": "Zone-L11-S",
+    "near_window": false,
+    "near_diffuser": null,
+    "near_printer": true,
+    "department": "IT Support",
+    "x_coord": 15.0,
+    "y_coord": 20.0
+  },
+  {
     "desk_id": "L12-21",
     "floor": "Level 12",
     "building": "Fairlands Building A",

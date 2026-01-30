@@ -22,10 +22,70 @@ import {
   Clock,
   CheckCircle,
 } from "lucide-react";
-import { Badge, Table, TableHead, TableRow, TableHeaderCell, TableBody, TableCell, Button } from "@tremor/react";
+import { Table, TableHead, TableRow, TableHeaderCell, TableBody, TableCell, Button } from "@tremor/react";
 import api from "../lib/api";
 import type { EskomStatusResponse, ThermalRunwayResponse } from "../lib/api";
 import { OptimizationPanel } from "../components/OptimizationPanel";
+
+// Sentinel-styled Badge component
+interface SentinelBadgeProps {
+  children: React.ReactNode;
+  variant?: "success" | "warning" | "error" | "info" | "neutral";
+  size?: "sm" | "md" | "lg";
+  className?: string;
+}
+
+function SentinelBadge({ children, variant = "neutral", size = "md", className = "" }: SentinelBadgeProps) {
+  const variantStyles = {
+    success: {
+      bg: "rgba(16, 185, 129, 0.15)",
+      color: "var(--color-sentinel-green)",
+      border: "rgba(16, 185, 129, 0.3)",
+    },
+    warning: {
+      bg: "rgba(245, 158, 11, 0.15)",
+      color: "var(--color-sentinel-amber)",
+      border: "rgba(245, 158, 11, 0.3)",
+    },
+    error: {
+      bg: "rgba(220, 38, 38, 0.15)",
+      color: "var(--color-sentinel-red)",
+      border: "rgba(220, 38, 38, 0.3)",
+    },
+    info: {
+      bg: "rgba(59, 130, 246, 0.15)",
+      color: "var(--color-sentinel-blue)",
+      border: "rgba(59, 130, 246, 0.3)",
+    },
+    neutral: {
+      bg: "rgba(142, 142, 142, 0.15)",
+      color: "var(--color-sentinel-text-secondary)",
+      border: "rgba(142, 142, 142, 0.3)",
+    },
+  };
+
+  const sizeStyles = {
+    sm: "text-xs px-2 py-0.5",
+    md: "text-sm px-2.5 py-0.5",
+    lg: "text-sm px-3 py-1",
+  };
+
+  const style = variantStyles[variant];
+  const sizeStyle = sizeStyles[size];
+
+  return (
+    <span
+      className={`inline-flex items-center justify-center rounded font-medium whitespace-nowrap ${sizeStyle} ${className}`}
+      style={{
+        background: style.bg,
+        color: style.color,
+        border: `1px solid ${style.border}`,
+      }}
+    >
+      {children}
+    </span>
+  );
+}
 
 interface ActionHistoryItem {
   timestamp: string;
@@ -250,13 +310,7 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Badge
-                size="lg"
-                style={{
-                  background: "rgba(16, 185, 129, 0.15)",
-                  color: "var(--color-sentinel-green)",
-                }}
-              >
+              <SentinelBadge variant="success" size="lg">
                 <div className="flex items-center gap-2">
                   <div
                     className="h-2 w-2 rounded-full"
@@ -264,7 +318,7 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
                   />
                   <span>Active Monitoring</span>
                 </div>
-              </Badge>
+              </SentinelBadge>
             </div>
           </div>
 
@@ -487,12 +541,12 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
                       </span>
                     </TableCell>
                     <TableCell>
-                      <Badge
-                        color={scenario.id === "baseline" ? "red" : "green"}
+                      <SentinelBadge
+                        variant={scenario.id === "baseline" ? "error" : "success"}
                         size="sm"
                       >
                         {scenario.runwayExtension}
-                      </Badge>
+                      </SentinelBadge>
                     </TableCell>
                     <TableCell>
                       <span style={{ color: "var(--color-sentinel-text-secondary)" }}>
@@ -505,12 +559,18 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
                       </span>
                     </TableCell>
                     <TableCell>
-                      <Badge
-                        color={scenario.id === "baseline" ? "red" : scenario.id === "sentinel" ? "green" : "yellow"}
+                      <SentinelBadge
+                        variant={
+                          scenario.id === "baseline"
+                            ? "error"
+                            : scenario.id === "sentinel"
+                            ? "success"
+                            : "warning"
+                        }
                         size="sm"
                       >
                         {scenario.successRate}
-                      </Badge>
+                      </SentinelBadge>
                     </TableCell>
                     <TableCell>
                       {scenario.id !== "baseline" && (
@@ -595,12 +655,18 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
                         </span>
                       </div>
                     </div>
-                    <Badge
+                    <SentinelBadge
                       size="sm"
-                      color={item.status === "completed" ? "green" : item.status === "pending" ? "yellow" : "red"}
+                      variant={
+                        item.status === "completed"
+                          ? "success"
+                          : item.status === "pending"
+                          ? "warning"
+                          : "error"
+                      }
                     >
                       {item.status}
-                    </Badge>
+                    </SentinelBadge>
                   </div>
                 </div>
               ))}

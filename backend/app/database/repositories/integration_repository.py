@@ -114,6 +114,35 @@ class IntegrationRepository:
         response = query.execute()
         return response.data
 
+    def get_all_point_mappings(
+        self,
+        building_id: Optional[str] = None,
+        confidence: Optional[str] = None,
+        verified_only: bool = False,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> Dict[str, Any]:
+        """Get point-to-asset mappings across all buildings with pagination.
+
+        Returns dict with 'points' list and 'total' count.
+        """
+        query = self.client.table('point_asset_mappings').select("*", count='exact')
+
+        if building_id:
+            query = query.eq('building_id', building_id)
+        if confidence:
+            query = query.eq('match_confidence', confidence)
+        if verified_only:
+            query = query.eq('is_verified', True)
+
+        query = query.range(offset, offset + limit - 1)
+        response = query.execute()
+
+        return {
+            'points': response.data,
+            'total': response.count or len(response.data),
+        }
+
     def get_point_mapping(self, building_id: str, point_id: str) -> Optional[Dict[str, Any]]:
         """Get mapping for a specific point."""
         response = self.client.table('point_asset_mappings').select("*").eq(

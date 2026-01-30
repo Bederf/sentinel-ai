@@ -38,20 +38,38 @@ export function TemperatureControl({
 }: TemperatureControlProps) {
   const [inputValue, setInputValue] = useState(value.toString());
   const [isEditing, setIsEditing] = useState(false);
+  const [sliderValue, setSliderValue] = useState(value);
+  const [isDragging, setIsDragging] = useState(false);
 
-  // Sync inputValue when value prop changes externally (e.g., after successful control action)
+  // Sync inputValue and sliderValue when value prop changes externally
   useEffect(() => {
     if (!isEditing) {
       setInputValue(value.toString());
     }
-  }, [value, isEditing]);
+    if (!isDragging) {
+      setSliderValue(value);
+    }
+  }, [value, isEditing, isDragging]);
 
-  // Handle slider change - use integer values
+  // Handle slider change - update local state during drag
   const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = parseInt(e.target.value, 10);
     if (!isNaN(newValue)) {
-      onChange(newValue);
+      setSliderValue(newValue);
       setInputValue(newValue.toString());
+    }
+  };
+
+  // Handle slider drag start
+  const handleSliderMouseDown = () => {
+    setIsDragging(true);
+  };
+
+  // Handle slider release - trigger onChange with final value
+  const handleSliderMouseUp = () => {
+    setIsDragging(false);
+    if (sliderValue !== value) {
+      onChange(sliderValue);
     }
   };
 
@@ -87,8 +105,8 @@ export function TemperatureControl({
     }
   };
 
-  // Calculate slider background gradient
-  const sliderPercentage = ((value - min) / (max - min)) * 100;
+  // Calculate slider background gradient using local slider value for smooth dragging
+  const sliderPercentage = ((sliderValue - min) / (max - min)) * 100;
 
   return (
     <div
@@ -153,7 +171,7 @@ export function TemperatureControl({
         <div className="flex items-baseline gap-1">
           <input
             type="text"
-            value={isEditing ? inputValue : value.toString()}
+            value={isEditing ? inputValue : (isDragging ? sliderValue.toString() : value.toString())}
             onChange={handleInputChange}
             onBlur={handleInputBlur}
             onFocus={handleInputFocus}
@@ -198,8 +216,12 @@ export function TemperatureControl({
           min={min}
           max={max}
           step={step}
-          value={value}
+          value={sliderValue}
           onChange={handleSliderChange}
+          onMouseDown={handleSliderMouseDown}
+          onMouseUp={handleSliderMouseUp}
+          onTouchStart={handleSliderMouseDown}
+          onTouchEnd={handleSliderMouseUp}
           disabled={disabled}
           className="w-full h-2 appearance-none rounded-full cursor-pointer"
           style={{

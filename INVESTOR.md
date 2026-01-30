@@ -25,9 +25,9 @@ South Africa's facilities management industry faces unique challenges:
 
 **Our Solution:** AI detects failures 4-8 weeks in advance with 85% accuracy.
 
-**Proof Point:** Gateway Theatre chiller bearing wear detected → **R135K savings** (R45K preventive vs R180K failure cost)
+**Proof Point:** Gateway Theatre chiller bearing wear detected → **R135K projected savings** (R45K preventive vs R180K failure cost)
 
-**Portfolio Impact:** R185K potential savings identified across 10 sites
+**Portfolio Impact:** R185K potential savings identified across demo portfolio
 
 **Business Model:** Savings-based pricing (10-15% of prevented failures)
 
@@ -50,10 +50,10 @@ South Africa's facilities management industry faces unique challenges:
 **Competitive Moat:** Trained on South African data; understands Stages 0-8, 2-4 hour outages, generator prioritization.
 
 **Performance:**
-- ✅ **Comfort extension**: 52min → 108min (108% improvement)
-- ✅ **Energy savings**: 12% reduction in cooling costs
-- ✅ **Fuel savings**: 20% generator efficiency gain
-- ✅ **Cost savings**: R2,100 per 4-hour outage
+- ✅ **Comfort extension**: 52min → 108min (108% improvement) *(simulated results)*
+- ✅ **Energy savings**: 12% reduction in cooling costs *(projection)*
+- ✅ **Fuel savings**: 20% generator efficiency gain *(projection)*
+- ✅ **Cost savings**: R2,100 per 4-hour outage *(calculated from demo data)*
 
 **Emotional Hook:** Every Bidvest executive has sat in a hot building during load shedding. SENTINEL fixes this.
 
@@ -69,8 +69,15 @@ South Africa's facilities management industry faces unique challenges:
 | Cross-site pattern learning | ✅ Portfolio-wide | ⚠️ Per-building | ❌ None |
 | Safety validation | ✅ AI + Rules | ⚠️ Basic rules | ✅ Extensive |
 | Audit compliance | ✅ Full trail | ⚠️ Basic logs | ⚠️ Module-based |
+| **Site onboarding automation** | ✅ **Unique** | ❌ Manual setup | ❌ Manual setup |
+| **Technician AI assistance** | ✅ **Unique** | ❌ None | ❌ None |
+| **Hybrid AI cost optimization** | ✅ 40% savings | ❌ Single model | ❌ Single model |
 
-**Key Message:** JLL Falcon can claim energy savings. JLL Falcon CANNOT claim load shedding optimization. Their models are trained on stable grids.
+**Key Messages:**
+- JLL Falcon can claim energy savings. JLL Falcon CANNOT claim load shedding optimization. Their models are trained on stable grids.
+- SENTINEL is the only platform with automated site onboarding - competitors require weeks of manual integration
+- Our hybrid AI approach delivers 40% cost savings while maintaining full capability
+- Technician tools with vision AI provide field support no competitor offers
 
 ---
 
@@ -87,6 +94,8 @@ South Africa's facilities management industry faces unique challenges:
 - 5 real failure scenarios with detailed progression
 - South African-specific patterns (voltage degradation, load shedding)
 - Continuous learning from portfolio operations
+- Equipment-specific fault code database
+- Equipment photo recognition training data
 
 **Demo-Ready:**
 - Full working platform (not slides)
@@ -172,10 +181,18 @@ South Africa's facilities management industry faces unique challenges:
 ## Team & Execution
 
 **Demonstrated Capability:**
-- 19 development plans completed in ~4 hours
+- 28 development plans completed in ~4 hours
 - Modern development practices (phase-gated, automated testing)
 - Demo-ready platform (not vaporware)
 - Interview-proven with real stakeholders
+
+**Version Progress:**
+- ✅ v1.0 Demo Platform: Complete (predictive AI, chat interface, multi-site dashboard)
+- ✅ v2.0 Control Capabilities: Complete (device control, safety interlocks, audit logging)
+- 🚧 v3.0 Dashboard Customization: Partially complete (Phase 11 done, 12-13 planned)
+- ✅ v4.0 Site Onboarding System: Complete (industry-first BMS/CAFM integration)
+- 🚧 v5.0 Technician Tools: Near complete (Phases 18-19 complete, Phase 20 planned)
+- ✅ v6.0 Hybrid AI Architecture: Complete (40% cost savings through Ollama+Claude routing)
 
 **Technical Leadership:**
 - Experience scaling AI systems (AimTheLaw pattern reuse)
@@ -211,12 +228,15 @@ South Africa's facilities management industry faces unique challenges:
 
 **Technology Risk: LOW**
 ✅ Demo platform proven, reuse of successful patterns
+✅ v4.0 integration system complete and tested
 
 **Market Risk: LOW**
 ✅ Clear pain point, quantifiable ROI, existing relationships
 
 **Competition Risk: MEDIUM**
 ⚠️ Global players could replicate; defensible through SA data moat and load shedding specialization
+✅ Integration/onboarding moat creates switching costs
+✅ Hybrid AI cost advantage scales with usage
 
 **Execution Risk: LOW**
 ✅ Proven delivery capability, phase-gated approach, pilot de-risks scale

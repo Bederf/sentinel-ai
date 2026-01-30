@@ -9,13 +9,15 @@
  */
 
 import { useState, useMemo } from "react";
-import { Search, Filter, Battery, Activity, AlertTriangle } from "lucide-react";
-import type { Device } from "../lib/api";
+import { Search, Filter, Battery, Activity, AlertTriangle, Building2, MapPin } from "lucide-react";
+import type { Device, Site } from "../lib/api";
 
 interface DeviceListProps {
   devices: Device[];
   selectedDevice: Device | null;
   onDeviceSelect: (device: Device) => void;
+  onRiskClick?: (device: Device) => void;
+  sites?: Site[];
 }
 
 interface FilterOptions {
@@ -24,7 +26,7 @@ interface FilterOptions {
   sortBy: "name" | "status" | "safety";
 }
 
-export function DeviceList({ devices, selectedDevice, onDeviceSelect }: DeviceListProps) {
+export function DeviceList({ devices, selectedDevice, onDeviceSelect, onRiskClick, sites = [] }: DeviceListProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<FilterOptions>({
@@ -32,6 +34,15 @@ export function DeviceList({ devices, selectedDevice, onDeviceSelect }: DeviceLi
     showOffline: false,
     sortBy: "name",
   });
+
+  // Create site lookup map
+  const siteLookup = useMemo(() => {
+    const lookup: Record<string, Site> = {};
+    sites.forEach(site => {
+      lookup[site.id] = site;
+    });
+    return lookup;
+  }, [sites]);
 
   const filteredDevices = useMemo(() => {
     // Filter by search query
@@ -81,14 +92,34 @@ export function DeviceList({ devices, selectedDevice, onDeviceSelect }: DeviceLi
     return filtered;
   }, [devices, searchQuery, filters]);
 
-  const getSafetyIcon = (safetyStatus: string) => {
+  const getSafetyIcon = (safetyStatus: string, device: Device) => {
     switch (safetyStatus) {
       case "safe":
         return <Activity className="h-3 w-3 text-green-500" />;
       case "warning":
-        return <AlertTriangle className="h-3 w-3 text-yellow-500" />;
       case "critical":
-        return <AlertTriangle className="h-3 w-3 text-red-500" />;
+        return (
+          <span
+            role="button"
+            tabIndex={0}
+            onClick={(e) => {
+              e.stopPropagation();
+              onRiskClick?.(device);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.stopPropagation();
+                onRiskClick?.(device);
+              }
+            }}
+            className="p-0.5 -m-0.5 rounded hover:bg-white/10 transition-colors cursor-pointer"
+            title="View risk intelligence"
+          >
+            <AlertTriangle
+              className={`h-3 w-3 ${safetyStatus === "warning" ? "text-yellow-500" : "text-red-500"}`}
+            />
+          </span>
+        );
       default:
         return <Activity className="h-3 w-3 text-gray-500" />;
     }
@@ -190,60 +221,120 @@ export function DeviceList({ devices, selectedDevice, onDeviceSelect }: DeviceLi
 
       {/* Device List */}
       <div className="flex-1 overflow-y-auto">
-        {filteredDevices.map((device) => (
-          <button
-            key={device.id}
-            onClick={() => onDeviceSelect(device)}
-            className={`w-full text-left p-4 border-b transition-colors ${
-              selectedDevice?.id === device.id
-                ? "bg-blue-500/10"
-                : "hover:bg-slate-500/5"
-            }`}
-            style={{ borderColor: "var(--color-sentinel-border)" }}
-          >
-            <div className="flex items-start justify-between mb-1">
-              <div className="flex-1">
-                <div
-                  className="font-medium text-sm truncate"
-                  style={{ color: "var(--color-sentinel-text-primary)" }}
-                >
-                  {device.name}
+        {filteredDevices.map((device) => {
+          const site = siteLookup[device.site_id];
+          const siteName = site?.name || device.site_id;
+          
+          // Extract site number from site_id (e.g., "site-004" -> "004", "site-001" -> "001")
+          let siteNumber = "";
+          const siteIdMatch = device.site_id.match(/site-(\d+)/i);
+          if (siteIdMatch) {
+            siteNumber = siteIdMatch[1].padStart(3, "0");
+          } else {
+            // Fallback: try to extract number from any format
+            const numMatch = device.site_id.match(/(\d+)/);
+            siteNumber = numMatch ? numMatch[1].padStart(3, "0") : device.site_id;
+          }
+          
+          // Remove "FNB" prefix from device name if present (case-insensitive)
+          const deviceName = device.name.replace(/^FNB\s*/i, "").trim();
+          
+          return (
+            <button
+              key={device.id}
+              onClick={() => onDeviceSelect(device)}
+              className={`w-full text-left p-4 border-b transition-colors ${
+                selectedDevice?.id === device.id
+                  ? "bg-blue-500/10"
+                  : "hover:bg-slate-500/5"
+              }`}
+              style={{ borderColor: "var(--color-sentinel-border)" }}
+            >
+              <div className="flex items-start justify-between mb-2">
+                <div className="flex-1 min-w-0">
+                  <div
+                    className="font-medium text-sm mb-1"
+                    style={{ color: "var(--color-sentinel-text-primary)" }}
+                  >
+                    {deviceName}
+                  </div>
+                  
+                  {/* Site Information */}
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                    <div className="flex items-center gap-1">
+                      <Building2 className="h-3 w-3" style={{ color: "var(--color-sentinel-text-disabled)" }} />
+                      <span className="text-xs font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                        {siteName}
+                      </span>
+                    </div>
+                    <span className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>
+                      •
+                    </span>
+                    <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                      {siteNumber}
+                    </span>
+                    {site?.region && (
+                      <>
+                        <span className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>
+                          •
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <MapPin className="h-3 w-3" style={{ color: "var(--color-sentinel-text-disabled)" }} />
+                          <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                            {site.region}
+                          </span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  
+                  {/* Device Type and Location */}
+                  <div
+                    className="text-xs flex items-center gap-2 flex-wrap"
+                    style={{ color: "var(--color-sentinel-text-secondary)" }}
+                  >
+                    <span>{device.type || device.device_type}</span>
+                    <span>•</span>
+                    <span>{device.location}</span>
+                    {device.manufacturer && (
+                      <>
+                        <span>•</span>
+                        <span>{device.manufacturer}</span>
+                      </>
+                    )}
+                  </div>
                 </div>
-                <div
-                  className="text-xs"
-                  style={{ color: "var(--color-sentinel-text-secondary)" }}
-                >
-                  {device.type || device.device_type} • {device.location}
+                <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+                  {getStatusIcon(device.status || "offline")}
+                  {getSafetyIcon(device.safety_status || "unknown", device)}
                 </div>
               </div>
-              <div className="flex items-center gap-1 ml-2">
-                {getStatusIcon(device.status || "offline")}
-                {getSafetyIcon(device.safety_status || "unknown")}
+              
+              {/* Status Badge Row */}
+              <div className="flex items-center gap-4 text-xs mt-2">
+                <span
+                  className={`px-2 py-0.5 rounded ${
+                    (device.status || "offline") === "online"
+                      ? "bg-green-500/10 text-green-500"
+                      : "bg-gray-500/10 text-gray-500"
+                  }`}
+                >
+                  {(device.status || "offline").toUpperCase()}
+                </span>
+                {device.last_communication && (
+                  <span style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                    {formatLastCommunication(device.last_communication)}
+                  </span>
+                )}
+                {device.current_value !== undefined && (
+                  <span style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                    {device.current_value}
+                  </span>
+                )}
               </div>
-            </div>
-            <div className="flex items-center gap-4 text-xs mt-2">
-              <span
-                className={`px-2 py-0.5 rounded ${
-                  (device.status || "offline") === "online"
-                    ? "bg-green-500/10 text-green-500"
-                    : "bg-gray-500/10 text-gray-500"
-                }`}
-              >
-                {(device.status || "offline").toUpperCase()}
-              </span>
-              {device.last_communication && (
-                <span style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                  {formatLastCommunication(device.last_communication)}
-                </span>
-              )}
-              {device.current_value !== undefined && (
-                <span style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                  {device.current_value}
-                </span>
-              )}
-            </div>
-          </button>
-        ))}
+            </button>
+          );
+        })}
 
         {filteredDevices.length === 0 && (
           <div className="p-4 text-center">

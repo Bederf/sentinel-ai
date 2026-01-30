@@ -15,7 +15,7 @@
  * - Existing dashboard theme
  */
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Cpu,
   Activity,
@@ -26,13 +26,16 @@ import {
   Clock,
   ChevronDown,
   ChevronUp,
+  Shield,
+  Building2,
 } from "lucide-react";
 import api from "../lib/api";
-import type { Device } from "../lib/api";
+import type { Device, Site, Prediction } from "../lib/api";
 import { DeviceList } from "./DeviceList";
 import { ControlPanel } from "./ControlPanel";
 import { LoadingCard } from "./LoadingCard";
 import { RecentActions } from "./RecentActions";
+import { PredictionDetail } from "./PredictionDetail";
 
 interface ControlDashboardProps {
   onError?: (error: string) => void;
@@ -40,22 +43,113 @@ interface ControlDashboardProps {
 
 export function ControlDashboard({ onError }: ControlDashboardProps) {
   const [devices, setDevices] = useState<Device[]>([]);
+  const [sites, setSites] = useState<Site[]>([]);
+  const [predictions, setPredictions] = useState<Prediction[]>([]);
+  const [selectedSiteId, setSelectedSiteId] = useState<string | null>(null);
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
+  const [selectedPrediction, setSelectedPrediction] = useState<Prediction | null>(null);
+  const [isPredictionDetailOpen, setIsPredictionDetailOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshDevices, setRefreshDevices] = useState(0);
   const [recentActionsExpanded, setRecentActionsExpanded] = useState(true);
   const [auditRefreshTrigger, setAuditRefreshTrigger] = useState(0);
 
-  // Load devices on mount
+  // Filter sites to only show buildings with devices, then sort alphabetically
+  const filteredSortedSites = useMemo(() => {
+    // Get unique site_ids from devices
+    const siteIdsWithDevices = new Set(devices.map(device => device.site_id));
+
+    // Filter sites to only include those with devices
+    const sitesWithDevices = sites.filter(site => siteIdsWithDevices.has(site.id));
+
+    // Sort alphabetically by name
+    return sitesWithDevices.sort((a, b) => a.name.localeCompare(b.name));
+  }, [sites, devices]);
+
+  // Filter devices by selected site
+  const filteredDevices = useMemo(() => {
+    if (!selectedSiteId) return devices;
+    const filtered = devices.filter((d) => d.site_id === selectedSiteId);
+
+    // If no devices for selected site, clear selection
+    if (filtered.length === 0 && selectedSiteId) {
+      const siteIdsWithDevices = new Set(devices.map(device => device.site_id));
+      if (!siteIdsWithDevices.has(selectedSiteId)) {
+        // Site has no devices, reset selection
+        const sitesWithDevices = sites.filter(site => siteIdsWithDevices.has(site.id));
+        if (sitesWithDevices.length > 0) {
+          const sortedSitesWithDevices = sitesWithDevices.sort((a, b) => a.name.localeCompare(b.name));
+          setSelectedSiteId(sortedSitesWithDevices[0]?.id || null);
+        } else {
+          setSelectedSiteId(null);
+        }
+      }
+    }
+
+    return filtered;
+  }, [devices, selectedSiteId, sites]);
+
+
+  // Load devices and sites on mount
   useEffect(() => {
     const loadDevices = async () => {
       try {
         setIsLoading(true);
-        const devices = await api.getDevices();
-        setDevices(devices);
-        // Auto-select first device if none selected
-        if (devices.length > 0 && !selectedDevice) {
-          setSelectedDevice(devices[0]);
+
+        // Fetch devices, sites, and predictions in parallel
+        const [devicesData, sitesData, predictionsData] = await Promise.all([
+          api.getDevices(),
+          api.getSites(),
+          api.getPredictions().catch(() => ({ predictions: [] })),
+        ]);
+
+        setSites(sitesData);
+        setPredictions(predictionsData.predictions || []);
+
+        // Process devices first
+        const devices = devicesData;
+
+        // Fetch safety status for each device
+        const devicesWithSafety = await Promise.all(
+          devices.map(async (device) => {
+            try {
+              const safetyStatus = await api.getDeviceSafetyStatus(device.id);
+              // Map API response to device safety_status format
+              // API returns: 'safe' | 'warning' | 'blocked' | 'alarm' | 'unknown'
+              // Device expects: 'safe' | 'warning' | 'critical' | 'unknown'
+              let mappedStatus: "safe" | "warning" | "critical" | "unknown" = "unknown";
+              if (safetyStatus.overall_status === "safe") {
+                mappedStatus = "safe";
+              } else if (safetyStatus.overall_status === "warning") {
+                mappedStatus = "warning";
+              } else if (safetyStatus.overall_status === "blocked" || safetyStatus.overall_status === "alarm") {
+                mappedStatus = "critical";
+              }
+
+              return {
+                ...device,
+                safety_status: mappedStatus,
+              };
+            } catch (error) {
+              console.warn(`Failed to fetch safety status for device ${device.id}:`, error);
+              return {
+                ...device,
+                safety_status: "unknown" as const,
+              };
+            }
+          })
+        );
+
+        setDevices(devicesWithSafety);
+
+        // Set default selected site to first with devices (after devices are set)
+        if (sitesData.length > 0 && devicesWithSafety.length > 0 && !selectedSiteId) {
+          const siteIdsWithDevices = new Set(devicesWithSafety.map(device => device.site_id));
+          const sitesWithDevices = sitesData.filter(site => siteIdsWithDevices.has(site.id));
+          if (sitesWithDevices.length > 0) {
+            const sortedSitesWithDevices = sitesWithDevices.sort((a, b) => a.name.localeCompare(b.name));
+            setSelectedSiteId(sortedSitesWithDevices[0].id);
+          }
         }
       } catch (error) {
         console.error("Failed to load devices:", error);
@@ -67,6 +161,19 @@ export function ControlDashboard({ onError }: ControlDashboardProps) {
 
     loadDevices();
   }, [refreshDevices]);
+
+  // Auto-select first device when site changes or devices load
+  useEffect(() => {
+    if (filteredDevices.length > 0) {
+      // Check if currently selected device is in the filtered list
+      const currentDeviceInList = selectedDevice && filteredDevices.some((d) => d.id === selectedDevice.id);
+      if (!currentDeviceInList) {
+        setSelectedDevice(filteredDevices[0]);
+      }
+    } else {
+      setSelectedDevice(null);
+    }
+  }, [filteredDevices, selectedSiteId]);
 
   const handleDeviceSelect = useCallback(async (device: Device) => {
     try {
@@ -83,14 +190,57 @@ export function ControlDashboard({ onError }: ControlDashboardProps) {
   const handleControlAction = useCallback(async (deviceId: string, point: string, value: number | boolean) => {
     try {
       await api.controlDevice(deviceId, point, value);
-      // Refresh devices and audit trail after successful control
-      setRefreshDevices((prev) => prev + 1);
+
+      // Only refresh audit trail - don't reload all devices (causes jarring page reload)
+      // The ControlPanel handles optimistic updates locally
       setAuditRefreshTrigger((prev) => prev + 1);
+
+      // Selectively update the specific device's point value in state
+      // This avoids a full page reload while keeping data in sync
+      setDevices((prevDevices) =>
+        prevDevices.map((device) => {
+          if (device.id !== deviceId) return device;
+          // Update the point value in the device's points
+          const updatedPoints = { ...device.points };
+          if (updatedPoints[point]) {
+            updatedPoints[point] = {
+              ...updatedPoints[point],
+              current_value: value,
+            };
+          }
+          return { ...device, points: updatedPoints };
+        })
+      );
+
+      // Also update selectedDevice if it's the one being controlled
+      setSelectedDevice((prevSelected) => {
+        if (!prevSelected || prevSelected.id !== deviceId) return prevSelected;
+        const updatedPoints = { ...prevSelected.points };
+        if (updatedPoints[point]) {
+          updatedPoints[point] = {
+            ...updatedPoints[point],
+            current_value: value,
+          };
+        }
+        return { ...prevSelected, points: updatedPoints };
+      });
     } catch (error) {
       console.error("Control action failed:", error);
       throw error;
     }
   }, []);
+
+  // Handle click on risk/warning icon to open prediction detail
+  const handleRiskClick = useCallback((device: Device) => {
+    // Find prediction for this device by matching equipment_id to device.id
+    const prediction = predictions.find(
+      (p) => p.equipment_id === device.id || p.equipment_name === device.name
+    );
+    if (prediction) {
+      setSelectedPrediction(prediction);
+      setIsPredictionDetailOpen(true);
+    }
+  }, [predictions]);
 
   if (isLoading) {
     return (
@@ -110,6 +260,47 @@ export function ControlDashboard({ onError }: ControlDashboardProps) {
     >
       {/* Left Column: Device List */}
       <div className="w-80 flex flex-col border-r" style={{ borderColor: "var(--color-sentinel-border)" }}>
+        {/* Site Selector Dropdown */}
+        <div
+          className="flex-none p-3 border-b"
+          style={{ borderColor: "var(--color-sentinel-border)" }}
+        >
+          <div className="relative">
+            <Building2
+              className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4"
+              style={{ color: "var(--color-sentinel-text-secondary)" }}
+            />
+            <select
+              value={selectedSiteId || ""}
+              onChange={(e) => setSelectedSiteId(e.target.value)}
+              className="w-full pl-9 pr-8 py-2 text-sm rounded appearance-none cursor-pointer"
+              style={{
+                background: "var(--color-sentinel-bg-secondary)",
+                border: "1px solid var(--color-sentinel-border)",
+                color: "var(--color-sentinel-text-primary)",
+                outline: "none",
+              }}
+            >
+              {filteredSortedSites.length > 0 ? (
+                filteredSortedSites.map((site) => (
+                  <option key={site.id} value={site.id}>
+                    {site.name}
+                  </option>
+                ))
+              ) : (
+                <option disabled value="">
+                  No buildings with devices
+                </option>
+              )}
+            </select>
+            <ChevronDown
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 pointer-events-none"
+              style={{ color: "var(--color-sentinel-text-secondary)" }}
+            />
+          </div>
+        </div>
+
+        {/* Device List Header */}
         <div
           className="flex-none p-4 border-b flex items-center justify-between"
           style={{ borderColor: "var(--color-sentinel-border)" }}
@@ -132,7 +323,7 @@ export function ControlDashboard({ onError }: ControlDashboardProps) {
                 className="text-xs"
                 style={{ color: "var(--color-sentinel-text-secondary)" }}
               >
-                {devices.filter((d) => d.status === "online").length} online, {devices.filter((d) => d.status === "offline").length} offline
+                {filteredDevices.filter((d) => d.status === "online").length} online, {filteredDevices.filter((d) => d.status === "offline").length} offline
               </span>
             </div>
           </div>
@@ -147,9 +338,11 @@ export function ControlDashboard({ onError }: ControlDashboardProps) {
         </div>
         <div className="flex-1 overflow-y-auto">
           <DeviceList
-            devices={devices}
+            devices={filteredDevices}
             selectedDevice={selectedDevice}
             onDeviceSelect={handleDeviceSelect}
+            onRiskClick={handleRiskClick}
+            sites={sites}
           />
         </div>
       </div>
@@ -185,24 +378,39 @@ export function ControlDashboard({ onError }: ControlDashboardProps) {
           </div>
           {selectedDevice && (
             <div className="flex items-center gap-2">
-              <div
-                className={`px-2 py-1 rounded text-xs font-medium ${
-                  (selectedDevice.safety_status || "unknown") === "safe"
-                    ? "bg-green-500/10 text-green-500"
-                    : (selectedDevice.safety_status || "unknown") === "warning"
-                    ? "bg-yellow-500/10 text-yellow-500"
-                    : "bg-red-500/10 text-red-500"
-                }`}
-              >
-                {(selectedDevice.safety_status || "unknown") === "safe" ? (
-                  <CheckCircle className="h-3 w-3 inline mr-1" />
-                ) : (selectedDevice.safety_status || "unknown") === "warning" ? (
-                  <AlertTriangle className="h-3 w-3 inline mr-1" />
-                ) : (
-                  <XCircle className="h-3 w-3 inline mr-1" />
-                )}
-                {(selectedDevice.safety_status || "unknown").toUpperCase()}
-              </div>
+              {selectedDevice.safety_status === "warning" || selectedDevice.safety_status === "critical" ? (
+                <button
+                  onClick={() => handleRiskClick(selectedDevice)}
+                  className={`px-2 py-1 rounded text-xs font-medium cursor-pointer hover:opacity-80 transition-opacity ${
+                    selectedDevice.safety_status === "warning"
+                      ? "bg-yellow-500/10 text-yellow-500"
+                      : "bg-red-500/10 text-red-500"
+                  }`}
+                  title="View risk intelligence"
+                >
+                  {selectedDevice.safety_status === "warning" ? (
+                    <AlertTriangle className="h-3 w-3 inline mr-1" />
+                  ) : (
+                    <XCircle className="h-3 w-3 inline mr-1" />
+                  )}
+                  {selectedDevice.safety_status.toUpperCase()}
+                </button>
+              ) : (
+                <div
+                  className={`px-2 py-1 rounded text-xs font-medium ${
+                    selectedDevice.safety_status === "safe"
+                      ? "bg-green-500/10 text-green-500"
+                      : "bg-gray-500/10 text-gray-500"
+                  }`}
+                >
+                  {selectedDevice.safety_status === "safe" ? (
+                    <CheckCircle className="h-3 w-3 inline mr-1" />
+                  ) : (
+                    <Shield className="h-3 w-3 inline mr-1" />
+                  )}
+                  {(selectedDevice.safety_status || "unknown").toUpperCase()}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -286,6 +494,18 @@ export function ControlDashboard({ onError }: ControlDashboardProps) {
           )}
         </div>
       </div>
+
+      {/* Risk Intelligence Detail Modal */}
+      {selectedPrediction && (
+        <PredictionDetail
+          prediction={selectedPrediction}
+          isOpen={isPredictionDetailOpen}
+          onClose={() => {
+            setIsPredictionDetailOpen(false);
+            setSelectedPrediction(null);
+          }}
+        />
+      )}
     </div>
   );
 }

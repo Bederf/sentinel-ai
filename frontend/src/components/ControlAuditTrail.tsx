@@ -26,6 +26,7 @@ import api from "../lib/api";
 import type {
   AuditLogEntryResponse,
 } from "../lib/api";
+import { formatDateTime } from "../lib/timeFormat";
 import AuditLogDetail from "./AuditLogDetail";
 import { LoadingCard } from "./LoadingCard";
 
@@ -545,7 +546,7 @@ export function ControlAuditTrail({ onError }: ControlAuditTrailProps) {
                         {getRelativeTime(log.timestamp)}
                       </div>
                       <div className="text-xs text-gray-500">
-                        {new Date(log.timestamp).toLocaleString()}
+                        {formatDateTime(log.timestamp)}
                       </div>
                     </td>
                     <td className="py-4 px-4">

@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { OptimizationToggle } from "./OptimizationToggle";
 import { OptimizationRecommendationModal } from "./OptimizationRecommendationModal";
+import { formatRelativeTime } from "../lib/timeFormat";
 import api from "../lib/api";
 import type {
   OptimizationStatusResponse,
@@ -140,9 +141,6 @@ export function OptimizationInfoCard({
     );
   }
 
-  // Debug: Always render something
-  console.log("[OptimizationInfoCard] Rendering with status:", optimizationStatus);
-
   const getStatusConfig = (status: OptimizationStatusType) => {
     switch (status) {
       case "optimized":
@@ -188,22 +186,6 @@ export function OptimizationInfoCard({
     }
   };
 
-  // Status config for potential future use
-  void getStatusConfig(optimizationStatus);
-
-  const formatRelativeTime = (timestamp: string | null) => {
-    if (!timestamp) return "Never";
-    const now = new Date();
-    const then = new Date(timestamp);
-    const diffMs = now.getTime() - then.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMins / 60);
-
-    if (diffMins < 2) return "Just now";
-    if (diffMins < 60) return `${diffMins} minutes ago`;
-    if (diffHours < 24) return `${diffHours} hours ago`;
-    return then.toLocaleDateString();
-  };
 
   // Handle approve recommendation
   const handleApproveRecommendation = async (_recommendationId: string) => {
@@ -225,7 +207,15 @@ export function OptimizationInfoCard({
         return;
       }
 
-      await api.approveOptimization(siteId, _recommendationId, setpointsToApply);
+      const result = await api.approveOptimization(siteId, _recommendationId, setpointsToApply);
+
+      console.log("[OptimizationInfoCard] Approval result:", result);
+
+      // Show success message
+      if (result.success) {
+        // Optional: You could add a toast notification here
+        console.log(`✅ Successfully applied ${result.results.filter((r: any) => r.success).length} of ${result.results.length} recommendations`);
+      }
 
       // Refresh optimization status after approve
       const status = await api.getOptimizationStatus(siteId);
@@ -285,7 +275,21 @@ export function OptimizationInfoCard({
           </div>
         </div>
         <div className="flex items-center gap-3">
-          {currentRecommendation && (
+          {/* Show success checkmark when optimized */}
+          {optimizationStatus === "optimized" && (
+            <div
+              className="p-2 rounded"
+              style={{
+                background: "rgba(16, 185, 129, 0.2)",
+                border: "1px solid var(--color-sentinel-green)",
+              }}
+              title="Recommendation applied successfully"
+            >
+              <CheckCircle className="h-4 w-4" style={{ color: "var(--color-sentinel-green)" }} />
+            </div>
+          )}
+          {/* Show recommendation button when pending */}
+          {currentRecommendation && optimizationStatus === "recommendation_pending" && (
             <button
               onClick={() => setShowRecommendationModal(true)}
               className="p-2 rounded transition-all hover:scale-110 animate-pulse"

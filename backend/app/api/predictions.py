@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
+from app.services.prediction_calculator import PredictionCalculator
 
 router = APIRouter()
 
@@ -13,7 +14,18 @@ DATA_DIR = Path(__file__).parent.parent / "data"
 
 
 def load_predictions() -> list[dict]:
-    """Load predictions from JSON file."""
+    """Load predictions - try calculated first, fallback to JSON."""
+    # Try to calculate predictions from data
+    # Use min_probability=50 to catch all degraded equipment (health < 80%)
+    try:
+        calculated = PredictionCalculator.calculate_predictions(min_probability=50)
+        if calculated:
+            return calculated
+    except Exception as e:
+        # If calculation fails, fall back to JSON
+        pass
+    
+    # Fallback to JSON file
     predictions_file = DATA_DIR / "predictions.json"
     if predictions_file.exists():
         with open(predictions_file) as f:

@@ -1,3 +1,19 @@
+---
+title: "Testing Strategy Guide"
+type: "guide"
+status: "approved"
+version: "1.0.0"
+created: "2026-01-30"
+updated: "2026-01-30"
+author: "Sentinel Development Team"
+tags: ["testing", "strategy", "pytest", "vitest"]
+related: ["e2e-testing.md", "test-data.md", "../12-development/tool-use-best-practices.md"]
+domain: "general"
+audience: "developers"
+complexity: "intermediate"
+estimated_read_time: 15
+---
+
 # Testing Guide for BMS Intelligence
 
 ## Overview

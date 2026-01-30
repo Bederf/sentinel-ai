@@ -2,17 +2,24 @@
 
 import json
 import logging
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
 
+import httpx
+
 from app.database.repositories.equipment_repository import EquipmentRepository
 from app.database.repositories.sensor_repository import SensorRepository
+from app.services.csv_loader import AssetData, AlarmData as CSVAlarmData
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+# Simulation API endpoint (already running)
+SIMULATION_API = "http://localhost:9095/api/simulation"
 
 # Load data directory
 DATA_DIR = Path(__file__).parent.parent / "data"
@@ -22,31 +29,284 @@ equipment_repo = EquipmentRepository()
 sensor_repo = SensorRepository()
 
 
-def load_equipment() -> list[dict]:
-    """Load equipment from JSON file."""
+def _derive_health_score(condition: str, age_years: int, expected_life: int) -> int:
+    """
+    Derive health score from condition, age, and expected life.
+
+    Returns a score 0-100 based on:
+    - Base score from condition (good=85, fair=65, poor=35)
+    - Age penalty (subtract points as asset approaches end of life)
+    """
+    # Base score from condition
+    condition_scores = {
+        "good": 85,
+        "fair": 65,
+        "poor": 35,
+    }
+    base_score = condition_scores.get(condition.lower(), 70)
+
+    # Age penalty: lose up to 15 points as remaining life decreases
+    if expected_life > 0:
+        remaining_ratio = max(0, (expected_life - age_years) / expected_life)
+        age_penalty = int((1 - remaining_ratio) * 15)
+    else:
+        age_penalty = 0
+
+    return max(0, min(100, base_score - age_penalty))
+
+
+def _derive_status(condition: str, health_score: int) -> str:
+    """Derive status from condition and health score."""
+    if condition.lower() == "poor" or health_score < 40:
+        return "critical"
+    elif condition.lower() == "fair" or health_score < 70:
+        return "warning"
+    return "normal"
+
+
+async def load_equipment() -> list[dict]:
+    """Load equipment from assets.csv via csv_loader (primary source)."""
+    try:
+        # Load from CSV using the csv_loader service
+        assets = AssetData.load()
+
+        if assets:
+            equipment_list = []
+            for asset in assets:
+                # Format dates as strings
+                install_date = ""
+                if asset.get("install_date"):
+                    if isinstance(asset["install_date"], datetime):
+                        install_date = asset["install_date"].strftime("%Y-%m-%d")
+                    else:
+                        install_date = str(asset["install_date"])
+
+                last_service = ""
+                if asset.get("last_service_date"):
+                    if isinstance(asset["last_service_date"], datetime):
+                        last_service = asset["last_service_date"].strftime("%Y-%m-%d")
+                    else:
+                        last_service = str(asset["last_service_date"])
+
+                # Calculate health score from condition and age
+                health_score = _derive_health_score(
+                    asset.get("condition", "fair"),
+                    asset.get("age_years", 0),
+                    asset.get("expected_life_years", 20)
+                )
+
+                # Derive status from condition
+                status = _derive_status(asset.get("condition", "fair"), health_score)
+
+                # Derive capacity from asset category (approximate)
+                capacity_map = {
+                    "hvac-chiller": "300 tons",
+                    "hvac-ahu": "10,000 CFM",
+                    "hvac-cooling-tower": "500 tons",
+                    "hvac-split": "24 kW",
+                    "hvac-fcu": "6 kW",
+                    "generator": "500 kVA",
+                    "ups": "200 kVA",
+                    "lift-passenger": "1600 kg",
+                    "db-board": "3200A",
+                }
+                asset_category = asset.get("asset_category", "").lower()
+                capacity = capacity_map.get(asset_category, "N/A")
+
+                equipment_list.append({
+                    "id": asset.get("asset_id", ""),
+                    "site_id": asset.get("site_id", "").lower(),  # Normalize to lowercase
+                    "site_name": asset.get("site_name", ""),
+                    "type": asset.get("asset_category", "unknown"),
+                    "name": asset.get("asset_tag", "Unknown Equipment"),
+                    "manufacturer": asset.get("make", "Unknown"),
+                    "model": asset.get("model", "Unknown"),
+                    "capacity": capacity,
+                    "install_date": install_date,
+                    "last_service": last_service,
+                    "status": status,
+                    "health_score": health_score,
+                    "location": asset.get("site_name", ""),
+                    "serial_number": asset.get("serial_number", ""),
+                    "condition": asset.get("condition", "fair"),
+                    "criticality": asset.get("criticality", "standard"),
+                    "notes": asset.get("notes", ""),
+                    "age_years": asset.get("age_years", 0),
+                    "expected_life_years": asset.get("expected_life_years", 20),
+                    "remaining_life_years": asset.get("remaining_life_years", 0),
+                })
+
+            logger.info(f"Loaded {len(equipment_list)} equipment items from assets.csv")
+            return equipment_list
+    except Exception as e:
+        logger.error(f"Failed to load from assets.csv: {e}")
+
+    # Fallback to equipment.json if CSV loading fails
     equipment_file = DATA_DIR / "equipment.json"
     if equipment_file.exists():
-        with open(equipment_file) as f:
-            return json.load(f)
-    return []
+        try:
+            with open(equipment_file) as f:
+                equipment_list = json.load(f)
+                logger.info(f"Loaded {len(equipment_list)} equipment items from equipment.json (fallback)")
+                return equipment_list
+        except Exception as e:
+            logger.error(f"Failed to load equipment.json: {e}")
+
+    # Final fallback to simulation API
+    logger.warning("No local data found, falling back to simulation API")
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(f"{SIMULATION_API}/equipment", timeout=5.0)
+            if response.status_code == 200:
+                data = response.json()
+                equipment_list = data.get("equipment", [])
+                logger.info(f"Loaded {len(equipment_list)} equipment items from simulation API")
+                return equipment_list
+            else:
+                logger.error(f"Simulation API returned {response.status_code}")
+                return []
+    except Exception as e:
+        logger.error(f"Failed to load equipment from simulation API: {e}")
+        return []
 
 
-def load_sensors() -> list[dict]:
-    """Load sensors from JSON file."""
+async def load_sensors() -> list[dict]:
+    """Load sensors from sensors.json file (primary source)."""
     sensors_file = DATA_DIR / "sensors.json"
     if sensors_file.exists():
-        with open(sensors_file) as f:
-            return json.load(f)
-    return []
+        try:
+            with open(sensors_file) as f:
+                sensors_list = json.load(f)
+                logger.info(f"Loaded {len(sensors_list)} sensors from sensors.json")
+                return sensors_list
+        except Exception as e:
+            logger.error(f"Failed to load sensors.json: {e}")
+
+    # Fallback to simulation API only if JSON not available
+    logger.warning("sensors.json not found, falling back to simulation API")
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(f"{SIMULATION_API}/equipment", timeout=5.0)
+            if response.status_code != 200:
+                return []
+
+            equipment_list = response.json().get("equipment", [])
+            all_sensors = []
+
+            for eq in equipment_list:
+                # Convert sensor readings to sensor format
+                for sensor_name, value in eq.get("sensor_readings", {}).items():
+                    if isinstance(value, (int, float)):
+                        sensor = {
+                            "id": f"{eq['id']}_{sensor_name.upper()}",
+                            "equipment_id": eq["id"],
+                            "name": f"{eq['name']} {sensor_name.replace('_', ' ').title()}",
+                            "type": "temperature" if "temp" in sensor_name.lower() else "pressure" if "press" in sensor_name.lower() else "generic",
+                            "unit": "°C" if "temp" in sensor_name.lower() else "bar" if "press" in sensor_name.lower() else "-",
+                            "current_value": value,
+                            "timestamp": eq.get("timestamp", ""),
+                            "quality": "good"
+                        }
+                        all_sensors.append(sensor)
+
+            logger.info(f"Loaded {len(all_sensors)} sensors from simulation API")
+            return all_sensors
+    except Exception as e:
+        logger.error(f"Failed to load sensors from simulation API: {e}")
+        return []
 
 
-def load_alerts() -> list[dict]:
-    """Load alerts from JSON file."""
+async def load_alerts() -> list[dict]:
+    """Load alerts from alarms.csv via csv_loader (primary source)."""
+    try:
+        # Load from CSV using the csv_loader service
+        alarms = CSVAlarmData.load()
+
+        if alarms:
+            alerts_list = []
+            for alarm in alarms:
+                # Map severity to priority
+                severity = alarm.get("severity", "minor").lower()
+                priority_map = {"critical": 5, "major": 4, "minor": 2, "warning": 1}
+                priority = priority_map.get(severity, 2)
+
+                # Format timestamp
+                triggered_at = ""
+                if alarm.get("triggered_at"):
+                    if isinstance(alarm["triggered_at"], datetime):
+                        triggered_at = alarm["triggered_at"].isoformat()
+                    else:
+                        triggered_at = str(alarm["triggered_at"])
+
+                alerts_list.append({
+                    "id": alarm.get("alarm_id", ""),
+                    "equipment_id": alarm.get("asset_id", ""),
+                    "type": "alarm",
+                    "severity": severity,
+                    "title": f"{alarm.get('asset_tag', '')} - {alarm.get('alarm_code', '')}",
+                    "description": alarm.get("alarm_description", ""),
+                    "status": "cleared" if alarm.get("cleared_at") else "active",
+                    "created_at": triggered_at,
+                    "acknowledged": bool(alarm.get("acknowledged_at")),
+                    "acknowledged_by": alarm.get("acknowledged_by", None),
+                    "assigned_to": None,
+                    "priority": priority,
+                    "tags": ["alarm", alarm.get("source", "bms")],
+                    "site_id": alarm.get("site_id", ""),
+                    "site_name": alarm.get("site_name", ""),
+                    "notes": alarm.get("notes", ""),
+                })
+
+            logger.info(f"Loaded {len(alerts_list)} alerts from alarms.csv")
+            return alerts_list
+    except Exception as e:
+        logger.error(f"Failed to load from alarms.csv: {e}")
+
+    # Fallback to alerts.json if CSV loading fails
     alerts_file = DATA_DIR / "alerts.json"
     if alerts_file.exists():
-        with open(alerts_file) as f:
-            return json.load(f)
-    return []
+        try:
+            with open(alerts_file) as f:
+                alerts_list = json.load(f)
+                logger.info(f"Loaded {len(alerts_list)} alerts from alerts.json (fallback)")
+                return alerts_list
+        except Exception as e:
+            logger.error(f"Failed to load alerts.json: {e}")
+
+    # Final fallback to simulation API
+    logger.warning("No local alert data found, falling back to simulation API")
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(f"{SIMULATION_API}/equipment", timeout=5.0)
+            if response.status_code != 200:
+                return []
+
+            equipment_list = response.json().get("equipment", [])
+            all_alerts = []
+
+            for eq in equipment_list:
+                for fault_code in eq.get("fault_codes", []):
+                    alert = {
+                        "id": f"ALERT_{eq['id']}_{fault_code}",
+                        "equipment_id": eq["id"],
+                        "type": "fault",
+                        "severity": "major" if "E14" in fault_code or "F21" in fault_code else "minor",
+                        "title": f"{eq['name']} - Fault {fault_code}",
+                        "description": f"Fault {fault_code} detected on {eq['name']}",
+                        "status": "active",
+                        "created_at": eq.get("timestamp", ""),
+                        "acknowledged": False,
+                        "assigned_to": None,
+                        "priority": 4 if "E14" in fault_code or "F21" in fault_code else 2,
+                        "tags": ["fault", "simulated"]
+                    }
+                    all_alerts.append(alert)
+
+            logger.info(f"Loaded {len(all_alerts)} alerts from simulation API")
+            return all_alerts
+    except Exception as e:
+        logger.error(f"Failed to load alerts from simulation API: {e}")
+        return []
 
 
 def load_safety_rules() -> list[dict]:
@@ -185,15 +445,38 @@ async def list_equipment(
     Returns:
         EquipmentListResponse with total count and list of equipment.
     """
-    equipment = load_equipment()
-    sensors = load_sensors()
-    alerts = load_alerts()
+    raw_equipment = await load_equipment()
+    sensors = await load_sensors()
+    alerts = await load_alerts()
 
-    # Apply filters
+    # Data is already transformed by load_equipment(), just ensure required fields exist
+    equipment = []
+    for eq in raw_equipment:
+        transformed = {
+            "id": eq.get("id", ""),
+            "site_id": eq.get("site_id", "site-001"),
+            "type": eq.get("type", "unknown"),
+            "name": eq.get("name", "Unknown Equipment"),
+            "manufacturer": eq.get("manufacturer", "Unknown"),
+            "model": eq.get("model", "Unknown"),
+            "capacity": eq.get("capacity", "N/A"),
+            "install_date": eq.get("install_date", ""),
+            "last_service": eq.get("last_service", ""),
+            "status": eq.get("status", "normal"),
+            "health_score": int(eq.get("health_score", 100)),
+            "location": eq.get("location", ""),
+            "serial_number": eq.get("serial_number", ""),
+        }
+        equipment.append(transformed)
+
+    # Apply filters - normalize site_id comparison (handle both SITE-001 and site-001 formats)
     if site_id:
-        equipment = [e for e in equipment if e["site_id"] == site_id]
+        site_id_lower = site_id.lower()
+        equipment = [e for e in equipment if e["site_id"].lower() == site_id_lower]
     if equipment_type:
-        equipment = [e for e in equipment if e["type"].lower() == equipment_type.lower()]
+        # Match equipment type (handle hvac-chiller, hvac-ahu etc.)
+        type_lower = equipment_type.lower()
+        equipment = [e for e in equipment if type_lower in e["type"].lower() or e["type"].lower() == type_lower]
     if status:
         equipment = [e for e in equipment if e["status"].lower() == status.lower()]
     if min_health is not None:
@@ -234,13 +517,30 @@ async def get_equipment(equipment_id: str) -> EquipmentResponse:
     Raises:
         HTTPException: If equipment not found.
     """
-    equipment = load_equipment()
-    sensors = load_sensors()
-    alerts = load_alerts()
+    raw_equipment = await load_equipment()
+    sensors = await load_sensors()
+    alerts = await load_alerts()
 
-    eq = next((e for e in equipment if e["id"] == equipment_id), None)
-    if not eq:
+    raw_eq = next((e for e in raw_equipment if e["id"] == equipment_id), None)
+    if not raw_eq:
         raise HTTPException(status_code=404, detail=f"Equipment {equipment_id} not found")
+
+    # Data is already transformed by load_equipment()
+    eq = {
+        "id": raw_eq.get("id", ""),
+        "site_id": raw_eq.get("site_id", "site-001"),
+        "type": raw_eq.get("type", "unknown"),
+        "name": raw_eq.get("name", "Unknown Equipment"),
+        "manufacturer": raw_eq.get("manufacturer", "Unknown"),
+        "model": raw_eq.get("model", "Unknown"),
+        "capacity": raw_eq.get("capacity", "N/A"),
+        "install_date": raw_eq.get("install_date", ""),
+        "last_service": raw_eq.get("last_service", ""),
+        "status": raw_eq.get("status", "normal"),
+        "health_score": int(raw_eq.get("health_score", 100)),
+        "location": raw_eq.get("location", ""),
+        "serial_number": raw_eq.get("serial_number", ""),
+    }
 
     eq_sensors = [s for s in sensors if s.get("equipment_id") == equipment_id]
     eq_alerts = [
@@ -276,7 +576,7 @@ async def get_equipment_controls(equipment_id: str):
 
         # Fallback to JSON if not in Supabase or Supabase errored
         if not eq:
-            equipment_list = load_equipment()
+            equipment_list = await load_equipment()
             eq = next((e for e in equipment_list if e.get("id") == equipment_id), None)
             # Map JSON fields to expected format
             if eq:
@@ -297,7 +597,7 @@ async def get_equipment_controls(equipment_id: str):
 
         # Fallback to JSON sensors if none from Supabase
         if not sensors:
-            all_sensors = load_sensors()
+            all_sensors = await load_sensors()
             sensors = [s for s in all_sensors if s.get("equipment_id") == equipment_id]
 
         # Convert sensors to control points format
@@ -467,7 +767,7 @@ async def control_equipment(
 
         # Fallback to JSON if not in Supabase
         if not eq:
-            equipment_list = load_equipment()
+            equipment_list = await load_equipment()
             eq = next((e for e in equipment_list if e.get("id") == equipment_id), None)
             if eq:
                 eq["building_id"] = eq.get("site_id", "")
@@ -499,7 +799,7 @@ async def control_equipment(
             except Exception as sensor_err:
                 logger.debug(f"Supabase sensor lookup failed: {sensor_err}")
             if not sensors:
-                all_sensors = load_sensors()
+                all_sensors = await load_sensors()
                 sensors = [s for s in all_sensors if s.get("equipment_id") == equipment_id]
             sensor = next((s for s in sensors if s.get("code") == point), None)
             if sensor:
@@ -587,7 +887,7 @@ async def get_equipment_stats(
     Returns:
         EquipmentStatsResponse with aggregated statistics.
     """
-    equipment = load_equipment()
+    equipment = await load_equipment()
 
     if site_id:
         equipment = [e for e in equipment if e["site_id"] == site_id]

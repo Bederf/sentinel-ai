@@ -1,11 +1,15 @@
-"""Alerts API endpoints."""
+"""Alerts API endpoints - SENTINEL Integration."""
 
 import json
 from pathlib import Path
 from typing import Optional
+from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
+
+# Import simulation service for live alerts
+from app.api.simulation import simulation_service
 
 router = APIRouter()
 
@@ -14,12 +18,52 @@ DATA_DIR = Path(__file__).parent.parent / "data"
 
 
 def load_alerts() -> list[dict]:
-    """Load alerts from JSON file."""
+    """Load alerts from JSON file AND simulation."""
+    alerts = []
+
+    # Load static alerts from JSON
     alerts_file = DATA_DIR / "alerts.json"
     if alerts_file.exists():
         with open(alerts_file) as f:
-            return json.load(f)
-    return []
+            static_alerts = json.load(f)
+            alerts.extend(static_alerts)
+
+    # Load live alerts from simulation
+    try:
+        sim_alerts = simulation_service.get_active_alerts()
+        for sa in sim_alerts:
+            # Convert simulation alert to standard format
+            alert = {
+                "id": sa["id"],
+                "anomaly_id": None,
+                "equipment_id": sa["equipment_id"],
+                "site_id": sa.get("site_id", "site-001"),
+                "type": sa["type"],
+                "severity": sa["severity"],
+                "status": sa["status"],
+                "title": sa["title"],
+                "message": sa["message"],
+                "created_at": sa["created_at"],
+                "updated_at": sa["created_at"],
+                "acknowledged": sa["acknowledged"],
+                "acknowledged_by": sa.get("acknowledged_by"),
+                "acknowledged_at": sa.get("acknowledged_at"),
+                "priority": sa["priority"],
+                "category": sa.get("category", "hvac"),
+                "estimated_cost_zar": 15000.0 if sa["severity"] == "critical" else 5000.0,
+                "potential_damage_zar": 150000.0 if sa["severity"] == "critical" else 50000.0,
+                "equipment_name": sa["equipment_name"],
+                "site_name": sa.get("site_name", "SENTINEL Demo Site"),
+                "health_score": sa.get("health_score"),
+                "fault_codes": sa.get("fault_codes", []),
+                "is_simulation": True
+            }
+            alerts.append(alert)
+    except Exception as e:
+        # If simulation not available, continue with static alerts only
+        pass
+
+    return alerts
 
 
 def load_anomalies() -> list[dict]:

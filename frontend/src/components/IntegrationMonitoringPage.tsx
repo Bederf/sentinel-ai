@@ -21,10 +21,14 @@ import {
   ChevronRight,
   Server,
   Zap,
+  Plus,
+  X,
 } from "lucide-react";
 import { Badge, Callout, Title } from "@tremor/react";
 import { monitoringApi } from "../lib/api";
+import { formatDateTime } from "../lib/timeFormat";
 import { GoLiveChecklist } from "./GoLiveChecklist";
+import { IntegrationWizard } from "./IntegrationWizard";
 import type {
   IntegrationHealthSummary,
   IntegrationAlert,
@@ -117,7 +121,7 @@ function AlertItem({ alert, onDismiss }: AlertItemProps) {
         <div>
           <p className="text-sm">{alert.message}</p>
           <p className="text-xs mt-1 opacity-70">
-            {new Date(alert.timestamp).toLocaleString()}
+            {formatDateTime(alert.timestamp)}
           </p>
         </div>
         <button
@@ -199,6 +203,7 @@ export function IntegrationMonitoringPage() {
   const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set());
   const [sites, setSites] = useState<Site[]>([]);
   const [selectedBuildingId, setSelectedBuildingId] = useState<string | null>(null);
+  const [showWizard, setShowWizard] = useState(false);
 
   // Loading states
   const [loadingHealth, setLoadingHealth] = useState(true);
@@ -395,6 +400,19 @@ export function IntegrationMonitoringPage() {
               </option>
             ))}
           </select>
+
+          {/* Add Data Source button */}
+          <button
+            onClick={() => setShowWizard(true)}
+            className="text-sm rounded px-3 py-2 flex items-center gap-2 font-medium"
+            style={{
+              background: "var(--color-sentinel-amber)",
+              color: "var(--color-sentinel-bg-primary)",
+            }}
+          >
+            <Plus className="w-4 h-4" />
+            Add Data Source
+          </button>
 
           {/* Refresh button */}
           <button
@@ -841,6 +859,47 @@ export function IntegrationMonitoringPage() {
         <div className="mt-6">
           <Title className="mb-4">Go-Live Validation</Title>
           <GoLiveChecklist buildingId={selectedBuildingId} />
+        </div>
+      )}
+
+      {/* Integration Wizard Modal */}
+      {showWizard && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: "rgba(0, 0, 0, 0.7)" }}
+        >
+          <div
+            className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-lg"
+            style={{
+              background: "var(--color-sentinel-bg-panel)",
+              border: "1px solid var(--color-sentinel-border)",
+            }}
+          >
+            <button
+              onClick={() => setShowWizard(false)}
+              className="absolute top-4 right-4 p-2 rounded z-10 transition-colors"
+              style={{
+                color: "var(--color-sentinel-text-primary)",
+                background: "var(--color-sentinel-bg-secondary)",
+                border: "1px solid var(--color-sentinel-border)",
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = "var(--color-sentinel-red)"}
+              onMouseLeave={(e) => e.currentTarget.style.background = "var(--color-sentinel-bg-secondary)"}
+              aria-label="Close wizard"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <div className="p-6">
+              <IntegrationWizard
+                buildingId={selectedBuildingId || "default"}
+                onClose={() => setShowWizard(false)}
+                onComplete={() => {
+                  setShowWizard(false);
+                  fetchData(true);
+                }}
+              />
+            </div>
+          </div>
         </div>
       )}
     </div>

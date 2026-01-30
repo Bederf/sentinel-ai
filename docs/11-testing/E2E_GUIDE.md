@@ -1,3 +1,19 @@
+---
+title: "End-to-End Testing Guide"
+type: "guide"
+status: "approved"
+version: "1.0.0"
+created: "2026-01-30"
+updated: "2026-01-30"
+author: "Sentinel Development Team"
+tags: ["testing", "e2e", "playwright", "automation"]
+related: ["testing-strategy.md", "test-data.md"]
+domain: "general"
+audience: "developers"
+complexity: "intermediate"
+estimated_read_time: 10
+---
+
 # E2E Testing Guide
 
 ## Overview

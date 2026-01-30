@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import api from "../lib/api";
 import type { AuditEntry } from "../lib/api";
+import { formatDateTime } from "../lib/timeFormat";
 
 interface RecentActionsProps {
   /** Filter to specific device (optional) */
@@ -95,7 +96,11 @@ export function RecentActions({
 
       try {
         const entries = await api.getRecentAuditLogs(limit, deviceId);
-        setActions(entries);
+        // Filter out duplicate entries by ID
+        const uniqueEntries = entries.filter((entry, index, self) =>
+          index === self.findIndex((e) => e.id === entry.id)
+        );
+        setActions(uniqueEntries);
         setError(null);
       } catch (err) {
         console.error("Failed to fetch recent actions:", err);
@@ -136,7 +141,7 @@ export function RecentActions({
     return (
       <div className="space-y-2 p-3">
         {[...Array(3)].map((_, i) => (
-          <div key={i} className="animate-pulse">
+          <div key={`skeleton-${i}`} className="animate-pulse">
             <div
               className="h-10 rounded"
               style={{ background: "var(--color-sentinel-bg-secondary)" }}
@@ -277,7 +282,7 @@ export function RecentActions({
               >
                 <div style={{ color: "var(--color-sentinel-text-secondary)" }}>
                   <span className="font-medium">Time:</span>{" "}
-                  {new Date(action.timestamp).toLocaleString()}
+                  {formatDateTime(action.timestamp)}
                 </div>
                 <div style={{ color: "var(--color-sentinel-text-secondary)" }}>
                   <span className="font-medium">Device ID:</span> {action.device_id}

@@ -17,6 +17,7 @@ from app.api import concept  # Concept Evolution CAFM data
 from app.api import dali  # DALI-2 lighting integration
 from app.api import complaints  # Comfort complaint handling
 from app.api import mcp  # MCP (Model Context Protocol) server
+from app.api import mcp_sse  # MCP SSE transport for remote clients
 from app.middleware.audit_middleware import AuditMiddleware
 from app.services.background_scheduler import scheduler_service
 from app.api.simulation import simulation_service  # BMS simulation service
@@ -67,6 +68,7 @@ app.include_router(simulation.router, prefix="/api", tags=["simulation"])  # BMS
 app.include_router(dali.router, tags=["dali-lighting"])  # DALI-2 lighting integration
 app.include_router(complaints.router, tags=["comfort-complaints"])  # Comfort complaint handling
 app.include_router(mcp.router, tags=["mcp"])  # MCP (Model Context Protocol) for AI tool integration
+app.include_router(mcp_sse.router, tags=["mcp-sse"])  # MCP SSE transport for remote clients
 
 
 @app.on_event("startup")
@@ -77,6 +79,11 @@ async def startup_event():
 
     # Generate initial demo data and schedule periodic updates (60 seconds)
     scheduler_service.add_demo_data_job(interval_seconds=60)
+
+    # Start AI optimization analysis job (runs every 15 minutes)
+    # Scans all sites with optimization_enabled=true and generates recommendations
+    # When a recommendation is generated, the flashing lightbulb appears on dashboard
+    scheduler_service.add_optimization_analysis_job(interval_seconds=900)  # 15 minutes
 
     # Start BMS simulation service
     try:

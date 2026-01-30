@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { Card, Badge, Button, Callout } from "@tremor/react";
 import { validationApi } from "../lib/api";
+import { formatDateTime } from "../lib/timeFormat";
 import type {
   ValidationChecklist,
   ChecklistItem,
@@ -335,7 +336,7 @@ export function GoLiveChecklist({ buildingId, onStatusChange }: GoLiveChecklistP
                   className="text-xs"
                   style={{ color: "var(--color-sentinel-text-disabled)" }}
                 >
-                  Last checked: {new Date(checklist.checked_at).toLocaleString()}
+                  Last checked: {formatDateTime(checklist.checked_at)}
                 </span>
               </div>
             </div>
@@ -491,11 +492,11 @@ export function GoLiveChecklist({ buildingId, onStatusChange }: GoLiveChecklistP
           {/* Blocking issues */}
           {checklist.blocking_issues.length > 0 && (
             <Callout title="Blocking Issues" color="rose" className="mb-4">
-              <ul className="list-disc list-inside text-sm">
+              <span className="text-sm">
                 {checklist.blocking_issues.map((issue, index) => (
-                  <li key={index}>{issue}</li>
+                  <span key={index} className="block">• {issue}</span>
                 ))}
-              </ul>
+              </span>
             </Callout>
           )}
 

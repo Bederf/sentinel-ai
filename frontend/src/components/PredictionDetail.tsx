@@ -90,8 +90,31 @@ interface PredictionDetailProps {
       };
       story?: string;
     };
+    cost_impact?: {
+      preventive_breakdown: {
+        labor_cost_zar: number;
+        parts_cost_zar: number;
+        downtime_hours: number;
+        total_zar: number;
+      };
+      failure_breakdown: {
+        emergency_repair_zar: number;
+        downtime_loss_zar: number;
+        downtime_hours: number;
+        total_zar: number;
+      };
+      potential_savings_zar: number;
+      savings_percent: number;
+      roi_message: string;
+    };
     recommended_action: string;
-    parts_required: string[];
+    parts_required: Array<{
+      part_number: string;
+      name: string;
+      quantity: number;
+      cost_zar: number;
+      lead_time_days: number;
+    }> | string[];
     urgency: string;
   };
   isOpen: boolean;
@@ -346,33 +369,128 @@ export function PredictionDetail({ prediction, isOpen, onClose }: PredictionDeta
           </SectionCard>
 
           {/* Cost Impact Analysis */}
-          {prediction.costImpact && (
+          {(prediction.costImpact || prediction.cost_impact) && (
             <SectionCard title="Cost Impact Analysis">
-              {!showCostBreakdown ? (
-                <div>
-                  <CostCard costImpact={prediction.costImpact} />
-                  <button
-                    onClick={() => setShowCostBreakdown(true)}
-                    className="mt-3 text-sm flex items-center gap-1"
-                    style={{ color: "var(--color-grafana-text-link)" }}
+              {prediction.costImpact ? (
+                // Original costImpact format
+                !showCostBreakdown ? (
+                  <div>
+                    <CostCard costImpact={prediction.costImpact} />
+                    <button
+                      onClick={() => setShowCostBreakdown(true)}
+                      className="mt-3 text-sm flex items-center gap-1"
+                      style={{ color: "var(--color-grafana-text-link)" }}
+                    >
+                      <ChevronDown className="h-4 w-4" />
+                      View detailed breakdown
+                    </button>
+                  </div>
+                ) : (
+                  <div>
+                    <CostBreakdownDetail costImpact={prediction.costImpact} />
+                    <button
+                      onClick={() => setShowCostBreakdown(false)}
+                      className="mt-3 text-sm flex items-center gap-1"
+                      style={{ color: "var(--color-grafana-text-link)" }}
+                    >
+                      <ChevronUp className="h-4 w-4" />
+                      Hide breakdown
+                    </button>
+                  </div>
+                )
+              ) : prediction.cost_impact ? (
+                // New cost_impact format from backend
+                <div className="space-y-4">
+                  {/* Summary message */}
+                  <div
+                    className="p-3 rounded"
+                    style={{
+                      background: "rgba(115, 191, 105, 0.15)",
+                      border: "1px solid rgba(115, 191, 105, 0.3)",
+                    }}
                   >
-                    <ChevronDown className="h-4 w-4" />
-                    View detailed breakdown
-                  </button>
+                    <span
+                      className="text-sm font-medium"
+                      style={{ color: "var(--color-status-success)" }}
+                    >
+                      {prediction.cost_impact.roi_message}
+                    </span>
+                  </div>
+
+                  {/* Comparison grid */}
+                  <div className="grid grid-cols-2 gap-4">
+                    {/* Preventive */}
+                    <div
+                      className="p-3 rounded"
+                      style={{
+                        background: "var(--color-grafana-bg-secondary)",
+                        border: "1px solid var(--color-grafana-border)",
+                      }}
+                    >
+                      <div className="text-xs mb-2" style={{ color: "var(--color-grafana-text-disabled)" }}>
+                        Preventive Maintenance
+                      </div>
+                      <div className="text-xl font-bold" style={{ color: "var(--color-status-success)" }}>
+                        {formatZAR(prediction.cost_impact.preventive_breakdown.total_zar)}
+                      </div>
+                      <div className="text-xs mt-2 space-y-1" style={{ color: "var(--color-grafana-text-secondary)" }}>
+                        <div className="flex justify-between">
+                          <span>Labor:</span>
+                          <span>{formatZAR(prediction.cost_impact.preventive_breakdown.labor_cost_zar)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Parts:</span>
+                          <span>{formatZAR(prediction.cost_impact.preventive_breakdown.parts_cost_zar)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Downtime:</span>
+                          <span>{prediction.cost_impact.preventive_breakdown.downtime_hours}h</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Failure */}
+                    <div
+                      className="p-3 rounded"
+                      style={{
+                        background: "var(--color-grafana-bg-secondary)",
+                        border: "1px solid var(--color-grafana-border)",
+                      }}
+                    >
+                      <div className="text-xs mb-2" style={{ color: "var(--color-grafana-text-disabled)" }}>
+                        If Failure Occurs
+                      </div>
+                      <div className="text-xl font-bold" style={{ color: "var(--color-status-error)" }}>
+                        {formatZAR(prediction.cost_impact.failure_breakdown.total_zar)}
+                      </div>
+                      <div className="text-xs mt-2 space-y-1" style={{ color: "var(--color-grafana-text-secondary)" }}>
+                        <div className="flex justify-between">
+                          <span>Emergency repair:</span>
+                          <span>{formatZAR(prediction.cost_impact.failure_breakdown.emergency_repair_zar)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Downtime loss:</span>
+                          <span>{formatZAR(prediction.cost_impact.failure_breakdown.downtime_loss_zar)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Downtime:</span>
+                          <span>{prediction.cost_impact.failure_breakdown.downtime_hours}h</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Savings highlight */}
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm" style={{ color: "var(--color-grafana-text-secondary)" }}>
+                      Potential Savings
+                    </span>
+                    <span className="text-lg font-bold" style={{ color: "var(--color-status-success)" }}>
+                      {formatZAR(prediction.cost_impact.potential_savings_zar)} ({prediction.cost_impact.savings_percent}%)
+                    </span>
+                  </div>
                 </div>
-              ) : (
-                <div>
-                  <CostBreakdownDetail costImpact={prediction.costImpact} />
-                  <button
-                    onClick={() => setShowCostBreakdown(false)}
-                    className="mt-3 text-sm flex items-center gap-1"
-                    style={{ color: "var(--color-grafana-text-link)" }}
-                  >
-                    <ChevronUp className="h-4 w-4" />
-                    Hide breakdown
-                  </button>
-                </div>
-              )}
+              ) : null}
             </SectionCard>
           )}
 
@@ -581,19 +699,77 @@ export function PredictionDetail({ prediction, isOpen, onClose }: PredictionDeta
           </div>
 
           {/* Parts Required */}
-          <SectionCard title="Parts Required">
-            <div className="space-y-2">
-              {prediction.parts_required.map((part, index) => (
-                <div key={index} className="flex items-center gap-2">
-                  <Wrench
-                    className="h-4 w-4"
-                    style={{ color: "var(--color-grafana-text-disabled)" }}
-                  />
-                  <span style={{ color: "var(--color-grafana-text-primary)" }}>{part}</span>
-                </div>
-              ))}
-            </div>
-          </SectionCard>
+          {prediction.parts_required && prediction.parts_required.length > 0 && (
+            <SectionCard title="Parts Required">
+              <div className="space-y-3">
+                {prediction.parts_required.map((part, index) => (
+                  typeof part === 'string' ? (
+                    // Old format: simple string
+                    <div key={index} className="flex items-center gap-2">
+                      <Wrench
+                        className="h-4 w-4"
+                        style={{ color: "var(--color-grafana-text-disabled)" }}
+                      />
+                      <span style={{ color: "var(--color-grafana-text-primary)" }}>{part}</span>
+                    </div>
+                  ) : (
+                    // New format: object with details
+                    <div
+                      key={index}
+                      className="p-3 rounded"
+                      style={{
+                        background: "var(--color-grafana-bg-secondary)",
+                        border: "1px solid var(--color-grafana-border)",
+                      }}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-start gap-2">
+                          <Wrench
+                            className="h-4 w-4 mt-0.5"
+                            style={{ color: "var(--color-grafana-text-disabled)" }}
+                          />
+                          <div>
+                            <div className="font-medium" style={{ color: "var(--color-grafana-text-primary)" }}>
+                              {part.name}
+                            </div>
+                            <div className="text-xs mt-1" style={{ color: "var(--color-grafana-text-disabled)" }}>
+                              Part #: {part.part_number} • Qty: {part.quantity}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-medium" style={{ color: "var(--color-grafana-text-primary)" }}>
+                            {formatZAR(part.cost_zar)}
+                          </div>
+                          <div className="text-xs" style={{ color: "var(--color-grafana-text-secondary)" }}>
+                            {part.lead_time_days} day{part.lead_time_days !== 1 ? 's' : ''} lead time
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                ))}
+
+                {/* Total parts cost for new format */}
+                {typeof prediction.parts_required[0] !== 'string' && (
+                  <div
+                    className="pt-3 mt-3 flex justify-between items-center"
+                    style={{ borderTop: "1px solid var(--color-grafana-border)" }}
+                  >
+                    <span className="text-sm font-medium" style={{ color: "var(--color-grafana-text-secondary)" }}>
+                      Total Parts Cost
+                    </span>
+                    <span className="text-lg font-bold" style={{ color: "var(--color-grafana-text-primary)" }}>
+                      {formatZAR(
+                        (prediction.parts_required as Array<{ cost_zar: number; quantity: number }>)
+                          .reduce((sum, p) => sum + (p.cost_zar * p.quantity), 0)
+                      )}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </SectionCard>
+          )}
 
           {/* Footer Actions */}
           <div className="flex justify-end gap-3 pt-4">

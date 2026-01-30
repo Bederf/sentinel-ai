@@ -13,6 +13,7 @@
 import { TemperatureControl } from "./TemperatureControl";
 import { SwitchControl } from "./SwitchControl";
 import { SelectorControl } from "./SelectorControl";
+import { ChillerToggleControl } from "./ChillerToggleControl";
 import type { DevicePoint } from "../lib/api";
 
 interface DeviceControlProps {
@@ -59,6 +60,29 @@ export function DeviceControl({
       );
 
     case "multistate_value":
+      // Special handling for chiller status points
+      if (point.name.toLowerCase().includes('chiller_status') ||
+          point.description.toLowerCase().includes('chiller operational status')) {
+        return (
+          <ChillerToggleControl
+            deviceId={point.device_id}
+            point={{
+              id: point.id,
+              name: point.name,
+              value: value as number,
+              type: point.point_type,
+              unit: point.unit,
+              min_value: point.min_value,
+              max_value: point.max_value,
+              states: point.metadata?.states
+            }}
+            onUpdate={(val) => onChange(val)}
+            disabled={disabled}
+          />
+        );
+      }
+
+      // Default multistate selector for other points
       const states = point.metadata?.states || {};
       const options = Object.entries(states).map(([key, label]) => ({
         value: parseInt(key),

@@ -68,7 +68,7 @@ export const AutonomousDecisionPanel: React.FC<AutonomousDecisionPanelProps> = (
   };
 
   return (
-    <Card className="p-6 bg-white dark:bg-gray-900 border rounded-lg">
+    <Card className="p-6 rounded-lg">
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
           Autonomous Decisions

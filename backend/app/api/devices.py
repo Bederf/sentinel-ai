@@ -80,6 +80,20 @@ async def get_devices(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+async def _enrich_device_with_current_values(device_id: str, device_dict: dict) -> dict:
+    """Add current point values from adapter state to device dict."""
+    try:
+        adapter = await device_manager.get_adapter(device_id)
+        if adapter and hasattr(adapter, 'get_state'):
+            state = adapter.get_state()
+            for point_name, point_data in device_dict.get("points", {}).items():
+                if point_name in state:
+                    point_data["current_value"] = state[point_name]
+    except Exception as e:
+        logger.warning(f"Could not enrich device {device_id} with current values: {e}")
+    return device_dict
+
+
 @router.get("/devices/{device_id}", response_model=dict)
 async def get_device(device_id: str) -> dict:
     """Get a specific device by ID."""
@@ -87,7 +101,11 @@ async def get_device(device_id: str) -> dict:
         device = await device_manager.get_device(device_id)
         if not device:
             raise HTTPException(status_code=404, detail=f"Device {device_id} not found")
-        return device.to_dict()
+
+        device_dict = device.to_dict()
+        # Add current point values from adapter state
+        device_dict = await _enrich_device_with_current_values(device_id, device_dict)
+        return device_dict
     except HTTPException:
         raise
     except Exception as e:
