@@ -226,18 +226,31 @@ class AIOptimizerService:
 **Available Control Points:**
 {self._format_available_points(hvac_devices)}
 
+{self._format_zone_context(hvac_devices)}
+
+**Zone-Aware Optimization Rules (IMPORTANT - Southern Hemisphere context):**
+- Executive/Server zones (P1): Maintain tighter comfort bands, never sacrifice cooling
+- South/West-facing zones: Account for afternoon solar heat gain (+1-2°C adjustment needed)
+- Top floor zones: Roof heat gain requires 0.5-1°C lower setpoints than interior zones
+- Meeting rooms (P2): Pre-condition 15 min before scheduled meetings
+- Load shedding: Prioritize by zone_priority (P1 = critical, P5 = lowest priority)
+- Plant rooms (P5): Can accept wider temperature ranges for energy savings
+
 **Building Constraints (SAFETY LIMITS - MUST NOT EXCEED):**
 - CHW temperature: 5-15°C (minimum 5°C to prevent freeze damage)
-- Zone temperature setpoints: 20-26°C (comfort range)
+- Zone temperature setpoints: 20-26°C (standard comfort range)
+- Executive zones: 21-23°C (tighter comfort band)
+- Server rooms: 18-22°C (critical cooling)
 - Humidity: 30-65% RH
 
 **Your Task:**
 1. Analyze the current conditions vs outdoor weather
 2. Consider energy pricing (higher rates = more aggressive optimization)
-3. Recommend specific HVAC setpoint changes
-4. IMPORTANT: Use the EXACT point_name from the "Available Control Points" list above
-5. Project energy savings in ZAR per hour
-6. Ensure all recommendations are within safety limits
+3. Apply zone-aware rules based on zone_type and exposure
+4. Recommend specific HVAC setpoint changes
+5. IMPORTANT: Use the EXACT point_name from the "Available Control Points" list above
+6. Project energy savings in ZAR per hour
+7. Ensure all recommendations are within safety limits for each zone type
 
 **Response Format (JSON):**
 ```json
@@ -511,6 +524,86 @@ Provide ONLY the JSON response, no additional text."""
             lines.append(f"- {zone_type} ({exposure}, {priority}): {', '.join(devices)}")
         return "\n".join(lines)
 
+    def _should_skip_zone_optimization(self, device: Device, zone_type: Optional[ZoneType]) -> bool:
+        """Check if zone type should have restricted optimization.
+
+        Server rooms and critical zones should not have cooling reduced.
+        """
+        if zone_type == ZoneType.SERVER_ROOM:
+            return True  # Never reduce cooling in server rooms
+        return False
+
+    def _get_zone_specific_setpoint_limits(
+        self, device: Device, zone_type: Optional[ZoneType]
+    ) -> tuple:
+        """Get zone-specific setpoint min/max limits.
+
+        Returns:
+            Tuple of (min_temp, max_temp) for the zone type
+        """
+        if zone_type == ZoneType.SERVER_ROOM:
+            return (18.0, 22.0)  # Tighter range for server rooms
+        elif zone_type == ZoneType.EXECUTIVE:
+            return (21.0, 23.0)  # Tighter comfort range for executive
+        elif zone_type == ZoneType.BANKING_HALL:
+            return (20.0, 24.0)  # Customer comfort
+        elif zone_type == ZoneType.MEETING_ROOM:
+            return (20.0, 24.0)  # Standard comfort when occupied
+        elif zone_type == ZoneType.PLANT_ROOM:
+            return (16.0, 30.0)  # Wide range for equipment areas
+        elif zone_type == ZoneType.PARKING:
+            return (10.0, 35.0)  # Minimal HVAC
+        else:  # OPEN_OFFICE, LOBBY, default
+            return (20.0, 26.0)  # Standard comfort range
+
+    def _apply_zone_aware_adjustments(
+        self,
+        device: Device,
+        base_setpoint_change: float,
+        outdoor_temp: float,
+    ) -> float:
+        """Apply zone-aware adjustments to setpoint recommendations.
+
+        Args:
+            device: The device to optimize
+            base_setpoint_change: Initial recommended setpoint change
+            outdoor_temp: Current outdoor temperature
+
+        Returns:
+            Adjusted setpoint change accounting for zone factors
+        """
+        zone_type = self._get_zone_type(device)
+        floor_level = self._get_floor_level(device)
+        exposure_modifier = self._get_exposure_modifier(device, outdoor_temp)
+
+        adjusted_change = base_setpoint_change
+
+        # Zone type adjustments
+        if zone_type == ZoneType.EXECUTIVE:
+            # Reduce setpoint increase for executive areas (comfort priority)
+            adjusted_change *= 0.5
+        elif zone_type == ZoneType.SERVER_ROOM:
+            # No setpoint increase for server rooms
+            adjusted_change = 0.0
+        elif zone_type == ZoneType.PLANT_ROOM:
+            # Can be more aggressive with plant rooms
+            adjusted_change *= 1.5
+
+        # Floor level adjustments
+        if floor_level >= 3 or floor_level == 99:  # Top floor or roof
+            # Reduce setpoint increase due to roof heat gain
+            adjusted_change *= 0.7
+        elif floor_level == 0:  # Ground floor
+            # Account for entry air infiltration
+            adjusted_change *= 0.9
+
+        # Exposure adjustments - south/west facing need less setpoint increase
+        if exposure_modifier > 0:
+            # Zones with solar gain need more cooling, so reduce setpoint increase
+            adjusted_change -= exposure_modifier * 0.3
+
+        return max(0.0, adjusted_change)  # Don't go negative
+
     def _analyze_with_rules(
         self,
         site_id: str,
@@ -569,10 +662,16 @@ Provide ONLY the JSON response, no additional text."""
                     "reason": reason,
                 })
 
-        # Rule 1: Zone temperature optimization for ALL zone controllers
-        # If outdoor > indoor + 3°C, recommend increasing cooling setpoint slightly
+        # Rule 1: Zone temperature optimization for ALL zone controllers (ZONE-AWARE)
+        # If outdoor > indoor + 3°C, recommend increasing cooling setpoint based on zone type
         if temp_diff > 3.0 and indoor_temp < 24.0:
             for zone_controller in zone_controllers:
+                zone_type = self._get_zone_type(zone_controller)
+
+                # Skip optimization for critical zones
+                if self._should_skip_zone_optimization(zone_controller, zone_type):
+                    continue
+
                 # Check for multiple possible cooling setpoint names
                 cooling_point_names = ["zone_cooling_setpoint", "cooling_setpoint", "cooling_setpoint_temp"]
                 current_point = self._find_point_on_device(zone_controller, cooling_point_names)
@@ -580,15 +679,25 @@ Provide ONLY the JSON response, no additional text."""
                 if current_point:
                     point_name = current_point.name
                     current_value = current_point.default_value if current_point else indoor_temp
-                    new_setpoint = min(current_value + 1.5, 24.0)
 
-                    add_recommendation(
-                        zone_controller,
-                        point_name,
-                        current_value,
-                        new_setpoint,
-                        f"Increase setpoint 1.5°C as outdoor temp rising to {outdoor_temp}°C - reduces cooling load while maintaining comfort",
+                    # Apply zone-aware adjustment to base 1.5°C increase
+                    adjusted_change = self._apply_zone_aware_adjustments(
+                        zone_controller, 1.5, outdoor_temp
                     )
+
+                    if adjusted_change > 0.1:  # Only recommend if meaningful change
+                        # Get zone-specific limits
+                        _, max_temp = self._get_zone_specific_setpoint_limits(zone_controller, zone_type)
+                        new_setpoint = min(current_value + adjusted_change, max_temp)
+
+                        zone_info = f" ({zone_type.value} zone)" if zone_type else ""
+                        add_recommendation(
+                            zone_controller,
+                            point_name,
+                            current_value,
+                            round(new_setpoint, 1),
+                            f"Increase setpoint {adjusted_change:.1f}°C{zone_info} as outdoor temp rising to {outdoor_temp}°C - reduces cooling load while maintaining comfort",
+                        )
 
         # Rule 2: Humidity optimization for ALL zone controllers with humidity setpoint
         if humidity < 50.0:
@@ -627,28 +736,46 @@ Provide ONLY the JSON response, no additional text."""
                         f"Increase CHW temp 1.5°C for higher chiller efficiency with rising outdoor temps",
                     )
 
-        # Rule 4: FCU optimization for ALL FCUs
-        # Optimize fan speed and setpoints based on conditions
+        # Rule 4: FCU optimization for ALL FCUs (ZONE-AWARE)
+        # Optimize fan speed and setpoints based on conditions and zone type
         if temp_diff > 2.0:
             for fcu in fcus:
+                zone_type = self._get_zone_type(fcu)
+
+                # Skip optimization for critical zones
+                if self._should_skip_zone_optimization(fcu, zone_type):
+                    continue
+
                 # Optimize cooling setpoint if available
-                cooling_point_names = ["cooling_setpoint", "zone_cooling_setpoint"]
+                cooling_point_names = ["cooling_setpoint", "zone_cooling_setpoint", "room_temp_setpoint"]
                 cooling_point = self._find_point_on_device(fcu, cooling_point_names)
 
                 if cooling_point:
                     current_value = cooling_point.default_value if cooling_point else 22.0
-                    new_setpoint = min(current_value + 1.0, 24.0)
 
-                    add_recommendation(
-                        fcu,
-                        cooling_point.name,
-                        current_value,
-                        new_setpoint,
-                        f"Increase FCU setpoint 1.0°C to reduce cooling load during high outdoor temps ({outdoor_temp}°C)",
-                    )
+                    # Apply zone-aware adjustment to base 1.0°C increase
+                    adjusted_change = self._apply_zone_aware_adjustments(fcu, 1.0, outdoor_temp)
+
+                    if adjusted_change > 0.1:
+                        # Get zone-specific limits
+                        _, max_temp = self._get_zone_specific_setpoint_limits(fcu, zone_type)
+                        new_setpoint = min(current_value + adjusted_change, max_temp)
+
+                        zone_info = f" ({zone_type.value} zone)" if zone_type else ""
+                        exposure = self._get_exposure(fcu)
+                        exposure_info = f", {exposure.value}-facing" if exposure else ""
+
+                        add_recommendation(
+                            fcu,
+                            cooling_point.name,
+                            current_value,
+                            round(new_setpoint, 1),
+                            f"Increase FCU setpoint {adjusted_change:.1f}°C{zone_info}{exposure_info} to reduce cooling load during high outdoor temps ({outdoor_temp}°C)",
+                        )
 
                 # Optimize fan speed if available and conditions warrant
-                if "fan_speed" in fcu.points and temp_diff < 5.0:
+                # Don't reduce fan speed in executive zones (comfort priority)
+                if "fan_speed" in fcu.points and temp_diff < 5.0 and zone_type not in [ZoneType.EXECUTIVE, ZoneType.SERVER_ROOM]:
                     current_speed = fcu.points.get("fan_speed")
                     current_value = current_speed.default_value if current_speed else 75.0
                     # Reduce fan speed slightly if temp difference is moderate
@@ -663,6 +790,9 @@ Provide ONLY the JSON response, no additional text."""
                             f"Reduce fan speed 10% for energy savings - moderate temperature differential allows lower airflow",
                         )
 
+        # Sort recommendations by zone priority (critical zones first)
+        recommendations = self._sort_recommendations_by_priority(recommendations, hvac_devices)
+
         # Calculate projected savings based on number and type of recommendations
         base_savings = 5.0  # kWh base
         energy_savings = base_savings + (len(recommendations) * 4.5)
@@ -672,7 +802,7 @@ Provide ONLY the JSON response, no additional text."""
 
         reasoning_parts = []
         # Check for various cooling setpoint names
-        cooling_point_names = ["cooling_setpoint", "zone_cooling_setpoint"]
+        cooling_point_names = ["cooling_setpoint", "zone_cooling_setpoint", "room_temp_setpoint"]
         if any(any(r["point_name"] == name for name in cooling_point_names) for r in recommendations):
             reasoning_parts.append("zone setpoint adjustment")
         if any("humidity" in r["point_name"].lower() for r in recommendations):
@@ -684,10 +814,21 @@ Provide ONLY the JSON response, no additional text."""
         if any("fan_speed" in r["point_name"] for r in recommendations):
             reasoning_parts.append("fan speed optimization")
 
+        # Add zone-aware context to reasoning
+        zone_context = []
+        for rec in recommendations:
+            device = next((d for d in hvac_devices if d.id == rec["device_id"]), None)
+            if device:
+                zone_type = self._get_zone_type(device)
+                if zone_type and zone_type.value not in zone_context:
+                    zone_context.append(zone_type.value)
+
         reasoning = f"Rising outdoor temperatures ({outdoor_temp}°C) with current conditions require proactive optimization. "
         if reasoning_parts:
             reasoning += f"Recommendations include: {', '.join(reasoning_parts)}. "
-        reasoning += f"All recommendations within safety limits."
+        if zone_context:
+            reasoning += f"Zone-aware adjustments applied for: {', '.join(zone_context)} zones. "
+        reasoning += f"All recommendations within safety limits and sorted by zone priority."
 
         return OptimizationRecommendation(
             site_id=site_id,
