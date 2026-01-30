@@ -1979,4 +1979,232 @@ export const validationApi = {
   },
 };
 
+// ============= DALI Lighting Interfaces (Phase 21) =============
+
+// DALI Controller interface
+export interface DALIController {
+  id: string;
+  name: string;
+  floor: string;
+  zone_id: string;
+  protocol_version: string;
+  firmware_version: string;
+  status: 'online' | 'offline' | 'error';
+  sensors_count: number;
+  luminaires_count: number;
+  last_communication: string;
+}
+
+// DALI Sensor interface (PIR occupancy sensor)
+export interface DALISensor {
+  id: string;
+  controller_id: string;
+  desk_id: string;
+  zone_id: string;
+  floor: string;
+  type: 'pir' | 'daylight' | 'combined';
+  status: 'online' | 'offline' | 'error';
+  occupied: boolean;
+  last_motion: string | null;
+  lux_level: number | null;
+  battery_level: number | null;
+}
+
+// DALI Luminaire interface
+export interface DALILuminaire {
+  id: string;
+  controller_id: string;
+  zone_id: string;
+  floor: string;
+  type: 'led_panel' | 'downlight' | 'linear' | 'emergency';
+  status: 'online' | 'offline' | 'fault';
+  power_watts: number;
+  brightness_percent: number;
+  color_temp_kelvin: number | null;
+  runtime_hours: number;
+  fault_code: string | null;
+}
+
+// Zone Occupancy summary
+export interface ZoneOccupancy {
+  zone_id: string;
+  zone_name: string;
+  floor: string;
+  total_sensors: number;
+  occupied_sensors: number;
+  occupancy_percent: number;
+  avg_lux_level: number;
+  status: 'busy' | 'moderate' | 'quiet' | 'empty';
+  last_updated: string;
+}
+
+// Zone Lighting status
+export interface ZoneLighting {
+  zone_id: string;
+  zone_name: string;
+  floor: string;
+  total_luminaires: number;
+  active_luminaires: number;
+  faulty_luminaires: number;
+  total_power_watts: number;
+  avg_brightness: number;
+  energy_waste_detected: boolean;
+  energy_waste_reason: string | null;
+}
+
+// Floor Summary
+export interface FloorSummary {
+  floor: string;
+  floor_name: string;
+  total_zones: number;
+  total_sensors: number;
+  occupied_sensors: number;
+  occupancy_percent: number;
+  total_luminaires: number;
+  faulty_luminaires: number;
+  total_power_watts: number;
+  zones: ZoneOccupancy[];
+}
+
+// Building Occupancy overview
+export interface BuildingOccupancy {
+  building_id: string;
+  building_name: string;
+  total_floors: number;
+  total_zones: number;
+  total_sensors: number;
+  occupied_sensors: number;
+  occupancy_percent: number;
+  total_luminaires: number;
+  faulty_luminaires: number;
+  total_power_watts: number;
+  energy_waste_zones: number;
+  floors: FloorSummary[];
+  last_updated: string;
+}
+
+// DALI System Stats
+export interface DALIStats {
+  total_controllers: number;
+  online_controllers: number;
+  total_sensors: number;
+  online_sensors: number;
+  total_luminaires: number;
+  faulty_luminaires: number;
+  current_occupancy_percent: number;
+  current_power_watts: number;
+  energy_today_kwh: number;
+  energy_waste_alerts: number;
+  last_sync: string;
+}
+
+// DALI API methods
+export const daliApi = {
+  /**
+   * Get all DALI controllers
+   * @param floor - Optional floor filter
+   */
+  getControllers: async (floor?: string): Promise<DALIController[]> => {
+    const params = new URLSearchParams();
+    if (floor) params.set('floor', floor);
+    const queryString = params.toString();
+    const response = await fetch(`${API_BASE_URL}/api/dali/controllers${queryString ? `?${queryString}` : ''}`);
+    if (!response.ok) throw new Error('Failed to fetch DALI controllers');
+    return response.json();
+  },
+
+  /**
+   * Get DALI sensors with optional filtering
+   * @param zoneId - Optional zone ID filter
+   */
+  getSensors: async (zoneId?: string): Promise<DALISensor[]> => {
+    const params = new URLSearchParams();
+    if (zoneId) params.set('zone_id', zoneId);
+    const queryString = params.toString();
+    const response = await fetch(`${API_BASE_URL}/api/dali/sensors${queryString ? `?${queryString}` : ''}`);
+    if (!response.ok) throw new Error('Failed to fetch DALI sensors');
+    return response.json();
+  },
+
+  /**
+   * Get sensor by desk ID
+   * @param deskId - Desk identifier
+   */
+  getSensorByDesk: async (deskId: string): Promise<DALISensor> => {
+    const response = await fetch(`${API_BASE_URL}/api/dali/sensors/desk/${deskId}`);
+    if (!response.ok) throw new Error('Failed to fetch sensor for desk');
+    return response.json();
+  },
+
+  /**
+   * Get DALI luminaires with optional filtering
+   * @param zoneId - Optional zone ID filter
+   */
+  getLuminaires: async (zoneId?: string): Promise<DALILuminaire[]> => {
+    const params = new URLSearchParams();
+    if (zoneId) params.set('zone_id', zoneId);
+    const queryString = params.toString();
+    const response = await fetch(`${API_BASE_URL}/api/dali/luminaires${queryString ? `?${queryString}` : ''}`);
+    if (!response.ok) throw new Error('Failed to fetch DALI luminaires');
+    return response.json();
+  },
+
+  /**
+   * Get faulty luminaires
+   */
+  getFaultyLuminaires: async (): Promise<DALILuminaire[]> => {
+    const response = await fetch(`${API_BASE_URL}/api/dali/luminaires/faulty`);
+    if (!response.ok) throw new Error('Failed to fetch faulty luminaires');
+    return response.json();
+  },
+
+  /**
+   * Get zone occupancy data
+   * @param zoneId - Zone ID
+   */
+  getZoneOccupancy: async (zoneId: string): Promise<ZoneOccupancy> => {
+    const response = await fetch(`${API_BASE_URL}/api/dali/zones/${zoneId}/occupancy`);
+    if (!response.ok) throw new Error('Failed to fetch zone occupancy');
+    return response.json();
+  },
+
+  /**
+   * Get zone lighting status
+   * @param zoneId - Zone ID
+   */
+  getZoneLighting: async (zoneId: string): Promise<ZoneLighting> => {
+    const response = await fetch(`${API_BASE_URL}/api/dali/zones/${zoneId}/lighting`);
+    if (!response.ok) throw new Error('Failed to fetch zone lighting');
+    return response.json();
+  },
+
+  /**
+   * Get floor summary
+   * @param floor - Floor identifier (e.g., "L10", "L11", "L12")
+   */
+  getFloorSummary: async (floor: string): Promise<FloorSummary> => {
+    const response = await fetch(`${API_BASE_URL}/api/dali/floors/${floor}/summary`);
+    if (!response.ok) throw new Error('Failed to fetch floor summary');
+    return response.json();
+  },
+
+  /**
+   * Get building occupancy overview
+   */
+  getBuildingOccupancy: async (): Promise<BuildingOccupancy> => {
+    const response = await fetch(`${API_BASE_URL}/api/dali/building/occupancy`);
+    if (!response.ok) throw new Error('Failed to fetch building occupancy');
+    return response.json();
+  },
+
+  /**
+   * Get DALI system statistics
+   */
+  getStats: async (): Promise<DALIStats> => {
+    const response = await fetch(`${API_BASE_URL}/api/dali/stats`);
+    if (!response.ok) throw new Error('Failed to fetch DALI stats');
+    return response.json();
+  },
+};
+
 export default api;
