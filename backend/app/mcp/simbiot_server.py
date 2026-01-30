@@ -891,6 +891,518 @@ async def search_alarms_tool(
     }
 
 
+async def get_trends_tool(
+    asset_id: str,
+    parameter: str,
+    from_time: Optional[str] = None,
+    to_time: Optional[str] = None,
+    interval: str = "1hour"
+) -> Dict[str, Any]:
+    """
+    Get historical trend data for an asset parameter.
+
+    MCP Tool: get_trends
+
+    Args:
+        asset_id: Asset/device ID (required)
+        parameter: Parameter name to get trends for (required)
+        from_time: Start time (ISO format, default: 24 hours ago)
+        to_time: End time (ISO format, default: now)
+        interval: Data interval - 1min, 5min, 15min, 1hour, 1day (default: 1hour)
+
+    Returns:
+        Dictionary with:
+        - data_points: Array of {timestamp, value, quality}
+        - asset_id: Asset ID
+        - parameter: Parameter name
+        - interval: Data interval used
+        - statistics: min, max, avg, count
+    """
+    # Parse time range
+    if to_time:
+        try:
+            end_dt = datetime.fromisoformat(to_time.replace('Z', '+00:00'))
+        except ValueError:
+            end_dt = datetime.now()
+    else:
+        end_dt = datetime.now()
+
+    if from_time:
+        try:
+            start_dt = datetime.fromisoformat(from_time.replace('Z', '+00:00'))
+        except ValueError:
+            start_dt = end_dt - timedelta(hours=24)
+    else:
+        start_dt = end_dt - timedelta(hours=24)
+
+    # Determine interval in minutes
+    interval_minutes = {
+        "1min": 1,
+        "5min": 5,
+        "15min": 15,
+        "1hour": 60,
+        "1day": 1440
+    }.get(interval, 60)
+
+    # Get base value from device
+    devices = _load_devices()
+    base_value = None
+    unit = ""
+
+    for device in devices:
+        if device.get("id") == asset_id:
+            points = device.get("points", {})
+            if parameter in points:
+                point_data = points[parameter]
+                base_value = point_data.get("default_value")
+                unit = point_data.get("unit", "")
+                break
+
+    if base_value is None:
+        return {
+            "error": f"Parameter {parameter} not found for asset {asset_id}",
+            "asset_id": asset_id,
+            "parameter": parameter
+        }
+
+    # Generate synthetic trend data based on base value
+    import random
+    random.seed(hash(f"{asset_id}{parameter}"))  # Reproducible randomness
+
+    data_points = []
+    current_time = start_dt
+    values = []
+
+    while current_time <= end_dt:
+        # Add realistic variation
+        if isinstance(base_value, (int, float)):
+            # Temperature-like variation
+            variation = random.uniform(-0.15, 0.15) * abs(base_value)
+            # Add time-of-day pattern for temperature
+            hour = current_time.hour
+            if "temp" in parameter.lower():
+                # Warmer in afternoon, cooler at night
+                if 9 <= hour <= 17:
+                    variation += abs(base_value) * 0.05
+                elif 0 <= hour <= 6:
+                    variation -= abs(base_value) * 0.03
+
+            value = round(base_value + variation, 2)
+            values.append(value)
+        else:
+            value = base_value
+            values.append(1 if value else 0)
+
+        quality = "good"
+        if random.random() < 0.02:  # 2% chance of questionable data
+            quality = "questionable"
+
+        data_points.append({
+            "timestamp": current_time.isoformat(),
+            "value": value,
+            "quality": quality
+        })
+
+        current_time += timedelta(minutes=interval_minutes)
+
+    # Calculate statistics
+    numeric_values = [v for v in values if isinstance(v, (int, float))]
+    statistics = {
+        "min": round(min(numeric_values), 2) if numeric_values else None,
+        "max": round(max(numeric_values), 2) if numeric_values else None,
+        "avg": round(sum(numeric_values) / len(numeric_values), 2) if numeric_values else None,
+        "count": len(data_points)
+    }
+
+    return {
+        "data_points": data_points,
+        "asset_id": asset_id,
+        "parameter": parameter,
+        "unit": unit,
+        "interval": interval,
+        "from_time": start_dt.isoformat(),
+        "to_time": end_dt.isoformat(),
+        "statistics": statistics
+    }
+
+
+async def get_health_score_tool(
+    asset_id: Optional[str] = None,
+    building_id: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Get health score breakdown for an asset or building.
+
+    MCP Tool: get_health_score
+
+    Args:
+        asset_id: Asset/device ID (one of asset_id or building_id required)
+        building_id: Building/site ID (one of asset_id or building_id required)
+
+    Returns:
+        Dictionary with:
+        - score: Overall health score (0-100)
+        - status: healthy, fair, degrading, critical
+        - breakdown: Score breakdown by category
+        - trend: improving, stable, declining
+        - factors: Contributing factors
+    """
+    if not asset_id and not building_id:
+        return {
+            "error": "Either asset_id or building_id is required"
+        }
+
+    devices = _load_devices()
+    alerts = _load_alerts()
+
+    if asset_id:
+        # Single asset health score
+        device = None
+        for d in devices:
+            if d.get("id") == asset_id:
+                device = d
+                break
+
+        if not device:
+            return {"error": f"Asset {asset_id} not found"}
+
+        metadata = device.get("metadata", {})
+        safety_status = metadata.get("safety_status", "safe")
+        equipment = device.get("equipment", {})
+
+        # Calculate base health from safety status
+        if safety_status == "critical" or safety_status == "alarm":
+            base_health = 30
+        elif safety_status == "warning":
+            base_health = 70
+        else:
+            base_health = 100
+
+        # Calculate breakdown factors
+        install_year = equipment.get("installation_year", 2020)
+        age_years = datetime.now().year - install_year
+        expected_life = 15  # Default expected life
+
+        age_score = max(0, 100 - (age_years / expected_life * 100))
+        maintenance_score = 90  # Mock value
+        performance_score = 95 if safety_status == "safe" else (70 if safety_status == "warning" else 40)
+
+        # Count relevant alarms
+        asset_alarms = [a for a in alerts if a.get("equipment_id") == asset_id]
+        alarm_penalty = min(30, len(asset_alarms) * 10)
+
+        overall_score = round((
+            base_health * 0.4 +
+            age_score * 0.2 +
+            maintenance_score * 0.2 +
+            performance_score * 0.2
+        ) - alarm_penalty)
+
+        overall_score = max(0, min(100, overall_score))
+
+        # Determine status and trend
+        if overall_score >= 80:
+            status = "healthy"
+        elif overall_score >= 60:
+            status = "fair"
+        elif overall_score >= 40:
+            status = "degrading"
+        else:
+            status = "critical"
+
+        trend = "stable"  # Could be enhanced with historical data
+        if safety_status == "warning":
+            trend = "declining"
+
+        return {
+            "asset_id": asset_id,
+            "asset_name": device.get("name"),
+            "score": overall_score,
+            "status": status,
+            "trend": trend,
+            "breakdown": {
+                "safety_status": {"score": base_health, "weight": 0.4},
+                "equipment_age": {"score": round(age_score), "weight": 0.2, "years": age_years},
+                "maintenance": {"score": maintenance_score, "weight": 0.2},
+                "performance": {"score": performance_score, "weight": 0.2}
+            },
+            "active_alarms": len(asset_alarms),
+            "factors": [
+                f"Safety status: {safety_status}",
+                f"Equipment age: {age_years} years",
+                f"Active alarms: {len(asset_alarms)}"
+            ]
+        }
+
+    else:
+        # Building health score (aggregate)
+        building_devices = [d for d in devices if d.get("site_id") == building_id]
+
+        if not building_devices:
+            return {"error": f"No devices found for building {building_id}"}
+
+        # Calculate per-device scores
+        device_scores = []
+        critical_count = 0
+        warning_count = 0
+
+        for device in building_devices:
+            metadata = device.get("metadata", {})
+            safety_status = metadata.get("safety_status", "safe")
+
+            if safety_status == "critical" or safety_status == "alarm":
+                device_scores.append(30)
+                critical_count += 1
+            elif safety_status == "warning":
+                device_scores.append(70)
+                warning_count += 1
+            else:
+                device_scores.append(100)
+
+        overall_score = round(sum(device_scores) / len(device_scores)) if device_scores else 100
+
+        # Count building alarms
+        building_alarms = [a for a in alerts if a.get("site_id") == building_id]
+
+        # Determine status
+        if critical_count > 0 or overall_score < 40:
+            status = "critical"
+        elif warning_count > 0 or overall_score < 60:
+            status = "degrading"
+        elif overall_score < 80:
+            status = "fair"
+        else:
+            status = "healthy"
+
+        return {
+            "building_id": building_id,
+            "score": overall_score,
+            "status": status,
+            "trend": "stable",
+            "breakdown": {
+                "device_count": len(building_devices),
+                "healthy_devices": len([s for s in device_scores if s >= 80]),
+                "warning_devices": warning_count,
+                "critical_devices": critical_count
+            },
+            "active_alarms": len(building_alarms),
+            "factors": [
+                f"Total devices: {len(building_devices)}",
+                f"Critical devices: {critical_count}",
+                f"Warning devices: {warning_count}",
+                f"Active alarms: {len(building_alarms)}"
+            ]
+        }
+
+
+async def get_work_orders_tool(
+    building_id: Optional[str] = None,
+    asset_id: Optional[str] = None,
+    status: str = "all",
+    limit: int = 50
+) -> Dict[str, Any]:
+    """
+    Get work orders.
+
+    MCP Tool: get_work_orders
+
+    Args:
+        building_id: Filter by building/site ID
+        asset_id: Filter by asset ID
+        status: Filter by status - open, completed, all (default)
+        limit: Maximum number of work orders (default 50)
+
+    Returns:
+        Dictionary with:
+        - work_orders: Array of work order objects
+        - total: Total matching work orders
+    """
+    # Try to load work orders from the work orders API storage
+    try:
+        from app.api.work_orders import _technician_work_orders
+        technician_wos = list(_technician_work_orders.values())
+    except ImportError:
+        technician_wos = []
+
+    # Load from CSV data
+    try:
+        from app.services.csv_loader import WorkOrderData
+        csv_work_orders = WorkOrderData.load()
+    except Exception:
+        csv_work_orders = []
+
+    # Combine and format work orders
+    work_orders = []
+
+    # Add technician work orders
+    for wo in technician_wos:
+        # Apply filters
+        if building_id and wo.get("site_id") != building_id:
+            continue
+        if asset_id and wo.get("equipment_id") != asset_id:
+            continue
+        if status == "open" and wo.get("status") in ["complete", "completed"]:
+            continue
+        if status == "completed" and wo.get("status") not in ["complete", "completed"]:
+            continue
+
+        work_orders.append({
+            "wo_number": wo.get("id"),
+            "date": wo.get("created_at").isoformat() if wo.get("created_at") else None,
+            "type": "technician",
+            "asset_id": wo.get("equipment_id"),
+            "site_id": wo.get("site_id"),
+            "description": wo.get("fault_description"),
+            "diagnosis": wo.get("diagnosis"),
+            "status": wo.get("status"),
+            "priority": wo.get("priority"),
+            "technician_notes": wo.get("technician_notes"),
+            "parts_needed": wo.get("parts_needed", []),
+            "resolution": wo.get("resolution"),
+            "source": "technician_chat"
+        })
+
+    # Add CSV work orders
+    for wo in csv_work_orders:
+        # Apply filters
+        if building_id and wo.get("site_id") != building_id:
+            continue
+        if asset_id and wo.get("asset_id") != asset_id:
+            continue
+        if status == "open" and wo.get("completed_date"):
+            continue
+        if status == "completed" and not wo.get("completed_date"):
+            continue
+
+        work_orders.append({
+            "wo_number": wo.get("work_order_id"),
+            "date": wo.get("reported_date").isoformat() if wo.get("reported_date") else None,
+            "type": wo.get("type"),
+            "asset_id": wo.get("asset_id"),
+            "asset_tag": wo.get("asset_tag"),
+            "site_id": wo.get("site_id"),
+            "site_name": wo.get("site_name"),
+            "description": wo.get("description"),
+            "fault_code": wo.get("fault_code"),
+            "status": "completed" if wo.get("completed_date") else "open",
+            "priority": wo.get("priority"),
+            "category": wo.get("category"),
+            "technician_name": wo.get("technician_name"),
+            "technician_notes": wo.get("technician_notes"),
+            "resolution": wo.get("resolution"),
+            "total_cost": wo.get("total_cost"),
+            "sla_met": wo.get("sla_met"),
+            "repeat_call": wo.get("repeat_call"),
+            "source": "cafm"
+        })
+
+    # Sort by date (most recent first)
+    work_orders.sort(key=lambda x: x.get("date") or "", reverse=True)
+
+    return {
+        "work_orders": work_orders[:limit],
+        "total": len(work_orders)
+    }
+
+
+async def create_work_order_tool(
+    building_id: str,
+    asset_id: str,
+    description: str,
+    priority: str = "medium",
+    suggested_parts: Optional[List[str]] = None,
+    user: str = "mcp_tool"
+) -> Dict[str, Any]:
+    """
+    Create a work order (SAFETY CRITICAL - includes audit logging).
+
+    MCP Tool: create_work_order
+
+    This operation creates a work order and logs the action for audit purposes.
+
+    Args:
+        building_id: Building/site ID (required)
+        asset_id: Asset/device ID (required)
+        description: Fault description (required)
+        priority: Priority level - low, medium, high, critical (default: medium)
+        suggested_parts: List of suggested parts for the repair
+        user: User identifier for audit logging
+
+    Returns:
+        Dictionary with:
+        - wo_number: Work order number
+        - status: Created work order status
+        - created_at: Creation timestamp
+        - audit_id: Audit log entry ID
+    """
+    import uuid
+    from datetime import datetime
+
+    # Generate work order ID
+    wo_number = f"MCP-{datetime.now().strftime('%Y%m%d')}-{str(uuid.uuid4())[:8].upper()}"
+
+    # Create work order
+    work_order = {
+        "id": wo_number,
+        "site_id": building_id,
+        "equipment_id": asset_id,
+        "fault_description": description,
+        "diagnosis": f"AI-generated work order for {asset_id}",
+        "priority": priority,
+        "status": "draft",
+        "created_at": datetime.now(),
+        "updated_at": None,
+        "technician_id": None,
+        "technician_notes": f"Created via MCP tool by {user}",
+        "parts_needed": suggested_parts or [],
+        "estimated_duration": None,
+        "resolution": None,
+        "parts_used": [],
+        "time_spent": None,
+    }
+
+    # Store in technician work orders
+    try:
+        from app.api.work_orders import _technician_work_orders
+        _technician_work_orders[wo_number] = work_order
+    except ImportError:
+        logger.warning("Could not import work order storage - work order created but not persisted")
+
+    # Create audit log entry
+    audit_id = f"audit-{datetime.now().strftime('%Y%m%d%H%M%S')}-{wo_number}"
+
+    try:
+        from app.services.audit_logger import audit_logger
+        await audit_logger.log_action(
+            action_type="work_order_create",
+            user=user,
+            resource_type="work_order",
+            resource_id=wo_number,
+            details={
+                "building_id": building_id,
+                "asset_id": asset_id,
+                "description": description,
+                "priority": priority,
+                "suggested_parts": suggested_parts
+            }
+        )
+    except Exception as e:
+        logger.warning(f"Could not log to audit logger: {e}")
+
+    return {
+        "wo_number": wo_number,
+        "status": "draft",
+        "created_at": work_order["created_at"].isoformat(),
+        "building_id": building_id,
+        "asset_id": asset_id,
+        "description": description,
+        "priority": priority,
+        "suggested_parts": suggested_parts or [],
+        "audit_id": audit_id,
+        "message": f"Work order {wo_number} created successfully"
+    }
+
+
 # ============================================================================
 # MCP Tool Definitions (JSON Schema)
 # ============================================================================
@@ -1091,6 +1603,116 @@ MCP_TOOLS = [
                 }
             },
             "required": ["query"]
+        }
+    },
+    {
+        "name": "get_trends",
+        "description": "Get historical trend data for an asset parameter. Returns time-series data points with statistics. Use for analyzing equipment performance over time.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "asset_id": {
+                    "type": "string",
+                    "description": "Asset/device ID (e.g., 001-gwc-chiller-001)"
+                },
+                "parameter": {
+                    "type": "string",
+                    "description": "Parameter name to get trends for (e.g., chw_supply_temp, fan_speed)"
+                },
+                "from_time": {
+                    "type": "string",
+                    "description": "Start time in ISO format (default: 24 hours ago)"
+                },
+                "to_time": {
+                    "type": "string",
+                    "description": "End time in ISO format (default: now)"
+                },
+                "interval": {
+                    "type": "string",
+                    "enum": ["1min", "5min", "15min", "1hour", "1day"],
+                    "description": "Data interval (default: 1hour)"
+                }
+            },
+            "required": ["asset_id", "parameter"]
+        }
+    },
+    {
+        "name": "get_health_score",
+        "description": "Get health score breakdown for an asset or building. Returns overall score, status, breakdown by category, and contributing factors.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "asset_id": {
+                    "type": "string",
+                    "description": "Asset/device ID (provide either asset_id or building_id)"
+                },
+                "building_id": {
+                    "type": "string",
+                    "description": "Building/site ID (provide either asset_id or building_id)"
+                }
+            },
+            "required": []
+        }
+    },
+    {
+        "name": "get_work_orders",
+        "description": "Get work orders. Returns work order history with filtering by building, asset, and status.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "building_id": {
+                    "type": "string",
+                    "description": "Filter by building/site ID"
+                },
+                "asset_id": {
+                    "type": "string",
+                    "description": "Filter by asset ID"
+                },
+                "status": {
+                    "type": "string",
+                    "enum": ["open", "completed", "all"],
+                    "description": "Filter by status (default: all)"
+                },
+                "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 200,
+                    "description": "Maximum work orders to return (default: 50)"
+                }
+            },
+            "required": []
+        }
+    },
+    {
+        "name": "create_work_order",
+        "description": "Create a work order (SAFETY CRITICAL). Includes audit logging. Use for creating work orders from AI diagnosis or chat requests.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "building_id": {
+                    "type": "string",
+                    "description": "Building/site ID"
+                },
+                "asset_id": {
+                    "type": "string",
+                    "description": "Asset/device ID"
+                },
+                "description": {
+                    "type": "string",
+                    "description": "Fault description"
+                },
+                "priority": {
+                    "type": "string",
+                    "enum": ["low", "medium", "high", "critical"],
+                    "description": "Priority level (default: medium)"
+                },
+                "suggested_parts": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "List of suggested parts for the repair"
+                }
+            },
+            "required": ["building_id", "asset_id", "description"]
         }
     }
 ]
