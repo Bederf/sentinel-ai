@@ -1,17 +1,16 @@
 [
   {
-    "id": "001-chiller-001",
+    "id": "001-gwc-chiller-001",
     "name": "Gateway Chiller",
     "device_type": "hvac",
     "protocol": "mock",
+    "site_id": "site-001",
     "hvac_type": "chiller",
-    "manufacturer": "Trane",
-    "model": "RTAC 200",
     "capacity": 200,
     "efficiency": 3.5,
     "points": {
-      "supply_temp": {
-        "name": "supply_temp",
+      "chw_supply_temp": {
+        "name": "chw_supply_temp",
         "point_type": "analog_input",
         "description": "Chilled water supply temperature",
         "unit": "°C",
@@ -20,8 +19,8 @@
         "default_value": 7.2,
         "writable": false
       },
-      "return_temp": {
-        "name": "return_temp",
+      "chw_return_temp": {
+        "name": "chw_return_temp",
         "point_type": "analog_input",
         "description": "Chilled water return temperature",
         "unit": "°C",
@@ -46,14 +45,14 @@
           }
         }
       },
-      "setpoint": {
-        "name": "setpoint",
+      "chw_supply_temp_setpoint": {
+        "name": "chw_supply_temp_setpoint",
         "point_type": "analog_value",
-        "description": "Chilled water setpoint temperature",
+        "description": "Chilled water supply temperature setpoint",
         "unit": "°C",
-        "min_value": 18.0,
-        "max_value": 28.0,
-        "default_value": 22.0,
+        "min_value": 5.0,
+        "max_value": 12.0,
+        "default_value": 7.0,
         "writable": true,
         "priority": 10
       },
@@ -68,9 +67,26 @@
         "writable": false
       }
     },
+    "device_location": {
+      "building": "Gateway Theatre",
+      "floor": "Basement",
+      "zone": "Plant Room",
+      "room": "MR1",
+      "description": "Basement Plant Room, Mechanical Room 1",
+      "zone_type": "plant_room",
+      "exposure": "interior",
+      "zone_priority": 5
+    },
+    "equipment": {
+      "manufacturer": "Trane",
+      "model": "RTAC 200",
+      "serial_number": "GWC-CH-200-001",
+      "installation_year": 2005,
+      "capacity_kw": 200
+    },
     "metadata": {
       "building": "Gateway Theatre",
-      "building_id": "fnb-gateway",
+      "building_id": "gateway",
       "floor": -1,
       "zone": "Plant Room",
       "location": "Basement Plant Room",
@@ -84,13 +100,12 @@
     }
   },
   {
-    "id": "001-ahu-001",
+    "id": "001-gwc-ahu-001",
     "name": "Level 3 AHU",
     "device_type": "hvac",
     "protocol": "mock",
+    "site_id": "site-001",
     "hvac_type": "ahu",
-    "manufacturer": "Carrier",
-    "model": "39ER",
     "capacity": 50,
     "efficiency": 2.8,
     "points": {
@@ -147,9 +162,26 @@
         }
       }
     },
+    "device_location": {
+      "building": "Gateway Theatre",
+      "floor": "FL3",
+      "zone": "Executive Wing",
+      "room": "MR1",
+      "description": "Floor 3, Executive Wing, Mechanical Room 1",
+      "zone_type": "executive",
+      "exposure": "west",
+      "zone_priority": 1
+    },
+    "equipment": {
+      "manufacturer": "Carrier",
+      "model": "39ER",
+      "serial_number": "GWC-AHU-50-001",
+      "installation_year": 2010,
+      "capacity_kw": 50
+    },
     "metadata": {
       "building": "Gateway Theatre",
-      "building_id": "fnb-gateway",
+      "building_id": "gateway",
       "floor": 3,
       "zone": "Executive Wing",
       "location": "Level 3 Plant Room",
@@ -160,13 +192,12 @@
     }
   },
   {
-    "id": "001-vav-001",
+    "id": "001-gwc-vav-001",
     "name": "Office VAV - CTO Suite",
     "device_type": "hvac",
     "protocol": "mock",
+    "site_id": "site-001",
     "hvac_type": "vav",
-    "manufacturer": "Titus",
-    "model": "VAV-EC",
     "capacity": 1.2,
     "points": {
       "room_temp": {
@@ -179,10 +210,10 @@
         "default_value": 26.0,
         "writable": false
       },
-      "setpoint": {
-        "name": "setpoint",
+      "room_temp_setpoint": {
+        "name": "room_temp_setpoint",
         "point_type": "analog_value",
-        "description": "Temperature setpoint",
+        "description": "Room temperature setpoint",
         "unit": "°C",
         "min_value": 18.0,
         "max_value": 26.0,
@@ -216,9 +247,26 @@
         "writable": true
       }
     },
+    "device_location": {
+      "building": "Gateway Theatre",
+      "floor": "FL3",
+      "zone": "Executive Wing",
+      "room": "OR301",
+      "description": "Floor 3, Executive Wing, Office Room 301 (CTO Office)",
+      "zone_type": "executive",
+      "exposure": "south",
+      "zone_priority": 1
+    },
+    "equipment": {
+      "manufacturer": "Titus",
+      "model": "VAV-EC",
+      "serial_number": "GWC-VAV-1.2-001",
+      "installation_year": 2010,
+      "capacity_kw": 1.2
+    },
     "metadata": {
       "building": "Gateway Theatre",
-      "building_id": "fnb-gateway",
+      "building_id": "gateway",
       "floor": 3,
       "zone": "Executive Wing",
       "location": "CTO Office Suite 301",
@@ -229,13 +277,12 @@
     }
   },
   {
-    "id": "001-lighting-001",
+    "id": "001-gwc-light-001",
     "name": "Lobby Lighting Panel",
     "device_type": "lighting",
     "protocol": "mock",
+    "site_id": "site-001",
     "lighting_type": "panel",
-    "manufacturer": "Philips",
-    "model": "Dynalite",
     "circuit_count": 8,
     "total_wattage": 3200,
     "dimmable": true,
@@ -287,9 +334,25 @@
         "writable": false
       }
     },
+    "device_location": {
+      "building": "Gateway Theatre",
+      "floor": "Ground",
+      "zone": "Lobby",
+      "room": "ER1",
+      "description": "Ground Floor, Lobby, Electrical Room 1",
+      "zone_type": "lobby",
+      "exposure": "north",
+      "zone_priority": 4
+    },
+    "equipment": {
+      "manufacturer": "Philips",
+      "model": "Dynalite",
+      "serial_number": "GWC-LIGHT-3200-001",
+      "installation_year": 2015
+    },
     "metadata": {
       "building": "Gateway Theatre",
-      "building_id": "fnb-gateway",
+      "building_id": "gateway",
       "floor": 0,
       "zone": "Lobby",
       "location": "Ground Floor Main Lobby",
@@ -301,13 +364,12 @@
     }
   },
   {
-    "id": "001-access-001",
+    "id": "001-gwc-acc-001",
     "name": "Main Entrance Access Control",
     "device_type": "security",
     "protocol": "mock",
+    "site_id": "site-001",
     "security_type": "reader",
-    "manufacturer": "HID",
-    "model": "iCLASS SE",
     "points": {
       "door_status": {
         "name": "door_status",
@@ -352,9 +414,25 @@
         "writable": false
       }
     },
+    "device_location": {
+      "building": "Gateway Theatre",
+      "floor": "Ground",
+      "zone": "Entrance",
+      "room": "LR1",
+      "description": "Ground Floor, Main Entrance, Lobby Reception 1",
+      "zone_type": "lobby",
+      "exposure": "north",
+      "zone_priority": 4
+    },
+    "equipment": {
+      "manufacturer": "HID",
+      "model": "iCLASS SE",
+      "serial_number": "GWC-ACC-SE-001",
+      "installation_year": 2018
+    },
     "metadata": {
       "building": "Gateway Theatre",
-      "building_id": "fnb-gateway",
+      "building_id": "gateway",
       "floor": 0,
       "zone": "Entrance",
       "location": "Ground Floor Main Entrance",
@@ -366,12 +444,11 @@
     }
   },
   {
-    "id": "001-firepump-001",
+    "id": "001-gwc-fire-001",
     "name": "Fire Pump Controller",
     "device_type": "fire_safety",
     "protocol": "mock",
-    "manufacturer": "Grundfos",
-    "model": "Hydro MPC",
+    "site_id": "site-001",
     "points": {
       "pump_status": {
         "name": "pump_status",
@@ -427,9 +504,25 @@
         "writable": false
       }
     },
+    "device_location": {
+      "building": "Gateway Theatre",
+      "floor": "Basement",
+      "zone": "Fire Systems",
+      "room": "MR1",
+      "description": "Basement, Fire Systems, Mechanical Room 1",
+      "zone_type": "plant_room",
+      "exposure": "interior",
+      "zone_priority": 5
+    },
+    "equipment": {
+      "manufacturer": "Grundfos",
+      "model": "Hydro MPC",
+      "serial_number": "GWC-FIRE-001",
+      "installation_year": 2005
+    },
     "metadata": {
       "building": "Gateway Theatre",
-      "building_id": "fnb-gateway",
+      "building_id": "gateway",
       "floor": -1,
       "zone": "Fire Systems",
       "location": "Basement Fire Pump Room",
@@ -442,13 +535,12 @@
     }
   },
   {
-    "id": "001-hvac-zone-001",
+    "id": "001-gwc-zone-001",
     "name": "Main Zone Controller - Floors 1-3",
     "device_type": "hvac",
     "protocol": "mock",
+    "site_id": "site-001",
     "hvac_type": "zone_controller",
-    "manufacturer": "Johnson Controls",
-    "model": "FX-PC",
     "points": {
       "zone_temp": {
         "name": "zone_temp",
@@ -460,20 +552,20 @@
         "default_value": 23.2,
         "writable": false
       },
-      "cooling_setpoint": {
-        "name": "cooling_setpoint",
+      "zone_cooling_setpoint": {
+        "name": "zone_cooling_setpoint",
         "point_type": "analog_value",
-        "description": "Cooling temperature setpoint",
+        "description": "Zone cooling temperature setpoint",
         "unit": "°C",
         "min_value": 20.0,
         "max_value": 26.0,
         "default_value": 23.0,
         "writable": true
       },
-      "heating_setpoint": {
-        "name": "heating_setpoint",
+      "zone_heating_setpoint": {
+        "name": "zone_heating_setpoint",
         "point_type": "analog_value",
-        "description": "Heating temperature setpoint",
+        "description": "Zone heating temperature setpoint",
         "unit": "°C",
         "min_value": 18.0,
         "max_value": 24.0,
@@ -483,7 +575,7 @@
       "humidity_setpoint": {
         "name": "humidity_setpoint",
         "point_type": "analog_value",
-        "description": "Humidity setpoint",
+        "description": "Zone humidity setpoint",
         "unit": "%",
         "min_value": 30.0,
         "max_value": 65.0,
@@ -532,9 +624,25 @@
         }
       }
     },
+    "device_location": {
+      "building": "Gateway Theatre",
+      "floor": "FL2",
+      "zone": "Main Office Area",
+      "room": "MR1",
+      "description": "Floor 2, Main Office Area, Mechanical Room 1 (BMS Room)",
+      "zone_type": "open_office",
+      "exposure": "east",
+      "zone_priority": 3
+    },
+    "equipment": {
+      "manufacturer": "Johnson Controls",
+      "model": "FX-PC",
+      "serial_number": "GWC-ZONE-PC-001",
+      "installation_year": 2010
+    },
     "metadata": {
       "building": "Gateway Theatre",
-      "building_id": "fnb-gateway",
+      "building_id": "gateway",
       "floor": "1-3",
       "zone": "Main Office Area",
       "location": "BMS Room Level 2",
@@ -545,13 +653,12 @@
     }
   },
   {
-    "id": "001-chw-001",
+    "id": "001-gwc-chw-001",
     "name": "Chilled Water System - Primary Loop",
     "device_type": "hvac",
     "protocol": "mock",
+    "site_id": "site-001",
     "hvac_type": "chw_system",
-    "manufacturer": "Grundfos",
-    "model": "TPE 100-200",
     "points": {
       "chw_supply_temp": {
         "name": "chw_supply_temp",
@@ -573,8 +680,8 @@
         "default_value": 12.0,
         "writable": false
       },
-      "supply_temp_setpoint": {
-        "name": "supply_temp_setpoint",
+      "chw_supply_temp_setpoint": {
+        "name": "chw_supply_temp_setpoint",
         "point_type": "analog_value",
         "description": "CHW supply temperature setpoint",
         "unit": "°C",
@@ -614,26 +721,41 @@
         "writable": false
       }
     },
+    "device_location": {
+      "building": "Gateway Theatre",
+      "floor": "Basement",
+      "zone": "Plant Room",
+      "room": "MR1",
+      "description": "Basement, Plant Room, Mechanical Room 1",
+      "zone_type": "plant_room",
+      "exposure": "interior",
+      "zone_priority": 5
+    },
+    "equipment": {
+      "manufacturer": "Grundfos",
+      "model": "TPE 100-200",
+      "serial_number": "GWC-CHW-PUMP-001",
+      "installation_year": 2005
+    },
     "metadata": {
       "building": "Gateway Theatre",
-      "building_id": "fnb-gateway",
+      "building_id": "gateway",
       "floor": -1,
       "zone": "Plant Room",
       "location": "Basement Plant Room",
       "serves": "All AHUs and FCUs",
-      "chillers_connected": ["001-chiller-001"],
+      "chillers_connected": ["001-gwc-chiller-001"],
       "safety_status": "safe",
       "safety_note": "Primary loop operating normally, pump at 75% capacity"
     }
   },
   {
-    "id": "003-fcu-001",
+    "id": "003-mmc-fcu-001",
     "name": "Menlyn FCU-001",
     "device_type": "hvac",
     "protocol": "mock",
+    "site_id": "site-004",
     "hvac_type": "fcu",
-    "manufacturer": "Trane",
-    "model": "WCVF-06",
     "capacity": 6,
     "points": {
       "room_temp": {
@@ -646,10 +768,10 @@
         "default_value": 18.6,
         "writable": false
       },
-      "setpoint": {
-        "name": "setpoint",
+      "room_temp_setpoint": {
+        "name": "room_temp_setpoint",
         "point_type": "analog_value",
-        "description": "Temperature setpoint",
+        "description": "Room temperature setpoint",
         "unit": "°C",
         "min_value": 18.0,
         "max_value": 26.0,
@@ -684,9 +806,26 @@
         "writable": true
       }
     },
+    "device_location": {
+      "building": "Menlyn Maine",
+      "floor": "FL1",
+      "zone": "Ground Floor",
+      "room": "OR001",
+      "description": "Floor 1, Ground Floor Zone, Office Room 001",
+      "zone_type": "open_office",
+      "exposure": "east",
+      "zone_priority": 3
+    },
+    "equipment": {
+      "manufacturer": "Trane",
+      "model": "WCVF-06",
+      "serial_number": "MMC-FCU-06-001",
+      "installation_year": 2012,
+      "capacity_kw": 6
+    },
     "metadata": {
       "building": "Menlyn Maine",
-      "building_id": "site-003",
+      "building_id": "menlyn",
       "floor": 1,
       "zone": "Ground Floor",
       "location": "Floor 1 Open Plan",
@@ -696,13 +835,12 @@
     }
   },
   {
-    "id": "003-fcu-002",
+    "id": "003-mmc-fcu-002",
     "name": "Menlyn FCU-002",
     "device_type": "hvac",
     "protocol": "mock",
+    "site_id": "site-004",
     "hvac_type": "fcu",
-    "manufacturer": "Trane",
-    "model": "WCVF-06",
     "capacity": 6,
     "points": {
       "room_temp": {
@@ -715,10 +853,10 @@
         "default_value": 18.5,
         "writable": false
       },
-      "setpoint": {
-        "name": "setpoint",
+      "room_temp_setpoint": {
+        "name": "room_temp_setpoint",
         "point_type": "analog_value",
-        "description": "Temperature setpoint",
+        "description": "Room temperature setpoint",
         "unit": "°C",
         "min_value": 18.0,
         "max_value": 26.0,
@@ -753,9 +891,26 @@
         "writable": true
       }
     },
+    "device_location": {
+      "building": "Menlyn Maine",
+      "floor": "FL2",
+      "zone": "Upper Floor",
+      "room": "OR002",
+      "description": "Floor 2, Upper Floor Zone, Office Room 002",
+      "zone_type": "open_office",
+      "exposure": "west",
+      "zone_priority": 3
+    },
+    "equipment": {
+      "manufacturer": "Trane",
+      "model": "WCVF-06",
+      "serial_number": "MMC-FCU-06-002",
+      "installation_year": 2012,
+      "capacity_kw": 6
+    },
     "metadata": {
       "building": "Menlyn Maine",
-      "building_id": "site-003",
+      "building_id": "menlyn",
       "floor": 2,
       "zone": "Upper Floor",
       "location": "Floor 2 Open Plan",
@@ -765,13 +920,12 @@
     }
   },
   {
-    "id": "003-ahu-001",
+    "id": "003-mmc-ahu-001",
     "name": "Menlyn AHU-1",
     "device_type": "hvac",
     "protocol": "mock",
+    "site_id": "site-004",
     "hvac_type": "ahu",
-    "manufacturer": "Carrier",
-    "model": "39M-45",
     "capacity": 45,
     "efficiency": 2.9,
     "points": {
@@ -834,9 +988,26 @@
         "writable": false
       }
     },
+    "device_location": {
+      "building": "Menlyn Maine",
+      "floor": "Roof",
+      "zone": "Plant Room",
+      "room": "MR1",
+      "description": "Roof Level, Plant Room, Mechanical Room 1",
+      "zone_type": "plant_room",
+      "exposure": "interior",
+      "zone_priority": 5
+    },
+    "equipment": {
+      "manufacturer": "Carrier",
+      "model": "39M-45",
+      "serial_number": "MMC-AHU-45-001",
+      "installation_year": 2012,
+      "capacity_kw": 45
+    },
     "metadata": {
       "building": "Menlyn Maine",
-      "building_id": "site-003",
+      "building_id": "menlyn",
       "floor": 0,
       "zone": "Plant Room",
       "location": "Roof Plant Room",
@@ -846,13 +1017,12 @@
     }
   },
   {
-    "id": "003-chiller-001",
+    "id": "003-mmc-chiller-001",
     "name": "Menlyn Chiller",
     "device_type": "hvac",
     "protocol": "mock",
+    "site_id": "site-004",
     "hvac_type": "chiller",
-    "manufacturer": "York",
-    "model": "YLAA0120HE",
     "capacity": 120,
     "efficiency": 3.2,
     "points": {
@@ -876,10 +1046,10 @@
         "default_value": 11.5,
         "writable": false
       },
-      "chw_setpoint": {
-        "name": "chw_setpoint",
+      "chw_supply_temp_setpoint": {
+        "name": "chw_supply_temp_setpoint",
         "point_type": "analog_value",
-        "description": "Chilled water setpoint temperature",
+        "description": "Chilled water supply temperature setpoint",
         "unit": "°C",
         "min_value": 5.0,
         "max_value": 12.0,
@@ -923,9 +1093,26 @@
         "writable": false
       }
     },
+    "device_location": {
+      "building": "Menlyn Maine",
+      "floor": "Basement",
+      "zone": "Plant Room",
+      "room": "MR1",
+      "description": "Basement, Plant Room, Mechanical Room 1",
+      "zone_type": "plant_room",
+      "exposure": "interior",
+      "zone_priority": 5
+    },
+    "equipment": {
+      "manufacturer": "York",
+      "model": "YLAA0120HE",
+      "serial_number": "MMC-CHILLER-120-001",
+      "installation_year": 2012,
+      "capacity_kw": 120
+    },
     "metadata": {
       "building": "Menlyn Maine",
-      "building_id": "site-003",
+      "building_id": "menlyn",
       "floor": -1,
       "zone": "Plant Room",
       "location": "Basement Plant Room",
@@ -936,13 +1123,12 @@
     }
   },
   {
-    "id": "001-ahu-001",
+    "id": "011-stc-ahu-001",
     "name": "Sandton AHU-1",
     "device_type": "hvac",
     "protocol": "mock",
+    "site_id": "site-002",
     "hvac_type": "ahu",
-    "manufacturer": "Carrier",
-    "model": "39M-80",
     "capacity": 80,
     "efficiency": 2.9,
     "points": {
@@ -1005,9 +1191,26 @@
         "writable": false
       }
     },
+    "device_location": {
+      "building": "Sandton City",
+      "floor": "Roof",
+      "zone": "Roof Level",
+      "room": "MR1",
+      "description": "Roof Level, Roof Zone, Mechanical Room 1",
+      "zone_type": "plant_room",
+      "exposure": "interior",
+      "zone_priority": 5
+    },
+    "equipment": {
+      "manufacturer": "Carrier",
+      "model": "39M-80",
+      "serial_number": "STC-AHU-80-001",
+      "installation_year": 2014,
+      "capacity_kw": 80
+    },
     "metadata": {
       "building": "Sandton City",
-      "building_id": "site-001",
+      "building_id": "sandton",
       "floor": 0,
       "zone": "Roof Level",
       "location": "Roof Plant Room",
@@ -1017,13 +1220,12 @@
     }
   },
   {
-    "id": "001-chiller-001",
+    "id": "011-stc-chiller-001",
     "name": "Sandton Chiller CH-1",
     "device_type": "hvac",
     "protocol": "mock",
+    "site_id": "site-002",
     "hvac_type": "chiller",
-    "manufacturer": "York",
-    "model": "YLAA0220HE",
     "capacity": 220,
     "efficiency": 3.4,
     "points": {
@@ -1047,10 +1249,10 @@
         "default_value": 12.0,
         "writable": false
       },
-      "chw_setpoint": {
-        "name": "chw_setpoint",
+      "chw_supply_temp_setpoint": {
+        "name": "chw_supply_temp_setpoint",
         "point_type": "analog_value",
-        "description": "Chilled water setpoint temperature",
+        "description": "Chilled water supply temperature setpoint",
         "unit": "°C",
         "min_value": 5.0,
         "max_value": 12.0,
@@ -1084,9 +1286,26 @@
         "writable": false
       }
     },
+    "device_location": {
+      "building": "Sandton City",
+      "floor": "Basement",
+      "zone": "Chiller Plant Room",
+      "room": "MR1",
+      "description": "Basement, Chiller Plant Room, Mechanical Room 1",
+      "zone_type": "plant_room",
+      "exposure": "interior",
+      "zone_priority": 5
+    },
+    "equipment": {
+      "manufacturer": "York",
+      "model": "YLAA0220HE",
+      "serial_number": "STC-CHILLER-220-001",
+      "installation_year": 2015,
+      "capacity_kw": 220
+    },
     "metadata": {
       "building": "Sandton City",
-      "building_id": "site-001",
+      "building_id": "sandton",
       "floor": -1,
       "zone": "Chiller Plant Room",
       "location": "Basement Plant Room",
@@ -1097,13 +1316,12 @@
     }
   },
   {
-    "id": "001-fcu-001",
+    "id": "011-stc-fcu-001",
     "name": "Sandton FCU Floor 1",
     "device_type": "hvac",
     "protocol": "mock",
+    "site_id": "site-002",
     "hvac_type": "fcu",
-    "manufacturer": "Trane",
-    "model": "WCVF-08",
     "capacity": 8,
     "points": {
       "room_temp": {
@@ -1116,10 +1334,10 @@
         "default_value": 22.8,
         "writable": false
       },
-      "setpoint": {
-        "name": "setpoint",
+      "room_temp_setpoint": {
+        "name": "room_temp_setpoint",
         "point_type": "analog_value",
-        "description": "Temperature setpoint",
+        "description": "Room temperature setpoint",
         "unit": "°C",
         "min_value": 18.0,
         "max_value": 26.0,
@@ -1154,9 +1372,26 @@
         "writable": true
       }
     },
+    "device_location": {
+      "building": "Sandton City",
+      "floor": "FL1",
+      "zone": "Floor 1 Office",
+      "room": "OR001",
+      "description": "Floor 1, Floor 1 Office Zone, Office Room 001",
+      "zone_type": "open_office",
+      "exposure": "north",
+      "zone_priority": 3
+    },
+    "equipment": {
+      "manufacturer": "Trane",
+      "model": "WCVF-08",
+      "serial_number": "STC-FCU-08-001",
+      "installation_year": 2015,
+      "capacity_kw": 8
+    },
     "metadata": {
       "building": "Sandton City",
-      "building_id": "site-001",
+      "building_id": "sandton",
       "floor": 1,
       "zone": "Floor 1 Office",
       "location": "Floor 1 Open Plan",
@@ -1166,13 +1401,12 @@
     }
   },
   {
-    "id": "001-zone-001",
+    "id": "011-stc-zone-001",
     "name": "Sandton Zone Controller",
     "device_type": "hvac",
     "protocol": "mock",
+    "site_id": "site-002",
     "hvac_type": "zone_controller",
-    "manufacturer": "Johnson Controls",
-    "model": "FX-PC",
     "points": {
       "zone_temp": {
         "name": "zone_temp",
@@ -1184,20 +1418,20 @@
         "default_value": 22.5,
         "writable": false
       },
-      "cooling_setpoint": {
-        "name": "cooling_setpoint",
+      "zone_cooling_setpoint": {
+        "name": "zone_cooling_setpoint",
         "point_type": "analog_value",
-        "description": "Cooling temperature setpoint",
+        "description": "Zone cooling temperature setpoint",
         "unit": "°C",
         "min_value": 20.0,
         "max_value": 26.0,
         "default_value": 22.0,
         "writable": true
       },
-      "heating_setpoint": {
-        "name": "heating_setpoint",
+      "zone_heating_setpoint": {
+        "name": "zone_heating_setpoint",
         "point_type": "analog_value",
-        "description": "Heating temperature setpoint",
+        "description": "Zone heating temperature setpoint",
         "unit": "°C",
         "min_value": 18.0,
         "max_value": 24.0,
@@ -1221,9 +1455,25 @@
         }
       }
     },
+    "device_location": {
+      "building": "Sandton City",
+      "floor": "FL2",
+      "zone": "Main Office Area",
+      "room": "MR1",
+      "description": "Floor 2, Main Office Area, Mechanical Room 1 (BMS Room)",
+      "zone_type": "open_office",
+      "exposure": "south",
+      "zone_priority": 3
+    },
+    "equipment": {
+      "manufacturer": "Johnson Controls",
+      "model": "FX-PC",
+      "serial_number": "STC-ZONE-PC-001",
+      "installation_year": 2015
+    },
     "metadata": {
       "building": "Sandton City",
-      "building_id": "site-001",
+      "building_id": "sandton",
       "floor": "1-3",
       "zone": "Main Office Area",
       "location": "BMS Room Level 2",
@@ -1233,13 +1483,12 @@
     }
   },
   {
-    "id": "002-ahu-001",
+    "id": "002-rbk-ahu-001",
     "name": "Rosebank AHU-1",
     "device_type": "hvac",
     "protocol": "mock",
+    "site_id": "site-003",
     "hvac_type": "ahu",
-    "manufacturer": "Daikin",
-    "model": "AHU-30",
     "capacity": 30,
     "efficiency": 3.0,
     "points": {
@@ -1292,9 +1541,26 @@
         "writable": true
       }
     },
+    "device_location": {
+      "building": "Rosebank",
+      "floor": "Roof",
+      "zone": "Roof",
+      "room": "MR1",
+      "description": "Roof Level, Roof Zone, Mechanical Room 1",
+      "zone_type": "plant_room",
+      "exposure": "interior",
+      "zone_priority": 5
+    },
+    "equipment": {
+      "manufacturer": "Daikin",
+      "model": "AHU-30",
+      "serial_number": "RBK-AHU-30-001",
+      "installation_year": 2013,
+      "capacity_kw": 30
+    },
     "metadata": {
       "building": "Rosebank",
-      "building_id": "site-002",
+      "building_id": "rosebank",
       "floor": 0,
       "zone": "Roof",
       "location": "Roof Plant Room",
@@ -1304,13 +1570,12 @@
     }
   },
   {
-    "id": "002-split-001",
+    "id": "002-rbk-split-001",
     "name": "Rosebank AC-1 Banking Hall",
     "device_type": "hvac",
     "protocol": "mock",
+    "site_id": "site-003",
     "hvac_type": "split_unit",
-    "manufacturer": "Samsung",
-    "model": "AR24TXHQASIN",
     "capacity": 7,
     "points": {
       "room_temp": {
@@ -1323,10 +1588,10 @@
         "default_value": 23.0,
         "writable": false
       },
-      "setpoint": {
-        "name": "setpoint",
+      "room_temp_setpoint": {
+        "name": "room_temp_setpoint",
         "point_type": "analog_value",
-        "description": "Temperature setpoint",
+        "description": "Room temperature setpoint",
         "unit": "°C",
         "min_value": 18.0,
         "max_value": 28.0,
@@ -1367,9 +1632,26 @@
         }
       }
     },
+    "device_location": {
+      "building": "Rosebank",
+      "floor": "FL1",
+      "zone": "Banking Hall",
+      "room": "OR001",
+      "description": "Floor 1, Banking Hall Zone, Office Room 001",
+      "zone_type": "banking_hall",
+      "exposure": "east",
+      "zone_priority": 2
+    },
+    "equipment": {
+      "manufacturer": "Samsung",
+      "model": "AR24TXHQASIN",
+      "serial_number": "RBK-SPLIT-7-001",
+      "installation_year": 2016,
+      "capacity_kw": 7
+    },
     "metadata": {
       "building": "Rosebank",
-      "building_id": "site-002",
+      "building_id": "rosebank",
       "floor": 1,
       "zone": "Banking Hall",
       "location": "Banking Hall",
@@ -1379,13 +1661,12 @@
     }
   },
   {
-    "id": "006-ahu-001",
+    "id": "006-vaw-ahu-001",
     "name": "V&A AHU-1",
     "device_type": "hvac",
     "protocol": "mock",
+    "site_id": "site-007",
     "hvac_type": "ahu",
-    "manufacturer": "Carrier",
-    "model": "39M-65",
     "capacity": 65,
     "efficiency": 2.8,
     "points": {
@@ -1448,9 +1729,26 @@
         "writable": false
       }
     },
+    "device_location": {
+      "building": "V&A Waterfront",
+      "floor": "Roof",
+      "zone": "Roof",
+      "room": "MR1",
+      "description": "Roof Level, Roof Zone, Mechanical Room 1",
+      "zone_type": "plant_room",
+      "exposure": "interior",
+      "zone_priority": 5
+    },
+    "equipment": {
+      "manufacturer": "Carrier",
+      "model": "39M-65",
+      "serial_number": "VAW-AHU-65-001",
+      "installation_year": 2014,
+      "capacity_kw": 65
+    },
     "metadata": {
       "building": "V&A Waterfront",
-      "building_id": "site-006",
+      "building_id": "waterfront",
       "floor": 0,
       "zone": "Roof",
       "location": "Roof Plant Room",
@@ -1460,13 +1758,12 @@
     }
   },
   {
-    "id": "006-chiller-001",
+    "id": "006-vaw-chiller-001",
     "name": "V&A Chiller CH-1",
     "device_type": "hvac",
     "protocol": "mock",
+    "site_id": "site-007",
     "hvac_type": "chiller",
-    "manufacturer": "York",
-    "model": "YLAA0180HE",
     "capacity": 180,
     "efficiency": 3.2,
     "points": {
@@ -1490,10 +1787,10 @@
         "default_value": 12.5,
         "writable": false
       },
-      "chw_setpoint": {
-        "name": "chw_setpoint",
+      "chw_supply_temp_setpoint": {
+        "name": "chw_supply_temp_setpoint",
         "point_type": "analog_value",
-        "description": "Chilled water setpoint temperature",
+        "description": "Chilled water supply temperature setpoint",
         "unit": "°C",
         "min_value": 5.0,
         "max_value": 12.0,
@@ -1527,9 +1824,26 @@
         "writable": false
       }
     },
+    "device_location": {
+      "building": "V&A Waterfront",
+      "floor": "Basement",
+      "zone": "Plant Room",
+      "room": "MR1",
+      "description": "Basement, Plant Room, Mechanical Room 1",
+      "zone_type": "plant_room",
+      "exposure": "interior",
+      "zone_priority": 5
+    },
+    "equipment": {
+      "manufacturer": "York",
+      "model": "YLAA0180HE",
+      "serial_number": "VAW-CHILLER-180-001",
+      "installation_year": 2014,
+      "capacity_kw": 180
+    },
     "metadata": {
       "building": "V&A Waterfront",
-      "building_id": "site-006",
+      "building_id": "waterfront",
       "floor": -1,
       "zone": "Plant Room",
       "location": "Basement Plant Room",
@@ -1540,13 +1854,12 @@
     }
   },
   {
-    "id": "006-fcu-001",
+    "id": "006-vaw-fcu-001",
     "name": "V&A FCU Floor 1",
     "device_type": "hvac",
     "protocol": "mock",
+    "site_id": "site-007",
     "hvac_type": "fcu",
-    "manufacturer": "Trane",
-    "model": "WCVF-08",
     "capacity": 8,
     "points": {
       "room_temp": {
@@ -1559,10 +1872,10 @@
         "default_value": 21.5,
         "writable": false
       },
-      "setpoint": {
-        "name": "setpoint",
+      "room_temp_setpoint": {
+        "name": "room_temp_setpoint",
         "point_type": "analog_value",
-        "description": "Temperature setpoint",
+        "description": "Room temperature setpoint",
         "unit": "°C",
         "min_value": 18.0,
         "max_value": 26.0,
@@ -1597,9 +1910,26 @@
         "writable": true
       }
     },
+    "device_location": {
+      "building": "V&A Waterfront",
+      "floor": "FL1",
+      "zone": "Floor 1",
+      "room": "OR001",
+      "description": "Floor 1, Floor 1 Zone, Office Room 001",
+      "zone_type": "open_office",
+      "exposure": "west",
+      "zone_priority": 3
+    },
+    "equipment": {
+      "manufacturer": "Trane",
+      "model": "WCVF-08",
+      "serial_number": "VAW-FCU-08-001",
+      "installation_year": 2014,
+      "capacity_kw": 8
+    },
     "metadata": {
       "building": "V&A Waterfront",
-      "building_id": "site-006",
+      "building_id": "waterfront",
       "floor": 1,
       "zone": "Floor 1",
       "location": "Floor 1 Open Plan",
@@ -1609,13 +1939,12 @@
     }
   },
   {
-    "id": "011-ahu-001",
+    "id": "011-umh-ahu-001",
     "name": "Umhlanga AHU-1",
     "device_type": "hvac",
     "protocol": "mock",
+    "site_id": "site-012",
     "hvac_type": "ahu",
-    "manufacturer": "Carrier",
-    "model": "39M-55",
     "capacity": 55,
     "efficiency": 2.9,
     "points": {
@@ -1678,9 +2007,26 @@
         "writable": false
       }
     },
+    "device_location": {
+      "building": "Umhlanga Ridge",
+      "floor": "Roof",
+      "zone": "Roof",
+      "room": "MR1",
+      "description": "Roof Level, Roof Zone, Mechanical Room 1",
+      "zone_type": "plant_room",
+      "exposure": "interior",
+      "zone_priority": 5
+    },
+    "equipment": {
+      "manufacturer": "Carrier",
+      "model": "39M-55",
+      "serial_number": "UMH-AHU-55-001",
+      "installation_year": 2017,
+      "capacity_kw": 55
+    },
     "metadata": {
       "building": "Umhlanga Ridge",
-      "building_id": "site-011",
+      "building_id": "umhlanga",
       "floor": 0,
       "zone": "Roof",
       "location": "Roof Plant Room",
@@ -1690,13 +2036,12 @@
     }
   },
   {
-    "id": "011-chiller-001",
+    "id": "011-umh-chiller-001",
     "name": "Umhlanga Chiller CH-1",
     "device_type": "hvac",
     "protocol": "mock",
+    "site_id": "site-012",
     "hvac_type": "chiller",
-    "manufacturer": "York",
-    "model": "YLAA0150HE",
     "capacity": 150,
     "efficiency": 3.3,
     "points": {
@@ -1720,10 +2065,10 @@
         "default_value": 11.8,
         "writable": false
       },
-      "chw_setpoint": {
-        "name": "chw_setpoint",
+      "chw_supply_temp_setpoint": {
+        "name": "chw_supply_temp_setpoint",
         "point_type": "analog_value",
-        "description": "Chilled water setpoint temperature",
+        "description": "Chilled water supply temperature setpoint",
         "unit": "°C",
         "min_value": 5.0,
         "max_value": 12.0,
@@ -1757,9 +2102,26 @@
         "writable": false
       }
     },
+    "device_location": {
+      "building": "Umhlanga Ridge",
+      "floor": "Basement",
+      "zone": "Plant Room",
+      "room": "MR1",
+      "description": "Basement, Plant Room, Mechanical Room 1",
+      "zone_type": "plant_room",
+      "exposure": "interior",
+      "zone_priority": 5
+    },
+    "equipment": {
+      "manufacturer": "York",
+      "model": "YLAA0150HE",
+      "serial_number": "UMH-CHILLER-150-001",
+      "installation_year": 2017,
+      "capacity_kw": 150
+    },
     "metadata": {
       "building": "Umhlanga Ridge",
-      "building_id": "site-011",
+      "building_id": "umhlanga",
       "floor": -1,
       "zone": "Plant Room",
       "location": "Basement Plant Room",
@@ -1770,13 +2132,12 @@
     }
   },
   {
-    "id": "011-fcu-001",
+    "id": "011-umh-fcu-001",
     "name": "Umhlanga FCU Floor 1",
     "device_type": "hvac",
     "protocol": "mock",
+    "site_id": "site-012",
     "hvac_type": "fcu",
-    "manufacturer": "Trane",
-    "model": "WCVF-08",
     "capacity": 8,
     "points": {
       "room_temp": {
@@ -1789,10 +2150,10 @@
         "default_value": 23.5,
         "writable": false
       },
-      "setpoint": {
-        "name": "setpoint",
+      "room_temp_setpoint": {
+        "name": "room_temp_setpoint",
         "point_type": "analog_value",
-        "description": "Temperature setpoint",
+        "description": "Room temperature setpoint",
         "unit": "°C",
         "min_value": 18.0,
         "max_value": 26.0,
@@ -1827,9 +2188,26 @@
         "writable": true
       }
     },
+    "device_location": {
+      "building": "Umhlanga Ridge",
+      "floor": "FL1",
+      "zone": "Floor 1",
+      "room": "OR001",
+      "description": "Floor 1, Floor 1 Zone, Office Room 001",
+      "zone_type": "open_office",
+      "exposure": "east",
+      "zone_priority": 3
+    },
+    "equipment": {
+      "manufacturer": "Trane",
+      "model": "WCVF-08",
+      "serial_number": "UMH-FCU-08-001",
+      "installation_year": 2017,
+      "capacity_kw": 8
+    },
     "metadata": {
       "building": "Umhlanga Ridge",
-      "building_id": "site-011",
+      "building_id": "umhlanga",
       "floor": 1,
       "zone": "Floor 1",
       "location": "Floor 1 Open Plan",
@@ -1839,13 +2217,12 @@
     }
   },
   {
-    "id": "011-fcu-002",
+    "id": "011-umh-fcu-002",
     "name": "Umhlanga FCU Floor 2",
     "device_type": "hvac",
     "protocol": "mock",
+    "site_id": "site-012",
     "hvac_type": "fcu",
-    "manufacturer": "Trane",
-    "model": "WCVF-08",
     "capacity": 8,
     "points": {
       "room_temp": {
@@ -1858,10 +2235,10 @@
         "default_value": 24.0,
         "writable": false
       },
-      "setpoint": {
-        "name": "setpoint",
+      "room_temp_setpoint": {
+        "name": "room_temp_setpoint",
         "point_type": "analog_value",
-        "description": "Temperature setpoint",
+        "description": "Room temperature setpoint",
         "unit": "°C",
         "min_value": 18.0,
         "max_value": 26.0,
@@ -1896,9 +2273,26 @@
         "writable": true
       }
     },
+    "device_location": {
+      "building": "Umhlanga Ridge",
+      "floor": "FL2",
+      "zone": "Floor 2",
+      "room": "OR002",
+      "description": "Floor 2, Floor 2 Zone, Office Room 002",
+      "zone_type": "open_office",
+      "exposure": "south",
+      "zone_priority": 3
+    },
+    "equipment": {
+      "manufacturer": "Trane",
+      "model": "WCVF-08",
+      "serial_number": "UMH-FCU-08-002",
+      "installation_year": 2017,
+      "capacity_kw": 8
+    },
     "metadata": {
       "building": "Umhlanga Ridge",
-      "building_id": "site-011",
+      "building_id": "umhlanga",
       "floor": 2,
       "zone": "Floor 2",
       "location": "Floor 2 Open Plan",
