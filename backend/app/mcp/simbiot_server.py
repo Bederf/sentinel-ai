@@ -1740,12 +1740,22 @@ class SIMBIOTMCPServer:
         """Initialize SIMBIOT MCP server."""
         self.tools = MCP_TOOLS
         self.tool_handlers = {
+            # Building/Asset tools (Plan 01)
             "get_buildings": get_buildings_tool,
             "get_assets": get_assets_tool,
             "get_asset_detail": get_asset_detail_tool,
             "get_devices": get_devices_tool,
             "read_device_point": read_device_point_tool,
-            "write_device_point": write_device_point_tool
+            "write_device_point": write_device_point_tool,
+            # Alarm tools (Plan 02)
+            "get_alarms": get_alarms_tool,
+            "search_alarms": search_alarms_tool,
+            # Trend/Analytics tools (Plan 02)
+            "get_trends": get_trends_tool,
+            "get_health_score": get_health_score_tool,
+            # Work order tools (Plan 02)
+            "get_work_orders": get_work_orders_tool,
+            "create_work_order": create_work_order_tool,
         }
         logger.info("SIMBIOTMCPServer initialized with %d tools", len(self.tools))
 

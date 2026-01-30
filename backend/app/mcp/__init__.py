@@ -16,12 +16,22 @@ from app.mcp.equipment_server import (
 
 from app.mcp.simbiot_server import (
     SIMBIOTMCPServer,
+    # Building/Asset tools
     get_buildings_tool,
     get_assets_tool,
     get_asset_detail_tool,
     get_devices_tool,
     read_device_point_tool,
     write_device_point_tool,
+    # Alarm tools
+    get_alarms_tool,
+    search_alarms_tool,
+    # Trend/Analytics tools
+    get_trends_tool,
+    get_health_score_tool,
+    # Work order tools
+    get_work_orders_tool,
+    create_work_order_tool,
     MCP_TOOLS as SIMBIOT_MCP_TOOLS
 )
 
@@ -34,11 +44,21 @@ __all__ = [
     "EQUIPMENT_MCP_TOOLS",
     # SIMBIOT MCP
     "SIMBIOTMCPServer",
+    # Building/Asset tools
     "get_buildings_tool",
     "get_assets_tool",
     "get_asset_detail_tool",
     "get_devices_tool",
     "read_device_point_tool",
     "write_device_point_tool",
+    # Alarm tools
+    "get_alarms_tool",
+    "search_alarms_tool",
+    # Trend/Analytics tools
+    "get_trends_tool",
+    "get_health_score_tool",
+    # Work order tools
+    "get_work_orders_tool",
+    "create_work_order_tool",
     "SIMBIOT_MCP_TOOLS"
 ]
