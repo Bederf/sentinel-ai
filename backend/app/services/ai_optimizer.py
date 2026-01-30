@@ -20,7 +20,7 @@ from app.models.optimization import (
     SiteOptimizationStatus,
     OptimizationHistoryEntry,
 )
-from app.models.device import Device, DeviceType
+from app.models.device import Device, DeviceType, DevicePoint, ZoneType, ExposureDirection
 from app.services.claude_service import claude_service
 from app.services.device_abstraction import device_manager
 from app.services.safety_interlocks import safety_engine
@@ -220,8 +220,11 @@ class AIOptimizerService:
 **Energy Pricing:**
 {json.dumps(energy_prices, indent=2)}
 
-**HVAC Equipment on Site:**
-{len(hvac_devices)} devices available
+**HVAC Equipment on Site ({len(hvac_devices)} devices):**
+{self._format_device_list(hvac_devices)}
+
+**Available Control Points:**
+{self._format_available_points(hvac_devices)}
 
 **Building Constraints (SAFETY LIMITS - MUST NOT EXCEED):**
 - CHW temperature: 5-15°C (minimum 5°C to prevent freeze damage)
@@ -232,8 +235,9 @@ class AIOptimizerService:
 1. Analyze the current conditions vs outdoor weather
 2. Consider energy pricing (higher rates = more aggressive optimization)
 3. Recommend specific HVAC setpoint changes
-4. Project energy savings in ZAR per hour
-5. Ensure all recommendations are within safety limits
+4. IMPORTANT: Use the EXACT point_name from the "Available Control Points" list above
+5. Project energy savings in ZAR per hour
+6. Ensure all recommendations are within safety limits
 
 **Response Format (JSON):**
 ```json
@@ -325,12 +329,187 @@ Provide ONLY the JSON response, no additional text."""
                 return device
         return None
 
+    def _find_devices_by_type(self, hvac_devices: List[Device], hvac_type: str) -> List[Device]:
+        """Find ALL devices of a specific hvac_type."""
+        return [d for d in hvac_devices if hasattr(d, 'hvac_type') and d.hvac_type == hvac_type]
+
+    def _find_devices_with_point(self, hvac_devices: List[Device], point_name: str) -> List[Device]:
+        """Find ALL devices that have a specific point."""
+        return [d for d in hvac_devices if point_name in d.points]
+
+    def _find_point_on_device(self, device: Device, possible_point_names: List[str]) -> Optional[DevicePoint]:
+        """Find a point on a device by checking multiple possible names."""
+        for point_name in possible_point_names:
+            if point_name in device.points:
+                return device.points[point_name]
+        return None
+
+    def _has_any_point(self, device: Device, possible_point_names: List[str]) -> bool:
+        """Check if device has any of the specified points."""
+        return any(point_name in device.points for point_name in possible_point_names)
+
+    def _format_device_list(self, hvac_devices: List[Device]) -> str:
+        """Format device list for Claude prompt."""
+        if not hvac_devices:
+            return "No HVAC devices found"
+        lines = []
+        for d in hvac_devices:
+            hvac_type = getattr(d, 'hvac_type', 'unknown')
+            location = getattr(d, 'location', 'unknown location')
+            lines.append(f"- {d.id}: {d.name} ({hvac_type}) at {location}")
+        return "\n".join(lines)
+
+    def _format_available_points(self, hvac_devices: List[Device]) -> str:
+        """Format available control points for Claude prompt."""
+        if not hvac_devices:
+            return "No control points available"
+        lines = []
+        for d in hvac_devices:
+            writable_points = [name for name, point in d.points.items() if point.writable]
+            if writable_points:
+                lines.append(f"- {d.id} ({d.name}): {', '.join(writable_points)}")
+        return "\n".join(lines) if lines else "No writable control points found"
+
     def _find_device_with_point(self, hvac_devices: List[Device], point_name: str) -> Optional[Device]:
         """Find a device that has a specific point."""
         for device in hvac_devices:
             if point_name in device.points:
                 return device
         return None
+
+    # Zone-Aware Optimization Helper Methods
+
+    def _group_devices_by_zone(self, hvac_devices: List[Device]) -> Dict[str, List[Device]]:
+        """Group devices by their zone name for coordinated optimization."""
+        zones: Dict[str, List[Device]] = {}
+        for device in hvac_devices:
+            zone = getattr(device.device_location, 'zone', 'Unknown') if hasattr(device, 'device_location') else 'Unknown'
+            if zone not in zones:
+                zones[zone] = []
+            zones[zone].append(device)
+        return zones
+
+    def _group_devices_by_floor(self, hvac_devices: List[Device]) -> Dict[str, List[Device]]:
+        """Group devices by floor level."""
+        floors: Dict[str, List[Device]] = {}
+        for device in hvac_devices:
+            floor = getattr(device.device_location, 'floor', 'Unknown') if hasattr(device, 'device_location') else 'Unknown'
+            if floor not in floors:
+                floors[floor] = []
+            floors[floor].append(device)
+        return floors
+
+    def _get_zone_priority(self, device: Device) -> int:
+        """Get zone priority for load shedding ordering (1=highest priority, 5=lowest)."""
+        if hasattr(device, 'device_location') and device.device_location:
+            return getattr(device.device_location, 'zone_priority', 3)
+        return 3  # Default to middle priority
+
+    def _get_zone_type(self, device: Device) -> Optional[ZoneType]:
+        """Get the zone type for a device."""
+        if hasattr(device, 'device_location') and device.device_location:
+            return getattr(device.device_location, 'zone_type', None)
+        return None
+
+    def _get_exposure(self, device: Device) -> Optional[ExposureDirection]:
+        """Get the exposure direction for a device."""
+        if hasattr(device, 'device_location') and device.device_location:
+            return getattr(device.device_location, 'exposure', None)
+        return None
+
+    def _get_floor_level(self, device: Device) -> int:
+        """Get numeric floor level from device location.
+
+        Returns:
+            Floor level as integer (-1=basement, 0=ground, 1+=upper floors)
+        """
+        if not hasattr(device, 'device_location') or not device.device_location:
+            return 0
+
+        floor = getattr(device.device_location, 'floor', 'Ground')
+        if floor == 'Basement':
+            return -1
+        elif floor == 'Ground':
+            return 0
+        elif floor == 'Roof':
+            return 99  # High number for roof
+        elif floor.startswith('FL'):
+            try:
+                return int(floor[2:])
+            except ValueError:
+                return 0
+        return 0
+
+    def _get_exposure_modifier(self, device: Device, outdoor_temp: float) -> float:
+        """Get temperature adjustment based on exposure direction and outdoor temp.
+
+        In the Southern Hemisphere (South Africa):
+        - South-facing zones receive maximum solar radiation
+        - North-facing zones receive minimal direct sun
+        - East gets morning sun, West gets afternoon sun
+
+        Args:
+            device: The device to check
+            outdoor_temp: Current outdoor temperature
+
+        Returns:
+            Temperature modifier in degrees (positive = needs more cooling)
+        """
+        exposure = self._get_exposure(device)
+        if exposure is None:
+            return 0.0
+
+        # Only apply modifiers when outdoor temp is warm enough to matter
+        if outdoor_temp < 25.0:
+            return 0.0
+
+        hour = datetime.now().hour
+        modifiers = {
+            ExposureDirection.SOUTH: 1.5 if 10 <= hour <= 16 else 0.5,  # Max solar gain midday
+            ExposureDirection.WEST: 1.0 if 14 <= hour <= 18 else 0.0,   # Afternoon heat
+            ExposureDirection.EAST: 1.0 if 6 <= hour <= 10 else 0.0,    # Morning heat
+            ExposureDirection.NORTH: 0.0,                                # Minimal gain in SA
+            ExposureDirection.INTERIOR: -0.5,                            # Slightly less cooling needed
+        }
+        return modifiers.get(exposure, 0.0)
+
+    def _sort_recommendations_by_priority(
+        self,
+        recommendations: List[Dict],
+        hvac_devices: List[Device],
+    ) -> List[Dict]:
+        """Sort recommendations by zone priority (critical zones first)."""
+        device_map = {d.id: d for d in hvac_devices}
+
+        def get_priority(rec: Dict) -> int:
+            device = device_map.get(rec.get("device_id"))
+            if device:
+                return self._get_zone_priority(device)
+            return 3  # Default priority
+
+        return sorted(recommendations, key=get_priority)
+
+    def _format_zone_context(self, hvac_devices: List[Device]) -> str:
+        """Format zone context for Claude prompt."""
+        zones_by_type: Dict[str, List[str]] = {}
+        for device in hvac_devices:
+            zone_type = self._get_zone_type(device)
+            exposure = self._get_exposure(device)
+            priority = self._get_zone_priority(device)
+
+            zone_type_str = zone_type.value if zone_type else 'unknown'
+            exposure_str = exposure.value if exposure else 'unknown'
+            key = f"{zone_type_str}|{exposure_str}|P{priority}"
+
+            if key not in zones_by_type:
+                zones_by_type[key] = []
+            zones_by_type[key].append(device.name)
+
+        lines = ["**Zone Classification:**"]
+        for key, devices in sorted(zones_by_type.items()):
+            zone_type, exposure, priority = key.split("|")
+            lines.append(f"- {zone_type} ({exposure}, {priority}): {', '.join(devices)}")
+        return "\n".join(lines)
 
     def _analyze_with_rules(
         self,
@@ -351,64 +530,138 @@ Provide ONLY the JSON response, no additional text."""
         recommendations = []
         confidence = 0.7  # Lower confidence for rule-based
 
-        # Find specific device types
-        zone_controller = (
-            self._find_device_by_type(hvac_devices, "zone_controller") or
-            self._find_device_with_point(hvac_devices, "cooling_setpoint")
-        )
-        chw_system = (
-            self._find_device_by_type(hvac_devices, "chw_system") or
-            self._find_device_with_point(hvac_devices, "supply_temp_setpoint")
-        )
-        chiller = self._find_device_by_type(hvac_devices, "chiller")
+        # Find ALL devices of each type (multi-device support)
+        # Prioritize explicit hvac_type matches, only fall back to point-based matching if none found
+        zone_controllers = self._find_devices_by_type(hvac_devices, "zone_controller")
+        if not zone_controllers:
+            # Fall back to devices with zone_cooling_setpoint or cooling_setpoint that aren't FCUs
+            zone_controllers = [
+                d for d in hvac_devices
+                if self._has_any_point(d, ["zone_cooling_setpoint", "cooling_setpoint"])
+                and getattr(d, 'hvac_type', '') != 'fcu'
+            ]
 
-        # Rule 1: Zone temperature optimization
+        chw_systems = self._find_devices_by_type(hvac_devices, "chw_system")
+        if not chw_systems:
+            # Fall back to devices with CHW setpoint
+            chw_systems = [
+                d for d in hvac_devices
+                if self._has_any_point(d, ["chw_supply_temp_setpoint", "supply_temp_setpoint"])
+            ]
+
+        fcus = self._find_devices_by_type(hvac_devices, "fcu")
+        chillers = self._find_devices_by_type(hvac_devices, "chiller")
+
+        # Track which device/point combinations have been recommended to avoid duplicates
+        recommended_pairs = set()
+
+        # Helper to add recommendation only if not already recommended
+        def add_recommendation(device, point_name, current_value, recommended_value, reason):
+            pair = (device.id, point_name)
+            if pair not in recommended_pairs:
+                recommended_pairs.add(pair)
+                recommendations.append({
+                    "device_id": device.id,
+                    "device_name": device.name,
+                    "point_name": point_name,
+                    "current_value": current_value,
+                    "recommended_value": recommended_value,
+                    "reason": reason,
+                })
+
+        # Rule 1: Zone temperature optimization for ALL zone controllers
         # If outdoor > indoor + 3°C, recommend increasing cooling setpoint slightly
-        if temp_diff > 3.0 and indoor_temp < 24.0 and zone_controller:
-            current_setpoint = zone_controller.points.get("cooling_setpoint")
-            current_value = current_setpoint.default_value if current_setpoint else indoor_temp
-            new_setpoint = min(current_value + 1.5, 24.0)
+        if temp_diff > 3.0 and indoor_temp < 24.0:
+            for zone_controller in zone_controllers:
+                # Check for multiple possible cooling setpoint names
+                cooling_point_names = ["zone_cooling_setpoint", "cooling_setpoint", "cooling_setpoint_temp"]
+                current_point = self._find_point_on_device(zone_controller, cooling_point_names)
 
-            recommendations.append({
-                "device_id": zone_controller.id,
-                "device_name": zone_controller.name,
-                "point_name": "cooling_setpoint",
-                "current_value": current_value,
-                "recommended_value": new_setpoint,
-                "reason": f"Increase setpoint 1.5°C as outdoor temp rising to {outdoor_temp}°C - reduces cooling load while maintaining comfort",
-            })
+                if current_point:
+                    point_name = current_point.name
+                    current_value = current_point.default_value if current_point else indoor_temp
+                    new_setpoint = min(current_value + 1.5, 24.0)
 
-        # Rule 2: Humidity optimization
-        # If humidity is low and zone controller has humidity setpoint
-        if humidity < 50.0 and zone_controller and "humidity_setpoint" in zone_controller.points:
-            current_humidity_sp = zone_controller.points.get("humidity_setpoint")
-            current_value = current_humidity_sp.default_value if current_humidity_sp else 55.0
-            new_humidity = min(current_value + 3.0, 60.0)
+                    add_recommendation(
+                        zone_controller,
+                        point_name,
+                        current_value,
+                        new_setpoint,
+                        f"Increase setpoint 1.5°C as outdoor temp rising to {outdoor_temp}°C - reduces cooling load while maintaining comfort",
+                    )
 
-            recommendations.append({
-                "device_id": zone_controller.id,
-                "device_name": zone_controller.name,
-                "point_name": "humidity_setpoint",
-                "current_value": current_value,
-                "recommended_value": new_humidity,
-                "reason": f"Allow humidity to rise 3% as outdoor humidity drops - reduces dehumidification energy",
-            })
+        # Rule 2: Humidity optimization for ALL zone controllers with humidity setpoint
+        if humidity < 50.0:
+            for zone_controller in zone_controllers:
+                if "humidity_setpoint" in zone_controller.points:
+                    current_humidity_sp = zone_controller.points.get("humidity_setpoint")
+                    current_value = current_humidity_sp.default_value if current_humidity_sp else 55.0
+                    new_humidity = min(current_value + 3.0, 60.0)
 
-        # Rule 3: CHW temperature optimization
+                    add_recommendation(
+                        zone_controller,
+                        "humidity_setpoint",
+                        current_value,
+                        new_humidity,
+                        f"Allow humidity to rise 3% as outdoor humidity drops - reduces dehumidification energy",
+                    )
+
+        # Rule 3: CHW temperature optimization for ALL chillers
         # If outdoor temp is high, can raise CHW supply temp for efficiency
-        if outdoor_temp > 28.0 and chw_system and "supply_temp_setpoint" in chw_system.points:
-            current_chw_sp = chw_system.points.get("supply_temp_setpoint")
-            current_value = current_chw_sp.default_value if current_chw_sp else 7.0
-            new_chw_temp = min(current_value + 1.5, 9.0)  # Don't go above 9°C
+        if outdoor_temp > 28.0:
+            for chiller in chillers:
+                # Check for multiple possible CHW setpoint names
+                chw_point_names = ["chw_supply_temp_setpoint", "supply_temp_setpoint", "chilled_water_setpoint"]
+                current_point = self._find_point_on_device(chiller, chw_point_names)
 
-            recommendations.append({
-                "device_id": chw_system.id,
-                "device_name": chw_system.name,
-                "point_name": "supply_temp_setpoint",
-                "current_value": current_value,
-                "recommended_value": new_chw_temp,
-                "reason": f"Increase CHW temp 1.5°C for higher chiller efficiency with rising outdoor temps",
-            })
+                if current_point:
+                    point_name = current_point.name
+                    current_value = current_point.default_value if current_point else 7.0
+                    new_chw_temp = min(current_value + 1.5, 9.0)  # Don't go above 9°C
+
+                    add_recommendation(
+                        chiller,
+                        point_name,
+                        current_value,
+                        new_chw_temp,
+                        f"Increase CHW temp 1.5°C for higher chiller efficiency with rising outdoor temps",
+                    )
+
+        # Rule 4: FCU optimization for ALL FCUs
+        # Optimize fan speed and setpoints based on conditions
+        if temp_diff > 2.0:
+            for fcu in fcus:
+                # Optimize cooling setpoint if available
+                cooling_point_names = ["cooling_setpoint", "zone_cooling_setpoint"]
+                cooling_point = self._find_point_on_device(fcu, cooling_point_names)
+
+                if cooling_point:
+                    current_value = cooling_point.default_value if cooling_point else 22.0
+                    new_setpoint = min(current_value + 1.0, 24.0)
+
+                    add_recommendation(
+                        fcu,
+                        cooling_point.name,
+                        current_value,
+                        new_setpoint,
+                        f"Increase FCU setpoint 1.0°C to reduce cooling load during high outdoor temps ({outdoor_temp}°C)",
+                    )
+
+                # Optimize fan speed if available and conditions warrant
+                if "fan_speed" in fcu.points and temp_diff < 5.0:
+                    current_speed = fcu.points.get("fan_speed")
+                    current_value = current_speed.default_value if current_speed else 75.0
+                    # Reduce fan speed slightly if temp difference is moderate
+                    new_speed = max(current_value - 10.0, 50.0)
+
+                    if new_speed < current_value:
+                        add_recommendation(
+                            fcu,
+                            "fan_speed",
+                            current_value,
+                            new_speed,
+                            f"Reduce fan speed 10% for energy savings - moderate temperature differential allows lower airflow",
+                        )
 
         # Calculate projected savings based on number and type of recommendations
         base_savings = 5.0  # kWh base
@@ -418,12 +671,18 @@ Provide ONLY the JSON response, no additional text."""
         percentage = min(8.0 + (len(recommendations) * 2.0), 15.0)
 
         reasoning_parts = []
-        if any(r["point_name"] == "cooling_setpoint" for r in recommendations):
+        # Check for various cooling setpoint names
+        cooling_point_names = ["cooling_setpoint", "zone_cooling_setpoint"]
+        if any(any(r["point_name"] == name for name in cooling_point_names) for r in recommendations):
             reasoning_parts.append("zone setpoint adjustment")
-        if any(r["point_name"] == "humidity_setpoint" for r in recommendations):
+        if any("humidity" in r["point_name"].lower() for r in recommendations):
             reasoning_parts.append("humidity optimization")
-        if any(r["point_name"] == "supply_temp_setpoint" for r in recommendations):
+        # Check for various CHW setpoint names
+        chw_point_names = ["chw_supply_temp_setpoint", "supply_temp_setpoint"]
+        if any(any(r["point_name"] == name for name in chw_point_names) for r in recommendations):
             reasoning_parts.append("CHW temperature optimization")
+        if any("fan_speed" in r["point_name"] for r in recommendations):
+            reasoning_parts.append("fan speed optimization")
 
         reasoning = f"Rising outdoor temperatures ({outdoor_temp}°C) with current conditions require proactive optimization. "
         if reasoning_parts:
