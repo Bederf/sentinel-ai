@@ -2207,4 +2207,122 @@ export const daliApi = {
   },
 };
 
+// ============= Comfort Complaints Interfaces (Phase 23) =============
+
+// Desk location model
+export interface Desk {
+  desk_id: string;
+  floor: string;
+  building: string;
+  zone_id: string;
+  near_window: boolean;
+  near_diffuser: string | null;
+  near_printer: boolean;
+  department: string | null;
+}
+
+// HVAC Zone model
+export interface HVACZone {
+  zone_id: string;
+  zone_name: string;
+  floor: string;
+  fcu_id: string;
+  vav_id: string | null;
+  temp_sensor: string;
+  co2_sensor: string | null;
+  typical_occupancy: number;
+  area_sqm: number | null;
+  setpoint: number;
+  current_temp: number;
+  status: string;
+}
+
+// Complaint diagnosis result
+export interface ComplaintDiagnosis {
+  complaint_id: string;
+  desk: Desk;
+  zone: HVACZone;
+  diagnosis: string;
+  root_cause: string;
+  confidence: 'high' | 'medium' | 'low';
+  suggestions: string[];
+  auto_action_taken: string | null;
+  needs_dispatch: boolean;
+}
+
+// Desk BMS context for lookup
+export interface DeskBMSContext {
+  desk: Desk;
+  bms_context: {
+    zone: HVACZone;
+    hvac_status: string;
+    temp_reading: number;
+    occupancy_percent: number;
+  };
+}
+
+// Complaints API methods
+export const complaintsApi = {
+  /**
+   * Submit a comfort complaint
+   * @param deskId - Desk ID (e.g., "25", "L12-25")
+   * @param complaintType - Type of complaint
+   * @param userName - Optional user name
+   * @param description - Optional description
+   */
+  submitComplaint: async (
+    deskId: string,
+    complaintType: string = 'too_hot',
+    userName?: string,
+    description?: string
+  ): Promise<ComplaintDiagnosis> => {
+    const params = new URLSearchParams({
+      desk_id: deskId,
+      complaint_type: complaintType,
+    });
+    if (userName) params.append('user_name', userName);
+    if (description) params.append('description', description);
+
+    const response = await fetch(`${API_BASE_URL}/api/complaints/submit?${params}`, {
+      method: 'POST',
+    });
+    if (!response.ok) throw new Error('Failed to submit complaint');
+    return response.json();
+  },
+
+  /**
+   * Get desk info and BMS context
+   * @param deskId - Desk ID
+   */
+  getDeskInfo: async (deskId: string): Promise<DeskBMSContext> => {
+    const response = await fetch(`${API_BASE_URL}/api/complaints/desk/${deskId}`);
+    if (!response.ok) throw new Error('Desk not found');
+    return response.json();
+  },
+
+  /**
+   * List all desks with optional filtering
+   * @param floor - Optional floor filter
+   * @param zoneId - Optional zone ID filter
+   */
+  listDesks: async (floor?: string, zoneId?: string): Promise<Desk[]> => {
+    const params = new URLSearchParams();
+    if (floor) params.append('floor', floor);
+    if (zoneId) params.append('zone_id', zoneId);
+    const query = params.toString();
+    const response = await fetch(`${API_BASE_URL}/api/complaints/desks${query ? `?${query}` : ''}`);
+    if (!response.ok) throw new Error('Failed to fetch desks');
+    return response.json();
+  },
+
+  /**
+   * List HVAC zones
+   */
+  listZones: async (): Promise<HVACZone[]> => {
+    const response = await fetch(`${API_BASE_URL}/api/complaints/zones`);
+    if (!response.ok) throw new Error('Failed to fetch zones');
+    return response.json();
+  },
+};
+
 export default api;
