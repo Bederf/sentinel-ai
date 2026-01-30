@@ -9,6 +9,7 @@ from anthropic import Anthropic, APIError, AuthenticationError, RateLimitError
 from app.config.settings import settings
 from app.services.fm_context import fm_context_service
 from app.services.chat_tools import CHAT_TOOLS, execute_tool
+from app.services.cross_system_analyzer import get_cross_system_analyzer
 
 logger = logging.getLogger(__name__)
 
@@ -127,11 +128,38 @@ def build_system_prompt_with_context() -> str:
     """
     context = fm_context_service.get_full_context()
 
+    # Add DALI lighting/occupancy context
+    lighting_context = ""
+    try:
+        analyzer = get_cross_system_analyzer()
+        building_occupancy = analyzer.dali.get_building_occupancy()
+        lighting_context = f"""
+## Real-Time Occupancy (from 1,315 DALI sensors)
+- Overall building occupancy: {building_occupancy['overall_occupancy_percent']:.0f}%
+- Total sensors: {building_occupancy['total_sensors']}
+- Currently occupied: {building_occupancy['total_occupied']}
+
+**For comfort complaints:**
+- You can check specific zone occupancy and daylight levels
+- High lux (>800) indicates solar heat gain potential
+- Low occupancy + high cooling = possible energy waste
+- Use desk ID to find exact sensor location
+- Reference occupancy data when analyzing "too hot" or "too cold" complaints
+
+**Lighting fault detection:**
+- Check for faulty luminaires when users report dark areas
+- DALI fault codes indicate lamp failure, driver issues, or communication errors
+"""
+    except Exception as e:
+        logger.warning(f"Could not load DALI context: {e}")
+
     full_prompt = f"""{FM_SYSTEM_PROMPT_BASE}
 
 ---
 
 {context}
+
+{lighting_context}
 
 ---
 
