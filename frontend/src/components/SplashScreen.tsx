@@ -18,26 +18,41 @@ export function SplashScreen({ onComplete, minDisplayTime = 2500 }: SplashScreen
   const startTimeRef = useRef(Date.now());
 
   useEffect(() => {
+    console.log('SplashScreen: Component mounted');
     const video = videoRef.current;
-    if (!video) return;
+    if (!video) {
+      console.error('SplashScreen: Video ref is null!');
+      return;
+    }
 
     const handleVideoEnd = () => {
+      console.log('SplashScreen: Video ended');
       const elapsed = Date.now() - startTimeRef.current;
       const remainingTime = Math.max(0, minDisplayTime - elapsed);
+      console.log('SplashScreen: Elapsed:', elapsed, 'Remaining:', remainingTime);
 
       // Wait for minimum display time, then fade out
       setTimeout(() => {
+        console.log('SplashScreen: Starting fade out');
         setFadeOut(true);
         // After fade animation, call onComplete
-        setTimeout(onComplete, 500);
+        setTimeout(() => {
+          console.log('SplashScreen: Calling onComplete');
+          onComplete();
+        }, 500);
       }, remainingTime);
     };
 
     // If video fails to load or play, still complete after minDisplayTime
-    const handleError = () => {
+    const handleError = (error?: Event) => {
+      console.error('SplashScreen: Video error or play failed:', error);
       setTimeout(() => {
+        console.log('SplashScreen: Fallback timeout triggering');
         setFadeOut(true);
-        setTimeout(onComplete, 500);
+        setTimeout(() => {
+          console.log('SplashScreen: Calling onComplete from fallback');
+          onComplete();
+        }, 500);
       }, minDisplayTime);
     };
 
@@ -45,7 +60,11 @@ export function SplashScreen({ onComplete, minDisplayTime = 2500 }: SplashScreen
     video.addEventListener("error", handleError);
 
     // Start playing
-    video.play().catch(handleError);
+    console.log('SplashScreen: Attempting to play video');
+    video.play().catch((err) => {
+      console.error('SplashScreen: Play failed:', err);
+      handleError(err);
+    });
 
     return () => {
       video.removeEventListener("ended", handleVideoEnd);

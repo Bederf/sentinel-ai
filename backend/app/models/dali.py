@@ -111,6 +111,9 @@ class DALISensor:
     x_coord: Optional[float] = None
     y_coord: Optional[float] = None
     last_updated: Optional[str] = None
+    # Scenecom extended fields
+    daylight_setpoint: float = 500.0  # Target lux for daylight harvesting
+    motion_count: int = 0  # Cumulative motion events (for analytics)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
@@ -128,6 +131,8 @@ class DALISensor:
             "x_coord": self.x_coord,
             "y_coord": self.y_coord,
             "last_updated": self.last_updated,
+            "daylight_setpoint": self.daylight_setpoint,
+            "motion_count": self.motion_count,
         }
 
     @classmethod
@@ -147,6 +152,8 @@ class DALISensor:
             x_coord=data.get("x_coord"),
             y_coord=data.get("y_coord"),
             last_updated=data.get("last_updated"),
+            daylight_setpoint=data.get("daylight_setpoint", 500.0),
+            motion_count=data.get("motion_count", 0),
         )
 
 
@@ -170,6 +177,9 @@ class DALILuminaire:
     fault_code: Optional[str] = None
     lamp_hours: int = 0
     last_updated: Optional[str] = None
+    # Scenecom extended fields
+    color_temp_kelvin: Optional[int] = None  # Tunable white: 2700K-6500K (None if not supported)
+    emergency_battery_pct: Optional[int] = None  # Emergency fitting battery % (None if not emergency)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
@@ -190,6 +200,8 @@ class DALILuminaire:
             "fault_code": self.fault_code,
             "lamp_hours": self.lamp_hours,
             "last_updated": self.last_updated,
+            "color_temp_kelvin": self.color_temp_kelvin,
+            "emergency_battery_pct": self.emergency_battery_pct,
         }
 
     @classmethod
@@ -212,6 +224,8 @@ class DALILuminaire:
             fault_code=data.get("fault_code"),
             lamp_hours=data.get("lamp_hours", 0),
             last_updated=data.get("last_updated"),
+            color_temp_kelvin=data.get("color_temp_kelvin"),
+            emergency_battery_pct=data.get("emergency_battery_pct"),
         )
 
 
@@ -251,6 +265,9 @@ class ZoneLighting:
     avg_dim_level: float
     total_power_w: float
     faulty_count: int = 0
+    # Scenecom extended fields
+    active_scene: Optional[int] = None  # Current scene number (1-8), None if manual
+    active_scene_name: Optional[str] = None  # Scene name (e.g., "Working", "Presentation")
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
@@ -262,6 +279,8 @@ class ZoneLighting:
             "avg_dim_level": self.avg_dim_level,
             "total_power_w": self.total_power_w,
             "faulty_count": self.faulty_count,
+            "active_scene": self.active_scene,
+            "active_scene_name": self.active_scene_name,
         }
 
 

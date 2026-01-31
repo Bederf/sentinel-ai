@@ -27,7 +27,14 @@ function App() {
   const [showSplash, setShowSplash] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     // Check if already authenticated in this session
-    return sessionStorage.getItem("sentinel_authenticated") === "true";
+    const authStatus = sessionStorage.getItem("sentinel_authenticated") === "true";
+    console.log('Initial auth check:', sessionStorage.getItem("sentinel_authenticated"), '=>', authStatus);
+
+    // TEMPORARY: Force PIN screen to show for debugging
+    // Comment out the next line to restore normal behavior
+    // sessionStorage.removeItem("sentinel_authenticated");
+
+    return authStatus;
   });
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -63,6 +70,15 @@ function App() {
     };
 
     checkHealth();
+
+    // Log authentication status for debugging
+    console.log('=== AUTH DEBUG ===');
+    console.log('showSplash:', showSplash);
+    console.log('isAuthenticated:', isAuthenticated);
+    console.log('sessionStorage:', sessionStorage.getItem("sentinel_authenticated"));
+    console.log('To reset PIN auth, run in console: sessionStorage.removeItem("sentinel_authenticated")');
+    console.log('==================');
+
     // Periodic health check every 30 seconds
     const healthInterval = setInterval(checkHealth, 30000);
     return () => clearInterval(healthInterval);
@@ -142,12 +158,20 @@ function App() {
 
   // Show splash screen on initial load
   if (showSplash) {
-    return <SplashScreen onComplete={() => setShowSplash(false)} />;
+    console.log('Showing splash screen');
+    return <SplashScreen onComplete={() => {
+      console.log('Splash complete, setting showSplash to false');
+      setShowSplash(false);
+    }} />;
   }
 
   // Show PIN entry after splash if not authenticated
   if (!isAuthenticated) {
-    return <PinEntry onSuccess={() => setIsAuthenticated(true)} />;
+    console.log('Showing PIN entry (authenticated =', isAuthenticated, ')');
+    return <PinEntry onSuccess={() => {
+      console.log('PIN entry success, setting authenticated to true');
+      setIsAuthenticated(true);
+    }} />;
   }
 
   return (

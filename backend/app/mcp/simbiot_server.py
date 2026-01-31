@@ -22,6 +22,7 @@ from collections import defaultdict
 
 from app.services.device_abstraction import device_manager
 from app.models.device import DeviceStatus
+from app.services.building_loader import get_building_loader
 
 logger = logging.getLogger(__name__)
 
@@ -1404,6 +1405,1361 @@ async def create_work_order_tool(
 
 
 # ============================================================================
+# Building Management Tools (for onboarding)
+# ============================================================================
+
+async def list_managed_buildings_tool() -> Dict[str, Any]:
+    """List all managed buildings."""
+    loader = get_building_loader()
+    loader.load(force=True)
+
+    registry = loader.get_registry()
+    active_ids = set(registry.get("active_buildings", []))
+
+    buildings = []
+    for building in loader.get_all_buildings():
+        info = building.to_dict()
+        info["is_active"] = building.id in active_ids
+        info["desk_count"] = len(loader.get_desks(building.id))
+        info["zone_count"] = len(loader.get_zones(building.id))
+        buildings.append(info)
+
+    return {
+        "buildings": buildings,
+        "total": len(buildings),
+        "active_count": len(active_ids),
+        "default_building": registry.get("default_building"),
+    }
+
+
+async def create_building_tool(
+    building_id: str,
+    name: str,
+    address: str = "",
+    floors: List[str] = None,
+    features: Dict[str, bool] = None,
+) -> Dict[str, Any]:
+    """Create a new building configuration.
+
+    Writes to both Supabase (primary) and JSON files (backup).
+    """
+    import json
+    import uuid
+    from pathlib import Path
+
+    buildings_path = Path(__file__).parent.parent / "data" / "buildings"
+    building_path = buildings_path / building_id
+
+    if building_path.exists():
+        return {
+            "success": False,
+            "error": f"Building '{building_id}' already exists",
+        }
+
+    # Generate deterministic UUID from building_id
+    building_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"building-{building_id}"))
+
+    # Prepare building data
+    building_data = {
+        "id": building_id,
+        "name": name,
+        "display_name": name,
+        "address": address,
+        "timezone": "Africa/Johannesburg",
+        "floors": floors or [],
+        "features": features or {
+            "hvac": True,
+            "dali": False,
+            "desk_diagnosis": True,
+        },
+        "metadata": {}
+    }
+
+    supabase_written = False
+
+    # 1. Try to write to Supabase first
+    try:
+        from app.config.settings import settings
+        if settings.supabase_url and settings.supabase_service_role_key:
+            from app.database.repositories import BuildingRepository
+            repo = BuildingRepository()
+
+            # Check if building already exists in Supabase
+            existing = repo.get_by_id(building_id)
+            if existing:
+                return {
+                    "success": False,
+                    "error": f"Building '{building_id}' already exists in database",
+                }
+
+            # Create in Supabase
+            supabase_record = {
+                "id": building_uuid,
+                "code": building_id,
+                "name": name,
+                "address": address,
+                "type": "branch",
+                "optimization_enabled": False,
+            }
+            repo.create(supabase_record)
+            supabase_written = True
+            logger.info(f"Created building in Supabase: {building_id}")
+    except Exception as e:
+        logger.warning(f"Supabase write failed, will use JSON only: {e}")
+
+    # 2. Always write to JSON files (backup + offline mode)
+    building_path.mkdir(parents=True, exist_ok=True)
+
+    with open(building_path / "building.json", "w") as f:
+        json.dump(building_data, f, indent=2)
+
+    # Create empty data files
+    with open(building_path / "desks.json", "w") as f:
+        json.dump([], f, indent=2)
+    with open(building_path / "zones.json", "w") as f:
+        json.dump([], f, indent=2)
+
+    logger.info(f"Created building via MCP: {building_id}")
+
+    return {
+        "success": True,
+        "building_id": building_id,
+        "name": name,
+        "status": "created",
+        "storage": "supabase+json" if supabase_written else "json",
+        "message": f"Building '{name}' created. Add desks/zones, then activate.",
+        "next_steps": [
+            "Add desks to the building",
+            "Add HVAC zones to the building",
+            f"Call activate_building with building_id='{building_id}'"
+        ]
+    }
+
+
+async def activate_building_tool(
+    building_id: str,
+    set_default: bool = False,
+) -> Dict[str, Any]:
+    """Activate a building (add to registry)."""
+    import json
+    from pathlib import Path
+
+    buildings_path = Path(__file__).parent.parent / "data" / "buildings"
+    building_path = buildings_path / building_id
+    registry_path = buildings_path / "_registry.json"
+
+    if not building_path.exists():
+        return {
+            "success": False,
+            "error": f"Building '{building_id}' not found",
+        }
+
+    # Load/create registry
+    if registry_path.exists():
+        with open(registry_path) as f:
+            registry = json.load(f)
+    else:
+        registry = {"active_buildings": [], "default_building": None}
+
+    # Add to active
+    if building_id not in registry["active_buildings"]:
+        registry["active_buildings"].append(building_id)
+
+    if set_default or not registry.get("default_building"):
+        registry["default_building"] = building_id
+
+    # Save registry
+    with open(registry_path, "w") as f:
+        json.dump(registry, f, indent=2)
+
+    # Reload
+    loader = get_building_loader()
+    loader.load(force=True)
+
+    logger.info(f"Activated building via MCP: {building_id}")
+
+    return {
+        "success": True,
+        "building_id": building_id,
+        "status": "active",
+        "is_default": registry["default_building"] == building_id,
+        "message": f"Building '{building_id}' is now active",
+    }
+
+
+async def get_building_config_tool(building_id: str) -> Dict[str, Any]:
+    """Get a building's full configuration."""
+    loader = get_building_loader()
+    building = loader.get_building(building_id)
+
+    if not building:
+        return {
+            "success": False,
+            "error": f"Building '{building_id}' not found",
+        }
+
+    desks = loader.get_desks(building_id)
+    zones = loader.get_zones(building_id)
+
+    return {
+        "success": True,
+        "building": building.to_dict(),
+        "is_active": building_id in loader.get_active_building_ids(),
+        "desks": {
+            "count": len(desks),
+            "sample": desks[:5] if desks else [],
+        },
+        "zones": {
+            "count": len(zones),
+            "data": zones,
+        },
+    }
+
+
+# ============================================================================
+# AI-Assisted Onboarding Tools
+# ============================================================================
+
+async def add_building_zones_tool(
+    building_id: str,
+    zones: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """
+    Add HVAC zones to a building with equipment mappings.
+
+    Writes to both Supabase (primary) and JSON files (backup).
+
+    Each zone should include:
+    - zone_id: Unique zone identifier (e.g., "Zone-L12-N")
+    - zone_name: Human-readable name (e.g., "Level 12 North")
+    - floor: Floor identifier (e.g., "L12")
+    - fcu_id: Fan Coil Unit ID
+    - vav_id: Variable Air Volume box ID (optional)
+    - ahu_id: Air Handling Unit ID
+    - temp_sensor: Temperature sensor ID
+    - co2_sensor: CO2 sensor ID
+    - setpoint: Temperature setpoint (default 22.0)
+    - current_temp: Current temperature (default 22.0)
+    - status: Zone status (default "running")
+    """
+    import json
+    import uuid
+    from pathlib import Path
+
+    buildings_path = Path(__file__).parent.parent / "data" / "buildings"
+    building_path = buildings_path / building_id
+    zones_file = building_path / "zones.json"
+
+    if not building_path.exists():
+        return {
+            "success": False,
+            "error": f"Building '{building_id}' not found. Create it first with create_building.",
+        }
+
+    # Validate and normalize zone data
+    normalized_zones = []
+    for zone in zones:
+        if not zone.get("zone_id"):
+            return {
+                "success": False,
+                "error": "Each zone must have a 'zone_id' field",
+            }
+
+        normalized = {
+            "zone_id": zone["zone_id"],
+            "zone_name": zone.get("zone_name", zone["zone_id"]),
+            "floor": zone.get("floor", ""),
+            "fcu_id": zone.get("fcu_id", ""),
+            "vav_id": zone.get("vav_id"),
+            "ahu_id": zone.get("ahu_id", ""),
+            "temp_sensor": zone.get("temp_sensor"),
+            "co2_sensor": zone.get("co2_sensor"),
+            "typical_occupancy": zone.get("typical_occupancy"),
+            "area_sqm": zone.get("area_sqm"),
+            "setpoint": zone.get("setpoint", 22.0),
+            "current_temp": zone.get("current_temp", 22.0),
+            "status": zone.get("status", "running"),
+            "desk_range": zone.get("desk_range", ""),
+        }
+        normalized_zones.append(normalized)
+
+    supabase_written = False
+
+    # 1. Try to write to Supabase first
+    try:
+        from app.config.settings import settings
+        if settings.supabase_url and settings.supabase_service_role_key:
+            from app.database.repositories import HVACZoneRepository
+            repo = HVACZoneRepository()
+
+            # Get building UUID
+            building_uuid = repo.get_building_uuid(building_id)
+            if building_uuid:
+                # Prepare Supabase records
+                supabase_zones = []
+                for zone in normalized_zones:
+                    zone_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"zone-{zone['zone_id']}"))
+                    supabase_zone = {
+                        "id": zone_uuid,
+                        "zone_id": zone["zone_id"],
+                        "zone_name": zone["zone_name"],
+                        "building_id": building_uuid,
+                        "floor": zone["floor"],
+                        "fcu_id": zone.get("fcu_id"),
+                        "vav_id": zone.get("vav_id"),
+                        "ahu_id": zone.get("ahu_id"),
+                        "temp_sensor": zone.get("temp_sensor"),
+                        "co2_sensor": zone.get("co2_sensor"),
+                        "typical_occupancy": zone.get("typical_occupancy"),
+                        "area_sqm": zone.get("area_sqm"),
+                        "setpoint": zone.get("setpoint", 22.0),
+                        "current_temp": zone.get("current_temp"),
+                        "status": zone.get("status", "idle"),
+                    }
+                    supabase_zones.append(supabase_zone)
+
+                repo.upsert_many(supabase_zones)
+                supabase_written = True
+                logger.info(f"Wrote {len(supabase_zones)} zones to Supabase for {building_id}")
+    except Exception as e:
+        logger.warning(f"Supabase zone write failed, will use JSON only: {e}")
+
+    # 2. Always write to JSON files (backup + offline mode)
+    existing_zones = []
+    if zones_file.exists():
+        with open(zones_file) as f:
+            existing_zones = json.load(f)
+
+    # Merge by zone_id (update existing or add new)
+    existing_ids = {z["zone_id"]: i for i, z in enumerate(existing_zones)}
+    for zone in normalized_zones:
+        if zone["zone_id"] in existing_ids:
+            existing_zones[existing_ids[zone["zone_id"]]] = zone
+        else:
+            existing_zones.append(zone)
+
+    # Save zones
+    with open(zones_file, "w") as f:
+        json.dump(existing_zones, f, indent=2)
+
+    # Reload building data
+    loader = get_building_loader()
+    loader.load(force=True)
+
+    logger.info(f"Added {len(normalized_zones)} zones to building {building_id}")
+
+    return {
+        "success": True,
+        "building_id": building_id,
+        "zones_added": len(normalized_zones),
+        "total_zones": len(existing_zones),
+        "zone_ids": [z["zone_id"] for z in normalized_zones],
+        "storage": "supabase+json" if supabase_written else "json",
+        "message": f"Added {len(normalized_zones)} zones to '{building_id}'",
+    }
+
+
+async def add_building_desks_tool(
+    building_id: str,
+    desks: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """
+    Add desks to a building with zone mappings, DALI lighting, and environmental context.
+
+    Each desk should include:
+    - desk_id: Unique desk identifier (e.g., "201", "L12-D001")
+    - zone_id: HVAC zone the desk belongs to
+    - floor: Floor identifier
+    - near_window: Boolean - near exterior window
+    - orientation: N/S/E/W/NE/NW/SE/SW - for solar analysis
+    - near_diffuser: Diffuser ID if under supply air outlet
+    - near_printer: Boolean - near heat source
+    - department: Department/team
+    - occupant: Occupant name
+    - x_coord, y_coord: Floor plan coordinates
+    - dali_zone: DALI lighting zone
+    - sensor_id: PIR occupancy sensor ID
+    - luminaire_ids: List of luminaire IDs serving desk
+    - dali_controller: Tridonic Scenecom controller ID
+    """
+    import json
+    from pathlib import Path
+
+    buildings_path = Path(__file__).parent.parent / "data" / "buildings"
+    building_path = buildings_path / building_id
+    desks_file = building_path / "desks.json"
+
+    if not building_path.exists():
+        return {
+            "success": False,
+            "error": f"Building '{building_id}' not found. Create it first with create_building.",
+        }
+
+    # Validate and normalize desk data
+    normalized_desks = []
+    for desk in desks:
+        if not desk.get("desk_id"):
+            return {
+                "success": False,
+                "error": "Each desk must have a 'desk_id' field",
+            }
+
+        normalized = {
+            "desk_id": str(desk["desk_id"]),
+            "zone_id": desk.get("zone_id", ""),
+            "floor": desk.get("floor", ""),
+            # Environmental context
+            "near_window": desk.get("near_window", False),
+            "orientation": desk.get("orientation"),  # N, S, E, W, NE, NW, SE, SW
+            "near_diffuser": desk.get("near_diffuser"),
+            "near_printer": desk.get("near_printer", False),
+            # Organizational
+            "department": desk.get("department"),
+            "occupant": desk.get("occupant"),
+            # Floor plan
+            "x_coord": desk.get("x_coord"),
+            "y_coord": desk.get("y_coord"),
+            # DALI-2 Scenecom integration
+            "dali_zone": desk.get("dali_zone"),
+            "sensor_id": desk.get("sensor_id"),
+            "luminaire_ids": desk.get("luminaire_ids"),
+            "dali_controller": desk.get("dali_controller"),
+        }
+        normalized_desks.append(normalized)
+
+    supabase_written = False
+
+    # 1. Try to write to Supabase first
+    try:
+        from app.config.settings import settings
+        if settings.supabase_url and settings.supabase_service_role_key:
+            from app.database.repositories import DeskRepository
+            repo = DeskRepository()
+
+            # Get building UUID
+            building_uuid = repo.get_building_uuid(building_id)
+            if building_uuid:
+                # Prepare Supabase records
+                supabase_desks = []
+                for desk in normalized_desks:
+                    desk_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"desk-{desk['desk_id']}"))
+
+                    # Look up zone UUID if zone_id provided
+                    hvac_zone_uuid = None
+                    if desk.get("zone_id"):
+                        hvac_zone_uuid = repo.get_hvac_zone_uuid(desk["zone_id"])
+
+                    supabase_desk = {
+                        "id": desk_uuid,
+                        "desk_id": desk["desk_id"],
+                        "building_id": building_uuid,
+                        "hvac_zone_id": hvac_zone_uuid,
+                        "floor": desk.get("floor", ""),
+                        "window_facing": desk.get("orientation"),
+                        "near_diffuser": bool(desk.get("near_diffuser")),
+                        "diffuser_id": desk.get("near_diffuser") if isinstance(desk.get("near_diffuser"), str) else None,
+                        "near_printer": desk.get("near_printer", False),
+                        "near_kitchen": desk.get("near_kitchen", False),
+                        "luminaire_ids": desk.get("luminaire_ids") or [],
+                        "sensor_ids": [desk.get("sensor_id")] if desk.get("sensor_id") else [],
+                    }
+                    supabase_desks.append(supabase_desk)
+
+                repo.upsert_many(supabase_desks)
+                supabase_written = True
+                logger.info(f"Wrote {len(supabase_desks)} desks to Supabase for {building_id}")
+    except Exception as e:
+        logger.warning(f"Supabase desk write failed, will use JSON only: {e}")
+
+    # 2. Always write to JSON files (backup + offline mode)
+    existing_desks = []
+    if desks_file.exists():
+        with open(desks_file) as f:
+            existing_desks = json.load(f)
+
+    # Merge by desk_id
+    existing_ids = {d["desk_id"]: i for i, d in enumerate(existing_desks)}
+    for desk in normalized_desks:
+        if desk["desk_id"] in existing_ids:
+            existing_desks[existing_ids[desk["desk_id"]]] = desk
+        else:
+            existing_desks.append(desk)
+
+    # Save desks
+    with open(desks_file, "w") as f:
+        json.dump(existing_desks, f, indent=2)
+
+    # Reload building data
+    loader = get_building_loader()
+    loader.load(force=True)
+
+    logger.info(f"Added {len(normalized_desks)} desks to building {building_id}")
+
+    return {
+        "success": True,
+        "building_id": building_id,
+        "desks_added": len(normalized_desks),
+        "total_desks": len(existing_desks),
+        "desk_ids": [d["desk_id"] for d in normalized_desks[:10]],
+        "storage": "supabase+json" if supabase_written else "json",
+        "message": f"Added {len(normalized_desks)} desks to '{building_id}'",
+    }
+
+
+async def add_building_devices_tool(
+    building_id: str,
+    devices: List[Dict[str, Any]],
+    site_code: str = None,
+) -> Dict[str, Any]:
+    """
+    Add BMS devices to the system for a building.
+
+    Each device should include:
+    - device_id: Unique device ID (following naming convention: {site}-{building}-{type}-{seq})
+    - device_type: Type (chiller, ahu, fcu, vav, etc.)
+    - name: Display name
+    - location: Location description
+    - protocol: Communication protocol (bacnet, modbus, mock)
+    - points: Dict of point names to current values
+    - metadata: Additional metadata (manufacturer, model, etc.)
+
+    If device_id is not provided, it will be auto-generated from site_code and device_type.
+    """
+    import json
+    from pathlib import Path
+
+    data_path = Path(__file__).parent.parent / "data"
+    devices_file = data_path / "mock_devices.json"
+
+    # Load existing devices
+    existing_devices = []
+    if devices_file.exists():
+        with open(devices_file) as f:
+            existing_devices = json.load(f)
+
+    # Track counts by type for auto-generating IDs
+    type_counts = defaultdict(int)
+    for d in existing_devices:
+        dtype = d.get("device_type", "unknown")
+        type_counts[dtype] += 1
+
+    # Use site code from building_id if not provided
+    if not site_code:
+        site_code = building_id[:3] if len(building_id) >= 3 else building_id
+
+    # Normalize devices
+    new_devices = []
+    for device in devices:
+        device_type = device.get("device_type", "unknown")
+
+        # Auto-generate device_id if not provided
+        if not device.get("device_id"):
+            type_counts[device_type] += 1
+            device_id = f"{site_code}-{building_id[:3]}-{device_type}-{type_counts[device_type]:03d}"
+        else:
+            device_id = device["device_id"]
+
+        normalized = {
+            "device_id": device_id,
+            "device_type": device_type,
+            "name": device.get("name", f"{device_type.upper()} {device_id}"),
+            "location": device.get("location", building_id),
+            "protocol": device.get("protocol", "mock"),
+            "status": device.get("status", "online"),
+            "building_id": building_id,
+            "points": device.get("points", {}),
+            "metadata": device.get("metadata", {}),
+        }
+        new_devices.append(normalized)
+
+    # Merge with existing (update or add)
+    existing_ids = {d["device_id"]: i for i, d in enumerate(existing_devices)}
+    for device in new_devices:
+        if device["device_id"] in existing_ids:
+            existing_devices[existing_ids[device["device_id"]]] = device
+        else:
+            existing_devices.append(device)
+
+    # Save devices
+    with open(devices_file, "w") as f:
+        json.dump(existing_devices, f, indent=2)
+
+    logger.info(f"Added {len(new_devices)} devices for building {building_id}")
+
+    return {
+        "success": True,
+        "building_id": building_id,
+        "devices_added": len(new_devices),
+        "total_devices": len(existing_devices),
+        "device_ids": [d["device_id"] for d in new_devices],
+        "message": f"Added {len(new_devices)} devices for '{building_id}'",
+    }
+
+
+async def import_point_list_tool(
+    building_id: str,
+    point_list: List[Dict[str, Any]],
+    site_code: str = None,
+    bms_vendor: str = None,
+) -> Dict[str, Any]:
+    """
+    Import BACnet point list and auto-generate device/zone structure.
+
+    This is the primary AI-assisted onboarding tool. It parses BMS point exports
+    and automatically creates device and zone structures based on naming patterns.
+
+    Supported BMS vendors (bms_vendor parameter):
+    - "desigo" or "siemens": Siemens Desigo CC (e.g., AHU-L12-01.SupplyAirTemp)
+    - "metasys" or "jci": Johnson Controls Metasys (e.g., NAE-1/AHU-1.SAT)
+    - "ebi" or "honeywell": Honeywell EBI (e.g., AHU_01_SAT)
+    - "ecostruxure" or "schneider": Schneider EcoStruxure (e.g., Building/Floor12/AHU01/SAT)
+    - "niagara" or "tridium": Tridium Niagara (e.g., station/Drivers/BACnet/AHU_01/SAT)
+    - "trend": Trend Controls (e.g., AHU1.SAT)
+    - "auto" (default): Auto-detect from naming patterns
+
+    Each point should include:
+    - point_name: BACnet object name (e.g., "AHU-L12-01.SupplyAirTemp")
+    - object_type: BACnet object type (e.g., "Analog Input", "Binary Output")
+    - instance: BACnet object instance number
+    - description: Point description
+    - units: Engineering units (optional)
+    - value: Current value (optional)
+
+    The tool will:
+    1. Parse device names from point names (e.g., "AHU-L12-01" from "AHU-L12-01.SupplyAirTemp")
+    2. Determine device types (AHU, FCU, VAV, Chiller, etc.)
+    3. Group points by device
+    4. Create device entries with point mappings
+    5. Infer zone structure from device naming patterns
+    """
+    import json
+    import re
+    from pathlib import Path
+
+    if not point_list:
+        return {
+            "success": False,
+            "error": "Point list is empty",
+        }
+
+    # Use site code from building_id if not provided
+    if not site_code:
+        site_code = building_id[:3] if len(building_id) >= 3 else building_id
+
+    # Normalize vendor name
+    vendor = (bms_vendor or "auto").lower()
+    vendor_aliases = {
+        "siemens": "desigo", "desigo_cc": "desigo",
+        "jci": "metasys", "johnson": "metasys", "johnson_controls": "metasys",
+        "honeywell": "ebi",
+        "schneider": "ecostruxure", "struxureware": "ecostruxure",
+        "tridium": "niagara",
+    }
+    vendor = vendor_aliases.get(vendor, vendor)
+
+    # BMS vendor-specific device extraction patterns
+    # Each returns (device_name, point_suffix) from a full point name
+    def extract_desigo(point_name: str) -> tuple:
+        """Siemens Desigo CC: AHU-L12-01.SupplyAirTemp, FCU_L11_02.RoomTemp"""
+        match = re.match(r"^([A-Za-z0-9\-_]+?)[\._](.+)$", point_name)
+        if match:
+            return match.group(1), match.group(2)
+        return point_name, ""
+
+    def extract_metasys(point_name: str) -> tuple:
+        """JCI Metasys: NAE-1/AHU-1.SAT, N2:AHU-1/SA-T, AHU1.SA-T"""
+        # Strip NAE/N2 prefix if present
+        cleaned = re.sub(r"^(NAE-?\d+[/:]|N\d+:)", "", point_name)
+        match = re.match(r"^([A-Za-z0-9\-_]+?)[\./](.+)$", cleaned)
+        if match:
+            return match.group(1), match.group(2)
+        return cleaned.split(".")[0], ""
+
+    def extract_ebi(point_name: str) -> tuple:
+        """Honeywell EBI: AHU_01_SAT, FCU_L12_03_ZNT"""
+        # EBI uses underscores, device is first 2-3 parts
+        parts = point_name.split("_")
+        if len(parts) >= 3:
+            # Detect if part[1] is a floor or sequence
+            if re.match(r"^(L?\d+|B\d+|G|GF)$", parts[1], re.I):
+                device_name = "_".join(parts[:3])
+                point_suffix = "_".join(parts[3:])
+            else:
+                device_name = "_".join(parts[:2])
+                point_suffix = "_".join(parts[2:])
+            return device_name, point_suffix
+        return parts[0], "_".join(parts[1:]) if len(parts) > 1 else ""
+
+    def extract_ecostruxure(point_name: str) -> tuple:
+        """Schneider EcoStruxure: Building/Floor12/AHU01/SupplyAirTemp"""
+        parts = point_name.split("/")
+        if len(parts) >= 3:
+            # Find the device part (usually contains AHU, FCU, etc.)
+            for i, part in enumerate(parts):
+                if re.search(r"(AHU|FCU|VAV|CH|CT)", part, re.I):
+                    return part, "/".join(parts[i+1:])
+            # Fallback: second-to-last is device
+            return parts[-2], parts[-1]
+        return parts[0], "/".join(parts[1:]) if len(parts) > 1 else ""
+
+    def extract_niagara(point_name: str) -> tuple:
+        """Tridium Niagara: station/Drivers/BACnet/AHU_L12_01/SupplyAirTemp"""
+        parts = point_name.split("/")
+        if len(parts) >= 2:
+            # Find device part (usually after BACnet or Drivers)
+            for i, part in enumerate(parts):
+                if re.search(r"(AHU|FCU|VAV|CH|CT|Chiller)", part, re.I):
+                    return part, "/".join(parts[i+1:])
+            # Fallback: last two parts
+            return parts[-2], parts[-1]
+        return point_name, ""
+
+    def extract_trend(point_name: str) -> tuple:
+        """Trend Controls: AHU1.SAT, FCU1.RT (short names)"""
+        match = re.match(r"^([A-Za-z]+\d+)\.(.+)$", point_name)
+        if match:
+            return match.group(1), match.group(2)
+        return point_name.split(".")[0], ""
+
+    def extract_auto(point_name: str) -> tuple:
+        """Auto-detect: try common patterns"""
+        # Niagara/EcoStruxure path style
+        if point_name.count("/") >= 2:
+            return extract_niagara(point_name)
+        # EBI underscore style with multiple parts
+        if point_name.count("_") >= 3:
+            return extract_ebi(point_name)
+        # Metasys NAE prefix
+        if re.match(r"^(NAE|N\d+)", point_name):
+            return extract_metasys(point_name)
+        # Default Desigo-style
+        return extract_desigo(point_name)
+
+    # Select extraction function
+    extractors = {
+        "desigo": extract_desigo,
+        "metasys": extract_metasys,
+        "ebi": extract_ebi,
+        "ecostruxure": extract_ecostruxure,
+        "niagara": extract_niagara,
+        "trend": extract_trend,
+        "auto": extract_auto,
+    }
+    extract_device = extractors.get(vendor, extract_auto)
+
+    # Device type patterns
+    device_patterns = {
+        "chiller": re.compile(r"(chiller|ch\d|chl)", re.I),
+        "ahu": re.compile(r"(ahu|air.?handling|ah\d)", re.I),
+        "fcu": re.compile(r"(fcu|fan.?coil|fc\d)", re.I),
+        "vav": re.compile(r"(vav|variable.?air)", re.I),
+        "pump": re.compile(r"(pump|chw.?p|chwp)", re.I),
+        "cooling_tower": re.compile(r"(cooling.?tower|ct\d)", re.I),
+        "meter": re.compile(r"(meter|kwh|energy)", re.I),
+        "boiler": re.compile(r"(boiler|blr)", re.I),
+        "hws": re.compile(r"(hws|hot.?water)", re.I),
+    }
+
+    # Parse points and group by device
+    devices_map = defaultdict(lambda: {"points": {}, "type": "unknown", "floor": ""})
+
+    for point in point_list:
+        point_name = point.get("point_name", "")
+        if not point_name:
+            continue
+
+        # Extract device name using vendor-specific pattern
+        device_name, point_suffix = extract_device(point_name)
+
+        # Determine device type
+        device_type = "unknown"
+        for dtype, pattern in device_patterns.items():
+            if pattern.search(device_name):
+                device_type = dtype
+                break
+
+        # Extract floor from device name (e.g., L12, L11, Floor12, etc.)
+        floor_match = re.search(r"[_\-]?(L\d+|B\d+|G|GF|Floor\d+|[0-9]{1,2}F)[_\-]?", device_name, re.I)
+        floor = floor_match.group(1).upper() if floor_match else ""
+        # Normalize Floor12 -> L12
+        floor = re.sub(r"Floor(\d+)", r"L\1", floor, flags=re.I)
+
+        # Normalize point name for storage
+        normalized_point = re.sub(r"[^a-z0-9_]", "_", point_suffix.lower()).strip("_")
+        if not normalized_point:
+            normalized_point = "value"
+
+        # Store point data
+        devices_map[device_name]["type"] = device_type
+        devices_map[device_name]["floor"] = floor
+        devices_map[device_name]["points"][normalized_point] = {
+            "original_name": point_name,
+            "object_type": point.get("object_type", ""),
+            "instance": point.get("instance"),
+            "description": point.get("description", ""),
+            "units": point.get("units", ""),
+            "value": point.get("value"),
+        }
+
+    # Generate devices
+    generated_devices = []
+    for device_name, data in devices_map.items():
+        device_type = data["type"]
+        floor = data["floor"]
+
+        # Generate device_id
+        seq = len([d for d in generated_devices if d["device_type"] == device_type]) + 1
+        device_id = f"{site_code}-{building_id[:3]}-{device_type}-{seq:03d}"
+
+        # Simplify points to just values
+        simple_points = {}
+        for pname, pdata in data["points"].items():
+            if pdata.get("value") is not None:
+                simple_points[pname] = pdata["value"]
+            else:
+                # Use 0 or False as default based on object type
+                if "binary" in pdata.get("object_type", "").lower():
+                    simple_points[pname] = False
+                else:
+                    simple_points[pname] = 0.0
+
+        device = {
+            "device_id": device_id,
+            "device_type": device_type,
+            "name": device_name,
+            "location": f"{building_id} {floor}".strip(),
+            "protocol": "bacnet",
+            "status": "online",
+            "building_id": building_id,
+            "floor": floor,
+            "points": simple_points,
+            "metadata": {
+                "source": "point_list_import",
+                "original_name": device_name,
+                "point_count": len(data["points"]),
+            },
+        }
+        generated_devices.append(device)
+
+    # Infer zones from FCU/VAV devices
+    inferred_zones = []
+    fcu_devices = [d for d in generated_devices if d["device_type"] == "fcu"]
+    vav_devices = [d for d in generated_devices if d["device_type"] == "vav"]
+    ahu_devices = [d for d in generated_devices if d["device_type"] == "ahu"]
+
+    for fcu in fcu_devices:
+        floor = fcu.get("floor", "")
+        fcu_name = fcu["metadata"]["original_name"]
+
+        # Try to find matching VAV
+        matching_vav = None
+        for vav in vav_devices:
+            if vav.get("floor") == floor:
+                matching_vav = vav
+                break
+
+        # Try to find matching AHU
+        matching_ahu = None
+        for ahu in ahu_devices:
+            if ahu.get("floor") == floor:
+                matching_ahu = ahu
+                break
+
+        zone_id = f"Zone-{floor}-{fcu_name[-2:]}" if floor else f"Zone-{fcu_name}"
+        zone = {
+            "zone_id": zone_id,
+            "floor": floor,
+            "fcu_id": fcu["device_id"],
+            "vav_id": matching_vav["device_id"] if matching_vav else None,
+            "ahu_id": matching_ahu["device_id"] if matching_ahu else None,
+            "setpoint": 22.0,
+            "current_temp": 22.0,
+            "status": "running",
+        }
+        inferred_zones.append(zone)
+
+    # Save the generated structures
+    result = {
+        "success": True,
+        "building_id": building_id,
+        "bms_vendor": vendor,
+        "analysis": {
+            "total_points": len(point_list),
+            "unique_devices": len(devices_map),
+            "device_types": dict(defaultdict(int)),
+        },
+        "generated": {
+            "devices": len(generated_devices),
+            "zones": len(inferred_zones),
+        },
+        "devices": generated_devices,
+        "zones": inferred_zones,
+        "message": f"Parsed {len(point_list)} points ({vendor} format) into {len(generated_devices)} devices and {len(inferred_zones)} zones",
+        "next_steps": [
+            "Review the generated devices and zones",
+            "Call add_building_devices to save devices",
+            "Call add_building_zones to save zones",
+            "Call activate_building to make the building active",
+        ],
+    }
+
+    # Count by device type
+    for d in generated_devices:
+        result["analysis"]["device_types"][d["device_type"]] = \
+            result["analysis"]["device_types"].get(d["device_type"], 0) + 1
+
+    logger.info(f"Imported point list for {building_id}: {len(point_list)} points -> {len(generated_devices)} devices")
+
+    return result
+
+
+async def import_controller_list_tool(
+    building_id: str,
+    controllers: List[Dict[str, Any]],
+    site_code: str = None,
+) -> Dict[str, Any]:
+    """
+    Import BMS controller information and create device structure.
+
+    Each controller should include:
+    - name: Controller name (e.g., "PXC-L12-01")
+    - ip_address: IP address
+    - bacnet_device_id: BACnet device instance (optional)
+    - area_served: Description of area served (e.g., "Level 12 North")
+    - controller_type: Type (e.g., "PXC", "PXA", "DDC")
+    - equipment: List of equipment names controlled (optional)
+
+    This tool creates controller devices that can be used as parent references
+    for other equipment in the system.
+    """
+    import json
+    from pathlib import Path
+
+    if not controllers:
+        return {
+            "success": False,
+            "error": "Controller list is empty",
+        }
+
+    # Use site code from building_id if not provided
+    if not site_code:
+        site_code = building_id[:3] if len(building_id) >= 3 else building_id
+
+    # Generate controller devices
+    generated_controllers = []
+    for idx, ctrl in enumerate(controllers):
+        name = ctrl.get("name", f"Controller-{idx+1}")
+
+        device = {
+            "device_id": f"{site_code}-{building_id[:3]}-ctrl-{idx+1:03d}",
+            "device_type": "controller",
+            "name": name,
+            "location": ctrl.get("area_served", building_id),
+            "protocol": "bacnet",
+            "status": "online",
+            "building_id": building_id,
+            "points": {},
+            "metadata": {
+                "ip_address": ctrl.get("ip_address", ""),
+                "bacnet_device_id": ctrl.get("bacnet_device_id"),
+                "controller_type": ctrl.get("controller_type", "DDC"),
+                "area_served": ctrl.get("area_served", ""),
+                "equipment_controlled": ctrl.get("equipment", []),
+                "source": "controller_list_import",
+            },
+        }
+        generated_controllers.append(device)
+
+    logger.info(f"Imported {len(generated_controllers)} controllers for {building_id}")
+
+    return {
+        "success": True,
+        "building_id": building_id,
+        "controllers_parsed": len(generated_controllers),
+        "controllers": generated_controllers,
+        "message": f"Parsed {len(controllers)} controllers for '{building_id}'",
+        "next_steps": [
+            "Review the generated controller devices",
+            "Call add_building_devices to save controllers",
+            "Import point list to add equipment under each controller",
+        ],
+    }
+
+
+# ============================================================================
+# AI/ML Predictive Maintenance Tools (Asset Metric Configuration)
+# ============================================================================
+
+# Asset metric templates library for predictive maintenance
+# These templates are used when onboarding a new building to auto-generate
+# metric configurations based on equipment types present.
+
+ASSET_METRIC_TEMPLATES = {
+    "generator": {
+        "category": "Electrical/Mechanical",
+        "metrics": [
+            {"metric_id": "gen_voltage_ll", "name": "Line-Line Voltage", "unit": "V", "data_source": "bms_sensor", "point_pattern": ["voltage_ll", "volt_ll"], "normal_range": [380, 420], "warning_range": [370, 430], "critical_range": [360, 440], "weight": 0.15},
+            {"metric_id": "gen_voltage_ln", "name": "Line-Neutral Voltage", "unit": "V", "data_source": "bms_sensor", "point_pattern": ["voltage_ln", "volt_ln"], "normal_range": [220, 240], "warning_range": [215, 245], "critical_range": [210, 250], "weight": 0.10},
+            {"metric_id": "gen_frequency", "name": "Frequency", "unit": "Hz", "data_source": "bms_sensor", "point_pattern": ["frequency", "hz"], "normal_range": [49.5, 50.5], "warning_range": [49.0, 51.0], "critical_range": [48.0, 52.0], "weight": 0.15},
+            {"metric_id": "gen_coolant_temp", "name": "Coolant Temperature", "unit": "°C", "data_source": "bms_sensor", "point_pattern": ["coolant_temp", "engine_temp"], "normal_range": [70, 95], "warning_range": [95, 105], "critical_range": [105, 115], "weight": 0.12},
+            {"metric_id": "gen_oil_pressure", "name": "Oil Pressure", "unit": "bar", "data_source": "bms_sensor", "point_pattern": ["oil_pressure", "oil_press"], "normal_range": [3.5, 6.0], "warning_range": [2.5, 3.5], "critical_range": [1.5, 2.5], "weight": 0.12},
+            {"metric_id": "gen_engine_hours", "name": "Engine Hours", "unit": "h", "data_source": "bms_sensor", "point_pattern": ["runtime", "hours"], "normal_range": [0, 500], "warning_range": [500, 1000], "critical_range": [1000, 2000], "weight": 0.10},
+            {"metric_id": "gen_battery_voltage", "name": "Battery Voltage", "unit": "V", "data_source": "bms_sensor", "point_pattern": ["battery_volt", "batt_v"], "normal_range": [12.6, 13.8], "warning_range": [12.0, 12.6], "critical_range": [11.5, 12.0], "weight": 0.08},
+            {"metric_id": "gen_fuel_level", "name": "Fuel Level", "unit": "%", "data_source": "bms_sensor", "point_pattern": ["fuel_level", "fuel_lvl"], "normal_range": [50, 100], "warning_range": [25, 50], "critical_range": [10, 25], "weight": 0.08},
+            {"metric_id": "gen_sound_level", "name": "Sound Level", "unit": "dBA", "data_source": "mobile_phone", "measurement_type": "audio", "normal_range": [70, 90], "warning_range": [90, 100], "critical_range": [100, 110], "weight": 0.05, "sampling_notes": "Record 10s at 1m from engine enclosure"},
+            {"metric_id": "gen_vibration_rms", "name": "Vibration RMS", "unit": "mm/s", "data_source": "mobile_phone", "measurement_type": "accelerometer", "normal_range": [0, 2.0], "warning_range": [2.0, 4.5], "critical_range": [4.5, 7.0], "weight": 0.05, "sampling_notes": "Phone mounted on engine block, 10s sample"},
+        ],
+        "manual_inspections": [
+            {"inspection_id": "gen_oil_analysis", "name": "Oil Analysis", "frequency_days": 90, "parameters": ["viscosity", "particles", "water", "metals"]},
+            {"inspection_id": "gen_fuel_filter", "name": "Fuel Filter Condition", "frequency_days": 180, "parameters": ["visual_inspection", "restriction_check"]},
+            {"inspection_id": "gen_belts_hoses", "name": "Belts and Hoses", "frequency_days": 60, "parameters": ["wear", "cracks", "tension"]},
+            {"inspection_id": "gen_exhaust", "name": "Exhaust System", "frequency_days": 365, "parameters": ["leaks", "mounting", "insulation"]},
+        ]
+    },
+    "chiller": {
+        "category": "HVAC/Refrigeration",
+        "metrics": [
+            {"metric_id": "chill_suction_press", "name": "Suction Pressure", "unit": "bar", "data_source": "bms_sensor", "point_pattern": ["suction", "low_side"], "normal_range": [3.5, 5.5], "warning_range": [2.5, 3.5], "critical_range": [1.5, 2.5], "weight": 0.15},
+            {"metric_id": "chill_discharge_press", "name": "Discharge Pressure", "unit": "bar", "data_source": "bms_sensor", "point_pattern": ["discharge", "high_side"], "normal_range": [12, 18], "warning_range": [18, 22], "critical_range": [22, 26], "weight": 0.15},
+            {"metric_id": "chill_superheat", "name": "Superheat", "unit": "K", "data_source": "bms_sensor", "point_pattern": ["superheat", "sh"], "normal_range": [4, 8], "warning_range": [2, 4], "critical_range": [0, 2], "weight": 0.10},
+            {"metric_id": "chill_subcooling", "name": "Subcooling", "unit": "K", "data_source": "bms_sensor", "point_pattern": ["subcool", "sc"], "normal_range": [3, 7], "warning_range": [1, 3], "critical_range": [0, 1], "weight": 0.10},
+            {"metric_id": "chill_chw_supply_temp", "name": "CHW Supply Temp", "unit": "°C", "data_source": "bms_sensor", "point_pattern": ["chw_supply", "chws"], "normal_range": [6, 8], "warning_range": [8, 12], "critical_range": [12, 15], "weight": 0.12},
+            {"metric_id": "chill_chw_return_temp", "name": "CHW Return Temp", "unit": "°C", "data_source": "bms_sensor", "point_pattern": ["chw_return", "chwr"], "normal_range": [11, 14], "warning_range": [14, 18], "critical_range": [18, 22], "weight": 0.10},
+            {"metric_id": "chill_motor_current", "name": "Compressor Motor Current", "unit": "A", "data_source": "bms_sensor", "point_pattern": ["motor_current", "current"], "normal_range": [0, 150], "warning_range": [150, 180], "critical_range": [180, 200], "weight": 0.12},
+            {"metric_id": "chill_oil_temp", "name": "Oil Temperature", "unit": "°C", "data_source": "bms_sensor", "point_pattern": ["oil_temp"], "normal_range": [45, 65], "warning_range": [65, 75], "critical_range": [75, 85], "weight": 0.08},
+            {"metric_id": "chill_sound_compressor", "name": "Compressor Sound", "unit": "dBA", "data_source": "mobile_phone", "measurement_type": "audio", "normal_range": [65, 85], "warning_range": [85, 95], "critical_range": [95, 105], "weight": 0.05, "sampling_notes": "Record 10s at 1m from compressor"},
+            {"metric_id": "chill_vibration_compressor", "name": "Compressor Vibration", "unit": "mm/s", "data_source": "mobile_phone", "measurement_type": "accelerometer", "normal_range": [0, 1.8], "warning_range": [1.8, 4.0], "critical_range": [4.0, 6.5], "weight": 0.03, "sampling_notes": "Phone on compressor housing, 10s sample"},
+        ],
+        "manual_inspections": [
+            {"inspection_id": "chill_refrigerant_leak", "name": "Refrigerant Leak Check", "frequency_days": 180, "parameters": ["visual_inspection", "electronic_leak_detector"]},
+            {"inspection_id": "chill_belt_condition", "name": "Belt Condition (if open drive)", "frequency_days": 90, "parameters": ["tension", "wear", "cracks"]},
+            {"inspection_id": "chill_electrical_connections", "name": "Electrical Connections", "frequency_days": 365, "parameters": ["tightness", "discoloration", "torque"]},
+            {"inspection_id": "chill_condenser_coils", "name": "Condenser Coil Condition", "frequency_days": 60, "parameters": ["cleanliness", "fins", "airflow"]},
+        ]
+    },
+    "ahu": {
+        "category": "HVAC/Air Handling",
+        "metrics": [
+            {"metric_id": "ahu_supply_air_temp", "name": "Supply Air Temperature", "unit": "°C", "data_source": "bms_sensor", "point_pattern": ["supply_temp", "sat", "discharge_temp"], "normal_range": [12, 16], "warning_range": [10, 12], "critical_range": [8, 10], "weight": 0.15},
+            {"metric_id": "ahu_return_air_temp", "name": "Return Air Temperature", "unit": "°C", "data_source": "bms_sensor", "point_pattern": ["return_temp", "rat"], "normal_range": [22, 26], "warning_range": [26, 30], "critical_range": [30, 35], "weight": 0.12},
+            {"metric_id": "ahu_mixed_air_temp", "name": "Mixed Air Temperature", "unit": "°C", "data_source": "bms_sensor", "point_pattern": ["mixed_temp", "mat"], "normal_range": [14, 20], "warning_range": [10, 14], "critical_range": [6, 10], "weight": 0.10},
+            {"metric_id": "ahu_static_pressure", "name": "Static Pressure", "unit": "Pa", "data_source": "bms_sensor", "point_pattern": ["static_press", "sp"], "normal_range": [200, 500], "warning_range": [100, 200], "critical_range": [50, 100], "weight": 0.12},
+            {"metric_id": "ahu_filter_dp", "name": "Filter Differential Pressure", "unit": "Pa", "data_source": "bms_sensor", "point_pattern": ["filter_dp", "filter_pressure"], "normal_range": [50, 125], "warning_range": [125, 200], "critical_range": [200, 250], "weight": 0.12},
+            {"metric_id": "ahu_fan_current", "name": "Fan Motor Current", "unit": "A", "data_source": "bms_sensor", "point_pattern": ["fan_current", "fan_amps"], "normal_range": [0, 25], "warning_range": [25, 30], "critical_range": [30, 35], "weight": 0.10},
+            {"metric_id": "ahu_outside_air_damper", "name": "Outside Air Damper", "unit": "%", "data_source": "bms_sensor", "point_pattern": ["oa_damper", "economizer"], "normal_range": [10, 100], "warning_range": [0, 10], "critical_range": [0, 5], "weight": 0.08},
+            {"metric_id": "ahu_sound_fan", "name": "Fan Sound Level", "unit": "dBA", "data_source": "mobile_phone", "measurement_type": "audio", "normal_range": [55, 75], "warning_range": [75, 85], "critical_range": [85, 95], "weight": 0.10, "sampling_notes": "Record 10s at 2m from fan inlet"},
+            {"metric_id": "ahu_vibration_belt", "name": "Belt/Motor Vibration", "unit": "mm/s", "data_source": "mobile_phone", "measurement_type": "accelerometer", "normal_range": [0, 2.5], "warning_range": [2.5, 5.0], "critical_range": [5.0, 8.0], "weight": 0.11, "sampling_notes": "Phone on motor housing, 10s sample"},
+        ],
+        "manual_inspections": [
+            {"inspection_id": "ahu_belt_condition", "name": "Belt Condition", "frequency_days": 60, "parameters": ["tension", "wear", "cracks", "alignment"]},
+            {"inspection_id": "ahu_bearing_lubrication", "name": "Bearing Lubrication", "frequency_days": 180, "parameters": ["grease_level", "grease_condition"]},
+            {"inspection_id": "ahu_coil_cleanliness", "name": "Coil Cleanliness", "frequency_days": 90, "parameters": ["heating_coil", "cooling_coil", "fins"]},
+            {"inspection_id": "ahu_damper_operation", "name": "Damper Operation", "frequency_days": 365, "parameters": ["oa_damper", "exhaust_damper", "linkage"]},
+        ]
+    },
+    "fcu": {
+        "category": "HVAC/Fan Coil",
+        "metrics": [
+            {"metric_id": "fcu_coil_temp", "name": "Coil Temperature", "unit": "°C", "data_source": "bms_sensor", "point_pattern": ["coil_temp", "leaving_water"], "normal_range": [6, 12], "warning_range": [12, 18], "critical_range": [18, 25], "weight": 0.20},
+            {"metric_id": "fcu_fan_speed", "name": "Fan Speed", "unit": "%", "data_source": "bms_sensor", "point_pattern": ["fan_speed", "speed"], "normal_range": [0, 100], "warning_range": [80, 100], "critical_range": [100, 100], "weight": 0.15},
+            {"metric_id": "fcu_valve_position", "name": "Control Valve Position", "unit": "%", "data_source": "bms_sensor", "point_pattern": ["valve_pos", "control_valve"], "normal_range": [0, 100], "warning_range": [90, 100], "critical_range": [100, 100], "weight": 0.15},
+            {"metric_id": "fcu_room_temp", "name": "Room Temperature", "unit": "°C", "data_source": "bms_sensor", "point_pattern": ["room_temp", "space_temp"], "normal_range": [20, 24], "warning_range": [24, 27], "critical_range": [27, 30], "weight": 0.20},
+            {"metric_id": "fcu_motor_current", "name": "Motor Current", "unit": "A", "data_source": "bms_sensor", "point_pattern": ["motor_current"], "normal_range": [0, 3.5], "warning_range": [3.5, 4.5], "critical_range": [4.5, 5.5], "weight": 0.15},
+            {"metric_id": "fcu_sound_fan", "name": "Fan Sound", "unit": "dBA", "data_source": "mobile_phone", "measurement_type": "audio", "normal_range": [35, 50], "warning_range": [50, 65], "critical_range": [65, 75], "weight": 0.10, "sampling_notes": "Record 10s at 1m from FCU"},
+            {"metric_id": "fcu_vibration_motor", "name": "Motor Vibration", "unit": "mm/s", "data_source": "mobile_phone", "measurement_type": "accelerometer", "normal_range": [0, 2.0], "warning_range": [2.0, 4.5], "critical_range": [4.5, 7.0], "weight": 0.05, "sampling_notes": "Phone on motor housing, 10s sample"},
+        ],
+        "manual_inspections": [
+            {"inspection_id": "fcu_filter_condition", "name": "Filter Condition", "frequency_days": 90, "parameters": ["cleanliness", "pressure_drop"]},
+            {"inspection_id": "fcu_condensate_tray", "name": "Condensate Tray", "frequency_days": 60, "parameters": ["cleanliness", "drainage", "leaks"]},
+            {"inspection_id": "fcu_fan_motor", "name": "Fan Motor", "frequency_days": 365, "parameters": ["bearings", "capacitor", "wiring"]},
+        ]
+    },
+    "ups": {
+        "category": "Electrical/Power",
+        "metrics": [
+            {"metric_id": "ups_battery_voltage", "name": "Battery Voltage", "unit": "V", "data_source": "bms_sensor", "point_pattern": ["batt_volt", "battery_voltage"], "normal_range": [12.0, 13.8], "warning_range": [11.0, 12.0], "critical_range": [10.0, 11.0], "weight": 0.20},
+            {"metric_id": "ups_load_percent", "name": "Load Percentage", "unit": "%", "data_source": "bms_sensor", "point_pattern": ["load", "load_percent"], "normal_range": [20, 80], "warning_range": [80, 95], "critical_range": [95, 100], "weight": 0.15},
+            {"metric_id": "ups_battery_temp", "name": "Battery Temperature", "unit": "°C", "data_source": "bms_sensor", "point_pattern": ["batt_temp"], "normal_range": [20, 25], "warning_range": [25, 30], "critical_range": [30, 35], "weight": 0.15},
+            {"metric_id": "ups_runtime_remaining", "name": "Runtime Remaining", "unit": "min", "data_source": "bms_sensor", "point_pattern": ["runtime", "battery_runtime"], "normal_range": [30, 120], "warning_range": [15, 30], "critical_range": [5, 15], "weight": 0.20},
+            {"metric_id": "ups_output_frequency", "name": "Output Frequency", "unit": "Hz", "data_source": "bms_sensor", "point_pattern": ["output_freq"], "normal_range": [49.5, 50.5], "warning_range": [49.0, 49.5], "critical_range": [48.5, 49.0], "weight": 0.10},
+            {"metric_id": "ups_battery_impedance", "name": "Battery Impedance", "unit": "mΩ", "data_source": "manual", "measurement_type": "battery_tester", "normal_range": [10, 30], "warning_range": [30, 50], "critical_range": [50, 80], "weight": 0.20, "sampling_notes": "Measured with battery impedance tester"},
+        ],
+        "manual_inspections": [
+            {"inspection_id": "ups_battery_visual", "name": "Battery Visual Inspection", "frequency_days": 30, "parameters": ["swelling", "leaks", "corrosion", "terminals"]},
+            {"inspection_id": "ups_fan_operation", "name": "Fan Operation", "frequency_days": 90, "parameters": ["noise", "vibration", "airflow"]},
+            {"inspection_id": "ups_capacitors", "name": "DC Capacitors", "frequency_days": 365, "parameters": ["bulging", "leaks", "ESR"]},
+        ]
+    },
+    "transformer": {
+        "category": "Electrical/Power",
+        "metrics": [
+            {"metric_id": "tx_winding_temp", "name": "Winding Temperature", "unit": "°C", "data_source": "bms_sensor", "point_pattern": ["winding_temp", "hw_temp"], "normal_range": [40, 80], "warning_range": [80, 100], "critical_range": [100, 120], "weight": 0.25},
+            {"metric_id": "tx_oil_temp", "name": "Oil Temperature", "unit": "°C", "data_source": "bms_sensor", "point_pattern": ["oil_temp", "tot"], "normal_range": [30, 70], "warning_range": [70, 90], "critical_range": [90, 110], "weight": 0.25},
+            {"metric_id": "tx_load_percent", "name": "Load Percentage", "unit": "%", "data_source": "bms_sensor", "point_pattern": ["load"], "normal_range": [30, 80], "warning_range": [80, 100], "critical_range": [100, 115], "weight": 0.20},
+            {"metric_id": "tx_tap_position", "name": "Tap Changer Position", "unit": "", "data_source": "bms_sensor", "point_pattern": ["tap", "oltc"], "normal_range": [-5, 5], "warning_range": [-10, -5], "critical_range": [-15, -10], "weight": 0.10},
+            {"metric_id": "tx_gas_analysis", "name": "DGA (Dissolved Gas Analysis)", "unit": "ppm", "data_source": "manual", "measurement_type": "oil_sample", "normal_range": [0, 100], "warning_range": [100, 500], "critical_range": [500, 1000], "weight": 0.20, "sampling_notes": "Annual oil sample lab analysis"},
+        ],
+        "manual_inspections": [
+            {"inspection_id": "tx_oil_quality", "name": "Oil Quality Test", "frequency_days": 365, "parameters": ["dielectric_strength", "acidity", "moisture", "DGA"]},
+            {"inspection_id": "tx_bushings", "name": "Bushings Inspection", "frequency_days": 365, "parameters": ["oil_level", "leaks", "tan_delta"]},
+            {"inspection_id": "tx_oltc_mechanism", "name": "OLTC Mechanism", "frequency_days": 365, "parameters": ["operation_count", "oil_quality", "mechanical_binding"]},
+        ]
+    },
+    "vav": {
+        "category": "HVAC/Air Distribution",
+        "metrics": [
+            {"metric_id": "vairflow", "name": "Airflow", "unit": "L/s", "data_source": "bms_sensor", "point_pattern": ["airflow", "flow"], "normal_range": [50, 200], "warning_range": [30, 50], "critical_range": [10, 30], "weight": 0.30},
+            {"metric_id": "vdamper_position", "name": "Damper Position", "unit": "%", "data_source": "bms_sensor", "point_pattern": ["damper", "position"], "normal_range": [10, 100], "warning_range": [0, 10], "critical_range": [0, 5], "weight": 0.20},
+            {"metric_id": "vreheat_valve", "name": "Reheat Valve Position", "unit": "%", "data_source": "bms_sensor", "point_pattern": ["reheat", "heating_valve"], "normal_range": [0, 100], "warning_range": [80, 100], "critical_range": [95, 100], "weight": 0.20},
+            {"metric_id": "vroom_temp", "name": "Room Temperature", "unit": "°C", "data_source": "bms_sensor", "point_pattern": ["room_temp"], "normal_range": [20, 24], "warning_range": [24, 27], "critical_range": [27, 30], "weight": 0.30},
+        ],
+        "manual_inspections": [
+            {"inspection_id": "vactuator", "name": "Damper Actuator", "frequency_days": 365, "parameters": ["calibration", "linkage", "noise"]},
+            {"inspection_id": "vflow_sensor", "name": "Airflow Sensor", "frequency_days": 365, "parameters": ["calibration", "cleanliness"]},
+        ]
+    },
+    "cooling_tower": {
+        "category": "HVAC/Heat Rejection",
+        "metrics": [
+            {"metric_id": "ct_basin_temp", "name": "Basin Temperature", "unit": "°C", "data_source": "bms_sensor", "point_pattern": ["basin_temp"], "normal_range": [20, 32], "warning_range": [32, 40], "critical_range": [40, 50], "weight": 0.25},
+            {"metric_id": "ct_fan_speed", "name": "Fan Speed", "unit": "%", "data_source": "bms_sensor", "point_pattern": ["fan_speed"], "normal_range": [0, 100], "warning_range": [80, 100], "critical_range": [100, 100], "weight": 0.20},
+            {"metric_id": "ct_water_level", "name": "Water Level", "unit": "%", "data_source": "bms_sensor", "point_pattern": ["water_level"], "normal_range": [50, 80], "warning_range": [30, 50], "critical_range": [10, 30], "weight": 0.20},
+            {"metric_id": "ct_fan_current", "name": "Fan Motor Current", "unit": "A", "data_source": "bms_sensor", "point_pattern": ["fan_current"], "normal_range": [0, 30], "warning_range": [30, 40], "critical_range": [40, 50], "weight": 0.15},
+            {"metric_id": "ct_sound_fan", "name": "Fan Sound Level", "unit": "dBA", "data_source": "mobile_phone", "measurement_type": "audio", "normal_range": [65, 85], "warning_range": [85, 95], "critical_range": [95, 105], "weight": 0.15, "sampling_notes": "Record 10s at 5m from tower"},
+            {"metric_id": "ct_vibration_fan", "name": "Fan Vibration", "unit": "mm/s", "data_source": "mobile_phone", "measurement_type": "accelerometer", "normal_range": [0, 3.0], "warning_range": [3.0, 6.0], "critical_range": [6.0, 10], "weight": 0.05, "sampling_notes": "Phone on fan motor, 10s sample"},
+        ],
+        "manual_inspections": [
+            {"inspection_id": "ct_fill_condition", "name": "Fill Condition", "frequency_days": 180, "parameters": ["cleanliness", "degradation", "biofouling"]},
+            {"inspection_id": "ct_nozzles", "name": "Distribution Nozzles", "frequency_days": 90, "parameters": ["blockage", "wear", "spray_pattern"]},
+            {"inspection_id": "ct_drift_eliminator", "name": "Drift Eliminator", "frequency_days": 365, "parameters": ["cleanliness", "damage"]},
+        ]
+    }
+}
+
+
+async def get_asset_metrics_template_tool(
+    building_id: str,
+    equipment_types: List[str] = None,
+) -> Dict[str, Any]:
+    """
+    Get asset metric templates for a building during onboarding.
+
+    Returns metric templates based on equipment types present in the building.
+    Engineers can review and configure these templates before activation.
+
+    Args:
+        building_id: Building/site ID
+        equipment_types: Optional list of equipment types to filter (e.g., ["generator", "chiller", "ahu"])
+                      If not provided, will auto-detect from building's devices
+
+    Returns:
+        Metric templates for each equipment type with configurable parameters
+    """
+    import json
+    from pathlib import Path
+
+    buildings_path = Path(__file__).parent.parent / "data" / "buildings"
+    building_path = buildings_path / building_id
+
+    if not building_path.exists():
+        return {
+            "success": False,
+            "error": f"Building '{building_id}' not found. Create it first with create_building.",
+        }
+
+    # If equipment_types not provided, detect from building's devices/zones
+    if not equipment_types:
+        equipment_types = set()
+
+        # Check zones for equipment references
+        zones_file = building_path / "zones.json"
+        if zones_file.exists():
+            with open(zones_file) as f:
+                zones = json.load(f)
+                for zone in zones:
+                    # Equipment IDs often contain type hints
+                    for field in ["fcu_id", "ahu_id", "vav_id"]:
+                        if zone.get(field):
+                            eq_id = zone[field].lower()
+                            if "fcu" in eq_id or "fan" in eq_id:
+                                equipment_types.add("fcu")
+                            elif "ahu" in eq_id:
+                                equipment_types.add("ahu")
+                            elif "vav" in eq_id:
+                                equipment_types.add("vav")
+
+        # Check devices file
+        devices_file = Path(__file__).parent.parent / "data" / "mock_devices.json"
+        if devices_file.exists():
+            with open(devices_file) as f:
+                devices = json.load(f)
+                for device in devices:
+                    if device.get("building_id") == building_id:
+                        device_type = device.get("device_type", "").lower()
+                        # Map device types to templates
+                        for template_type in ASSET_METRIC_TEMPLATES.keys():
+                            if template_type in device_type:
+                                equipment_types.add(template_type)
+                                break
+
+        equipment_types = list(equipment_types)
+
+    # Generate templates for each equipment type
+    templates = {}
+    for eq_type in equipment_types:
+        template_key = eq_type.lower()
+        if template_key in ASSET_METRIC_TEMPLATES:
+            templates[eq_type] = ASSET_METRIC_TEMPLATES[template_key]
+
+    return {
+        "success": True,
+        "building_id": building_id,
+        "equipment_types_detected": equipment_types,
+        "metric_templates": templates,
+        "total_metrics": sum(len(t.get("metrics", [])) for t in templates.values()),
+        "total_inspections": sum(len(t.get("manual_inspections", [])) for t in templates.values()),
+        "message": f"Generated {len(templates)} equipment type templates with {sum(len(t.get('metrics', [])) for t in templates.values())} metrics",
+        "next_steps": [
+            "Review the generated metric templates",
+            "Configure thresholds and weights as needed",
+            "Call configure_asset_metrics to save configuration",
+        ],
+    }
+
+
+async def configure_asset_metrics_tool(
+    building_id: str,
+    metric_config: Dict[str, Any],
+    save_to_file: bool = True,
+) -> Dict[str, Any]:
+    """
+    Configure asset metrics for a building after onboarding.
+
+    Engineers can customize:
+    - Thresholds (normal/warning/critical ranges)
+    - Weights (for health score calculation)
+    - Measurement intervals
+    - Which metrics use mobile phone vs BMS sensors
+
+    Args:
+        building_id: Building/site ID
+        metric_config: Configuration dictionary with structure:
+            {
+                "equipment_type": {
+                    "metrics": {
+                        "metric_id": {
+                            "enabled": true/false,
+                            "normal_range": [min, max],
+                            "warning_range": [min, max],
+                            "critical_range": [min, max],
+                            "weight": 0.1,
+                            "measurement_interval_days": 7,
+                            "custom_threshold": "override value"
+                        }
+                    },
+                    "manual_inspections": {
+                        "inspection_id": {
+                            "enabled": true/false,
+                            "frequency_days": 90,
+                            "assigned_to": "technician_name"
+                        }
+                    }
+                }
+            }
+        save_to_file: If true, saves configuration to building's asset_metrics.json
+
+    Returns:
+        Configuration summary with next steps
+    """
+    import json
+    from pathlib import Path
+    from datetime import datetime
+
+    buildings_path = Path(__file__).parent.parent / "data" / "buildings"
+    building_path = buildings_path / building_id
+
+    if not building_path.exists():
+        return {
+            "success": False,
+            "error": f"Building '{building_id}' not found. Create it first with create_building.",
+        }
+
+    # Merge with templates and validate
+    configured_metrics = {}
+    total_enabled = 0
+
+    for eq_type, config in metric_config.items():
+        template_key = eq_type.lower()
+        if template_key not in ASSET_METRIC_TEMPLATES:
+            continue
+
+        template = ASSET_METRIC_TEMPLATES[template_key]
+        configured_metrics[eq_type] = {
+            "category": template.get("category", ""),
+            "metrics": [],
+            "manual_inspections": [],
+        }
+
+        # Process metrics
+        if "metrics" in config:
+            for metric in template.get("metrics", []):
+                metric_id = metric["metric_id"]
+                user_config = config["metrics"].get(metric_id, {})
+
+                # Merge template with user config
+                configured_metric = {**metric}
+                if user_config.get("enabled", True):
+                    configured_metric.update({
+                        "normal_range": user_config.get("normal_range", metric["normal_range"]),
+                        "warning_range": user_config.get("warning_range", metric["warning_range"]),
+                        "critical_range": user_config.get("critical_range", metric["critical_range"]),
+                        "weight": user_config.get("weight", metric.get("weight", 0.1)),
+                        "measurement_interval_days": user_config.get("measurement_interval_days", 7),
+                        "custom_threshold": user_config.get("custom_threshold"),
+                        "configured_at": datetime.now().isoformat(),
+                    })
+                    configured_metrics[eq_type]["metrics"].append(configured_metric)
+                    total_enabled += 1
+
+        # Process manual inspections
+        if "manual_inspections" in config:
+            for inspection in template.get("manual_inspections", []):
+                inspection_id = inspection["inspection_id"]
+                user_config = config["manual_inspections"].get(inspection_id, {})
+
+                configured_inspection = {**inspection}
+                if user_config.get("enabled", True):
+                    configured_inspection.update({
+                        "frequency_days": user_config.get("frequency_days", inspection["frequency_days"]),
+                        "assigned_to": user_config.get("assigned_to", "TBD"),
+                        "configured_at": datetime.now().isoformat(),
+                    })
+                    configured_metrics[eq_type]["manual_inspections"].append(configured_inspection)
+
+    # Save to file if requested
+    if save_to_file:
+        metrics_file = building_path / "asset_metrics.json"
+        with open(metrics_file, "w") as f:
+            json.dump(configured_metrics, f, indent=2)
+
+        logger.info(f"Configured {total_enabled} metrics for building {building_id}")
+
+    return {
+        "success": True,
+        "building_id": building_id,
+        "metrics_configured": total_enabled,
+        "equipment_types": list(configured_metrics.keys()),
+        "configuration": configured_metrics,
+        "message": f"Configured {total_enabled} metrics across {len(configured_metrics)} equipment types",
+        "next_steps": [
+            "Asset metrics are now ready for data collection",
+            "Use the mobile app to capture manual measurements",
+            "ML models will train after 3-6 months of data collection",
+        ],
+    }
+
+
+# ============================================================================
 # MCP Tool Definitions (JSON Schema)
 # ============================================================================
 
@@ -1714,6 +3070,333 @@ MCP_TOOLS = [
             },
             "required": ["building_id", "asset_id", "description"]
         }
+    },
+    # Building Management Tools (for onboarding new buildings)
+    {
+        "name": "list_managed_buildings",
+        "description": "List all managed buildings (active and inactive). Use this to see what buildings are configured in the system.",
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+            "required": []
+        }
+    },
+    {
+        "name": "create_building",
+        "description": "Create a new building configuration. Creates the building folder structure and config files. Building is NOT activated by default.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "building_id": {
+                    "type": "string",
+                    "description": "Unique building ID (lowercase, no spaces, e.g., 'sandton', 'gateway-centre')"
+                },
+                "name": {
+                    "type": "string",
+                    "description": "Building display name (e.g., 'Sandton Office Park')"
+                },
+                "address": {
+                    "type": "string",
+                    "description": "Building address"
+                },
+                "floors": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "List of floor identifiers (e.g., ['L1', 'L2', 'L3'])"
+                },
+                "features": {
+                    "type": "object",
+                    "description": "Features to enable: {hvac: true, dali: false, desk_diagnosis: true}"
+                }
+            },
+            "required": ["building_id", "name"]
+        }
+    },
+    {
+        "name": "activate_building",
+        "description": "Activate a building so it appears in the system. Call this after setting up desks and zones.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "building_id": {
+                    "type": "string",
+                    "description": "Building ID to activate"
+                },
+                "set_default": {
+                    "type": "boolean",
+                    "description": "Set as the default building (default: false)"
+                }
+            },
+            "required": ["building_id"]
+        }
+    },
+    {
+        "name": "get_building_config",
+        "description": "Get a building's configuration including desks, zones, and features.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "building_id": {
+                    "type": "string",
+                    "description": "Building ID to get config for"
+                }
+            },
+            "required": ["building_id"]
+        }
+    },
+    # AI-Assisted Onboarding Tools (for ingesting BMS export data)
+    {
+        "name": "add_building_zones",
+        "description": "Add HVAC zones to a building with equipment mappings (FCU, VAV, AHU). Use after importing point list or when manually configuring zones.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "building_id": {
+                    "type": "string",
+                    "description": "Building ID to add zones to"
+                },
+                "zones": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "zone_id": {"type": "string", "description": "Unique zone ID (e.g., 'Zone-L12-N')"},
+                            "floor": {"type": "string", "description": "Floor identifier (e.g., 'L12')"},
+                            "fcu_id": {"type": "string", "description": "Fan Coil Unit device ID"},
+                            "vav_id": {"type": "string", "description": "VAV box device ID (optional)"},
+                            "ahu_id": {"type": "string", "description": "Air Handling Unit device ID"},
+                            "setpoint": {"type": "number", "description": "Temperature setpoint (default 22.0)"},
+                            "desk_range": {"type": "string", "description": "Desk range served (e.g., '201-206')"}
+                        },
+                        "required": ["zone_id"]
+                    },
+                    "description": "Array of zone definitions with equipment mappings"
+                }
+            },
+            "required": ["building_id", "zones"]
+        }
+    },
+    {
+        "name": "add_building_desks",
+        "description": "Add desks to a building with zone mappings, DALI lighting, and environmental context. Enables desk-to-zone comfort diagnosis with solar/HVAC/lighting integration.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "building_id": {
+                    "type": "string",
+                    "description": "Building ID to add desks to"
+                },
+                "desks": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "desk_id": {"type": "string", "description": "Unique desk ID (e.g., '201', 'L12-D001')"},
+                            "zone_id": {"type": "string", "description": "HVAC zone the desk belongs to"},
+                            "floor": {"type": "string", "description": "Floor identifier (e.g., 'Level 12')"},
+                            "near_window": {"type": "boolean", "description": "Near exterior window (solar heat gain)"},
+                            "orientation": {"type": "string", "enum": ["N", "S", "E", "W", "NE", "NW", "SE", "SW"], "description": "Window orientation for solar analysis (Southern Hemisphere: N=most sun)"},
+                            "near_diffuser": {"type": "string", "description": "Supply air diffuser ID if under one (draft issues)"},
+                            "near_printer": {"type": "boolean", "description": "Near heat source (printer/copier)"},
+                            "department": {"type": "string", "description": "Department/team"},
+                            "occupant": {"type": "string", "description": "Occupant name"},
+                            "x_coord": {"type": "number", "description": "Floor plan X coordinate"},
+                            "y_coord": {"type": "number", "description": "Floor plan Y coordinate"},
+                            "dali_zone": {"type": "string", "description": "DALI lighting zone (often matches HVAC zone)"},
+                            "sensor_id": {"type": "string", "description": "DALI PIR occupancy sensor ID (e.g., 'PIR-L12-N-001')"},
+                            "luminaire_ids": {"type": "array", "items": {"type": "string"}, "description": "Luminaire IDs serving this desk"},
+                            "dali_controller": {"type": "string", "description": "Tridonic Scenecom controller ID (e.g., 'DALI-L12-01')"}
+                        },
+                        "required": ["desk_id"]
+                    },
+                    "description": "Array of desk definitions with HVAC and DALI context"
+                }
+            },
+            "required": ["building_id", "desks"]
+        }
+    },
+    {
+        "name": "add_building_devices",
+        "description": "Add BMS devices (chillers, AHUs, FCUs, VAVs, etc.) to the system. Devices are added to mock_devices.json.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "building_id": {
+                    "type": "string",
+                    "description": "Building ID to add devices to"
+                },
+                "site_code": {
+                    "type": "string",
+                    "description": "Site code for device ID generation (default: first 3 chars of building_id)"
+                },
+                "devices": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "device_id": {"type": "string", "description": "Device ID (auto-generated if not provided)"},
+                            "device_type": {"type": "string", "description": "Type: chiller, ahu, fcu, vav, pump, meter, controller"},
+                            "name": {"type": "string", "description": "Display name"},
+                            "location": {"type": "string", "description": "Location description"},
+                            "protocol": {"type": "string", "description": "Protocol: bacnet, modbus, mock"},
+                            "points": {"type": "object", "description": "Point name to value mappings"},
+                            "metadata": {"type": "object", "description": "Additional metadata"}
+                        },
+                        "required": ["device_type"]
+                    },
+                    "description": "Array of device definitions"
+                }
+            },
+            "required": ["building_id", "devices"]
+        }
+    },
+    {
+        "name": "import_point_list",
+        "description": "AI-assisted onboarding: Import BACnet point list and auto-generate device/zone structure. Supports multiple BMS vendors with different naming conventions. Auto-detects vendor if not specified.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "building_id": {
+                    "type": "string",
+                    "description": "Building ID to import points for"
+                },
+                "site_code": {
+                    "type": "string",
+                    "description": "Site code for device ID generation (default: first 3 chars of building_id)"
+                },
+                "bms_vendor": {
+                    "type": "string",
+                    "enum": ["auto", "desigo", "siemens", "metasys", "jci", "ebi", "honeywell", "ecostruxure", "schneider", "niagara", "tridium", "trend"],
+                    "description": "BMS vendor for naming pattern hints: desigo/siemens, metasys/jci, ebi/honeywell, ecostruxure/schneider, niagara/tridium, trend. Default: auto-detect"
+                },
+                "point_list": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "point_name": {"type": "string", "description": "BACnet object name (e.g., 'AHU-L12-01.SupplyAirTemp')"},
+                            "object_type": {"type": "string", "description": "BACnet object type (e.g., 'Analog Input', 'Binary Output')"},
+                            "instance": {"type": "integer", "description": "BACnet object instance number"},
+                            "description": {"type": "string", "description": "Point description"},
+                            "units": {"type": "string", "description": "Engineering units"},
+                            "value": {"description": "Current value (number, boolean, or string)"}
+                        },
+                        "required": ["point_name"]
+                    },
+                    "description": "Array of BACnet points from BMS export"
+                }
+            },
+            "required": ["building_id", "point_list"]
+        }
+    },
+    {
+        "name": "import_controller_list",
+        "description": "Import BMS controller information (PXC, DDC controllers) and create device structure. Use alongside import_point_list for complete onboarding.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "building_id": {
+                    "type": "string",
+                    "description": "Building ID to import controllers for"
+                },
+                "site_code": {
+                    "type": "string",
+                    "description": "Site code for device ID generation (default: first 3 chars of building_id)"
+                },
+                "controllers": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "name": {"type": "string", "description": "Controller name (e.g., 'PXC-L12-01')"},
+                            "ip_address": {"type": "string", "description": "IP address"},
+                            "bacnet_device_id": {"type": "integer", "description": "BACnet device instance"},
+                            "area_served": {"type": "string", "description": "Area served (e.g., 'Level 12 North')"},
+                            "controller_type": {"type": "string", "description": "Type: PXC, PXA, DDC"},
+                            "equipment": {"type": "array", "items": {"type": "string"}, "description": "Equipment names controlled"}
+                        },
+                        "required": ["name"]
+                    },
+                    "description": "Array of controller definitions"
+                }
+            },
+            "required": ["building_id", "controllers"]
+        }
+    },
+    {
+        "name": "get_asset_metrics_template",
+        "description": "Get asset metric templates for AI/ML predictive maintenance during building onboarding. Returns metric templates based on equipment types present in the building. Engineers can review and configure thresholds, weights, and data sources (BMS sensor, mobile phone, manual) before activation.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "building_id": {
+                    "type": "string",
+                    "description": "Building/site ID to get metric templates for"
+                },
+                "equipment_types": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "enum": ["generator", "chiller", "ahu", "fcu", "ups", "transformer", "vav", "cooling_tower"]
+                    },
+                    "description": "Optional list of equipment types to filter. If not provided, will auto-detect from building's devices and zones"
+                }
+            },
+            "required": ["building_id"]
+        }
+    },
+    {
+        "name": "configure_asset_metrics",
+        "description": "Configure asset metrics for AI/ML predictive maintenance after building onboarding. Engineers can customize thresholds (normal/warning/critical), health score weights, measurement intervals, and specify which metrics use mobile phone vs BMS sensors. Saves configuration to building's asset_metrics.json file.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "building_id": {
+                    "type": "string",
+                    "description": "Building/site ID to configure metrics for"
+                },
+                "metric_config": {
+                    "type": "object",
+                    "description": "Configuration dictionary with equipment_types as keys, containing 'metrics' and 'manual_inspections' with custom thresholds, weights, and intervals",
+                    "additionalProperties": {
+                        "type": "object",
+                        "properties": {
+                            "metrics": {
+                                "type": "object",
+                                "additionalProperties": {
+                                    "type": "object",
+                                    "properties": {
+                                        "enabled": {"type": "boolean", "description": "Enable this metric"},
+                                        "normal_range": {"type": "array", "items": {"type": "number"}, "description": "[min, max] normal range"},
+                                        "warning_range": {"type": "array", "items": {"type": "number"}, "description": "[min, max] warning range"},
+                                        "critical_range": {"type": "array", "items": {"type": "number"}, "description": "[min, max] critical range"},
+                                        "weight": {"type": "number", "description": "Health score weight (0-1)"},
+                                        "measurement_interval_days": {"type": "integer", "description": "Days between measurements"},
+                                        "custom_threshold": {"type": "string", "description": "Custom threshold override"}
+                                    }
+                                }
+                            },
+                            "manual_inspections": {
+                                "type": "object",
+                                "additionalProperties": {
+                                    "type": "object",
+                                    "properties": {
+                                        "enabled": {"type": "boolean"},
+                                        "frequency_days": {"type": "integer"},
+                                        "assigned_to": {"type": "string"}
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "save_to_file": {
+                    "type": "boolean",
+                    "description": "Save configuration to building's asset_metrics.json file (default: true)"
+                }
+            },
+            "required": ["building_id", "metric_config"]
+        }
     }
 ]
 
@@ -1756,6 +3439,20 @@ class SIMBIOTMCPServer:
             # Work order tools (Plan 02)
             "get_work_orders": get_work_orders_tool,
             "create_work_order": create_work_order_tool,
+            # Building management tools (onboarding)
+            "list_managed_buildings": list_managed_buildings_tool,
+            "create_building": create_building_tool,
+            "activate_building": activate_building_tool,
+            "get_building_config": get_building_config_tool,
+            # AI-Assisted Onboarding tools
+            "add_building_zones": add_building_zones_tool,
+            "add_building_desks": add_building_desks_tool,
+            "add_building_devices": add_building_devices_tool,
+            "import_point_list": import_point_list_tool,
+            "import_controller_list": import_controller_list_tool,
+            # AI/ML Predictive Maintenance tools (asset metric configuration)
+            "get_asset_metrics_template": get_asset_metrics_template_tool,
+            "configure_asset_metrics": configure_asset_metrics_tool,
         }
         logger.info("SIMBIOTMCPServer initialized with %d tools", len(self.tools))
 

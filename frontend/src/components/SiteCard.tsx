@@ -224,7 +224,11 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
         const status = await api.getOptimizationStatus(site.id);
         setOptimizationStatus(status.optimization_status);
         // Track if there's a recommendation available (for lightbulb icon)
-        setHasRecommendation(!!status.last_recommendation);
+        // Only show lightbulb if there are actual recommendations to review
+        const hasRecs = !!(status.last_recommendation &&
+                        status.last_recommendation.recommendations &&
+                        status.last_recommendation.recommendations.length > 0);
+        setHasRecommendation(hasRecs);
       } catch (error) {
         console.error('Failed to fetch optimization status:', error);
         setOptimizationStatus('error');
@@ -247,15 +251,19 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
       try {
         // For demo purposes, we'll fetch the full status and extract the recommendation
         const status = await api.getOptimizationStatus(site.id);
-        if (status.last_recommendation) {
+        if (status.last_recommendation &&
+            status.last_recommendation.recommendations &&
+            status.last_recommendation.recommendations.length > 0) {
           setCurrentRecommendation(status.last_recommendation);
         } else {
-          // If no pending recommendation, show error or close modal
+          // If no pending recommendation or empty recommendations, close modal
           setShowRecommendationModal(false);
+          setCurrentRecommendation(null);
         }
       } catch (error) {
         console.error('Failed to fetch recommendation:', error);
         setShowRecommendationModal(false);
+        setCurrentRecommendation(null);
       } finally {
         setLoadingRecommendation(false);
       }
@@ -267,7 +275,10 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
   // Handle optimization badge click - show modal if there's a recommendation to review
   const handleOptimizationClick = (e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent card click from firing
-    if (hasRecommendation) {
+    // Double-check there are actual recommendations before opening modal
+    if (hasRecommendation && currentRecommendation &&
+        currentRecommendation.recommendations &&
+        currentRecommendation.recommendations.length > 0) {
       setShowRecommendationModal(true);
     }
   };
@@ -439,8 +450,20 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
           className="flex items-center justify-between pt-3"
           style={{ borderTop: "1px solid var(--color-sentinel-border)" }}
         >
-          {/* Equipment Count */}
-          <div className="flex items-center gap-2">
+          {/* Equipment Count with breakdown tooltip */}
+          <div
+            className="flex items-center gap-2 group relative"
+            title={
+              site.equipment_breakdown
+                ? `Equipment Breakdown:\n` +
+                  `├─ ${site.equipment_breakdown.equipment} Legacy Equipment\n` +
+                  `├─ ${site.equipment_breakdown.hvac_zones} HVAC Zones\n` +
+                  `├─ ${site.equipment_breakdown.generators + site.equipment_breakdown.generator_groups + site.equipment_breakdown.diesel_tanks} Generator Plant\n` +
+                  `├─ ${site.equipment_breakdown.energy_centre} Energy Centre\n` +
+                  `└─ ${site.equipment_breakdown.dali_controllers} DALI Controllers`
+                : `${site.equipment_count} Total Equipment`
+            }
+          >
             <Cpu
               className="h-4 w-4"
               style={{ color: "var(--color-sentinel-blue)" }}
@@ -456,10 +479,17 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
                 {site.equipment_count}
               </div>
               <div
-                className="text-xs"
+                className="text-xs flex items-center gap-1"
                 style={{ color: "var(--color-sentinel-text-disabled)" }}
               >
-                Assets
+                Equipment
+                {site.equipment_breakdown && (
+                  <span
+                    className="inline-block w-1 h-1 rounded-full"
+                    style={{ background: "var(--color-sentinel-blue)" }}
+                    title="Detailed breakdown available"
+                  />
+                )}
               </div>
             </div>
           </div>

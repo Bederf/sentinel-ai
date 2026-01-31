@@ -678,7 +678,7 @@ async def lookup_desk(desk_id: str, building: str | None = None) -> dict[str, An
     """
     Look up a desk and return its zone, HVAC, and sensor context.
 
-    For Sandton (FNB Fairlands) which has DALI integration, this returns
+    For Sandton which has DALI integration, this returns
     detailed occupancy and lighting data from PIR sensors.
 
     Args:
@@ -1280,7 +1280,7 @@ CHAT_TOOLS = [
     },
     {
         "name": "lookup_desk",
-        "description": "Look up a desk location and get its HVAC zone, temperature, and sensor data. Use this when a technician reports a comfort complaint from a user at a specific desk. Returns zone info, HVAC equipment IDs, and DALI sensor data (for Sandton/FNB Fairlands which has DALI integration). If the desk isn't found, ask the technician for clarification.",
+        "description": "Look up a desk location and get its HVAC zone, temperature, and sensor data. Use this when a technician reports a comfort complaint from a user at a specific desk. Returns zone info, HVAC equipment IDs, and DALI sensor data (Sandton has DALI integration). If the desk isn't found, ask the technician for clarification.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -1290,7 +1290,7 @@ CHAT_TOOLS = [
                 },
                 "building": {
                     "type": "string",
-                    "description": "Optional building name if working across multiple sites. For Sandton/FNB Fairlands (which has DALI), this is automatic."
+                    "description": "Optional building name if working across multiple sites. For Sandton (which has DALI), this is automatic."
                 }
             },
             "required": ["desk_id"]

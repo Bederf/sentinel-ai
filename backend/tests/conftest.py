@@ -102,7 +102,7 @@ def sample_device() -> dict:
     return {
         "id": "test-device-001",
         "name": "Test Chiller",
-        "device_type": "HVAC_CHILLER",
+        "device_type": "hvac",
         "protocol": "mock",
         "location": "Test Location",
         "site_id": "test-site-001",
@@ -142,11 +142,11 @@ def sample_safety_rule() -> dict:
     return {
         "id": "test-rule-001",
         "name": "Test Temperature Range",
-        "type": "TEMPERATURE_RANGE",
-        "device_type": "HVAC_CHILLER",
+        "type": "temperature_range",
+        "device_type": "hvac",
         "device_id": None,
         "point_name": "setpoint",
-        "severity": "BLOCK",
+        "severity": "block",
         "enabled": True,
         "min_value": 16.0,
         "max_value": 28.0,

@@ -149,3 +149,45 @@ class BuildingRepository:
         ).execute()
 
         return len(response.data) > 0
+
+    def get_asset_summary(self, building_uuid: str) -> Optional[Dict[str, Any]]:
+        """Get categorized asset counts from Supabase view.
+
+        Args:
+            building_uuid: Building UUID
+
+        Returns:
+            Asset summary dict with counts by category, or None if not found
+        """
+        try:
+            response = self.client.table('v_building_asset_summary').select(
+                "*"
+            ).eq('building_id', building_uuid).execute()
+
+            if response.data:
+                return response.data[0]
+            return None
+        except Exception:
+            # View may not exist (migrations not applied)
+            return None
+
+    def get_asset_summary_by_code(self, building_code: str) -> Optional[Dict[str, Any]]:
+        """Get categorized asset counts by building code.
+
+        Args:
+            building_code: Building code (e.g., 'sandton')
+
+        Returns:
+            Asset summary dict with counts by category, or None if not found
+        """
+        try:
+            response = self.client.table('v_building_asset_summary').select(
+                "*"
+            ).eq('building_code', building_code).execute()
+
+            if response.data:
+                return response.data[0]
+            return None
+        except Exception:
+            # View may not exist (migrations not applied)
+            return None

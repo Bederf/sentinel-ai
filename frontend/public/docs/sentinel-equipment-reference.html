@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SENTINEL Equipment Reference - Sandton</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 11px;
+      line-height: 1.4;
+      color: #1a1a2e;
+      padding: 20px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    h1 { font-size: 18px; margin-bottom: 4px; color: #0f4c81; }
+    h2 { font-size: 13px; margin: 16px 0 8px; color: #0f4c81; border-bottom: 2px solid #0f4c81; padding-bottom: 4px; }
+    h3 { font-size: 11px; margin: 12px 0 6px; color: #333; }
+    .subtitle { font-size: 12px; color: #666; margin-bottom: 4px; }
+    .note { font-size: 10px; color: #888; font-style: italic; margin-bottom: 16px; }
+    table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 10px; }
+    th, td { border: 1px solid #ddd; padding: 4px 6px; text-align: left; }
+    th { background: #f5f5f5; font-weight: 600; }
+    .status-online { color: #10b981; }
+    .status-fault { color: #ef4444; font-weight: bold; }
+    pre {
+      background: #f8f9fa;
+      border: 1px solid #e9ecef;
+      border-radius: 4px;
+      padding: 10px;
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 9px;
+      line-height: 1.5;
+      overflow-x: auto;
+    }
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .footer {
+      margin-top: 20px;
+      padding-top: 10px;
+      border-top: 1px solid #ddd;
+      font-size: 9px;
+      color: #888;
+      text-align: center;
+    }
+    @media print {
+      body { padding: 10px; font-size: 10px; }
+      h1 { font-size: 16px; }
+      h2 { font-size: 12px; margin: 12px 0 6px; }
+      pre { font-size: 8px; }
+      table { font-size: 9px; }
+      .no-print { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <h1>SENTINEL Equipment Reference</h1>
+  <p class="subtitle">Sandton Building - Quick Reference Card</p>
+  <p class="note">BMS: Siemens Desigo CC (BACnet/IP) | Lighting: DALI-2 (Tridonic Scenecom)</p>
+
+  <h2>Zone-to-Equipment Mapping</h2>
+  <table>
+    <thead>
+      <tr><th>Zone</th><th>Floor</th><th>FCU</th><th>VAV</th><th>AHU</th><th>Status</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Zone-L12-N</td><td>L12</td><td>FCU-L12-03</td><td>VAV-L12-03A</td><td>AHU-L12-01</td><td class="status-online">● Online</td></tr>
+      <tr><td>Zone-L12-S</td><td>L12</td><td>FCU-L12-04</td><td>VAV-L12-04A</td><td>AHU-L12-01</td><td class="status-online">● Online</td></tr>
+      <tr><td>Zone-L11-N</td><td>L11</td><td>FCU-L11-01</td><td>VAV-L11-01A</td><td>AHU-L11-01</td><td class="status-online">● Online</td></tr>
+      <tr><td>Zone-L11-S</td><td>L11</td><td>FCU-L11-02</td><td>VAV-L11-02A</td><td>AHU-L11-01</td><td class="status-fault">● Fault</td></tr>
+      <tr><td>Zone-L10-N</td><td>L10</td><td>FCU-L10-01</td><td>VAV-L10-01A</td><td>AHU-L10-01</td><td class="status-online">● Online</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Equipment Hierarchy</h2>
+  <pre>
+CHILLER (011-stc-chiller-001) ─── 220 kW
+    │
+    ├── AHU-L12-01 (50 kW)
+    │   ├── VAV-L12-03A ──► FCU-L12-03 ──► Zone-L12-N (Desks 201-206)
+    │   └── VAV-L12-04A ──► FCU-L12-04 ──► Zone-L12-S (Desks 207-212)
+    │
+    ├── AHU-L11-01 (50 kW)
+    │   ├── VAV-L11-01A ──► FCU-L11-01 ──► Zone-L11-N (Desks 101-106)
+    │   └── VAV-L11-02A ──► FCU-L11-02 ──► Zone-L11-S (Desks 107-112) [FAULT]
+    │
+    └── AHU-L10-01 (50 kW)
+        └── VAV-L10-01A ──► FCU-L10-01 ──► Zone-L10-N (Desks 001-012)
+  </pre>
+
+  <div class="two-col">
+    <div>
+      <h2>SENTINEL Control Points</h2>
+      <table>
+        <thead>
+          <tr><th>Equipment / Point</th><th>Read</th><th>Write</th><th>Limit</th></tr>
+        </thead>
+        <tbody>
+          <tr><td colspan="4"><strong>FCU</strong></td></tr>
+          <tr><td>room_temp</td><td>✓</td><td>-</td><td>-</td></tr>
+          <tr><td>room_temp_setpoint</td><td>✓</td><td>✓</td><td>16-28°C</td></tr>
+          <tr><td>fan_speed</td><td>✓</td><td>✓</td><td>-</td></tr>
+          <tr><td>valve_position</td><td>✓</td><td>-</td><td>-</td></tr>
+          <tr><td colspan="4"><strong>VAV</strong></td></tr>
+          <tr><td>damper_position</td><td>✓</td><td>✓</td><td>10-100%</td></tr>
+          <tr><td>airflow_actual</td><td>✓</td><td>-</td><td>-</td></tr>
+          <tr><td>reheat_valve</td><td>✓</td><td>✓</td><td>0-100%</td></tr>
+          <tr><td colspan="4"><strong>AHU</strong></td></tr>
+          <tr><td>supply_air_temp</td><td>✓</td><td>-</td><td>-</td></tr>
+          <tr><td>fan_status</td><td>✓</td><td>✓</td><td>-</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div>
+      <h2>DALI Lighting Zones</h2>
+      <table>
+        <thead>
+          <tr><th>Zone</th><th>Controllers</th><th>Sensors</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Zone-L12-N</td><td>DALI-L12-01 to 03</td><td>10</td></tr>
+          <tr><td>Zone-L12-S</td><td>DALI-L12-04 to 06</td><td>5</td></tr>
+          <tr><td>Zone-L11-N</td><td>DALI-L11-01 to 03</td><td>6</td></tr>
+          <tr><td>Zone-L11-S</td><td>DALI-L11-04 to 06</td><td>5</td></tr>
+          <tr><td>Zone-L10-N</td><td>DALI-L10-01 to 03</td><td>4</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Quick Actions</h2>
+      <table>
+        <thead>
+          <tr><th>Complaint</th><th>SENTINEL Action</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Too hot</td><td>Check lux, lower setpoint, dim lights</td></tr>
+          <tr><td>Too cold</td><td>Increase reheat, raise setpoint</td></tr>
+          <tr><td>Stuffy</td><td>Increase VAV airflow</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="footer">
+    <strong>SENTINEL BMS Intelligence</strong> | Sandton Building | v1.0 | Print: Ctrl+P
+  </div>
+
+  <script class="no-print">
+    // Auto-print hint
+    console.log('To save as PDF: Press Ctrl+P (or Cmd+P) and select "Save as PDF"');
+  </script>
+</body>
+</html>

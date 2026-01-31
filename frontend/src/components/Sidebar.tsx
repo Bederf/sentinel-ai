@@ -287,6 +287,36 @@ export function Sidebar({ currentView, onViewChange, version = "1.0" }: SidebarP
                     </ul>
                   </div>
 
+                  {/* Quick Links */}
+                  <div
+                    className="pt-2"
+                    style={{ borderTop: "1px solid var(--color-sentinel-border)" }}
+                  >
+                    <div
+                      className="font-medium mb-2"
+                      style={{ color: "var(--color-sentinel-text-primary)" }}
+                    >
+                      Quick Links
+                    </div>
+                    <a
+                      href="/docs/sentinel-equipment-reference.html"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 py-1 px-2 rounded transition-colors hover:bg-opacity-50"
+                      style={{
+                        color: "var(--color-sentinel-text-secondary)",
+                        background: "transparent",
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = "var(--color-sentinel-bg-panel)"}
+                      onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+                    >
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      <span>Equipment Reference (PDF)</span>
+                    </a>
+                  </div>
+
                   <div
                     className="pt-2"
                     style={{ borderTop: "1px solid var(--color-sentinel-border)" }}

@@ -13,20 +13,39 @@ import uuid
 
 class Desk(BaseModel):
     """
-    Desk location model - maps physical desk to HVAC zone.
+    Desk location model - maps physical desk to HVAC zone and DALI lighting.
 
     Enables the killer feature: "Too hot at Desk 25" -> instant BMS diagnosis.
+
+    Integrates:
+    - HVAC zone (FCU, VAV, AHU)
+    - DALI-2 lighting (Tridonic Scenecom)
+    - Environmental context (window, orientation, heat sources)
     """
     desk_id: str  # e.g., "L12-25" or "25"
     floor: str  # e.g., "Level 12"
-    building: str  # e.g., "Fairlands Building A"
+    building: str = ""  # e.g., "Sandton" (can be inferred from folder)
     zone_id: str  # e.g., "Zone-L12-N"
+
+    # Environmental context
     near_window: bool = False
+    orientation: Optional[str] = None  # "N", "S", "E", "W", "NE", "NW", "SE", "SW" - for solar analysis
     near_diffuser: Optional[str] = None  # e.g., "DIFF-25" if under a supply diffuser
     near_printer: bool = False
+
+    # Organizational
     department: Optional[str] = None
+    occupant: Optional[str] = None  # Who sits here
+
+    # Floor plan position
     x_coord: Optional[float] = None
     y_coord: Optional[float] = None
+
+    # DALI-2 Scenecom integration (Tridonic)
+    dali_zone: Optional[str] = None  # DALI zone/group (e.g., "Zone-L12-N" - often matches HVAC zone)
+    sensor_id: Optional[str] = None  # PIR occupancy sensor (e.g., "PIR-L12-N-001")
+    luminaire_ids: Optional[List[str]] = None  # Luminaires serving this desk (e.g., ["LUM-L12-001", "LUM-L12-002"])
+    dali_controller: Optional[str] = None  # Scenecom controller (e.g., "DALI-L12-01")
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
@@ -36,11 +55,17 @@ class Desk(BaseModel):
             "building": self.building,
             "zone_id": self.zone_id,
             "near_window": self.near_window,
+            "orientation": self.orientation,
             "near_diffuser": self.near_diffuser,
             "near_printer": self.near_printer,
             "department": self.department,
+            "occupant": self.occupant,
             "x_coord": self.x_coord,
             "y_coord": self.y_coord,
+            "dali_zone": self.dali_zone,
+            "sensor_id": self.sensor_id,
+            "luminaire_ids": self.luminaire_ids,
+            "dali_controller": self.dali_controller,
         }
 
     @classmethod
@@ -52,11 +77,17 @@ class Desk(BaseModel):
             building=data.get("building", ""),
             zone_id=data.get("zone_id", ""),
             near_window=data.get("near_window", False),
+            orientation=data.get("orientation"),
             near_diffuser=data.get("near_diffuser"),
             near_printer=data.get("near_printer", False),
             department=data.get("department"),
+            occupant=data.get("occupant"),
             x_coord=data.get("x_coord"),
             y_coord=data.get("y_coord"),
+            dali_zone=data.get("dali_zone"),
+            sensor_id=data.get("sensor_id"),
+            luminaire_ids=data.get("luminaire_ids"),
+            dali_controller=data.get("dali_controller"),
         )
 
 

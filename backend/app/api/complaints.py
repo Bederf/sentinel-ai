@@ -11,7 +11,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException
 
-from app.services.complaint_handler import get_complaint_handler
+from app.services.complaint_handler import get_complaint_handler, reload_complaint_handler
 
 router = APIRouter(prefix="/api/complaints", tags=["Comfort Complaints"])
 
@@ -160,3 +160,23 @@ async def list_hvac_zones() -> List[dict]:
     """
     handler = get_complaint_handler()
     return [z.to_dict() for z in handler.get_all_zones()]
+
+
+@router.post("/reload")
+async def reload_data() -> dict:
+    """
+    Reload desk and zone data from building configuration.
+    Use this after updating desk/zone JSON files without restarting the backend.
+
+    Returns:
+        Summary of loaded data counts
+    """
+    handler = reload_complaint_handler()
+    desks = handler.get_all_desks()
+    zones = handler.get_all_zones()
+    return {
+        "status": "reloaded",
+        "desks_loaded": len(desks),
+        "zones_loaded": len(zones),
+        "message": f"Loaded {len(desks)} desks and {len(zones)} zones"
+    }

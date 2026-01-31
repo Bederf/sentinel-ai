@@ -17,7 +17,7 @@ class DeviceFactory:
     def create(
         device_id: Optional[str] = None,
         name: Optional[str] = None,
-        device_type: str = "HVAC_CHILLER",
+        device_type: str = "hvac",
         protocol: str = "mock",
         **kwargs
     ) -> dict:
@@ -52,7 +52,7 @@ class DeviceFactory:
     def create_chiller(**kwargs) -> dict:
         """Create a test chiller device."""
         return DeviceFactory.create(
-            device_type="HVAC_CHILLER",
+            device_type="hvac",
             name=kwargs.get("name", "Test Chiller"),
             points={
                 "setpoint": {
@@ -74,7 +74,7 @@ class DeviceFactory:
     def create_ahu(**kwargs) -> dict:
         """Create a test AHU device."""
         return DeviceFactory.create(
-            device_type="HVAC_AHU",
+            device_type="hvac",
             name=kwargs.get("name", "Test AHU"),
             points={
                 "fan_speed": {
@@ -121,7 +121,7 @@ class SafetyRuleFactory:
     @staticmethod
     def create_temperature_range(
         rule_id: Optional[str] = None,
-        device_type: str = "HVAC_CHILLER",
+        device_type: str = "hvac",
         min_temp: float = 16.0,
         max_temp: float = 28.0,
         **kwargs
@@ -146,7 +146,7 @@ class SafetyRuleFactory:
     @staticmethod
     def create_runtime_limit(
         rule_id: Optional[str] = None,
-        device_type: str = "HVAC_CHILLER",
+        device_type: str = "hvac",
         min_runtime_minutes: int = 5,
         **kwargs
     ) -> dict:

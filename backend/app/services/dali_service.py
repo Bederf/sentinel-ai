@@ -113,6 +113,9 @@ class DALIService:
             x_coord=data.get("x_coord"),
             y_coord=data.get("y_coord"),
             last_updated=data.get("last_updated"),
+            # Scenecom extended fields
+            daylight_setpoint=data.get("daylight_setpoint", 500.0),
+            motion_count=data.get("motion_count", 0),
         )
 
     def _adapt_luminaire(self, data: dict) -> DALILuminaire:
@@ -134,6 +137,9 @@ class DALIService:
             fault_code=data.get("fault_code"),
             lamp_hours=data.get("lamp_hours", data.get("operating_hours", 0)),
             last_updated=data.get("last_updated"),
+            # Scenecom extended fields
+            color_temp_kelvin=data.get("color_temp_kelvin"),
+            emergency_battery_pct=data.get("emergency_battery_pct"),
         )
 
     # === Controller Operations ===
@@ -233,7 +239,10 @@ class DALIService:
             active_luminaires=len(active),
             avg_dim_level=round(sum(l.current_level for l in luminaires) / len(luminaires), 1),
             total_power_w=sum(l.power_consumption for l in luminaires),
-            faulty_count=len(faulty)
+            faulty_count=len(faulty),
+            # Scenecom extended fields
+            active_scene=zone.get("active_scene"),
+            active_scene_name=zone.get("active_scene_name"),
         )
 
     def get_zone_summary(self, zone_id: str) -> Dict:

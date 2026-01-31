@@ -16,6 +16,77 @@ interface ApiError {
   status: number;
 }
 
+// Equipment breakdown by category (from Supabase view)
+export interface EquipmentBreakdown {
+  equipment: number;
+  hvac_zones: number;
+  generators: number;
+  generator_groups: number;
+  diesel_tanks: number;
+  energy_centre: number;
+  dali_controllers: number;
+}
+
+// Equipment summary response (from /api/buildings/{id}/equipment-summary)
+export interface EquipmentSummary {
+  building_id: string;
+  building_name: string;
+  total_assets: number;
+  categories: {
+    equipment: number;
+    hvac_zones: number;
+    generators: number;
+    generator_groups: number;
+    diesel_tanks: number;
+    energy_centres: number;
+    mv_incomers: number;
+    transformers: number;
+    lv_switchboards: number;
+    ats_units: number;
+    power_meters: number;
+    pfc_banks: number;
+    ups_systems: number;
+    feeders: number;
+    dali_controllers: number;
+  };
+  supplementary: {
+    desks: number;
+    luminaires: number;
+    dali_sensors: number;
+  };
+  source: "supabase" | "json";
+}
+
+// Building equipment item (from /api/buildings/{id}/equipment)
+export interface BuildingEquipmentItem {
+  id: string;
+  name: string;
+  type: string;
+  category: string;
+  status: "normal" | "warning" | "critical" | "unknown";
+  health: number;
+  location: string;
+  details: Record<string, any>;
+  controllable: boolean;
+}
+
+// Category status counts
+export interface CategoryStatus {
+  total: number;
+  normal: number;
+  warning: number;
+  critical: number;
+}
+
+// Building equipment response (from /api/buildings/{id}/equipment)
+export interface BuildingEquipmentResponse {
+  building_id: string;
+  building_name: string;
+  total_equipment: number;
+  categories: Record<string, CategoryStatus>;
+  equipment: BuildingEquipmentItem[];
+}
+
 // Site/Building interface (summary view)
 export interface Site {
   id: string;
@@ -24,7 +95,7 @@ export interface Site {
   address?: string; // Full address from backend
   region: string;
   type: string;
-  equipment_count: number;
+  equipment_count: number; // Total equipment count
   alert_count: number;
   status: "normal" | "warning" | "critical";
   // Extended fields from backend (optional for summary, required for detail)
@@ -37,6 +108,8 @@ export interface Site {
   contact_email?: string;
   contact_phone?: string;
   active_alerts?: number;
+  // Equipment breakdown (when available from Supabase or JSON)
+  equipment_breakdown?: EquipmentBreakdown;
   // Optimization fields (Phase 8)
   optimization_enabled?: boolean;
   optimization_status?: "optimized" | "recommendation_pending" | "warning" | "error" | "unknown";
@@ -744,6 +817,22 @@ export const api = {
   },
 
   /**
+   * Get equipment summary breakdown for a building
+   * @param buildingId - Building ID (e.g., 'sandton')
+   */
+  async getEquipmentSummary(buildingId: string): Promise<EquipmentSummary> {
+    return fetchApi<EquipmentSummary>(`/api/buildings/${buildingId}/equipment-summary`);
+  },
+
+  /**
+   * Get all equipment for a building with status
+   * @param buildingId - Building ID (e.g., 'sandton')
+   */
+  async getBuildingEquipment(buildingId: string): Promise<BuildingEquipmentResponse> {
+    return fetchApi<BuildingEquipmentResponse>(`/api/buildings/${buildingId}/equipment`);
+  },
+
+  /**
    * Get dashboard statistics overview
    */
   async getStats(): Promise<DashboardStats> {
@@ -1025,7 +1114,13 @@ export const api = {
   async getLatestRecommendation(siteId: string): Promise<OptimizationRecommendation | null> {
     try {
       const status = await this.getOptimizationStatus(siteId);
-      return status.last_recommendation;
+      // Only return recommendation if it has actual recommendations to show
+      if (status.last_recommendation &&
+          status.last_recommendation.recommendations &&
+          status.last_recommendation.recommendations.length > 0) {
+        return status.last_recommendation;
+      }
+      return null;
     } catch (error) {
       console.error(`Failed to fetch latest recommendation for site ${siteId}:`, error);
       return null;

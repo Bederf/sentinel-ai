@@ -28,7 +28,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import api from "../lib/api";
-import type { Alert, Prediction, EnergyDataPoint, Device } from "../lib/api";
+import type { Alert, Prediction, EnergyDataPoint, Device, BuildingEquipmentItem, CategoryStatus } from "../lib/api";
 import { formatDateTime, getTimezoneAbbreviation, isDifferentTimezone } from "../lib/timeFormat";
 import { KPICard } from "./KPICard";
 import { EnergyChart } from "./EnergyChart";
@@ -65,19 +65,10 @@ interface SiteDetailData {
   optimization_enabled?: boolean;
 }
 
-interface Equipment {
-  id: string;
-  name: string;
-  type: string;
-  site_id: string;
-  model?: string;
-  manufacturer?: string;
-  install_date?: string;
-  health_score: number;
-  status: string;
-  last_service?: string;
+// Extended equipment interface for local state (combines API response with local fields)
+interface Equipment extends BuildingEquipmentItem {
+  health_score: number;  // Alias for health (for backwards compat)
   last_maintenance?: string;
-  next_maintenance?: string;
 }
 
 type TabType = "equipment" | "alerts" | "energy" | "predictions";
@@ -85,6 +76,8 @@ type TabType = "equipment" | "alerts" | "energy" | "predictions";
 export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
   const [site, setSite] = useState<SiteDetailData | null>(null);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
+  const [equipmentCategories, setEquipmentCategories] = useState<Record<string, CategoryStatus>>({});
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [energyData, setEnergyData] = useState<EnergyDataPoint[]>([]);
@@ -119,9 +112,36 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
           location: siteData.location,
         } as SiteDetailData);
 
-        // Fetch equipment for this site using API client
-        const equipmentData = await api.getEquipment(siteId);
-        setEquipment(equipmentData as unknown as Equipment[]);
+        // Determine building_id from site_id (mapping sites.json to building folders)
+        // site-002 -> sandton
+        const SITE_TO_BUILDING: Record<string, string> = {
+          "site-002": "sandton",
+        };
+        const buildingId = SITE_TO_BUILDING[siteId] || siteId;
+
+        // Fetch equipment for this building using new building equipment endpoint
+        try {
+          const buildingEquipment = await api.getBuildingEquipment(buildingId);
+          // Map to Equipment interface (add health_score alias)
+          const mappedEquipment: Equipment[] = buildingEquipment.equipment.map((eq) => ({
+            ...eq,
+            health_score: eq.health,
+          }));
+          setEquipment(mappedEquipment);
+          setEquipmentCategories(buildingEquipment.categories);
+        } catch (eqErr) {
+          console.warn("Building equipment endpoint failed, falling back to legacy:", eqErr);
+          // Fallback to legacy equipment endpoint
+          const equipmentData = await api.getEquipment(siteId);
+          setEquipment(equipmentData.map((eq) => ({
+            ...eq,
+            health_score: 80,
+            health: 80,
+            category: "Other",
+            controllable: false,
+            details: {},
+          })) as Equipment[]);
+        }
 
         // Fetch alerts for this site
         const allAlerts = await api.getAlerts();
@@ -310,8 +330,27 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
       // Use equipment control endpoint for Supabase equipment
       await api.controlEquipment(deviceId, point, value);
       // Refresh equipment list after control action
-      const equipmentData = await api.getEquipment(siteId);
-      setEquipment(equipmentData as unknown as Equipment[]);
+      const SITE_TO_BUILDING: Record<string, string> = { "site-002": "sandton" };
+      const buildingId = SITE_TO_BUILDING[siteId] || siteId;
+      try {
+        const buildingEquipment = await api.getBuildingEquipment(buildingId);
+        setEquipment(buildingEquipment.equipment.map((eq) => ({
+          ...eq,
+          health_score: eq.health,
+        })));
+        setEquipmentCategories(buildingEquipment.categories);
+      } catch {
+        // Fallback
+        const equipmentData = await api.getEquipment(siteId);
+        setEquipment(equipmentData.map((eq) => ({
+          ...eq,
+          health_score: 80,
+          health: 80,
+          category: "Other",
+          controllable: false,
+          details: {},
+        })) as Equipment[]);
+      }
     } catch (error) {
       console.error("Equipment control failed:", error);
       throw error;
@@ -530,7 +569,7 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <KPICard
           title="Equipment"
-          value={equipment.length}
+          value={site.equipment_count}
           icon={<Cpu className="h-5 w-5" />}
           accentColor="blue"
         />
@@ -718,12 +757,23 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
           {activeTab === "equipment" && (
             <div>
               <div className="flex items-center justify-between mb-4">
-                <h3
-                  className="text-lg font-semibold"
-                  style={{ color: "var(--color-sentinel-text-primary)" }}
-                >
-                  Equipment
-                </h3>
+                <div className="flex items-center gap-3">
+                  <h3
+                    className="text-lg font-semibold"
+                    style={{ color: "var(--color-sentinel-text-primary)" }}
+                  >
+                    Equipment
+                  </h3>
+                  <div
+                    className="px-2 py-1 rounded text-xs font-medium"
+                    style={{
+                      background: "rgba(59, 130, 246, 0.15)",
+                      color: "var(--color-sentinel-blue)",
+                    }}
+                  >
+                    {equipment.length} Total
+                  </div>
+                </div>
                 <div className="flex items-center gap-2">
                   <div
                     className="px-2 py-1 rounded text-xs font-medium"
@@ -732,7 +782,7 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
                       color: "var(--color-sentinel-green)",
                     }}
                   >
-                    {healthyEquipment} Healthy
+                    {healthyEquipment} OK
                   </div>
                   <div
                     className="px-2 py-1 rounded text-xs font-medium"
@@ -755,121 +805,213 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
                 </div>
               </div>
 
-              {equipment.length === 0 ? (
-                <div className="text-center py-12">
-                  <Cpu
-                    className="h-12 w-12 mx-auto mb-3"
-                    style={{ color: "var(--color-sentinel-text-disabled)" }}
-                  />
-                  <p style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                    No equipment found for this site
-                  </p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}>
-                        {["Equipment", "Type", "Status", "Health", "Last Maintenance"].map((header) => (
-                          <th
-                            key={header}
-                            className="text-left py-3 px-4 text-xs font-medium uppercase tracking-wider"
-                            style={{ color: "var(--color-sentinel-text-secondary)" }}
-                          >
-                            {header}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {equipment.map((item) => (
-                        <tr
-                          key={item.id}
-                          className="hover:brightness-110 cursor-pointer transition-colors"
+              {/* Category Filter Chips */}
+              {Object.keys(equipmentCategories).length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-4">
+                  <button
+                    onClick={() => setSelectedCategory(null)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                      selectedCategory === null ? "ring-2 ring-offset-1" : ""
+                    }`}
+                    style={{
+                      background: selectedCategory === null
+                        ? "var(--color-sentinel-blue)"
+                        : "var(--color-sentinel-bg-secondary)",
+                      color: selectedCategory === null
+                        ? "white"
+                        : "var(--color-sentinel-text-secondary)",
+                      ringColor: "var(--color-sentinel-blue)",
+                    }}
+                  >
+                    All ({equipment.length})
+                  </button>
+                  {Object.entries(equipmentCategories).map(([category, stats]) => (
+                    <button
+                      key={category}
+                      onClick={() => setSelectedCategory(category)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                        selectedCategory === category ? "ring-2 ring-offset-1" : ""
+                      }`}
+                      style={{
+                        background: selectedCategory === category
+                          ? "var(--color-sentinel-blue)"
+                          : "var(--color-sentinel-bg-secondary)",
+                        color: selectedCategory === category
+                          ? "white"
+                          : "var(--color-sentinel-text-secondary)",
+                        ringColor: "var(--color-sentinel-blue)",
+                      }}
+                    >
+                      {category} ({stats.total})
+                      {stats.critical > 0 && (
+                        <span
+                          className="ml-1 px-1 rounded"
                           style={{
-                            borderBottom: "1px solid var(--color-sentinel-border)",
+                            background: "rgba(220, 38, 38, 0.3)",
+                            color: "var(--color-sentinel-red)",
                           }}
-                          onClick={() => handleEquipmentClick(item)}
                         >
-                          <td className="py-3 px-4">
-                            <div className="flex items-center gap-3">
-                              {getStatusIcon(item.status)}
-                              <div>
-                                <p className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
-                                  {item.name}
-                                </p>
-                                {(item.manufacturer || item.model) && (
-                                  <p className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                                    {item.manufacturer} {item.model}
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                          </td>
-                          <td className="py-3 px-4">
-                            <div
-                              className="inline-block px-2 py-1 rounded text-xs font-medium"
-                              style={{
-                                background: "var(--color-sentinel-bg-secondary)",
-                                color: "var(--color-sentinel-text-secondary)",
-                              }}
+                          {stats.critical}
+                        </span>
+                      )}
+                      {stats.warning > 0 && (
+                        <span
+                          className="ml-1 px-1 rounded"
+                          style={{
+                            background: "rgba(245, 158, 11, 0.3)",
+                            color: "var(--color-sentinel-amber)",
+                          }}
+                        >
+                          {stats.warning}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {(() => {
+                const filteredEquipment = selectedCategory
+                  ? equipment.filter((eq) => eq.category === selectedCategory)
+                  : equipment;
+
+                return filteredEquipment.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Cpu
+                      className="h-12 w-12 mx-auto mb-3"
+                      style={{ color: "var(--color-sentinel-text-disabled)" }}
+                    />
+                    <p style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                      {selectedCategory
+                        ? `No ${selectedCategory} equipment found`
+                        : "No equipment found for this site"}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}>
+                          {["Equipment", "Category", "Type", "Location", "Status", "Health"].map((header) => (
+                            <th
+                              key={header}
+                              className="text-left py-3 px-4 text-xs font-medium uppercase tracking-wider"
+                              style={{ color: "var(--color-sentinel-text-secondary)" }}
                             >
-                              {item.type.replace("_", " ")}
-                            </div>
-                          </td>
-                          <td className="py-3 px-4">
-                            {item.status === "warning" || item.status === "critical" ? (
-                              <button
-                                onClick={(e) => handleEquipmentRiskClick(item, e)}
-                                className="inline-block px-2 py-1 rounded text-xs font-medium cursor-pointer hover:opacity-80 transition-opacity"
-                                style={{
-                                  background: getStatusColor(item.status) + "20",
-                                  color: getStatusColor(item.status),
-                                  border: "none",
-                                }}
-                                title="Click to view prediction details"
-                              >
-                                {item.status}
-                              </button>
-                            ) : (
+                              {header}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredEquipment.map((item) => (
+                          <tr
+                            key={item.id}
+                            className="hover:brightness-110 cursor-pointer transition-colors"
+                            style={{
+                              borderBottom: "1px solid var(--color-sentinel-border)",
+                            }}
+                            onClick={() => item.controllable ? handleEquipmentClick(item) : null}
+                          >
+                            <td className="py-3 px-4">
+                              <div className="flex items-center gap-3">
+                                {getStatusIcon(item.status)}
+                                <div>
+                                  <p className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                                    {item.name}
+                                  </p>
+                                  <p className="text-xs font-mono" style={{ color: "var(--color-sentinel-text-disabled)" }}>
+                                    {item.id}
+                                  </p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-3 px-4">
                               <div
                                 className="inline-block px-2 py-1 rounded text-xs font-medium"
                                 style={{
-                                  background: getStatusColor(item.status) + "20",
-                                  color: getStatusColor(item.status),
+                                  background: item.category === "HVAC"
+                                    ? "rgba(59, 130, 246, 0.15)"
+                                    : item.category === "Generator Plant"
+                                    ? "rgba(245, 158, 11, 0.15)"
+                                    : item.category === "Energy Centre"
+                                    ? "rgba(168, 85, 247, 0.15)"
+                                    : item.category === "Lighting"
+                                    ? "rgba(251, 191, 36, 0.15)"
+                                    : "var(--color-sentinel-bg-secondary)",
+                                  color: item.category === "HVAC"
+                                    ? "var(--color-sentinel-blue)"
+                                    : item.category === "Generator Plant"
+                                    ? "var(--color-sentinel-amber)"
+                                    : item.category === "Energy Centre"
+                                    ? "#a78bfa"
+                                    : item.category === "Lighting"
+                                    ? "#fbbf24"
+                                    : "var(--color-sentinel-text-secondary)",
                                 }}
                               >
-                                {item.status}
+                                {item.category}
                               </div>
-                            )}
-                          </td>
-                          <td className="py-3 px-4">
-                            <div className="flex items-center gap-2">
-                              <div className="flex-1 max-w-[100px] h-2 rounded-full overflow-hidden" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
-                                <div
-                                  className="h-full rounded-full"
-                                  style={{
-                                    width: `${item.health_score}%`,
-                                    background: getStatusColor(item.status),
-                                  }}
-                                />
-                              </div>
-                              <span className="text-sm font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>
-                                {item.health_score}%
+                            </td>
+                            <td className="py-3 px-4">
+                              <span className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                                {item.type.replace(/_/g, " ")}
                               </span>
-                            </div>
-                          </td>
-                          <td className="py-3 px-4">
-                            <span className="text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
-                              {formatDate(item.last_maintenance || item.last_service, item.id, item.health_score)}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+                            </td>
+                            <td className="py-3 px-4">
+                              <span className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                                {item.location || "—"}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4">
+                              {item.status === "warning" || item.status === "critical" ? (
+                                <button
+                                  onClick={(e) => handleEquipmentRiskClick(item, e)}
+                                  className="inline-block px-2 py-1 rounded text-xs font-medium cursor-pointer hover:opacity-80 transition-opacity"
+                                  style={{
+                                    background: getStatusColor(item.status) + "20",
+                                    color: getStatusColor(item.status),
+                                    border: "none",
+                                  }}
+                                  title="Click to view prediction details"
+                                >
+                                  {item.status}
+                                </button>
+                              ) : (
+                                <div
+                                  className="inline-block px-2 py-1 rounded text-xs font-medium"
+                                  style={{
+                                    background: getStatusColor(item.status) + "20",
+                                    color: getStatusColor(item.status),
+                                  }}
+                                >
+                                  {item.status}
+                                </div>
+                              )}
+                            </td>
+                            <td className="py-3 px-4">
+                              <div className="flex items-center gap-2">
+                                <div className="flex-1 max-w-[80px] h-2 rounded-full overflow-hidden" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                                  <div
+                                    className="h-full rounded-full"
+                                    style={{
+                                      width: `${item.health_score}%`,
+                                      background: getStatusColor(item.status),
+                                    }}
+                                  />
+                                </div>
+                                <span className="text-sm font-medium w-10" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                                  {item.health_score}%
+                                </span>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })()}
             </div>
           )}
 

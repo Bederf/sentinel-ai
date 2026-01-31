@@ -236,8 +236,7 @@ export function DeviceList({ devices, selectedDevice, onDeviceSelect, onRiskClic
             siteNumber = numMatch ? numMatch[1].padStart(3, "0") : device.site_id;
           }
           
-          // Remove "FNB" prefix from device name if present (case-insensitive)
-          const deviceName = device.name.replace(/^FNB\s*/i, "").trim();
+          const deviceName = device.name;
           
           return (
             <button

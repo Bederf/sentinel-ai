@@ -18,6 +18,12 @@ from app.api import dali  # DALI-2 lighting integration
 from app.api import complaints  # Comfort complaint handling
 from app.api import mcp  # MCP (Model Context Protocol) server
 from app.api import mcp_sse  # MCP SSE transport for remote clients
+from app.api import buildings  # Building management (onboarding)
+from app.api import generators  # Generator/SCADA integration
+from app.api import energy_centre  # Energy centre (MV/LV, ATS, meters, UPS)
+from app.api import modules  # Module registry (bolt-on modules)
+from app.api import hvac  # HVAC module API
+from app.api import health_config  # Health calculation config API
 from app.middleware.audit_middleware import AuditMiddleware
 from app.services.background_scheduler import scheduler_service
 from app.api.simulation import simulation_service  # BMS simulation service
@@ -69,6 +75,12 @@ app.include_router(dali.router, tags=["dali-lighting"])  # DALI-2 lighting integ
 app.include_router(complaints.router, tags=["comfort-complaints"])  # Comfort complaint handling
 app.include_router(mcp.router, tags=["mcp"])  # MCP (Model Context Protocol) for AI tool integration
 app.include_router(mcp_sse.router, tags=["mcp-sse"])  # MCP SSE transport for remote clients
+app.include_router(buildings.router, tags=["buildings"])  # Building management (onboarding)
+app.include_router(generators.router, prefix="/api", tags=["generators"])  # Generator/SCADA
+app.include_router(energy_centre.router, prefix="/api", tags=["energy-centre"])  # Energy centre
+app.include_router(modules.router, prefix="/api", tags=["modules"])  # Module registry (bolt-on)
+app.include_router(hvac.router, prefix="/api", tags=["hvac"])  # HVAC module
+app.include_router(health_config.router, tags=["health-config"])  # Health config
 
 
 @app.on_event("startup")

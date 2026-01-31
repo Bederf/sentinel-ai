@@ -550,9 +550,9 @@ class TestSortRecommendationsByPriority:
         ]
 
         recommendations = [
-            {"device_id": "device-p5", "point_name": "setpoint", "recommended_value": 24.0},
-            {"device_id": "device-p1", "point_name": "setpoint", "recommended_value": 22.0},
-            {"device_id": "device-p3", "point_name": "setpoint", "recommended_value": 23.0},
+            {"equipment_id": "device-p5", "point_name": "setpoint", "recommended_value": 24.0},
+            {"equipment_id": "device-p1", "point_name": "setpoint", "recommended_value": 22.0},
+            {"equipment_id": "device-p3", "point_name": "setpoint", "recommended_value": 23.0},
         ]
 
         sorted_recs = self.optimizer._sort_recommendations_by_priority(
@@ -560,9 +560,9 @@ class TestSortRecommendationsByPriority:
         )
 
         # Should be sorted P1, P3, P5
-        assert sorted_recs[0]["device_id"] == "device-p1"
-        assert sorted_recs[1]["device_id"] == "device-p3"
-        assert sorted_recs[2]["device_id"] == "device-p5"
+        assert sorted_recs[0]["equipment_id"] == "device-p1"
+        assert sorted_recs[1]["equipment_id"] == "device-p3"
+        assert sorted_recs[2]["equipment_id"] == "device-p5"
 
 
 class TestFormatZoneContext:

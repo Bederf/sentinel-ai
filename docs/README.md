@@ -38,16 +38,22 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - [Autonomous Control Levels](04-features/autonomous-control-levels.md) - Control autonomy
 - [Technician Chat](04-features/technician-chat.md) - Guided fault diagnosis
 - [Integration Wizard](04-features/integration-wizard.md) - BMS/CAFM integration
+- [AI-Assisted Onboarding](04-features/ai-assisted-onboarding.md) - Import BMS data via MCP tools
 
 ### 🏢 BMS Concepts
 - [BMS Fundamentals](05-bms-concepts/bms-fundamentals.md) - BMS domain knowledge
-- [HVAC Systems](05-bms-concepts/hvac-systems.md) - HVAC equipment and control
+- [HVAC Systems Guide](05-bms-concepts/hvac-systems.md) - Chiller, AHU, FCU, VAV with schematics (Technician/Operator reference)
 
 ### 🛡️ Safety & Compliance
 - [Safety Interlocks Engine](06-safety-compliance/safety-interlocks-engine.md) - Safety validation
 
 ### 🔗 Integrations
+- [DALI-HVAC Integration](07-integrations/dali-hvac-integration.md) - Cross-system comfort diagnosis
 - [CAFM Schema](07-integrations/cafm-schema.md) - CAFM data model
+- [Energy Centre](07-integrations/energy-centre.md) - Generators, ATS, power metering, UPS
+
+### 📦 Modules
+- [Module Registry](13-modules/module-registry.md) - Bolt-on module system architecture
 
 ### 🤖 AI & ML
 - [Claude Integration](08-ai-ml/claude-integration.md) - Claude API usage
@@ -80,7 +86,7 @@ docs/
 ├── 10-security/             # Auth, audit, API keys
 ├── 11-testing/              # Unit tests, integration tests
 ├── 12-development/          # Workflow, tooling, best practices
-├── 13-modules/              # SENTINEL modules (Solar, Water, etc.)
+├── 13-modules/              # Bolt-on module system (Energy, HVAC, Security, Lighting)
 ├── 14-south-africa-context/ # Load shedding, Eskom
 ├── 15-troubleshooting/      # Common issues, diagnostics
 ├── 16-glossary/             # BMS terms, acronyms
@@ -171,8 +177,8 @@ When adding new documentation:
 ## Status
 
 - **Total Directories:** 17
-- **Total Documents:** 14 (in progress)
-- **With Frontmatter:** 8
+- **Total Documents:** 18 (in progress)
+- **With Frontmatter:** 12
 - **Target:** 25-30 core documents
 
 ## Next Actions
@@ -182,6 +188,8 @@ When adding new documentation:
 - [ ] Create Tier 2 domain-specific docs (BMS concepts, load shedding)
 - [ ] Create Tier 3 feature specs
 - [ ] Create Tier 4 troubleshooting and operations guides
+- [x] Module Registry documentation (13-modules/module-registry.md)
+- [x] Energy Centre integration (07-integrations/energy-centre.md)
 
 ## Related Resources
 

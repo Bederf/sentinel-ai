@@ -246,7 +246,8 @@ class BackgroundSchedulerService:
                     loop.close()
 
                     # Update site status
-                    if validation["allowed"]:
+                    # Only mark as pending if there are actual recommendations to show
+                    if validation["allowed"] and len(recommendation.recommendations) > 0:
                         site["optimization_status"] = OptimizationStatus.RECOMMENDATION_PENDING.value
                         site["last_recommendation"] = recommendation.to_dict()
                         results.append({
@@ -255,6 +256,16 @@ class BackgroundSchedulerService:
                             "status": "success",
                             "confidence": recommendation.confidence,
                             "recommendations_count": len(recommendation.recommendations),
+                        })
+                    elif validation["allowed"] and len(recommendation.recommendations) == 0:
+                        # No actionable recommendations - don't show notification
+                        site["optimization_status"] = OptimizationStatus.OPTIMIZED.value
+                        site["last_recommendation"] = None  # Clear any old recommendation
+                        results.append({
+                            "site_id": site_id,
+                            "site_name": site_name,
+                            "status": "skipped",
+                            "reason": "No actionable adjustments available (building has no controllable HVAC assets or conditions don't warrant changes)",
                         })
                     else:
                         site["optimization_status"] = OptimizationStatus.WARNING.value

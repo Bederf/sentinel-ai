@@ -3,6 +3,11 @@ Cross-System Analyzer
 =====================
 Combines HVAC (Desigo) + Lighting (Scenecom) + Occupancy data
 for intelligent comfort diagnostics.
+
+Data Sources:
+- HVAC: zones.json via BuildingDataLoader (zone temps, setpoints, FCU/VAV/AHU)
+- Lighting: dali_mock_data.json via DALIService (lux, occupancy, luminaires)
+- Desks: desks.json via BuildingDataLoader (desk context: near_window, etc.)
 """
 
 from typing import Dict, List, Optional
@@ -11,6 +16,7 @@ from datetime import datetime
 import logging
 
 from app.services.dali_service import get_dali_service
+from app.services.building_loader import get_building_loader
 
 logger = logging.getLogger(__name__)
 from app.models.dali import ZoneOccupancy, ZoneLighting
@@ -55,18 +61,35 @@ class CrossSystemAnalyzer:
 
     def __init__(self):
         self.dali = get_dali_service()
-        # Would also inject HVAC service in production
-        self._mock_hvac_data = self._load_mock_hvac()
+        self._building_loader = get_building_loader()
+        self._hvac_data: Dict[str, Dict] = {}
+        self._load_hvac_from_zones()
 
-    def _load_mock_hvac(self) -> Dict:
-        """Load mock HVAC zone data (simplified for demo)"""
-        return {
-            "Zone-L12-N": {"temp": 22.5, "setpoint": 22.0, "status": "running", "fcu": "FCU-L12-03"},
-            "Zone-L12-S": {"temp": 23.0, "setpoint": 22.0, "status": "running", "fcu": "FCU-L12-04"},
-            "Zone-L11-N": {"temp": 21.5, "setpoint": 22.0, "status": "running", "fcu": "FCU-L11-01"},
-            "Zone-L11-S": {"temp": 24.0, "setpoint": 22.0, "status": "fault", "fcu": "FCU-L11-02"},
-            "Zone-L10-N": {"temp": 22.0, "setpoint": 22.0, "status": "running", "fcu": "FCU-L10-01"},
-        }
+    def _load_hvac_from_zones(self) -> None:
+        """Load HVAC zone data from building loader (zones.json files)."""
+        all_zones = self._building_loader.get_all_zones()
+
+        for zone in all_zones:
+            zone_id = zone.get("zone_id")
+            if zone_id:
+                self._hvac_data[zone_id] = {
+                    "temp": zone.get("current_temp", 22.0),
+                    "setpoint": zone.get("setpoint", 22.0),
+                    "status": zone.get("status", "running"),
+                    "fcu": zone.get("fcu_id", ""),
+                    "vav": zone.get("vav_id"),
+                    "ahu": zone.get("ahu_id"),
+                    "zone_name": zone.get("zone_name", zone_id),
+                    "floor": zone.get("floor", ""),
+                    "building_id": zone.get("building_id", ""),
+                }
+
+        logger.info(f"Loaded HVAC data for {len(self._hvac_data)} zones from building loader")
+
+    def refresh_hvac_data(self) -> None:
+        """Refresh HVAC data from building loader (call after zone updates)."""
+        self._building_loader.load(force=True)
+        self._load_hvac_from_zones()
 
     def analyze_comfort_complaint(
         self,
@@ -82,7 +105,7 @@ class CrossSystemAnalyzer:
         # Get zone data
         occupancy = self.dali.get_zone_occupancy(zone_id)
         lighting = self.dali.get_zone_lighting(zone_id)
-        hvac = self._mock_hvac_data.get(zone_id, {"temp": 22.0, "setpoint": 22.0, "status": "unknown"})
+        hvac = self._hvac_data.get(zone_id, {"temp": 22.0, "setpoint": 22.0, "status": "unknown"})
 
         # Desk-specific data if provided
         desk_sensor = None
@@ -217,11 +240,18 @@ class CrossSystemAnalyzer:
                 # HVAC is fine, solar is the issue
                 cause = "Solar heat gain from windows. HVAC is working correctly but direct sunlight is warming your location."
                 confidence = "high"
-                suggestions = [
-                    "Close blinds or activate automated shading",
-                    f"Temporarily boost cooling to {hvac['setpoint'] - 2}C for 2 hours",
-                    "Consider relocating to a shaded desk"
-                ]
+                suggestions = []
+
+                # Suggest dimming lights to reduce heat load (actual DALI control)
+                if lighting and lighting.avg_dim_level > 50:
+                    suggestions.append(f"Dim zone lighting from {lighting.avg_dim_level:.0f}% to 30% to reduce heat load")
+
+                # Suggest FCU setpoint adjustment (actual HVAC control)
+                suggestions.append(f"Boost FCU cooling: lower setpoint from {hvac['setpoint']}°C to {hvac['setpoint'] - 2}°C for 2 hours")
+
+                # Suggest VAV adjustment if available
+                suggestions.append("Increase VAV airflow to desk area")
+
                 if occupancy and occupancy.occupancy_percent < 30:
                     suggestions.append("Note: Zone is only {:.0f}% occupied - less internal heat load".format(occupancy.occupancy_percent))
                 return (cause, confidence, suggestions)
@@ -243,18 +273,24 @@ class CrossSystemAnalyzer:
                 ["Check chilled water supply temperature", "Verify FCU fan speed and valve position", "Review zone load vs equipment capacity"]
             )
 
-        # Default
+        # Default - suggest actions on actual BMS assets
+        default_suggestions = []
+        if lighting and lighting.avg_dim_level > 60:
+            default_suggestions.append(f"Reduce zone lighting from {lighting.avg_dim_level:.0f}% to 50%")
+        default_suggestions.append(f"Lower FCU setpoint by 1°C (current: {hvac['setpoint']}°C)")
+        default_suggestions.append("Dispatch technician to check for localized heat sources")
+
         return (
             "No clear equipment issue detected. May be localized discomfort or perception.",
             "low",
-            ["Check for localized heat sources (equipment, sun exposure)", "Consider desk fan or temporary relocation"]
+            default_suggestions
         )
 
     def get_zone_context_for_chat(self, zone_id: str) -> str:
         """Get formatted zone context for AI chat"""
         occupancy = self.dali.get_zone_occupancy(zone_id)
         lighting = self.dali.get_zone_lighting(zone_id)
-        hvac = self._mock_hvac_data.get(zone_id, {})
+        hvac = self._hvac_data.get(zone_id, {})
 
         lines = [f"## Zone: {zone_id}"]
 

@@ -8,6 +8,10 @@ from app.database.repositories.audit_repository import AuditRepository
 from app.database.repositories.prediction_repository import PredictionRepository
 from app.database.repositories.safety_rules_repository import SafetyRulesRepository
 from app.database.repositories.integration_repository import IntegrationRepository
+from app.database.repositories.hvac_zone_repository import HVACZoneRepository
+from app.database.repositories.desk_repository import DeskRepository
+from app.database.repositories.generator_repository import GeneratorRepository
+from app.database.repositories.energy_centre_repository import EnergyCentreRepository
 
 __all__ = [
     'BuildingRepository',
@@ -18,4 +22,8 @@ __all__ = [
     'PredictionRepository',
     'SafetyRulesRepository',
     'IntegrationRepository',
+    'HVACZoneRepository',
+    'DeskRepository',
+    'GeneratorRepository',
+    'EnergyCentreRepository',
 ]

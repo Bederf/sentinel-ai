@@ -4,11 +4,16 @@ Comfort Complaint Handler
 Handles comfort complaints by linking desk location to HVAC systems.
 Uses CrossSystemAnalyzer for diagnosis with occupancy context.
 
+Data sources:
+- Building config (desks, zones): JSON files via BuildingDataLoader
+- Complaint history: Supabase (with JSON fallback)
+
 The killer feature: "Too hot at Desk 25" -> instant BMS diagnosis.
 """
 
 import json
 import logging
+import os
 import re
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -21,8 +26,12 @@ from app.models.complaint import (
     ComplaintDiagnosis,
 )
 from app.services.cross_system_analyzer import get_cross_system_analyzer
+from app.services.building_loader import get_building_loader
 
 logger = logging.getLogger(__name__)
+
+# Check if Supabase is configured
+USE_SUPABASE = os.getenv("SUPABASE_URL") and os.getenv("SUPABASE_KEY")
 
 
 class ComfortComplaintHandler:
@@ -39,34 +48,27 @@ class ComfortComplaintHandler:
         self._load_data()
 
     def _load_data(self):
-        """Load desk and zone data from JSON files."""
-        data_path = Path(__file__).parent.parent / "data"
+        """Load desk and zone data using BuildingDataLoader."""
+        loader = get_building_loader()
 
-        # Load desks
-        desks_file = data_path / "desks.json"
-        if desks_file.exists():
-            with open(desks_file) as f:
-                desks_data = json.load(f)
-                for d in desks_data:
-                    desk = Desk.from_dict(d)
-                    self._desks[desk.desk_id] = desk
-                    # Create normalized ID mappings for flexible lookup
-                    self._create_desk_id_mappings(desk)
-            logger.info(f"Loaded {len(self._desks)} desks")
-        else:
-            logger.warning(f"Desks data not found at {desks_file}")
+        # Load desks from all active buildings
+        all_desks = loader.get_all_desks()
+        for d in all_desks:
+            desk = Desk.from_dict(d)
+            self._desks[desk.desk_id] = desk
+            # Create normalized ID mappings for flexible lookup
+            self._create_desk_id_mappings(desk)
+        logger.info(f"Loaded {len(self._desks)} desks from {len(loader.get_active_building_ids())} building(s)")
 
-        # Load zones
-        zones_file = data_path / "hvac_zones.json"
-        if zones_file.exists():
-            with open(zones_file) as f:
-                zones_data = json.load(f)
-                for z in zones_data:
-                    zone = HVACZone.from_dict(z)
-                    self._zones[zone.zone_id] = zone
-            logger.info(f"Loaded {len(self._zones)} zones")
-        else:
-            logger.warning(f"Zones data not found at {zones_file}")
+        # Load zones from all active buildings
+        all_zones = loader.get_all_zones()
+        for z in all_zones:
+            zone = HVACZone.from_dict(z)
+            self._zones[zone.zone_id] = zone
+        logger.info(f"Loaded {len(self._zones)} zones")
+
+        # Store loader reference for building lookups
+        self._loader = loader
 
     def _create_desk_id_mappings(self, desk: Desk):
         """Create multiple ID mappings for flexible desk lookup."""
@@ -169,11 +171,19 @@ class ComfortComplaintHandler:
                 "setpoint": zone.setpoint,
                 "status": zone.status,
             },
+            "dali_context": {
+                "dali_zone": desk.dali_zone,
+                "sensor_id": desk.sensor_id,
+                "luminaire_ids": desk.luminaire_ids,
+                "dali_controller": desk.dali_controller,
+            },
             "desk_context": {
                 "near_window": desk.near_window,
+                "orientation": desk.orientation,
                 "near_diffuser": desk.near_diffuser,
                 "near_printer": desk.near_printer,
                 "department": desk.department,
+                "occupant": desk.occupant,
             },
         }
 
@@ -262,19 +272,46 @@ class ComfortComplaintHandler:
         # Check time of day for solar context
         current_hour = datetime.now().hour
 
-        # Near window + too_hot + afternoon = solar heat gain
-        if desk.near_window and complaint_type == "too_hot" and 12 <= current_hour <= 18:
-            if "solar" not in enhanced_root_cause.lower():
+        # Near window + too_hot + time of day + orientation = solar heat gain analysis
+        if desk.near_window and complaint_type == "too_hot":
+            orientation = (desk.orientation or "").upper()
+            solar_issue = False
+            solar_direction = ""
+
+            # Morning sun (E, NE, SE) - 6am to 11am
+            if orientation in ("E", "NE", "SE") and 6 <= current_hour <= 11:
+                solar_issue = True
+                solar_direction = "morning sun (east-facing)"
+            # Afternoon sun (W, NW, SW) - 12pm to 6pm
+            elif orientation in ("W", "NW", "SW") and 12 <= current_hour <= 18:
+                solar_issue = True
+                solar_direction = "afternoon sun (west-facing)"
+            # North-facing gets sun most of day in Southern Hemisphere
+            elif orientation == "N" and 9 <= current_hour <= 16:
+                solar_issue = True
+                solar_direction = "direct sun (north-facing)"
+            # Fallback if no orientation specified
+            elif not orientation and 12 <= current_hour <= 18:
+                solar_issue = True
+                solar_direction = "afternoon sun (orientation unknown)"
+
+            if solar_issue and "solar" not in enhanced_root_cause.lower():
                 enhanced_root_cause = (
-                    f"Solar heat gain likely - desk is near west-facing window. "
+                    f"Solar heat gain likely - desk near {solar_direction} window. "
                     f"{enhanced_root_cause}"
                 )
                 enhanced_confidence = "high"
-                enhanced_suggestions.insert(0, "Close blinds or activate automated shading")
-                if "Temporarily boost cooling" not in str(enhanced_suggestions):
-                    enhanced_suggestions.insert(
-                        1, f"Temporarily boost cooling to {zone.setpoint - 2}C for 2 hours"
-                    )
+                # Use actual BMS controls: FCU setpoint and zone lighting
+                enhanced_suggestions.insert(0, f"Lower FCU {zone.fcu_id} setpoint to {zone.setpoint - 2}°C")
+
+                # If we have DALI info, be specific about which luminaires to dim
+                if desk.luminaire_ids:
+                    lum_list = ", ".join(desk.luminaire_ids[:3])
+                    enhanced_suggestions.insert(1, f"Dim luminaires {lum_list} to 40% to reduce heat load")
+                elif desk.dali_controller:
+                    enhanced_suggestions.insert(1, f"Dim zone lighting via {desk.dali_controller} to 40%")
+                else:
+                    enhanced_suggestions.insert(1, "Dim zone lighting to 40% to reduce heat load")
 
         # Under diffuser + too_cold = direct airflow
         if desk.near_diffuser and complaint_type == "too_cold":
@@ -284,9 +321,9 @@ class ComfortComplaintHandler:
             )
             enhanced_confidence = "high"
             enhanced_suggestions = [
-                f"Adjust diffuser {desk.near_diffuser} direction or airflow",
-                "Consider desk relocation",
-                "Install local air deflector",
+                f"Reduce VAV {zone.vav_id} airflow to desk area",
+                f"Raise FCU {zone.fcu_id} setpoint by 1°C (current: {zone.setpoint}°C)",
+                "Dispatch technician to adjust diffuser direction",
             ]
 
         # Near printer + too_hot = heat source
@@ -297,7 +334,10 @@ class ComfortComplaintHandler:
                     f"{enhanced_root_cause}"
                 )
                 enhanced_suggestions.insert(
-                    0, "Consider relocating desk away from printer heat source"
+                    0, f"Increase VAV {zone.vav_id} airflow to dissipate printer heat"
+                )
+                enhanced_suggestions.insert(
+                    1, f"Lower FCU {zone.fcu_id} setpoint by 1°C"
                 )
 
         # Check if zone has fault
@@ -382,4 +422,16 @@ def get_complaint_handler() -> ComfortComplaintHandler:
     global _handler
     if _handler is None:
         _handler = ComfortComplaintHandler()
+    return _handler
+
+
+def reload_complaint_handler() -> ComfortComplaintHandler:
+    """Force reload of complaint handler with fresh data."""
+    global _handler
+    # Force building loader to reload
+    loader = get_building_loader()
+    loader.load(force=True)
+    # Recreate handler
+    _handler = ComfortComplaintHandler()
+    logger.info("Complaint handler reloaded with fresh data")
     return _handler

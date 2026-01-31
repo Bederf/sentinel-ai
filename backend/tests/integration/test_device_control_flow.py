@@ -129,4 +129,5 @@ class TestDeviceControlFlow:
         # If blocked, verify error message
         if control_response.status_code in [400, 422]:
             error_data = control_response.json()
-            assert "message" in error_data or "error" in error_data
+            # FastAPI uses "detail" for error messages
+            assert "message" in error_data or "error" in error_data or "detail" in error_data

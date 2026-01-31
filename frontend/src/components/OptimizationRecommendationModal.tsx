@@ -209,12 +209,17 @@ export function OptimizationRecommendationModal({
 
   // Memoize impact analysis
   const impactAnalysis = useMemo(() => {
-    if (!recommendation) return null;
+    if (!recommendation || !recommendation.projected_savings) return null;
 
     const savings = recommendation.projected_savings;
     const energyPercent = savings.energy_percent ?? savings.percentage_improvement ?? 0;
     const costZar = savings.cost_zar ?? savings.cost_zar_per_hour ?? 0;
     const monthlyCost = typeof costZar === 'number' ? costZar * 8 * 22 : 0;
+
+    // If all values are 0, return null to avoid showing empty impact
+    if (energyPercent === 0 && monthlyCost === 0) {
+      return null;
+    }
 
     return {
       energy: `${typeof energyPercent === 'number' ? energyPercent : 0}% reduction (≈${formatCurrency(monthlyCost)}/month)`,
@@ -225,7 +230,7 @@ export function OptimizationRecommendationModal({
   }, [recommendation]);
 
   // Don't render if not open or no recommendation
-  if (!isOpen || !recommendation) {
+  if (!isOpen || !recommendation || !recommendation.recommendations || recommendation.recommendations.length === 0) {
     return null;
   }
 

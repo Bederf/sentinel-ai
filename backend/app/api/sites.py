@@ -45,6 +45,103 @@ def load_alerts() -> list[dict]:
     return []
 
 
+def get_json_asset_counts(site_id: str) -> dict:
+    """Aggregate asset counts from all JSON sources for a site.
+
+    Counts assets from:
+    - equipment.json (legacy equipment)
+    - buildings/{building_code}/zones.json (HVAC zones)
+    - buildings/{building_code}/generators.json (generators, groups, tanks)
+    - buildings/{building_code}/energy_centre.json (EC components)
+    - dali_mock_data.json (DALI controllers by building)
+
+    Returns:
+        Dict with total_assets and breakdown by category
+    """
+    # Map site_id to building_code (for modular building structure)
+    # TODO: Store this mapping in sites.json or buildings registry
+    SITE_TO_BUILDING = {
+        "site-002": "sandton",  # Sandton City Office Tower -> sandton folder
+    }
+
+    building_code = SITE_TO_BUILDING.get(site_id, site_id)
+
+    counts = {
+        "equipment": 0,
+        "hvac_zones": 0,
+        "generators": 0,
+        "generator_groups": 0,
+        "diesel_tanks": 0,
+        "energy_centre": 0,
+        "dali_controllers": 0,
+    }
+
+    # 1. Legacy equipment from equipment.json
+    equipment_file = DATA_DIR / "equipment.json"
+    if equipment_file.exists():
+        with open(equipment_file) as f:
+            equipment = json.load(f)
+            counts["equipment"] = len([e for e in equipment if e.get("site_id") == site_id])
+
+    # 2. Building-specific data
+    building_path = DATA_DIR / "buildings" / building_code
+
+    # HVAC zones
+    zones_file = building_path / "zones.json"
+    if zones_file.exists():
+        with open(zones_file) as f:
+            zones = json.load(f)
+            counts["hvac_zones"] = len(zones)
+
+    # Generators (includes generators, groups, tanks)
+    generators_file = building_path / "generators.json"
+    if generators_file.exists():
+        with open(generators_file) as f:
+            gen_data = json.load(f)
+            counts["generators"] = len(gen_data.get("generators", []))
+            counts["generator_groups"] = len(gen_data.get("groups", []))
+            counts["diesel_tanks"] = len(gen_data.get("diesel_tanks", []))
+
+    # Energy centre components
+    ec_file = building_path / "energy_centre.json"
+    if ec_file.exists():
+        with open(ec_file) as f:
+            ec_data = json.load(f)
+            ec_count = 1 if ec_data else 0  # The energy centre itself
+            ec_count += len(ec_data.get("mv_incomers", []))
+            ec_count += len(ec_data.get("transformers", []))
+            ec_count += len(ec_data.get("lv_switchboards", []))
+            ec_count += len(ec_data.get("ats_units", []))
+            ec_count += len(ec_data.get("power_meters", []))
+            ec_count += len(ec_data.get("pfc_banks", []))
+            ec_count += len(ec_data.get("ups_systems", []))
+            ec_count += len(ec_data.get("feeders", []))
+            counts["energy_centre"] = ec_count
+
+    # 3. DALI controllers from dali_mock_data.json
+    dali_file = DATA_DIR / "dali_mock_data.json"
+    if dali_file.exists():
+        with open(dali_file) as f:
+            dali_data = json.load(f)
+            # Check if site_id matches (flat structure) or building_id matches (nested)
+            if dali_data.get("site_id") == site_id:
+                counts["dali_controllers"] = len(dali_data.get("controllers", []))
+            else:
+                # Try nested buildings structure
+                for building in dali_data.get("buildings", []):
+                    if building.get("building_id", "").lower() == building_code.lower():
+                        counts["dali_controllers"] = len(building.get("controllers", []))
+                        break
+
+    # Calculate total
+    total = sum(counts.values())
+
+    return {
+        "total_assets": total,
+        "breakdown": counts,
+    }
+
+
 def calculate_site_status(site_alerts: list[dict]) -> Literal["normal", "warning", "critical"]:
     """Calculate site status based on active alerts."""
     if not site_alerts:
@@ -67,13 +164,31 @@ def calculate_site_status(site_alerts: list[dict]) -> Literal["normal", "warning
     return "normal"
 
 
-def db_to_site_dict(db_building: dict, equipment_count: int = 0, alert_count: int = 0) -> dict:
-    """Convert database building record to API-compatible site dict."""
+def db_to_site_dict(
+    db_building: dict,
+    equipment_count: int = 0,
+    alert_count: int = 0,
+    asset_summary: Optional[dict] = None
+) -> dict:
+    """Convert database building record to API-compatible site dict.
+
+    Args:
+        db_building: Building record from database
+        equipment_count: Legacy equipment count (fallback)
+        alert_count: Active alert count
+        asset_summary: Asset summary from v_building_asset_summary view (if available)
+    """
     operating_hours = db_building.get("operating_hours") or {}
     if isinstance(operating_hours, str):
         operating_hours = json.loads(operating_hours)
 
-    return {
+    # Use total_assets from summary if available, otherwise fall back to equipment_count
+    if asset_summary:
+        total_assets = asset_summary.get("total_assets", 0)
+    else:
+        total_assets = equipment_count or db_building.get("equipment_count", 0)
+
+    result = {
         "id": db_building.get("code"),
         "name": db_building.get("name"),
         "address": db_building.get("address", ""),
@@ -93,10 +208,34 @@ def db_to_site_dict(db_building: dict, equipment_count: int = 0, alert_count: in
         "optimization_status": db_building.get("optimization_status") or "unknown",
         "control_enabled": db_building.get("control_enabled", False),
         "control_note": db_building.get("control_note"),
-        "equipment_count": equipment_count or db_building.get("equipment_count", 0),
+        "equipment_count": total_assets,  # Total assets (renamed from equipment_count for API compat)
         "alert_count": alert_count,
         "active_alerts": alert_count,
     }
+
+    # Include asset breakdown if available
+    if asset_summary:
+        result["asset_breakdown"] = {
+            "equipment": asset_summary.get("equipment_count", 0),
+            "hvac_zones": asset_summary.get("hvac_zone_count", 0),
+            "generators": asset_summary.get("generator_count", 0),
+            "generator_groups": asset_summary.get("generator_group_count", 0),
+            "diesel_tanks": asset_summary.get("diesel_tank_count", 0),
+            "energy_centre": (
+                asset_summary.get("energy_centre_count", 0) +
+                asset_summary.get("mv_incomer_count", 0) +
+                asset_summary.get("transformer_count", 0) +
+                asset_summary.get("lv_switchboard_count", 0) +
+                asset_summary.get("ats_count", 0) +
+                asset_summary.get("power_meter_count", 0) +
+                asset_summary.get("pfc_bank_count", 0) +
+                asset_summary.get("ups_count", 0) +
+                asset_summary.get("feeder_count", 0)
+            ),
+            "dali_controllers": asset_summary.get("dali_controller_count", 0),
+        }
+
+    return result
 
 
 class OperatingHours(BaseModel):
@@ -162,9 +301,18 @@ def get_sites_from_supabase(
         for b in buildings:
             # Get equipment and alert counts
             building_uuid = b.get("id")
+            building_code = b.get("code")
+
+            # Try to get asset summary from view
+            asset_summary = None
+            if building_code:
+                asset_summary = repo.get_asset_summary_by_code(building_code)
+
+            # Fallback to legacy equipment count
             eq_count = repo.get_equipment_count(building_uuid) if building_uuid else 0
             alert_count = repo.get_alert_count(building_uuid) if building_uuid else 0
-            sites.append(db_to_site_dict(b, eq_count, alert_count))
+
+            sites.append(db_to_site_dict(b, eq_count, alert_count, asset_summary))
 
         return sites, True
     except Exception as e:
@@ -185,10 +333,15 @@ def get_site_from_supabase(site_id: str) -> tuple[Optional[dict], bool]:
             return None, True  # Success but not found
 
         building_uuid = building.get("id")
+
+        # Try to get asset summary from view
+        asset_summary = repo.get_asset_summary_by_code(site_id)
+
+        # Fallback to legacy equipment count
         eq_count = repo.get_equipment_count(building_uuid) if building_uuid else 0
         alert_count = repo.get_alert_count(building_uuid) if building_uuid else 0
 
-        return db_to_site_dict(building, eq_count, alert_count), True
+        return db_to_site_dict(building, eq_count, alert_count, asset_summary), True
     except Exception as e:
         logger.warning(f"Supabase query failed, falling back to JSON: {e}")
         return None, False
@@ -221,7 +374,6 @@ async def list_sites(
 
     # Fallback to JSON
     sites = load_sites()
-    equipment = load_equipment()
     alerts = load_alerts()
 
     if region:
@@ -231,23 +383,32 @@ async def list_sites(
 
     result = []
     for site in sites:
-        site_equipment = [e for e in equipment if e.get("site_id") == site["id"]]
+        site_id = site["id"]
+
+        # Get aggregated asset counts from all JSON sources
+        asset_counts = get_json_asset_counts(site_id)
+
         site_alerts = [
-            a for a in alerts if a.get("site_id") == site["id"] and a.get("status") == "active"
+            a for a in alerts if a.get("site_id") == site_id and a.get("status") == "active"
         ]
         status = calculate_site_status(site_alerts)
         alert_count = len(site_alerts)
-        result.append(
-            SiteResponse(
-                **site,
-                equipment_count=len(site_equipment),
-                active_alerts=alert_count,
-                alert_count=alert_count,
-                status=status,
-            )
+
+        site_response = SiteResponse(
+            **site,
+            equipment_count=asset_counts["total_assets"],
+            active_alerts=alert_count,
+            alert_count=alert_count,
+            status=status,
         )
 
-    return SiteListResponse(total=len(result), sites=result)
+        # Add asset breakdown to the response dict (for SiteCard tooltip)
+        site_dict = site_response.model_dump()
+        site_dict["asset_breakdown"] = asset_counts["breakdown"]
+        result.append(site_dict)
+
+    # Convert back to SiteResponse objects (with extra fields preserved)
+    return SiteListResponse(total=len(result), sites=[SiteResponse(**s) for s in result])
 
 
 @router.get("/sites/{site_id}", response_model=SiteResponse)
@@ -272,14 +433,15 @@ async def get_site(site_id: str) -> SiteResponse:
 
     # Fallback to JSON
     sites = load_sites()
-    equipment = load_equipment()
     alerts = load_alerts()
 
     site = next((s for s in sites if s["id"] == site_id), None)
     if not site:
         raise HTTPException(status_code=404, detail=f"Site {site_id} not found")
 
-    site_equipment = [e for e in equipment if e.get("site_id") == site_id]
+    # Get aggregated asset counts from all JSON sources
+    asset_counts = get_json_asset_counts(site_id)
+
     site_alerts = [
         a for a in alerts if a.get("site_id") == site_id and a.get("status") == "active"
     ]
@@ -288,7 +450,7 @@ async def get_site(site_id: str) -> SiteResponse:
 
     return SiteResponse(
         **site,
-        equipment_count=len(site_equipment),
+        equipment_count=asset_counts["total_assets"],
         active_alerts=alert_count,
         alert_count=alert_count,
         location=site.get("address", ""),

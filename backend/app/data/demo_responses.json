@@ -47,8 +47,8 @@
     },
     {
       "query_pattern": "how busy|occupancy|how many people|who is in",
-      "response": "Here's the real-time occupancy across FNB Fairlands (from 1,315 DALI sensors):\n\n**Level 12** (Executive) - 45% occupied\n- North wing: 52% (mainly morning meetings)\n- South wing: 38% (quieter today)\n\n**Level 11** (Open Plan) - 23% occupied\n- North wing: 31%\n- South wing: 0% - Empty for 2+ hours\n\n**Level 10** (Mixed Use) - 67% occupied\n- Meeting rooms 10A, 10B: FULL\n- Open area: 58%\n\n**Energy Opportunity:** Level 11 South has been unoccupied for 2+ hours but lights are at 80% and HVAC is running full cooling. Estimated waste: R45/hour.\n\n[Dim Lights L11-S] [Reduce Cooling L11-S] [View Heatmap]\n\nSource: [FNB Fairlands Occupancy Dashboard]",
-      "citations": ["FNB Fairlands Occupancy Dashboard"]
+      "response": "Here's the real-time occupancy across Sandton (from 1,315 DALI sensors):\n\n**Level 12** (Executive) - 45% occupied\n- North wing: 52% (mainly morning meetings)\n- South wing: 38% (quieter today)\n\n**Level 11** (Open Plan) - 23% occupied\n- North wing: 31%\n- South wing: 0% - Empty for 2+ hours\n\n**Level 10** (Mixed Use) - 67% occupied\n- Meeting rooms 10A, 10B: FULL\n- Open area: 58%\n\n**Energy Opportunity:** Level 11 South has been unoccupied for 2+ hours but lights are at 80% and HVAC is running full cooling. Estimated waste: R45/hour.\n\n[Dim Lights L11-S] [Reduce Cooling L11-S] [View Heatmap]\n\nSource: [Sandton Occupancy Dashboard]",
+      "citations": ["Sandton Occupancy Dashboard"]
     },
     {
       "query_pattern": "faulty light|lamp failure|light not working|dark",

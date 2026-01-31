@@ -13,7 +13,7 @@
         "name": "chw_supply_temp",
         "point_type": "analog_input",
         "description": "Chilled water supply temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 5.0,
         "max_value": 15.0,
         "default_value": 7.2,
@@ -23,7 +23,7 @@
         "name": "chw_return_temp",
         "point_type": "analog_input",
         "description": "Chilled water return temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 10.0,
         "max_value": 20.0,
         "default_value": 12.5,
@@ -49,7 +49,7 @@
         "name": "chw_supply_temp_setpoint",
         "point_type": "analog_value",
         "description": "Chilled water supply temperature setpoint",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 5.0,
         "max_value": 12.0,
         "default_value": 7.0,
@@ -113,7 +113,7 @@
         "name": "supply_air_temp",
         "point_type": "analog_input",
         "description": "Supply air temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 15.0,
         "max_value": 25.0,
         "default_value": 18.5,
@@ -123,7 +123,7 @@
         "name": "return_air_temp",
         "point_type": "analog_input",
         "description": "Return air temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 20.0,
         "max_value": 30.0,
         "default_value": 24.5,
@@ -204,7 +204,7 @@
         "name": "room_temp",
         "point_type": "analog_input",
         "description": "Room temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 16.0,
         "max_value": 32.0,
         "default_value": 26.0,
@@ -214,7 +214,7 @@
         "name": "room_temp_setpoint",
         "point_type": "analog_value",
         "description": "Room temperature setpoint",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 18.0,
         "max_value": 26.0,
         "default_value": 24.0,
@@ -273,7 +273,7 @@
       "serves": "CTO Office",
       "occupant": "CTO",
       "safety_status": "warning",
-      "safety_note": "Room temperature 26°C above comfort range (22-24°C) - adjust setpoint to restore comfort"
+      "safety_note": "Room temperature 26\u00b0C above comfort range (22-24\u00b0C) - adjust setpoint to restore comfort"
     }
   },
   {
@@ -546,7 +546,7 @@
         "name": "zone_temp",
         "point_type": "analog_input",
         "description": "Average zone temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 16.0,
         "max_value": 30.0,
         "default_value": 23.2,
@@ -556,7 +556,7 @@
         "name": "zone_cooling_setpoint",
         "point_type": "analog_value",
         "description": "Zone cooling temperature setpoint",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 20.0,
         "max_value": 26.0,
         "default_value": 23.0,
@@ -566,7 +566,7 @@
         "name": "zone_heating_setpoint",
         "point_type": "analog_value",
         "description": "Zone heating temperature setpoint",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 18.0,
         "max_value": 24.0,
         "default_value": 20.0,
@@ -664,7 +664,7 @@
         "name": "chw_supply_temp",
         "point_type": "analog_input",
         "description": "Chilled water supply temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 4.0,
         "max_value": 15.0,
         "default_value": 7.0,
@@ -674,7 +674,7 @@
         "name": "chw_return_temp",
         "point_type": "analog_input",
         "description": "Chilled water return temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 8.0,
         "max_value": 20.0,
         "default_value": 12.0,
@@ -684,7 +684,7 @@
         "name": "chw_supply_temp_setpoint",
         "point_type": "analog_value",
         "description": "CHW supply temperature setpoint",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 5.0,
         "max_value": 12.0,
         "default_value": 7.0,
@@ -744,7 +744,9 @@
       "zone": "Plant Room",
       "location": "Basement Plant Room",
       "serves": "All AHUs and FCUs",
-      "chillers_connected": ["001-gwc-chiller-001"],
+      "chillers_connected": [
+        "001-gwc-chiller-001"
+      ],
       "safety_status": "safe",
       "safety_note": "Primary loop operating normally, pump at 75% capacity"
     }
@@ -762,7 +764,7 @@
         "name": "room_temp",
         "point_type": "analog_input",
         "description": "Room temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 16.0,
         "max_value": 32.0,
         "default_value": 18.6,
@@ -772,7 +774,7 @@
         "name": "room_temp_setpoint",
         "point_type": "analog_value",
         "description": "Room temperature setpoint",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 18.0,
         "max_value": 26.0,
         "default_value": 22.0,
@@ -831,7 +833,7 @@
       "location": "Floor 1 Open Plan",
       "serves": "Ground floor office area",
       "safety_status": "safe",
-      "safety_note": "Room at 18.6°C - running cool"
+      "safety_note": "Room at 18.6\u00b0C - running cool"
     }
   },
   {
@@ -847,7 +849,7 @@
         "name": "room_temp",
         "point_type": "analog_input",
         "description": "Room temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 16.0,
         "max_value": 32.0,
         "default_value": 18.5,
@@ -857,7 +859,7 @@
         "name": "room_temp_setpoint",
         "point_type": "analog_value",
         "description": "Room temperature setpoint",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 18.0,
         "max_value": 26.0,
         "default_value": 22.0,
@@ -916,7 +918,7 @@
       "location": "Floor 2 Open Plan",
       "serves": "Upper floor office area",
       "safety_status": "safe",
-      "safety_note": "Room at 18.5°C - running cool"
+      "safety_note": "Room at 18.5\u00b0C - running cool"
     }
   },
   {
@@ -933,7 +935,7 @@
         "name": "supply_air_temp",
         "point_type": "analog_input",
         "description": "Supply air temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 12.0,
         "max_value": 25.0,
         "default_value": 14.5,
@@ -943,7 +945,7 @@
         "name": "return_air_temp",
         "point_type": "analog_input",
         "description": "Return air temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 18.0,
         "max_value": 30.0,
         "default_value": 21.0,
@@ -1013,7 +1015,7 @@
       "location": "Roof Plant Room",
       "serves": "Both floors",
       "safety_status": "safe",
-      "safety_note": "Return air at 21°C indicates space warmer than FCU readings"
+      "safety_note": "Return air at 21\u00b0C indicates space warmer than FCU readings"
     }
   },
   {
@@ -1030,7 +1032,7 @@
         "name": "chw_supply_temp",
         "point_type": "analog_input",
         "description": "Chilled water supply temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 4.0,
         "max_value": 15.0,
         "default_value": 6.8,
@@ -1040,7 +1042,7 @@
         "name": "chw_return_temp",
         "point_type": "analog_input",
         "description": "Chilled water return temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 8.0,
         "max_value": 20.0,
         "default_value": 11.5,
@@ -1050,7 +1052,7 @@
         "name": "chw_supply_temp_setpoint",
         "point_type": "analog_value",
         "description": "Chilled water supply temperature setpoint",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 5.0,
         "max_value": 12.0,
         "default_value": 7.0,
@@ -1119,7 +1121,7 @@
       "serves": "Entire building chilled water",
       "critical": true,
       "safety_status": "safe",
-      "safety_note": "CHW setpoint at 7°C - consider raising to 8°C for efficiency"
+      "safety_note": "CHW setpoint at 7\u00b0C - consider raising to 8\u00b0C for efficiency"
     }
   },
   {
@@ -1136,7 +1138,7 @@
         "name": "supply_air_temp",
         "point_type": "analog_input",
         "description": "Supply air temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 12.0,
         "max_value": 25.0,
         "default_value": 15.2,
@@ -1146,7 +1148,7 @@
         "name": "return_air_temp",
         "point_type": "analog_input",
         "description": "Return air temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 18.0,
         "max_value": 30.0,
         "default_value": 23.5,
@@ -1233,7 +1235,7 @@
         "name": "chw_supply_temp",
         "point_type": "analog_input",
         "description": "Chilled water supply temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 4.0,
         "max_value": 15.0,
         "default_value": 7.0,
@@ -1243,7 +1245,7 @@
         "name": "chw_return_temp",
         "point_type": "analog_input",
         "description": "Chilled water return temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 8.0,
         "max_value": 20.0,
         "default_value": 12.0,
@@ -1253,7 +1255,7 @@
         "name": "chw_supply_temp_setpoint",
         "point_type": "analog_value",
         "description": "Chilled water supply temperature setpoint",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 5.0,
         "max_value": 12.0,
         "default_value": 7.0,
@@ -1328,7 +1330,7 @@
         "name": "room_temp",
         "point_type": "analog_input",
         "description": "Room temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 16.0,
         "max_value": 32.0,
         "default_value": 22.8,
@@ -1338,7 +1340,7 @@
         "name": "room_temp_setpoint",
         "point_type": "analog_value",
         "description": "Room temperature setpoint",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 18.0,
         "max_value": 26.0,
         "default_value": 22.0,
@@ -1412,7 +1414,7 @@
         "name": "zone_temp",
         "point_type": "analog_input",
         "description": "Average zone temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 16.0,
         "max_value": 30.0,
         "default_value": 22.5,
@@ -1422,7 +1424,7 @@
         "name": "zone_cooling_setpoint",
         "point_type": "analog_value",
         "description": "Zone cooling temperature setpoint",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 20.0,
         "max_value": 26.0,
         "default_value": 22.0,
@@ -1432,7 +1434,7 @@
         "name": "zone_heating_setpoint",
         "point_type": "analog_value",
         "description": "Zone heating temperature setpoint",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 18.0,
         "max_value": 24.0,
         "default_value": 20.0,
@@ -1496,7 +1498,7 @@
         "name": "supply_air_temp",
         "point_type": "analog_input",
         "description": "Supply air temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 12.0,
         "max_value": 25.0,
         "default_value": 16.0,
@@ -1506,7 +1508,7 @@
         "name": "return_air_temp",
         "point_type": "analog_input",
         "description": "Return air temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 18.0,
         "max_value": 30.0,
         "default_value": 24.0,
@@ -1582,7 +1584,7 @@
         "name": "room_temp",
         "point_type": "analog_input",
         "description": "Room temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 16.0,
         "max_value": 32.0,
         "default_value": 23.0,
@@ -1592,7 +1594,7 @@
         "name": "room_temp_setpoint",
         "point_type": "analog_value",
         "description": "Room temperature setpoint",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 18.0,
         "max_value": 28.0,
         "default_value": 22.0,
@@ -1674,7 +1676,7 @@
         "name": "supply_air_temp",
         "point_type": "analog_input",
         "description": "Supply air temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 12.0,
         "max_value": 25.0,
         "default_value": 15.5,
@@ -1684,7 +1686,7 @@
         "name": "return_air_temp",
         "point_type": "analog_input",
         "description": "Return air temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 18.0,
         "max_value": 30.0,
         "default_value": 22.0,
@@ -1771,7 +1773,7 @@
         "name": "chw_supply_temp",
         "point_type": "analog_input",
         "description": "Chilled water supply temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 4.0,
         "max_value": 15.0,
         "default_value": 7.2,
@@ -1781,7 +1783,7 @@
         "name": "chw_return_temp",
         "point_type": "analog_input",
         "description": "Chilled water return temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 8.0,
         "max_value": 20.0,
         "default_value": 12.5,
@@ -1791,7 +1793,7 @@
         "name": "chw_supply_temp_setpoint",
         "point_type": "analog_value",
         "description": "Chilled water supply temperature setpoint",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 5.0,
         "max_value": 12.0,
         "default_value": 7.0,
@@ -1866,7 +1868,7 @@
         "name": "room_temp",
         "point_type": "analog_input",
         "description": "Room temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 16.0,
         "max_value": 32.0,
         "default_value": 21.5,
@@ -1876,7 +1878,7 @@
         "name": "room_temp_setpoint",
         "point_type": "analog_value",
         "description": "Room temperature setpoint",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 18.0,
         "max_value": 26.0,
         "default_value": 22.0,
@@ -1952,7 +1954,7 @@
         "name": "supply_air_temp",
         "point_type": "analog_input",
         "description": "Supply air temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 12.0,
         "max_value": 25.0,
         "default_value": 16.5,
@@ -1962,7 +1964,7 @@
         "name": "return_air_temp",
         "point_type": "analog_input",
         "description": "Return air temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 18.0,
         "max_value": 30.0,
         "default_value": 24.5,
@@ -2049,7 +2051,7 @@
         "name": "chw_supply_temp",
         "point_type": "analog_input",
         "description": "Chilled water supply temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 4.0,
         "max_value": 15.0,
         "default_value": 6.5,
@@ -2059,7 +2061,7 @@
         "name": "chw_return_temp",
         "point_type": "analog_input",
         "description": "Chilled water return temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 8.0,
         "max_value": 20.0,
         "default_value": 11.8,
@@ -2069,7 +2071,7 @@
         "name": "chw_supply_temp_setpoint",
         "point_type": "analog_value",
         "description": "Chilled water supply temperature setpoint",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 5.0,
         "max_value": 12.0,
         "default_value": 6.5,
@@ -2144,7 +2146,7 @@
         "name": "room_temp",
         "point_type": "analog_input",
         "description": "Room temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 16.0,
         "max_value": 32.0,
         "default_value": 23.5,
@@ -2154,7 +2156,7 @@
         "name": "room_temp_setpoint",
         "point_type": "analog_value",
         "description": "Room temperature setpoint",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 18.0,
         "max_value": 26.0,
         "default_value": 23.0,
@@ -2229,7 +2231,7 @@
         "name": "room_temp",
         "point_type": "analog_input",
         "description": "Room temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 16.0,
         "max_value": 32.0,
         "default_value": 24.0,
@@ -2239,7 +2241,7 @@
         "name": "room_temp_setpoint",
         "point_type": "analog_value",
         "description": "Room temperature setpoint",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 18.0,
         "max_value": 26.0,
         "default_value": 23.0,
@@ -2299,6 +2301,1063 @@
       "serves": "Floor 2 office area",
       "safety_status": "safe",
       "safety_note": "Slightly warmer - upper floor heat gain"
+    }
+  },
+  {
+    "id": "FCU-L12-03",
+    "name": "Sandton Level 12 North FCU",
+    "device_type": "hvac",
+    "protocol": "mock",
+    "site_id": "sandton",
+    "hvac_type": "fcu",
+    "capacity": 8,
+    "points": {
+      "room_temp": {
+        "name": "room_temp",
+        "point_type": "analog_input",
+        "description": "Room temperature",
+        "unit": "\u00b0C",
+        "min_value": 16.0,
+        "max_value": 32.0,
+        "default_value": 22.5,
+        "writable": false
+      },
+      "room_temp_setpoint": {
+        "name": "room_temp_setpoint",
+        "point_type": "analog_value",
+        "description": "Room temperature setpoint",
+        "unit": "\u00b0C",
+        "min_value": 18.0,
+        "max_value": 26.0,
+        "default_value": 22.0,
+        "writable": true
+      },
+      "fan_speed": {
+        "name": "fan_speed",
+        "point_type": "multistate_value",
+        "description": "Fan speed setting",
+        "unit": "",
+        "default_value": 2,
+        "writable": true,
+        "metadata": {
+          "states": {
+            "0": "off",
+            "1": "low",
+            "2": "medium",
+            "3": "high",
+            "4": "auto"
+          }
+        }
+      },
+      "valve_position": {
+        "name": "valve_position",
+        "point_type": "analog_value",
+        "description": "Chilled water valve position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 65,
+        "writable": true
+      },
+      "fcu_status": {
+        "name": "fcu_status",
+        "point_type": "multistate_value",
+        "description": "FCU operational status",
+        "unit": "",
+        "default_value": 1,
+        "writable": true,
+        "metadata": {
+          "states": {
+            "0": "off",
+            "1": "running",
+            "2": "fault"
+          }
+        }
+      }
+    },
+    "device_location": {
+      "building": "Sandton Office Park",
+      "floor": "L12",
+      "zone": "Level 12 North",
+      "zone_id": "Zone-L12-N"
+    },
+    "metadata": {
+      "building": "Sandton Office Park",
+      "building_id": "sandton",
+      "floor": "L12",
+      "zone": "Level 12 North",
+      "zone_id": "Zone-L12-N",
+      "serves": "Serves Level 12 North open plan area"
+    }
+  },
+  {
+    "id": "VAV-L12-03A",
+    "name": "Sandton Level 12 North VAV",
+    "device_type": "hvac",
+    "protocol": "mock",
+    "site_id": "sandton",
+    "hvac_type": "vav",
+    "capacity": 500,
+    "points": {
+      "damper_position": {
+        "name": "damper_position",
+        "point_type": "analog_value",
+        "description": "VAV damper position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 70,
+        "writable": true
+      },
+      "airflow_setpoint": {
+        "name": "airflow_setpoint",
+        "point_type": "analog_value",
+        "description": "Airflow setpoint",
+        "unit": "CFM",
+        "min_value": 100,
+        "max_value": 500,
+        "default_value": 350,
+        "writable": true
+      },
+      "airflow_actual": {
+        "name": "airflow_actual",
+        "point_type": "analog_input",
+        "description": "Actual airflow",
+        "unit": "CFM",
+        "min_value": 0,
+        "max_value": 600,
+        "default_value": 340,
+        "writable": false
+      },
+      "reheat_valve": {
+        "name": "reheat_valve",
+        "point_type": "analog_value",
+        "description": "Reheat valve position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 0,
+        "writable": true
+      }
+    },
+    "device_location": {
+      "building": "Sandton Office Park",
+      "floor": "L12",
+      "zone": "Level 12 North",
+      "zone_id": "Zone-L12-N"
+    },
+    "metadata": {
+      "building": "Sandton Office Park",
+      "building_id": "sandton",
+      "floor": "L12",
+      "zone": "Level 12 North",
+      "zone_id": "Zone-L12-N",
+      "parent_ahu": "AHU-L12-01"
+    }
+  },
+  {
+    "id": "FCU-L12-04",
+    "name": "Sandton Level 12 South FCU",
+    "device_type": "hvac",
+    "protocol": "mock",
+    "site_id": "sandton",
+    "hvac_type": "fcu",
+    "capacity": 8,
+    "points": {
+      "room_temp": {
+        "name": "room_temp",
+        "point_type": "analog_input",
+        "description": "Room temperature",
+        "unit": "\u00b0C",
+        "min_value": 16.0,
+        "max_value": 32.0,
+        "default_value": 23.0,
+        "writable": false
+      },
+      "room_temp_setpoint": {
+        "name": "room_temp_setpoint",
+        "point_type": "analog_value",
+        "description": "Room temperature setpoint",
+        "unit": "\u00b0C",
+        "min_value": 18.0,
+        "max_value": 26.0,
+        "default_value": 22.0,
+        "writable": true
+      },
+      "fan_speed": {
+        "name": "fan_speed",
+        "point_type": "multistate_value",
+        "description": "Fan speed setting",
+        "unit": "",
+        "default_value": 2,
+        "writable": true,
+        "metadata": {
+          "states": {
+            "0": "off",
+            "1": "low",
+            "2": "medium",
+            "3": "high",
+            "4": "auto"
+          }
+        }
+      },
+      "valve_position": {
+        "name": "valve_position",
+        "point_type": "analog_value",
+        "description": "Chilled water valve position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 65,
+        "writable": true
+      },
+      "fcu_status": {
+        "name": "fcu_status",
+        "point_type": "multistate_value",
+        "description": "FCU operational status",
+        "unit": "",
+        "default_value": 1,
+        "writable": true,
+        "metadata": {
+          "states": {
+            "0": "off",
+            "1": "running",
+            "2": "fault"
+          }
+        }
+      }
+    },
+    "device_location": {
+      "building": "Sandton Office Park",
+      "floor": "L12",
+      "zone": "Level 12 South",
+      "zone_id": "Zone-L12-S"
+    },
+    "metadata": {
+      "building": "Sandton Office Park",
+      "building_id": "sandton",
+      "floor": "L12",
+      "zone": "Level 12 South",
+      "zone_id": "Zone-L12-S",
+      "serves": "Serves Level 12 South open plan area"
+    }
+  },
+  {
+    "id": "VAV-L12-04A",
+    "name": "Sandton Level 12 South VAV",
+    "device_type": "hvac",
+    "protocol": "mock",
+    "site_id": "sandton",
+    "hvac_type": "vav",
+    "capacity": 500,
+    "points": {
+      "damper_position": {
+        "name": "damper_position",
+        "point_type": "analog_value",
+        "description": "VAV damper position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 70,
+        "writable": true
+      },
+      "airflow_setpoint": {
+        "name": "airflow_setpoint",
+        "point_type": "analog_value",
+        "description": "Airflow setpoint",
+        "unit": "CFM",
+        "min_value": 100,
+        "max_value": 500,
+        "default_value": 350,
+        "writable": true
+      },
+      "airflow_actual": {
+        "name": "airflow_actual",
+        "point_type": "analog_input",
+        "description": "Actual airflow",
+        "unit": "CFM",
+        "min_value": 0,
+        "max_value": 600,
+        "default_value": 340,
+        "writable": false
+      },
+      "reheat_valve": {
+        "name": "reheat_valve",
+        "point_type": "analog_value",
+        "description": "Reheat valve position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 0,
+        "writable": true
+      }
+    },
+    "device_location": {
+      "building": "Sandton Office Park",
+      "floor": "L12",
+      "zone": "Level 12 South",
+      "zone_id": "Zone-L12-S"
+    },
+    "metadata": {
+      "building": "Sandton Office Park",
+      "building_id": "sandton",
+      "floor": "L12",
+      "zone": "Level 12 South",
+      "zone_id": "Zone-L12-S",
+      "parent_ahu": "AHU-L12-01"
+    }
+  },
+  {
+    "id": "FCU-L11-01",
+    "name": "Sandton Level 11 North FCU",
+    "device_type": "hvac",
+    "protocol": "mock",
+    "site_id": "sandton",
+    "hvac_type": "fcu",
+    "capacity": 8,
+    "points": {
+      "room_temp": {
+        "name": "room_temp",
+        "point_type": "analog_input",
+        "description": "Room temperature",
+        "unit": "\u00b0C",
+        "min_value": 16.0,
+        "max_value": 32.0,
+        "default_value": 21.5,
+        "writable": false
+      },
+      "room_temp_setpoint": {
+        "name": "room_temp_setpoint",
+        "point_type": "analog_value",
+        "description": "Room temperature setpoint",
+        "unit": "\u00b0C",
+        "min_value": 18.0,
+        "max_value": 26.0,
+        "default_value": 22.0,
+        "writable": true
+      },
+      "fan_speed": {
+        "name": "fan_speed",
+        "point_type": "multistate_value",
+        "description": "Fan speed setting",
+        "unit": "",
+        "default_value": 2,
+        "writable": true,
+        "metadata": {
+          "states": {
+            "0": "off",
+            "1": "low",
+            "2": "medium",
+            "3": "high",
+            "4": "auto"
+          }
+        }
+      },
+      "valve_position": {
+        "name": "valve_position",
+        "point_type": "analog_value",
+        "description": "Chilled water valve position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 65,
+        "writable": true
+      },
+      "fcu_status": {
+        "name": "fcu_status",
+        "point_type": "multistate_value",
+        "description": "FCU operational status",
+        "unit": "",
+        "default_value": 1,
+        "writable": true,
+        "metadata": {
+          "states": {
+            "0": "off",
+            "1": "running",
+            "2": "fault"
+          }
+        }
+      }
+    },
+    "device_location": {
+      "building": "Sandton Office Park",
+      "floor": "L11",
+      "zone": "Level 11 North",
+      "zone_id": "Zone-L11-N"
+    },
+    "metadata": {
+      "building": "Sandton Office Park",
+      "building_id": "sandton",
+      "floor": "L11",
+      "zone": "Level 11 North",
+      "zone_id": "Zone-L11-N",
+      "serves": "Serves Level 11 North open plan area"
+    }
+  },
+  {
+    "id": "VAV-L11-01A",
+    "name": "Sandton Level 11 North VAV",
+    "device_type": "hvac",
+    "protocol": "mock",
+    "site_id": "sandton",
+    "hvac_type": "vav",
+    "capacity": 500,
+    "points": {
+      "damper_position": {
+        "name": "damper_position",
+        "point_type": "analog_value",
+        "description": "VAV damper position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 70,
+        "writable": true
+      },
+      "airflow_setpoint": {
+        "name": "airflow_setpoint",
+        "point_type": "analog_value",
+        "description": "Airflow setpoint",
+        "unit": "CFM",
+        "min_value": 100,
+        "max_value": 500,
+        "default_value": 350,
+        "writable": true
+      },
+      "airflow_actual": {
+        "name": "airflow_actual",
+        "point_type": "analog_input",
+        "description": "Actual airflow",
+        "unit": "CFM",
+        "min_value": 0,
+        "max_value": 600,
+        "default_value": 340,
+        "writable": false
+      },
+      "reheat_valve": {
+        "name": "reheat_valve",
+        "point_type": "analog_value",
+        "description": "Reheat valve position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 0,
+        "writable": true
+      }
+    },
+    "device_location": {
+      "building": "Sandton Office Park",
+      "floor": "L11",
+      "zone": "Level 11 North",
+      "zone_id": "Zone-L11-N"
+    },
+    "metadata": {
+      "building": "Sandton Office Park",
+      "building_id": "sandton",
+      "floor": "L11",
+      "zone": "Level 11 North",
+      "zone_id": "Zone-L11-N",
+      "parent_ahu": "AHU-L11-01"
+    }
+  },
+  {
+    "id": "FCU-L11-02",
+    "name": "Sandton Level 11 South FCU",
+    "device_type": "hvac",
+    "protocol": "mock",
+    "site_id": "sandton",
+    "hvac_type": "fcu",
+    "capacity": 8,
+    "points": {
+      "room_temp": {
+        "name": "room_temp",
+        "point_type": "analog_input",
+        "description": "Room temperature",
+        "unit": "\u00b0C",
+        "min_value": 16.0,
+        "max_value": 32.0,
+        "default_value": 24.0,
+        "writable": false
+      },
+      "room_temp_setpoint": {
+        "name": "room_temp_setpoint",
+        "point_type": "analog_value",
+        "description": "Room temperature setpoint",
+        "unit": "\u00b0C",
+        "min_value": 18.0,
+        "max_value": 26.0,
+        "default_value": 22.0,
+        "writable": true
+      },
+      "fan_speed": {
+        "name": "fan_speed",
+        "point_type": "multistate_value",
+        "description": "Fan speed setting",
+        "unit": "",
+        "default_value": 2,
+        "writable": true,
+        "metadata": {
+          "states": {
+            "0": "off",
+            "1": "low",
+            "2": "medium",
+            "3": "high",
+            "4": "auto"
+          }
+        }
+      },
+      "valve_position": {
+        "name": "valve_position",
+        "point_type": "analog_value",
+        "description": "Chilled water valve position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 65,
+        "writable": true
+      },
+      "fcu_status": {
+        "name": "fcu_status",
+        "point_type": "multistate_value",
+        "description": "FCU operational status",
+        "unit": "",
+        "default_value": 1,
+        "writable": true,
+        "metadata": {
+          "states": {
+            "0": "off",
+            "1": "running",
+            "2": "fault"
+          }
+        }
+      }
+    },
+    "device_location": {
+      "building": "Sandton Office Park",
+      "floor": "L11",
+      "zone": "Level 11 South",
+      "zone_id": "Zone-L11-S"
+    },
+    "metadata": {
+      "building": "Sandton Office Park",
+      "building_id": "sandton",
+      "floor": "L11",
+      "zone": "Level 11 South",
+      "zone_id": "Zone-L11-S",
+      "serves": "Serves Level 11 South open plan area"
+    }
+  },
+  {
+    "id": "VAV-L11-02A",
+    "name": "Sandton Level 11 South VAV",
+    "device_type": "hvac",
+    "protocol": "mock",
+    "site_id": "sandton",
+    "hvac_type": "vav",
+    "capacity": 500,
+    "points": {
+      "damper_position": {
+        "name": "damper_position",
+        "point_type": "analog_value",
+        "description": "VAV damper position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 70,
+        "writable": true
+      },
+      "airflow_setpoint": {
+        "name": "airflow_setpoint",
+        "point_type": "analog_value",
+        "description": "Airflow setpoint",
+        "unit": "CFM",
+        "min_value": 100,
+        "max_value": 500,
+        "default_value": 350,
+        "writable": true
+      },
+      "airflow_actual": {
+        "name": "airflow_actual",
+        "point_type": "analog_input",
+        "description": "Actual airflow",
+        "unit": "CFM",
+        "min_value": 0,
+        "max_value": 600,
+        "default_value": 340,
+        "writable": false
+      },
+      "reheat_valve": {
+        "name": "reheat_valve",
+        "point_type": "analog_value",
+        "description": "Reheat valve position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 0,
+        "writable": true
+      }
+    },
+    "device_location": {
+      "building": "Sandton Office Park",
+      "floor": "L11",
+      "zone": "Level 11 South",
+      "zone_id": "Zone-L11-S"
+    },
+    "metadata": {
+      "building": "Sandton Office Park",
+      "building_id": "sandton",
+      "floor": "L11",
+      "zone": "Level 11 South",
+      "zone_id": "Zone-L11-S",
+      "parent_ahu": "AHU-L11-01"
+    }
+  },
+  {
+    "id": "FCU-L10-01",
+    "name": "Sandton Level 10 North FCU",
+    "device_type": "hvac",
+    "protocol": "mock",
+    "site_id": "sandton",
+    "hvac_type": "fcu",
+    "capacity": 8,
+    "points": {
+      "room_temp": {
+        "name": "room_temp",
+        "point_type": "analog_input",
+        "description": "Room temperature",
+        "unit": "\u00b0C",
+        "min_value": 16.0,
+        "max_value": 32.0,
+        "default_value": 22.0,
+        "writable": false
+      },
+      "room_temp_setpoint": {
+        "name": "room_temp_setpoint",
+        "point_type": "analog_value",
+        "description": "Room temperature setpoint",
+        "unit": "\u00b0C",
+        "min_value": 18.0,
+        "max_value": 26.0,
+        "default_value": 22.0,
+        "writable": true
+      },
+      "fan_speed": {
+        "name": "fan_speed",
+        "point_type": "multistate_value",
+        "description": "Fan speed setting",
+        "unit": "",
+        "default_value": 2,
+        "writable": true,
+        "metadata": {
+          "states": {
+            "0": "off",
+            "1": "low",
+            "2": "medium",
+            "3": "high",
+            "4": "auto"
+          }
+        }
+      },
+      "valve_position": {
+        "name": "valve_position",
+        "point_type": "analog_value",
+        "description": "Chilled water valve position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 65,
+        "writable": true
+      },
+      "fcu_status": {
+        "name": "fcu_status",
+        "point_type": "multistate_value",
+        "description": "FCU operational status",
+        "unit": "",
+        "default_value": 1,
+        "writable": true,
+        "metadata": {
+          "states": {
+            "0": "off",
+            "1": "running",
+            "2": "fault"
+          }
+        }
+      }
+    },
+    "device_location": {
+      "building": "Sandton Office Park",
+      "floor": "L10",
+      "zone": "Level 10 North",
+      "zone_id": "Zone-L10-N"
+    },
+    "metadata": {
+      "building": "Sandton Office Park",
+      "building_id": "sandton",
+      "floor": "L10",
+      "zone": "Level 10 North",
+      "zone_id": "Zone-L10-N",
+      "serves": "Serves Level 10 North open plan area"
+    }
+  },
+  {
+    "id": "VAV-L10-01A",
+    "name": "Sandton Level 10 North VAV",
+    "device_type": "hvac",
+    "protocol": "mock",
+    "site_id": "sandton",
+    "hvac_type": "vav",
+    "capacity": 500,
+    "points": {
+      "damper_position": {
+        "name": "damper_position",
+        "point_type": "analog_value",
+        "description": "VAV damper position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 70,
+        "writable": true
+      },
+      "airflow_setpoint": {
+        "name": "airflow_setpoint",
+        "point_type": "analog_value",
+        "description": "Airflow setpoint",
+        "unit": "CFM",
+        "min_value": 100,
+        "max_value": 500,
+        "default_value": 350,
+        "writable": true
+      },
+      "airflow_actual": {
+        "name": "airflow_actual",
+        "point_type": "analog_input",
+        "description": "Actual airflow",
+        "unit": "CFM",
+        "min_value": 0,
+        "max_value": 600,
+        "default_value": 340,
+        "writable": false
+      },
+      "reheat_valve": {
+        "name": "reheat_valve",
+        "point_type": "analog_value",
+        "description": "Reheat valve position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 0,
+        "writable": true
+      }
+    },
+    "device_location": {
+      "building": "Sandton Office Park",
+      "floor": "L10",
+      "zone": "Level 10 North",
+      "zone_id": "Zone-L10-N"
+    },
+    "metadata": {
+      "building": "Sandton Office Park",
+      "building_id": "sandton",
+      "floor": "L10",
+      "zone": "Level 10 North",
+      "zone_id": "Zone-L10-N",
+      "parent_ahu": "AHU-L10-01"
+    }
+  },
+  {
+    "id": "AHU-L12-01",
+    "name": "Sandton L12 AHU",
+    "device_type": "hvac",
+    "protocol": "mock",
+    "site_id": "sandton",
+    "hvac_type": "ahu",
+    "capacity": 50,
+    "points": {
+      "supply_air_temp": {
+        "name": "supply_air_temp",
+        "point_type": "analog_input",
+        "description": "Supply air temperature",
+        "unit": "\u00b0C",
+        "min_value": 10.0,
+        "max_value": 25.0,
+        "default_value": 14.0,
+        "writable": false
+      },
+      "supply_air_temp_setpoint": {
+        "name": "supply_air_temp_setpoint",
+        "point_type": "analog_value",
+        "description": "Supply air temperature setpoint",
+        "unit": "\u00b0C",
+        "min_value": 12.0,
+        "max_value": 18.0,
+        "default_value": 14.0,
+        "writable": true
+      },
+      "return_air_temp": {
+        "name": "return_air_temp",
+        "point_type": "analog_input",
+        "description": "Return air temperature",
+        "unit": "\u00b0C",
+        "min_value": 18.0,
+        "max_value": 28.0,
+        "default_value": 23.0,
+        "writable": false
+      },
+      "fan_status": {
+        "name": "fan_status",
+        "point_type": "multistate_value",
+        "description": "Supply fan status",
+        "unit": "",
+        "default_value": 1,
+        "writable": true,
+        "metadata": {
+          "states": {
+            "0": "off",
+            "1": "running",
+            "2": "fault"
+          }
+        }
+      },
+      "fan_speed": {
+        "name": "fan_speed",
+        "point_type": "analog_value",
+        "description": "Fan speed",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 75,
+        "writable": true
+      },
+      "outside_air_damper": {
+        "name": "outside_air_damper",
+        "point_type": "analog_value",
+        "description": "Outside air damper position",
+        "unit": "%",
+        "min_value": 10,
+        "max_value": 100,
+        "default_value": 25,
+        "writable": true
+      },
+      "chw_valve": {
+        "name": "chw_valve",
+        "point_type": "analog_value",
+        "description": "Chilled water valve position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 60,
+        "writable": true
+      }
+    },
+    "device_location": {
+      "building": "Sandton Office Park",
+      "floor": "L12",
+      "zone": "Plant Room",
+      "room": "AHU Room L12"
+    },
+    "metadata": {
+      "building": "Sandton Office Park",
+      "building_id": "sandton",
+      "floor": "L12",
+      "serves": "All zones on L12",
+      "critical": true
+    }
+  },
+  {
+    "id": "AHU-L11-01",
+    "name": "Sandton L11 AHU",
+    "device_type": "hvac",
+    "protocol": "mock",
+    "site_id": "sandton",
+    "hvac_type": "ahu",
+    "capacity": 50,
+    "points": {
+      "supply_air_temp": {
+        "name": "supply_air_temp",
+        "point_type": "analog_input",
+        "description": "Supply air temperature",
+        "unit": "\u00b0C",
+        "min_value": 10.0,
+        "max_value": 25.0,
+        "default_value": 14.0,
+        "writable": false
+      },
+      "supply_air_temp_setpoint": {
+        "name": "supply_air_temp_setpoint",
+        "point_type": "analog_value",
+        "description": "Supply air temperature setpoint",
+        "unit": "\u00b0C",
+        "min_value": 12.0,
+        "max_value": 18.0,
+        "default_value": 14.0,
+        "writable": true
+      },
+      "return_air_temp": {
+        "name": "return_air_temp",
+        "point_type": "analog_input",
+        "description": "Return air temperature",
+        "unit": "\u00b0C",
+        "min_value": 18.0,
+        "max_value": 28.0,
+        "default_value": 23.0,
+        "writable": false
+      },
+      "fan_status": {
+        "name": "fan_status",
+        "point_type": "multistate_value",
+        "description": "Supply fan status",
+        "unit": "",
+        "default_value": 1,
+        "writable": true,
+        "metadata": {
+          "states": {
+            "0": "off",
+            "1": "running",
+            "2": "fault"
+          }
+        }
+      },
+      "fan_speed": {
+        "name": "fan_speed",
+        "point_type": "analog_value",
+        "description": "Fan speed",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 75,
+        "writable": true
+      },
+      "outside_air_damper": {
+        "name": "outside_air_damper",
+        "point_type": "analog_value",
+        "description": "Outside air damper position",
+        "unit": "%",
+        "min_value": 10,
+        "max_value": 100,
+        "default_value": 25,
+        "writable": true
+      },
+      "chw_valve": {
+        "name": "chw_valve",
+        "point_type": "analog_value",
+        "description": "Chilled water valve position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 60,
+        "writable": true
+      }
+    },
+    "device_location": {
+      "building": "Sandton Office Park",
+      "floor": "L11",
+      "zone": "Plant Room",
+      "room": "AHU Room L11"
+    },
+    "metadata": {
+      "building": "Sandton Office Park",
+      "building_id": "sandton",
+      "floor": "L11",
+      "serves": "All zones on L11",
+      "critical": true
+    }
+  },
+  {
+    "id": "AHU-L10-01",
+    "name": "Sandton L10 AHU",
+    "device_type": "hvac",
+    "protocol": "mock",
+    "site_id": "sandton",
+    "hvac_type": "ahu",
+    "capacity": 50,
+    "points": {
+      "supply_air_temp": {
+        "name": "supply_air_temp",
+        "point_type": "analog_input",
+        "description": "Supply air temperature",
+        "unit": "\u00b0C",
+        "min_value": 10.0,
+        "max_value": 25.0,
+        "default_value": 14.0,
+        "writable": false
+      },
+      "supply_air_temp_setpoint": {
+        "name": "supply_air_temp_setpoint",
+        "point_type": "analog_value",
+        "description": "Supply air temperature setpoint",
+        "unit": "\u00b0C",
+        "min_value": 12.0,
+        "max_value": 18.0,
+        "default_value": 14.0,
+        "writable": true
+      },
+      "return_air_temp": {
+        "name": "return_air_temp",
+        "point_type": "analog_input",
+        "description": "Return air temperature",
+        "unit": "\u00b0C",
+        "min_value": 18.0,
+        "max_value": 28.0,
+        "default_value": 23.0,
+        "writable": false
+      },
+      "fan_status": {
+        "name": "fan_status",
+        "point_type": "multistate_value",
+        "description": "Supply fan status",
+        "unit": "",
+        "default_value": 1,
+        "writable": true,
+        "metadata": {
+          "states": {
+            "0": "off",
+            "1": "running",
+            "2": "fault"
+          }
+        }
+      },
+      "fan_speed": {
+        "name": "fan_speed",
+        "point_type": "analog_value",
+        "description": "Fan speed",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 75,
+        "writable": true
+      },
+      "outside_air_damper": {
+        "name": "outside_air_damper",
+        "point_type": "analog_value",
+        "description": "Outside air damper position",
+        "unit": "%",
+        "min_value": 10,
+        "max_value": 100,
+        "default_value": 25,
+        "writable": true
+      },
+      "chw_valve": {
+        "name": "chw_valve",
+        "point_type": "analog_value",
+        "description": "Chilled water valve position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 60,
+        "writable": true
+      }
+    },
+    "device_location": {
+      "building": "Sandton Office Park",
+      "floor": "L10",
+      "zone": "Plant Room",
+      "room": "AHU Room L10"
+    },
+    "metadata": {
+      "building": "Sandton Office Park",
+      "building_id": "sandton",
+      "floor": "L10",
+      "serves": "All zones on L10",
+      "critical": true
     }
   }
 ]

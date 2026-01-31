@@ -23,20 +23,35 @@ export function PinEntry({ onSuccess }: PinEntryProps) {
   const [error, setError] = useState(false);
   const [shake, setShake] = useState(false);
 
+  // Log component mount
+  useEffect(() => {
+    console.log('=== PIN ENTRY DEBUG ===');
+    console.log('PinEntry component mounted');
+    console.log('Valid PIN:', VALID_PIN);
+    console.log('Current sessionStorage:', sessionStorage.getItem("sentinel_authenticated"));
+    console.log('=======================');
+  }, []);
+
   const handleDigitPress = useCallback((digit: string) => {
+    console.log('Digit pressed:', digit, 'Current PIN:', pin);
     if (pin.length < 5) {
       const newPin = pin + digit;
       setPin(newPin);
       setError(false);
 
+      console.log('PIN entered:', newPin, 'Length:', newPin.length, 'Expected:', VALID_PIN);
+
       // Auto-verify when 5 digits entered
       if (newPin.length === 5) {
         setTimeout(() => {
+          console.log('Verifying PIN:', newPin, '===', VALID_PIN, '?', newPin === VALID_PIN);
           if (newPin === VALID_PIN) {
             // Store auth in sessionStorage
             sessionStorage.setItem("sentinel_authenticated", "true");
+            console.log('PIN correct, calling onSuccess');
             onSuccess();
           } else {
+            console.log('PIN incorrect');
             setError(true);
             setShake(true);
             setTimeout(() => {
@@ -210,6 +225,14 @@ export function PinEntry({ onSuccess }: PinEntryProps) {
       >
         <Lock className="w-3 h-3" />
         Use keyboard or tap to enter PIN
+      </p>
+
+      {/* Debug info - can be removed later */}
+      <p
+        className="mt-2 text-xs"
+        style={{ color: "var(--color-sentinel-text-disabled)", opacity: 0.5 }}
+      >
+        DEBUG: PIN entry screen is active. Valid PIN is {VALID_PIN}
       </p>
 
       {/* Shake animation keyframes */}
