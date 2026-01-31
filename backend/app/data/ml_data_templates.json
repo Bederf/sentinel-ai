@@ -1,0 +1,804 @@
+{
+  "generator": {
+    "minor": {
+      "required": [
+        "service_sheet",
+        "audio_recording",
+        "oil_sample",
+        "diesel_sample"
+      ],
+      "optional": [
+        "issue_photo",
+        "thermal_image"
+      ],
+      "prompts": {
+        "service_sheet": "Send a photo of your completed service sheet",
+        "audio_recording": "Record 10 seconds of the engine running (hold phone 1m from generator)",
+        "oil_sample": "Photo of oil sample (hold bottle up to light so we can see color/clarity)",
+        "diesel_sample": "Photo of diesel sample (hold up to light to check for contamination)",
+        "issue_photo": "Any photos of issues found? (If no issues, reply 'none')",
+        "thermal_image": "Thermal image of generator housing (if FLIR available)",
+        "observation": "Anything else you'd like to mention? (voice note or text - optional)"
+      },
+      "audio_duration_seconds": 10,
+      "validation_rules": {
+        "hour_meter": {"min": 0, "max": 100000, "unit": "hours", "required": true},
+        "battery_voltage": {"min": 10, "max": 32, "unit": "V", "required": true},
+        "oil_pressure": {"min": 0, "max": 10, "unit": "bar", "required": true},
+        "coolant_temp": {"min": 0, "max": 120, "unit": "C", "required": true}
+      }
+    },
+    "major": {
+      "required": [
+        "service_sheet",
+        "audio_recording",
+        "oil_sample",
+        "diesel_sample",
+        "oil_analysis_report"
+      ],
+      "optional": [
+        "issue_photo",
+        "thermal_image",
+        "load_test_video",
+        "before_after_photos"
+      ],
+      "prompts": {
+        "service_sheet": "Send a photo of your completed service sheet (all readings)",
+        "audio_recording": "Record 30 seconds of the engine running under load",
+        "oil_sample": "Before-change oil sample in clear bottle",
+        "diesel_sample": "Diesel sample in clear bottle (check for water/contamination)",
+        "oil_analysis_report": "Photo of lab analysis report (if available)",
+        "load_test_video": "Video of full load test (optional, 30s max)",
+        "before_after_photos": "Before and after photos of work performed",
+        "issue_photo": "Photos of any issues found during inspection",
+        "observation": "Additional observations or concerns (optional)"
+      },
+      "audio_duration_seconds": 30
+    },
+    "breakdown": {
+      "required": [
+        "fault_description",
+        "root_cause_photo",
+        "repair_action",
+        "parts_replaced"
+      ],
+      "optional": [
+        "audio_before_repair",
+        "audio_after_repair",
+        "thermal_image"
+      ],
+      "prompts": {
+        "fault_description": "Describe what you found - what was the root cause?",
+        "root_cause_photo": "Photo of the failed component or fault",
+        "repair_action": "What repair did you perform?",
+        "parts_replaced": "Photo of replacement part label (make/model)",
+        "audio_before_repair": "Recording of fault sound (if applicable)",
+        "audio_after_repair": "Recording after repair - running normally?",
+        "thermal_image": "Thermal scan if overheating was involved"
+      }
+    }
+  },
+  "generator_group": {
+    "minor": {
+      "required": [
+        "service_sheet",
+        "sync_test_result",
+        "load_sharing_check"
+      ],
+      "optional": [
+        "thermal_image"
+      ],
+      "prompts": {
+        "service_sheet": "Photo of group controller service sheet",
+        "sync_test_result": "Did sync panel test pass? Describe any issues",
+        "load_sharing_check": "Load sharing between units - balanced? (% per unit)",
+        "thermal_image": "Thermal image of sync panel connections"
+      }
+    }
+  },
+  "diesel_tank": {
+    "minor": {
+      "required": [
+        "tank_level_reading",
+        "fuel_sample",
+        "leak_inspection"
+      ],
+      "optional": [
+        "tank_condition_photo"
+      ],
+      "prompts": {
+        "tank_level_reading": "Current tank level reading (% or liters)",
+        "fuel_sample": "Photo of diesel sample from tank bottom (check for water/sediment)",
+        "leak_inspection": "Any leaks found at fittings, gauges, or tank seams?",
+        "tank_condition_photo": "Photo of tank exterior condition"
+      }
+    }
+  },
+  "fcu": {
+    "minor": {
+      "required": [
+        "service_sheet",
+        "filter_condition",
+        "valve_operation"
+      ],
+      "optional": [
+        "motor_audio",
+        "coil_condition"
+      ],
+      "prompts": {
+        "service_sheet": "Photo of FCU service sheet with readings",
+        "filter_condition": "Photo of filter - clean/dirty? Did you replace?",
+        "valve_operation": "Valve cycling smoothly? Position at 0%, 50%, 100% demand?",
+        "motor_audio": "Record 10s of fan motor running",
+        "coil_condition": "Photo of coil condition - clean or needs chemical wash?"
+      },
+      "audio_duration_seconds": 10,
+      "validation_rules": {
+        "supply_air_temp": {"min": 10, "max": 35, "unit": "C", "required": true},
+        "return_air_temp": {"min": 15, "max": 35, "unit": "C", "required": true},
+        "valve_position": {"min": 0, "max": 100, "unit": "%", "required": true}
+      }
+    },
+    "major": {
+      "required": [
+        "service_sheet",
+        "filter_replaced",
+        "coil_chemical_wash",
+        "motor_bearing_check",
+        "valve_actuator_test"
+      ],
+      "optional": [
+        "thermal_image",
+        "before_after_photos"
+      ],
+      "prompts": {
+        "service_sheet": "Complete service sheet with all readings",
+        "filter_replaced": "Photo of new filter installed",
+        "coil_chemical_wash": "Did you perform chemical wash? Before/after photos",
+        "motor_bearing_check": "Motor bearing condition - any noise/vibration?",
+        "valve_actuator_test": "Actuator full stroke test - 0% to 100% travel time?",
+        "thermal_image": "Thermal image of motor and electrical connections",
+        "before_after_photos": "Before and after coil cleaning photos"
+      }
+    },
+    "breakdown": {
+      "required": [
+        "fault_description",
+        "root_cause",
+        "diagnostic_steps",
+        "repair_action",
+        "parts_replaced"
+      ],
+      "optional": [
+        "actuator_audio",
+        "control_signal_reading"
+      ],
+      "prompts": {
+        "fault_description": "What was the reported issue? (e.g., zone too hot/cold, no airflow)",
+        "root_cause": "What did you find was the root cause?",
+        "diagnostic_steps": "What checks did you perform to diagnose? (power, signal, mechanical)",
+        "repair_action": "What repair did you perform?",
+        "parts_replaced": "Photo of replacement part label (actuator model, etc.)",
+        "actuator_audio": "Record actuator operating - smooth or grinding?",
+        "control_signal_reading": "BMS control signal voltage at 100% demand?"
+      },
+      "validation_rules": {
+        "control_voltage": {"min": 0, "max": 10, "unit": "V", "required": false},
+        "actuator_supply": {"min": 20, "max": 28, "unit": "VAC", "required": false}
+      }
+    }
+  },
+  "vav": {
+    "minor": {
+      "required": [
+        "service_sheet",
+        "damper_operation",
+        "airflow_reading"
+      ],
+      "optional": [
+        "actuator_audio",
+        "controller_photo"
+      ],
+      "prompts": {
+        "service_sheet": "Photo of VAV service sheet",
+        "damper_operation": "Damper cycling smoothly? Min/max position test OK?",
+        "airflow_reading": "Measured CFM at min and max damper position",
+        "actuator_audio": "Record 10s of damper cycling open to closed",
+        "controller_photo": "Photo of VAV controller display (setpoints, readings)"
+      },
+      "validation_rules": {
+        "damper_position": {"min": 0, "max": 100, "unit": "%", "required": true},
+        "airflow_cfm": {"min": 0, "max": 2000, "unit": "CFM", "required": true}
+      }
+    },
+    "breakdown": {
+      "required": [
+        "fault_description",
+        "root_cause",
+        "repair_action"
+      ],
+      "optional": [
+        "damper_photo",
+        "actuator_test"
+      ],
+      "prompts": {
+        "fault_description": "What was the issue? (damper stuck, no airflow, hunting)",
+        "root_cause": "What was the root cause?",
+        "repair_action": "What did you repair/replace?",
+        "damper_photo": "Photo of damper blade condition",
+        "actuator_test": "Actuator stroke test - travel time and smoothness?"
+      }
+    }
+  },
+  "ahu": {
+    "minor": {
+      "required": [
+        "service_sheet",
+        "filter_condition",
+        "belt_condition",
+        "motor_audio"
+      ],
+      "optional": [
+        "vibration_reading",
+        "thermal_image"
+      ],
+      "prompts": {
+        "service_sheet": "Photo of AHU service sheet with all readings",
+        "filter_condition": "Filter DP reading and condition (replace if >250Pa)",
+        "belt_condition": "Belt tension and condition - any cracks or wear?",
+        "motor_audio": "Record 15s of supply fan motor running",
+        "vibration_reading": "Motor bearing vibration reading (mm/s)",
+        "thermal_image": "Thermal scan of motor, bearings, and VSD"
+      },
+      "audio_duration_seconds": 15,
+      "validation_rules": {
+        "filter_dp": {"min": 0, "max": 500, "unit": "Pa", "required": true},
+        "supply_air_temp": {"min": 10, "max": 25, "unit": "C", "required": true},
+        "return_air_temp": {"min": 18, "max": 30, "unit": "C", "required": true},
+        "fan_speed": {"min": 0, "max": 100, "unit": "%", "required": true}
+      }
+    },
+    "major": {
+      "required": [
+        "service_sheet",
+        "filter_replaced",
+        "belt_replaced",
+        "motor_bearing_check",
+        "coil_inspection",
+        "damper_operation"
+      ],
+      "optional": [
+        "vsd_parameters",
+        "thermal_image",
+        "vibration_analysis"
+      ],
+      "prompts": {
+        "service_sheet": "Complete service sheet with all readings",
+        "filter_replaced": "Photo of new filters installed",
+        "belt_replaced": "Photo of new belts - tension setting?",
+        "motor_bearing_check": "Motor bearing condition - grease added? Vibration reading?",
+        "coil_inspection": "Cooling/heating coil condition - chemical wash needed?",
+        "damper_operation": "All dampers operating correctly? (OA, RA, EA)",
+        "vsd_parameters": "VSD parameter screenshot (if accessible)",
+        "thermal_image": "Full thermal scan of AHU components",
+        "vibration_analysis": "Vibration spectrum analysis (if available)"
+      }
+    },
+    "breakdown": {
+      "required": [
+        "fault_description",
+        "root_cause",
+        "repair_action",
+        "parts_replaced"
+      ],
+      "optional": [
+        "fault_audio",
+        "thermal_image"
+      ],
+      "prompts": {
+        "fault_description": "What was the fault? (motor trip, no cooling, noise)",
+        "root_cause": "What was the root cause?",
+        "repair_action": "What repair did you perform?",
+        "parts_replaced": "Photo of replacement parts",
+        "fault_audio": "Recording of fault sound (if mechanical issue)",
+        "thermal_image": "Thermal image if overheating was involved"
+      }
+    }
+  },
+  "sensor": {
+    "minor": {
+      "required": [
+        "calibration_check",
+        "reading_comparison"
+      ],
+      "optional": [
+        "sensor_photo",
+        "wiring_check"
+      ],
+      "prompts": {
+        "calibration_check": "Sensor reading vs reference meter - what's the deviation?",
+        "reading_comparison": "BMS reading vs actual measured value",
+        "sensor_photo": "Photo of sensor installation",
+        "wiring_check": "Wiring connections tight? Any corrosion?"
+      },
+      "validation_rules": {
+        "deviation": {"min": -5, "max": 5, "unit": "%", "required": true}
+      }
+    },
+    "breakdown": {
+      "required": [
+        "fault_description",
+        "replacement_info"
+      ],
+      "prompts": {
+        "fault_description": "What was wrong with the sensor? (drift, failed, erratic)",
+        "replacement_info": "Photo of replacement sensor model/serial"
+      }
+    }
+  },
+  "mv_incomer": {
+    "minor": {
+      "required": [
+        "service_sheet",
+        "insulation_test",
+        "contact_inspection"
+      ],
+      "optional": [
+        "thermal_image",
+        "protection_relay_test"
+      ],
+      "prompts": {
+        "service_sheet": "MV incomer service sheet with all test results",
+        "insulation_test": "Insulation resistance test results (Mohm)",
+        "contact_inspection": "Main contact condition - pitting or wear?",
+        "thermal_image": "Thermal scan of busbars and connections",
+        "protection_relay_test": "Protection relay test results"
+      },
+      "validation_rules": {
+        "insulation_resistance": {"min": 100, "max": 10000, "unit": "Mohm", "required": true}
+      }
+    }
+  },
+  "transformer": {
+    "minor": {
+      "required": [
+        "service_sheet",
+        "oil_temp_reading",
+        "winding_temp_reading",
+        "load_reading"
+      ],
+      "optional": [
+        "oil_sample",
+        "thermal_image",
+        "silica_gel_check"
+      ],
+      "prompts": {
+        "service_sheet": "Transformer service sheet with readings",
+        "oil_temp_reading": "Oil temperature reading (C)",
+        "winding_temp_reading": "Winding temperature reading (C)",
+        "load_reading": "Current load (% of rated)",
+        "oil_sample": "Oil sample for DGA (if major service)",
+        "thermal_image": "Thermal scan of transformer and connections",
+        "silica_gel_check": "Breather silica gel condition - blue or pink?"
+      },
+      "validation_rules": {
+        "oil_temp": {"min": 20, "max": 95, "unit": "C", "required": true},
+        "winding_temp": {"min": 20, "max": 105, "unit": "C", "required": true},
+        "load_percent": {"min": 0, "max": 120, "unit": "%", "required": true}
+      }
+    },
+    "major": {
+      "required": [
+        "service_sheet",
+        "oil_sample",
+        "dga_report",
+        "insulation_test",
+        "tap_changer_test"
+      ],
+      "optional": [
+        "thermal_image",
+        "fan_operation"
+      ],
+      "prompts": {
+        "service_sheet": "Complete transformer service sheet",
+        "oil_sample": "Oil sample for DGA analysis",
+        "dga_report": "Photo of DGA analysis report",
+        "insulation_test": "Winding insulation test results",
+        "tap_changer_test": "Tap changer operation test - all positions?",
+        "thermal_image": "Full thermal survey of transformer",
+        "fan_operation": "Cooling fans operating correctly?"
+      }
+    }
+  },
+  "lv_switchboard": {
+    "minor": {
+      "required": [
+        "service_sheet",
+        "thermal_scan",
+        "breaker_operation"
+      ],
+      "optional": [
+        "connection_torque_check",
+        "busbar_inspection"
+      ],
+      "prompts": {
+        "service_sheet": "Switchboard service sheet",
+        "thermal_scan": "Thermal image of all breakers and connections",
+        "breaker_operation": "All breakers operating correctly? Trip test results?",
+        "connection_torque_check": "Connection torque check completed?",
+        "busbar_inspection": "Busbar condition - any discoloration or damage?"
+      }
+    }
+  },
+  "ats": {
+    "minor": {
+      "required": [
+        "service_sheet",
+        "transfer_test",
+        "contact_inspection"
+      ],
+      "optional": [
+        "thermal_image",
+        "controller_photo"
+      ],
+      "prompts": {
+        "service_sheet": "ATS service sheet with test results",
+        "transfer_test": "Transfer test performed? Time to transfer (seconds)?",
+        "contact_inspection": "Main contact condition - any pitting or wear?",
+        "thermal_image": "Thermal scan during operation",
+        "controller_photo": "Photo of ATS controller display (settings)"
+      },
+      "validation_rules": {
+        "transfer_time": {"min": 0, "max": 30, "unit": "seconds", "required": true}
+      }
+    },
+    "breakdown": {
+      "required": [
+        "fault_description",
+        "root_cause",
+        "repair_action"
+      ],
+      "prompts": {
+        "fault_description": "What was the ATS fault? (failed to transfer, stuck)",
+        "root_cause": "What was the root cause? (mechanical, electrical, controller)",
+        "repair_action": "What repair was performed?"
+      }
+    }
+  },
+  "ups": {
+    "minor": {
+      "required": [
+        "service_sheet",
+        "battery_test",
+        "load_reading"
+      ],
+      "optional": [
+        "thermal_image",
+        "event_log"
+      ],
+      "prompts": {
+        "service_sheet": "UPS service sheet with all readings",
+        "battery_test": "Battery test results - voltage per cell, runtime?",
+        "load_reading": "Current load (kVA and %)",
+        "thermal_image": "Thermal scan of UPS and batteries",
+        "event_log": "Photo of UPS event log (last 10 events)"
+      },
+      "validation_rules": {
+        "battery_voltage": {"min": 10, "max": 60, "unit": "V", "required": true},
+        "load_percent": {"min": 0, "max": 100, "unit": "%", "required": true},
+        "runtime_minutes": {"min": 0, "max": 120, "unit": "min", "required": true}
+      }
+    },
+    "major": {
+      "required": [
+        "service_sheet",
+        "battery_impedance",
+        "load_bank_test",
+        "capacitor_check"
+      ],
+      "optional": [
+        "bypass_test",
+        "thermal_image"
+      ],
+      "prompts": {
+        "service_sheet": "Complete UPS service sheet",
+        "battery_impedance": "Battery impedance test results per string",
+        "load_bank_test": "Load bank test results - runtime at 100% load?",
+        "capacitor_check": "DC capacitor condition - any bulging?",
+        "bypass_test": "Static bypass transfer test OK?",
+        "thermal_image": "Full thermal survey"
+      }
+    }
+  },
+  "power_meter": {
+    "minor": {
+      "required": [
+        "accuracy_check",
+        "ct_connection_check"
+      ],
+      "optional": [
+        "meter_photo",
+        "communication_test"
+      ],
+      "prompts": {
+        "accuracy_check": "Meter reading vs clamp meter - deviation (%)?",
+        "ct_connection_check": "CT connections tight? Correct ratio set?",
+        "meter_photo": "Photo of meter display",
+        "communication_test": "Modbus/BACnet communication working?"
+      }
+    }
+  },
+  "pfc_bank": {
+    "minor": {
+      "required": [
+        "service_sheet",
+        "capacitor_check",
+        "contactor_check"
+      ],
+      "optional": [
+        "thermal_image",
+        "power_factor_reading"
+      ],
+      "prompts": {
+        "service_sheet": "PFC bank service sheet",
+        "capacitor_check": "Capacitor condition - any bulging or leaking?",
+        "contactor_check": "Contactor operation - all stages switching?",
+        "thermal_image": "Thermal scan of capacitors and contactors",
+        "power_factor_reading": "Current power factor reading"
+      },
+      "validation_rules": {
+        "power_factor": {"min": 0.85, "max": 1.0, "unit": "", "required": true}
+      }
+    }
+  },
+  "feeder": {
+    "minor": {
+      "required": [
+        "thermal_scan",
+        "load_reading",
+        "connection_check"
+      ],
+      "prompts": {
+        "thermal_scan": "Thermal image of feeder breaker and cables",
+        "load_reading": "Current load (A) and % of rated",
+        "connection_check": "All connections tight? Cable condition OK?"
+      }
+    }
+  },
+  "dali_controller": {
+    "minor": {
+      "required": [
+        "service_sheet",
+        "communication_test",
+        "addressing_check"
+      ],
+      "optional": [
+        "controller_photo",
+        "bus_scan"
+      ],
+      "prompts": {
+        "service_sheet": "DALI controller service sheet",
+        "communication_test": "All luminaires responding on DALI bus?",
+        "addressing_check": "Address conflicts? Any luminaires showing errors?",
+        "controller_photo": "Photo of controller status LEDs",
+        "bus_scan": "Screenshot of DALI bus scan results"
+      }
+    },
+    "breakdown": {
+      "required": [
+        "fault_description",
+        "root_cause",
+        "repair_action"
+      ],
+      "prompts": {
+        "fault_description": "What was the DALI fault? (no communication, addressing, power)",
+        "root_cause": "Root cause found?",
+        "repair_action": "What was repaired/replaced?"
+      }
+    }
+  },
+  "luminaire_group": {
+    "minor": {
+      "required": [
+        "operation_test",
+        "dimming_test"
+      ],
+      "optional": [
+        "lux_reading",
+        "driver_check"
+      ],
+      "prompts": {
+        "operation_test": "All luminaires in group responding to on/off?",
+        "dimming_test": "Dimming smooth across 0-100%? Any flickering?",
+        "lux_reading": "Lux level at desk height (if meter available)",
+        "driver_check": "Any drivers showing fault LED?"
+      },
+      "validation_rules": {
+        "lux_level": {"min": 300, "max": 1000, "unit": "lux", "required": false}
+      }
+    },
+    "breakdown": {
+      "required": [
+        "fault_description",
+        "affected_luminaires",
+        "repair_action"
+      ],
+      "prompts": {
+        "fault_description": "What was the lighting issue? (not working, flickering, wrong level)",
+        "affected_luminaires": "Which luminaires/addresses affected?",
+        "repair_action": "What was repaired? (driver, lamp, wiring, address)"
+      }
+    }
+  },
+  "daylight_sensor": {
+    "minor": {
+      "required": [
+        "calibration_check",
+        "reading_verification"
+      ],
+      "optional": [
+        "sensor_photo",
+        "lens_cleaning"
+      ],
+      "prompts": {
+        "calibration_check": "Sensor reading vs lux meter - deviation?",
+        "reading_verification": "Daylight harvesting responding correctly to light changes?",
+        "sensor_photo": "Photo of sensor installation and orientation",
+        "lens_cleaning": "Sensor lens cleaned?"
+      }
+    }
+  },
+  "occupancy_sensor": {
+    "minor": {
+      "required": [
+        "detection_test",
+        "sensitivity_check"
+      ],
+      "optional": [
+        "sensor_photo",
+        "timeout_setting"
+      ],
+      "prompts": {
+        "detection_test": "Walk test performed - detecting movement correctly?",
+        "sensitivity_check": "Sensitivity set correctly for the space?",
+        "sensor_photo": "Photo of sensor coverage area",
+        "timeout_setting": "What is the vacancy timeout setting?"
+      }
+    },
+    "breakdown": {
+      "required": [
+        "fault_description",
+        "root_cause"
+      ],
+      "prompts": {
+        "fault_description": "Sensor issue? (not detecting, false triggers, always on)",
+        "root_cause": "What was the cause? (failed sensor, wiring, obstruction)"
+      }
+    }
+  },
+  "chiller": {
+    "minor": {
+      "required": [
+        "service_sheet",
+        "compressor_audio",
+        "sight_glass_photo"
+      ],
+      "optional": [
+        "oil_sight_glass",
+        "thermal_image"
+      ],
+      "prompts": {
+        "service_sheet": "Send chiller service sheet with pressures and temperatures",
+        "compressor_audio": "Record 30 seconds of compressor running",
+        "sight_glass_photo": "Photo of refrigerant sight glass (check for bubbles/moisture)",
+        "oil_sight_glass": "Photo of oil sight glass (if accessible)",
+        "thermal_image": "Thermal image of compressor and electrical connections",
+        "observation": "Any unusual sounds, vibrations, or observations?"
+      },
+      "audio_duration_seconds": 30,
+      "validation_rules": {
+        "suction_pressure": {"min": 0, "max": 20, "unit": "bar", "required": true},
+        "discharge_pressure": {"min": 0, "max": 30, "unit": "bar", "required": true},
+        "evap_temp": {"min": 0, "max": 15, "unit": "C", "required": true},
+        "cond_temp": {"min": 25, "max": 55, "unit": "C", "required": true}
+      }
+    },
+    "major": {
+      "required": [
+        "service_sheet",
+        "compressor_audio",
+        "oil_sample",
+        "refrigerant_analysis"
+      ],
+      "optional": [
+        "vibration_data",
+        "thermal_image",
+        "electrical_connections",
+        "tube_inspection"
+      ],
+      "prompts": {
+        "service_sheet": "Complete service sheet with all readings",
+        "compressor_audio": "Extended compressor recording (60s, all stages)",
+        "oil_sample": "Oil sample for analysis",
+        "refrigerant_analysis": "Photo of refrigerant analysis report",
+        "vibration_data": "Contact vibration readings (if available)",
+        "thermal_image": "Thermal scan of all components",
+        "observation": "Detailed observations and recommendations"
+      },
+      "audio_duration_seconds": 60
+    },
+    "breakdown": {
+      "required": [
+        "fault_description",
+        "fault_code",
+        "root_cause",
+        "repair_action"
+      ],
+      "prompts": {
+        "fault_description": "What was the chiller fault? (trip, low superheat, high pressure)",
+        "fault_code": "Controller fault code displayed?",
+        "root_cause": "What was the root cause?",
+        "repair_action": "What repair was performed?"
+      }
+    }
+  },
+  "pump": {
+    "minor": {
+      "required": [
+        "service_sheet",
+        "pump_audio",
+        "bearing_temp"
+      ],
+      "optional": [
+        "vibration_reading",
+        "seal_condition"
+      ],
+      "prompts": {
+        "service_sheet": "Pump service sheet with readings",
+        "pump_audio": "Record 15 seconds of pump running",
+        "bearing_temp": "Bearing temperature reading (C)",
+        "vibration_reading": "Vibration reading (mm/s)",
+        "seal_condition": "Mechanical seal condition - any leaks?"
+      },
+      "audio_duration_seconds": 15,
+      "validation_rules": {
+        "bearing_temp": {"min": 20, "max": 80, "unit": "C", "required": true},
+        "vibration": {"min": 0, "max": 10, "unit": "mm/s", "required": false}
+      }
+    },
+    "major": {
+      "required": [
+        "service_sheet",
+        "pump_audio",
+        "bearing_analysis",
+        "seal_inspection",
+        "impeller_check"
+      ],
+      "optional": [
+        "alignment_check",
+        "thermal_image"
+      ],
+      "prompts": {
+        "service_sheet": "Complete pump service sheet",
+        "pump_audio": "Extended pump recording - listen for cavitation",
+        "bearing_analysis": "Bearing condition - grease or replace?",
+        "seal_inspection": "Seal condition - replace if worn",
+        "impeller_check": "Impeller condition - erosion or damage?",
+        "alignment_check": "Motor-pump alignment checked?",
+        "thermal_image": "Thermal scan of motor and bearings"
+      }
+    },
+    "breakdown": {
+      "required": [
+        "fault_description",
+        "root_cause",
+        "repair_action"
+      ],
+      "prompts": {
+        "fault_description": "Pump fault? (seized, no flow, noise, leak)",
+        "root_cause": "Root cause found?",
+        "repair_action": "What was repaired/replaced?"
+      }
+    }
+  }
+}

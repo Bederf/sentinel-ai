@@ -6,7 +6,18 @@ This document describes the integration between Clawd (Telegram AI bot) and SENT
 
 Clawd is a Telegram AI bot located at `/home/bederf/clawd` that integrates with SENTINEL for building management queries. Technicians can ask questions via Telegram and receive BMS-aware responses with actual HVAC readings, diagnostics, and device control capabilities.
 
-**Demo Building:** Sandton - Full DALI lighting + HVAC integration (24 desks, 5 zones, L10-L12)
+**Demo Building:** Sandton - Full DALI lighting + HVAC + Energy Centre integration
+- 300 desks (100 per floor, 20 per zone)
+- 15 zones across 3 floors (L10, L11, L12)
+- 145 equipment items in Supabase (HVAC, generators, energy centre, DALI lighting)
+
+## Integration Modes
+
+| Mode | Direction | Description |
+|------|-----------|-------------|
+| **Query Mode** | User → Clawd → SENTINEL | Technician asks questions, gets BMS data |
+| **Alert Mode** | SENTINEL → Clawd → User | BMS sends alerts to FM team |
+| **Work Order Mode** | Bidirectional | Alert → Dispatch → Data Collection |
 
 ## Architecture
 
@@ -304,16 +315,223 @@ Error: Control action blocked by safety rule
 
 **Solution**: Check safety rules - temperature must be 16-28°C.
 
+## Alert Notifications (SENTINEL → Clawd)
+
+When SENTINEL detects equipment faults, it sends alerts to FM team via Clawd Telegram.
+
+### Alert Flow
+
+```
+Zone Temp Spike (25°C in Zone-L10-C)
+    ↓
+Zone Diagnostics Service
+    ↓
+Root Cause Analysis (FCU valve stuck at 15%)
+    ↓
+Alert Notifier → Clawd Bot → Telegram FM Group
+    ↓
+FM replies: /dispatch
+    ↓
+Work Order Created with Diagnostic Context
+    ↓
+Technician Email (Gmail API)
+    ↓
+Technician repairs → replies "done"
+    ↓
+Context-Aware Data Collection
+```
+
+### Alert Notification Format
+
+```
+🚨 CRITICAL ALERT - Sandton
+
+Zone: Zone-L10-C
+Equipment: FCU-L10-03
+Type: fcu_valve_stuck
+
+FCU valve stuck at 15% - insufficient chilled water flow
+
+Equipment Status:
+✅ AHU-L10-01: normal
+⚠️ FCU-L10-03: warning
+✅ VAV-L10-03: normal
+
+Diagnosis: Valve actuator not responding
+Fault Code: E04
+
+Actions:
+  1. Check valve actuator power supply (24VAC)
+  2. Verify BMS control signal (0-10V)
+  3. Replace actuator if unresponsive
+
+Parts: Belimo LMV-D3 actuator
+Est. Repair: 2h
+
+Reply: /ack | /dispatch | /wo FCU-L10-03
+```
+
+### Alert Notifier Service
+
+**Location**: `backend/app/services/clawd_integration/alert_notifier.py`
+
+```python
+from app.services.clawd_integration.alert_notifier import alert_notifier
+
+# Send alert to FM team
+alert_notifier.send_alert_sync({
+    "id": alert_id,
+    "building_name": "Sandton",
+    "zone_name": "Zone-L10-C",
+    "equipment_name": "FCU-L10-03",
+    "equipment_code": "FCU-L10-03",
+    "type": "fcu_valve_stuck",
+    "severity": "critical",
+    "message": "FCU valve stuck at 15%",
+    "reading": 25.0,
+    "setpoint": 21.0
+})
+```
+
+**Environment Variables**:
+```bash
+CLAWD_BOT_TOKEN=<telegram-bot-token>
+CLAWD_FM_CHAT_ID=<fm-group-chat-id>
+```
+
+## Zone Diagnostics
+
+Root cause analysis for zone comfort issues.
+
+**Location**: `backend/app/services/zone_diagnostics.py`
+
+### Fault Types
+
+| Fault Type | Description | Typical Cause |
+|------------|-------------|---------------|
+| `fcu_valve_stuck` | Valve not responding | Actuator failure |
+| `fcu_fan_failure` | No airflow | Motor/capacitor |
+| `vav_damper_stuck` | Damper not moving | Actuator/linkage |
+| `ahu_supply_high` | Supply air too warm | Chiller/coil issue |
+| `sensor_fault` | Erratic readings | Failed sensor |
+| `high_occupancy` | Minor deviation | Heat load |
+
+### Diagnostic Result
+
+```python
+@dataclass
+class DiagnosticResult:
+    zone_id: str
+    current_temp: float
+    setpoint: float
+    deviation: float
+    fault_type: FaultType
+    faulty_equipment: str
+    fault_code: Optional[str]
+    fault_description: str
+    equipment_status: Dict[str, Dict]
+    recommended_actions: List[str]
+    parts_required: List[str]
+    estimated_repair_hours: float
+    severity: str  # critical, warning, info
+```
+
+## Work Order Dispatch
+
+When FM replies `/dispatch` to an alert, SENTINEL creates a work order with full diagnostic context.
+
+### Dispatch API
+
+**Endpoint**: `POST /api/alerts/{alert_id}/dispatch`
+
+```python
+{
+    "technician_id": "@jsmith",
+    "technician_name": "John Smith",
+    "service_type": "breakdown",
+    "diagnostic_context": {
+        "fault_type": "fcu_valve_stuck",
+        "fault_code": "E04",
+        "fault_description": "FCU valve stuck at 15%",
+        "original_reading": 25.0,
+        "setpoint": 21.0,
+        "deviation": 4.0,
+        "faulty_equipment": "FCU-L10-03",
+        "zone_id": "Zone-L10-C",
+        "recommended_actions": [
+            "Check valve actuator power supply (24VAC)",
+            "Verify BMS control signal (0-10V)",
+            "Replace actuator if unresponsive"
+        ],
+        "parts_required": ["Belimo LMV-D3 actuator"],
+        "severity": "critical"
+    }
+}
+```
+
+### Dispatch Flow
+
+1. **Create Work Order** - Linked to alert
+2. **Create Service Record** - With diagnostic context
+3. **Email Technician** - Via Clawd Gmail skill
+4. **Telegram Notification** - To assigned technician
+5. **Update Alert Status** - Marked as "dispatched"
+
+## ML Knowledge Capture
+
+After technician repairs equipment, Clawd collects service data for ML training.
+
+See `docs/04-features/41-ml-knowledge-capture-01.md` for complete details.
+
+### Context-Aware Prompts
+
+Because Clawd knows the original fault, it asks **targeted questions**:
+
+```
+Clawd: FCU-L10-03 repair complete - thanks!
+       We detected: FCU valve stuck at 15% (E04)
+       Did you confirm this was the issue?
+       □ Yes, confirmed
+       □ No, different issue
+
+Tech: Yes, confirmed
+
+Clawd: What was the root cause?
+       □ Actuator motor failed
+       □ Actuator jammed mechanically
+       □ Control signal issue (0-10V)
+       □ Power supply issue (24VAC)
+```
+
+### Comprehensive Response Handling
+
+If technician provides all info at once:
+
+```
+Tech: Yes actuator motor failed, replaced Belimo LMV-D3, zone now 21.5C
+
+Clawd: Got it! (fault confirmed, root cause: Actuator motor failed,
+       part: Belimo LMV-D3, temp: 21.5°C)
+
+       Just need a photo of the replacement part label
+```
+
 ## Files Reference
 
 ### SENTINEL (this repo)
 - `backend/app/api/complaints.py` - Complaint endpoints
+- `backend/app/api/alerts.py` - Alert and dispatch endpoints
 - `backend/app/services/complaint_handler.py` - Diagnosis logic
-- `backend/app/data/desks.json` - Desk definitions
-- `backend/app/data/hvac_zones.json` - HVAC zone config
+- `backend/app/services/zone_diagnostics.py` - Zone fault analysis
+- `backend/app/services/clawd_integration/alert_notifier.py` - Alert notifications
+- `backend/app/services/clawd_integration/work_order_notifier.py` - WO notifications
+- `backend/app/services/ml_template_service.py` - ML data collection templates
+- `backend/app/data/ml_data_templates.json` - Equipment-specific templates (19 types)
+- `backend/app/data/buildings/sandton/zones.json` - Zone definitions
 
 ### Clawd (`/home/bederf/clawd`)
 - `tools/bms_desk_diagnosis.py` - Desk diagnosis client
 - `tools/bms_control.py` - Device control client
 - `tools/clawd_ai_bridge.py` - Pattern detection & routing
 - `tools/tiered_ai_router.py` - AI model routing
+- Gmail skill - Email notifications to technicians

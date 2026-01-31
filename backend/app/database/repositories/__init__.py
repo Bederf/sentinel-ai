@@ -12,6 +12,7 @@ from app.database.repositories.hvac_zone_repository import HVACZoneRepository
 from app.database.repositories.desk_repository import DeskRepository
 from app.database.repositories.generator_repository import GeneratorRepository
 from app.database.repositories.energy_centre_repository import EnergyCentreRepository
+from app.database.repositories.service_record_repository import ServiceRecordRepository
 
 __all__ = [
     'BuildingRepository',
@@ -26,4 +27,5 @@ __all__ = [
     'DeskRepository',
     'GeneratorRepository',
     'EnergyCentreRepository',
+    'ServiceRecordRepository',
 ]

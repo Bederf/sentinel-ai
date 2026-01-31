@@ -1,6 +1,7 @@
 """Alerts API endpoints - SENTINEL Integration."""
 
 import json
+import uuid
 from pathlib import Path
 from typing import Optional
 from datetime import datetime
@@ -10,6 +11,7 @@ from pydantic import BaseModel
 
 # Import simulation service for live alerts
 from app.api.simulation import simulation_service
+from app.services.clawd_integration.alert_notifier import alert_notifier
 
 router = APIRouter()
 
@@ -355,6 +357,230 @@ async def list_anomalies(
         total_repair_cost_zar=total_repair,
         total_potential_damage_zar=total_damage,
         anomalies=result,
+    )
+
+
+class DiagnosticContextRequest(BaseModel):
+    """Diagnostic context from zone diagnostics."""
+    fault_type: Optional[str] = None
+    fault_code: Optional[str] = None
+    fault_description: Optional[str] = None
+    original_reading: Optional[float] = None
+    setpoint: Optional[float] = None
+    deviation: Optional[float] = None
+    faulty_equipment: Optional[str] = None
+    zone_id: Optional[str] = None
+    recommended_actions: list[str] = []
+    parts_required: list[str] = []
+    severity: Optional[str] = None
+
+
+class CreateAlertRequest(BaseModel):
+    """Request to create a new alert."""
+    equipment_code: str
+    type: str
+    severity: str  # critical, warning, info
+    title: str
+    message: str
+    zone_name: Optional[str] = None
+    reading: Optional[float] = None
+    setpoint: Optional[float] = None
+    notify_clawd: bool = True
+    diagnostic_context: Optional[DiagnosticContextRequest] = None  # For work order data collection
+
+
+class CreateAlertResponse(BaseModel):
+    """Response for alert creation."""
+    id: str
+    status: str
+    clawd_notified: bool
+    message: str
+
+
+@router.post("/alerts", response_model=CreateAlertResponse)
+async def create_alert(request: CreateAlertRequest) -> CreateAlertResponse:
+    """
+    Create a new alert and optionally notify via Clawd Telegram.
+
+    Used by sensors/thermostats to report issues.
+    """
+    from app.database.supabase_client import get_supabase_client
+
+    client = get_supabase_client()
+
+    # Get equipment by code
+    equipment = client.table("equipment").select("id, name, building_id").eq(
+        "code", request.equipment_code
+    ).execute()
+
+    if not equipment.data:
+        raise HTTPException(status_code=404, detail=f"Equipment {request.equipment_code} not found")
+
+    eq = equipment.data[0]
+
+    # Get building name
+    building = client.table("buildings").select("name").eq("id", eq["building_id"]).execute()
+    building_name = building.data[0]["name"] if building.data else "Unknown"
+
+    # Create alert
+    alert_id = str(uuid.uuid4())
+    alert_data = {
+        "id": alert_id,
+        "building_id": eq["building_id"],
+        "equipment_id": eq["id"],
+        "type": request.type,
+        "severity": request.severity,
+        "status": "active",
+        "title": request.title,
+        "message": request.message
+    }
+
+    client.table("alerts").insert(alert_data).execute()
+
+    # Send Clawd notification if requested
+    clawd_notified = False
+    if request.notify_clawd:
+        clawd_alert = {
+            "id": alert_id,
+            "building_name": building_name,
+            "zone_name": request.zone_name or "Unknown",
+            "equipment_name": eq["name"],
+            "equipment_code": request.equipment_code,
+            "type": request.type,
+            "severity": request.severity,
+            "message": request.message,
+            "reading": request.reading,
+            "setpoint": request.setpoint
+        }
+        clawd_notified = alert_notifier.send_alert_sync(clawd_alert)
+
+    return CreateAlertResponse(
+        id=alert_id,
+        status="active",
+        clawd_notified=clawd_notified,
+        message=f"Alert created for {eq['name']}"
+    )
+
+
+@router.post("/alerts/{alert_id}/acknowledge")
+async def acknowledge_alert(alert_id: str, acknowledged_by: str = "operator"):
+    """Acknowledge an alert."""
+    from app.database.supabase_client import get_supabase_client
+
+    client = get_supabase_client()
+
+    result = client.table("alerts").update({
+        "status": "acknowledged",
+        "acknowledged_at": datetime.now().isoformat(),
+        "acknowledged_by": acknowledged_by
+    }).eq("id", alert_id).execute()
+
+    if not result.data:
+        raise HTTPException(status_code=404, detail=f"Alert {alert_id} not found")
+
+    return {"status": "acknowledged", "alert_id": alert_id}
+
+
+class DispatchWorkOrderRequest(BaseModel):
+    """Request to dispatch work order from alert."""
+    technician_id: str
+    technician_name: str
+    service_type: str = "breakdown"  # breakdown, callout
+    diagnostic_context: Optional[DiagnosticContextRequest] = None
+
+
+class DispatchWorkOrderResponse(BaseModel):
+    """Response for work order dispatch."""
+    work_order_id: str
+    service_record_code: str
+    status: str
+    technician_notified: bool
+    message: str
+
+
+@router.post("/alerts/{alert_id}/dispatch", response_model=DispatchWorkOrderResponse)
+async def dispatch_work_order(alert_id: str, request: DispatchWorkOrderRequest):
+    """Dispatch a work order from an alert.
+
+    Creates a work order, service record with diagnostic context,
+    and notifies the technician via Clawd Telegram.
+
+    The diagnostic context enables context-aware data collection prompts
+    so Clawd asks targeted questions based on the detected fault.
+    """
+    from app.database.supabase_client import get_supabase_client
+    from app.services.clawd_integration.work_order_notifier import work_order_notifier
+
+    client = get_supabase_client()
+
+    # Get alert details
+    alert_result = client.table("alerts").select("*").eq("id", alert_id).execute()
+    if not alert_result.data:
+        raise HTTPException(status_code=404, detail=f"Alert {alert_id} not found")
+
+    alert = alert_result.data[0]
+
+    # Get equipment details
+    equipment_result = client.table("equipment").select("*").eq("id", alert["equipment_id"]).execute()
+    if not equipment_result.data:
+        raise HTTPException(status_code=404, detail=f"Equipment not found")
+
+    equipment = equipment_result.data[0]
+
+    # Create work order
+    work_order_id = str(uuid.uuid4())
+    work_order = {
+        "id": work_order_id,
+        "alert_id": alert_id,
+        "building_id": alert["building_id"],
+        "equipment_id": alert["equipment_id"],
+        "type": request.service_type,
+        "status": "assigned",
+        "priority": "high" if alert["severity"] == "critical" else "medium",
+        "description": alert.get("message", ""),
+        "assigned_to": request.technician_name,
+        "created_at": datetime.now().isoformat()
+    }
+
+    # Note: Would insert to work_orders table if it exists
+    # client.table("work_orders").insert(work_order).execute()
+
+    # Prepare diagnostic context for service record
+    diag_context = None
+    if request.diagnostic_context:
+        diag_context = request.diagnostic_context.dict()
+
+    # Notify technician via Clawd (creates service record)
+    wo_data = {
+        "work_order_id": work_order_id,
+        "equipment_id": alert["equipment_id"],
+        "building_id": alert["building_id"],
+        "equipment_name": equipment["name"],
+        "criticality": "HIGH" if alert["severity"] == "critical" else "MEDIUM",
+        "service_type": request.service_type,
+        "technician_id": request.technician_id,
+        "technician_name": request.technician_name,
+        "description": alert.get("message", ""),
+        "diagnostic_context": diag_context  # Pass context for smart data collection
+    }
+
+    notified = await work_order_notifier.notify_technician(wo_data)
+
+    # Update alert status
+    client.table("alerts").update({
+        "status": "dispatched",
+        "updated_at": datetime.now().isoformat()
+    }).eq("id", alert_id).execute()
+
+    # Get service record code
+    service_record_code = f"SR-{datetime.now().year}-PENDING"  # Would get from repository
+
+    return DispatchWorkOrderResponse(
+        work_order_id=work_order_id,
+        service_record_code=service_record_code,
+        status="dispatched",
+        technician_notified=notified,
+        message=f"Work order dispatched to {request.technician_name}"
     )
 
 

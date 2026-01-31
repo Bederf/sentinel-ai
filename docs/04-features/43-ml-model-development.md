@@ -1,0 +1,250 @@
+---
+status: implemented
+version: 43-01
+date: 2026-01-31
+---
+
+# Phase 43: ML Model Development
+
+## Overview
+
+Phase 43 implements machine learning capabilities for equipment monitoring:
+
+1. **LSTM Time-Series Forecasting** - Predict sensor values 24/48/72 hours ahead
+2. **Autoencoder Anomaly Detection** - Detect unusual equipment behavior
+
+## Architecture
+
+```
+backend/ml/
+├── __init__.py           # Package documentation
+├── registry.py           # Model versioning and management
+├── requirements.txt      # ML dependencies (tensorflow, sklearn, etc.)
+├── models/               # Saved models
+│   ├── lstm/            # LSTM model files (.h5, _scaler.joblib)
+│   ├── autoencoder/     # Autoencoder model files
+│   └── registry.json    # Model registry
+├── lstm/
+│   ├── __init__.py
+│   ├── data_prep.py     # Training data preparation
+│   ├── model.py         # LSTM architecture (128-64-32)
+│   └── train.py         # Training pipeline
+└── autoencoder/
+    ├── __init__.py
+    ├── data_prep.py     # Normal data preparation
+    ├── model.py         # LSTM autoencoder
+    └── train.py         # Training pipeline
+```
+
+## LSTM Forecasting
+
+### Model Architecture
+
+- **Input**: 168 timesteps (7 days hourly) × N features
+- **LSTM Layers**: 128 → 64 → 32 units with BatchNorm and Dropout
+- **Output**: 3 values (24h, 48h, 72h predictions)
+- **Loss**: MSE with L2 regularization
+- **Optimizer**: Adam with ReduceLROnPlateau
+
+### Equipment Configurations
+
+| Equipment | Features | Target |
+|-----------|----------|--------|
+| Chiller | chw_supply_temp, chw_return_temp, suction_pressure, discharge_pressure, compressor_current | chw_supply_temp |
+| AHU | supply_temp, return_temp, filter_dp, fan_current, mixed_air_temp | supply_temp |
+| Generator | battery_voltage, oil_pressure, coolant_temp, load_pct | coolant_temp |
+| FCU | supply_temp, fan_current, valve_position | supply_temp |
+| UPS | battery_voltage, load_pct, temperature | temperature |
+
+### Training
+
+```bash
+# Train single equipment type
+cd backend
+python -m ml.lstm.train --equipment-type chiller --epochs 50
+
+# Train all equipment types
+python -m ml.lstm.train --all --epochs 50
+```
+
+### API Usage
+
+```bash
+# Get predictions
+curl "http://localhost:9095/api/ml/predictions/lstm/chiller-001?equipment_type=chiller"
+
+# Get trend data for visualization
+curl "http://localhost:9095/api/ml/predictions/trend/chiller-001?equipment_type=chiller"
+```
+
+Response:
+```json
+{
+  "equipment_id": "chiller-001",
+  "equipment_type": "chiller",
+  "predictions": {
+    "24h": 12.5,
+    "48h": 12.8,
+    "72h": 13.1
+  },
+  "confidence": 0.85,
+  "timestamp": "2026-01-31T10:00:00Z"
+}
+```
+
+## Autoencoder Anomaly Detection
+
+### Concept
+
+Autoencoders learn to compress and reconstruct "normal" operation patterns. When presented with anomalous data, they fail to reconstruct it accurately, resulting in high reconstruction error.
+
+**Key Principle**: Train ONLY on normal data. Exclude failure periods.
+
+### Model Architecture
+
+- **Encoder**: LSTM(64) → LSTM(32) → Dense(16) (latent space)
+- **Decoder**: RepeatVector → LSTM(32) → LSTM(64) → Dense(N)
+- **Threshold**: 99th percentile of validation reconstruction errors
+
+### Training
+
+```bash
+# Train single equipment type
+cd backend
+python -m ml.autoencoder.train --equipment-type chiller --epochs 50
+
+# Train all equipment types
+python -m ml.autoencoder.train --all --epochs 50
+```
+
+### API Usage
+
+```bash
+# Check single equipment
+curl "http://localhost:9095/api/ml/anomalies/equipment/chiller-001?equipment_type=chiller"
+
+# Get all anomaly alerts
+curl "http://localhost:9095/api/ml/anomalies/alerts"
+
+# Get anomaly score history
+curl "http://localhost:9095/api/ml/anomalies/history/chiller-001?equipment_type=chiller&days=7"
+```
+
+Response:
+```json
+{
+  "equipment_id": "chiller-001",
+  "equipment_type": "chiller",
+  "is_anomaly": false,
+  "anomaly_score": 0.00042,
+  "threshold": 0.00068,
+  "score_pct": 61.7,
+  "severity": "normal",
+  "timestamp": "2026-01-31T10:00:00Z"
+}
+```
+
+### Severity Levels
+
+| Score/Threshold Ratio | Severity | Description |
+|-----------------------|----------|-------------|
+| < 0.7 | normal | Normal operation |
+| 0.7 - 1.0 | warning | Approaching threshold |
+| 1.0 - 1.5 | elevated | Just above threshold |
+| 1.5 - 2.0 | high | Significant anomaly |
+| > 2.0 | critical | Severe anomaly |
+
+## Model Registry
+
+The model registry tracks trained models and their metrics:
+
+```bash
+# List all models
+curl "http://localhost:9095/api/ml/models"
+
+# Get specific model
+curl "http://localhost:9095/api/ml/models/lstm_chiller_20260131_100000"
+
+# Activate a model
+curl -X POST "http://localhost:9095/api/ml/models/lstm_chiller_20260131_100000/activate"
+
+# Compare model versions
+curl "http://localhost:9095/api/ml/models/compare/lstm/chiller"
+```
+
+## Training via API
+
+```bash
+# Train LSTM model
+curl -X POST "http://localhost:9095/api/ml/train/lstm/chiller" \
+  -H "Content-Type: application/json" \
+  -d '{"epochs": 50, "use_demo_data": true}'
+
+# Train autoencoder
+curl -X POST "http://localhost:9095/api/ml/train/autoencoder/chiller" \
+  -H "Content-Type: application/json" \
+  -d '{"epochs": 50, "use_demo_data": true}'
+
+# Train all models
+curl -X POST "http://localhost:9095/api/ml/train/all" \
+  -H "Content-Type: application/json" \
+  -d '{"epochs": 50, "use_demo_data": true}'
+```
+
+## Dependencies
+
+Install ML dependencies:
+
+```bash
+cd backend
+pip install -r ml/requirements.txt
+```
+
+Required packages:
+- TensorFlow 2.x
+- scikit-learn
+- pandas
+- numpy
+- joblib
+
+## Integration with Inference Service
+
+```python
+from app.services.ml_inference import get_lstm_service, get_anomaly_service
+
+# LSTM predictions
+lstm = get_lstm_service()
+prediction = lstm.predict("chiller-001", "chiller")
+print(f"24h forecast: {prediction['predictions']['24h']}")
+
+# Anomaly detection
+anomaly = get_anomaly_service()
+result = anomaly.check_equipment("chiller-001", "chiller")
+if result["is_anomaly"]:
+    print(f"ANOMALY: score={result['anomaly_score']:.4f}")
+```
+
+## Data Requirements
+
+### LSTM
+- Minimum 6 months of hourly sensor data
+- 168+ hours of continuous data for single prediction
+
+### Autoencoder
+- Minimum 3 months of normal operation data
+- Exclude 7 days before and 3 days after known failures
+
+## Current Limitations
+
+1. **Demo Data**: Uses synthetic data for development/testing
+2. **No InfluxDB Integration**: Would connect to time-series database in production
+3. **Single Feature Target**: LSTM predicts single target per model
+4. **Fixed Window Sizes**: 168h (LSTM), 24h (autoencoder)
+
+## Future Enhancements
+
+- Phase 42 integration (InfluxDB feature store)
+- Multi-variate prediction
+- Attention mechanisms
+- Transfer learning between equipment types
+- Online learning for model updates
