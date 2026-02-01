@@ -17,7 +17,6 @@ import { useState, useEffect } from "react";
 import api, { type Site, type OptimizationRecommendation } from "../lib/api";
 import { OptimizationStatusBadge } from "./OptimizationStatusBadge";
 import { OptimizationRecommendationModal } from "./OptimizationRecommendationModal";
-import { useHealthThresholds } from "../hooks/useHealthThresholds";
 import { getTimezoneAbbreviation, isDifferentTimezone } from "../lib/timeFormat";
 
 interface SiteCardProps {
@@ -102,7 +101,6 @@ function getSafePercentageColor(safe: number, total: number): string {
 export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizationStatus = false }: SiteCardProps) {
   const statusConfig = getStatusConfig(site.status);
   const hasAlerts = site.alert_count > 0;
-  const _healthThresholds = useHealthThresholds(); // Available for future use
   const [safetySummary, setSafetySummary] = useState<DeviceSafetySummary | null>(null);
   const [loadingSafety, setLoadingSafety] = useState(false);
   const [optimizationStatus, setOptimizationStatus] = useState<OptimizationStatusType>("unknown");

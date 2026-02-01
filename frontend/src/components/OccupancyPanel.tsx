@@ -17,7 +17,7 @@ import { useState, useEffect, useCallback } from "react";
 import { RefreshCw, Users, Lightbulb, AlertTriangle, Cpu, Eye, Zap, Building2, ChevronDown } from "lucide-react";
 import { OccupancyHeatmap } from "./OccupancyHeatmap";
 import { api } from "../lib/api";
-import type { BuildingOccupancy, DALIStats, FloorSummary, ZoneLighting, Site } from "../lib/api";
+import type { BuildingOccupancy, DALIStats, ZoneLighting, Site } from "../lib/api";
 
 // Mock data for development until backend API is ready
 const mockBuildingOccupancy: BuildingOccupancy = {

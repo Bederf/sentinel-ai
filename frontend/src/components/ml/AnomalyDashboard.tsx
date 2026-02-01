@@ -25,10 +25,10 @@ import {
   Icon,
 } from "@tremor/react";
 import {
-  ExclamationTriangleIcon,
-  CheckCircleIcon,
-  ArrowPathIcon,
-} from "@heroicons/react/24/outline";
+  AlertTriangle,
+  CheckCircle,
+  RefreshCw,
+} from "lucide-react";
 import type { AnomalyResult, MLHealth } from "../../lib/mlApi";
 import {
   getAllAnomalies,
@@ -98,7 +98,7 @@ export function AnomalyDashboard({ refreshInterval = 30000 }: AnomalyDashboardPr
       <Grid numItems={1} numItemsSm={2} numItemsLg={4} className="gap-4">
         <Card decoration="top" decorationColor="green">
           <Flex justifyContent="start" className="space-x-4">
-            <Icon icon={CheckCircleIcon} color="green" size="lg" />
+            <Icon icon={CheckCircle} color="green" size="lg" />
             <div>
               <Text>Normal Equipment</Text>
               <Metric>{normalCount}</Metric>
@@ -108,7 +108,7 @@ export function AnomalyDashboard({ refreshInterval = 30000 }: AnomalyDashboardPr
 
         <Card decoration="top" decorationColor="red">
           <Flex justifyContent="start" className="space-x-4">
-            <Icon icon={ExclamationTriangleIcon} color="red" size="lg" />
+            <Icon icon={AlertTriangle} color="red" size="lg" />
             <div>
               <Text>Active Anomalies</Text>
               <Metric>{anomalyCount}</Metric>
@@ -132,7 +132,7 @@ export function AnomalyDashboard({ refreshInterval = 30000 }: AnomalyDashboardPr
           <Button
             size="xs"
             variant="secondary"
-            icon={ArrowPathIcon}
+            icon={RefreshCw}
             onClick={fetchData}
             className="mt-2"
           >

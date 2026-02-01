@@ -19,6 +19,10 @@ vi.mock('../../lib/api', () => ({
     getSites: vi.fn(),
     getPredictions: vi.fn(),
     getEnergy: vi.fn(),
+    getHealthThresholds: vi.fn().mockResolvedValue({
+      warning: 70,
+      critical: 40,
+    }),
   },
 }));
 
@@ -56,7 +60,8 @@ describe('Dashboard Integration Flow', () => {
 
     // Verify sites are displayed
     await waitFor(() => {
-      expect(screen.getByText('Site 1')).toBeInTheDocument();
+      // Site name appears in both the SiteCard and dropdown options
+      expect(screen.getAllByText('Site 1').length).toBeGreaterThan(0);
     });
   });
 
@@ -75,9 +80,9 @@ describe('Dashboard Integration Flow', () => {
 
   it('should calculate and display site status counts', async () => {
     const sites = [
-      createMockSite({ id: 'site-001', status: 'normal' }),
-      createMockSite({ id: 'site-002', status: 'warning' }),
-      createMockSite({ id: 'site-003', status: 'critical' }),
+      createMockSite({ id: 'site-001', name: 'Site 1', status: 'normal' }),
+      createMockSite({ id: 'site-002', name: 'Site 2', status: 'warning' }),
+      createMockSite({ id: 'site-003', name: 'Site 3', status: 'critical' }),
     ];
 
     (api.getSites as any).mockResolvedValue(sites);
@@ -86,8 +91,8 @@ describe('Dashboard Integration Flow', () => {
     render(<Dashboard onViewChange={mockOnViewChange} />);
 
     await waitFor(() => {
-      // Should display site cards
-      expect(screen.getByText('Site 1')).toBeInTheDocument();
+      // Should display site cards (Site name appears in both card and dropdown)
+      expect(screen.getAllByText('Site 1').length).toBeGreaterThan(0);
     });
   });
 });

@@ -244,58 +244,6 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
     }
   };
 
-  /**
-   * Generate a mock maintenance date based on equipment health score
-   * Healthier equipment = more recent maintenance
-   */
-  const generateMockMaintenanceDate = (equipmentId: string, healthScore: number): Date => {
-    const seed = equipmentId.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
-
-    let monthsAgo: number;
-    if (healthScore >= thresholds.healthy) {
-      monthsAgo = 1 + (seed % 3);
-    } else if (healthScore >= thresholds.warning) {
-      monthsAgo = 3 + (seed % 4);
-    } else {
-      monthsAgo = 6 + (seed % 7);
-    }
-
-    const date = new Date();
-    date.setMonth(date.getMonth() - monthsAgo);
-    const daysInMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
-    date.setDate(1 + (seed % daysInMonth));
-
-    return date;
-  };
-
-  const formatDate = (dateStr: string | undefined, equipmentId?: string, healthScore?: number) => {
-    if (dateStr && dateStr !== "N/A" && dateStr.trim() !== "") {
-      try {
-        const date = new Date(dateStr);
-        if (!isNaN(date.getTime())) {
-          return date.toLocaleDateString("en-ZA", {
-            year: "numeric",
-            month: "short",
-            day: "numeric",
-          });
-        }
-      } catch (e) {
-        // Invalid date, fall through to mock data
-      }
-    }
-    
-    if (equipmentId && healthScore !== undefined) {
-      const mockDate = generateMockMaintenanceDate(equipmentId, healthScore);
-      return mockDate.toLocaleDateString("en-ZA", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-      });
-    }
-    
-    return "N/A";
-  };
-
   // Reserved for future use:
   // const getHealthColor = (score: number) => {
   //   if (score >= thresholds.healthy) return "var(--color-sentinel-green)";
@@ -425,7 +373,7 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
   // Calculate summary stats based on status field (matches what's shown in table)
   const healthyEquipment = equipment.filter((e) => e.status === "normal" || e.status === "online").length;
   const warningEquipment = equipment.filter((e) => e.status === "warning").length;
-  const criticalEquipment = equipment.filter((e) => e.status === "critical" || e.status === "offline").length;
+  const criticalEquipment = equipment.filter((e) => e.status === "critical" || e.status === "offline" || e.status === "maintenance").length;
   const avgHealth = equipment.length > 0
     ? Math.round(equipment.reduce((sum, e) => sum + e.health_score, 0) / equipment.length)
     : 0;
@@ -784,24 +732,60 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
                   >
                     {healthyEquipment} OK
                   </div>
-                  <div
-                    className="px-2 py-1 rounded text-xs font-medium"
+                  <button
+                    onClick={() => {
+                      // Filter to warning equipment and show first prediction if available
+                      const warningItems = equipment.filter((e) => e.status === "warning");
+                      if (warningItems.length > 0) {
+                        const prediction = predictions.find(
+                          (p) => warningItems.some((w) => p.equipment_id === w.id || p.equipment_name === w.name)
+                        );
+                        if (prediction) {
+                          setSelectedPrediction(prediction);
+                          setIsPredictionDetailOpen(true);
+                        } else {
+                          // No prediction yet - show the first warning equipment in control panel
+                          const firstWarning = warningItems[0];
+                          handleEquipmentClick(firstWarning);
+                        }
+                      }
+                    }}
+                    className="px-2 py-1 rounded text-xs font-medium transition-all hover:brightness-110 cursor-pointer"
                     style={{
                       background: "rgba(245, 158, 11, 0.15)",
                       color: "var(--color-sentinel-amber)",
                     }}
+                    title="Click to view failure predictions for warning equipment"
                   >
                     {warningEquipment} Warning
-                  </div>
-                  <div
-                    className="px-2 py-1 rounded text-xs font-medium"
+                  </button>
+                  <button
+                    onClick={() => {
+                      // Filter to critical equipment and show first prediction if available
+                      const criticalItems = equipment.filter((e) => e.status === "critical" || e.status === "offline" || e.status === "maintenance");
+                      if (criticalItems.length > 0) {
+                        const prediction = predictions.find(
+                          (p) => criticalItems.some((c) => p.equipment_id === c.id || p.equipment_name === c.name)
+                        );
+                        if (prediction) {
+                          setSelectedPrediction(prediction);
+                          setIsPredictionDetailOpen(true);
+                        } else {
+                          // No prediction yet - show the first critical equipment in control panel
+                          const firstCritical = criticalItems[0];
+                          handleEquipmentClick(firstCritical);
+                        }
+                      }
+                    }}
+                    className="px-2 py-1 rounded text-xs font-medium transition-all hover:brightness-110 cursor-pointer"
                     style={{
                       background: "rgba(220, 38, 38, 0.15)",
                       color: "var(--color-sentinel-red)",
                     }}
+                    title="Click to view failure predictions for critical equipment"
                   >
                     {criticalEquipment} Critical
-                  </div>
+                  </button>
                 </div>
               </div>
 
@@ -820,8 +804,8 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
                       color: selectedCategory === null
                         ? "white"
                         : "var(--color-sentinel-text-secondary)",
-                      ringColor: "var(--color-sentinel-blue)",
-                    }}
+                      "--tw-ring-color": "var(--color-sentinel-blue)",
+                    } as React.CSSProperties}
                   >
                     All ({equipment.length})
                   </button>
@@ -839,8 +823,8 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
                         color: selectedCategory === category
                           ? "white"
                           : "var(--color-sentinel-text-secondary)",
-                        ringColor: "var(--color-sentinel-blue)",
-                      }}
+                        "--tw-ring-color": "var(--color-sentinel-blue)",
+                      } as React.CSSProperties}
                     >
                       {category} ({stats.total})
                       {stats.critical > 0 && (

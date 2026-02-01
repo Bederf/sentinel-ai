@@ -15,12 +15,14 @@ import { useState, useEffect, useMemo } from "react";
 import {
   Building2,
   AlertTriangle,
+  AlertCircle,
   Cpu,
   Shield,
   Bell,
   DollarSign,
   RefreshCw,
   LayoutGrid,
+  XCircle,
 } from "lucide-react";
 import {
   DndContext,
@@ -38,7 +40,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable';
 import api from "../lib/api";
-import type { DashboardStats, Site, Prediction, EnergyDataPoint } from "../lib/api";
+import type { DashboardStats, Site, Prediction, EnergyDataPoint, BuildingEquipmentItem } from "../lib/api";
 import { SortableKPICard } from "./SortableKPICard";
 import { DashboardSection } from "./DashboardSection";
 import { SiteCard } from "./SiteCard";
@@ -47,7 +49,6 @@ import { SiteDetail } from "./SiteDetail";
 import { EnergyChart } from "./EnergyChart";
 import { PredictionCard } from "./PredictionCard";
 import { PredictionDetail } from "./PredictionDetail";
-import { HeroPredictionCard } from "./HeroPredictionCard";
 import { ROISummaryCard } from "./ROISummaryCard";
 import { OccupancyPanel } from "./OccupancyPanel";
 import ComfortComplaintPanel from "./ComfortComplaintPanel";
@@ -99,6 +100,9 @@ export function Dashboard({ onViewChange }: DashboardProps) {
   const [energyFilterSiteId, setEnergyFilterSiteId] = useState<string | null>(null);
   const [selectedDays, setSelectedDays] = useState<TimePeriod>(30);
 
+  // At-risk equipment state (warning/critical status)
+  const [atRiskEquipment, setAtRiskEquipment] = useState<BuildingEquipmentItem[]>([]);
+
   // Drag and drop state
   const [sectionOrder, setSectionOrder] = useState<DashboardSectionId[]>([
     'kpi-row',
@@ -142,6 +146,19 @@ export function Dashboard({ onViewChange }: DashboardProps) {
         setSites(sitesData);
         setPredictions(predictionsData.predictions);
         setError(null);
+
+        // Load at-risk equipment from Sandton (site-002)
+        try {
+          const equipmentData = await api.getBuildingEquipment("sandton");
+          // Filter for warning and critical status only
+          const riskEquipment = equipmentData.equipment.filter(
+            (e) => e.status === "warning" || e.status === "critical"
+          );
+          setAtRiskEquipment(riskEquipment);
+        } catch (eqErr) {
+          console.error("Failed to load at-risk equipment:", eqErr);
+          setAtRiskEquipment([]);
+        }
       } catch (err) {
         console.error("Failed to load dashboard data:", err);
         setError("Failed to load dashboard data");
@@ -655,21 +672,146 @@ export function Dashboard({ onViewChange }: DashboardProps) {
         {/* ROI Summary Card */}
         {predictions.length > 0 && <ROISummaryCard predictions={predictions} />}
 
-        {/* Hero Prediction Card - Highest Risk */}
-        {predictions.length > 0 && (
-          <HeroPredictionCard
-            prediction={predictions.reduce((highest, p) =>
-              p.probability_percent > highest.probability_percent ? p : highest
-            )}
-            onClick={() =>
-              handlePredictionClick(
-                predictions.reduce((highest, p) =>
-                  p.probability_percent > highest.probability_percent ? p : highest
-                )
-              )
-            }
-          />
-        )}
+        {/* Hero Risk Card - Highest Risk Equipment */}
+        {atRiskEquipment.length > 0 && (() => {
+          // Find highest risk: critical first, then warning, sorted by lowest health
+          const sortedRisk = [...atRiskEquipment].sort((a, b) => {
+            // Critical comes before warning
+            if (a.status === "critical" && b.status !== "critical") return -1;
+            if (b.status === "critical" && a.status !== "critical") return 1;
+            // Then sort by health (lower = higher risk)
+            return a.health - b.health;
+          });
+          const highestRisk = sortedRisk[0];
+          const riskProbability = highestRisk.status === "critical"
+            ? Math.max(80, 100 - highestRisk.health)
+            : Math.max(60, 100 - highestRisk.health);
+
+          return (
+            <div
+              className="rounded-md overflow-hidden cursor-pointer hover:brightness-105 transition-all"
+              style={{
+                background: highestRisk.status === "critical"
+                  ? "linear-gradient(135deg, rgba(220, 38, 38, 0.2) 0%, rgba(220, 38, 38, 0.1) 100%)"
+                  : "linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(245, 158, 11, 0.1) 100%)",
+                border: `1px solid ${highestRisk.status === "critical" ? "rgba(220, 38, 38, 0.4)" : "rgba(245, 158, 11, 0.4)"}`,
+              }}
+              onClick={() => setSelectedSiteId("site-002")}
+            >
+              <div className="p-5">
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span
+                        className="text-xs px-2 py-0.5 rounded font-medium uppercase"
+                        style={{
+                          background: highestRisk.status === "critical" ? "rgba(220, 38, 38, 0.3)" : "rgba(245, 158, 11, 0.3)",
+                          color: highestRisk.status === "critical" ? "var(--color-sentinel-red)" : "var(--color-sentinel-amber)",
+                        }}
+                      >
+                        Highest Risk - Immediate Attention Required
+                      </span>
+                    </div>
+                    <h3
+                      className="text-lg font-semibold"
+                      style={{ color: "var(--color-sentinel-text-primary)" }}
+                    >
+                      {highestRisk.name}
+                    </h3>
+                    <p
+                      className="text-sm"
+                      style={{ color: "var(--color-sentinel-text-secondary)" }}
+                    >
+                      {highestRisk.category} • {highestRisk.type} • {highestRisk.location}
+                    </p>
+                    <p
+                      className="text-xs"
+                      style={{ color: "var(--color-sentinel-text-secondary)" }}
+                    >
+                      {highestRisk.building_name} • {highestRisk.building_id}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <div
+                      className="text-3xl font-bold"
+                      style={{
+                        color: highestRisk.status === "critical" ? "var(--color-sentinel-red)" : "var(--color-sentinel-amber)",
+                      }}
+                    >
+                      {highestRisk.health}%
+                    </div>
+                    <div
+                      className="text-xs uppercase font-medium"
+                      style={{
+                        color: highestRisk.status === "critical" ? "var(--color-sentinel-red)" : "var(--color-sentinel-amber)",
+                      }}
+                    >
+                      Health Score
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
+                  <div
+                    className="p-3 rounded"
+                    style={{ background: "rgba(0, 0, 0, 0.2)" }}
+                  >
+                    <div
+                      className="text-xs mb-1"
+                      style={{ color: "var(--color-sentinel-text-secondary)" }}
+                    >
+                      Risk Level
+                    </div>
+                    <div
+                      className="text-lg font-semibold"
+                      style={{
+                        color: highestRisk.status === "critical" ? "var(--color-sentinel-red)" : "var(--color-sentinel-amber)",
+                      }}
+                    >
+                      {riskProbability}%
+                    </div>
+                  </div>
+                  <div
+                    className="p-3 rounded"
+                    style={{ background: "rgba(0, 0, 0, 0.2)" }}
+                  >
+                    <div
+                      className="text-xs mb-1"
+                      style={{ color: "var(--color-sentinel-text-secondary)" }}
+                    >
+                      Status
+                    </div>
+                    <div
+                      className="text-lg font-semibold uppercase"
+                      style={{
+                        color: highestRisk.status === "critical" ? "var(--color-sentinel-red)" : "var(--color-sentinel-amber)",
+                      }}
+                    >
+                      {highestRisk.status}
+                    </div>
+                  </div>
+                  <div
+                    className="p-3 rounded"
+                    style={{ background: "rgba(0, 0, 0, 0.2)" }}
+                  >
+                    <div
+                      className="text-xs mb-1"
+                      style={{ color: "var(--color-sentinel-text-secondary)" }}
+                    >
+                      Action Required
+                    </div>
+                    <div
+                      className="text-sm font-medium"
+                      style={{ color: "var(--color-sentinel-text-primary)" }}
+                    >
+                      {highestRisk.status === "critical" ? "Immediate" : "Schedule"}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Predictions Panel */}
         <div
@@ -709,33 +851,137 @@ export function Dashboard({ onViewChange }: DashboardProps) {
                 </span>
               </div>
             </div>
-            {predictions.length > 0 && (
+            {(atRiskEquipment.length > 0 || predictions.length > 0) && (
               <div className="flex items-center gap-2">
-                <span
-                  className="text-xs px-2 py-1 rounded"
-                  style={{
-                    background: "rgba(245, 158, 11, 0.15)",
-                    color: "var(--color-sentinel-amber)",
-                  }}
-                >
-                  {predictions.length} at-risk assets
-                </span>
-                <span
-                  className="text-xs px-2 py-1 rounded"
-                  style={{
-                    background: "rgba(16, 185, 129, 0.15)",
-                    color: "var(--color-sentinel-green)",
-                  }}
-                >
-                  {formatZAR(totalPotentialSavings)} saveable
-                </span>
+                {atRiskEquipment.filter(e => e.status === "warning").length > 0 && (
+                  <span
+                    className="text-xs px-2 py-1 rounded"
+                    style={{
+                      background: "rgba(245, 158, 11, 0.15)",
+                      color: "var(--color-sentinel-amber)",
+                    }}
+                  >
+                    {atRiskEquipment.filter(e => e.status === "warning").length} Warning
+                  </span>
+                )}
+                {atRiskEquipment.filter(e => e.status === "critical").length > 0 && (
+                  <span
+                    className="text-xs px-2 py-1 rounded"
+                    style={{
+                      background: "rgba(220, 38, 38, 0.15)",
+                      color: "var(--color-sentinel-red)",
+                    }}
+                  >
+                    {atRiskEquipment.filter(e => e.status === "critical").length} Critical
+                  </span>
+                )}
+                {predictions.length > 0 && (
+                  <span
+                    className="text-xs px-2 py-1 rounded"
+                    style={{
+                      background: "rgba(16, 185, 129, 0.15)",
+                      color: "var(--color-sentinel-green)",
+                    }}
+                  >
+                    {formatZAR(totalPotentialSavings)} saveable
+                  </span>
+                )}
               </div>
             )}
           </div>
 
+          {/* At-Risk Equipment Section */}
+          {atRiskEquipment.length > 0 && (
+            <div
+              className="p-4"
+              style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}
+            >
+              <h4
+                className="text-sm font-medium mb-3"
+                style={{ color: "var(--color-sentinel-text-primary)" }}
+              >
+                Equipment Requiring Attention
+              </h4>
+              <div className="space-y-2">
+                {atRiskEquipment.map((equip) => (
+                  <div
+                    key={equip.id}
+                    className="flex items-center justify-between p-3 rounded cursor-pointer hover:brightness-110 transition-all"
+                    style={{
+                      background: equip.status === "critical"
+                        ? "rgba(220, 38, 38, 0.1)"
+                        : "rgba(245, 158, 11, 0.1)",
+                      border: `1px solid ${equip.status === "critical"
+                        ? "rgba(220, 38, 38, 0.3)"
+                        : "rgba(245, 158, 11, 0.3)"}`,
+                    }}
+                    onClick={() => {
+                      // Navigate to site detail for this equipment
+                      setSelectedSiteId("site-002");
+                    }}
+                  >
+                    <div className="flex items-center gap-3">
+                      {equip.status === "critical" ? (
+                        <XCircle className="h-5 w-5" style={{ color: "var(--color-sentinel-red)" }} />
+                      ) : (
+                        <AlertCircle className="h-5 w-5" style={{ color: "var(--color-sentinel-amber)" }} />
+                      )}
+                      <div>
+                        <div
+                          className="font-medium text-sm"
+                          style={{ color: "var(--color-sentinel-text-primary)" }}
+                        >
+                          {equip.name}
+                        </div>
+                        <div
+                          className="text-xs"
+                          style={{ color: "var(--color-sentinel-text-secondary)" }}
+                        >
+                          {equip.category} • {equip.location}
+                        </div>
+                        <div
+                          className="text-xs"
+                          style={{ color: "var(--color-sentinel-text-secondary)" }}
+                        >
+                          {equip.building_name} • {equip.building_id}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="text-right"
+                      >
+                        <div
+                          className="text-sm font-medium"
+                          style={{
+                            color: equip.status === "critical"
+                              ? "var(--color-sentinel-red)"
+                              : "var(--color-sentinel-amber)",
+                          }}
+                        >
+                          {equip.health}%
+                        </div>
+                        <div
+                          className="text-xs uppercase"
+                          style={{
+                            color: equip.status === "critical"
+                              ? "var(--color-sentinel-red)"
+                              : "var(--color-sentinel-amber)",
+                          }}
+                        >
+                          {equip.status}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Predictions Grid */}
           <div className="p-4">
-            {predictions.length === 0 ? (
+            {predictions.length === 0 && atRiskEquipment.length === 0 ? (
               <div className="text-center py-8">
                 <Shield
                   className="h-12 w-12 mx-auto mb-2"
@@ -745,7 +991,7 @@ export function Dashboard({ onViewChange }: DashboardProps) {
                   No risk predictions detected
                 </span>
               </div>
-            ) : (
+            ) : predictions.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                 {predictions.map((prediction) => (
                   <PredictionCard
@@ -755,7 +1001,7 @@ export function Dashboard({ onViewChange }: DashboardProps) {
                   />
                 ))}
               </div>
-            )}
+            ) : null}
           </div>
         </div>
       </div>

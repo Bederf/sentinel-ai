@@ -32,6 +32,8 @@ from app.api import timeseries  # Phase 42 InfluxDB time-series data
 from app.api import sensor_analysis  # Phase 41-03 phyphox sensor analysis
 from app.api import features  # Phase 42-02 ML feature store
 from app.api import data_quality  # Phase 42-03 Data quality monitoring
+from app.api import survival  # Phase 43-03 Survival analysis (Cox PH)
+from app.api import classification  # Phase 43-04 Failure type classification (Random Forest)
 from app.middleware.audit_middleware import AuditMiddleware
 from app.services.background_scheduler import scheduler_service
 from app.api.simulation import simulation_service  # BMS simulation service
@@ -98,6 +100,8 @@ app.include_router(timeseries.router)  # Phase 42 InfluxDB time-series data
 app.include_router(sensor_analysis.router)  # Phase 41-03 phyphox sensor analysis
 app.include_router(features.router)  # Phase 42-02 ML feature store
 app.include_router(data_quality.router)  # Phase 42-03 Data quality monitoring
+app.include_router(survival.router)  # Phase 43-03 Survival analysis
+app.include_router(classification.router, prefix="/api/classification", tags=["classification"])  # Phase 43-04 Failure type classification
 
 
 @app.on_event("startup")

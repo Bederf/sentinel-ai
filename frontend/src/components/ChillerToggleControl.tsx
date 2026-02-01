@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Power, PowerOff } from 'lucide-react';
 import { useControlAction } from '../hooks/useControlAction';
 

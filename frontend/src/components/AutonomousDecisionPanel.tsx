@@ -2,9 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card } from './Card';
 import { Badge } from './Badge';
 import { RefreshCw, CheckCircle, XCircle, AlertTriangle, Clock } from 'lucide-react';
-import { useAutonomousSystem } from '@/hooks/useAutonomousSystem';
 import { api } from '@/lib/api';
-import { motion } from 'framer-motion';
 
 interface AutonomousDecisionPanelProps {
   autoRefresh?: boolean;
@@ -17,7 +15,6 @@ export const AutonomousDecisionPanel: React.FC<AutonomousDecisionPanelProps> = (
 }) => {
   const [decisions, setDecisions] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const { systemStatus } = useAutonomousSystem();
 
   const fetchDecisions = async () => {
     setIsLoading(true);
@@ -73,17 +70,6 @@ export const AutonomousDecisionPanel: React.FC<AutonomousDecisionPanelProps> = (
         <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
           Autonomous Decisions
         </h3>
-        {systemStatus && (
-          <Badge
-            className={`${
-              systemStatus.enabled
-                ? 'bg-green-500 text-white'
-                : 'bg-gray-500 text-white'
-            }`}
-          >
-            {systemStatus.enabled ? 'Autonomous: ON' : 'Autonomous: OFF'}
-          </Badge>
-        )}
       </div>
 
       {isLoading ? (
@@ -98,12 +84,9 @@ export const AutonomousDecisionPanel: React.FC<AutonomousDecisionPanelProps> = (
               No autonomous decisions yet
             </p>
           ) : (
-            decisions.map((decision, index) => (
-              <motion.div
+            decisions.map((decision) => (
+              <div
                 key={decision.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.05 }}
                 className="border rounded-lg p-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
               >
                 <div className="flex items-center justify-between mb-2">
@@ -138,7 +121,7 @@ export const AutonomousDecisionPanel: React.FC<AutonomousDecisionPanelProps> = (
                     Executed in {decision.execution_time_ms.toFixed(1)}ms
                   </div>
                 )}
-              </motion.div>
+              </div>
             ))
           )}
         </div>

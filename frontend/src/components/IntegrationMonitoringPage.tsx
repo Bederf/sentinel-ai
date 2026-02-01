@@ -180,13 +180,6 @@ function formatRelativeTime(dateStr: string): string {
   return `${diffDays} days ago`;
 }
 
-// Quality score color
-function getQualityColor(score: number): string {
-  if (score < 50) return "var(--color-sentinel-red)";
-  if (score < 80) return "var(--color-sentinel-amber)";
-  return "var(--color-sentinel-green)";
-}
-
 // Main component
 export function IntegrationMonitoringPage() {
   // State
@@ -468,15 +461,13 @@ export function IntegrationMonitoringPage() {
             <HealthCard
               title="Quality Score"
               value={
-                qualityMetrics ? (
-                  <span style={{ color: getQualityColor(qualityMetrics.overall_score) }}>
-                    {qualityMetrics.overall_score.toFixed(0)}%
-                  </span>
-                ) : selectedBuildingId ? (
-                  loadingQuality ? "..." : "N/A"
-                ) : (
-                  "Select building"
-                )
+                qualityMetrics
+                  ? `${qualityMetrics.overall_score.toFixed(0)}%`
+                  : selectedBuildingId
+                  ? loadingQuality
+                    ? "..."
+                    : "N/A"
+                  : "Select building"
               }
               subtitle={
                 qualityMetrics

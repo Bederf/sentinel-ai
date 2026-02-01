@@ -12,7 +12,8 @@ describe('KPICard', () => {
   describe('Rendering', () => {
     it('should render title', () => {
       render(<KPICard title="Test KPI" value={100} />);
-      expect(screen.getByText('TEST KPI')).toBeInTheDocument();
+      // CSS applies uppercase, but DOM text is unchanged
+      expect(screen.getByText('Test KPI')).toBeInTheDocument();
     });
 
     it('should render numeric value', () => {
@@ -108,10 +109,11 @@ describe('KPICard', () => {
     it('should call onClick when card is clicked', async () => {
       const handleClick = vi.fn();
       const user = userEvent.setup();
-      
+
       render(<KPICard title="Test" value={100} onClick={handleClick} />);
-      
-      const card = screen.getByText('TEST KPI').closest('div[class*="cursor-pointer"]');
+
+      // CSS applies uppercase, but DOM text is unchanged
+      const card = screen.getByText('Test').closest('div[class*="cursor-pointer"]');
       if (card) {
         await user.click(card);
         expect(handleClick).toHaveBeenCalledTimes(1);

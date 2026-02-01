@@ -14,9 +14,7 @@ import { useState, useEffect } from "react";
 import {
   Brain,
   TrendingUp,
-  AlertTriangle,
   CheckCircle,
-  XCircle,
   Clock,
   Lightbulb,
 } from "lucide-react";
@@ -140,51 +138,6 @@ export function OptimizationInfoCard({
       </div>
     );
   }
-
-  const getStatusConfig = (status: OptimizationStatusType) => {
-    switch (status) {
-      case "optimized":
-        return {
-          icon: <CheckCircle className="h-5 w-5" />,
-          color: "var(--color-sentinel-green)",
-          bgColor: "rgba(16, 185, 129, 0.15)",
-          label: "Optimized",
-          message: "Building is running at optimal settings",
-        };
-      case "recommendation_pending":
-        return {
-          icon: <Lightbulb className="h-5 w-5" />,
-          color: "var(--color-sentinel-amber)",
-          bgColor: "rgba(245, 158, 11, 0.15)",
-          label: "Recommendation Available",
-          message: "AI has suggestions to improve efficiency",
-        };
-      case "warning":
-        return {
-          icon: <AlertTriangle className="h-5 w-5" />,
-          color: "var(--color-sentinel-amber)",
-          bgColor: "rgba(245, 158, 11, 0.15)",
-          label: "Review Needed",
-          message: "Recommendation requires attention",
-        };
-      case "error":
-        return {
-          icon: <XCircle className="h-5 w-5" />,
-          color: "var(--color-sentinel-red)",
-          bgColor: "rgba(220, 38, 38, 0.15)",
-          label: "Optimization Error",
-          message: "Last optimization failed",
-        };
-      default:
-        return {
-          icon: <Clock className="h-5 w-5" />,
-          color: "var(--color-sentinel-text-disabled)",
-          bgColor: "rgba(142, 142, 142, 0.15)",
-          label: "Analyzing...",
-          message: "AI is analyzing building conditions",
-        };
-    }
-  };
 
 
   // Handle approve recommendation

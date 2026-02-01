@@ -66,6 +66,8 @@ export interface BuildingEquipmentItem {
   status: "normal" | "warning" | "critical" | "unknown";
   health: number;
   location: string;
+  building_id: string;
+  building_name: string;
   details: Record<string, any>;
   controllable: boolean;
 }
@@ -110,6 +112,13 @@ export interface Site {
   active_alerts?: number;
   // Equipment breakdown (when available from Supabase or JSON)
   equipment_breakdown?: EquipmentBreakdown;
+  // Equipment status counts (ok/warning/critical)
+  equipment_status?: {
+    total: number;
+    ok: number;
+    warning: number;
+    critical: number;
+  };
   // Optimization fields (Phase 8)
   optimization_enabled?: boolean;
   optimization_status?: "optimized" | "recommendation_pending" | "warning" | "error" | "unknown";
@@ -129,7 +138,10 @@ export interface Equipment {
   type: string;
   site_id: string;
   site_name: string;
-  status: "online" | "offline" | "maintenance";
+  status: "online" | "offline" | "maintenance" | "normal" | "warning" | "critical" | "unknown";
+  location?: string;
+  building_id?: string;
+  building_name?: string;
   last_reading?: {
     timestamp: string;
     value: number;
@@ -171,6 +183,8 @@ export interface Anomaly {
 
 // Device point interface
 export interface DevicePoint {
+  id?: string; // Point ID
+  device_id?: string; // Device ID this point belongs to
   name: string;
   point_type: string;
   description: string;

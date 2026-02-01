@@ -144,7 +144,7 @@ describe('ControlPanel', () => {
   });
 
   describe('Safety Status Integration', () => {
-    it('should display safety rules when provided', () => {
+    it('should display safety warning message when provided', () => {
       render(
         <ControlPanel
           device={mockDevice}
@@ -158,8 +158,10 @@ describe('ControlPanel', () => {
           }}
         />
       );
-      expect(screen.getByText('Temperature range')).toBeInTheDocument();
-      expect(screen.getByText('Runtime limit')).toBeInTheDocument();
+      // Component displays WARNING badge and safety message
+      expect(screen.getByText('WARNING')).toBeInTheDocument();
+      expect(screen.getByText('Warning condition')).toBeInTheDocument();
+      expect(screen.getByText('Safety Warning')).toBeInTheDocument();
     });
 
     it('should disable controls when status is blocked', () => {

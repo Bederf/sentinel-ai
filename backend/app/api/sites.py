@@ -142,6 +142,35 @@ def get_json_asset_counts(site_id: str) -> dict:
     }
 
 
+def get_equipment_status_breakdown(building_uuid: str) -> dict:
+    """Get equipment count by status for a building.
+
+    Args:
+        building_uuid: Building UUID
+
+    Returns:
+        Dict with total, ok, warning, critical counts
+    """
+    try:
+        from app.database.supabase_client import get_supabase_client
+        client = get_supabase_client()
+
+        # Count equipment by status
+        counts = {"total": 0, "ok": 0, "warning": 0, "critical": 0}
+
+        for status, key in [("normal", "ok"), ("warning", "warning"), ("critical", "critical")]:
+            result = client.table("equipment").select("id", count="exact").eq(
+                "building_id", building_uuid
+            ).eq("status", status).execute()
+            counts[key] = result.count or 0
+            counts["total"] += counts[key]
+
+        return counts
+    except Exception as e:
+        logger.warning(f"Failed to get equipment status breakdown: {e}")
+        return {"total": 0, "ok": 0, "warning": 0, "critical": 0}
+
+
 def calculate_site_status(site_alerts: list[dict]) -> Literal["normal", "warning", "critical"]:
     """Calculate site status based on active alerts."""
     if not site_alerts:
@@ -168,7 +197,8 @@ def db_to_site_dict(
     db_building: dict,
     equipment_count: int = 0,
     alert_count: int = 0,
-    asset_summary: Optional[dict] = None
+    asset_summary: Optional[dict] = None,
+    equipment_status: Optional[dict] = None
 ) -> dict:
     """Convert database building record to API-compatible site dict.
 
@@ -177,10 +207,14 @@ def db_to_site_dict(
         equipment_count: Legacy equipment count (fallback)
         alert_count: Active alert count
         asset_summary: Asset summary from v_building_asset_summary view (if available)
+        equipment_status: Equipment status breakdown (ok/warning/critical counts)
     """
-    operating_hours = db_building.get("operating_hours") or {}
+    operating_hours = db_building.get("operating_hours") or {"start": "08:00", "end": "18:00"}
     if isinstance(operating_hours, str):
-        operating_hours = json.loads(operating_hours)
+        try:
+            operating_hours = json.loads(operating_hours)
+        except (json.JSONDecodeError, TypeError):
+            operating_hours = {"start": "08:00", "end": "18:00"}
 
     # Use total_assets from summary if available, otherwise fall back to equipment_count
     if asset_summary:
@@ -189,24 +223,24 @@ def db_to_site_dict(
         total_assets = equipment_count or db_building.get("equipment_count", 0)
 
     result = {
-        "id": db_building.get("code"),
-        "name": db_building.get("name"),
-        "address": db_building.get("address", ""),
-        "region": db_building.get("region", ""),
-        "type": db_building.get("type", "branch"),
-        "sqm": db_building.get("sqm", 0),
-        "floors": db_building.get("floors", 1),
-        "year_built": db_building.get("year_built", 2020),
-        "operating_hours": operating_hours if operating_hours else {"start": "08:00", "end": "18:00"},
-        "timezone": db_building.get("timezone", "Africa/Johannesburg"),
-        "occupancy_pattern": db_building.get("occupancy_pattern", "office"),
-        "latitude": float(db_building.get("latitude", 0)) if db_building.get("latitude") else 0.0,
-        "longitude": float(db_building.get("longitude", 0)) if db_building.get("longitude") else 0.0,
-        "contact_email": db_building.get("contact_email", ""),
-        "contact_phone": db_building.get("contact_phone", ""),
-        "optimization_enabled": db_building.get("optimization_enabled", False),
+        "id": db_building.get("code") or db_building.get("id", "unknown"),
+        "name": db_building.get("name") or "Unknown Building",
+        "address": db_building.get("address") or "",
+        "region": db_building.get("region") or "Unknown",
+        "type": db_building.get("type") or "regional_office",
+        "sqm": db_building.get("sqm") or 0,
+        "floors": db_building.get("floors") or 1,
+        "year_built": db_building.get("year_built") or 2020,
+        "operating_hours": operating_hours,
+        "timezone": db_building.get("timezone") or "Africa/Johannesburg",
+        "occupancy_pattern": db_building.get("occupancy_pattern") or "office",
+        "latitude": float(db_building.get("latitude") or 0),
+        "longitude": float(db_building.get("longitude") or 0),
+        "contact_email": db_building.get("contact_email") or "",
+        "contact_phone": db_building.get("contact_phone") or "",
+        "optimization_enabled": db_building.get("optimization_enabled") or False,
         "optimization_status": db_building.get("optimization_status") or "unknown",
-        "control_enabled": db_building.get("control_enabled", False),
+        "control_enabled": db_building.get("control_enabled") or False,
         "control_note": db_building.get("control_note"),
         "equipment_count": total_assets,  # Total assets (renamed from equipment_count for API compat)
         "alert_count": alert_count,
@@ -234,6 +268,10 @@ def db_to_site_dict(
             ),
             "dali_controllers": asset_summary.get("dali_controller_count", 0),
         }
+
+    # Include equipment status breakdown if available
+    if equipment_status:
+        result["equipment_status"] = equipment_status
 
     return result
 
@@ -263,6 +301,14 @@ class SiteBase(BaseModel):
     contact_phone: str
 
 
+class EquipmentStatusBreakdown(BaseModel):
+    """Equipment status breakdown."""
+    total: int = 0
+    ok: int = 0
+    warning: int = 0
+    critical: int = 0
+
+
 class SiteResponse(SiteBase):
     """Site response with computed fields."""
     equipment_count: int = 0
@@ -274,6 +320,7 @@ class SiteResponse(SiteBase):
     optimization_status: str = "unknown"
     control_enabled: bool = False
     control_note: Optional[str] = None
+    equipment_status: Optional[EquipmentStatusBreakdown] = None
 
 
 class SiteListResponse(BaseModel):
@@ -312,7 +359,10 @@ def get_sites_from_supabase(
             eq_count = repo.get_equipment_count(building_uuid) if building_uuid else 0
             alert_count = repo.get_alert_count(building_uuid) if building_uuid else 0
 
-            sites.append(db_to_site_dict(b, eq_count, alert_count, asset_summary))
+            # Get equipment status breakdown
+            equipment_status = get_equipment_status_breakdown(building_uuid) if building_uuid else None
+
+            sites.append(db_to_site_dict(b, eq_count, alert_count, asset_summary, equipment_status))
 
         return sites, True
     except Exception as e:
@@ -341,7 +391,10 @@ def get_site_from_supabase(site_id: str) -> tuple[Optional[dict], bool]:
         eq_count = repo.get_equipment_count(building_uuid) if building_uuid else 0
         alert_count = repo.get_alert_count(building_uuid) if building_uuid else 0
 
-        return db_to_site_dict(building, eq_count, alert_count, asset_summary), True
+        # Get equipment status breakdown
+        equipment_status = get_equipment_status_breakdown(building_uuid) if building_uuid else None
+
+        return db_to_site_dict(building, eq_count, alert_count, asset_summary, equipment_status), True
     except Exception as e:
         logger.warning(f"Supabase query failed, falling back to JSON: {e}")
         return None, False

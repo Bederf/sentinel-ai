@@ -65,9 +65,9 @@ export function DeviceControl({
           point.description.toLowerCase().includes('chiller operational status')) {
         return (
           <ChillerToggleControl
-            deviceId={point.device_id}
+            deviceId={point.device_id || ''}
             point={{
-              id: point.id,
+              id: point.id || '',
               name: point.name,
               value: value as number,
               type: point.point_type,

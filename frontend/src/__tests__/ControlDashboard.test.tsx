@@ -19,6 +19,14 @@ vi.mock('../lib/api', () => ({
     getDevices: vi.fn(),
     getDevice: vi.fn(),
     controlDevice: vi.fn(),
+    getSites: vi.fn(),
+    getPredictions: vi.fn(),
+    getDeviceSafetyStatus: vi.fn(),
+    getRecentAuditLogs: vi.fn(),
+    getHealthThresholds: vi.fn().mockResolvedValue({
+      warning: 70,
+      critical: 40,
+    }),
   },
 }));
 
@@ -84,6 +92,12 @@ describe('ControlDashboard', () => {
       const device = mockDevices.find(d => d.id === id);
       return Promise.resolve(device);
     });
+    (api.getSites as ReturnType<typeof vi.fn>).mockResolvedValue([
+      { id: 'gateway-theatre', name: 'Gateway Theatre', location: 'Cape Town', status: 'normal' },
+    ]);
+    (api.getPredictions as ReturnType<typeof vi.fn>).mockResolvedValue({ predictions: [] });
+    (api.getDeviceSafetyStatus as ReturnType<typeof vi.fn>).mockResolvedValue({ overall_status: 'safe' });
+    (api.getRecentAuditLogs as ReturnType<typeof vi.fn>).mockResolvedValue({ entries: [] });
   });
 
   describe('Initial Loading', () => {
@@ -107,7 +121,8 @@ describe('ControlDashboard', () => {
       render(<ControlDashboard />);
 
       await waitFor(() => {
-        expect(screen.getByText(/online/i)).toBeInTheDocument();
+        // Component shows "X online, Y offline" in the device count header
+        expect(screen.getByText(/2 online/i)).toBeInTheDocument();
       });
     });
   });

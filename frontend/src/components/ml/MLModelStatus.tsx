@@ -25,10 +25,10 @@ import {
   NumberInput,
 } from "@tremor/react";
 import {
-  PlayIcon,
-  CheckCircleIcon,
-  ClockIcon,
-} from "@heroicons/react/24/outline";
+  Play,
+  CheckCircle,
+  Clock,
+} from "lucide-react";
 import type { MLModel, TrainResponse } from "../../lib/mlApi";
 import { listMLModels, trainModel, activateModel } from "../../lib/mlApi";
 
@@ -171,7 +171,7 @@ export function MLModelStatus({ onModelTrained }: MLModelStatusProps) {
 
           <div className="flex items-end">
             <Button
-              icon={PlayIcon}
+              icon={Play}
               onClick={handleTrain}
               loading={training}
               disabled={training}
@@ -220,7 +220,7 @@ export function MLModelStatus({ onModelTrained }: MLModelStatusProps) {
                   <TableCell>
                     <Badge
                       color={model.status === "active" ? "green" : "gray"}
-                      icon={model.status === "active" ? CheckCircleIcon : ClockIcon}
+                      icon={model.status === "active" ? CheckCircle : Clock}
                     >
                       {model.status}
                     </Badge>
@@ -282,7 +282,7 @@ export function MLModelStatus({ onModelTrained }: MLModelStatusProps) {
                   <TableCell>
                     <Badge
                       color={model.status === "active" ? "green" : "gray"}
-                      icon={model.status === "active" ? CheckCircleIcon : ClockIcon}
+                      icon={model.status === "active" ? CheckCircle : Clock}
                     >
                       {model.status}
                     </Badge>

@@ -21,6 +21,8 @@ from app.models.optimization import (
     OptimizationStatus,
     OptimizationHistoryEntry,
 )
+from app.database.repositories import BuildingRepository
+from app.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -312,8 +314,35 @@ class ToggleRequest(BaseModel):
 
 
 def load_sites():
-    """Load sites from JSON file."""
-    filepath = DATA_DIR / "sites.json"
+    """Load sites from Supabase, with fallback to legacy JSON file."""
+    # Try Supabase first
+    if not settings.use_json_storage:
+        try:
+            repo = BuildingRepository()
+            buildings = repo.get_all()
+            if buildings:
+                # Convert database format to expected format
+                sites = []
+                for b in buildings:
+                    site = {
+                        "id": b.get("code") or b.get("id"),
+                        "name": b.get("name"),
+                        "optimization_enabled": b.get("optimization_enabled", False),
+                        "optimization_status": b.get("optimization_status", "unknown"),
+                        "optimization_settings": b.get("optimization_settings"),
+                        "last_recommendation": b.get("last_recommendation"),
+                        "last_optimization": b.get("last_optimization"),
+                        "optimization_history": b.get("optimization_history", []),
+                        "error_message": b.get("error_message"),
+                        "_uuid": b.get("id"),  # Store UUID for updates
+                    }
+                    sites.append(site)
+                return sites
+        except Exception as e:
+            logger.warning(f"Failed to load sites from Supabase: {e}")
+
+    # Fallback to legacy JSON file
+    filepath = DATA_DIR / "_legacy" / "sites.json"
     if filepath.exists():
         with open(filepath) as f:
             return json.load(f)
@@ -321,8 +350,29 @@ def load_sites():
 
 
 def save_sites(sites: List[Dict[str, Any]]):
-    """Save sites to JSON file."""
-    filepath = DATA_DIR / "sites.json"
+    """Save sites to Supabase, with fallback to legacy JSON file."""
+    # Try Supabase first
+    if not settings.use_json_storage:
+        try:
+            repo = BuildingRepository()
+            for site in sites:
+                site_id = site.get("id")
+                # Build update data (only optimization-related fields that exist in schema)
+                update_data = {
+                    "optimization_enabled": site.get("optimization_enabled", False),
+                    "optimization_status": site.get("optimization_status", "unknown"),
+                    "optimization_settings": site.get("optimization_settings"),
+                    "last_recommendation": site.get("last_recommendation"),
+                    "last_optimization": site.get("last_optimization"),
+                    "optimization_history": site.get("optimization_history", []),
+                }
+                repo.update(site_id, update_data)
+            return
+        except Exception as e:
+            logger.warning(f"Failed to save sites to Supabase: {e}")
+
+    # Fallback to legacy JSON file
+    filepath = DATA_DIR / "_legacy" / "sites.json"
     with open(filepath, 'w') as f:
         json.dump(sites, f, indent=2)
 

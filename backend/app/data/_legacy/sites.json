@@ -24,209 +24,11 @@
     "optimization_status": "recommendation_pending",
     "optimization_settings": {
       "mode": "supervised",
-      "last_analysis": "2026-01-31T18:40:49.181449",
+      "last_analysis": "2026-01-31T23:41:49.850275",
       "analysis_interval_minutes": 15
     },
     "last_optimization": null,
     "optimization_history": [
-      {
-        "timestamp": "2026-01-31T06:04:15.564599",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.75,
-          "validation_passed": true,
-          "recommendations_count": 1
-        }
-      },
-      {
-        "timestamp": "2026-01-31T06:19:15.406712",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.75,
-          "validation_passed": true,
-          "recommendations_count": 1
-        }
-      },
-      {
-        "timestamp": "2026-01-31T06:34:15.363025",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.75,
-          "validation_passed": true,
-          "recommendations_count": 1
-        }
-      },
-      {
-        "timestamp": "2026-01-31T06:49:15.439675",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.75,
-          "validation_passed": true,
-          "recommendations_count": 1
-        }
-      },
-      {
-        "timestamp": "2026-01-31T07:04:15.336103",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.75,
-          "validation_passed": true,
-          "recommendations_count": 1
-        }
-      },
-      {
-        "timestamp": "2026-01-31T07:19:15.414426",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.75,
-          "validation_passed": true,
-          "recommendations_count": 1
-        }
-      },
-      {
-        "timestamp": "2026-01-31T07:34:15.246585",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.75,
-          "validation_passed": true,
-          "recommendations_count": 1
-        }
-      },
-      {
-        "timestamp": "2026-01-31T07:49:15.183009",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.75,
-          "validation_passed": true,
-          "recommendations_count": 1
-        }
-      },
-      {
-        "timestamp": "2026-01-31T08:04:15.907572",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.75,
-          "validation_passed": true,
-          "recommendations_count": 1
-        }
-      },
-      {
-        "timestamp": "2026-01-31T08:19:15.215641",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.75,
-          "validation_passed": true,
-          "recommendations_count": 1
-        }
-      },
-      {
-        "timestamp": "2026-01-31T08:34:15.383295",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.75,
-          "validation_passed": true,
-          "recommendations_count": 1
-        }
-      },
-      {
-        "timestamp": "2026-01-31T08:49:15.324533",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.75,
-          "validation_passed": true,
-          "recommendations_count": 1
-        }
-      },
-      {
-        "timestamp": "2026-01-31T09:04:15.254773",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.75,
-          "validation_passed": true,
-          "recommendations_count": 1
-        }
-      },
-      {
-        "timestamp": "2026-01-31T09:19:15.339914",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.75,
-          "validation_passed": true,
-          "recommendations_count": 1
-        }
-      },
-      {
-        "timestamp": "2026-01-31T09:34:15.684258",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.75,
-          "validation_passed": true,
-          "recommendations_count": 1
-        }
-      },
-      {
-        "timestamp": "2026-01-31T09:49:15.235564",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.75,
-          "validation_passed": true,
-          "recommendations_count": 1
-        }
-      },
-      {
-        "timestamp": "2026-01-31T10:04:15.466234",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.75,
-          "validation_passed": true,
-          "recommendations_count": 1
-        }
-      },
-      {
-        "timestamp": "2026-01-31T10:19:15.365241",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.75,
-          "validation_passed": true,
-          "recommendations_count": 1
-        }
-      },
       {
         "timestamp": "2026-01-31T10:34:15.262814",
         "action": "analyzed",
@@ -578,11 +380,209 @@
           "validation_passed": true,
           "recommendations_count": 1
         }
+      },
+      {
+        "timestamp": "2026-01-31T18:54:02.919494",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.75,
+          "validation_passed": true,
+          "recommendations_count": 1
+        }
+      },
+      {
+        "timestamp": "2026-01-31T18:55:49.254016",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.75,
+          "validation_passed": true,
+          "recommendations_count": 1
+        }
+      },
+      {
+        "timestamp": "2026-01-31T19:10:49.325966",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.75,
+          "validation_passed": true,
+          "recommendations_count": 1
+        }
+      },
+      {
+        "timestamp": "2026-01-31T19:25:49.248972",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.75,
+          "validation_passed": true,
+          "recommendations_count": 1
+        }
+      },
+      {
+        "timestamp": "2026-01-31T19:40:49.168834",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.75,
+          "validation_passed": true,
+          "recommendations_count": 1
+        }
+      },
+      {
+        "timestamp": "2026-01-31T19:55:49.400527",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.75,
+          "validation_passed": true,
+          "recommendations_count": 1
+        }
+      },
+      {
+        "timestamp": "2026-01-31T20:10:49.326189",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.75,
+          "validation_passed": true,
+          "recommendations_count": 1
+        }
+      },
+      {
+        "timestamp": "2026-01-31T20:25:49.388053",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.75,
+          "validation_passed": true,
+          "recommendations_count": 1
+        }
+      },
+      {
+        "timestamp": "2026-01-31T20:40:49.253933",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.75,
+          "validation_passed": true,
+          "recommendations_count": 1
+        }
+      },
+      {
+        "timestamp": "2026-01-31T20:55:49.407070",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.75,
+          "validation_passed": true,
+          "recommendations_count": 1
+        }
+      },
+      {
+        "timestamp": "2026-01-31T21:10:49.448339",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.75,
+          "validation_passed": true,
+          "recommendations_count": 1
+        }
+      },
+      {
+        "timestamp": "2026-01-31T21:25:49.183175",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.75,
+          "validation_passed": true,
+          "recommendations_count": 1
+        }
+      },
+      {
+        "timestamp": "2026-01-31T21:40:49.115492",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.75,
+          "validation_passed": true,
+          "recommendations_count": 1
+        }
+      },
+      {
+        "timestamp": "2026-01-31T22:41:49.717852",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.75,
+          "validation_passed": true,
+          "recommendations_count": 1
+        }
+      },
+      {
+        "timestamp": "2026-01-31T22:56:49.608236",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.75,
+          "validation_passed": true,
+          "recommendations_count": 1
+        }
+      },
+      {
+        "timestamp": "2026-01-31T23:11:49.715114",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.75,
+          "validation_passed": true,
+          "recommendations_count": 1
+        }
+      },
+      {
+        "timestamp": "2026-01-31T23:26:49.812535",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.75,
+          "validation_passed": true,
+          "recommendations_count": 1
+        }
+      },
+      {
+        "timestamp": "2026-01-31T23:41:49.850330",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.75,
+          "validation_passed": true,
+          "recommendations_count": 1
+        }
       }
     ],
     "last_recommendation": {
       "site_id": "site-001",
-      "timestamp": "2026-01-31T18:40:49.180273",
+      "timestamp": "2026-01-31T23:41:49.845932",
       "recommendations": [
         {
           "equipment_id": "001-gwc-zone-001",
@@ -628,209 +628,11 @@
     "optimization_status": "recommendation_pending",
     "optimization_settings": {
       "mode": "supervised",
-      "last_analysis": "2026-01-31T18:40:50.009565",
+      "last_analysis": "2026-01-31T23:41:50.804623",
       "analysis_interval_minutes": 15
     },
     "last_optimization": null,
     "optimization_history": [
-      {
-        "timestamp": "2026-01-31T06:04:16.469555",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7999999999999999,
-          "validation_passed": true,
-          "recommendations_count": 2
-        }
-      },
-      {
-        "timestamp": "2026-01-31T06:19:16.181438",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7999999999999999,
-          "validation_passed": true,
-          "recommendations_count": 2
-        }
-      },
-      {
-        "timestamp": "2026-01-31T06:34:16.016175",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7999999999999999,
-          "validation_passed": true,
-          "recommendations_count": 2
-        }
-      },
-      {
-        "timestamp": "2026-01-31T06:49:16.340452",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7999999999999999,
-          "validation_passed": true,
-          "recommendations_count": 2
-        }
-      },
-      {
-        "timestamp": "2026-01-31T07:04:16.192479",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7999999999999999,
-          "validation_passed": true,
-          "recommendations_count": 2
-        }
-      },
-      {
-        "timestamp": "2026-01-31T07:19:16.076506",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7999999999999999,
-          "validation_passed": true,
-          "recommendations_count": 2
-        }
-      },
-      {
-        "timestamp": "2026-01-31T07:34:15.932059",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7999999999999999,
-          "validation_passed": true,
-          "recommendations_count": 2
-        }
-      },
-      {
-        "timestamp": "2026-01-31T07:49:16.174238",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7999999999999999,
-          "validation_passed": true,
-          "recommendations_count": 2
-        }
-      },
-      {
-        "timestamp": "2026-01-31T08:04:16.654656",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7999999999999999,
-          "validation_passed": true,
-          "recommendations_count": 2
-        }
-      },
-      {
-        "timestamp": "2026-01-31T08:19:16.008141",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7999999999999999,
-          "validation_passed": true,
-          "recommendations_count": 2
-        }
-      },
-      {
-        "timestamp": "2026-01-31T08:34:16.044824",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7999999999999999,
-          "validation_passed": true,
-          "recommendations_count": 2
-        }
-      },
-      {
-        "timestamp": "2026-01-31T08:49:16.233125",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7999999999999999,
-          "validation_passed": true,
-          "recommendations_count": 2
-        }
-      },
-      {
-        "timestamp": "2026-01-31T09:04:16.061837",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7999999999999999,
-          "validation_passed": true,
-          "recommendations_count": 2
-        }
-      },
-      {
-        "timestamp": "2026-01-31T09:19:16.370337",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7999999999999999,
-          "validation_passed": true,
-          "recommendations_count": 2
-        }
-      },
-      {
-        "timestamp": "2026-01-31T09:34:16.510119",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7999999999999999,
-          "validation_passed": true,
-          "recommendations_count": 2
-        }
-      },
-      {
-        "timestamp": "2026-01-31T09:49:16.197823",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7999999999999999,
-          "validation_passed": true,
-          "recommendations_count": 2
-        }
-      },
-      {
-        "timestamp": "2026-01-31T10:04:16.140042",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7999999999999999,
-          "validation_passed": true,
-          "recommendations_count": 2
-        }
-      },
-      {
-        "timestamp": "2026-01-31T10:19:16.018384",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7999999999999999,
-          "validation_passed": true,
-          "recommendations_count": 2
-        }
-      },
       {
         "timestamp": "2026-01-31T10:34:16.119456",
         "action": "analyzed",
@@ -1182,11 +984,209 @@
           "validation_passed": true,
           "recommendations_count": 2
         }
+      },
+      {
+        "timestamp": "2026-01-31T18:54:04.240162",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7999999999999999,
+          "validation_passed": true,
+          "recommendations_count": 2
+        }
+      },
+      {
+        "timestamp": "2026-01-31T18:55:50.029758",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7999999999999999,
+          "validation_passed": true,
+          "recommendations_count": 2
+        }
+      },
+      {
+        "timestamp": "2026-01-31T19:10:50.041255",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7999999999999999,
+          "validation_passed": true,
+          "recommendations_count": 2
+        }
+      },
+      {
+        "timestamp": "2026-01-31T19:25:49.990663",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7999999999999999,
+          "validation_passed": true,
+          "recommendations_count": 2
+        }
+      },
+      {
+        "timestamp": "2026-01-31T19:40:50.170872",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7999999999999999,
+          "validation_passed": true,
+          "recommendations_count": 2
+        }
+      },
+      {
+        "timestamp": "2026-01-31T19:55:50.361332",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7999999999999999,
+          "validation_passed": true,
+          "recommendations_count": 2
+        }
+      },
+      {
+        "timestamp": "2026-01-31T20:10:50.078655",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7999999999999999,
+          "validation_passed": true,
+          "recommendations_count": 2
+        }
+      },
+      {
+        "timestamp": "2026-01-31T20:25:50.214820",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7999999999999999,
+          "validation_passed": true,
+          "recommendations_count": 2
+        }
+      },
+      {
+        "timestamp": "2026-01-31T20:40:50.257771",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7999999999999999,
+          "validation_passed": true,
+          "recommendations_count": 2
+        }
+      },
+      {
+        "timestamp": "2026-01-31T20:55:50.201816",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7999999999999999,
+          "validation_passed": true,
+          "recommendations_count": 2
+        }
+      },
+      {
+        "timestamp": "2026-01-31T21:10:50.092846",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7999999999999999,
+          "validation_passed": true,
+          "recommendations_count": 2
+        }
+      },
+      {
+        "timestamp": "2026-01-31T21:25:50.011515",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7999999999999999,
+          "validation_passed": true,
+          "recommendations_count": 2
+        }
+      },
+      {
+        "timestamp": "2026-01-31T21:40:49.887217",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7999999999999999,
+          "validation_passed": true,
+          "recommendations_count": 2
+        }
+      },
+      {
+        "timestamp": "2026-01-31T22:41:50.533371",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7999999999999999,
+          "validation_passed": true,
+          "recommendations_count": 2
+        }
+      },
+      {
+        "timestamp": "2026-01-31T22:56:50.619452",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7999999999999999,
+          "validation_passed": true,
+          "recommendations_count": 2
+        }
+      },
+      {
+        "timestamp": "2026-01-31T23:11:50.553376",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7999999999999999,
+          "validation_passed": true,
+          "recommendations_count": 2
+        }
+      },
+      {
+        "timestamp": "2026-01-31T23:26:50.703120",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7999999999999999,
+          "validation_passed": true,
+          "recommendations_count": 2
+        }
+      },
+      {
+        "timestamp": "2026-01-31T23:41:50.804641",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7999999999999999,
+          "validation_passed": true,
+          "recommendations_count": 2
+        }
       }
     ],
     "last_recommendation": {
       "site_id": "site-002",
-      "timestamp": "2026-01-31T18:40:50.008413",
+      "timestamp": "2026-01-31T23:41:50.803217",
       "recommendations": [
         {
           "equipment_id": "011-stc-zone-001",
@@ -1241,209 +1241,11 @@
     "optimization_status": "optimized",
     "optimization_settings": {
       "mode": "supervised",
-      "last_analysis": "2026-01-31T18:40:50.610820",
+      "last_analysis": "2026-01-31T23:41:51.386778",
       "analysis_interval_minutes": 15
     },
     "last_optimization": null,
     "optimization_history": [
-      {
-        "timestamp": "2026-01-31T06:04:17.033957",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T06:19:16.706615",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T06:34:16.536689",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T06:49:17.028452",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T07:04:16.592919",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T07:19:16.499166",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T07:34:16.536713",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T07:50:11.294117",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T08:04:17.289048",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T08:19:16.577375",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T08:34:16.682055",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T08:49:16.990093",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T09:04:16.547607",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T09:19:16.901367",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T09:34:17.399034",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T09:49:16.787484",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T10:04:16.640107",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T10:19:16.642217",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
       {
         "timestamp": "2026-01-31T10:34:16.629057",
         "action": "analyzed",
@@ -1795,6 +1597,204 @@
           "validation_passed": true,
           "recommendations_count": 0
         }
+      },
+      {
+        "timestamp": "2026-01-31T18:54:04.853437",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T18:55:50.484430",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T19:10:50.498792",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T19:25:50.580601",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T19:40:50.769160",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T19:55:50.962383",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T20:10:50.619577",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T20:25:50.604318",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T20:40:50.795608",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T20:55:50.862686",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T21:10:50.571108",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T21:25:50.559717",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T21:40:50.445445",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T22:41:51.196013",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T22:56:51.141282",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T23:11:51.043137",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T23:26:51.248322",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T23:41:51.386804",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
       }
     ],
     "last_recommendation": null
@@ -1824,209 +1824,11 @@
     "optimization_status": "recommendation_pending",
     "optimization_settings": {
       "mode": "supervised",
-      "last_analysis": "2026-01-31T18:40:51.456666",
+      "last_analysis": "2026-01-31T23:41:52.621033",
       "analysis_interval_minutes": 15
     },
     "last_optimization": null,
     "optimization_history": [
-      {
-        "timestamp": "2026-01-31T06:04:17.867583",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7999999999999999,
-          "validation_passed": true,
-          "recommendations_count": 2
-        }
-      },
-      {
-        "timestamp": "2026-01-31T06:19:17.298378",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7999999999999999,
-          "validation_passed": true,
-          "recommendations_count": 2
-        }
-      },
-      {
-        "timestamp": "2026-01-31T06:34:17.372148",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7999999999999999,
-          "validation_passed": true,
-          "recommendations_count": 2
-        }
-      },
-      {
-        "timestamp": "2026-01-31T06:49:17.853449",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7999999999999999,
-          "validation_passed": true,
-          "recommendations_count": 2
-        }
-      },
-      {
-        "timestamp": "2026-01-31T07:04:17.412070",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7999999999999999,
-          "validation_passed": true,
-          "recommendations_count": 2
-        }
-      },
-      {
-        "timestamp": "2026-01-31T07:19:17.228058",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7999999999999999,
-          "validation_passed": true,
-          "recommendations_count": 2
-        }
-      },
-      {
-        "timestamp": "2026-01-31T07:34:17.423755",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7999999999999999,
-          "validation_passed": true,
-          "recommendations_count": 2
-        }
-      },
-      {
-        "timestamp": "2026-01-31T07:50:12.031580",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7999999999999999,
-          "validation_passed": true,
-          "recommendations_count": 2
-        }
-      },
-      {
-        "timestamp": "2026-01-31T08:04:18.026445",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7999999999999999,
-          "validation_passed": true,
-          "recommendations_count": 2
-        }
-      },
-      {
-        "timestamp": "2026-01-31T08:19:17.294901",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7999999999999999,
-          "validation_passed": true,
-          "recommendations_count": 2
-        }
-      },
-      {
-        "timestamp": "2026-01-31T08:34:17.551135",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7999999999999999,
-          "validation_passed": true,
-          "recommendations_count": 2
-        }
-      },
-      {
-        "timestamp": "2026-01-31T08:49:17.885323",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7999999999999999,
-          "validation_passed": true,
-          "recommendations_count": 2
-        }
-      },
-      {
-        "timestamp": "2026-01-31T09:04:17.343259",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7999999999999999,
-          "validation_passed": true,
-          "recommendations_count": 2
-        }
-      },
-      {
-        "timestamp": "2026-01-31T09:19:17.856999",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7999999999999999,
-          "validation_passed": true,
-          "recommendations_count": 2
-        }
-      },
-      {
-        "timestamp": "2026-01-31T09:34:18.157869",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7999999999999999,
-          "validation_passed": true,
-          "recommendations_count": 2
-        }
-      },
-      {
-        "timestamp": "2026-01-31T09:49:17.634842",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7999999999999999,
-          "validation_passed": true,
-          "recommendations_count": 2
-        }
-      },
-      {
-        "timestamp": "2026-01-31T10:04:17.505751",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7999999999999999,
-          "validation_passed": true,
-          "recommendations_count": 2
-        }
-      },
-      {
-        "timestamp": "2026-01-31T10:19:17.521545",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7999999999999999,
-          "validation_passed": true,
-          "recommendations_count": 2
-        }
-      },
       {
         "timestamp": "2026-01-31T10:34:17.320241",
         "action": "analyzed",
@@ -2378,11 +2180,209 @@
           "validation_passed": true,
           "recommendations_count": 2
         }
+      },
+      {
+        "timestamp": "2026-01-31T18:54:05.698756",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7999999999999999,
+          "validation_passed": true,
+          "recommendations_count": 2
+        }
+      },
+      {
+        "timestamp": "2026-01-31T18:55:51.822228",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7999999999999999,
+          "validation_passed": true,
+          "recommendations_count": 2
+        }
+      },
+      {
+        "timestamp": "2026-01-31T19:10:51.405584",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7999999999999999,
+          "validation_passed": true,
+          "recommendations_count": 2
+        }
+      },
+      {
+        "timestamp": "2026-01-31T19:25:51.241156",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7999999999999999,
+          "validation_passed": true,
+          "recommendations_count": 2
+        }
+      },
+      {
+        "timestamp": "2026-01-31T19:40:51.617770",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7999999999999999,
+          "validation_passed": true,
+          "recommendations_count": 2
+        }
+      },
+      {
+        "timestamp": "2026-01-31T19:55:51.711802",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7999999999999999,
+          "validation_passed": true,
+          "recommendations_count": 2
+        }
+      },
+      {
+        "timestamp": "2026-01-31T20:10:51.411073",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7999999999999999,
+          "validation_passed": true,
+          "recommendations_count": 2
+        }
+      },
+      {
+        "timestamp": "2026-01-31T20:25:51.650402",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7999999999999999,
+          "validation_passed": true,
+          "recommendations_count": 2
+        }
+      },
+      {
+        "timestamp": "2026-01-31T20:40:51.551804",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7999999999999999,
+          "validation_passed": true,
+          "recommendations_count": 2
+        }
+      },
+      {
+        "timestamp": "2026-01-31T20:55:51.917120",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7999999999999999,
+          "validation_passed": true,
+          "recommendations_count": 2
+        }
+      },
+      {
+        "timestamp": "2026-01-31T21:10:51.281773",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7999999999999999,
+          "validation_passed": true,
+          "recommendations_count": 2
+        }
+      },
+      {
+        "timestamp": "2026-01-31T21:25:51.450432",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7999999999999999,
+          "validation_passed": true,
+          "recommendations_count": 2
+        }
+      },
+      {
+        "timestamp": "2026-01-31T21:40:51.224589",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7999999999999999,
+          "validation_passed": true,
+          "recommendations_count": 2
+        }
+      },
+      {
+        "timestamp": "2026-01-31T22:41:51.890851",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7999999999999999,
+          "validation_passed": true,
+          "recommendations_count": 2
+        }
+      },
+      {
+        "timestamp": "2026-01-31T22:56:51.990150",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7999999999999999,
+          "validation_passed": true,
+          "recommendations_count": 2
+        }
+      },
+      {
+        "timestamp": "2026-01-31T23:11:51.820671",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7999999999999999,
+          "validation_passed": true,
+          "recommendations_count": 2
+        }
+      },
+      {
+        "timestamp": "2026-01-31T23:26:52.139518",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7999999999999999,
+          "validation_passed": true,
+          "recommendations_count": 2
+        }
+      },
+      {
+        "timestamp": "2026-01-31T23:41:52.621052",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7999999999999999,
+          "validation_passed": true,
+          "recommendations_count": 2
+        }
       }
     ],
     "last_recommendation": {
       "site_id": "site-004",
-      "timestamp": "2026-01-31T18:40:51.455683",
+      "timestamp": "2026-01-31T23:41:52.620087",
       "recommendations": [
         {
           "equipment_id": "003-mmc-fcu-001",
@@ -2398,9 +2398,9 @@
           "equipment_name": "Menlyn FCU-002",
           "point_name": "room_temp_setpoint",
           "current_value": 22.0,
-          "recommended_value": 22.7,
+          "recommended_value": 23.0,
           "unit": "\u00b0C",
-          "reason": "Increase FCU setpoint 0.7\u00b0C (open_office zone), west-facing to reduce cooling load during high outdoor temps (28.0\u00b0C)"
+          "reason": "Increase FCU setpoint 1.0\u00b0C (open_office zone), west-facing to reduce cooling load during high outdoor temps (28.0\u00b0C)"
         }
       ],
       "projected_savings": {
@@ -2437,209 +2437,11 @@
     "optimization_status": "optimized",
     "optimization_settings": {
       "mode": "supervised",
-      "last_analysis": "2026-01-31T18:40:51.871925",
+      "last_analysis": "2026-01-31T23:41:52.858634",
       "analysis_interval_minutes": 15
     },
     "last_optimization": null,
     "optimization_history": [
-      {
-        "timestamp": "2026-01-31T06:04:18.190816",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T06:19:17.553783",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T06:34:17.607964",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T06:49:18.117284",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T07:04:17.739283",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T07:19:17.470065",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T07:34:17.662551",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T07:50:12.336182",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T08:04:18.513295",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T08:19:17.612890",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T08:34:17.812210",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T08:49:18.266599",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T09:04:17.615793",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T09:19:18.109781",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T09:34:18.418802",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T09:49:17.919645",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T10:04:17.776074",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T10:19:17.778860",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
       {
         "timestamp": "2026-01-31T10:34:17.649114",
         "action": "analyzed",
@@ -2991,6 +2793,204 @@
           "validation_passed": true,
           "recommendations_count": 0
         }
+      },
+      {
+        "timestamp": "2026-01-31T18:54:05.926706",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T18:55:52.111429",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T19:10:51.904021",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T19:25:51.511422",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T19:40:51.949094",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T19:55:52.022501",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T20:10:51.852624",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T20:25:51.894423",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T20:40:51.844099",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T20:55:52.339386",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T21:10:51.753637",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T21:25:51.751430",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T21:40:51.467048",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T22:41:52.167808",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T22:56:52.491759",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T23:11:52.083983",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T23:26:52.423083",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T23:41:52.858660",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
       }
     ],
     "last_recommendation": null
@@ -3020,209 +3020,11 @@
     "optimization_status": "optimized",
     "optimization_settings": {
       "mode": "supervised",
-      "last_analysis": "2026-01-31T18:40:52.312000",
+      "last_analysis": "2026-01-31T23:41:53.331576",
       "analysis_interval_minutes": 15
     },
     "last_optimization": null,
     "optimization_history": [
-      {
-        "timestamp": "2026-01-31T06:04:18.445921",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T06:19:17.797493",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T06:34:17.889287",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T06:49:18.422411",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T07:04:18.000581",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T07:19:17.840725",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T07:34:17.929672",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T07:50:12.592011",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T08:04:18.738010",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T08:19:17.908309",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T08:34:18.062048",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T08:49:18.581578",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T09:04:17.974161",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T09:19:18.364361",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T09:34:18.703128",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T09:49:18.174545",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T10:04:18.078112",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T10:19:18.011889",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
       {
         "timestamp": "2026-01-31T10:34:17.935909",
         "action": "analyzed",
@@ -3574,6 +3376,204 @@
           "validation_passed": true,
           "recommendations_count": 0
         }
+      },
+      {
+        "timestamp": "2026-01-31T18:54:06.286633",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T18:55:52.395110",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T19:10:52.131014",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T19:25:51.780732",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T19:40:52.281630",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T19:55:52.375155",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T20:10:52.321315",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T20:25:52.285641",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T20:40:52.125380",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T20:55:52.872670",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T21:10:52.033624",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T21:25:52.082760",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T21:40:51.730253",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T22:41:52.593174",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T22:56:52.741019",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T23:11:52.357136",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T23:26:52.907512",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T23:41:53.331600",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
       }
     ],
     "last_recommendation": null
@@ -3603,209 +3603,11 @@
     "optimization_status": "recommendation_pending",
     "optimization_settings": {
       "mode": "supervised",
-      "last_analysis": "2026-01-31T18:40:52.893629",
+      "last_analysis": "2026-01-31T23:41:53.963436",
       "analysis_interval_minutes": 15
     },
     "last_optimization": null,
     "optimization_history": [
-      {
-        "timestamp": "2026-01-31T06:04:19.050697",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.75,
-          "validation_passed": true,
-          "recommendations_count": 1
-        }
-      },
-      {
-        "timestamp": "2026-01-31T06:19:18.356152",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.75,
-          "validation_passed": true,
-          "recommendations_count": 1
-        }
-      },
-      {
-        "timestamp": "2026-01-31T06:34:18.714094",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.75,
-          "validation_passed": true,
-          "recommendations_count": 1
-        }
-      },
-      {
-        "timestamp": "2026-01-31T06:49:19.067277",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.75,
-          "validation_passed": true,
-          "recommendations_count": 1
-        }
-      },
-      {
-        "timestamp": "2026-01-31T07:04:18.666751",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.75,
-          "validation_passed": true,
-          "recommendations_count": 1
-        }
-      },
-      {
-        "timestamp": "2026-01-31T07:19:18.695947",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.75,
-          "validation_passed": true,
-          "recommendations_count": 1
-        }
-      },
-      {
-        "timestamp": "2026-01-31T07:34:18.564176",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.75,
-          "validation_passed": true,
-          "recommendations_count": 1
-        }
-      },
-      {
-        "timestamp": "2026-01-31T07:50:13.252540",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.75,
-          "validation_passed": true,
-          "recommendations_count": 1
-        }
-      },
-      {
-        "timestamp": "2026-01-31T08:04:19.508722",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.75,
-          "validation_passed": true,
-          "recommendations_count": 1
-        }
-      },
-      {
-        "timestamp": "2026-01-31T08:19:18.989065",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.75,
-          "validation_passed": true,
-          "recommendations_count": 1
-        }
-      },
-      {
-        "timestamp": "2026-01-31T08:34:18.746251",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.75,
-          "validation_passed": true,
-          "recommendations_count": 1
-        }
-      },
-      {
-        "timestamp": "2026-01-31T08:49:19.051137",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.75,
-          "validation_passed": true,
-          "recommendations_count": 1
-        }
-      },
-      {
-        "timestamp": "2026-01-31T09:04:18.601430",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.75,
-          "validation_passed": true,
-          "recommendations_count": 1
-        }
-      },
-      {
-        "timestamp": "2026-01-31T09:19:18.950153",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.75,
-          "validation_passed": true,
-          "recommendations_count": 1
-        }
-      },
-      {
-        "timestamp": "2026-01-31T09:34:19.517841",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.75,
-          "validation_passed": true,
-          "recommendations_count": 1
-        }
-      },
-      {
-        "timestamp": "2026-01-31T09:49:18.683959",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.75,
-          "validation_passed": true,
-          "recommendations_count": 1
-        }
-      },
-      {
-        "timestamp": "2026-01-31T10:04:18.922226",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.75,
-          "validation_passed": true,
-          "recommendations_count": 1
-        }
-      },
-      {
-        "timestamp": "2026-01-31T10:19:18.620728",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.75,
-          "validation_passed": true,
-          "recommendations_count": 1
-        }
-      },
       {
         "timestamp": "2026-01-31T10:34:18.647833",
         "action": "analyzed",
@@ -4157,20 +3959,218 @@
           "validation_passed": true,
           "recommendations_count": 1
         }
+      },
+      {
+        "timestamp": "2026-01-31T18:54:07.022527",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.75,
+          "validation_passed": true,
+          "recommendations_count": 1
+        }
+      },
+      {
+        "timestamp": "2026-01-31T18:55:53.184345",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.75,
+          "validation_passed": true,
+          "recommendations_count": 1
+        }
+      },
+      {
+        "timestamp": "2026-01-31T19:10:52.690448",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.75,
+          "validation_passed": true,
+          "recommendations_count": 1
+        }
+      },
+      {
+        "timestamp": "2026-01-31T19:25:52.613979",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.75,
+          "validation_passed": true,
+          "recommendations_count": 1
+        }
+      },
+      {
+        "timestamp": "2026-01-31T19:40:52.960067",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.75,
+          "validation_passed": true,
+          "recommendations_count": 1
+        }
+      },
+      {
+        "timestamp": "2026-01-31T19:55:52.992868",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.75,
+          "validation_passed": true,
+          "recommendations_count": 1
+        }
+      },
+      {
+        "timestamp": "2026-01-31T20:10:53.080998",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.75,
+          "validation_passed": true,
+          "recommendations_count": 1
+        }
+      },
+      {
+        "timestamp": "2026-01-31T20:25:52.857535",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.75,
+          "validation_passed": true,
+          "recommendations_count": 1
+        }
+      },
+      {
+        "timestamp": "2026-01-31T20:40:52.816482",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.75,
+          "validation_passed": true,
+          "recommendations_count": 1
+        }
+      },
+      {
+        "timestamp": "2026-01-31T20:55:53.530979",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.75,
+          "validation_passed": true,
+          "recommendations_count": 1
+        }
+      },
+      {
+        "timestamp": "2026-01-31T21:10:52.721040",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.75,
+          "validation_passed": true,
+          "recommendations_count": 1
+        }
+      },
+      {
+        "timestamp": "2026-01-31T21:25:52.903590",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.75,
+          "validation_passed": true,
+          "recommendations_count": 1
+        }
+      },
+      {
+        "timestamp": "2026-01-31T21:40:52.652440",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.75,
+          "validation_passed": true,
+          "recommendations_count": 1
+        }
+      },
+      {
+        "timestamp": "2026-01-31T22:41:53.254506",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.75,
+          "validation_passed": true,
+          "recommendations_count": 1
+        }
+      },
+      {
+        "timestamp": "2026-01-31T22:56:53.576111",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.75,
+          "validation_passed": true,
+          "recommendations_count": 1
+        }
+      },
+      {
+        "timestamp": "2026-01-31T23:11:53.304506",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.75,
+          "validation_passed": true,
+          "recommendations_count": 1
+        }
+      },
+      {
+        "timestamp": "2026-01-31T23:26:53.526611",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.75,
+          "validation_passed": true,
+          "recommendations_count": 1
+        }
+      },
+      {
+        "timestamp": "2026-01-31T23:41:53.963460",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.75,
+          "validation_passed": true,
+          "recommendations_count": 1
+        }
       }
     ],
     "last_recommendation": {
       "site_id": "site-007",
-      "timestamp": "2026-01-31T18:40:52.892119",
+      "timestamp": "2026-01-31T23:41:53.962562",
       "recommendations": [
         {
           "equipment_id": "006-vaw-fcu-001",
           "equipment_name": "V&A FCU Floor 1",
           "point_name": "room_temp_setpoint",
           "current_value": 22.0,
-          "recommended_value": 22.7,
+          "recommended_value": 23.0,
           "unit": "\u00b0C",
-          "reason": "Increase FCU setpoint 0.7\u00b0C (open_office zone), west-facing to reduce cooling load during high outdoor temps (28.0\u00b0C)"
+          "reason": "Increase FCU setpoint 1.0\u00b0C (open_office zone), west-facing to reduce cooling load during high outdoor temps (28.0\u00b0C)"
         }
       ],
       "projected_savings": {
@@ -4207,209 +4207,11 @@
     "optimization_status": "optimized",
     "optimization_settings": {
       "mode": "supervised",
-      "last_analysis": "2026-01-31T18:40:53.167147",
+      "last_analysis": "2026-01-31T23:41:54.318314",
       "analysis_interval_minutes": 15
     },
     "last_optimization": null,
     "optimization_history": [
-      {
-        "timestamp": "2026-01-31T06:04:19.319939",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T06:19:18.641107",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T06:34:18.975646",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T06:49:19.320664",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T07:04:18.953335",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T07:19:18.937654",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T07:34:18.908483",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T07:50:13.493760",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T08:04:19.767457",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T08:19:19.243339",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T08:34:19.026931",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T08:49:19.264643",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T09:04:18.948021",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T09:19:19.232054",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T09:34:19.816022",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T09:49:18.919477",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T10:04:19.185375",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T10:19:18.896667",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
       {
         "timestamp": "2026-01-31T10:34:18.913061",
         "action": "analyzed",
@@ -4761,6 +4563,204 @@
           "validation_passed": true,
           "recommendations_count": 0
         }
+      },
+      {
+        "timestamp": "2026-01-31T18:54:07.298542",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T18:55:53.597749",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T19:10:52.982429",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T19:25:52.953691",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T19:40:53.272169",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T19:55:53.297347",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T20:10:53.431704",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T20:25:53.125442",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T20:40:53.136500",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T20:55:53.909943",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T21:10:53.454641",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T21:25:53.164231",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T21:40:52.899023",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T22:41:53.512523",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T22:56:53.837667",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T23:11:53.572377",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T23:26:53.860239",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T23:41:54.318332",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
       }
     ],
     "last_recommendation": null
@@ -4790,209 +4790,11 @@
     "optimization_status": "optimized",
     "optimization_settings": {
       "mode": "supervised",
-      "last_analysis": "2026-01-31T18:40:53.479111",
+      "last_analysis": "2026-01-31T23:41:54.584623",
       "analysis_interval_minutes": 15
     },
     "last_optimization": null,
     "optimization_history": [
-      {
-        "timestamp": "2026-01-31T06:04:19.582979",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T06:19:18.975216",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T06:34:19.282240",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T06:49:19.581376",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T07:04:19.232664",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T07:19:19.181106",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T07:34:19.212493",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T07:50:13.749655",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T08:04:20.085823",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T08:19:19.553051",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T08:34:19.347685",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T08:49:19.846932",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T09:04:19.210775",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T09:19:19.536039",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T09:34:20.103398",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T09:49:19.200303",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T10:04:19.476947",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T10:19:19.128047",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
       {
         "timestamp": "2026-01-31T10:34:19.176864",
         "action": "analyzed",
@@ -5344,6 +5146,204 @@
           "validation_passed": true,
           "recommendations_count": 0
         }
+      },
+      {
+        "timestamp": "2026-01-31T18:54:07.738820",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T18:55:53.894334",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T19:10:53.210624",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T19:25:53.451453",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T19:40:53.543884",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T19:55:53.657180",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T20:10:53.660513",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T20:25:53.371795",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T20:40:53.433957",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T20:55:54.241151",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T21:10:53.776600",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T21:25:53.468612",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T21:40:53.146462",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T22:41:53.951537",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T22:56:54.085882",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T23:11:53.847739",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T23:26:54.198901",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T23:41:54.584644",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
       }
     ],
     "last_recommendation": null
@@ -5373,209 +5373,11 @@
     "optimization_status": "optimized",
     "optimization_settings": {
       "mode": "supervised",
-      "last_analysis": "2026-01-31T18:40:53.731670",
+      "last_analysis": "2026-01-31T23:41:54.822290",
       "analysis_interval_minutes": 15
     },
     "last_optimization": null,
     "optimization_history": [
-      {
-        "timestamp": "2026-01-31T06:04:19.848511",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T06:19:19.212601",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T06:34:19.526856",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T06:49:19.859541",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T07:04:19.466697",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T07:19:19.435672",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T07:34:19.503950",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T07:50:13.986545",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T08:04:20.606811",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T08:19:19.814889",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T08:34:19.599710",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T08:49:20.111086",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T09:04:19.464838",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T09:19:19.838518",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T09:34:20.455694",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T09:49:19.445416",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T10:04:19.709331",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
-      {
-        "timestamp": "2026-01-31T10:19:19.390591",
-        "action": "analyzed",
-        "result": "success",
-        "user": "scheduler",
-        "details": {
-          "confidence": 0.7,
-          "validation_passed": true,
-          "recommendations_count": 0
-        }
-      },
       {
         "timestamp": "2026-01-31T10:34:19.444559",
         "action": "analyzed",
@@ -5919,6 +5721,204 @@
       },
       {
         "timestamp": "2026-01-31T18:40:53.731700",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T18:54:08.045426",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T18:55:54.221481",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T19:10:53.572240",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T19:25:53.724459",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T19:40:54.066694",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T19:55:54.073801",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T20:10:53.989968",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T20:25:53.674537",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T20:40:53.777200",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T20:55:54.560546",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T21:10:54.159419",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T21:25:53.850565",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T21:40:53.661327",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T22:41:54.249315",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T22:56:54.355144",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T23:11:54.091274",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T23:26:54.462670",
+        "action": "analyzed",
+        "result": "success",
+        "user": "scheduler",
+        "details": {
+          "confidence": 0.7,
+          "validation_passed": true,
+          "recommendations_count": 0
+        }
+      },
+      {
+        "timestamp": "2026-01-31T23:41:54.822311",
         "action": "analyzed",
         "result": "success",
         "user": "scheduler",

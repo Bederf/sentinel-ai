@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card } from './Card';
 import { Badge } from './Badge';
-import { AlertTriangle, CheckCircle, Thermometer, Zap } from 'lucide-react';
+import { Thermometer } from 'lucide-react';
 import { api } from '@/lib/api';
 
 interface BoundaryStatusPanelProps {
@@ -20,7 +20,7 @@ export const BoundaryStatusPanel: React.FC<BoundaryStatusPanelProps> = ({
       const response = await api.getBoundaryStatus(deviceId);
       const statuses = Object.entries(response.data).map(([deviceId, status]) => ({
         deviceId,
-        ...status,
+        ...(status && typeof status === 'object' ? status : {}),
       }));
       setBoundaryStatuses(statuses);
     } catch (error) {
@@ -35,20 +35,6 @@ export const BoundaryStatusPanel: React.FC<BoundaryStatusPanelProps> = ({
     const interval = setInterval(fetchBoundaryStatus, 5000);
     return () => clearInterval(interval);
   }, [deviceId]);
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'safe':
-        return <CheckCircle className="h-5 w-5 text-green-500" />;
-      case 'warning':
-        return <AlertTriangle className="h-5 w-5 text-yellow-500" />;
-      case 'critical':
-      case 'emergency':
-        return <AlertTriangle className="h-5 w-5 text-red-500" />;
-      default:
-        return <Thermometer className="h-5 w-5 text-blue-500" />;
-    }
-  };
 
   const getSeverityBadge = (escalationLevel: number) => {
     const variants = {
@@ -86,7 +72,7 @@ export const BoundaryStatusPanel: React.FC<BoundaryStatusPanelProps> = ({
               No boundary monitoring data available
             </p>
           ) : (
-            boundaryStatuses.map((status, index) => (
+            boundaryStatuses.map((status) => (
               <div
                 key={status.deviceId}
                 className="border-b pb-3 last:border-0"

@@ -294,25 +294,27 @@ export function EquipmentStatusPanel({ siteId, compact = false, onEquipmentSelec
           ))}
         </TabList>
 
-        <TabPanels>
-          <TabPanel>
-            <Grid numItems={3} className="gap-4">
-              {equipment.map((eq) => (
-                <EquipmentCard key={eq.id} eq={eq} />
-              ))}
-            </Grid>
-          </TabPanel>
-
-          {types.map((type) => (
-            <TabPanel key={type}>
+        {(() => {
+          const allTabPanels = [
+            <TabPanel key="all">
               <Grid numItems={3} className="gap-4">
-                {equipmentByType[type].map((eq) => (
+                {equipment.map((eq) => (
                   <EquipmentCard key={eq.id} eq={eq} />
                 ))}
               </Grid>
-            </TabPanel>
-          ))}
-        </TabPanels>
+            </TabPanel>,
+            ...types.map((type) => (
+              <TabPanel key={type}>
+                <Grid numItems={3} className="gap-4">
+                  {equipmentByType[type].map((eq) => (
+                    <EquipmentCard key={eq.id} eq={eq} />
+                  ))}
+                </Grid>
+              </TabPanel>
+            )),
+          ];
+          return <TabPanels>{allTabPanels}</TabPanels>;
+        })()}
       </TabGroup>
     </div>
   );

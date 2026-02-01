@@ -15,7 +15,6 @@ import {
   Text,
   Grid,
   Metric,
-  ProgressBar,
 } from "@tremor/react";
 import type { TrendData } from "../../lib/mlApi";
 import { getPredictionTrend, formatPrediction } from "../../lib/mlApi";

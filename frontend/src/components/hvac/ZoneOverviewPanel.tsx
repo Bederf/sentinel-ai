@@ -102,7 +102,7 @@ export function ZoneOverviewPanel({ siteId, compact = false, onZoneSelect }: Zon
       <Card>
         <Title>Zone Overview</Title>
         <Text className="text-red-500 mt-4">{error}</Text>
-        <Button size="xs" className="mt-2" onClick={() => { setError(null); loadZones(); }}>
+        <Button size="xs" className="mt-2" onClick={() => { setError(null); loadZonesRef.current?.(); }}>
           Retry
         </Button>
       </Card>

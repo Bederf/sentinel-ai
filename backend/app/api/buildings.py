@@ -555,13 +555,102 @@ async def get_building_equipment(building_id: str) -> dict:
     Get all equipment for a building with status.
 
     Returns all equipment items from:
-    - HVAC zones (with temp, setpoint, status)
-    - Generators, groups, tanks (with operational status)
-    - Energy centre components (transformers, UPS, meters, etc.)
-    - DALI controllers (with online status)
+    - Supabase equipment table (primary source)
+    - JSON fallback: HVAC zones, generators, energy centre, DALI controllers
 
     Each item includes: id, name, type, category, status, health, details
     """
+    # Map building_id to site code for Supabase lookup
+    BUILDING_TO_SITE = {"sandton": "site-002"}
+    site_code = BUILDING_TO_SITE.get(building_id, building_id)
+
+    # Try Supabase first
+    try:
+        from app.database.repositories.equipment_repository import EquipmentRepository
+        repo = EquipmentRepository()
+        equipment_data = repo.get_by_building_code(site_code)
+
+        if equipment_data:
+            equipment_list = []
+            categories = {}
+
+            for eq in equipment_data:
+                # Determine category from type
+                eq_type = eq.get("type", "unknown").lower()
+                type_to_category = {
+                    "sensor": "Sensors",
+                    "vav": "HVAC",
+                    "ahu": "HVAC",
+                    "fcu": "HVAC",
+                    "chiller": "HVAC",
+                    "split_unit": "HVAC",
+                    "cooling_tower": "HVAC",
+                    "hvac_zone": "HVAC",
+                    "generator": "Generator Plant",
+                    "diesel_tank": "Generator Plant",
+                    "generator_group": "Generator Plant",
+                    "transformer": "Energy Centre",
+                    "mv_incomer": "Energy Centre",
+                    "lv_switchboard": "Energy Centre",
+                    "ats": "Energy Centre",
+                    "ups": "Energy Centre",
+                    "power_meter": "Energy Centre",
+                    "pfc_bank": "Energy Centre",
+                    "feeder": "Energy Centre",
+                    "dali_controller": "Lighting",
+                    "luminaire": "Lighting",
+                }
+                category = type_to_category.get(eq_type, "Other")
+                status = eq.get("status", "normal")
+                health = eq.get("health_score", 85)
+
+                equipment_list.append({
+                    "id": eq.get("code", eq.get("id")),
+                    "name": eq.get("name"),
+                    "type": eq_type,
+                    "category": category,
+                    "status": status,
+                    "health": health,
+                    "location": eq.get("location", ""),
+                    "building_id": site_code,
+                    "building_name": building_name,
+                    "details": {
+                        "manufacturer": eq.get("manufacturer"),
+                        "model": eq.get("model"),
+                        "metadata": eq.get("metadata", {}),
+                    },
+                    "controllable": eq_type not in ["sensor", "power_meter"],
+                })
+
+                # Update category stats
+                if category not in categories:
+                    categories[category] = {"total": 0, "normal": 0, "warning": 0, "critical": 0}
+                categories[category]["total"] += 1
+                if status == "normal":
+                    categories[category]["normal"] += 1
+                elif status == "warning":
+                    categories[category]["warning"] += 1
+                elif status == "critical":
+                    categories[category]["critical"] += 1
+
+            # Get building name from Supabase
+            from app.database.supabase_client import get_supabase_client
+            client = get_supabase_client()
+            building_result = client.table("buildings").select("name").eq("code", site_code).execute()
+            building_name = building_result.data[0]["name"] if building_result.data else building_id
+
+            return {
+                "building_id": building_id,
+                "building_name": building_name,
+                "total_equipment": len(equipment_list),
+                "categories": categories,
+                "equipment": equipment_list,
+                "source": "supabase",
+            }
+    except Exception as e:
+        logger.warning(f"Supabase equipment fetch failed for {building_id}: {e}")
+
+    # Fall back to JSON files
     loader = get_building_loader()
     building = loader.get_building(building_id)
 
@@ -920,4 +1009,5 @@ async def get_building_equipment(building_id: str) -> dict:
         "total_equipment": len(equipment_list),
         "categories": categories,
         "equipment": equipment_list,
+        "source": "json",
     }

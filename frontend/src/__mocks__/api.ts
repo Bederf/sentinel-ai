@@ -261,6 +261,22 @@ const createMockApi = () => {
       message: 'Recommendation deferred',
       deferUntil: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
     }),
+
+    // Health thresholds API methods
+    getHealthThresholds: vi.fn().mockResolvedValue({
+      warning: 70,
+      critical: 40,
+    }),
+
+    updateHealthThresholds: vi.fn().mockResolvedValue({
+      warning: 70,
+      critical: 40,
+    }),
+
+    // Device safety status (simple version)
+    getDeviceSafetyStatus: vi.fn().mockResolvedValue({
+      overall_status: 'safe' as const,
+    }),
   };
 
   return mockApi;

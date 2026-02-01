@@ -20,3 +20,6 @@ seaborn>=0.12.0
 
 # Time-series utilities
 statsmodels>=0.14.0
+
+# Survival Analysis (Phase 43-03)
+lifelines>=0.28.0
