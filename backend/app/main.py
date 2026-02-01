@@ -35,6 +35,7 @@ from app.api import data_quality  # Phase 42-03 Data quality monitoring
 from app.api import survival  # Phase 43-03 Survival analysis (Cox PH)
 from app.api import classification  # Phase 43-04 Failure type classification (Random Forest)
 from app.api import rag  # Phase 44 RAG (Retrieval-Augmented Generation)
+from app.api import baseline  # Phase 44 Asset Baseline Assessment
 from app.middleware.audit_middleware import AuditMiddleware
 from app.services.background_scheduler import scheduler_service
 from app.api.simulation import simulation_service  # BMS simulation service
