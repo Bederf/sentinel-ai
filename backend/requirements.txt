@@ -18,6 +18,9 @@ anthropic>=0.39.0
 supabase==2.3.0
 psycopg2-binary==2.9.9
 
+# Time-Series Database
+influxdb-client>=1.38.0
+
 # Data Migration
 ijson>=3.2.0
 tqdm>=4.66.0
