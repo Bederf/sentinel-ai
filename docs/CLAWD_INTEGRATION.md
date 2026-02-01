@@ -516,17 +516,113 @@ Clawd: Got it! (fault confirmed, root cause: Actuator motor failed,
        Just need a photo of the replacement part label
 ```
 
+## Service Sheet OCR (3-Stage Pipeline)
+
+When technicians upload service sheet photos, SENTINEL processes them through a 3-stage OCR pipeline.
+
+See `docs/04-features/41-ml-knowledge-capture-02.md` for complete details.
+
+### OCR Architecture
+
+```
+Technician sends service sheet photo
+    ↓
+┌─────────────────────────────────────┐
+│  Stage 1: Claude Vision OCR         │
+│  - Extract text and structured data │
+│  - Per-field confidence scores      │
+└─────────────────────────────────────┘
+    ↓
+┌─────────────────────────────────────┐
+│  Stage 2: Template Validation       │
+│  - Validate against equipment type  │
+│  - Type coercion and range checks   │
+└─────────────────────────────────────┘
+    ↓
+┌─────────────────────────────────────┐
+│  Stage 3: AI Enhancement            │
+│  - Fill gaps, trigger corrections   │
+│  - Track human-verified corrections │
+└─────────────────────────────────────┘
+    ↓
+Store in service_readings table
+```
+
+### Clawd OCR Endpoints
+
+```bash
+# Upload service sheet photo
+POST /api/clawd/ocr/process-service-sheet
+{
+    "service_record_id": "SR-2026-ABC123",
+    "equipment_id": "gen-001",
+    "service_type": "minor",
+    "telegram_user_id": "@jsmith",
+    "image_data": "base64...",
+    "media_type": "image/jpeg"
+}
+
+# Submit correction
+POST /api/clawd/ocr/correction
+{
+    "service_record_id": "SR-2026-ABC123",
+    "correction": "24.5"
+}
+
+# Check OCR status
+GET /api/clawd/ocr/status/{service_record_id}
+```
+
+### Correction Flow
+
+If OCR has low confidence or validation errors, Clawd prompts for corrections:
+
+```
+Clawd: ⚠️ Battery voltage not detected on service sheet.
+       Please type the value:
+
+Tech: 24.5
+
+Clawd: ✅ Got it! (battery_voltage: 24.5V)
+       Next: Hour meter reading?
+
+Tech: 1247
+
+Clawd: ✅ Service sheet data complete!
+       - Battery voltage: 24.5V
+       - Hour meter: 1247h
+       - Oil pressure: 45 psi (from OCR)
+```
+
+### Correction Tracking
+
+All corrections tracked for ML data quality:
+```json
+{
+    "reading_name": "battery_voltage",
+    "reading_value": "24.5",
+    "ocr_confidence": 0.0,
+    "was_corrected": true,
+    "corrected_from": null,
+    "corrected_by": "@jsmith"
+}
+```
+
 ## Files Reference
 
 ### SENTINEL (this repo)
 - `backend/app/api/complaints.py` - Complaint endpoints
 - `backend/app/api/alerts.py` - Alert and dispatch endpoints
+- `backend/app/api/ocr.py` - OCR processing endpoints
+- `backend/app/api/clawd_webhooks.py` - Clawd webhook endpoints (WO + OCR)
 - `backend/app/services/complaint_handler.py` - Diagnosis logic
 - `backend/app/services/zone_diagnostics.py` - Zone fault analysis
+- `backend/app/services/ocr_service.py` - 3-stage OCR pipeline
 - `backend/app/services/clawd_integration/alert_notifier.py` - Alert notifications
 - `backend/app/services/clawd_integration/work_order_notifier.py` - WO notifications
+- `backend/app/services/clawd_integration/ocr_correction_handler.py` - OCR corrections
 - `backend/app/services/ml_template_service.py` - ML data collection templates
-- `backend/app/data/ml_data_templates.json` - Equipment-specific templates (19 types)
+- `backend/app/data/ml_data_templates.json` - Equipment-specific templates (23 types)
 - `backend/app/data/buildings/sandton/zones.json` - Zone definitions
 
 ### Clawd (`/home/bederf/clawd`)
