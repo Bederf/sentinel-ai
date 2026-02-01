@@ -26,6 +26,7 @@ from app.api import hvac  # HVAC module API
 from app.api import health_config  # Health calculation config API
 from app.api import service_records  # Phase 41 ML service records
 from app.api import clawd_webhooks  # Phase 41 Clawd integration
+from app.api import ocr  # Phase 41-02 OCR for service sheets
 from app.api import ml_predictions  # Phase 43 ML predictions & anomaly detection
 from app.api import timeseries  # Phase 42 InfluxDB time-series data
 from app.middleware.audit_middleware import AuditMiddleware
@@ -88,6 +89,7 @@ app.include_router(hvac.router, prefix="/api", tags=["hvac"])  # HVAC module
 app.include_router(health_config.router, tags=["health-config"])  # Health config
 app.include_router(service_records.router, tags=["service-records"])  # Phase 41 ML data collection
 app.include_router(clawd_webhooks.router, tags=["clawd"])  # Phase 41 Clawd integration
+app.include_router(ocr.router, prefix="/api", tags=["ocr"])  # Phase 41-02 OCR
 app.include_router(ml_predictions.router)  # Phase 43 ML predictions & anomaly detection
 app.include_router(timeseries.router)  # Phase 42 InfluxDB time-series data
 
