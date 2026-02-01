@@ -105,6 +105,7 @@ app.include_router(data_quality.router)  # Phase 42-03 Data quality monitoring
 app.include_router(survival.router)  # Phase 43-03 Survival analysis
 app.include_router(classification.router, prefix="/api/classification", tags=["classification"])  # Phase 43-04 Failure type classification
 app.include_router(rag.router, tags=["rag"])  # Phase 44 RAG with pgvector
+app.include_router(baseline.router)  # Phase 44 Asset Baseline Assessment
 
 
 @app.on_event("startup")

@@ -28,6 +28,7 @@ from app.models.baseline import (
     DeviationStatus
 )
 from app.services.baseline_service import get_baseline_service
+from app.services.baseline_report_service import get_baseline_report_service
 from app.services.auth_service import get_current_user
 from app.models.user import User
 
@@ -414,6 +415,78 @@ async def get_baseline_summary(
 
     summary = await service.repository.get_baseline_summary(equipment_id)
     return summary
+
+
+@router.get(
+    "/{equipment_id}/baseline/report/json",
+    summary="Generate JSON baseline report",
+    description="Generate comprehensive baseline assessment report in JSON format"
+)
+async def generate_json_report(
+    equipment_id: str,
+    include_elements: bool = Query(True, description="Include element-level baselines"),
+    include_history: bool = Query(True, description="Include comparison history"),
+    current_user: User = Depends(get_current_user)
+):
+    """Generate JSON baseline report."""
+    report_service = get_baseline_report_service()
+
+    try:
+        report = await report_service.generate_json_report(
+            equipment_id,
+            include_element_baselines=include_elements,
+            include_comparison_history=include_history
+        )
+        return report
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+
+
+@router.get(
+    "/{equipment_id}/baseline/report/html",
+    summary="Generate HTML baseline report",
+    description="Generate comprehensive baseline assessment report in HTML format"
+)
+async def generate_html_report(
+    equipment_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Generate HTML baseline report."""
+    report_service = get_baseline_report_service()
+
+    try:
+        html_content = await report_service.generate_html_report(equipment_id)
+        return {"html": html_content}
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+
+
+@router.get(
+    "/{equipment_id}/baseline/report/pdf",
+    summary="Generate PDF baseline report",
+    description="Generate comprehensive baseline assessment report in PDF format"
+)
+async def generate_pdf_report(
+    equipment_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Generate PDF baseline report."""
+    report_service = get_baseline_report_service()
+
+    try:
+        pdf_content = await report_service.generate_pdf_report(equipment_id)
+        return {"pdf_content": pdf_content}
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
 
 
 # ============================================================================

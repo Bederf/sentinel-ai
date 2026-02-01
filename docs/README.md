@@ -34,11 +34,17 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - [MCP Tools Reference](03-api-reference/mcp-tools-reference.md) - Model Context Protocol tools
 
 ### ✨ Features
-- [Predictive Intelligence](04-features/predictive-intelligence.md) - AI failure prediction
-- [Autonomous Control Levels](04-features/autonomous-control-levels.md) - Control autonomy
-- [Technician Chat](04-features/technician-chat.md) - Guided fault diagnosis
-- [Integration Wizard](04-features/integration-wizard.md) - BMS/CAFM integration
+- **[AI Operations & Monitoring](04-features/ai-operations-monitoring.md)** - Day-to-day AI monitoring & recommendations (control-aware)
+- **[44-02: Explainable AI for ML Predictions](04-features/44-02-explainable-ai.md)** - Natural language explanations for AI predictions (Phase 44-02)
+- **[Asset Baseline Assessment](04-features/44-asset-baseline-assessment.md)** - Asset condition scoring and maintenance cost modeling (Phase 44)
+- **[Routine Inspection & Maintenance](04-features/45-routine-inspection-maintenance.md)** - Field inspection workflow with baseline tracking (Phase 45)
+- **[Repair Effectiveness & ML Feedback Loop](04-features/46-repair-effectiveness-ml-feedback.md)** - Post-repair health updates and ML learning (Phase 46)
+- [Technician Chat](04-features/technician-chat.md) - Guided fault diagnosis (Phase 19)
 - [AI-Assisted Onboarding](04-features/ai-assisted-onboarding.md) - Import BMS data via MCP tools
+- [41 - ML Knowledge Capture](04-features/41-ml-knowledge-capture-01.md) - OCR and data collection
+- [42 - Data Collection & Storage](04-features/42-data-collection-storage.md) - InfluxDB integration
+- [43 - ML Model Development](04-features/43-ml-model-development.md) - LSTM and Autoencoder models
+- [18 - Fault Code Database](04-features/18-fault-code-database.md) - Equipment fault diagnosis
 
 ### 🏢 BMS Concepts
 - [BMS Fundamentals](05-bms-concepts/bms-fundamentals.md) - BMS domain knowledge
@@ -58,6 +64,8 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 ### 🤖 AI & ML
 - [Claude Integration](08-ai-ml/claude-integration.md) - Claude API usage
 - [Hybrid AI Router](08-ai-ml/hybrid-ai-router.md) - Ollama/Claude routing
+- **[RAG Integration Overview](08-ai-ml/rag-integration-overview.md)** - Vector database and semantic search (Phase 44-01)
+- **[Explainable AI](08-ai-ml/explainable-ai.md)** - XAI for ML predictions and maintenance recommendations (Phase 44-02)
 
 ### 🔧 Development
 - [Tool Use Best Practices](12-development/tool-use-best-practices.md) - Development workflow
