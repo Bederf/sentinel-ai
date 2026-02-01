@@ -3359,5 +3359,1325 @@
       "serves": "All zones on L10",
       "critical": true
     }
+  },
+  {
+    "id": "002-stc-vav-l12-01",
+    "name": "Sandton VAV-L12-01",
+    "device_type": "hvac",
+    "protocol": "mock",
+    "site_id": "site-002",
+    "hvac_type": "vav",
+    "capacity": 500,
+    "points": {
+      "damper_position": {
+        "name": "damper_position",
+        "point_type": "analog_value",
+        "description": "VAV damper position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 40,
+        "writable": true
+      },
+      "airflow_actual": {
+        "name": "airflow_actual",
+        "point_type": "analog_input",
+        "description": "Actual airflow",
+        "unit": "L/s",
+        "min_value": 0,
+        "max_value": 600,
+        "default_value": 200,
+        "writable": false
+      },
+      "airflow_setpoint": {
+        "name": "airflow_setpoint",
+        "point_type": "analog_value",
+        "description": "Airflow setpoint",
+        "unit": "L/s",
+        "min_value": 50,
+        "max_value": 500,
+        "default_value": 250,
+        "writable": true
+      },
+      "discharge_air_temp": {
+        "name": "discharge_air_temp",
+        "point_type": "analog_input",
+        "description": "Discharge air temperature",
+        "unit": "\u00b0C",
+        "min_value": 10,
+        "max_value": 30,
+        "default_value": 14.5,
+        "writable": false
+      },
+      "heating_valve": {
+        "name": "heating_valve",
+        "point_type": "analog_value",
+        "description": "Reheat valve position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 0,
+        "writable": true
+      }
+    },
+    "device_location": {
+      "building": "Sandton City",
+      "floor": "L12",
+      "zone": "Zone-L12-A",
+      "room": "Ceiling L12",
+      "description": "Level 12, Zone A",
+      "zone_type": "office",
+      "exposure": "interior",
+      "zone_priority": 3
+    },
+    "equipment": {
+      "manufacturer": "Trane",
+      "model": "DERA-500",
+      "serial_number": "STC-VAV-L12-01",
+      "installation_year": 2018,
+      "capacity_ls": 500
+    },
+    "metadata": {
+      "building": "Sandton City",
+      "building_id": "sandton",
+      "floor": 12,
+      "zone": "Zone-L12-A",
+      "location": "Level 12 Zone A ceiling",
+      "serves": "Zone-L12-A",
+      "safety_status": "safe",
+      "safety_note": "Operating normally"
+    }
+  },
+  {
+    "id": "002-stc-vav-l12-02",
+    "name": "Sandton VAV-L12-02",
+    "device_type": "hvac",
+    "protocol": "mock",
+    "site_id": "site-002",
+    "hvac_type": "vav",
+    "capacity": 500,
+    "points": {
+      "damper_position": {
+        "name": "damper_position",
+        "point_type": "analog_value",
+        "description": "VAV damper position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 50,
+        "writable": true
+      },
+      "airflow_actual": {
+        "name": "airflow_actual",
+        "point_type": "analog_input",
+        "description": "Actual airflow",
+        "unit": "L/s",
+        "min_value": 0,
+        "max_value": 600,
+        "default_value": 250,
+        "writable": false
+      },
+      "airflow_setpoint": {
+        "name": "airflow_setpoint",
+        "point_type": "analog_value",
+        "description": "Airflow setpoint",
+        "unit": "L/s",
+        "min_value": 50,
+        "max_value": 500,
+        "default_value": 250,
+        "writable": true
+      },
+      "discharge_air_temp": {
+        "name": "discharge_air_temp",
+        "point_type": "analog_input",
+        "description": "Discharge air temperature",
+        "unit": "\u00b0C",
+        "min_value": 10,
+        "max_value": 30,
+        "default_value": 14.5,
+        "writable": false
+      },
+      "heating_valve": {
+        "name": "heating_valve",
+        "point_type": "analog_value",
+        "description": "Reheat valve position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 0,
+        "writable": true
+      }
+    },
+    "device_location": {
+      "building": "Sandton City",
+      "floor": "L12",
+      "zone": "Zone-L12-B",
+      "room": "Ceiling L12",
+      "description": "Level 12, Zone B",
+      "zone_type": "office",
+      "exposure": "interior",
+      "zone_priority": 3
+    },
+    "equipment": {
+      "manufacturer": "Trane",
+      "model": "DERA-500",
+      "serial_number": "STC-VAV-L12-02",
+      "installation_year": 2018,
+      "capacity_ls": 500
+    },
+    "metadata": {
+      "building": "Sandton City",
+      "building_id": "sandton",
+      "floor": 12,
+      "zone": "Zone-L12-B",
+      "location": "Level 12 Zone B ceiling",
+      "serves": "Zone-L12-B",
+      "safety_status": "safe",
+      "safety_note": "Operating normally"
+    }
+  },
+  {
+    "id": "002-stc-vav-l12-03",
+    "name": "Sandton VAV-L12-03",
+    "device_type": "hvac",
+    "protocol": "mock",
+    "site_id": "site-002",
+    "hvac_type": "vav",
+    "capacity": 500,
+    "points": {
+      "damper_position": {
+        "name": "damper_position",
+        "point_type": "analog_value",
+        "description": "VAV damper position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 50,
+        "writable": true
+      },
+      "airflow_actual": {
+        "name": "airflow_actual",
+        "point_type": "analog_input",
+        "description": "Actual airflow",
+        "unit": "L/s",
+        "min_value": 0,
+        "max_value": 600,
+        "default_value": 250,
+        "writable": false
+      },
+      "airflow_setpoint": {
+        "name": "airflow_setpoint",
+        "point_type": "analog_value",
+        "description": "Airflow setpoint",
+        "unit": "L/s",
+        "min_value": 50,
+        "max_value": 500,
+        "default_value": 250,
+        "writable": true
+      },
+      "discharge_air_temp": {
+        "name": "discharge_air_temp",
+        "point_type": "analog_input",
+        "description": "Discharge air temperature",
+        "unit": "\u00b0C",
+        "min_value": 10,
+        "max_value": 30,
+        "default_value": 14.5,
+        "writable": false
+      },
+      "heating_valve": {
+        "name": "heating_valve",
+        "point_type": "analog_value",
+        "description": "Reheat valve position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 0,
+        "writable": true
+      }
+    },
+    "device_location": {
+      "building": "Sandton City",
+      "floor": "L12",
+      "zone": "Zone-L12-C",
+      "room": "Ceiling L12",
+      "description": "Level 12, Zone C",
+      "zone_type": "office",
+      "exposure": "interior",
+      "zone_priority": 3
+    },
+    "equipment": {
+      "manufacturer": "Trane",
+      "model": "DERA-500",
+      "serial_number": "STC-VAV-L12-03",
+      "installation_year": 2018,
+      "capacity_ls": 500
+    },
+    "metadata": {
+      "building": "Sandton City",
+      "building_id": "sandton",
+      "floor": 12,
+      "zone": "Zone-L12-C",
+      "location": "Level 12 Zone C ceiling",
+      "serves": "Zone-L12-C",
+      "safety_status": "safe",
+      "safety_note": "Operating normally"
+    }
+  },
+  {
+    "id": "002-stc-vav-l12-04",
+    "name": "Sandton VAV-L12-04",
+    "device_type": "hvac",
+    "protocol": "mock",
+    "site_id": "site-002",
+    "hvac_type": "vav",
+    "capacity": 500,
+    "points": {
+      "damper_position": {
+        "name": "damper_position",
+        "point_type": "analog_value",
+        "description": "VAV damper position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 50,
+        "writable": true
+      },
+      "airflow_actual": {
+        "name": "airflow_actual",
+        "point_type": "analog_input",
+        "description": "Actual airflow",
+        "unit": "L/s",
+        "min_value": 0,
+        "max_value": 600,
+        "default_value": 250,
+        "writable": false
+      },
+      "airflow_setpoint": {
+        "name": "airflow_setpoint",
+        "point_type": "analog_value",
+        "description": "Airflow setpoint",
+        "unit": "L/s",
+        "min_value": 50,
+        "max_value": 500,
+        "default_value": 250,
+        "writable": true
+      },
+      "discharge_air_temp": {
+        "name": "discharge_air_temp",
+        "point_type": "analog_input",
+        "description": "Discharge air temperature",
+        "unit": "\u00b0C",
+        "min_value": 10,
+        "max_value": 30,
+        "default_value": 14.5,
+        "writable": false
+      },
+      "heating_valve": {
+        "name": "heating_valve",
+        "point_type": "analog_value",
+        "description": "Reheat valve position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 0,
+        "writable": true
+      }
+    },
+    "device_location": {
+      "building": "Sandton City",
+      "floor": "L12",
+      "zone": "Zone-L12-D",
+      "room": "Ceiling L12",
+      "description": "Level 12, Zone D",
+      "zone_type": "office",
+      "exposure": "interior",
+      "zone_priority": 3
+    },
+    "equipment": {
+      "manufacturer": "Trane",
+      "model": "DERA-500",
+      "serial_number": "STC-VAV-L12-04",
+      "installation_year": 2018,
+      "capacity_ls": 500
+    },
+    "metadata": {
+      "building": "Sandton City",
+      "building_id": "sandton",
+      "floor": 12,
+      "zone": "Zone-L12-D",
+      "location": "Level 12 Zone D ceiling",
+      "serves": "Zone-L12-D",
+      "safety_status": "safe",
+      "safety_note": "Operating normally"
+    }
+  },
+  {
+    "id": "002-stc-vav-l12-05",
+    "name": "Sandton VAV-L12-05",
+    "device_type": "hvac",
+    "protocol": "mock",
+    "site_id": "site-002",
+    "hvac_type": "vav",
+    "capacity": 500,
+    "points": {
+      "damper_position": {
+        "name": "damper_position",
+        "point_type": "analog_value",
+        "description": "VAV damper position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 49,
+        "writable": true
+      },
+      "airflow_actual": {
+        "name": "airflow_actual",
+        "point_type": "analog_input",
+        "description": "Actual airflow",
+        "unit": "L/s",
+        "min_value": 0,
+        "max_value": 600,
+        "default_value": 245,
+        "writable": false
+      },
+      "airflow_setpoint": {
+        "name": "airflow_setpoint",
+        "point_type": "analog_value",
+        "description": "Airflow setpoint",
+        "unit": "L/s",
+        "min_value": 50,
+        "max_value": 500,
+        "default_value": 250,
+        "writable": true
+      },
+      "discharge_air_temp": {
+        "name": "discharge_air_temp",
+        "point_type": "analog_input",
+        "description": "Discharge air temperature",
+        "unit": "\u00b0C",
+        "min_value": 10,
+        "max_value": 30,
+        "default_value": 14.5,
+        "writable": false
+      },
+      "heating_valve": {
+        "name": "heating_valve",
+        "point_type": "analog_value",
+        "description": "Reheat valve position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 0,
+        "writable": true
+      }
+    },
+    "device_location": {
+      "building": "Sandton City",
+      "floor": "L12",
+      "zone": "Zone-L12-E",
+      "room": "Ceiling L12",
+      "description": "Level 12, Zone E",
+      "zone_type": "office",
+      "exposure": "interior",
+      "zone_priority": 3
+    },
+    "equipment": {
+      "manufacturer": "Trane",
+      "model": "DERA-500",
+      "serial_number": "STC-VAV-L12-05",
+      "installation_year": 2018,
+      "capacity_ls": 500
+    },
+    "metadata": {
+      "building": "Sandton City",
+      "building_id": "sandton",
+      "floor": 12,
+      "zone": "Zone-L12-E",
+      "location": "Level 12 Zone E ceiling",
+      "serves": "Zone-L12-E",
+      "safety_status": "safe",
+      "safety_note": "Operating normally"
+    }
+  },
+  {
+    "id": "002-stc-vav-l11-01",
+    "name": "Sandton VAV-L11-01",
+    "device_type": "hvac",
+    "protocol": "mock",
+    "site_id": "site-002",
+    "hvac_type": "vav",
+    "capacity": 500,
+    "points": {
+      "damper_position": {
+        "name": "damper_position",
+        "point_type": "analog_value",
+        "description": "VAV damper position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 43,
+        "writable": true
+      },
+      "airflow_actual": {
+        "name": "airflow_actual",
+        "point_type": "analog_input",
+        "description": "Actual airflow",
+        "unit": "L/s",
+        "min_value": 0,
+        "max_value": 600,
+        "default_value": 215,
+        "writable": false
+      },
+      "airflow_setpoint": {
+        "name": "airflow_setpoint",
+        "point_type": "analog_value",
+        "description": "Airflow setpoint",
+        "unit": "L/s",
+        "min_value": 50,
+        "max_value": 500,
+        "default_value": 250,
+        "writable": true
+      },
+      "discharge_air_temp": {
+        "name": "discharge_air_temp",
+        "point_type": "analog_input",
+        "description": "Discharge air temperature",
+        "unit": "\u00b0C",
+        "min_value": 10,
+        "max_value": 30,
+        "default_value": 14.5,
+        "writable": false
+      },
+      "heating_valve": {
+        "name": "heating_valve",
+        "point_type": "analog_value",
+        "description": "Reheat valve position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 0,
+        "writable": true
+      }
+    },
+    "device_location": {
+      "building": "Sandton City",
+      "floor": "L11",
+      "zone": "Zone-L11-A",
+      "room": "Ceiling L11",
+      "description": "Level 11, Zone A",
+      "zone_type": "office",
+      "exposure": "interior",
+      "zone_priority": 3
+    },
+    "equipment": {
+      "manufacturer": "Trane",
+      "model": "DERA-500",
+      "serial_number": "STC-VAV-L11-01",
+      "installation_year": 2018,
+      "capacity_ls": 500
+    },
+    "metadata": {
+      "building": "Sandton City",
+      "building_id": "sandton",
+      "floor": 11,
+      "zone": "Zone-L11-A",
+      "location": "Level 11 Zone A ceiling",
+      "serves": "Zone-L11-A",
+      "safety_status": "safe",
+      "safety_note": "Operating normally"
+    }
+  },
+  {
+    "id": "002-stc-vav-l11-02",
+    "name": "Sandton VAV-L11-02",
+    "device_type": "hvac",
+    "protocol": "mock",
+    "site_id": "site-002",
+    "hvac_type": "vav",
+    "capacity": 500,
+    "points": {
+      "damper_position": {
+        "name": "damper_position",
+        "point_type": "analog_value",
+        "description": "VAV damper position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 46,
+        "writable": true
+      },
+      "airflow_actual": {
+        "name": "airflow_actual",
+        "point_type": "analog_input",
+        "description": "Actual airflow",
+        "unit": "L/s",
+        "min_value": 0,
+        "max_value": 600,
+        "default_value": 230,
+        "writable": false
+      },
+      "airflow_setpoint": {
+        "name": "airflow_setpoint",
+        "point_type": "analog_value",
+        "description": "Airflow setpoint",
+        "unit": "L/s",
+        "min_value": 50,
+        "max_value": 500,
+        "default_value": 250,
+        "writable": true
+      },
+      "discharge_air_temp": {
+        "name": "discharge_air_temp",
+        "point_type": "analog_input",
+        "description": "Discharge air temperature",
+        "unit": "\u00b0C",
+        "min_value": 10,
+        "max_value": 30,
+        "default_value": 14.5,
+        "writable": false
+      },
+      "heating_valve": {
+        "name": "heating_valve",
+        "point_type": "analog_value",
+        "description": "Reheat valve position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 0,
+        "writable": true
+      }
+    },
+    "device_location": {
+      "building": "Sandton City",
+      "floor": "L11",
+      "zone": "Zone-L11-B",
+      "room": "Ceiling L11",
+      "description": "Level 11, Zone B",
+      "zone_type": "office",
+      "exposure": "interior",
+      "zone_priority": 3
+    },
+    "equipment": {
+      "manufacturer": "Trane",
+      "model": "DERA-500",
+      "serial_number": "STC-VAV-L11-02",
+      "installation_year": 2018,
+      "capacity_ls": 500
+    },
+    "metadata": {
+      "building": "Sandton City",
+      "building_id": "sandton",
+      "floor": 11,
+      "zone": "Zone-L11-B",
+      "location": "Level 11 Zone B ceiling",
+      "serves": "Zone-L11-B",
+      "safety_status": "safe",
+      "safety_note": "Operating normally"
+    }
+  },
+  {
+    "id": "002-stc-vav-l11-03",
+    "name": "Sandton VAV-L11-03",
+    "device_type": "hvac",
+    "protocol": "mock",
+    "site_id": "site-002",
+    "hvac_type": "vav",
+    "capacity": 500,
+    "points": {
+      "damper_position": {
+        "name": "damper_position",
+        "point_type": "analog_value",
+        "description": "VAV damper position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 52,
+        "writable": true
+      },
+      "airflow_actual": {
+        "name": "airflow_actual",
+        "point_type": "analog_input",
+        "description": "Actual airflow",
+        "unit": "L/s",
+        "min_value": 0,
+        "max_value": 600,
+        "default_value": 260,
+        "writable": false
+      },
+      "airflow_setpoint": {
+        "name": "airflow_setpoint",
+        "point_type": "analog_value",
+        "description": "Airflow setpoint",
+        "unit": "L/s",
+        "min_value": 50,
+        "max_value": 500,
+        "default_value": 250,
+        "writable": true
+      },
+      "discharge_air_temp": {
+        "name": "discharge_air_temp",
+        "point_type": "analog_input",
+        "description": "Discharge air temperature",
+        "unit": "\u00b0C",
+        "min_value": 10,
+        "max_value": 30,
+        "default_value": 14.5,
+        "writable": false
+      },
+      "heating_valve": {
+        "name": "heating_valve",
+        "point_type": "analog_value",
+        "description": "Reheat valve position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 0,
+        "writable": true
+      }
+    },
+    "device_location": {
+      "building": "Sandton City",
+      "floor": "L11",
+      "zone": "Zone-L11-C",
+      "room": "Ceiling L11",
+      "description": "Level 11, Zone C",
+      "zone_type": "office",
+      "exposure": "interior",
+      "zone_priority": 3
+    },
+    "equipment": {
+      "manufacturer": "Trane",
+      "model": "DERA-500",
+      "serial_number": "STC-VAV-L11-03",
+      "installation_year": 2018,
+      "capacity_ls": 500
+    },
+    "metadata": {
+      "building": "Sandton City",
+      "building_id": "sandton",
+      "floor": 11,
+      "zone": "Zone-L11-C",
+      "location": "Level 11 Zone C ceiling",
+      "serves": "Zone-L11-C",
+      "safety_status": "safe",
+      "safety_note": "Operating normally"
+    }
+  },
+  {
+    "id": "002-stc-vav-l11-04",
+    "name": "Sandton VAV-L11-04",
+    "device_type": "hvac",
+    "protocol": "mock",
+    "site_id": "site-002",
+    "hvac_type": "vav",
+    "capacity": 500,
+    "points": {
+      "damper_position": {
+        "name": "damper_position",
+        "point_type": "analog_value",
+        "description": "VAV damper position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 40,
+        "writable": true
+      },
+      "airflow_actual": {
+        "name": "airflow_actual",
+        "point_type": "analog_input",
+        "description": "Actual airflow",
+        "unit": "L/s",
+        "min_value": 0,
+        "max_value": 600,
+        "default_value": 200,
+        "writable": false
+      },
+      "airflow_setpoint": {
+        "name": "airflow_setpoint",
+        "point_type": "analog_value",
+        "description": "Airflow setpoint",
+        "unit": "L/s",
+        "min_value": 50,
+        "max_value": 500,
+        "default_value": 250,
+        "writable": true
+      },
+      "discharge_air_temp": {
+        "name": "discharge_air_temp",
+        "point_type": "analog_input",
+        "description": "Discharge air temperature",
+        "unit": "\u00b0C",
+        "min_value": 10,
+        "max_value": 30,
+        "default_value": 14.5,
+        "writable": false
+      },
+      "heating_valve": {
+        "name": "heating_valve",
+        "point_type": "analog_value",
+        "description": "Reheat valve position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 0,
+        "writable": true
+      }
+    },
+    "device_location": {
+      "building": "Sandton City",
+      "floor": "L11",
+      "zone": "Zone-L11-D",
+      "room": "Ceiling L11",
+      "description": "Level 11, Zone D",
+      "zone_type": "office",
+      "exposure": "interior",
+      "zone_priority": 3
+    },
+    "equipment": {
+      "manufacturer": "Trane",
+      "model": "DERA-500",
+      "serial_number": "STC-VAV-L11-04",
+      "installation_year": 2018,
+      "capacity_ls": 500
+    },
+    "metadata": {
+      "building": "Sandton City",
+      "building_id": "sandton",
+      "floor": 11,
+      "zone": "Zone-L11-D",
+      "location": "Level 11 Zone D ceiling",
+      "serves": "Zone-L11-D",
+      "safety_status": "safe",
+      "safety_note": "Operating normally"
+    }
+  },
+  {
+    "id": "002-stc-vav-l11-05",
+    "name": "Sandton VAV-L11-05",
+    "device_type": "hvac",
+    "protocol": "mock",
+    "site_id": "site-002",
+    "hvac_type": "vav",
+    "capacity": 500,
+    "points": {
+      "damper_position": {
+        "name": "damper_position",
+        "point_type": "analog_value",
+        "description": "VAV damper position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 46,
+        "writable": true
+      },
+      "airflow_actual": {
+        "name": "airflow_actual",
+        "point_type": "analog_input",
+        "description": "Actual airflow",
+        "unit": "L/s",
+        "min_value": 0,
+        "max_value": 600,
+        "default_value": 230,
+        "writable": false
+      },
+      "airflow_setpoint": {
+        "name": "airflow_setpoint",
+        "point_type": "analog_value",
+        "description": "Airflow setpoint",
+        "unit": "L/s",
+        "min_value": 50,
+        "max_value": 500,
+        "default_value": 250,
+        "writable": true
+      },
+      "discharge_air_temp": {
+        "name": "discharge_air_temp",
+        "point_type": "analog_input",
+        "description": "Discharge air temperature",
+        "unit": "\u00b0C",
+        "min_value": 10,
+        "max_value": 30,
+        "default_value": 14.5,
+        "writable": false
+      },
+      "heating_valve": {
+        "name": "heating_valve",
+        "point_type": "analog_value",
+        "description": "Reheat valve position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 0,
+        "writable": true
+      }
+    },
+    "device_location": {
+      "building": "Sandton City",
+      "floor": "L11",
+      "zone": "Zone-L11-E",
+      "room": "Ceiling L11",
+      "description": "Level 11, Zone E",
+      "zone_type": "office",
+      "exposure": "interior",
+      "zone_priority": 3
+    },
+    "equipment": {
+      "manufacturer": "Trane",
+      "model": "DERA-500",
+      "serial_number": "STC-VAV-L11-05",
+      "installation_year": 2018,
+      "capacity_ls": 500
+    },
+    "metadata": {
+      "building": "Sandton City",
+      "building_id": "sandton",
+      "floor": 11,
+      "zone": "Zone-L11-E",
+      "location": "Level 11 Zone E ceiling",
+      "serves": "Zone-L11-E",
+      "safety_status": "safe",
+      "safety_note": "Operating normally"
+    }
+  },
+  {
+    "id": "002-stc-vav-l10-01",
+    "name": "Sandton VAV-L10-01",
+    "device_type": "hvac",
+    "protocol": "mock",
+    "site_id": "site-002",
+    "hvac_type": "vav",
+    "capacity": 500,
+    "points": {
+      "damper_position": {
+        "name": "damper_position",
+        "point_type": "analog_value",
+        "description": "VAV damper position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 49,
+        "writable": true
+      },
+      "airflow_actual": {
+        "name": "airflow_actual",
+        "point_type": "analog_input",
+        "description": "Actual airflow",
+        "unit": "L/s",
+        "min_value": 0,
+        "max_value": 600,
+        "default_value": 245,
+        "writable": false
+      },
+      "airflow_setpoint": {
+        "name": "airflow_setpoint",
+        "point_type": "analog_value",
+        "description": "Airflow setpoint",
+        "unit": "L/s",
+        "min_value": 50,
+        "max_value": 500,
+        "default_value": 250,
+        "writable": true
+      },
+      "discharge_air_temp": {
+        "name": "discharge_air_temp",
+        "point_type": "analog_input",
+        "description": "Discharge air temperature",
+        "unit": "\u00b0C",
+        "min_value": 10,
+        "max_value": 30,
+        "default_value": 14.5,
+        "writable": false
+      },
+      "heating_valve": {
+        "name": "heating_valve",
+        "point_type": "analog_value",
+        "description": "Reheat valve position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 0,
+        "writable": true
+      }
+    },
+    "device_location": {
+      "building": "Sandton City",
+      "floor": "L10",
+      "zone": "Zone-L10-A",
+      "room": "Ceiling L10",
+      "description": "Level 10, Zone A",
+      "zone_type": "office",
+      "exposure": "interior",
+      "zone_priority": 3
+    },
+    "equipment": {
+      "manufacturer": "Trane",
+      "model": "DERA-500",
+      "serial_number": "STC-VAV-L10-01",
+      "installation_year": 2018,
+      "capacity_ls": 500
+    },
+    "metadata": {
+      "building": "Sandton City",
+      "building_id": "sandton",
+      "floor": 10,
+      "zone": "Zone-L10-A",
+      "location": "Level 10 Zone A ceiling",
+      "serves": "Zone-L10-A",
+      "safety_status": "safe",
+      "safety_note": "Operating normally"
+    }
+  },
+  {
+    "id": "002-stc-vav-l10-02",
+    "name": "Sandton VAV-L10-02",
+    "device_type": "hvac",
+    "protocol": "mock",
+    "site_id": "site-002",
+    "hvac_type": "vav",
+    "capacity": 500,
+    "points": {
+      "damper_position": {
+        "name": "damper_position",
+        "point_type": "analog_value",
+        "description": "VAV damper position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 40,
+        "writable": true
+      },
+      "airflow_actual": {
+        "name": "airflow_actual",
+        "point_type": "analog_input",
+        "description": "Actual airflow",
+        "unit": "L/s",
+        "min_value": 0,
+        "max_value": 600,
+        "default_value": 200,
+        "writable": false
+      },
+      "airflow_setpoint": {
+        "name": "airflow_setpoint",
+        "point_type": "analog_value",
+        "description": "Airflow setpoint",
+        "unit": "L/s",
+        "min_value": 50,
+        "max_value": 500,
+        "default_value": 250,
+        "writable": true
+      },
+      "discharge_air_temp": {
+        "name": "discharge_air_temp",
+        "point_type": "analog_input",
+        "description": "Discharge air temperature",
+        "unit": "\u00b0C",
+        "min_value": 10,
+        "max_value": 30,
+        "default_value": 14.5,
+        "writable": false
+      },
+      "heating_valve": {
+        "name": "heating_valve",
+        "point_type": "analog_value",
+        "description": "Reheat valve position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 0,
+        "writable": true
+      }
+    },
+    "device_location": {
+      "building": "Sandton City",
+      "floor": "L10",
+      "zone": "Zone-L10-B",
+      "room": "Ceiling L10",
+      "description": "Level 10, Zone B",
+      "zone_type": "office",
+      "exposure": "interior",
+      "zone_priority": 3
+    },
+    "equipment": {
+      "manufacturer": "Trane",
+      "model": "DERA-500",
+      "serial_number": "STC-VAV-L10-02",
+      "installation_year": 2018,
+      "capacity_ls": 500
+    },
+    "metadata": {
+      "building": "Sandton City",
+      "building_id": "sandton",
+      "floor": 10,
+      "zone": "Zone-L10-B",
+      "location": "Level 10 Zone B ceiling",
+      "serves": "Zone-L10-B",
+      "safety_status": "safe",
+      "safety_note": "Operating normally"
+    }
+  },
+  {
+    "id": "002-stc-vav-l10-03",
+    "name": "Sandton VAV-L10-03",
+    "device_type": "hvac",
+    "protocol": "mock",
+    "site_id": "site-002",
+    "hvac_type": "vav",
+    "capacity": 500,
+    "points": {
+      "damper_position": {
+        "name": "damper_position",
+        "point_type": "analog_value",
+        "description": "VAV damper position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 95,
+        "writable": true
+      },
+      "airflow_actual": {
+        "name": "airflow_actual",
+        "point_type": "analog_input",
+        "description": "Actual airflow",
+        "unit": "L/s",
+        "min_value": 0,
+        "max_value": 600,
+        "default_value": 475,
+        "writable": false
+      },
+      "airflow_setpoint": {
+        "name": "airflow_setpoint",
+        "point_type": "analog_value",
+        "description": "Airflow setpoint",
+        "unit": "L/s",
+        "min_value": 50,
+        "max_value": 500,
+        "default_value": 250,
+        "writable": true
+      },
+      "discharge_air_temp": {
+        "name": "discharge_air_temp",
+        "point_type": "analog_input",
+        "description": "Discharge air temperature",
+        "unit": "\u00b0C",
+        "min_value": 10,
+        "max_value": 30,
+        "default_value": 14.5,
+        "writable": false
+      },
+      "heating_valve": {
+        "name": "heating_valve",
+        "point_type": "analog_value",
+        "description": "Reheat valve position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 0,
+        "writable": true
+      }
+    },
+    "device_location": {
+      "building": "Sandton City",
+      "floor": "L10",
+      "zone": "Zone-L10-C",
+      "room": "Ceiling L10",
+      "description": "Level 10, Zone C",
+      "zone_type": "office",
+      "exposure": "interior",
+      "zone_priority": 3
+    },
+    "equipment": {
+      "manufacturer": "Trane",
+      "model": "DERA-500",
+      "serial_number": "STC-VAV-L10-03",
+      "installation_year": 2018,
+      "capacity_ls": 500
+    },
+    "metadata": {
+      "building": "Sandton City",
+      "building_id": "sandton",
+      "floor": 10,
+      "zone": "Zone-L10-C",
+      "location": "Level 10 Zone C ceiling",
+      "serves": "Zone-L10-C",
+      "safety_status": "safe",
+      "safety_note": "Operating normally"
+    }
+  },
+  {
+    "id": "002-stc-vav-l10-04",
+    "name": "Sandton VAV-L10-04",
+    "device_type": "hvac",
+    "protocol": "mock",
+    "site_id": "site-002",
+    "hvac_type": "vav",
+    "capacity": 500,
+    "points": {
+      "damper_position": {
+        "name": "damper_position",
+        "point_type": "analog_value",
+        "description": "VAV damper position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 50,
+        "writable": true
+      },
+      "airflow_actual": {
+        "name": "airflow_actual",
+        "point_type": "analog_input",
+        "description": "Actual airflow",
+        "unit": "L/s",
+        "min_value": 0,
+        "max_value": 600,
+        "default_value": 250,
+        "writable": false
+      },
+      "airflow_setpoint": {
+        "name": "airflow_setpoint",
+        "point_type": "analog_value",
+        "description": "Airflow setpoint",
+        "unit": "L/s",
+        "min_value": 50,
+        "max_value": 500,
+        "default_value": 250,
+        "writable": true
+      },
+      "discharge_air_temp": {
+        "name": "discharge_air_temp",
+        "point_type": "analog_input",
+        "description": "Discharge air temperature",
+        "unit": "\u00b0C",
+        "min_value": 10,
+        "max_value": 30,
+        "default_value": 14.5,
+        "writable": false
+      },
+      "heating_valve": {
+        "name": "heating_valve",
+        "point_type": "analog_value",
+        "description": "Reheat valve position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 0,
+        "writable": true
+      }
+    },
+    "device_location": {
+      "building": "Sandton City",
+      "floor": "L10",
+      "zone": "Zone-L10-D",
+      "room": "Ceiling L10",
+      "description": "Level 10, Zone D",
+      "zone_type": "office",
+      "exposure": "interior",
+      "zone_priority": 3
+    },
+    "equipment": {
+      "manufacturer": "Trane",
+      "model": "DERA-500",
+      "serial_number": "STC-VAV-L10-04",
+      "installation_year": 2018,
+      "capacity_ls": 500
+    },
+    "metadata": {
+      "building": "Sandton City",
+      "building_id": "sandton",
+      "floor": 10,
+      "zone": "Zone-L10-D",
+      "location": "Level 10 Zone D ceiling",
+      "serves": "Zone-L10-D",
+      "safety_status": "safe",
+      "safety_note": "Operating normally"
+    }
+  },
+  {
+    "id": "002-stc-vav-l10-05",
+    "name": "Sandton VAV-L10-05",
+    "device_type": "hvac",
+    "protocol": "mock",
+    "site_id": "site-002",
+    "hvac_type": "vav",
+    "capacity": 500,
+    "points": {
+      "damper_position": {
+        "name": "damper_position",
+        "point_type": "analog_value",
+        "description": "VAV damper position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 45,
+        "writable": true
+      },
+      "airflow_actual": {
+        "name": "airflow_actual",
+        "point_type": "analog_input",
+        "description": "Actual airflow",
+        "unit": "L/s",
+        "min_value": 0,
+        "max_value": 600,
+        "default_value": 225,
+        "writable": false
+      },
+      "airflow_setpoint": {
+        "name": "airflow_setpoint",
+        "point_type": "analog_value",
+        "description": "Airflow setpoint",
+        "unit": "L/s",
+        "min_value": 50,
+        "max_value": 500,
+        "default_value": 250,
+        "writable": true
+      },
+      "discharge_air_temp": {
+        "name": "discharge_air_temp",
+        "point_type": "analog_input",
+        "description": "Discharge air temperature",
+        "unit": "\u00b0C",
+        "min_value": 10,
+        "max_value": 30,
+        "default_value": 14.5,
+        "writable": false
+      },
+      "heating_valve": {
+        "name": "heating_valve",
+        "point_type": "analog_value",
+        "description": "Reheat valve position",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 0,
+        "writable": true
+      }
+    },
+    "device_location": {
+      "building": "Sandton City",
+      "floor": "L10",
+      "zone": "Zone-L10-E",
+      "room": "Ceiling L10",
+      "description": "Level 10, Zone E",
+      "zone_type": "office",
+      "exposure": "interior",
+      "zone_priority": 3
+    },
+    "equipment": {
+      "manufacturer": "Trane",
+      "model": "DERA-500",
+      "serial_number": "STC-VAV-L10-05",
+      "installation_year": 2018,
+      "capacity_ls": 500
+    },
+    "metadata": {
+      "building": "Sandton City",
+      "building_id": "sandton",
+      "floor": 10,
+      "zone": "Zone-L10-E",
+      "location": "Level 10 Zone E ceiling",
+      "serves": "Zone-L10-E",
+      "safety_status": "safe",
+      "safety_note": "Operating normally"
+    }
   }
 ]

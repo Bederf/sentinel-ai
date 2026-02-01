@@ -4,7 +4,7 @@ type: "architecture"
 status: "approved"
 version: "1.0.0"
 created: "2026-01-30"
-updated: "2026-01-30"
+updated: "2026-02-01"
 author: "Sentinel Development Team"
 tags: ["architecture", "system-design", "components"]
 related: ["device-abstraction-layer.md", "database-schema.md", "../03-api-reference/rest-api-endpoints.md"]
@@ -187,7 +187,7 @@ frontend/src/
 
 **Component Organization**
 - **Control System:** ControlPanel, DeviceControl, SafetyStatus
-- **Dashboard:** KPICard, SiteCard, AlertFeed
+- **Dashboard:** KPICard, SiteCard, AlertFeed, ExpandableRiskList, RiskDetailModal
 - **AI Chat:** Chat, TechnicianChat, DiagnosisFlow
 - **Integration:** IntegrationWizard, GoLiveChecklist
 
@@ -426,6 +426,67 @@ flowchart LR
     style Validate fill:#f1f8e9
     style GoLive fill:#e0f7fa
 ```
+
+### 4. Building Risk Cards Flow
+
+Dashboard SiteCards expand to show at-risk equipment with drill-down to control and risk detail views.
+
+```mermaid
+flowchart TB
+    subgraph Dashboard["Dashboard"]
+        SiteCard[SiteCard<br/>Sandton Building]
+        Stats[Stats Row<br/>Equipment | Safe | Risks]
+    end
+
+    subgraph Expandable["Expandable Risk List"]
+        Toggle[Click to Expand]
+        RiskList[At-Risk Equipment<br/>Sorted: Critical → Warning → Health]
+        EquipRow[Equipment Row<br/>Status | Name | Health % | Arrow]
+    end
+
+    subgraph Actions["User Actions"]
+        ClickRow[Click Row]
+        ClickBadge[Click Status Badge]
+    end
+
+    subgraph Targets["Navigation Targets"]
+        ControlDash[ControlDashboard<br/>Pre-selected Equipment]
+        RiskModal[RiskDetailModal<br/>Health Factors Breakdown]
+    end
+
+    SiteCard --> Stats
+    Stats -->|Has Alerts| Toggle
+    Toggle --> RiskList
+    RiskList --> EquipRow
+
+    EquipRow --> ClickRow
+    EquipRow --> ClickBadge
+
+    ClickRow -->|sessionStorage| ControlDash
+    ClickBadge --> RiskModal
+
+    RiskModal -->|Open Control Panel| ControlDash
+
+    style SiteCard fill:#e1f5fe
+    style RiskList fill:#fff3e0
+    style RiskModal fill:#fce4ec
+    style ControlDash fill:#e8f5e9
+```
+
+**Components:**
+- **SiteCard** - Building card with expandable risk list (when `alert_count > 0`)
+- **ExpandableRiskList** - Collapsible list of warning/critical equipment, lazy-loaded
+- **RiskDetailModal** - Equipment health factors breakdown with action buttons
+
+**Health Factors Displayed:**
+- Age Score (equipment age vs expected lifespan)
+- Service Status (days since/until service)
+- Runtime Hours (accumulated operating hours)
+- Fault History (recent fault count)
+
+**Navigation:**
+- Click equipment row → ControlDashboard with equipment pre-selected via sessionStorage
+- Click status badge → RiskDetailModal with health factors and recommended action
 
 ## Technology Stack
 

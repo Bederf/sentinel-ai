@@ -1,0 +1,401 @@
+"""Repository for BMS device operations.
+
+This repository handles CRUD operations for the devices table,
+which represents the BMS control layer (protocol-agnostic device abstraction).
+"""
+
+from typing import List, Optional, Dict, Any
+import logging
+from app.database.supabase_client import get_supabase_client
+
+logger = logging.getLogger(__name__)
+
+
+class DeviceRepository:
+    """Repository for BMS device database operations."""
+
+    def __init__(self):
+        """Initialize the repository with a Supabase client."""
+        self.client = get_supabase_client()
+
+    def get_all(
+        self,
+        building_id: Optional[str] = None,
+        device_type: Optional[str] = None,
+        status: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get all devices with optional filtering.
+
+        Args:
+            building_id: Filter by building UUID
+            device_type: Filter by device type (hvac, lighting, security, etc.)
+            status: Filter by status (online, offline, fault, etc.)
+
+        Returns:
+            List of devices
+        """
+        query = self.client.table('devices').select("*")
+
+        if building_id:
+            query = query.eq('building_id', building_id)
+        if device_type:
+            query = query.eq('device_type', device_type)
+        if status:
+            query = query.eq('status', status)
+
+        response = query.execute()
+        return response.data
+
+    def get_by_id(self, building_id: str, device_id: str) -> Optional[Dict[str, Any]]:
+        """Get device by building and device_id composite key.
+
+        Args:
+            building_id: Building UUID
+            device_id: Device identifier (e.g., '001-gwc-chiller-001')
+
+        Returns:
+            Device data or None if not found
+        """
+        response = self.client.table('devices').select("*").eq(
+            'building_id', building_id
+        ).eq('device_id', device_id).execute()
+
+        if response.data:
+            return response.data[0]
+        return None
+
+    def get_by_uuid(self, uuid: str) -> Optional[Dict[str, Any]]:
+        """Get device by its UUID.
+
+        Args:
+            uuid: Device UUID
+
+        Returns:
+            Device data or None if not found
+        """
+        response = self.client.table('devices').select("*").eq('id', uuid).execute()
+
+        if response.data:
+            return response.data[0]
+        return None
+
+    def get_by_building_code(self, building_code: str) -> List[Dict[str, Any]]:
+        """Get devices by building code.
+
+        Args:
+            building_code: Building code (e.g., 'sandton')
+
+        Returns:
+            List of devices
+        """
+        # First get the building UUID
+        building_response = self.client.table('buildings').select('id').eq(
+            'code', building_code
+        ).execute()
+
+        if not building_response.data:
+            return []
+
+        building_uuid = building_response.data[0]['id']
+
+        # Get devices for this building
+        response = self.client.table('devices').select("*").eq(
+            'building_id', building_uuid
+        ).execute()
+
+        return response.data
+
+    def get_by_equipment(self, equipment_id: str) -> List[Dict[str, Any]]:
+        """Get devices linked to specific equipment.
+
+        Args:
+            equipment_id: Equipment UUID
+
+        Returns:
+            List of devices controlling this equipment
+        """
+        response = self.client.table('devices').select("*").eq(
+            'equipment_id', equipment_id
+        ).execute()
+
+        return response.data
+
+    def get_by_zone(self, zone_id: str) -> List[Dict[str, Any]]:
+        """Get devices in a specific HVAC zone.
+
+        Args:
+            zone_id: HVAC Zone UUID
+
+        Returns:
+            List of devices in this zone
+        """
+        response = self.client.table('devices').select("*").eq(
+            'zone_id', zone_id
+        ).execute()
+
+        return response.data
+
+    def get_with_details(
+        self,
+        building_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get devices with enriched building/equipment/zone details.
+
+        Uses the v_devices_with_equipment view for efficient joins.
+
+        Args:
+            building_id: Optional filter by building UUID
+
+        Returns:
+            List of enriched device records
+        """
+        query = self.client.table('v_devices_with_equipment').select("*")
+
+        if building_id:
+            query = query.eq('building_id', building_id)
+
+        response = query.execute()
+        return response.data
+
+    def get_fault_devices(
+        self,
+        building_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get all devices with fault status.
+
+        Args:
+            building_id: Optional filter by building UUID
+
+        Returns:
+            List of devices in fault state
+        """
+        query = self.client.table('devices').select("*").eq('status', 'fault')
+
+        if building_id:
+            query = query.eq('building_id', building_id)
+
+        response = query.execute()
+        return response.data
+
+    def get_offline_devices(
+        self,
+        building_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get all offline devices.
+
+        Args:
+            building_id: Optional filter by building UUID
+
+        Returns:
+            List of offline devices
+        """
+        query = self.client.table('devices').select("*").eq('status', 'offline')
+
+        if building_id:
+            query = query.eq('building_id', building_id)
+
+        response = query.execute()
+        return response.data
+
+    def create(self, device_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Create a new device.
+
+        Args:
+            device_data: Device data including building_id, device_id, name, etc.
+
+        Returns:
+            Created device
+        """
+        response = self.client.table('devices').insert(device_data).execute()
+        return response.data[0]
+
+    def upsert(self, device_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Insert or update a device.
+
+        Uses composite unique constraint (building_id, device_id).
+
+        Args:
+            device_data: Device data
+
+        Returns:
+            Upserted device data
+        """
+        response = self.client.table('devices').upsert(
+            device_data,
+            on_conflict='building_id,device_id'
+        ).execute()
+        return response.data[0] if response.data else {}
+
+    def upsert_many(self, devices: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Insert or update multiple devices.
+
+        Args:
+            devices: List of device data dicts
+
+        Returns:
+            List of upserted devices
+        """
+        if not devices:
+            return []
+
+        response = self.client.table('devices').upsert(
+            devices,
+            on_conflict='building_id,device_id'
+        ).execute()
+        return response.data
+
+    def update(
+        self,
+        building_id: str,
+        device_id: str,
+        device_data: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
+        """Update a device.
+
+        Args:
+            building_id: Building UUID
+            device_id: Device identifier
+            device_data: Data to update
+
+        Returns:
+            Updated device or None if not found
+        """
+        response = self.client.table('devices').update(
+            device_data
+        ).eq('building_id', building_id).eq('device_id', device_id).execute()
+
+        if response.data:
+            return response.data[0]
+        return None
+
+    def update_by_uuid(
+        self,
+        uuid: str,
+        device_data: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
+        """Update a device by UUID.
+
+        Args:
+            uuid: Device UUID
+            device_data: Data to update
+
+        Returns:
+            Updated device or None if not found
+        """
+        response = self.client.table('devices').update(
+            device_data
+        ).eq('id', uuid).execute()
+
+        if response.data:
+            return response.data[0]
+        return None
+
+    def delete(self, building_id: str, device_id: str) -> bool:
+        """Delete a device.
+
+        Args:
+            building_id: Building UUID
+            device_id: Device identifier
+
+        Returns:
+            True if deleted, False if not found
+        """
+        response = self.client.table('devices').delete().eq(
+            'building_id', building_id
+        ).eq('device_id', device_id).execute()
+
+        return len(response.data) > 0
+
+    def delete_by_uuid(self, uuid: str) -> bool:
+        """Delete a device by UUID.
+
+        Args:
+            uuid: Device UUID
+
+        Returns:
+            True if deleted, False if not found
+        """
+        response = self.client.table('devices').delete().eq('id', uuid).execute()
+        return len(response.data) > 0
+
+    def update_status(
+        self,
+        building_id: str,
+        device_id: str,
+        status: str
+    ) -> Optional[Dict[str, Any]]:
+        """Update device status.
+
+        Args:
+            building_id: Building UUID
+            device_id: Device identifier
+            status: New status ('online', 'offline', 'fault', 'maintenance', 'standby')
+
+        Returns:
+            Updated device or None if not found
+        """
+        return self.update(building_id, device_id, {'status': status})
+
+    def update_last_seen(
+        self,
+        building_id: str,
+        device_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """Update device last_seen timestamp to NOW.
+
+        Uses the optimized update_device_last_seen function.
+
+        Args:
+            building_id: Building UUID
+            device_id: Device identifier
+
+        Returns:
+            None (function returns VOID for performance)
+        """
+        # Use the stored function for fast heartbeat updates
+        try:
+            self.client.rpc('update_device_last_seen', {
+                'p_device_id': device_id,
+                'p_building_id': building_id
+            }).execute()
+            return None
+        except Exception as e:
+            logger.error(f"Failed to update last_seen for device {device_id}: {e}")
+            return None
+
+    def update_points(
+        self,
+        building_id: str,
+        device_id: str,
+        points: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
+        """Update device points (control/monitoring points).
+
+        Args:
+            building_id: Building UUID
+            device_id: Device identifier
+            points: Points JSONB object
+
+        Returns:
+            Updated device or None if not found
+        """
+        return self.update(building_id, device_id, {'points': points})
+
+    def get_building_summary(self, building_id: str) -> Optional[Dict[str, Any]]:
+        """Get device summary for a building.
+
+        Uses the v_building_device_summary view.
+
+        Args:
+            building_id: Building UUID
+
+        Returns:
+            Device summary with counts by type and status
+        """
+        response = self.client.table('v_building_device_summary').select(
+            "*"
+        ).eq('building_id', building_id).execute()
+
+        if response.data:
+            return response.data[0]
+        return None

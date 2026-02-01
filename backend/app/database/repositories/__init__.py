@@ -13,6 +13,13 @@ from app.database.repositories.desk_repository import DeskRepository
 from app.database.repositories.generator_repository import GeneratorRepository
 from app.database.repositories.energy_centre_repository import EnergyCentreRepository
 from app.database.repositories.service_record_repository import ServiceRecordRepository
+from app.database.repositories.device_repository import DeviceRepository
+from app.database.repositories.dali_repository import (
+    DALIControllerRepository,
+    DALILuminaireRepository,
+    DALISensorRepository,
+    DALIGroupRepository,
+)
 
 __all__ = [
     'BuildingRepository',
@@ -28,4 +35,9 @@ __all__ = [
     'GeneratorRepository',
     'EnergyCentreRepository',
     'ServiceRecordRepository',
+    'DeviceRepository',
+    'DALIControllerRepository',
+    'DALILuminaireRepository',
+    'DALISensorRepository',
+    'DALIGroupRepository',
 ]

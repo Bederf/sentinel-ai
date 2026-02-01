@@ -138,12 +138,17 @@ class DeviceValue:
 
 @dataclass
 class DeviceLocation:
-    """Physical location of a device for technician navigation."""
+    """Physical location of a device for technician navigation.
+
+    Links devices to zones for zone-based control and analysis.
+    A zone contains multiple devices/equipment (AHU, VAV, FCU, luminaires, etc.).
+    """
     building: str  # Full building name
     floor: str  # FL1, FL2, Basement, Roof, Ground
     zone: str  # Q1-Q4 or directional (North, South, East, West)
     room: str  # MR4 (Mechanical Room 4), ER1, OR12, etc.
     description: str  # Human-readable location string
+    zone_id: Optional[str] = None  # References hvac_zones.zone_id for device-to-zone mapping
     # Zone-aware optimization fields
     zone_type: Optional['ZoneType'] = None  # Type of zone for optimization priority
     exposure: Optional['ExposureDirection'] = None  # Exterior exposure for solar gain
@@ -157,6 +162,7 @@ class DeviceLocation:
             "zone": self.zone,
             "room": self.room,
             "description": self.description,
+            "zone_id": self.zone_id,
             "zone_type": self.zone_type.value if self.zone_type else None,
             "exposure": self.exposure.value if self.exposure else None,
             "zone_priority": self.zone_priority
@@ -384,10 +390,7 @@ def create_device_from_dict(data: Dict[str, Any]) -> Device:
             loc_data["zone_type"] = ZoneType(loc_data["zone_type"])
         if "exposure" in loc_data and isinstance(loc_data["exposure"], str):
             loc_data["exposure"] = ExposureDirection(loc_data["exposure"])
-        # Filter out unexpected fields (e.g., zone_id) that may be in JSON
-        valid_fields = {f: getattr(DeviceLocation, f) for f in DeviceLocation.__dataclass_fields__}
-        filtered_loc_data = {k: v for k, v in loc_data.items() if k in valid_fields}
-        data["device_location"] = DeviceLocation(**filtered_loc_data)
+        data["device_location"] = DeviceLocation(**loc_data)
     elif "location" in data and isinstance(data["location"], str):
         # Legacy string location - create basic DeviceLocation
         data["device_location"] = DeviceLocation(

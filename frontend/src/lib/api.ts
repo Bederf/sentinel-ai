@@ -57,6 +57,12 @@ export interface EquipmentSummary {
   source: "supabase" | "json";
 }
 
+// Health factor breakdown for equipment
+export interface HealthFactor {
+  score: number;
+  value: string;
+}
+
 // Building equipment item (from /api/buildings/{id}/equipment)
 export interface BuildingEquipmentItem {
   id: string;
@@ -70,6 +76,12 @@ export interface BuildingEquipmentItem {
   building_name: string;
   details: Record<string, any>;
   controllable: boolean;
+  health_factors?: {
+    age?: HealthFactor;
+    service?: HealthFactor;
+    runtime?: HealthFactor;
+    fault_history?: HealthFactor;
+  };
 }
 
 // Category status counts

@@ -245,6 +245,14 @@ export function Dashboard({ onViewChange }: DashboardProps) {
     setSelectedSiteId(null);
   };
 
+  // Handle equipment control navigation from SiteCard risk list
+  const handleEquipmentControlNavigate = (equipmentId: string, siteId: string) => {
+    // Store selection in sessionStorage for ControlDashboard to pick up
+    sessionStorage.setItem("sentinel_selected_equipment", equipmentId);
+    sessionStorage.setItem("sentinel_selected_site", siteId);
+    onViewChange("control");
+  };
+
   // Handle prediction card click
   const handlePredictionClick = (prediction: Prediction) => {
     setSelectedPrediction(prediction);
@@ -568,7 +576,13 @@ export function Dashboard({ onViewChange }: DashboardProps) {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {sites.map((site) => (
-                  <SiteCard key={site.id} site={site} onClick={handleSiteClick} showOptimizationStatus={true} />
+                  <SiteCard
+                    key={site.id}
+                    site={site}
+                    onClick={handleSiteClick}
+                    showOptimizationStatus={true}
+                    onEquipmentControlNavigate={handleEquipmentControlNavigate}
+                  />
                 ))}
               </div>
             )}

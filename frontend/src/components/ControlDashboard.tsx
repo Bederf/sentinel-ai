@@ -53,6 +53,23 @@ export function ControlDashboard({ onError }: ControlDashboardProps) {
   const [refreshDevices, setRefreshDevices] = useState(0);
   const [recentActionsExpanded, setRecentActionsExpanded] = useState(true);
   const [auditRefreshTrigger, setAuditRefreshTrigger] = useState(0);
+  const [pendingEquipmentSelection, setPendingEquipmentSelection] = useState<string | null>(null);
+
+  // Check for pre-selected equipment from Dashboard navigation
+  useEffect(() => {
+    const storedEquipmentId = sessionStorage.getItem("sentinel_selected_equipment");
+    const storedSiteId = sessionStorage.getItem("sentinel_selected_site");
+
+    if (storedEquipmentId && storedSiteId) {
+      // Map site ID to the format used in devices (e.g., "site-002" stays as-is for device matching)
+      setSelectedSiteId(storedSiteId);
+      setPendingEquipmentSelection(storedEquipmentId);
+
+      // Clear from storage
+      sessionStorage.removeItem("sentinel_selected_equipment");
+      sessionStorage.removeItem("sentinel_selected_site");
+    }
+  }, []);
 
   // Filter sites to only show buildings with devices, then sort alphabetically
   const filteredSortedSites = useMemo(() => {
@@ -163,8 +180,28 @@ export function ControlDashboard({ onError }: ControlDashboardProps) {
   }, [refreshDevices]);
 
   // Auto-select first device when site changes or devices load
+  // Also handle pending equipment selection from Dashboard navigation
   useEffect(() => {
     if (filteredDevices.length > 0) {
+      // Check if there's a pending equipment selection from navigation
+      if (pendingEquipmentSelection) {
+        // Try to find the device by ID (equipment ID format may differ)
+        const pendingDevice = filteredDevices.find(
+          (d) =>
+            d.id === pendingEquipmentSelection ||
+            d.id.includes(pendingEquipmentSelection) ||
+            pendingEquipmentSelection.includes(d.id)
+        );
+
+        if (pendingDevice) {
+          setSelectedDevice(pendingDevice);
+          setPendingEquipmentSelection(null);
+          return;
+        }
+        // If not found in current filter, clear pending selection
+        setPendingEquipmentSelection(null);
+      }
+
       // Check if currently selected device is in the filtered list
       const currentDeviceInList = selectedDevice && filteredDevices.some((d) => d.id === selectedDevice.id);
       if (!currentDeviceInList) {
@@ -173,7 +210,7 @@ export function ControlDashboard({ onError }: ControlDashboardProps) {
     } else {
       setSelectedDevice(null);
     }
-  }, [filteredDevices, selectedSiteId]);
+  }, [filteredDevices, selectedSiteId, pendingEquipmentSelection]);
 
   const handleDeviceSelect = useCallback(async (device: Device) => {
     try {

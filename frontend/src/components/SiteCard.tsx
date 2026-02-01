@@ -14,9 +14,11 @@
 
 import { Building2, Cpu, AlertTriangle, MapPin, Shield, Clock } from "lucide-react";
 import { useState, useEffect } from "react";
-import api, { type Site, type OptimizationRecommendation } from "../lib/api";
+import api, { type Site, type OptimizationRecommendation, type BuildingEquipmentItem } from "../lib/api";
 import { OptimizationStatusBadge } from "./OptimizationStatusBadge";
 import { OptimizationRecommendationModal } from "./OptimizationRecommendationModal";
+import { ExpandableRiskList } from "./ExpandableRiskList";
+import { RiskDetailModal } from "./RiskDetailModal";
 import { getTimezoneAbbreviation, isDifferentTimezone } from "../lib/timeFormat";
 
 interface SiteCardProps {
@@ -24,6 +26,7 @@ interface SiteCardProps {
   onClick?: (site: Site) => void;
   showSafetyStatus?: boolean;
   showOptimizationStatus?: boolean;
+  onEquipmentControlNavigate?: (equipmentId: string, siteId: string) => void;
 }
 
 type SafetyStatus = 'safe' | 'warning' | 'blocked' | 'alarm' | 'unknown';
@@ -98,7 +101,7 @@ function getSafePercentageColor(safe: number, total: number): string {
   }
 }
 
-export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizationStatus = false }: SiteCardProps) {
+export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizationStatus = false, onEquipmentControlNavigate }: SiteCardProps) {
   const statusConfig = getStatusConfig(site.status);
   const hasAlerts = site.alert_count > 0;
   const [safetySummary, setSafetySummary] = useState<DeviceSafetySummary | null>(null);
@@ -108,6 +111,11 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
   const [showRecommendationModal, setShowRecommendationModal] = useState(false);
   const [currentRecommendation, setCurrentRecommendation] = useState<OptimizationRecommendation | null>(null);
   const [, setLoadingRecommendation] = useState(false);
+
+  // Expandable risk list state
+  const [riskListExpanded, setRiskListExpanded] = useState(false);
+  const [selectedRiskEquipment, setSelectedRiskEquipment] = useState<BuildingEquipmentItem | null>(null);
+  const [showRiskModal, setShowRiskModal] = useState(false);
 
   const handleClick = () => {
     if (onClick) {
@@ -323,6 +331,26 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
     } catch (error) {
       console.error('Failed to reject recommendation:', error);
       throw error; // Re-throw to show error in modal
+    }
+  };
+
+  // Handle equipment click from risk list - navigate to control
+  const handleEquipmentClick = (equipment: BuildingEquipmentItem) => {
+    if (onEquipmentControlNavigate) {
+      onEquipmentControlNavigate(equipment.id, site.id);
+    }
+  };
+
+  // Handle status badge click from risk list - show risk detail modal
+  const handleStatusBadgeClick = (equipment: BuildingEquipmentItem) => {
+    setSelectedRiskEquipment(equipment);
+    setShowRiskModal(true);
+  };
+
+  // Handle navigation to control from risk modal
+  const handleNavigateToControl = (equipmentId: string) => {
+    if (onEquipmentControlNavigate) {
+      onEquipmentControlNavigate(equipmentId, site.id);
     }
   };
 
@@ -594,6 +622,17 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
         </div>
       </div>
 
+      {/* Expandable Risk List - only show if there are alerts */}
+      {hasAlerts && (
+        <ExpandableRiskList
+          siteId={site.id}
+          expanded={riskListExpanded}
+          onToggle={() => setRiskListExpanded(!riskListExpanded)}
+          onEquipmentClick={handleEquipmentClick}
+          onStatusBadgeClick={handleStatusBadgeClick}
+        />
+      )}
+
       {/* Recommendation Modal */}
       {showRecommendationModal && currentRecommendation && (
         <OptimizationRecommendationModal
@@ -606,6 +645,19 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
           onApprove={handleApproveRecommendation}
           onReject={handleRejectRecommendation}
           siteName={site.name}
+        />
+      )}
+
+      {/* Risk Detail Modal */}
+      {showRiskModal && selectedRiskEquipment && (
+        <RiskDetailModal
+          isOpen={showRiskModal}
+          onClose={() => {
+            setShowRiskModal(false);
+            setSelectedRiskEquipment(null);
+          }}
+          equipment={selectedRiskEquipment}
+          onNavigateToControl={handleNavigateToControl}
         />
       )}
     </div>

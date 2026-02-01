@@ -291,27 +291,30 @@ export function EquipmentStatusPanel({ siteId, compact = false, onEquipmentSelec
             <Tab key={type}>
               {typeLabels[type] || type.toUpperCase()} ({equipmentByType[type].length})
             </Tab>
-          ))}
+          )) as any}
         </TabList>
 
-        <TabPanels>
-          <TabPanel>
-            <Grid numItems={3} className="gap-4">
-              {equipment.map((eq) => (
-                <EquipmentCard key={eq.id} eq={eq} />
-              ))}
-            </Grid>
-          </TabPanel>
-          {types.map((type) => (
-            <TabPanel key={type}>
+        {(() => {
+          const allTabs = [
+            <TabPanel key="all">
               <Grid numItems={3} className="gap-4">
-                {equipmentByType[type].map((eq) => (
+                {equipment.map((eq) => (
                   <EquipmentCard key={eq.id} eq={eq} />
                 ))}
               </Grid>
-            </TabPanel>
-          ))} as unknown as React.ReactElement[]
-        </TabPanels>
+            </TabPanel>,
+            ...types.map((type) => (
+              <TabPanel key={type}>
+                <Grid numItems={3} className="gap-4">
+                  {equipmentByType[type].map((eq) => (
+                    <EquipmentCard key={eq.id} eq={eq} />
+                  ))}
+                </Grid>
+              </TabPanel>
+            )),
+          ];
+          return <TabPanels>{allTabs as any}</TabPanels>;
+        })()}
       </TabGroup>
     </div>
   );
