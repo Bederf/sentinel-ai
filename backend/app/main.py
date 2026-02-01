@@ -31,6 +31,7 @@ from app.api import timeseries  # Phase 42 InfluxDB time-series data
 from app.middleware.audit_middleware import AuditMiddleware
 from app.services.background_scheduler import scheduler_service
 from app.api.simulation import simulation_service  # BMS simulation service
+from app.services.health_simulation_service import health_simulation_service  # Supabase health simulation
 
 app = FastAPI(
     title=settings.app_name,
@@ -105,18 +106,27 @@ async def startup_event():
     # When a recommendation is generated, the flashing lightbulb appears on dashboard
     scheduler_service.add_optimization_analysis_job(interval_seconds=900)  # 15 minutes
 
-    # Start BMS simulation service
+    # Start BMS simulation service (in-memory demo)
     try:
         await simulation_service.start_simulation()
         print("BMS Simulation service started successfully")
     except Exception as e:
         print(f"Failed to start simulation service: {e}")
 
+    # Start health simulation service (writes to Supabase, triggers Clawd alerts)
+    # Runs every hour between 08:00-17:00
+    try:
+        await health_simulation_service.start()
+        print("Health simulation service started (hourly, 08:00-17:00)")
+    except Exception as e:
+        print(f"Failed to start health simulation service: {e}")
+
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """Cleanup background services on shutdown."""
     scheduler_service.stop()
+    await health_simulation_service.stop()
 
 
 @app.get("/")

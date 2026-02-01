@@ -993,7 +993,8 @@ async def diagnose_comfort_complaint(
 
 
 # Password for accessing proprietary system methodology
-METHODOLOGY_PASSWORD = "Open says me"
+# Uses the same PIN as frontend splash screen for consistency
+METHODOLOGY_PASSWORD = "27921"
 
 # System methodology documentation (proprietary)
 SYSTEM_METHODOLOGY = """

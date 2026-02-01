@@ -367,5 +367,96 @@ async def force_equipment_degradation(
     }
 
 
+# =============================================================================
+# Health Simulation (Supabase) Endpoints
+# These endpoints control the health simulation that writes to Supabase
+# and triggers Clawd health alerts
+# =============================================================================
+
+from app.services.health_simulation_service import health_simulation_service
+
+
+@router.get("/health-sim/status")
+async def get_health_simulation_status():
+    """Get health simulation status (Supabase-based)."""
+    return health_simulation_service.get_status()
+
+
+@router.post("/health-sim/start")
+async def start_health_simulation():
+    """Start the health simulation that writes to Supabase."""
+    await health_simulation_service.start()
+    return {
+        "success": True,
+        "message": "Health simulation started",
+        "status": health_simulation_service.get_status(),
+    }
+
+
+@router.post("/health-sim/stop")
+async def stop_health_simulation():
+    """Stop the health simulation."""
+    await health_simulation_service.stop()
+    return {
+        "success": True,
+        "message": "Health simulation stopped",
+        "status": health_simulation_service.get_status(),
+    }
+
+
+@router.post("/health-sim/config")
+async def configure_health_simulation(
+    interval_seconds: Optional[int] = Query(None, description="Interval between cycles (60-3600)"),
+    degradation_rate: Optional[float] = Query(None, description="Max health drop per cycle (1-20)"),
+    fault_probability: Optional[float] = Query(None, description="Chance of sudden fault (0.01-0.1)"),
+    target_equipment_per_cycle: Optional[int] = Query(None, description="Equipment to update per cycle (1-50)"),
+):
+    """Configure health simulation parameters."""
+    config_updates = {}
+    if interval_seconds is not None:
+        config_updates["interval_seconds"] = max(60, min(3600, interval_seconds))
+    if degradation_rate is not None:
+        config_updates["degradation_rate"] = max(1, min(20, degradation_rate))
+    if fault_probability is not None:
+        config_updates["fault_probability"] = max(0.01, min(0.1, fault_probability))
+    if target_equipment_per_cycle is not None:
+        config_updates["target_equipment_per_cycle"] = max(1, min(50, target_equipment_per_cycle))
+
+    if config_updates:
+        health_simulation_service.set_config(**config_updates)
+
+    return {
+        "success": True,
+        "updated": config_updates,
+        "current_config": {
+            "interval_seconds": health_simulation_service.config["interval_seconds"],
+            "degradation_rate": health_simulation_service.config["degradation_rate"],
+            "fault_probability": health_simulation_service.config["fault_probability"],
+            "target_equipment_per_cycle": health_simulation_service.config["target_equipment_per_cycle"],
+        },
+    }
+
+
+@router.post("/health-sim/fault/{equipment_id}")
+async def trigger_equipment_fault(
+    equipment_id: str,
+    severity: str = Query("moderate", description="Fault severity: minor, moderate, major, critical"),
+):
+    """Trigger a fault on specific equipment (writes to Supabase)."""
+    result = await health_simulation_service.trigger_fault(equipment_id, severity)
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+    return result
+
+
+@router.post("/health-sim/maintenance/{equipment_id}")
+async def trigger_equipment_maintenance(equipment_id: str):
+    """Trigger maintenance on specific equipment (restores health in Supabase)."""
+    result = await health_simulation_service.trigger_maintenance(equipment_id)
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+    return result
+
+
 # Export the router
-__all__ = ['router', 'simulation_service']
+__all__ = ['router', 'simulation_service', 'health_simulation_service']
