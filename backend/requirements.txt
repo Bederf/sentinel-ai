@@ -21,6 +21,10 @@ psycopg2-binary==2.9.9
 # Time-Series Database
 influxdb-client>=1.38.0
 
+# ML Feature Store
+pandas>=2.0.0
+pyarrow>=14.0.0
+
 # Data Migration
 ijson>=3.2.0
 tqdm>=4.66.0
