@@ -1,0 +1,404 @@
+{
+  "version": "1.0.0",
+  "description": "Feature definitions for ML training datasets. Features are computed from InfluxDB sensor data.",
+  "common": [
+    {
+      "name": "temp_mean_7d",
+      "dtype": "float",
+      "description": "Mean temperature over 7 days",
+      "source_sensor": "temperature",
+      "aggregation": "mean",
+      "window_days": 7
+    },
+    {
+      "name": "temp_std_7d",
+      "dtype": "float",
+      "description": "Temperature standard deviation over 7 days",
+      "source_sensor": "temperature",
+      "aggregation": "std",
+      "window_days": 7
+    },
+    {
+      "name": "temp_min_7d",
+      "dtype": "float",
+      "description": "Minimum temperature over 7 days",
+      "source_sensor": "temperature",
+      "aggregation": "min",
+      "window_days": 7
+    },
+    {
+      "name": "temp_max_7d",
+      "dtype": "float",
+      "description": "Maximum temperature over 7 days",
+      "source_sensor": "temperature",
+      "aggregation": "max",
+      "window_days": 7
+    },
+    {
+      "name": "temp_trend_7d",
+      "dtype": "float",
+      "description": "Temperature trend (linear regression slope) over 7 days",
+      "source_sensor": "temperature",
+      "aggregation": "trend",
+      "window_days": 7
+    },
+    {
+      "name": "vibration_rms_mean_7d",
+      "dtype": "float",
+      "description": "Mean RMS vibration over 7 days",
+      "source_sensor": "vibration_rms",
+      "aggregation": "mean",
+      "window_days": 7
+    },
+    {
+      "name": "vibration_rms_max_7d",
+      "dtype": "float",
+      "description": "Maximum RMS vibration over 7 days",
+      "source_sensor": "vibration_rms",
+      "aggregation": "max",
+      "window_days": 7
+    },
+    {
+      "name": "vibration_trend_7d",
+      "dtype": "float",
+      "description": "Vibration trend over 7 days",
+      "source_sensor": "vibration_rms",
+      "aggregation": "trend",
+      "window_days": 7
+    },
+    {
+      "name": "runtime_hours_30d",
+      "dtype": "float",
+      "description": "Total runtime hours over 30 days",
+      "source_sensor": "runtime_hours",
+      "aggregation": "max",
+      "window_days": 30
+    },
+    {
+      "name": "current_mean_7d",
+      "dtype": "float",
+      "description": "Mean electrical current over 7 days",
+      "source_sensor": "current",
+      "aggregation": "mean",
+      "window_days": 7
+    },
+    {
+      "name": "current_std_7d",
+      "dtype": "float",
+      "description": "Current standard deviation over 7 days",
+      "source_sensor": "current",
+      "aggregation": "std",
+      "window_days": 7
+    }
+  ],
+  "chiller": [
+    {
+      "name": "suction_pressure_mean_7d",
+      "dtype": "float",
+      "description": "Mean suction pressure over 7 days",
+      "source_sensor": "suction_pressure",
+      "aggregation": "mean",
+      "window_days": 7
+    },
+    {
+      "name": "discharge_pressure_mean_7d",
+      "dtype": "float",
+      "description": "Mean discharge pressure over 7 days",
+      "source_sensor": "discharge_pressure",
+      "aggregation": "mean",
+      "window_days": 7
+    },
+    {
+      "name": "pressure_ratio_7d",
+      "dtype": "float",
+      "description": "Mean pressure ratio (discharge/suction) over 7 days",
+      "source_sensor": "pressure_ratio",
+      "aggregation": "mean",
+      "window_days": 7
+    },
+    {
+      "name": "compressor_current_mean_7d",
+      "dtype": "float",
+      "description": "Mean compressor current over 7 days",
+      "source_sensor": "compressor_current",
+      "aggregation": "mean",
+      "window_days": 7
+    },
+    {
+      "name": "compressor_current_max_7d",
+      "dtype": "float",
+      "description": "Maximum compressor current over 7 days",
+      "source_sensor": "compressor_current",
+      "aggregation": "max",
+      "window_days": 7
+    },
+    {
+      "name": "chw_supply_temp_mean_7d",
+      "dtype": "float",
+      "description": "Mean chilled water supply temperature over 7 days",
+      "source_sensor": "chw_supply_temp",
+      "aggregation": "mean",
+      "window_days": 7
+    },
+    {
+      "name": "chw_return_temp_mean_7d",
+      "dtype": "float",
+      "description": "Mean chilled water return temperature over 7 days",
+      "source_sensor": "chw_return_temp",
+      "aggregation": "mean",
+      "window_days": 7
+    },
+    {
+      "name": "delta_t_mean_7d",
+      "dtype": "float",
+      "description": "Mean delta-T (return - supply) over 7 days",
+      "source_sensor": "delta_t",
+      "aggregation": "mean",
+      "window_days": 7
+    },
+    {
+      "name": "cop_mean_7d",
+      "dtype": "float",
+      "description": "Mean Coefficient of Performance over 7 days",
+      "source_sensor": "cop",
+      "aggregation": "mean",
+      "window_days": 7
+    },
+    {
+      "name": "cop_trend_7d",
+      "dtype": "float",
+      "description": "COP trend over 7 days (degradation indicator)",
+      "source_sensor": "cop",
+      "aggregation": "trend",
+      "window_days": 7
+    },
+    {
+      "name": "oil_pressure_mean_7d",
+      "dtype": "float",
+      "description": "Mean oil pressure over 7 days",
+      "source_sensor": "oil_pressure",
+      "aggregation": "mean",
+      "window_days": 7
+    },
+    {
+      "name": "oil_pressure_min_7d",
+      "dtype": "float",
+      "description": "Minimum oil pressure over 7 days",
+      "source_sensor": "oil_pressure",
+      "aggregation": "min",
+      "window_days": 7
+    }
+  ],
+  "ahu": [
+    {
+      "name": "filter_dp_mean_7d",
+      "dtype": "float",
+      "description": "Mean filter differential pressure over 7 days",
+      "source_sensor": "filter_dp",
+      "aggregation": "mean",
+      "window_days": 7
+    },
+    {
+      "name": "filter_dp_max_7d",
+      "dtype": "float",
+      "description": "Maximum filter differential pressure over 7 days",
+      "source_sensor": "filter_dp",
+      "aggregation": "max",
+      "window_days": 7
+    },
+    {
+      "name": "filter_dp_trend_7d",
+      "dtype": "float",
+      "description": "Filter DP trend (clogging indicator) over 7 days",
+      "source_sensor": "filter_dp",
+      "aggregation": "trend",
+      "window_days": 7
+    },
+    {
+      "name": "supply_temp_mean_7d",
+      "dtype": "float",
+      "description": "Mean supply air temperature over 7 days",
+      "source_sensor": "supply_temp",
+      "aggregation": "mean",
+      "window_days": 7
+    },
+    {
+      "name": "return_temp_mean_7d",
+      "dtype": "float",
+      "description": "Mean return air temperature over 7 days",
+      "source_sensor": "return_temp",
+      "aggregation": "mean",
+      "window_days": 7
+    },
+    {
+      "name": "mixed_air_temp_mean_7d",
+      "dtype": "float",
+      "description": "Mean mixed air temperature over 7 days",
+      "source_sensor": "mixed_air_temp",
+      "aggregation": "mean",
+      "window_days": 7
+    },
+    {
+      "name": "fan_current_mean_7d",
+      "dtype": "float",
+      "description": "Mean fan motor current over 7 days",
+      "source_sensor": "fan_current",
+      "aggregation": "mean",
+      "window_days": 7
+    },
+    {
+      "name": "fan_current_max_7d",
+      "dtype": "float",
+      "description": "Maximum fan motor current over 7 days",
+      "source_sensor": "fan_current",
+      "aggregation": "max",
+      "window_days": 7
+    },
+    {
+      "name": "fan_speed_mean_7d",
+      "dtype": "float",
+      "description": "Mean fan speed percentage over 7 days",
+      "source_sensor": "fan_speed",
+      "aggregation": "mean",
+      "window_days": 7
+    },
+    {
+      "name": "supply_humidity_mean_7d",
+      "dtype": "float",
+      "description": "Mean supply air humidity over 7 days",
+      "source_sensor": "supply_humidity",
+      "aggregation": "mean",
+      "window_days": 7
+    },
+    {
+      "name": "return_humidity_mean_7d",
+      "dtype": "float",
+      "description": "Mean return air humidity over 7 days",
+      "source_sensor": "return_humidity",
+      "aggregation": "mean",
+      "window_days": 7
+    },
+    {
+      "name": "damper_position_mean_7d",
+      "dtype": "float",
+      "description": "Mean outside air damper position over 7 days",
+      "source_sensor": "damper_position",
+      "aggregation": "mean",
+      "window_days": 7
+    }
+  ],
+  "generator": [
+    {
+      "name": "battery_voltage_mean_7d",
+      "dtype": "float",
+      "description": "Mean battery voltage over 7 days",
+      "source_sensor": "battery_voltage",
+      "aggregation": "mean",
+      "window_days": 7
+    },
+    {
+      "name": "battery_voltage_min_7d",
+      "dtype": "float",
+      "description": "Minimum battery voltage over 7 days",
+      "source_sensor": "battery_voltage",
+      "aggregation": "min",
+      "window_days": 7
+    },
+    {
+      "name": "battery_voltage_trend_7d",
+      "dtype": "float",
+      "description": "Battery voltage trend over 7 days",
+      "source_sensor": "battery_voltage",
+      "aggregation": "trend",
+      "window_days": 7
+    },
+    {
+      "name": "oil_pressure_mean_7d",
+      "dtype": "float",
+      "description": "Mean engine oil pressure over 7 days",
+      "source_sensor": "oil_pressure",
+      "aggregation": "mean",
+      "window_days": 7
+    },
+    {
+      "name": "oil_pressure_min_7d",
+      "dtype": "float",
+      "description": "Minimum engine oil pressure over 7 days",
+      "source_sensor": "oil_pressure",
+      "aggregation": "min",
+      "window_days": 7
+    },
+    {
+      "name": "coolant_temp_mean_7d",
+      "dtype": "float",
+      "description": "Mean coolant temperature over 7 days",
+      "source_sensor": "coolant_temp",
+      "aggregation": "mean",
+      "window_days": 7
+    },
+    {
+      "name": "coolant_temp_max_7d",
+      "dtype": "float",
+      "description": "Maximum coolant temperature over 7 days",
+      "source_sensor": "coolant_temp",
+      "aggregation": "max",
+      "window_days": 7
+    },
+    {
+      "name": "fuel_level_mean_7d",
+      "dtype": "float",
+      "description": "Mean fuel level percentage over 7 days",
+      "source_sensor": "fuel_level",
+      "aggregation": "mean",
+      "window_days": 7
+    },
+    {
+      "name": "fuel_consumption_rate_7d",
+      "dtype": "float",
+      "description": "Fuel consumption rate trend over 7 days",
+      "source_sensor": "fuel_level",
+      "aggregation": "trend",
+      "window_days": 7
+    },
+    {
+      "name": "engine_rpm_mean_7d",
+      "dtype": "float",
+      "description": "Mean engine RPM over 7 days",
+      "source_sensor": "engine_rpm",
+      "aggregation": "mean",
+      "window_days": 7
+    },
+    {
+      "name": "output_voltage_mean_7d",
+      "dtype": "float",
+      "description": "Mean output voltage over 7 days",
+      "source_sensor": "output_voltage",
+      "aggregation": "mean",
+      "window_days": 7
+    },
+    {
+      "name": "output_frequency_mean_7d",
+      "dtype": "float",
+      "description": "Mean output frequency over 7 days",
+      "source_sensor": "output_frequency",
+      "aggregation": "mean",
+      "window_days": 7
+    },
+    {
+      "name": "load_percentage_mean_7d",
+      "dtype": "float",
+      "description": "Mean load percentage over 7 days",
+      "source_sensor": "load_percentage",
+      "aggregation": "mean",
+      "window_days": 7
+    },
+    {
+      "name": "starts_30d",
+      "dtype": "int",
+      "description": "Number of engine starts over 30 days",
+      "source_sensor": "start_count",
+      "aggregation": "count_delta",
+      "window_days": 30
+    }
+  ]
+}
