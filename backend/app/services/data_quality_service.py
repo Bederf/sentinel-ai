@@ -115,9 +115,9 @@ class DataQualityService:
             total_expected += health.expected_readings_24h
             total_actual += health.actual_readings_24h
 
-        # Calculate overall completeness
+        # Calculate overall completeness (cap at 100% to handle timing variations)
         completeness_pct = (
-            (total_actual / total_expected * 100) if total_expected > 0 else 0.0
+            min(100.0, (total_actual / total_expected * 100)) if total_expected > 0 else 0.0
         )
 
         # Determine overall quality level
@@ -174,7 +174,7 @@ class DataQualityService:
 
         actual_readings = len(readings)
         completeness_pct = (
-            (actual_readings / expected_readings * 100)
+            min(100.0, (actual_readings / expected_readings * 100))
             if expected_readings > 0 else 0.0
         )
 

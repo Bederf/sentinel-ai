@@ -31,6 +31,7 @@ from app.api import ml_predictions  # Phase 43 ML predictions & anomaly detectio
 from app.api import timeseries  # Phase 42 InfluxDB time-series data
 from app.api import sensor_analysis  # Phase 41-03 phyphox sensor analysis
 from app.api import features  # Phase 42-02 ML feature store
+from app.api import data_quality  # Phase 42-03 Data quality monitoring
 from app.middleware.audit_middleware import AuditMiddleware
 from app.services.background_scheduler import scheduler_service
 from app.api.simulation import simulation_service  # BMS simulation service
@@ -96,6 +97,7 @@ app.include_router(ml_predictions.router)  # Phase 43 ML predictions & anomaly d
 app.include_router(timeseries.router)  # Phase 42 InfluxDB time-series data
 app.include_router(sensor_analysis.router)  # Phase 41-03 phyphox sensor analysis
 app.include_router(features.router)  # Phase 42-02 ML feature store
+app.include_router(data_quality.router)  # Phase 42-03 Data quality monitoring
 
 
 @app.on_event("startup")
