@@ -294,27 +294,25 @@ export function EquipmentStatusPanel({ siteId, compact = false, onEquipmentSelec
           ))}
         </TabList>
 
-        {(() => {
-          const allTabPanels = [
-            <TabPanel key="all">
+        {/* @ts-expect-error - Tremor TabPanels type issue with mixed static and mapped TabPanels */}
+        <TabPanels>
+          <TabPanel>
+            <Grid numItems={3} className="gap-4">
+              {equipment.map((eq) => (
+                <EquipmentCard key={eq.id} eq={eq} />
+              ))}
+            </Grid>
+          </TabPanel>
+          {types.map((type) => (
+            <TabPanel key={type}>
               <Grid numItems={3} className="gap-4">
-                {equipment.map((eq) => (
+                {equipmentByType[type].map((eq) => (
                   <EquipmentCard key={eq.id} eq={eq} />
                 ))}
               </Grid>
-            </TabPanel>,
-            ...types.map((type) => (
-              <TabPanel key={type}>
-                <Grid numItems={3} className="gap-4">
-                  {equipmentByType[type].map((eq) => (
-                    <EquipmentCard key={eq.id} eq={eq} />
-                  ))}
-                </Grid>
-              </TabPanel>
-            )),
-          ];
-          return <TabPanels>{allTabPanels}</TabPanels>;
-        })()}
+            </TabPanel>
+          ))}
+        </TabPanels>
       </TabGroup>
     </div>
   );

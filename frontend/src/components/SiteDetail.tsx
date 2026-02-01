@@ -371,9 +371,9 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
   }
 
   // Calculate summary stats based on status field (matches what's shown in table)
-  const healthyEquipment = equipment.filter((e) => e.status === "normal" || e.status === "online").length;
+  const healthyEquipment = equipment.filter((e) => e.status === "normal" || (e.status as string) === "online").length;
   const warningEquipment = equipment.filter((e) => e.status === "warning").length;
-  const criticalEquipment = equipment.filter((e) => e.status === "critical" || e.status === "offline" || e.status === "maintenance").length;
+  const criticalEquipment = equipment.filter((e) => e.status === "critical" || (e.status as string) === "offline" || (e.status as string) === "maintenance").length;
   const avgHealth = equipment.length > 0
     ? Math.round(equipment.reduce((sum, e) => sum + e.health_score, 0) / equipment.length)
     : 0;
@@ -762,7 +762,7 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
                   <button
                     onClick={() => {
                       // Filter to critical equipment and show first prediction if available
-                      const criticalItems = equipment.filter((e) => e.status === "critical" || e.status === "offline" || e.status === "maintenance");
+                      const criticalItems = equipment.filter((e) => e.status === "critical" || (e.status as string) === "offline" || (e.status as string) === "maintenance");
                       if (criticalItems.length > 0) {
                         const prediction = predictions.find(
                           (p) => criticalItems.some((c) => p.equipment_id === c.id || p.equipment_name === c.name)

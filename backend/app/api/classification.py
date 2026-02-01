@@ -3,14 +3,18 @@
 This module provides REST API endpoints for failure type classification.
 It integrates with the classification service to predict failure types
 and provide explainability.
+
+Also includes comprehensive prediction endpoint that combines all ML models.
 """
 
 import logging
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Query
 
 from app.services.classification_service import get_classification_service
+from app.services.ml_inference import get_lstm_service, get_anomaly_service
+from app.services.survival_service import SurvivalService
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
@@ -173,3 +177,139 @@ async def health_check():
             "status": "unhealthy",
             "error": str(e)
         }
+
+
+# === Comprehensive Prediction Endpoint ===
+
+class ComprehensivePredictionResponse(BaseModel):
+    """Comprehensive prediction combining all ML models."""
+    equipment_id: str
+    equipment_type: str
+    predictions: Dict
+    overall_risk: Dict
+
+
+@router.get("/comprehensive/{equipment_id}", response_model=ComprehensivePredictionResponse)
+async def get_comprehensive_prediction(equipment_id: str):
+    """Get all ML predictions for equipment (LSTM, Autoencoder, Survival, Classifier).
+
+    Combines predictions from all available models:
+    - LSTM: Time-series forecasting (24/48/72h)
+    - Autoencoder: Anomaly detection
+    - Survival: Failure probability (30/60/90 days)
+    - Classifier: Failure type prediction
+
+    Calculates overall risk score from all predictions.
+
+    Args:
+        equipment_id: Equipment identifier
+
+    Returns:
+        Comprehensive prediction with overall risk assessment
+    """
+    from app.database.repositories.equipment_repository import EquipmentRepository
+
+    # Get equipment
+    equipment_repo = EquipmentRepository()
+    equipment = equipment_repo.get_by_id(equipment_id)
+
+    if not equipment:
+        from app.data.equipment import get_equipment
+        equipment = get_equipment(equipment_id)
+
+    if not equipment:
+        raise HTTPException(status_code=404, detail="Equipment not found")
+
+    equipment_type = equipment.get("equipment_type") if isinstance(equipment, dict) else equipment.equipment_type
+
+    results = {
+        "equipment_id": equipment_id,
+        "equipment_type": equipment_type,
+        "predictions": {}
+    }
+
+    # LSTM forecast
+    try:
+        lstm_service = get_lstm_service()
+        results["predictions"]["forecast"] = lstm_service.predict(equipment_id, equipment_type)
+    except Exception as e:
+        logger.debug(f"LSTM prediction failed for {equipment_id}: {e}")
+        results["predictions"]["forecast"] = {"error": str(e)}
+
+    # Anomaly detection
+    try:
+        anomaly_service = get_anomaly_service()
+        results["predictions"]["anomaly"] = anomaly_service.check_equipment(equipment_id)
+    except Exception as e:
+        logger.debug(f"Anomaly detection failed for {equipment_id}: {e}")
+        results["predictions"]["anomaly"] = {"error": str(e)}
+
+    # Survival analysis
+    try:
+        survival_service = SurvivalService()
+        results["predictions"]["survival"] = survival_service.predict_equipment(equipment_id)
+    except Exception as e:
+        logger.debug(f"Survival analysis failed for {equipment_id}: {e}")
+        results["predictions"]["survival"] = {"error": str(e)}
+
+    # Failure classification
+    try:
+        classification_service = get_classification_service()
+        results["predictions"]["failure_type"] = classification_service.predict_failure_type(equipment_id)
+    except Exception as e:
+        logger.debug(f"Classification failed for {equipment_id}: {e}")
+        results["predictions"]["failure_type"] = {"error": str(e)}
+
+    # Calculate overall risk
+    results["overall_risk"] = calculate_overall_risk(results["predictions"])
+
+    return results
+
+
+def calculate_overall_risk(predictions: Dict) -> Dict:
+    """Calculate overall risk from all predictions.
+
+    Args:
+        predictions: Dictionary of prediction results
+
+    Returns:
+        Overall risk assessment with score and level
+    """
+    risk_score = 0
+    risk_factors = []
+
+    # Anomaly detection contributes to risk
+    if "anomaly" in predictions and "is_anomaly" in predictions["anomaly"]:
+        if predictions["anomaly"]["is_anomaly"]:
+            risk_score += 30
+            risk_factors.append("Anomalous behavior detected")
+
+    # Survival analysis contributes
+    if "survival" in predictions and "failure_probability" in predictions["survival"]:
+        prob_30d = predictions["survival"]["failure_probability"]["30d"]
+        risk_score += int(prob_30d * 40)
+        if prob_30d > 0.3:
+            risk_factors.append(f"{int(prob_30d*100)}% failure probability in 30 days")
+
+    # Failure type confidence contributes
+    if "failure_type" in predictions and "confidence" in predictions["failure_type"]:
+        conf = predictions["failure_type"]["confidence"]
+        if conf > 0.7:
+            risk_score += 20
+            risk_factors.append(f"High confidence ({int(conf*100)}%) {predictions['failure_type']['predicted_failure']} risk")
+
+    # Determine risk level
+    if risk_score > 70:
+        risk_level = "critical"
+    elif risk_score > 40:
+        risk_level = "high"
+    elif risk_score > 20:
+        risk_level = "medium"
+    else:
+        risk_level = "low"
+
+    return {
+        "risk_score": min(100, risk_score),
+        "risk_level": risk_level,
+        "risk_factors": risk_factors
+    }

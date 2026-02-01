@@ -2384,6 +2384,46 @@ export interface ComplaintDiagnosis {
   needs_dispatch: boolean;
 }
 
+// Failure Classification interfaces (Phase 43-04)
+export interface FailurePrediction {
+  equipment_id: string;
+  equipment_type: string;
+  predicted_failure: string;
+  confidence: number;
+  all_failure_probabilities: Record<string, number>;
+  contributing_factors: Array<{
+    feature: string;
+    value: number;
+    importance: number;
+    contribution: number;
+  }>;
+  timestamp: string;
+}
+
+export interface FleetFailureRisk {
+  equipment_id: string;
+  equipment_type: string;
+  predicted_failure: string;
+  confidence: number;
+}
+
+export interface FeatureImportanceItem {
+  feature: string;
+  importance: number;
+}
+
+export interface ClassificationModelInfo {
+  equipment_type: string;
+  model_path: string;
+  metadata: {
+    accuracy?: number;
+    n_classes?: number;
+    classes?: string[];
+    n_samples?: number;
+    trained_at?: string;
+  };
+}
+
 // Desk BMS context for lookup
 export interface DeskBMSContext {
   desk: Desk;
@@ -2455,6 +2495,68 @@ export const complaintsApi = {
   listZones: async (): Promise<HVACZone[]> => {
     const response = await fetch(`${API_BASE_URL}/api/complaints/zones`);
     if (!response.ok) throw new Error('Failed to fetch zones');
+    return response.json();
+  },
+};
+
+// Classification API methods (Phase 43-04)
+export const classificationApi = {
+  /**
+   * Get predicted failure type for equipment
+   * @param equipmentId - Equipment ID
+   */
+  getFailureType: async (equipmentId: string): Promise<FailurePrediction> => {
+    const response = await fetch(`${API_BASE_URL}/api/classification/failure-type/${equipmentId}`);
+    if (!response.ok) throw new Error('Failed to get failure prediction');
+    return response.json();
+  },
+
+  /**
+   * Get fleet-wide failure risks
+   * @param minConfidence - Minimum confidence threshold (default: 0.5)
+   */
+  getFleetRisks: async (minConfidence: number = 0.5): Promise<FleetFailureRisk[]> => {
+    const response = await fetch(`${API_BASE_URL}/api/classification/fleet/risks?min_confidence=${minConfidence}`);
+    if (!response.ok) throw new Error('Failed to get fleet risks');
+    return response.json();
+  },
+
+  /**
+   * Get feature importance for equipment type
+   * @param equipmentType - Equipment type (chiller, ahu, etc.)
+   * @param topN - Number of top features (default: 20)
+   */
+  getFeatureImportance: async (equipmentType: string, topN: number = 20): Promise<FeatureImportanceItem[]> => {
+    const response = await fetch(`${API_BASE_URL}/api/classification/feature-importance/${equipmentType}?top_n=${topN}`);
+    if (!response.ok) throw new Error('Failed to get feature importance');
+    return response.json();
+  },
+
+  /**
+   * Get model info for equipment type
+   * @param equipmentType - Equipment type
+   */
+  getModelInfo: async (equipmentType: string): Promise<ClassificationModelInfo> => {
+    const response = await fetch(`${API_BASE_URL}/api/classification/models/${equipmentType}`);
+    if (!response.ok) throw new Error('Failed to get model info');
+    return response.json();
+  },
+
+  /**
+   * List all available classification models
+   */
+  listModels: async (): Promise<ClassificationModelInfo[]> => {
+    const response = await fetch(`${API_BASE_URL}/api/classification/models`);
+    if (!response.ok) throw new Error('Failed to list models');
+    return response.json();
+  },
+
+  /**
+   * Check classification service health
+   */
+  healthCheck: async (): Promise<{ status: string; n_models: number; equipment_types: string[] }> => {
+    const response = await fetch(`${API_BASE_URL}/api/classification/health`);
+    if (!response.ok) throw new Error('Health check failed');
     return response.json();
   },
 };

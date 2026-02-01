@@ -384,7 +384,10 @@ def create_device_from_dict(data: Dict[str, Any]) -> Device:
             loc_data["zone_type"] = ZoneType(loc_data["zone_type"])
         if "exposure" in loc_data and isinstance(loc_data["exposure"], str):
             loc_data["exposure"] = ExposureDirection(loc_data["exposure"])
-        data["device_location"] = DeviceLocation(**loc_data)
+        # Filter out unexpected fields (e.g., zone_id) that may be in JSON
+        valid_fields = {f: getattr(DeviceLocation, f) for f in DeviceLocation.__dataclass_fields__}
+        filtered_loc_data = {k: v for k, v in loc_data.items() if k in valid_fields}
+        data["device_location"] = DeviceLocation(**filtered_loc_data)
     elif "location" in data and isinstance(data["location"], str):
         # Legacy string location - create basic DeviceLocation
         data["device_location"] = DeviceLocation(
