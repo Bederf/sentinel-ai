@@ -13,8 +13,10 @@ Endpoints:
 - POST /api/sensor-analysis/score - Calculate condition score
 """
 
+import json
 import logging
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, File, UploadFile, Form, HTTPException, Query
@@ -31,6 +33,44 @@ router = APIRouter(prefix="/api/sensor-analysis", tags=["sensor-analysis"])
 # In-memory storage for demo (would use database in production)
 _baselines = {}
 _recordings = {}
+_demo_loaded = False
+
+
+def _load_demo_data():
+    """Load demo baselines and recordings from JSON files on first access."""
+    global _demo_loaded
+    if _demo_loaded:
+        return
+
+    data_dir = Path(__file__).parent.parent / "data" / "sensor_analysis"
+
+    # Load baselines
+    baselines_file = data_dir / "demo_baselines.json"
+    if baselines_file.exists():
+        try:
+            with open(baselines_file, "r") as f:
+                baselines = json.load(f)
+            for equipment_id, baseline in baselines.items():
+                _baselines[equipment_id] = baseline
+            logger.info(f"Loaded {len(baselines)} demo baselines")
+        except Exception as e:
+            logger.warning(f"Failed to load demo baselines: {e}")
+
+    # Load recordings
+    recordings_file = data_dir / "demo_recordings.json"
+    if recordings_file.exists():
+        try:
+            with open(recordings_file, "r") as f:
+                recordings = json.load(f)
+            for equipment_id, recs in recordings.items():
+                if equipment_id not in _recordings:
+                    _recordings[equipment_id] = []
+                _recordings[equipment_id].extend(recs)
+            logger.info(f"Loaded demo recordings for {len(recordings)} equipment items")
+        except Exception as e:
+            logger.warning(f"Failed to load demo recordings: {e}")
+
+    _demo_loaded = True
 
 
 @router.post("/process")
@@ -217,6 +257,7 @@ async def capture_baseline(
 @router.get("/baseline/{equipment_id}")
 async def get_baseline(equipment_id: str):
     """Get current baseline for equipment."""
+    _load_demo_data()  # Ensure demo data is loaded
     if equipment_id in _baselines:
         return {
             "equipment_id": equipment_id,
@@ -247,6 +288,7 @@ async def get_equipment_trend(
     equipment_id: str,
     limit: int = Query(10, description="Number of recent readings to analyze")
 ):
+    _load_demo_data()  # Ensure demo data is loaded
     """Get trend analysis for equipment based on historical readings."""
     if equipment_id not in _recordings or len(_recordings[equipment_id]) < 2:
         return {
@@ -323,6 +365,7 @@ async def get_recordings(
     limit: int = Query(20, description="Maximum number of recordings to return")
 ):
     """Get historical recordings for equipment."""
+    _load_demo_data()  # Ensure demo data is loaded
     recordings = _recordings.get(equipment_id, [])
 
     return {
@@ -335,6 +378,7 @@ async def get_recordings(
 @router.get("/health")
 async def health_check():
     """Health check endpoint for sensor analysis service."""
+    _load_demo_data()  # Ensure demo data is loaded
     return {
         "status": "healthy",
         "baselines_count": len(_baselines),

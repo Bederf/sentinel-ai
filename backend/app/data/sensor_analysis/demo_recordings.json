@@ -1,0 +1,174 @@
+{
+  "eqp-008": [
+    {
+      "recording_id": "rec-gen1-001",
+      "equipment_id": "eqp-008",
+      "created_at": "2025-12-15T09:30:00Z",
+      "measurement_type": "vibration",
+      "source": "screenshot",
+      "rms_total_ms2": 3.1,
+      "peak_frequencies_hz": [25.0, 50.0, 75.0, 100.0],
+      "dominant_frequency_hz": 25.0,
+      "quality_score": 92,
+      "notes": "Monthly check - vibration slightly elevated"
+    },
+    {
+      "recording_id": "rec-gen1-002",
+      "equipment_id": "eqp-008",
+      "created_at": "2026-01-15T10:15:00Z",
+      "measurement_type": "vibration",
+      "source": "screenshot",
+      "rms_total_ms2": 3.4,
+      "peak_frequencies_hz": [25.0, 50.0, 75.0, 100.0, 112.5],
+      "dominant_frequency_hz": 25.0,
+      "quality_score": 88,
+      "notes": "New peak at 112.5 Hz detected - monitoring"
+    },
+    {
+      "recording_id": "rec-gen1-003",
+      "equipment_id": "eqp-008",
+      "created_at": "2026-01-28T14:45:00Z",
+      "measurement_type": "vibration",
+      "source": "csv_export",
+      "rms_total_ms2": 3.2,
+      "peak_frequencies_hz": [25.0, 50.0, 75.0, 100.0],
+      "dominant_frequency_hz": 25.0,
+      "quality_score": 95,
+      "notes": "Post load test reading - normal harmonic structure"
+    }
+  ],
+  "eqp-004": [
+    {
+      "recording_id": "rec-ch1-001",
+      "equipment_id": "eqp-004",
+      "created_at": "2025-11-20T11:00:00Z",
+      "measurement_type": "vibration",
+      "source": "screenshot",
+      "rms_total_ms2": 2.0,
+      "peak_frequencies_hz": [48.5, 97.0, 145.5],
+      "dominant_frequency_hz": 48.5,
+      "quality_score": 90,
+      "notes": "Routine check - normal"
+    },
+    {
+      "recording_id": "rec-ch1-002",
+      "equipment_id": "eqp-004",
+      "created_at": "2025-12-18T09:30:00Z",
+      "measurement_type": "vibration",
+      "source": "screenshot",
+      "rms_total_ms2": 2.2,
+      "peak_frequencies_hz": [48.5, 97.0, 145.5],
+      "dominant_frequency_hz": 48.5,
+      "quality_score": 88,
+      "notes": "Minor increase in vibration - within tolerance"
+    },
+    {
+      "recording_id": "rec-ch1-003",
+      "equipment_id": "eqp-004",
+      "created_at": "2026-01-22T15:20:00Z",
+      "measurement_type": "vibration",
+      "source": "csv_export",
+      "rms_total_ms2": 1.95,
+      "peak_frequencies_hz": [48.5, 97.0, 145.5],
+      "dominant_frequency_hz": 48.5,
+      "quality_score": 94,
+      "notes": "Stable readings - compressor healthy"
+    }
+  ],
+  "eqp-003": [
+    {
+      "recording_id": "rec-ahu7-001",
+      "equipment_id": "eqp-003",
+      "created_at": "2025-09-15T10:30:00Z",
+      "measurement_type": "vibration",
+      "source": "screenshot",
+      "rms_total_ms2": 2.4,
+      "peak_frequencies_hz": [16.0, 32.0, 48.0, 128.5, 135.0],
+      "dominant_frequency_hz": 16.0,
+      "quality_score": 75,
+      "notes": "Bearing signature strengthening - recommend inspection"
+    },
+    {
+      "recording_id": "rec-ahu7-002",
+      "equipment_id": "eqp-003",
+      "created_at": "2025-10-20T14:15:00Z",
+      "measurement_type": "vibration",
+      "source": "screenshot",
+      "rms_total_ms2": 2.8,
+      "peak_frequencies_hz": [16.0, 32.0, 48.0, 128.5, 135.0, 142.0],
+      "dominant_frequency_hz": 16.0,
+      "quality_score": 72,
+      "notes": "Additional bearing frequencies - schedule maintenance"
+    },
+    {
+      "recording_id": "rec-ahu7-003",
+      "equipment_id": "eqp-003",
+      "created_at": "2025-11-25T09:45:00Z",
+      "measurement_type": "vibration",
+      "source": "csv_export",
+      "rms_total_ms2": 3.2,
+      "peak_frequencies_hz": [16.0, 32.0, 48.0, 128.5, 135.0, 142.0, 149.5],
+      "dominant_frequency_hz": 16.0,
+      "quality_score": 68,
+      "anomalies": {
+        "type": "bearing_defect",
+        "subtype": "outer_race",
+        "confidence": 0.78,
+        "severity": "medium"
+      },
+      "notes": "BPFO signature confirmed - bearing replacement scheduled"
+    }
+  ],
+  "eqp-001": [
+    {
+      "recording_id": "rec-ahu1-001",
+      "equipment_id": "eqp-001",
+      "created_at": "2025-12-10T11:30:00Z",
+      "measurement_type": "vibration",
+      "source": "screenshot",
+      "rms_total_ms2": 1.25,
+      "peak_frequencies_hz": [12.0, 24.0, 36.0],
+      "dominant_frequency_hz": 12.0,
+      "quality_score": 92,
+      "notes": "Normal operation - VSD at 75%"
+    },
+    {
+      "recording_id": "rec-ahu1-002",
+      "equipment_id": "eqp-001",
+      "created_at": "2026-01-08T10:00:00Z",
+      "measurement_type": "vibration",
+      "source": "screenshot",
+      "rms_total_ms2": 1.3,
+      "peak_frequencies_hz": [12.0, 24.0, 36.0],
+      "dominant_frequency_hz": 12.0,
+      "quality_score": 90,
+      "notes": "Stable - no concerns"
+    }
+  ],
+  "eqp-006": [
+    {
+      "recording_id": "rec-ct1-001",
+      "equipment_id": "eqp-006",
+      "created_at": "2025-10-15T09:00:00Z",
+      "measurement_type": "vibration",
+      "source": "screenshot",
+      "rms_total_ms2": 1.6,
+      "peak_frequencies_hz": [14.5, 29.0, 43.5],
+      "dominant_frequency_hz": 14.5,
+      "quality_score": 88,
+      "notes": "Summer operation check - full speed"
+    },
+    {
+      "recording_id": "rec-ct1-002",
+      "equipment_id": "eqp-006",
+      "created_at": "2025-12-05T11:20:00Z",
+      "measurement_type": "vibration",
+      "source": "csv_export",
+      "rms_total_ms2": 1.55,
+      "peak_frequencies_hz": [14.5, 29.0, 43.5],
+      "dominant_frequency_hz": 14.5,
+      "quality_score": 90,
+      "notes": "Winter operation - reduced load"
+    }
+  ]
+}
