@@ -29,6 +29,7 @@ from app.api import clawd_webhooks  # Phase 41 Clawd integration
 from app.api import ocr  # Phase 41-02 OCR for service sheets
 from app.api import ml_predictions  # Phase 43 ML predictions & anomaly detection
 from app.api import timeseries  # Phase 42 InfluxDB time-series data
+from app.api import sensor_analysis  # Phase 41-03 phyphox sensor analysis
 from app.middleware.audit_middleware import AuditMiddleware
 from app.services.background_scheduler import scheduler_service
 from app.api.simulation import simulation_service  # BMS simulation service
@@ -92,6 +93,7 @@ app.include_router(clawd_webhooks.router, tags=["clawd"])  # Phase 41 Clawd inte
 app.include_router(ocr.router, prefix="/api", tags=["ocr"])  # Phase 41-02 OCR
 app.include_router(ml_predictions.router)  # Phase 43 ML predictions & anomaly detection
 app.include_router(timeseries.router)  # Phase 42 InfluxDB time-series data
+app.include_router(sensor_analysis.router)  # Phase 41-03 phyphox sensor analysis
 
 
 @app.on_event("startup")
