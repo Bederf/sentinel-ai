@@ -6,19 +6,33 @@ showing which features are most predictive of equipment failures.
 
 import { Card, Title, BarChart, Table, TableHead, TableHeaderCell, TableRow, TableBody, TableCell, Badge, Callout } from "@tremor/react";
 import { AlertCircle, TrendingUp } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
-import { classificationApi, FeatureImportanceItem } from "@/lib/api";
+import { classificationApi, type FeatureImportanceItem } from "@/lib/api";
+import { useState, useEffect } from "react";
 
 interface FeatureImportanceProps {
   equipmentType: string;
 }
 
 export function FeatureImportance({ equipmentType }: FeatureImportanceProps) {
-  const { data, isLoading, error } = useQuery({
-    queryKey: ["feature-importance", equipmentType],
-    queryFn: () => classificationApi.getFeatureImportance(equipmentType, 10),
-    staleTime: 60000, // Cache for 1 minute
-  });
+  const [data, setData] = useState<FeatureImportanceItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const result = await classificationApi.getFeatureImportance(equipmentType, 10);
+        setData(result);
+      } catch (err) {
+        setError(err instanceof Error ? err : new Error("Unknown error"));
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchData();
+  }, [equipmentType]);
 
   if (isLoading) {
     return (
@@ -55,7 +69,7 @@ export function FeatureImportance({ equipmentType }: FeatureImportanceProps) {
   }
 
   // Format importance as percentage
-  const chartData = data.map(item => ({
+  const chartData = data.map((item: FeatureImportanceItem) => ({
     feature: formatFeatureName(item.feature),
     importance: item.importance * 100,
   }));
@@ -98,7 +112,7 @@ export function FeatureImportance({ equipmentType }: FeatureImportanceProps) {
           </TableRow>
         </TableHead>
         <TableBody>
-          {data.map((item, index) => (
+          {data.map((item: FeatureImportanceItem, index: number) => (
             <TableRow key={item.feature}>
               <TableCell>
                 <Badge

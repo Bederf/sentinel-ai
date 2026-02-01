@@ -214,8 +214,14 @@ async def get_comprehensive_prediction(equipment_id: str):
     equipment = equipment_repo.get_by_id(equipment_id)
 
     if not equipment:
-        from app.data.equipment import get_equipment
-        equipment = get_equipment(equipment_id)
+        # Try JSON fallback
+        import json
+        from pathlib import Path
+        equipment_file = Path(__file__).parent.parent / "data" / "equipment.json"
+        with open(equipment_file) as f:
+            all_equipment = json.load(f)
+            equipment_list = [eq for eq in all_equipment if eq.get("id") == equipment_id]
+            equipment = equipment_list[0] if equipment_list else None
 
     if not equipment:
         raise HTTPException(status_code=404, detail="Equipment not found")

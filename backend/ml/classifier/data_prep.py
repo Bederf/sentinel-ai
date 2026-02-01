@@ -67,8 +67,12 @@ class ClassifierDataPrep:
 
         if not equipment_list:
             # Try JSON fallback
-            from app.data.equipment import get_equipment_by_type
-            equipment_list = get_equipment_by_type(equipment_type)
+            import json
+            from pathlib import Path
+            equipment_file = Path(__file__).parent.parent.parent / "data" / "equipment.json"
+            with open(equipment_file) as f:
+                all_equipment = json.load(f)
+                equipment_list = [eq for eq in all_equipment if eq.get("equipment_type") == equipment_type]
 
         if not equipment_list:
             raise ValueError(f"No equipment found for type: {equipment_type}")

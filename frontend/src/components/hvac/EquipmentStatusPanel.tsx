@@ -294,7 +294,6 @@ export function EquipmentStatusPanel({ siteId, compact = false, onEquipmentSelec
           ))}
         </TabList>
 
-        {/* @ts-expect-error - Tremor TabPanels type issue with mixed static and mapped TabPanels */}
         <TabPanels>
           <TabPanel>
             <Grid numItems={3} className="gap-4">
@@ -311,7 +310,7 @@ export function EquipmentStatusPanel({ siteId, compact = false, onEquipmentSelec
                 ))}
               </Grid>
             </TabPanel>
-          ))}
+          ))} as unknown as React.ReactElement[]
         </TabPanels>
       </TabGroup>
     </div>

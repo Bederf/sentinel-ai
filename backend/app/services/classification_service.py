@@ -85,8 +85,13 @@ class FailureClassificationService:
 
         if not equipment:
             # Try JSON fallback
-            from app.data.equipment import get_equipment
-            equipment = get_equipment(equipment_id)
+            import json
+            from pathlib import Path
+            equipment_file = Path(__file__).parent.parent / "data" / "equipment.json"
+            with open(equipment_file) as f:
+                all_equipment = json.load(f)
+                equipment_list = [eq for eq in all_equipment if eq.get("id") == equipment_id]
+                equipment = equipment_list[0] if equipment_list else None
 
         if not equipment:
             raise ValueError(f"Equipment not found: {equipment_id}")
@@ -148,8 +153,11 @@ class FailureClassificationService:
 
         if not equipment_list:
             # Try JSON fallback
-            from app.data.equipment import get_all_equipment
-            equipment_list = get_all_equipment()
+            import json
+            from pathlib import Path
+            equipment_file = Path(__file__).parent.parent / "data" / "equipment.json"
+            with open(equipment_file) as f:
+                equipment_list = json.load(f)
 
         results = []
 
