@@ -18,6 +18,7 @@ from app.api import dali  # DALI-2 lighting integration
 from app.api import complaints  # Comfort complaint handling
 from app.api import mcp  # MCP (Model Context Protocol) server
 from app.api import mcp_sse  # MCP SSE transport for remote clients
+from app.api import mcp_openai  # MCP OpenAI ChatGPT connector
 from app.api import buildings  # Building management (onboarding)
 from app.api import generators  # Generator/SCADA integration
 from app.api import energy_centre  # Energy centre (MV/LV, ATS, meters, UPS)
@@ -35,7 +36,8 @@ from app.api import data_quality  # Phase 42-03 Data quality monitoring
 from app.api import survival  # Phase 43-03 Survival analysis (Cox PH)
 from app.api import classification  # Phase 43-04 Failure type classification (Random Forest)
 from app.api import rag  # Phase 44 RAG (Retrieval-Augmented Generation)
-from app.api import baseline  # Phase 44 Asset Baseline Assessment
+# from app.api import baseline  # Phase 44 Asset Baseline Assessment - TODO: Fix import errors
+# from app.api import inspection  # Phase 45 Routine Inspection & Maintenance - TODO: Fix import errors
 from app.middleware.audit_middleware import AuditMiddleware
 from app.services.background_scheduler import scheduler_service
 from app.api.simulation import simulation_service  # BMS simulation service
@@ -88,6 +90,7 @@ app.include_router(dali.router, tags=["dali-lighting"])  # DALI-2 lighting integ
 app.include_router(complaints.router, tags=["comfort-complaints"])  # Comfort complaint handling
 app.include_router(mcp.router, tags=["mcp"])  # MCP (Model Context Protocol) for AI tool integration
 app.include_router(mcp_sse.router, tags=["mcp-sse"])  # MCP SSE transport for remote clients
+app.include_router(mcp_openai.router, tags=["mcp-openai"])  # MCP OpenAI ChatGPT connector
 app.include_router(buildings.router, tags=["buildings"])  # Building management (onboarding)
 app.include_router(generators.router, prefix="/api", tags=["generators"])  # Generator/SCADA
 app.include_router(energy_centre.router, prefix="/api", tags=["energy-centre"])  # Energy centre
@@ -105,7 +108,8 @@ app.include_router(data_quality.router)  # Phase 42-03 Data quality monitoring
 app.include_router(survival.router)  # Phase 43-03 Survival analysis
 app.include_router(classification.router, prefix="/api/classification", tags=["classification"])  # Phase 43-04 Failure type classification
 app.include_router(rag.router, tags=["rag"])  # Phase 44 RAG with pgvector
-app.include_router(baseline.router)  # Phase 44 Asset Baseline Assessment
+# app.include_router(baseline.router)  # Phase 44 Asset Baseline Assessment - TODO: Fix import errors
+# app.include_router(inspection.router)  # Phase 45 Routine Inspection & Maintenance - TODO: Fix import errors
 
 
 @app.on_event("startup")
@@ -121,6 +125,11 @@ async def startup_event():
     # Scans all sites with optimization_enabled=true and generates recommendations
     # When a recommendation is generated, the flashing lightbulb appears on dashboard
     scheduler_service.add_optimization_analysis_job(interval_seconds=900)  # 15 minutes
+
+    # Start prediction generation job (runs every 5 minutes)
+    # Scans equipment health scores and creates predictions for at-risk equipment
+    # When equipment health drops below 90%, a prediction is auto-generated
+    scheduler_service.add_prediction_generation_job(interval_seconds=300)  # 5 minutes
 
     # Start BMS simulation service (in-memory demo)
     try:

@@ -1,13 +1,17 @@
 """Stats API endpoint for dashboard overview."""
 
 import json
+import logging
 from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter
 from pydantic import BaseModel
 
+from app.config.settings import settings
+
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 # Load data directory
 DATA_DIR = Path(__file__).parent.parent / "data"
@@ -20,6 +24,135 @@ def load_json(filename: str) -> list[dict] | dict:
         with open(filepath) as f:
             return json.load(f)
     return []
+
+
+def get_stats_from_supabase() -> Optional[dict]:
+    """Get stats from Supabase database.
+
+    Returns None if Supabase is not available or configured for JSON storage.
+    """
+    if settings.use_json_storage:
+        return None
+
+    try:
+        from app.database.supabase_client import get_supabase_client
+        client = get_supabase_client()
+
+        # Get building count
+        buildings_result = client.table("buildings").select("id", count="exact").execute()
+        total_sites = buildings_result.count or 0
+
+        # Get equipment counts by status
+        equipment_result = client.table("equipment").select("status", count="exact").execute()
+        equipment_data = equipment_result.data or []
+
+        # Get total equipment count
+        total_equipment = 0
+        warning_count = 0
+        critical_count = 0
+        total_health = 0
+
+        # Query equipment with health scores
+        eq_detail = client.table("equipment").select("status,health_score").execute()
+        eq_items = eq_detail.data or []
+        total_equipment = len(eq_items)
+
+        for eq in eq_items:
+            status = eq.get("status", "normal")
+            health = eq.get("health_score", 100)
+            total_health += health
+            if status == "warning":
+                warning_count += 1
+            elif status == "critical":
+                critical_count += 1
+
+        avg_health = round(total_health / total_equipment, 1) if total_equipment > 0 else 0
+
+        # Get active alerts
+        alerts_result = client.table("alerts").select("severity", count="exact").eq("status", "active").execute()
+        active_alerts = alerts_result.data or []
+
+        alert_critical = sum(1 for a in active_alerts if a.get("severity") == "critical")
+        alert_warning = sum(1 for a in active_alerts if a.get("severity") == "warning")
+        alert_info = sum(1 for a in active_alerts if a.get("severity") == "info")
+        alert_total = len(active_alerts)
+
+        # Get sensor count
+        sensors_result = client.table("sensors").select("id", count="exact").execute()
+        total_sensors = sensors_result.count or 0
+
+        # Get readings count (from sensor_readings table - uses time as key)
+        readings_result = client.table("sensor_readings").select("time", count="exact").execute()
+        total_readings = readings_result.count or 0
+
+        # Get anomalies
+        anomalies_result = client.table("anomalies").select("*").execute()
+        anomalies = anomalies_result.data or []
+        total_repair = sum(a.get("repair_cost_zar", 0) for a in anomalies)
+        total_damage = sum(a.get("damage_cost_zar", 0) for a in anomalies)
+
+        # Get buildings with sqm for total
+        buildings_detail = client.table("buildings").select("region,sqm").execute()
+        buildings = buildings_detail.data or []
+        total_sqm = sum(b.get("sqm", 0) for b in buildings)
+
+        # Aggregate by region
+        region_stats = {}
+        for b in buildings:
+            region = b.get("region", "Unknown")
+            if region not in region_stats:
+                region_stats[region] = {"region": region, "site_count": 0, "equipment_count": 0, "total_sqm": 0, "alert_count": 0}
+            region_stats[region]["site_count"] += 1
+            region_stats[region]["total_sqm"] += b.get("sqm", 0)
+
+        by_region = list(region_stats.values())
+        by_region.sort(key=lambda r: -r["site_count"])
+
+        # Equipment by type (simplified - use type field)
+        eq_types = client.table("equipment").select("type,health_score,status").execute()
+        type_stats = {}
+        for eq in (eq_types.data or []):
+            eq_type = eq.get("type", "Unknown")
+            if eq_type not in type_stats:
+                type_stats[eq_type] = {"type": eq_type, "count": 0, "total_health": 0, "warning_count": 0}
+            type_stats[eq_type]["count"] += 1
+            type_stats[eq_type]["total_health"] += eq.get("health_score", 100)
+            if eq.get("status") == "warning":
+                type_stats[eq_type]["warning_count"] += 1
+
+        by_equipment_type = [
+            {
+                "type": stats["type"],
+                "count": stats["count"],
+                "avg_health": round(stats["total_health"] / stats["count"], 1) if stats["count"] > 0 else 0,
+                "warning_count": stats["warning_count"],
+            }
+            for stats in type_stats.values()
+        ]
+        by_equipment_type.sort(key=lambda t: -t["count"])
+
+        return {
+            "total_sites": total_sites,
+            "total_equipment": total_equipment,
+            "total_sensors": total_sensors,
+            "total_readings": total_readings,
+            "avg_equipment_health": avg_health,
+            "equipment_warning_count": warning_count,
+            "equipment_critical_count": critical_count,
+            "alert_critical": alert_critical,
+            "alert_warning": alert_warning,
+            "alert_info": alert_info,
+            "alert_total": alert_total,
+            "anomalies": anomalies,
+            "total_repair": total_repair,
+            "total_damage": total_damage,
+            "by_region": by_region,
+            "by_equipment_type": by_equipment_type,
+            "total_sqm": total_sqm,
+        }
+    except Exception as e:
+        logger.warning(f"Failed to get stats from Supabase: {e}")
+        return None
 
 
 class RegionStats(BaseModel):
@@ -119,20 +252,63 @@ async def get_stats() -> StatsResponse:
     Returns:
         StatsResponse with complete dashboard data.
     """
-    # Load all data
+    # Try Supabase first
+    supabase_stats = get_stats_from_supabase()
+
+    if supabase_stats:
+        # Build response from Supabase data
+        alert_summary = AlertSummary(
+            critical=supabase_stats["alert_critical"],
+            warning=supabase_stats["alert_warning"],
+            info=supabase_stats["alert_info"],
+            total=supabase_stats["alert_total"],
+        )
+
+        anomalies = supabase_stats["anomalies"]
+        anomaly_summary = AnomalySummary(
+            total=len(anomalies),
+            total_repair_cost_zar=supabase_stats["total_repair"],
+            total_potential_damage_zar=supabase_stats["total_damage"],
+            potential_savings_zar=supabase_stats["total_damage"] - supabase_stats["total_repair"],
+        )
+
+        by_region = [RegionStats(**r) for r in supabase_stats["by_region"]]
+        by_equipment_type = [EquipmentTypeStats(**t) for t in supabase_stats["by_equipment_type"]]
+
+        return StatsResponse(
+            total_sites=supabase_stats["total_sites"],
+            total_equipment=supabase_stats["total_equipment"],
+            total_sensors=supabase_stats["total_sensors"],
+            total_readings=supabase_stats["total_readings"],
+            avg_equipment_health=supabase_stats["avg_equipment_health"],
+            equipment_warning_count=supabase_stats["equipment_warning_count"],
+            equipment_critical_count=supabase_stats["equipment_critical_count"],
+            alerts=alert_summary,
+            active_alerts=alert_summary.total,
+            critical_alerts=alert_summary.critical,
+            anomalies=anomaly_summary,
+            pending_anomalies=len(anomalies),
+            by_region=by_region,
+            by_equipment_type=by_equipment_type,
+            total_sqm=supabase_stats["total_sqm"],
+            data_range_days=30,  # Default for Supabase
+            uptime_percent=None,
+        )
+
+    # Fallback to JSON files
     sites = load_json("sites.json")
     equipment = load_json("equipment.json")
     sensors = load_json("sensors.json")
     readings = load_json("readings.json")
     alerts = load_json("alerts.json")
     anomalies = load_json("anomalies.json")
-    
+
     # Basic counts
     total_sites = len(sites)
     total_equipment = len(equipment)
     total_sensors = len(sensors)
     total_readings = len(readings)
-    
+
     # Equipment health
     if equipment:
         avg_health = sum(e["health_score"] for e in equipment) / len(equipment)
@@ -142,7 +318,7 @@ async def get_stats() -> StatsResponse:
         avg_health = 0
         warning_count = 0
         critical_count = 0
-    
+
     # Active alerts by severity
     active_alerts = [a for a in alerts if a["status"] == "active"]
     alert_summary = AlertSummary(
@@ -151,7 +327,7 @@ async def get_stats() -> StatsResponse:
         info=sum(1 for a in active_alerts if a["severity"] == "info"),
         total=len(active_alerts),
     )
-    
+
     # Anomaly summary
     total_repair = sum(a["repair_cost_zar"] for a in anomalies)
     total_damage = sum(a["damage_cost_zar"] for a in anomalies)
@@ -161,7 +337,7 @@ async def get_stats() -> StatsResponse:
         total_potential_damage_zar=total_damage,
         potential_savings_zar=total_damage - total_repair,
     )
-    
+
     # Stats by region
     region_stats: dict[str, dict] = {}
     for site in sites:
@@ -176,22 +352,22 @@ async def get_stats() -> StatsResponse:
             }
         region_stats[region]["site_count"] += 1
         region_stats[region]["total_sqm"] += site["sqm"]
-    
+
     # Add equipment and alert counts to regions
     site_to_region = {s["id"]: s["region"] for s in sites}
     for eq in equipment:
         region = site_to_region.get(eq["site_id"])
         if region and region in region_stats:
             region_stats[region]["equipment_count"] += 1
-    
+
     for alert in active_alerts:
         region = site_to_region.get(alert["site_id"])
         if region and region in region_stats:
             region_stats[region]["alert_count"] += 1
-    
+
     by_region = [RegionStats(**stats) for stats in region_stats.values()]
     by_region.sort(key=lambda r: -r.site_count)
-    
+
     # Stats by equipment type
     type_stats: dict[str, dict] = {}
     for eq in equipment:
@@ -207,7 +383,7 @@ async def get_stats() -> StatsResponse:
         type_stats[eq_type]["total_health"] += eq["health_score"]
         if eq["status"] == "warning":
             type_stats[eq_type]["warning_count"] += 1
-    
+
     by_equipment_type = [
         EquipmentTypeStats(
             type=stats["type"],
@@ -218,10 +394,10 @@ async def get_stats() -> StatsResponse:
         for stats in type_stats.values()
     ]
     by_equipment_type.sort(key=lambda t: -t.count)
-    
+
     # Total sqm
     total_sqm = sum(s["sqm"] for s in sites)
-    
+
     # Date range
     if readings:
         timestamps = [r["timestamp"] for r in readings]
@@ -230,7 +406,7 @@ async def get_stats() -> StatsResponse:
         date_range = (max(dates) - min(dates)).days + 1
     else:
         date_range = 0
-    
+
     return StatsResponse(
         total_sites=total_sites,
         total_equipment=total_equipment,
@@ -248,5 +424,5 @@ async def get_stats() -> StatsResponse:
         by_equipment_type=by_equipment_type,
         total_sqm=total_sqm,
         data_range_days=date_range,
-        uptime_percent=None,  # Not calculated yet, can be added later
+        uptime_percent=None,
     )

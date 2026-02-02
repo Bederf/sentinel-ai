@@ -15,14 +15,12 @@ import { useState, useEffect, useMemo } from "react";
 import {
   Building2,
   AlertTriangle,
-  AlertCircle,
   Cpu,
   Shield,
   Bell,
   DollarSign,
   RefreshCw,
   LayoutGrid,
-  XCircle,
 } from "lucide-react";
 import {
   DndContext,
@@ -78,9 +76,11 @@ type KPICardId =
 
 interface DashboardProps {
   onViewChange: (view: View) => void;
+  openCardLibrary?: boolean;
+  onCardLibraryClose?: () => void;
 }
 
-export function Dashboard({ onViewChange }: DashboardProps) {
+export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }: DashboardProps) {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [sites, setSites] = useState<Site[]>([]);
   const [predictions, setPredictions] = useState<Prediction[]>([]);
@@ -144,17 +144,45 @@ export function Dashboard({ onViewChange }: DashboardProps) {
         ]);
         setStats(statsData);
         setSites(sitesData);
-        setPredictions(predictionsData.predictions);
+        // Filter predictions to show only critical and warning severity (API maps high→warning)
+        setPredictions(predictionsData.predictions.filter(p => p.severity === 'critical' || p.severity === 'warning'));
         setError(null);
 
-        // Load at-risk equipment from Sandton (site-002)
+        // Load at-risk equipment from ALL sites
         try {
-          const equipmentData = await api.getBuildingEquipment("sandton");
-          // Filter for warning and critical status only
-          const riskEquipment = equipmentData.equipment.filter(
-            (e) => e.status === "warning" || e.status === "critical"
-          );
-          setAtRiskEquipment(riskEquipment);
+          const allRiskEquipment: BuildingEquipmentItem[] = [];
+
+          // Fetch equipment from each site in parallel
+          const equipmentPromises = sitesData.map(async (site) => {
+            try {
+              const equipmentData = await api.getBuildingEquipment(site.id);
+              // Filter for warning and critical status only
+              return equipmentData.equipment.filter(
+                (e) => e.status === "warning" || e.status === "critical"
+              );
+            } catch (err) {
+              console.warn(`Failed to load equipment for site ${site.id}:`, err);
+              return [];
+            }
+          });
+
+          const results = await Promise.all(equipmentPromises);
+
+          // Combine all at-risk equipment
+          results.forEach((siteEquipment) => {
+            allRiskEquipment.push(...siteEquipment);
+          });
+
+          // Sort by severity (critical first) then by health (lowest first)
+          allRiskEquipment.sort((a, b) => {
+            // Critical comes before warning
+            if (a.status === "critical" && b.status !== "critical") return -1;
+            if (b.status === "critical" && a.status !== "critical") return 1;
+            // Then sort by health (lower = higher risk)
+            return a.health - b.health;
+          });
+
+          setAtRiskEquipment(allRiskEquipment);
         } catch (eqErr) {
           console.error("Failed to load at-risk equipment:", eqErr);
           setAtRiskEquipment([]);
@@ -193,6 +221,19 @@ export function Dashboard({ onViewChange }: DashboardProps) {
     loadPreferences();
   }, []);
 
+  // Handle card library open state from Sidebar
+  useEffect(() => {
+    if (openCardLibrary) {
+      setIsCardLibraryOpen(true);
+    }
+  }, [openCardLibrary]);
+
+  // Handle card library close
+  const handleCardLibraryClose = () => {
+    setIsCardLibraryOpen(false);
+    onCardLibraryClose?.();
+  };
+
   // Load energy data when filters change
   useEffect(() => {
     const loadEnergyData = async () => {
@@ -215,8 +256,14 @@ export function Dashboard({ onViewChange }: DashboardProps) {
   const normalSites = sites.filter((s) => s.status === "normal").length;
   const warningSites = sites.filter((s) => s.status === "warning").length;
 
-  // Calculate total potential savings from all predictions
-  const totalPotentialSavings = predictions.reduce((sum, prediction) => {
+  // Filter predictions to only show critical/warning severity
+  // Note: API maps database 'high'/'medium' to 'warning'
+  const criticalPredictions = predictions.filter(p =>
+    p.severity === 'critical' || p.severity === 'warning'
+  );
+
+  // Calculate total potential savings from filtered predictions only
+  const totalPotentialSavings = criticalPredictions.reduce((sum, prediction) => {
     if (prediction.financial_impact) {
       return sum + prediction.financial_impact.potential_loss_zar;
     }
@@ -379,15 +426,15 @@ export function Dashboard({ onViewChange }: DashboardProps) {
       },
       'kpi-active-risks': {
         title: "Active Risks",
-        value: stats.active_alerts || 0,
+        value: ((stats as any).equipment_warning_count || 0) + ((stats as any).equipment_critical_count || 0),
         icon: <Bell className="h-5 w-5" />,
-        // Only show delta if critical_alerts exists and is greater than 0
-        delta: (stats as any).critical_alerts !== undefined && (stats as any).critical_alerts !== null && (stats as any).critical_alerts > 0 
-          ? -((stats as any).critical_alerts * 10) 
+        // Show critical count if any
+        delta: (stats as any).equipment_critical_count > 0
+          ? -((stats as any).equipment_critical_count * 10)
           : undefined,
         isInverseTrend: true,
-        deltaText: (stats as any).critical_alerts !== undefined && (stats as any).critical_alerts !== null && (stats as any).critical_alerts > 0 
-          ? `${(stats as any).critical_alerts} critical` 
+        deltaText: (stats as any).equipment_critical_count > 0
+          ? `${(stats as any).equipment_critical_count} critical`
           : undefined,
         accentColor: "orange" as const,
       },
@@ -710,7 +757,7 @@ export function Dashboard({ onViewChange }: DashboardProps) {
                   : "linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(245, 158, 11, 0.1) 100%)",
                 border: `1px solid ${highestRisk.status === "critical" ? "rgba(220, 38, 38, 0.4)" : "rgba(245, 158, 11, 0.4)"}`,
               }}
-              onClick={() => setSelectedSiteId("site-002")}
+              onClick={() => setSelectedSiteId(highestRisk.site_id)}
             >
               <div className="p-5">
                 <div className="flex items-start justify-between mb-4">
@@ -742,7 +789,7 @@ export function Dashboard({ onViewChange }: DashboardProps) {
                       className="text-xs"
                       style={{ color: "var(--color-sentinel-text-secondary)" }}
                     >
-                      {highestRisk.building_name} • {highestRisk.building_id}
+                      {highestRisk.building_name} • Site ID: {highestRisk.site_id}
                     </p>
                   </div>
                   <div className="text-right">
@@ -865,30 +912,8 @@ export function Dashboard({ onViewChange }: DashboardProps) {
                 </span>
               </div>
             </div>
-            {(atRiskEquipment.length > 0 || predictions.length > 0) && (
+            {predictions.length > 0 && (
               <div className="flex items-center gap-2">
-                {atRiskEquipment.filter(e => e.status === "warning").length > 0 && (
-                  <span
-                    className="text-xs px-2 py-1 rounded"
-                    style={{
-                      background: "rgba(245, 158, 11, 0.15)",
-                      color: "var(--color-sentinel-amber)",
-                    }}
-                  >
-                    {atRiskEquipment.filter(e => e.status === "warning").length} Warning
-                  </span>
-                )}
-                {atRiskEquipment.filter(e => e.status === "critical").length > 0 && (
-                  <span
-                    className="text-xs px-2 py-1 rounded"
-                    style={{
-                      background: "rgba(220, 38, 38, 0.15)",
-                      color: "var(--color-sentinel-red)",
-                    }}
-                  >
-                    {atRiskEquipment.filter(e => e.status === "critical").length} Critical
-                  </span>
-                )}
                 {predictions.length > 0 && (
                   <span
                     className="text-xs px-2 py-1 rounded"
@@ -904,8 +929,8 @@ export function Dashboard({ onViewChange }: DashboardProps) {
             )}
           </div>
 
-          {/* At-Risk Equipment Section */}
-          {atRiskEquipment.length > 0 && (
+          {/* At-Risk Equipment Section - REMOVED */}
+          {/* {atRiskEquipment.length > 0 && (
             <div
               className="p-4"
               style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}
@@ -991,11 +1016,11 @@ export function Dashboard({ onViewChange }: DashboardProps) {
                 ))}
               </div>
             </div>
-          )}
+          )} */}
 
           {/* Predictions Grid */}
           <div className="p-4">
-            {predictions.length === 0 && atRiskEquipment.length === 0 ? (
+            {predictions.length === 0 ? (
               <div className="text-center py-8">
                 <Shield
                   className="h-12 w-12 mx-auto mb-2"
@@ -1007,7 +1032,9 @@ export function Dashboard({ onViewChange }: DashboardProps) {
               </div>
             ) : predictions.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                {predictions.map((prediction) => (
+                {predictions
+                  .filter(p => p.severity === 'critical' || p.severity === 'warning')
+                  .map((prediction) => (
                   <PredictionCard
                     key={prediction.id}
                     prediction={prediction}
@@ -1106,7 +1133,7 @@ export function Dashboard({ onViewChange }: DashboardProps) {
         {/* Card Library Panel */}
         <CardLibrary
           isOpen={isCardLibraryOpen}
-          onClose={() => setIsCardLibraryOpen(false)}
+          onClose={handleCardLibraryClose}
           visibleKpiCards={visibleKpiCards}
           visibleSections={visibleSections}
           onKpiVisibilityChange={handleKpiVisibilityChange}

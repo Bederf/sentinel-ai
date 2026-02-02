@@ -104,20 +104,26 @@ async def get_building(building_id: str) -> dict:
     Get building details.
 
     Returns building metadata, desk count, zone count.
+
+    Maps friendly building names (e.g., 'sandton') to site codes (e.g., 'site-002')
     """
+    # Map building_id to site code for JSON lookup
+    BUILDING_TO_SITE = {"sandton": "site-002"}
+    site_code = BUILDING_TO_SITE.get(building_id, building_id)
+
     loader = get_building_loader()
-    building = loader.get_building(building_id)
+    building = loader.get_building(site_code)
 
     if not building:
-        raise HTTPException(status_code=404, detail=f"Building '{building_id}' not found")
+        raise HTTPException(status_code=404, detail=f"Building '{building_id}' (site '{site_code}') not found")
 
-    desks = loader.get_desks(building_id)
-    zones = loader.get_zones(building_id)
+    desks = loader.get_desks(site_code)
+    zones = loader.get_zones(site_code)
 
     result = building.to_dict()
     result["desk_count"] = len(desks)
     result["zone_count"] = len(zones)
-    result["is_active"] = building_id in loader.get_active_building_ids()
+    result["is_active"] = site_code in loader.get_active_building_ids()
 
     return result
 
@@ -192,11 +198,14 @@ async def upload_desks(building_id: str, desks: List[dict]) -> dict:
     Upload/replace desk data for a building.
 
     Expects array of desk objects. Building field is added automatically.
+    Maps 'sandton' to 'site-002' for file operations.
     """
-    building_path = DATA_PATH / building_id
+    BUILDING_TO_SITE = {"sandton": "site-002"}
+    site_code = BUILDING_TO_SITE.get(building_id, building_id)
+    building_path = DATA_PATH / site_code
 
     if not building_path.exists():
-        raise HTTPException(status_code=404, detail=f"Building '{building_id}' not found")
+        raise HTTPException(status_code=404, detail=f"Building '{building_id}' (site '{site_code}') not found")
 
     # Validate and save
     for desk in desks:
@@ -223,11 +232,14 @@ async def upload_zones(building_id: str, zones: List[dict]) -> dict:
     Upload/replace zone data for a building.
 
     Expects array of zone objects.
+    Maps 'sandton' to 'site-002' for file operations.
     """
-    building_path = DATA_PATH / building_id
+    BUILDING_TO_SITE = {"sandton": "site-002"}
+    site_code = BUILDING_TO_SITE.get(building_id, building_id)
+    building_path = DATA_PATH / site_code
 
     if not building_path.exists():
-        raise HTTPException(status_code=404, detail=f"Building '{building_id}' not found")
+        raise HTTPException(status_code=404, detail=f"Building '{building_id}' (site '{site_code}') not found")
 
     # Validate and save
     for zone in zones:
@@ -255,11 +267,14 @@ async def activate_building(building_id: str, set_default: bool = False) -> dict
 
     Args:
         set_default: If True, also set as the default building
+    Maps 'sandton' to 'site-002' for file operations.
     """
-    building_path = DATA_PATH / building_id
+    BUILDING_TO_SITE = {"sandton": "site-002"}
+    site_code = BUILDING_TO_SITE.get(building_id, building_id)
+    building_path = DATA_PATH / site_code
 
     if not building_path.exists():
-        raise HTTPException(status_code=404, detail=f"Building '{building_id}' not found")
+        raise HTTPException(status_code=404, detail=f"Building '{building_id}' (site '{site_code}') not found")
 
     # Load and update registry
     registry_path = DATA_PATH / "_registry.json"
@@ -269,13 +284,13 @@ async def activate_building(building_id: str, set_default: bool = False) -> dict
     else:
         registry = {"active_buildings": [], "default_building": None}
 
-    # Add to active if not already
-    if building_id not in registry["active_buildings"]:
-        registry["active_buildings"].append(building_id)
+    # Add to active if not already (use site_code for registry)
+    if site_code not in registry["active_buildings"]:
+        registry["active_buildings"].append(site_code)
 
-    # Set as default if requested or if first building
+    # Set as default if requested or if first building (use site_code for registry)
     if set_default or not registry.get("default_building"):
-        registry["default_building"] = building_id
+        registry["default_building"] = site_code
 
     # Save registry
     with open(registry_path, "w") as f:
@@ -285,13 +300,14 @@ async def activate_building(building_id: str, set_default: bool = False) -> dict
     loader = get_building_loader()
     loader.load(force=True)
 
-    logger.info(f"Activated building: {building_id}")
+    logger.info(f"Activated building: {building_id} -> {site_code}")
 
     return {
         "building_id": building_id,
+        "site_code": site_code,
         "status": "active",
-        "is_default": registry["default_building"] == building_id,
-        "message": f"Building '{building_id}' is now active",
+        "is_default": registry["default_building"] == site_code,
+        "message": f"Building '{building_id}' (site '{site_code}') is now active",
     }
 
 
@@ -299,7 +315,11 @@ async def activate_building(building_id: str, set_default: bool = False) -> dict
 async def deactivate_building(building_id: str) -> dict:
     """
     Deactivate a building (remove from registry but keep data).
+    Maps 'sandton' to 'site-002' for registry operations.
     """
+    BUILDING_TO_SITE = {"sandton": "site-002"}
+    site_code = BUILDING_TO_SITE.get(building_id, building_id)
+
     registry_path = DATA_PATH / "_registry.json"
 
     if not registry_path.exists():
@@ -308,14 +328,14 @@ async def deactivate_building(building_id: str) -> dict:
     with open(registry_path) as f:
         registry = json.load(f)
 
-    if building_id not in registry.get("active_buildings", []):
-        raise HTTPException(status_code=400, detail=f"Building '{building_id}' is not active")
+    if site_code not in registry.get("active_buildings", []):
+        raise HTTPException(status_code=400, detail=f"Building '{building_id}' (site '{site_code}') is not active")
 
     # Remove from active
-    registry["active_buildings"].remove(building_id)
+    registry["active_buildings"].remove(site_code)
 
     # Clear default if this was the default
-    if registry.get("default_building") == building_id:
+    if registry.get("default_building") == site_code:
         registry["default_building"] = registry["active_buildings"][0] if registry["active_buildings"] else None
 
     # Save registry
@@ -341,26 +361,30 @@ async def delete_building(building_id: str, confirm: bool = False) -> dict:
     Delete a building and all its data.
 
     Requires confirm=true to actually delete.
+    Maps 'sandton' to 'site-002' for file operations.
     """
+    BUILDING_TO_SITE = {"sandton": "site-002"}
+    site_code = BUILDING_TO_SITE.get(building_id, building_id)
+
     if not confirm:
         raise HTTPException(
             status_code=400,
             detail="Add ?confirm=true to confirm deletion"
         )
 
-    building_path = DATA_PATH / building_id
+    building_path = DATA_PATH / site_code
 
     if not building_path.exists():
-        raise HTTPException(status_code=404, detail=f"Building '{building_id}' not found")
+        raise HTTPException(status_code=404, detail=f"Building '{building_id}' (site '{site_code}') not found")
 
     # First deactivate
     registry_path = DATA_PATH / "_registry.json"
     if registry_path.exists():
         with open(registry_path) as f:
             registry = json.load(f)
-        if building_id in registry.get("active_buildings", []):
-            registry["active_buildings"].remove(building_id)
-        if registry.get("default_building") == building_id:
+        if site_code in registry.get("active_buildings", []):
+            registry["active_buildings"].remove(site_code)
+        if registry.get("default_building") == site_code:
             registry["default_building"] = registry["active_buildings"][0] if registry["active_buildings"] else None
         with open(registry_path, "w") as f:
             json.dump(registry, f, indent=2)
@@ -372,32 +396,39 @@ async def delete_building(building_id: str, confirm: bool = False) -> dict:
     loader = get_building_loader()
     loader.load(force=True)
 
-    logger.info(f"Deleted building: {building_id}")
+    logger.info(f"Deleted building: {building_id} -> {site_code}")
 
     return {
         "building_id": building_id,
+        "site_code": site_code,
         "status": "deleted",
-        "message": f"Building '{building_id}' and all data deleted",
+        "message": f"Building '{building_id}' (site '{site_code}') and all data deleted",
     }
 
 
 @router.get("/{building_id}/desks")
 async def get_building_desks(building_id: str) -> List[dict]:
-    """Get all desks for a building."""
+    """Get all desks for a building. Maps 'sandton' to 'site-002'."""
+    BUILDING_TO_SITE = {"sandton": "site-002"}
+    site_code = BUILDING_TO_SITE.get(building_id, building_id)
+
     loader = get_building_loader()
-    desks = loader.get_desks(building_id)
-    if not desks and building_id not in loader.get_active_building_ids():
-        raise HTTPException(status_code=404, detail=f"Building '{building_id}' not found")
+    desks = loader.get_desks(site_code)
+    if not desks and site_code not in loader.get_active_building_ids():
+        raise HTTPException(status_code=404, detail=f"Building '{building_id}' (site '{site_code}') not found")
     return desks
 
 
 @router.get("/{building_id}/zones")
 async def get_building_zones(building_id: str) -> List[dict]:
-    """Get all zones for a building."""
+    """Get all zones for a building. Maps 'sandton' to 'site-002'."""
+    BUILDING_TO_SITE = {"sandton": "site-002"}
+    site_code = BUILDING_TO_SITE.get(building_id, building_id)
+
     loader = get_building_loader()
-    zones = loader.get_zones(building_id)
-    if not zones and building_id not in loader.get_active_building_ids():
-        raise HTTPException(status_code=404, detail=f"Building '{building_id}' not found")
+    zones = loader.get_zones(site_code)
+    if not zones and site_code not in loader.get_active_building_ids():
+        raise HTTPException(status_code=404, detail=f"Building '{building_id}' (site '{site_code}') not found")
     return zones
 
 
@@ -454,13 +485,17 @@ async def get_equipment_summary(building_id: str) -> dict:
         logger.debug(f"Supabase asset summary failed: {e}")
 
     # Fall back to JSON file counting
+    # Map building_id to site code for JSON lookup
+    BUILDING_TO_SITE = {"sandton": "site-002"}
+    site_code = BUILDING_TO_SITE.get(building_id, building_id)
+
     loader = get_building_loader()
-    building = loader.get_building(building_id)
+    building = loader.get_building(site_code)
 
     if not building:
-        raise HTTPException(status_code=404, detail=f"Building '{building_id}' not found")
+        raise HTTPException(status_code=404, detail=f"Building '{building_id}' (site '{site_code}') not found")
 
-    building_path = DATA_PATH / building_id
+    building_path = DATA_PATH / site_code
 
     # Count from JSON files
     counts = {
@@ -571,6 +606,12 @@ async def get_building_equipment(building_id: str) -> dict:
         equipment_data = repo.get_by_building_code(site_code)
 
         if equipment_data:
+            # Get building name from Supabase first (needed in the loop)
+            from app.database.supabase_client import get_supabase_client
+            client = get_supabase_client()
+            building_result = client.table("buildings").select("name").eq("code", site_code).execute()
+            building_name = building_result.data[0]["name"] if building_result.data else building_id
+
             equipment_list = []
             categories = {}
 
@@ -614,6 +655,7 @@ async def get_building_equipment(building_id: str) -> dict:
                     "location": eq.get("location", ""),
                     "building_id": site_code,
                     "building_name": building_name,
+                    "site_id": building_id,  # API parameter (e.g., "site-002" or "sandton")
                     "details": {
                         "manufacturer": eq.get("manufacturer"),
                         "model": eq.get("model"),
@@ -633,12 +675,6 @@ async def get_building_equipment(building_id: str) -> dict:
                 elif status == "critical":
                     categories[category]["critical"] += 1
 
-            # Get building name from Supabase
-            from app.database.supabase_client import get_supabase_client
-            client = get_supabase_client()
-            building_result = client.table("buildings").select("name").eq("code", site_code).execute()
-            building_name = building_result.data[0]["name"] if building_result.data else building_id
-
             return {
                 "building_id": building_id,
                 "building_name": building_name,
@@ -652,12 +688,12 @@ async def get_building_equipment(building_id: str) -> dict:
 
     # Fall back to JSON files
     loader = get_building_loader()
-    building = loader.get_building(building_id)
+    building = loader.get_building(site_code)
 
     if not building:
-        raise HTTPException(status_code=404, detail=f"Building '{building_id}' not found")
+        raise HTTPException(status_code=404, detail=f"Building '{building_id}' (site '{site_code}') not found")
 
-    building_path = DATA_PATH / building_id
+    building_path = DATA_PATH / site_code
     equipment_list = []
 
     def get_status_health(status: str) -> tuple:
@@ -692,6 +728,9 @@ async def get_building_equipment(building_id: str) -> dict:
                     "status": status,
                     "health": health,
                     "location": f"Floor {zone.get('floor', 'N/A')}",
+                    "building_id": site_code,
+                    "building_name": building.name,
+                    "site_id": building_id,
                     "details": {
                         "current_temp": zone.get("current_temp"),
                         "setpoint": zone.get("setpoint"),
@@ -720,6 +759,9 @@ async def get_building_equipment(building_id: str) -> dict:
                     "status": status,
                     "health": health,
                     "location": tank.get("location", ""),
+                    "building_id": site_code,
+                    "building_name": building.name,
+                    "site_id": building_id,
                     "details": {
                         "capacity_liters": tank.get("capacity_liters"),
                         "current_level_pct": level_pct,
@@ -738,6 +780,9 @@ async def get_building_equipment(building_id: str) -> dict:
                     "status": status,
                     "health": health,
                     "location": group.get("location", ""),
+                    "building_id": site_code,
+                    "building_name": building.name,
+                    "site_id": building_id,
                     "details": {
                         "generators_running": group.get("generators_running"),
                         "total_load_kw": group.get("total_load_kw"),
@@ -757,6 +802,9 @@ async def get_building_equipment(building_id: str) -> dict:
                     "status": status,
                     "health": health,
                     "location": gen.get("location", ""),
+                    "building_id": site_code,
+                    "building_name": building.name,
+                    "site_id": building_id,
                     "details": {
                         "rated_power_kw": gen.get("rated_power_kw"),
                         "engine_running": gen.get("engine_running"),
@@ -783,6 +831,9 @@ async def get_building_equipment(building_id: str) -> dict:
                     "status": status,
                     "health": health,
                     "location": incomer.get("location", ""),
+                    "building_id": site_code,
+                    "building_name": building.name,
+                    "site_id": building_id,
                     "details": {
                         "voltage_kv": incomer.get("voltage_kv"),
                         "power_kw": incomer.get("power_kw"),
@@ -802,6 +853,9 @@ async def get_building_equipment(building_id: str) -> dict:
                     "status": status,
                     "health": health,
                     "location": tx.get("location", ""),
+                    "building_id": site_code,
+                    "building_name": building.name,
+                    "site_id": building_id,
                     "details": {
                         "rated_power_kva": tx.get("rated_power_kva"),
                         "load_percent": tx.get("load_percent"),
@@ -812,7 +866,7 @@ async def get_building_equipment(building_id: str) -> dict:
 
             # LV Switchboards
             for sb in ec_data.get("lv_switchboards", []):
-                status, health = get_status_health("online" if sb.get("main_breaker_closed") else "fault")
+                status, health = get_status_health("online" if sb.get("healthy") else "fault")
                 equipment_list.append({
                     "id": sb.get("switchboard_id"),
                     "name": sb.get("name"),
@@ -821,6 +875,9 @@ async def get_building_equipment(building_id: str) -> dict:
                     "status": status,
                     "health": health,
                     "location": sb.get("location", ""),
+                    "building_id": site_code,
+                    "building_name": building.name,
+                    "site_id": building_id,
                     "details": {
                         "total_load_kw": sb.get("total_load_kw"),
                         "bus_voltage_v": sb.get("bus_voltage_v"),
@@ -830,7 +887,13 @@ async def get_building_equipment(building_id: str) -> dict:
 
             # ATS Units
             for ats in ec_data.get("ats_units", []):
-                status, health = get_status_health("online" if ats.get("healthy") else "fault")
+                # ATS health: check if both interlocks are OK and at least one power source is available
+                is_healthy = (
+                    ats.get("mechanical_interlock_ok", False) and
+                    ats.get("electrical_interlock_ok", False) and
+                    (ats.get("mains_available", False) or ats.get("generator_available", False))
+                )
+                status, health = get_status_health("online" if is_healthy else "fault")
                 equipment_list.append({
                     "id": ats.get("ats_id"),
                     "name": ats.get("name"),
@@ -839,6 +902,9 @@ async def get_building_equipment(building_id: str) -> dict:
                     "status": status,
                     "health": health,
                     "location": ats.get("location", ""),
+                    "building_id": site_code,
+                    "building_name": building.name,
+                    "site_id": building_id,
                     "details": {
                         "position": ats.get("position"),
                         "mode": ats.get("mode"),
@@ -856,6 +922,9 @@ async def get_building_equipment(building_id: str) -> dict:
                     "status": "normal",
                     "health": 95,
                     "location": meter.get("location", ""),
+                    "building_id": site_code,
+                    "building_name": building.name,
+                    "site_id": building_id,
                     "details": {
                         "power_kw": meter.get("power_kw"),
                         "energy_kwh": meter.get("energy_kwh_total"),
@@ -874,6 +943,9 @@ async def get_building_equipment(building_id: str) -> dict:
                     "status": status,
                     "health": health,
                     "location": pfc.get("location", ""),
+                    "building_id": site_code,
+                    "building_name": building.name,
+                    "site_id": building_id,
                     "details": {
                         "power_factor": pfc.get("power_factor"),
                         "stages_active": pfc.get("stages_active"),
@@ -892,6 +964,9 @@ async def get_building_equipment(building_id: str) -> dict:
                     "status": status,
                     "health": health,
                     "location": ups.get("location", ""),
+                    "building_id": site_code,
+                    "building_name": building.name,
+                    "site_id": building_id,
                     "details": {
                         "rated_power_kva": ups.get("rated_power_kva"),
                         "load_percent": ups.get("load_percent"),
@@ -903,7 +978,7 @@ async def get_building_equipment(building_id: str) -> dict:
 
             # Feeders
             for feeder in ec_data.get("feeders", []):
-                status, health = get_status_health("online" if feeder.get("breaker_closed") else "offline")
+                status, health = get_status_health("online" if feeder.get("breaker_state") == "closed" else "offline")
                 equipment_list.append({
                     "id": feeder.get("feeder_id"),
                     "name": feeder.get("name"),
@@ -912,6 +987,9 @@ async def get_building_equipment(building_id: str) -> dict:
                     "status": status,
                     "health": health,
                     "location": feeder.get("location", ""),
+                    "building_id": site_code,
+                    "building_name": building.name,
+                    "site_id": building_id,
                     "details": {
                         "rated_current_a": feeder.get("rated_current_a"),
                         "current_a": feeder.get("current_a"),
@@ -941,6 +1019,9 @@ async def get_building_equipment(building_id: str) -> dict:
                         "status": status,
                         "health": health,
                         "location": controller.get("location", ""),
+                        "building_id": site_code,
+                        "building_name": building.name,
+                        "site_id": building_id,
                         "details": {
                             "ip_address": controller.get("ip_address"),
                             "channels": controller.get("channels"),
@@ -982,6 +1063,9 @@ async def get_building_equipment(building_id: str) -> dict:
                         "status": status,
                         "health": health,
                         "location": eq.get("location", ""),
+                        "building_id": site_code,
+                        "building_name": building.name,
+                        "site_id": building_id,
                         "details": {
                             "manufacturer": eq.get("manufacturer"),
                             "model": eq.get("model"),

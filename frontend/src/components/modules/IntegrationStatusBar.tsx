@@ -8,6 +8,7 @@
 import { Badge, Flex, Text } from '@tremor/react';
 import { useModules } from '../../contexts/ModuleContext';
 import { MODULE_COLORS } from '../../lib/moduleRegistry';
+import { useHealthThresholds } from '../../hooks/useHealthThresholds';
 
 interface IntegrationStatusBarProps {
   compact?: boolean;
@@ -15,6 +16,7 @@ interface IntegrationStatusBarProps {
 
 export function IntegrationStatusBar({ compact = false }: IntegrationStatusBarProps) {
   const { activeModules, integrationSummary } = useModules();
+  const { thresholds } = useHealthThresholds();
 
   if (activeModules.length === 0) {
     return null;
@@ -55,7 +57,7 @@ export function IntegrationStatusBar({ compact = false }: IntegrationStatusBarPr
                 color={MODULE_COLORS[m.module_type] || 'gray'}
               >
                 {m.module_type.toUpperCase()}
-                {m.health_score < 80 && (
+                {m.health_score < thresholds.healthy && (
                   <span className="ml-1 text-xs">({m.health_score.toFixed(0)}%)</span>
                 )}
               </Badge>

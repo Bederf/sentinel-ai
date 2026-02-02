@@ -9,6 +9,7 @@ from datetime import datetime
 import logging
 
 from app.services.bms_simulation_service import create_simulation_service
+from app.services.health_threshold_service import get_health_status
 from app.models.device import Device, DeviceValue
 
 logger = logging.getLogger(__name__)
@@ -153,6 +154,38 @@ async def set_simulation_speed(speed: float = Query(..., description="Simulation
     except Exception as e:
         logger.error(f"Error setting simulation speed: {e}")
         raise HTTPException(status_code=500, detail=f"Error setting simulation speed: {e}")
+
+
+@router.post("/stop")
+async def stop_simulation():
+    """Stop the BMS simulation completely"""
+    try:
+        await simulation_service.stop_simulation()
+        return {
+            "success": True,
+            "message": "Simulation stopped",
+            "is_running": simulation_service.is_running,
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Error stopping simulation: {e}")
+        raise HTTPException(status_code=500, detail=f"Error stopping simulation: {e}")
+
+
+@router.post("/start")
+async def start_simulation():
+    """Start the BMS simulation"""
+    try:
+        await simulation_service.start_simulation()
+        return {
+            "success": True,
+            "message": "Simulation started",
+            "is_running": simulation_service.is_running,
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Error starting simulation: {e}")
+        raise HTTPException(status_code=500, detail=f"Error starting simulation: {e}")
 
 @router.get("/stats")
 async def get_simulation_stats():
@@ -328,7 +361,7 @@ async def get_equipment_status(equipment_id: str):
         "type": eq.type,
         "status": eq.status,
         "health_score": eq.health_score,
-        "health_status": "healthy" if eq.health_score >= 70 else "warning" if eq.health_score >= 50 else "critical" if eq.health_score >= 20 else "failed",
+        "health_status": get_health_status(eq.health_score),
         "fault_codes": eq.fault_codes,
         "temperature": eq.temperature,
         "power_consumption": eq.power_consumption,
@@ -456,6 +489,416 @@ async def trigger_equipment_maintenance(equipment_id: str):
     if "error" in result:
         raise HTTPException(status_code=404, detail=result["error"])
     return result
+
+
+# =============================================================================
+# Demo Flow Endpoints
+# Trigger warnings and reset to healthy for demo presentations
+# =============================================================================
+
+from app.services.equipment_alert_service import get_equipment_alert_service
+from app.services.prediction_generator import get_prediction_generator
+from app.database.repositories.prediction_repository import PredictionRepository
+from app.database.repositories.alert_repository import AlertRepository
+from app.services.maintenance_recommender import get_maintenance_recommender
+from app.services.module_registry_service import ModuleRegistryService
+from app.models.module_registry import (
+    AIRecommendation, ModuleType, RecommendationType, RecommendationPriority
+)
+import random
+import uuid
+
+
+@router.post("/demo/trigger-warnings")
+async def trigger_demo_warnings(
+    site_code: str = Query("site-002", description="Site code to trigger warnings for"),
+    count: int = Query(3, description="Number of equipment to set to warning state", ge=1, le=10),
+):
+    """
+    Demo endpoint: Trigger warning states on random equipment.
+
+    1. Selects N random equipment from the building
+    2. Updates health_score to 65 and status to 'warning'
+    3. Creates alerts in Supabase for each
+    4. Sends Telegram notifications via Clawd
+    5. Generates predictions for at-risk equipment
+    6. Creates AI maintenance recommendations with suggested actions
+
+    Args:
+        site_code: Building code (default: site-002 for Sandton)
+        count: Number of equipment to affect (1-10)
+
+    Returns:
+        Summary of triggered warnings including AI recommendations
+    """
+    from app.database.supabase_client import get_supabase_client
+
+    client = get_supabase_client()
+    alert_service = get_equipment_alert_service()
+    prediction_generator = get_prediction_generator()
+
+    # Get building UUID from code
+    building_resp = client.table("buildings").select("id, name, code").eq("code", site_code).execute()
+    if not building_resp.data:
+        raise HTTPException(status_code=404, detail=f"Building {site_code} not found")
+
+    building = building_resp.data[0]
+    building_id = building["id"]
+    building_name = building["name"]
+
+    logger.info(f"Demo: Triggering {count} warnings for {building_name} ({site_code})")
+
+    # Get healthy equipment from building (health >= 70)
+    equipment_resp = client.table("equipment").select(
+        "id, code, name, type, health_score"
+    ).eq("building_id", building_id).gte("health_score", 70).execute()
+
+    if not equipment_resp.data:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No healthy equipment found in {building_name} to trigger warnings"
+        )
+
+    # Select random subset
+    available = equipment_resp.data
+    selected_count = min(count, len(available))
+    selected_equipment = random.sample(available, selected_count)
+
+    results = {
+        "building": building_name,
+        "site_code": site_code,
+        "equipment_affected": [],
+        "alerts_created": 0,
+        "telegram_notifications": 0,
+        "predictions_generated": 0,
+        "recommendations_generated": 0,
+        "errors": [],
+    }
+
+    # Initialize AI recommendation services
+    module_registry = ModuleRegistryService()
+    recommender = get_maintenance_recommender(client)
+
+    # Process each selected equipment
+    for eq in selected_equipment:
+        try:
+            old_health = eq.get("health_score", 92)
+
+            # Update health to warning state (65) and status to 'warning'
+            client.table("equipment").update({
+                "health_score": 65,
+                "status": "warning",
+                "updated_at": datetime.now().isoformat(),
+            }).eq("id", eq["id"]).execute()
+
+            # Create alert
+            alert_result = alert_service.create_alert_for_equipment(
+                equipment_id=eq["id"],
+                building_id=building_id,
+                severity="warning",
+                message=f"Health score dropped from {old_health}% to 65%. Maintenance recommended.",
+                alert_type="health_degradation",
+                notify_telegram=True,
+            )
+
+            results["equipment_affected"].append({
+                "name": eq["name"],
+                "code": eq.get("code", ""),
+                "type": eq.get("type", ""),
+                "old_health": old_health,
+                "new_health": 65,
+            })
+
+            if alert_result.get("alert"):
+                results["alerts_created"] += 1
+            if alert_result.get("telegram_sent"):
+                results["telegram_notifications"] += 1
+
+        except Exception as e:
+            error_msg = f"Error processing {eq.get('name', eq['id'])}: {str(e)}"
+            logger.error(error_msg)
+            results["errors"].append(error_msg)
+
+    # Generate predictions for at-risk equipment
+    try:
+        pred_result = await prediction_generator.generate_predictions_for_all_sites()
+        results["predictions_generated"] = pred_result.get("generated", 0)
+    except Exception as e:
+        logger.error(f"Prediction generation failed: {e}")
+        results["errors"].append(f"Prediction generation failed: {str(e)}")
+
+    # Generate AI recommendations for affected equipment
+    for eq_info in results["equipment_affected"]:
+        try:
+            # Find the equipment in our selected list
+            eq = next((e for e in selected_equipment if e["name"] == eq_info["name"]), None)
+            if not eq:
+                continue
+
+            # Generate maintenance recommendation using fallback (fast, no LLM)
+            recommendation = recommender._generate_fallback_recommendation(
+                equipment_id=eq.get("code", eq["id"]),
+                equipment_type=eq.get("type", "unknown"),
+                risk_level="high",  # Warning state = high risk
+                predicted_failure="health_degradation"
+            )
+
+            # Create AIRecommendation for module registry
+            ai_rec = AIRecommendation(
+                recommendation_id=str(uuid.uuid4()),
+                timestamp=datetime.now().isoformat(),
+                source_module=ModuleType.HVAC,  # Default to HVAC module
+                recommendation_type=RecommendationType.MAINTENANCE,
+                priority=RecommendationPriority.HIGH,
+                title=f"Maintenance Required: {eq['name']}",
+                description=f"Health score dropped to 65%. {'; '.join(recommendation.immediate_actions[:2])}",
+                confidence=0.85,
+                related_modules=[ModuleType.ENERGY] if "chiller" in eq.get("type", "").lower() else [],
+                telemetry_context={
+                    "equipment_id": eq.get("code", eq["id"]),
+                    "equipment_type": eq.get("type", "unknown"),
+                    "health_score": 65,
+                    "building_id": site_code,
+                },
+                suggested_action={
+                    "type": "schedule_maintenance",
+                    "priority": recommendation.priority,
+                    "immediate_actions": recommendation.immediate_actions,
+                    "scheduled_maintenance": recommendation.scheduled_maintenance,
+                    "spare_parts": recommendation.spare_parts,
+                    "estimated_downtime": recommendation.estimated_downtime,
+                },
+                auto_actionable=False,
+                acknowledged=False,
+                resolved=False,
+            )
+
+            # Add to module registry
+            module_registry.add_recommendation(site_code, ai_rec)
+            results["recommendations_generated"] += 1
+
+        except Exception as e:
+            logger.warning(f"Failed to generate recommendation for {eq_info['name']}: {e}")
+
+    logger.info(
+        f"Demo complete: {results['alerts_created']} alerts, "
+        f"{results['telegram_notifications']} Telegram notifications, "
+        f"{results['predictions_generated']} predictions, "
+        f"{results['recommendations_generated']} AI recommendations"
+    )
+
+    return {
+        "success": True,
+        "message": f"Triggered {len(results['equipment_affected'])} warning states for {building_name}",
+        "results": results,
+        "timestamp": datetime.now().isoformat(),
+    }
+
+
+@router.post("/demo/reset-to-healthy")
+async def reset_demo_to_healthy(
+    site_code: str = Query("site-002", description="Site code to reset to healthy state"),
+):
+    """
+    Demo endpoint: Reset all equipment to healthy state.
+
+    1. Updates all equipment health_score to 92 and status to 'normal'
+    2. Resolves all active alerts for the building
+    3. Resolves all active predictions for the building
+
+    Args:
+        site_code: Building code (default: site-002 for Sandton)
+
+    Returns:
+        Summary of reset operations
+    """
+    from app.database.supabase_client import get_supabase_client
+
+    client = get_supabase_client()
+    alert_service = get_equipment_alert_service()
+    prediction_repo = PredictionRepository()
+
+    # Get building UUID from code
+    building_resp = client.table("buildings").select("id, name, code").eq("code", site_code).execute()
+    if not building_resp.data:
+        raise HTTPException(status_code=404, detail=f"Building {site_code} not found")
+
+    building = building_resp.data[0]
+    building_id = building["id"]
+    building_name = building["name"]
+
+    logger.info(f"Demo: Resetting {building_name} ({site_code}) to healthy state")
+
+    results = {
+        "building": building_name,
+        "site_code": site_code,
+        "equipment_reset": 0,
+        "alerts_resolved": 0,
+        "predictions_resolved": 0,
+        "recommendations_resolved": 0,
+        "errors": [],
+    }
+
+    # Initialize module registry for recommendations
+    module_registry = ModuleRegistryService()
+
+    # Reset all equipment health to 92 and status to 'normal'
+    try:
+        equipment_resp = client.table("equipment").select("id").eq("building_id", building_id).execute()
+
+        if equipment_resp.data:
+            for eq in equipment_resp.data:
+                client.table("equipment").update({
+                    "health_score": 92,
+                    "status": "normal",
+                    "updated_at": datetime.now().isoformat(),
+                }).eq("id", eq["id"]).execute()
+                results["equipment_reset"] += 1
+
+    except Exception as e:
+        error_msg = f"Failed to reset equipment: {str(e)}"
+        logger.error(error_msg)
+        results["errors"].append(error_msg)
+
+    # Resolve all active alerts for building
+    try:
+        resolved_alerts = alert_service.resolve_alerts_for_building(building_id)
+        results["alerts_resolved"] = resolved_alerts
+    except Exception as e:
+        error_msg = f"Failed to resolve alerts: {str(e)}"
+        logger.error(error_msg)
+        results["errors"].append(error_msg)
+
+    # Resolve all active predictions for building
+    try:
+        active_predictions = prediction_repo.get_active_by_building(building_id)
+        for pred in active_predictions:
+            prediction_repo.resolve(pred.get("code", pred.get("id")))
+            results["predictions_resolved"] += 1
+    except Exception as e:
+        error_msg = f"Failed to resolve predictions: {str(e)}"
+        logger.error(error_msg)
+        results["errors"].append(error_msg)
+
+    # Resolve all AI recommendations for site
+    try:
+        active_recs = module_registry.get_recommendations(
+            site_id=site_code,
+            include_resolved=False,
+            limit=100
+        )
+        for rec in active_recs:
+            module_registry.resolve_recommendation(site_code, rec.recommendation_id)
+            results["recommendations_resolved"] += 1
+    except Exception as e:
+        error_msg = f"Failed to resolve recommendations: {str(e)}"
+        logger.error(error_msg)
+        results["errors"].append(error_msg)
+
+    logger.info(
+        f"Demo reset complete: {results['equipment_reset']} equipment, "
+        f"{results['alerts_resolved']} alerts, "
+        f"{results['predictions_resolved']} predictions, "
+        f"{results['recommendations_resolved']} AI recommendations"
+    )
+
+    return {
+        "success": True,
+        "message": f"Reset {building_name} to healthy state",
+        "results": results,
+        "timestamp": datetime.now().isoformat(),
+    }
+
+
+# =============================================================================
+# Background Scheduler Control
+# Pause/resume prediction generation and other background jobs
+# =============================================================================
+
+from app.services.background_scheduler import scheduler_service
+
+
+@router.get("/scheduler/status")
+async def get_scheduler_status():
+    """Get status of all background scheduler jobs."""
+    jobs = []
+    for job in scheduler_service.scheduler.get_jobs():
+        jobs.append({
+            "id": job.id,
+            "name": job.name,
+            "next_run": job.next_run_time.isoformat() if job.next_run_time else None,
+            "paused": job.next_run_time is None,
+        })
+
+    return {
+        "running": scheduler_service.scheduler.running,
+        "jobs": jobs,
+        "timestamp": datetime.now().isoformat(),
+    }
+
+
+@router.post("/scheduler/pause/{job_id}")
+async def pause_scheduler_job(job_id: str):
+    """Pause a specific scheduler job."""
+    job = scheduler_service.scheduler.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+
+    scheduler_service.scheduler.pause_job(job_id)
+    return {
+        "success": True,
+        "message": f"Paused job: {job.name}",
+        "job_id": job_id,
+        "timestamp": datetime.now().isoformat(),
+    }
+
+
+@router.post("/scheduler/resume/{job_id}")
+async def resume_scheduler_job(job_id: str):
+    """Resume a paused scheduler job."""
+    job = scheduler_service.scheduler.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+
+    scheduler_service.scheduler.resume_job(job_id)
+    return {
+        "success": True,
+        "message": f"Resumed job: {job.name}",
+        "job_id": job_id,
+        "timestamp": datetime.now().isoformat(),
+    }
+
+
+@router.post("/scheduler/pause-all")
+async def pause_all_scheduler_jobs():
+    """Pause all background scheduler jobs."""
+    paused = []
+    for job in scheduler_service.scheduler.get_jobs():
+        scheduler_service.scheduler.pause_job(job.id)
+        paused.append(job.id)
+
+    return {
+        "success": True,
+        "message": f"Paused {len(paused)} jobs",
+        "jobs_paused": paused,
+        "timestamp": datetime.now().isoformat(),
+    }
+
+
+@router.post("/scheduler/resume-all")
+async def resume_all_scheduler_jobs():
+    """Resume all background scheduler jobs."""
+    resumed = []
+    for job in scheduler_service.scheduler.get_jobs():
+        scheduler_service.scheduler.resume_job(job.id)
+        resumed.append(job.id)
+
+    return {
+        "success": True,
+        "message": f"Resumed {len(resumed)} jobs",
+        "jobs_resumed": resumed,
+        "timestamp": datetime.now().isoformat(),
+    }
 
 
 # Export the router

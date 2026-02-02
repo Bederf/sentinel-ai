@@ -40,6 +40,7 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentView, setCurrentView] = useState<View>("dashboard");
+  const [showCardLibrary, setShowCardLibrary] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showAlertsPanel, setShowAlertsPanel] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
@@ -113,7 +114,17 @@ function App() {
   const handleAlertsPanelOpen = () => {
     setShowAlertsPanel(true);
     setLastViewedAlertTime(new Date());
-    setUnreadAlertCount(0); // Reset count when opened
+    // Don't reset count immediately - let individual alert clicks handle it
+  };
+
+  // Handle when an individual alert is marked as read
+  const handleAlertRead = (_alertId: string) => {
+    setUnreadAlertCount((prev) => Math.max(0, prev - 1));
+  };
+
+  // Handle when all alerts are cleared
+  const handleClearAllAlerts = () => {
+    setUnreadAlertCount(0);
   };
 
   const formatDate = (date: Date) => {
@@ -180,7 +191,12 @@ function App() {
       style={{ background: "var(--color-sentinel-bg-canvas)" }}
     >
       {/* Sidebar Navigation */}
-      <Sidebar currentView={currentView} onViewChange={setCurrentView} version={health?.version || "1.0"} />
+      <Sidebar
+        currentView={currentView}
+        onViewChange={setCurrentView}
+        version={health?.version || "1.0"}
+        onCustomizeDashboard={() => setShowCardLibrary(true)}
+      />
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
@@ -303,7 +319,12 @@ function App() {
 
                 {/* Alert Feed Content */}
                 <div className="overflow-y-auto max-h-[500px]">
-                  <AlertFeed limit={20} refreshInterval={30000} />
+                  <AlertFeed
+                    limit={20}
+                    refreshInterval={30000}
+                    onAlertRead={handleAlertRead}
+                    onClearAll={handleClearAllAlerts}
+                  />
                 </div>
               </div>
             )}
@@ -437,7 +458,11 @@ function App() {
           style={{ background: "var(--color-sentinel-bg-canvas)" }}
         >
           {currentView === "dashboard" ? (
-            <Dashboard onViewChange={setCurrentView} />
+            <Dashboard
+              onViewChange={setCurrentView}
+              openCardLibrary={showCardLibrary}
+              onCardLibraryClose={() => setShowCardLibrary(false)}
+            />
           ) : currentView === "control" ? (
             <ControlDashboard onError={(error) => setError(error)} />
           ) : currentView === "control-audit" ? (

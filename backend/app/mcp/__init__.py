@@ -40,6 +40,11 @@ from app.mcp.simbiot_stdio import (
     main as simbiot_stdio_main
 )
 
+from app.mcp.openai_connector_server import (
+    OpenAIConnectorMCPServer,
+    get_openai_connector_server
+)
+
 __all__ = [
     # Equipment MCP
     "EquipmentMCPServer",
@@ -68,5 +73,8 @@ __all__ = [
     "SIMBIOT_MCP_TOOLS",
     # SIMBIOT stdio transport
     "MCPServerStdio",
-    "simbiot_stdio_main"
+    "simbiot_stdio_main",
+    # OpenAI ChatGPT Connector
+    "OpenAIConnectorMCPServer",
+    "get_openai_connector_server"
 ]

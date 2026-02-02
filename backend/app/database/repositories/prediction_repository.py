@@ -217,3 +217,50 @@ class PredictionRepository:
         ).execute()
 
         return len(response.data) > 0
+
+    def has_active_prediction_for_equipment(self, equipment_id: str) -> bool:
+        """Check if equipment already has an active or acknowledged prediction.
+
+        This prevents duplicate predictions for equipment that already has
+        an ongoing prediction being tracked.
+
+        Args:
+            equipment_id: Equipment UUID
+
+        Returns:
+            True if an active/acknowledged prediction exists, False otherwise
+        """
+        response = self.client.table('predictions').select("id").eq(
+            'equipment_id', equipment_id
+        ).in_('status', ['active', 'acknowledged']).execute()
+
+        return len(response.data) > 0
+
+    def get_active_equipment_ids(self) -> List[str]:
+        """Get list of equipment IDs that have active predictions.
+
+        Returns:
+            List of equipment UUIDs with active predictions
+        """
+        response = self.client.table('predictions').select("equipment_id").eq(
+            'status', 'active'
+        ).execute()
+
+        return [p['equipment_id'] for p in response.data]
+
+    def resolve_by_equipment(self, equipment_id: str) -> int:
+        """Resolve all active predictions for equipment.
+
+        Used when equipment health improves above threshold.
+
+        Args:
+            equipment_id: Equipment UUID
+
+        Returns:
+            Number of predictions resolved
+        """
+        response = self.client.table('predictions').update(
+            {'status': 'resolved'}
+        ).eq('equipment_id', equipment_id).eq('status', 'active').execute()
+
+        return len(response.data)

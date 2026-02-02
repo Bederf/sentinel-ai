@@ -12,6 +12,7 @@ import { useState, useEffect, useRef } from "react";
 import { Card, Title, Text, Badge, Flex, Grid } from "@tremor/react";
 import { Thermometer, Power, PowerOff, Activity, AlertTriangle, Clock } from "lucide-react";
 import { hvacApi, type Chiller } from "../../lib/hvacApi";
+import { useHealthThresholds } from "../../hooks/useHealthThresholds";
 
 interface ChillerControlPanelProps {
   siteId?: string;
@@ -26,6 +27,7 @@ export function ChillerControlPanel({ siteId, compact = false, onChillerChange }
   const [controllingChiller, setControllingChiller] = useState<string | null>(null);
   const mountedRef = useRef(true);
   const loadChillersRef = useRef<() => Promise<void>>();
+  const { thresholds } = useHealthThresholds();
 
   useEffect(() => {
     mountedRef.current = true;
@@ -69,8 +71,8 @@ export function ChillerControlPanel({ siteId, compact = false, onChillerChange }
   }
 
   function getHealthColor(score: number): "green" | "amber" | "red" {
-    if (score >= 80) return "green";
-    if (score >= 60) return "amber";
+    if (score >= thresholds.healthy) return "green";
+    if (score >= thresholds.warning) return "amber";
     return "red";
   }
 
@@ -248,7 +250,7 @@ export function ChillerControlPanel({ siteId, compact = false, onChillerChange }
               )}
 
               {/* Health Warning */}
-              {(chiller.calculated_health || chiller.health_score) < 70 && (
+              {(chiller.calculated_health || chiller.health_score) < thresholds.warning && (
                 <Flex
                   alignItems="center"
                   className="gap-2 mt-3 p-2 rounded"

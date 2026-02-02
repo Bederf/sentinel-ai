@@ -2,8 +2,12 @@
 
 import logging
 import re
+import sys
 import time
 from typing import AsyncGenerator, Dict, Any
+
+# Add clawd tools to path for rate limit tracker
+sys.path.insert(0, '/home/bederf/clawd/tools')
 
 from app.services.claude_service import claude_service
 from app.config.settings import settings
@@ -27,10 +31,18 @@ class HybridAIService:
             "fast": "llama3.2:1b",
             "balanced": "phi3:mini"
         }
-        # Rate limit tracking
-        self.claude_rate_limited = False
-        self.rate_limit_time = 0
-        self.cooldown_period = 60  # Wait 60 seconds after rate limit
+        # Import shared rate limit tracker
+        try:
+            from rate_limit_tracker import rate_limit_tracker
+            self.rate_tracker = rate_limit_tracker
+            logger.info("Using shared rate limit tracker")
+        except ImportError:
+            logger.warning("Shared rate limit tracker not available, using local tracking")
+            self.rate_tracker = None
+            # Fallback to local tracking
+            self.claude_rate_limited = False
+            self.rate_limit_time = 0
+            self.cooldown_period = 60
 
     def classify_task(self, message: str) -> Dict[str, Any]:
         """
@@ -139,24 +151,30 @@ class HybridAIService:
             "tier": 1
         }
 
-    def _should_use_claude(self) -> bool:
+    def _should_use_claude(self) -> tuple[bool, str]:
         """
         Check if Claude is available (not in cooldown from rate limit).
 
         Returns:
-            True if Claude can be used, False if in cooldown
+            (should_use: bool, reason: str)
         """
+        # Use shared tracker if available
+        if self.rate_tracker:
+            return self.rate_tracker.should_use_claude()
+
+        # Fallback to local tracking
         if not self.claude_rate_limited:
-            return True
+            return True, "Claude available"
 
         time_since_limit = time.time() - self.rate_limit_time
         if time_since_limit > self.cooldown_period:
             logger.info("Rate limit cooldown expired, attempting Claude again")
             self.claude_rate_limited = False
-            return True
+            return True, "Cooldown expired"
 
-        logger.info(f"Claude in cooldown for {self.cooldown_period - int(time_since_limit)}s more")
-        return False
+        remaining = int(self.cooldown_period - time_since_limit)
+        logger.info(f"Claude in cooldown for {remaining}s more")
+        return False, f"Claude in cooldown for {remaining}s"
 
     async def query_ollama(self, message: str, model: str = "llama3.2:1b", escalate_on_fail: bool = True) -> str:
         """
@@ -230,6 +248,10 @@ class HybridAIService:
             Response text chunks
         """
         try:
+            # Record the request before calling Claude
+            if self.rate_tracker:
+                self.rate_tracker.record_request()
+
             # Try Claude first
             async for chunk in claude_service.stream_response(
                 [{"role": "user", "content": message}],
@@ -240,8 +262,14 @@ class HybridAIService:
         except RateLimitError as e:
             # Handle rate limit - fallback to Ollama
             logger.warning(f"Claude rate limit hit: {e}")
-            self.claude_rate_limited = True
-            self.rate_limit_time = time.time()
+
+            # Record rate limit hit in shared tracker
+            if self.rate_tracker:
+                self.rate_tracker.record_rate_limit_hit()
+            else:
+                # Fallback to local tracking
+                self.claude_rate_limited = True
+                self.rate_limit_time = time.time()
 
             logger.info("Falling back to Ollama due to rate limit")
             routing = self.classify_task(message)
@@ -295,8 +323,19 @@ class HybridAIService:
 
         # Force Claude for tool calling (bypasses rate limit check for safety)
         if use_tools:
-            logger.info("Tool calling enabled, using Claude (bypassing rate limit check)")
+            can_use_claude, reason = self._should_use_claude()
+
+            if not can_use_claude:
+                logger.warning(f"Tool calling requested but Claude unavailable: {reason}")
+                yield f"[Claude unavailable: {reason}] Tool-based actions are not available right now. Please try again in a moment."
+                return
+
+            logger.info("Tool calling enabled, using Claude")
             try:
+                # Record the request
+                if self.rate_tracker:
+                    self.rate_tracker.record_request()
+
                 async for chunk in claude_service.stream_response_with_tools(
                     [{"role": "user", "content": message}]
                 ):
@@ -304,17 +343,29 @@ class HybridAIService:
                 return
             except RateLimitError as e:
                 logger.warning(f"Claude rate limit hit during tool calling: {e}")
-                self.claude_rate_limited = True
-                self.rate_limit_time = time.time()
+
+                # Record rate limit hit
+                if self.rate_tracker:
+                    self.rate_tracker.record_rate_limit_hit()
+                else:
+                    self.claude_rate_limited = True
+                    self.rate_limit_time = time.time()
+
                 yield "[Claude rate limited] Cannot perform tool-based actions right now. Please try a simpler query."
                 return
 
         # Check if Claude is in cooldown period
-        if routing["provider"] == "anthropic" and not self._should_use_claude():
-            logger.info("Claude is rate limited, forcing Ollama fallback")
-            routing["provider"] = "ollama"
-            routing["model"] = self.ollama_models["balanced"]
-            routing["reason"] += " (Claude rate limited in cooldown)"
+        if routing["provider"] == "anthropic":
+            can_use_claude, reason = self._should_use_claude()
+            if not can_use_claude:
+                logger.info(f"Claude unavailable: {reason}, forcing Ollama fallback")
+                routing["provider"] = "ollama"
+                routing["model"] = self.ollama_models["balanced"]
+                routing["reason"] += f" ({reason})"
+
+                # Record that we checked/used the rate limiter
+                if self.rate_tracker:
+                    self.rate_tracker.record_request()
 
         # Route to appropriate provider
         if routing["provider"] == "ollama":

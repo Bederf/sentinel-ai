@@ -11,7 +11,7 @@
  */
 
 import { useState, useEffect, useCallback } from "react";
-import { Bell, Clock, RefreshCw, CheckCircle } from "lucide-react";
+import { Bell, Clock, RefreshCw, CheckCircle, CheckCheck } from "lucide-react";
 import api from "../lib/api";
 import type { Alert } from "../lib/api";
 
@@ -24,6 +24,10 @@ interface AlertFeedProps {
   initialAlerts?: Alert[];
   /** Callback when alerts are refreshed */
   onRefresh?: (alerts: Alert[]) => void;
+  /** Callback when an alert is marked as read */
+  onAlertRead?: (alertId: string) => void;
+  /** Callback when all alerts are cleared/marked as read */
+  onClearAll?: () => void;
 }
 
 /**
@@ -96,11 +100,15 @@ export function AlertFeed({
   refreshInterval = 30000,
   initialAlerts,
   onRefresh,
+  onAlertRead,
+  onClearAll,
 }: AlertFeedProps) {
   const [alerts, setAlerts] = useState<Alert[]>(initialAlerts || []);
   const [loading, setLoading] = useState(!initialAlerts);
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  // Track locally read alerts for immediate UI feedback
+  const [locallyReadAlerts, setLocallyReadAlerts] = useState<Set<string>>(new Set());
 
   // Fetch alerts from API
   const fetchAlerts = useCallback(async () => {
@@ -146,6 +154,68 @@ export function AlertFeed({
     setLoading(true);
     fetchAlerts();
   };
+
+  // Handle alert click - mark as read
+  const handleAlertClick = async (alertId: string) => {
+    // If already read (acknowledged or locally marked), do nothing
+    const alert = alerts.find(a => a.id === alertId);
+    if (alert?.acknowledged || locallyReadAlerts.has(alertId)) {
+      return;
+    }
+
+    // Mark as locally read immediately for UI feedback
+    setLocallyReadAlerts(prev => new Set(prev).add(alertId));
+
+    // Notify parent
+    if (onAlertRead) {
+      onAlertRead(alertId);
+    }
+
+    // Call API to acknowledge (fire and forget, UI already updated)
+    try {
+      await api.acknowledgeAlert(alertId);
+    } catch (err) {
+      console.error("Failed to acknowledge alert:", err);
+      // Don't revert UI - local read state is still valid
+    }
+  };
+
+  // Check if an alert is read (either acknowledged or locally marked)
+  const isAlertRead = (alert: Alert): boolean => {
+    return alert.acknowledged || locallyReadAlerts.has(alert.id);
+  };
+
+  // Handle clear all - mark all alerts as read
+  const handleClearAll = async () => {
+    // Get all unread alert IDs
+    const unreadAlerts = alerts.filter(a => !isAlertRead(a));
+
+    if (unreadAlerts.length === 0) return;
+
+    // Mark all as locally read immediately
+    setLocallyReadAlerts(prev => {
+      const newSet = new Set(prev);
+      unreadAlerts.forEach(a => newSet.add(a.id));
+      return newSet;
+    });
+
+    // Notify parent
+    if (onClearAll) {
+      onClearAll();
+    }
+
+    // Call API for each alert (fire and forget)
+    for (const alert of unreadAlerts) {
+      try {
+        await api.acknowledgeAlert(alert.id);
+      } catch (err) {
+        console.error(`Failed to acknowledge alert ${alert.id}:`, err);
+      }
+    }
+  };
+
+  // Count unread alerts
+  const unreadCount = alerts.filter(a => !isAlertRead(a)).length;
 
   // Count by severity
   const criticalCount = alerts.filter((a) => a.severity === "critical").length;
@@ -236,17 +306,33 @@ export function AlertFeed({
             </div>
           </div>
         </div>
-        <button
-          onClick={handleManualRefresh}
-          className="p-2 rounded transition-colors hover:brightness-125"
-          style={{ background: "var(--color-grafana-bg-secondary)" }}
-          title="Refresh alerts"
-        >
-          <RefreshCw
-            className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
-            style={{ color: "var(--color-grafana-text-secondary)" }}
-          />
-        </button>
+        <div className="flex items-center gap-2">
+          {unreadCount > 0 && (
+            <button
+              onClick={handleClearAll}
+              className="px-2 py-1 rounded text-xs font-medium transition-colors hover:brightness-125 flex items-center gap-1"
+              style={{
+                background: "var(--color-grafana-bg-secondary)",
+                color: "var(--color-grafana-text-secondary)",
+              }}
+              title="Mark all as read"
+            >
+              <CheckCheck className="h-3.5 w-3.5" />
+              <span>Clear</span>
+            </button>
+          )}
+          <button
+            onClick={handleManualRefresh}
+            className="p-2 rounded transition-colors hover:brightness-125"
+            style={{ background: "var(--color-grafana-bg-secondary)" }}
+            title="Refresh alerts"
+          >
+            <RefreshCw
+              className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
+              style={{ color: "var(--color-grafana-text-secondary)" }}
+            />
+          </button>
+        </div>
       </div>
 
       {/* Error State */}
@@ -279,34 +365,58 @@ export function AlertFeed({
           <div className="space-y-1">
             {alerts.map((alert) => {
               const config = getSeverityConfig(alert.severity);
+              const isRead = isAlertRead(alert);
 
               return (
                 <div
                   key={alert.id}
-                  className="rounded overflow-hidden transition-all hover:brightness-110"
+                  onClick={() => handleAlertClick(alert.id)}
+                  className="rounded overflow-hidden transition-all hover:brightness-110 cursor-pointer"
                   style={{
                     background: config.bg,
                     borderLeft: `3px solid ${config.color}`,
+                    opacity: isRead ? 0.6 : 1,
                   }}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleAlertClick(alert.id);
+                    }
+                  }}
+                  aria-label={`${isRead ? 'Read' : 'Unread'} alert: ${alert.message}`}
                 >
                   <div className="p-3">
                     {/* Header: Message and Severity */}
                     <div className="flex items-start justify-between gap-2 mb-2">
                       <span
-                        className="font-medium text-sm line-clamp-2"
-                        style={{ color: "var(--color-grafana-text-primary)" }}
+                        className="text-sm line-clamp-2"
+                        style={{
+                          color: "var(--color-grafana-text-primary)",
+                          fontWeight: isRead ? 400 : 500,
+                        }}
                       >
                         {alert.message}
                       </span>
-                      <span
-                        className="flex-shrink-0 text-xs font-medium px-1.5 py-0.5 rounded"
-                        style={{
-                          color: config.color,
-                          background: "rgba(0, 0, 0, 0.2)",
-                        }}
-                      >
-                        {config.label}
-                      </span>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        {!isRead && (
+                          <span
+                            className="w-2 h-2 rounded-full"
+                            style={{ background: "var(--color-sentinel-blue)" }}
+                            title="Unread"
+                          />
+                        )}
+                        <span
+                          className="text-xs font-medium px-1.5 py-0.5 rounded"
+                          style={{
+                            color: config.color,
+                            background: "rgba(0, 0, 0, 0.2)",
+                          }}
+                        >
+                          {config.label}
+                        </span>
+                      </div>
                     </div>
 
                     {/* Context: Site and Equipment */}

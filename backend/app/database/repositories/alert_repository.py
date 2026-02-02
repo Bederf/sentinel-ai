@@ -171,3 +171,54 @@ class AlertRepository:
         response = self.client.table('alerts').delete().eq('id', alert_id).execute()
 
         return len(response.data) > 0
+
+    def resolve_by_equipment(self, equipment_id: str) -> int:
+        """Resolve all active alerts for a specific equipment.
+
+        Called when a service record is completed to mark all related
+        alerts as resolved.
+
+        Args:
+            equipment_id: Equipment UUID
+
+        Returns:
+            Number of alerts resolved
+        """
+        # Get all active alerts for this equipment
+        active_alerts = self.get_active_by_equipment(equipment_id)
+
+        if not active_alerts:
+            return 0
+
+        # Resolve each alert
+        resolved_count = 0
+        for alert in active_alerts:
+            result = self.resolve(alert['id'])
+            if result:
+                resolved_count += 1
+
+        return resolved_count
+
+    def resolve_by_building(self, building_id: str) -> int:
+        """Resolve all active alerts for a specific building.
+
+        Args:
+            building_id: Building UUID
+
+        Returns:
+            Number of alerts resolved
+        """
+        # Get all active alerts for this building
+        active_alerts = self.get_active_by_building(building_id)
+
+        if not active_alerts:
+            return 0
+
+        # Resolve each alert
+        resolved_count = 0
+        for alert in active_alerts:
+            result = self.resolve(alert['id'])
+            if result:
+                resolved_count += 1
+
+        return resolved_count

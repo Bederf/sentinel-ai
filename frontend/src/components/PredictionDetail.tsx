@@ -41,13 +41,23 @@ interface PredictionDetailProps {
     timeframe_days: number;
     severity: "critical" | "high" | "medium" | "low";
     evidence: {
-      repeat_work_orders: number;
-      repeat_period_months: number;
-      alarm_frequency: Record<string, number>;
-      asset_age_years: number;
-      expected_life_years: number;
-      technician_notes: string[];
-      latest_reading: {
+      repeat_work_orders?: number;
+      repeat_period_months?: number;
+      alarm_frequency?: Record<string, number>;
+      asset_age_years?: number;
+      expected_life_years?: number;
+      technician_notes?: string[];
+      health_score?: number;
+      health_trend?: string;
+      // Support both latest_reading (legacy) and last_reading (auto-generated)
+      latest_reading?: {
+        parameter: string;
+        value: number;
+        baseline: number;
+        threshold: number;
+        trend: string;
+      };
+      last_reading?: {
         parameter: string;
         value: number;
         baseline: number;
@@ -167,12 +177,13 @@ export function PredictionDetail({ prediction, isOpen, onClose }: PredictionDeta
       maximumFractionDigits: 0,
     }).format(amount);
 
+  // Get reading data (support both latest_reading and last_reading)
+  const reading = prediction.evidence?.latest_reading || prediction.evidence?.last_reading;
+
   // Calculate trend percentage
-  const trendPercent = Math.round(
-    ((prediction.evidence.latest_reading.value - prediction.evidence.latest_reading.baseline) /
-      prediction.evidence.latest_reading.baseline) *
-      100
-  );
+  const trendPercent = reading?.baseline
+    ? Math.round(((reading.value - reading.baseline) / reading.baseline) * 100)
+    : 0;
 
   return (
     <Dialog open={isOpen} onClose={onClose} className="z-50">
@@ -251,8 +262,8 @@ export function PredictionDetail({ prediction, isOpen, onClose }: PredictionDeta
               color="var(--color-grafana-orange)"
             />
             <MetricCard
-              value={`${prediction.evidence.asset_age_years} yrs`}
-              label="Asset Age"
+              value={prediction.evidence?.asset_age_years ? `${prediction.evidence.asset_age_years} yrs` : (prediction.evidence?.health_score ? `${prediction.evidence.health_score}%` : "N/A")}
+              label={prediction.evidence?.asset_age_years ? "Asset Age" : "Health Score"}
               color="var(--color-grafana-cyan)"
             />
           </div>
@@ -302,34 +313,50 @@ export function PredictionDetail({ prediction, isOpen, onClose }: PredictionDeta
               </div>
             </div>
 
-            <div className="flex gap-3 mt-4">
-              <span
-                className="text-xs px-2 py-1 rounded flex items-center gap-1"
-                style={{
-                  background: "rgba(255, 152, 48, 0.15)",
-                  color: "var(--color-status-warning)",
-                }}
-              >
-                <Wrench className="h-3 w-3" />
-                {prediction.evidence.repeat_work_orders} work orders in {prediction.evidence.repeat_period_months} months
-              </span>
-              <span
-                className="text-xs px-2 py-1 rounded flex items-center gap-1"
-                style={{
-                  background: "rgba(50, 116, 217, 0.15)",
-                  color: "var(--color-grafana-blue)",
-                }}
-              >
-                <Clock className="h-3 w-3" />
-                Expected life: {prediction.evidence.expected_life_years} years
-              </span>
+            <div className="flex gap-3 mt-4 flex-wrap">
+              {prediction.evidence?.repeat_work_orders !== undefined && (
+                <span
+                  className="text-xs px-2 py-1 rounded flex items-center gap-1"
+                  style={{
+                    background: "rgba(255, 152, 48, 0.15)",
+                    color: "var(--color-status-warning)",
+                  }}
+                >
+                  <Wrench className="h-3 w-3" />
+                  {prediction.evidence.repeat_work_orders} work orders in {prediction.evidence.repeat_period_months || 12} months
+                </span>
+              )}
+              {prediction.evidence?.health_trend && (
+                <span
+                  className="text-xs px-2 py-1 rounded flex items-center gap-1"
+                  style={{
+                    background: prediction.evidence.health_trend === "declining" ? "rgba(220, 38, 38, 0.15)" : "rgba(50, 116, 217, 0.15)",
+                    color: prediction.evidence.health_trend === "declining" ? "var(--color-grafana-red)" : "var(--color-grafana-blue)",
+                  }}
+                >
+                  <TrendingUp className="h-3 w-3" />
+                  Health trend: {prediction.evidence.health_trend}
+                </span>
+              )}
+              {prediction.evidence?.expected_life_years !== undefined && (
+                <span
+                  className="text-xs px-2 py-1 rounded flex items-center gap-1"
+                  style={{
+                    background: "rgba(50, 116, 217, 0.15)",
+                    color: "var(--color-grafana-blue)",
+                  }}
+                >
+                  <Clock className="h-3 w-3" />
+                  Expected life: {prediction.evidence.expected_life_years} years
+                </span>
+              )}
             </div>
           </div>
 
           {/* Contributing Factors */}
           <SectionCard title="Contributing Factors">
             <div className="space-y-4">
-              {prediction.contributing_factors.map((factor, index) => (
+              {(prediction.contributing_factors || []).map((factor, index) => (
                 <div key={index}>
                   <div className="flex justify-between mb-1">
                     <span
@@ -498,109 +525,125 @@ export function PredictionDetail({ prediction, isOpen, onClose }: PredictionDeta
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Latest Reading */}
             <SectionCard title="Latest Reading">
-              <div className="flex justify-between items-start mb-3">
-                <span style={{ color: "var(--color-grafana-text-secondary)" }}>
-                  {prediction.evidence.latest_reading.parameter.replace(/_/g, " ")}
-                </span>
-                <span
-                  className="text-xs px-2 py-0.5 rounded flex items-center gap-1"
-                  style={{
-                    background:
-                      prediction.evidence.latest_reading.trend === "increasing"
-                        ? "rgba(242, 73, 92, 0.15)"
-                        : "rgba(50, 116, 217, 0.15)",
-                    color:
-                      prediction.evidence.latest_reading.trend === "increasing"
-                        ? "var(--color-status-error)"
-                        : "var(--color-grafana-blue)",
-                  }}
-                >
-                  {prediction.evidence.latest_reading.trend === "increasing" ? (
-                    <TrendingUp className="h-3 w-3" />
-                  ) : (
-                    <Activity className="h-3 w-3" />
-                  )}
-                  {prediction.evidence.latest_reading.trend}
-                </span>
-              </div>
-              <div
-                className="text-3xl font-bold mb-2"
-                style={{ color: "var(--color-grafana-text-primary)" }}
-              >
-                {prediction.evidence.latest_reading.value}
-                <span
-                  className="text-sm ml-2"
-                  style={{ color: "var(--color-grafana-text-disabled)" }}
-                >
-                  (baseline: {prediction.evidence.latest_reading.baseline})
-                </span>
-              </div>
-              <div className="flex gap-4">
-                <div>
-                  <span
-                    className="text-xs"
-                    style={{ color: "var(--color-grafana-text-disabled)" }}
-                  >
-                    Change
-                  </span>
-                  <div
-                    className="text-sm font-semibold"
-                    style={{
-                      color: trendPercent > 0 ? "var(--color-status-error)" : "var(--color-status-success)",
-                    }}
-                  >
-                    {trendPercent > 0 ? "+" : ""}
-                    {trendPercent}%
+              {reading ? (
+                <>
+                  <div className="flex justify-between items-start mb-3">
+                    <span style={{ color: "var(--color-grafana-text-secondary)" }}>
+                      {reading.parameter.replace(/_/g, " ")}
+                    </span>
+                    <span
+                      className="text-xs px-2 py-0.5 rounded flex items-center gap-1"
+                      style={{
+                        background:
+                          reading.trend === "increasing" || reading.trend === "declining"
+                            ? "rgba(242, 73, 92, 0.15)"
+                            : "rgba(50, 116, 217, 0.15)",
+                        color:
+                          reading.trend === "increasing" || reading.trend === "declining"
+                            ? "var(--color-status-error)"
+                            : "var(--color-grafana-blue)",
+                      }}
+                    >
+                      {reading.trend === "increasing" || reading.trend === "declining" ? (
+                        <TrendingUp className="h-3 w-3" />
+                      ) : (
+                        <Activity className="h-3 w-3" />
+                      )}
+                      {reading.trend}
+                    </span>
                   </div>
-                </div>
-                <div>
-                  <span
-                    className="text-xs"
-                    style={{ color: "var(--color-grafana-text-disabled)" }}
-                  >
-                    Threshold
-                  </span>
                   <div
-                    className="text-sm font-semibold"
+                    className="text-3xl font-bold mb-2"
                     style={{ color: "var(--color-grafana-text-primary)" }}
                   >
-                    {prediction.evidence.latest_reading.threshold}
+                    {reading.value}
+                    <span
+                      className="text-sm ml-2"
+                      style={{ color: "var(--color-grafana-text-disabled)" }}
+                    >
+                      (baseline: {reading.baseline})
+                    </span>
                   </div>
+                  <div className="flex gap-4">
+                    <div>
+                      <span
+                        className="text-xs"
+                        style={{ color: "var(--color-grafana-text-disabled)" }}
+                      >
+                        Change
+                      </span>
+                      <div
+                        className="text-sm font-semibold"
+                        style={{
+                          color: trendPercent > 0 ? "var(--color-status-error)" : "var(--color-status-success)",
+                        }}
+                      >
+                        {trendPercent > 0 ? "+" : ""}
+                        {trendPercent}%
+                      </div>
+                    </div>
+                    <div>
+                      <span
+                        className="text-xs"
+                        style={{ color: "var(--color-grafana-text-disabled)" }}
+                      >
+                        Threshold
+                      </span>
+                      <div
+                        className="text-sm font-semibold"
+                        style={{ color: "var(--color-grafana-text-primary)" }}
+                      >
+                        {reading.threshold}
+                      </div>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div style={{ color: "var(--color-grafana-text-disabled)" }}>
+                  No reading data available
                 </div>
-              </div>
+              )}
             </SectionCard>
 
             {/* Alarm Frequency */}
             <SectionCard title="Alarm Frequency (30 days)">
               <div className="space-y-2">
-                {Object.entries(prediction.evidence.alarm_frequency).map(([alarm, count]) => (
-                  <div key={alarm} className="flex justify-between items-center">
-                    <span
-                      className="text-sm"
-                      style={{ color: "var(--color-grafana-text-secondary)" }}
-                    >
-                      {alarm.replace(/_/g, " ")}
-                    </span>
-                    <span
-                      className="text-xs font-medium px-2 py-0.5 rounded"
-                      style={{
-                        background: "rgba(242, 73, 92, 0.15)",
-                        color: "var(--color-status-error)",
-                      }}
-                    >
-                      {count}
-                    </span>
+                {prediction.evidence?.alarm_frequency ? (
+                  Object.entries(prediction.evidence.alarm_frequency).map(([alarm, count]) => (
+                    <div key={alarm} className="flex justify-between items-center">
+                      <span
+                        className="text-sm"
+                        style={{ color: "var(--color-grafana-text-secondary)" }}
+                      >
+                        {alarm.replace(/_/g, " ")}
+                      </span>
+                      <span
+                        className="text-xs font-medium px-2 py-0.5 rounded"
+                        style={{
+                          background: "rgba(242, 73, 92, 0.15)",
+                          color: "var(--color-status-error)",
+                        }}
+                      >
+                        {count}
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <div style={{ color: "var(--color-grafana-text-disabled)" }}>
+                    No alarm data available
                   </div>
-                ))}
+                )}
               </div>
             </SectionCard>
           </div>
 
           {/* Technician Notes with AI Highlighting */}
-          <HighlightedNotes notes={prediction.evidence.technician_notes} />
+          {prediction.evidence?.technician_notes && prediction.evidence.technician_notes.length > 0 && (
+            <HighlightedNotes notes={prediction.evidence.technician_notes} />
+          )}
 
           {/* Pattern Timeline - Cross-site pattern recognition */}
-          {prediction.similar_failures.length > 0 && (
+          {prediction.similar_failures && prediction.similar_failures.length > 0 && (
             <PatternTimeline
               currentSite={prediction.site_name}
               currentEquipment={prediction.equipment_name}
@@ -610,69 +653,71 @@ export function PredictionDetail({ prediction, isOpen, onClose }: PredictionDeta
           )}
 
           {/* Financial Impact */}
-          <SectionCard title="Financial Impact Analysis">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div>
-                <div
-                  className="text-xl font-bold"
-                  style={{ color: "var(--color-grafana-text-primary)" }}
-                >
-                  {formatZAR(prediction.financial_impact.repair_cost_zar)}
+          {prediction.financial_impact && (
+            <SectionCard title="Financial Impact Analysis">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <div
+                    className="text-xl font-bold"
+                    style={{ color: "var(--color-grafana-text-primary)" }}
+                  >
+                    {formatZAR(prediction.financial_impact.repair_cost_zar || 0)}
+                  </div>
+                  <span
+                    className="text-xs"
+                    style={{ color: "var(--color-grafana-text-secondary)" }}
+                  >
+                    Repair Cost
+                  </span>
                 </div>
-                <span
-                  className="text-xs"
-                  style={{ color: "var(--color-grafana-text-secondary)" }}
-                >
-                  Repair Cost
-                </span>
-              </div>
-              <div>
-                <div
-                  className="text-xl font-bold"
-                  style={{ color: "var(--color-status-error)" }}
-                >
-                  {formatZAR(prediction.financial_impact.potential_loss_zar)}
+                <div>
+                  <div
+                    className="text-xl font-bold"
+                    style={{ color: "var(--color-status-error)" }}
+                  >
+                    {formatZAR(prediction.financial_impact.potential_loss_zar || 0)}
+                  </div>
+                  <span
+                    className="text-xs"
+                    style={{ color: "var(--color-grafana-text-secondary)" }}
+                  >
+                    Potential Loss
+                  </span>
                 </div>
-                <span
-                  className="text-xs"
-                  style={{ color: "var(--color-grafana-text-secondary)" }}
-                >
-                  Potential Loss
-                </span>
-              </div>
-              <div>
-                <div
-                  className="text-xl font-bold"
-                  style={{ color: "var(--color-status-success)" }}
-                >
-                  {formatZAR(
-                    prediction.financial_impact.potential_loss_zar -
-                      prediction.financial_impact.repair_cost_zar
-                  )}
+                <div>
+                  <div
+                    className="text-xl font-bold"
+                    style={{ color: "var(--color-status-success)" }}
+                  >
+                    {formatZAR(
+                      (prediction.financial_impact.potential_loss_zar || 0) -
+                        (prediction.financial_impact.repair_cost_zar || 0)
+                    )}
+                  </div>
+                  <span
+                    className="text-xs"
+                    style={{ color: "var(--color-grafana-text-secondary)" }}
+                  >
+                    Potential Savings
+                  </span>
                 </div>
-                <span
-                  className="text-xs"
-                  style={{ color: "var(--color-grafana-text-secondary)" }}
-                >
-                  Potential Savings
-                </span>
-              </div>
-              <div>
-                <div
-                  className="text-xl font-bold"
-                  style={{ color: "var(--color-grafana-orange)" }}
-                >
-                  {prediction.financial_impact.estimated_repair_hours}h
+                <div>
+                  <div
+                    className="text-xl font-bold"
+                    style={{ color: "var(--color-grafana-orange)" }}
+                  >
+                    {prediction.financial_impact.estimated_repair_hours || 0}h
+                  </div>
+                  <span
+                    className="text-xs"
+                    style={{ color: "var(--color-grafana-text-secondary)" }}
+                  >
+                    Est. Downtime
+                  </span>
                 </div>
-                <span
-                  className="text-xs"
-                  style={{ color: "var(--color-grafana-text-secondary)" }}
-                >
-                  Est. Downtime
-                </span>
               </div>
-            </div>
-          </SectionCard>
+            </SectionCard>
+          )}
 
           {/* Recommended Action */}
           <div

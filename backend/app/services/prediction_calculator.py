@@ -5,6 +5,7 @@ from typing import Dict, List, Any, Optional
 from collections import defaultdict
 
 from app.services.csv_loader import WorkOrderData, AssetData, AlarmData
+from app.services.health_threshold_service import get_health_thresholds
 from pathlib import Path
 import json
 
@@ -125,12 +126,14 @@ class PredictionCalculator:
                         alarms_by_equipment[eq["id"]].append(alarm)
 
         # Analyze each equipment item (use health score as base)
+        thresholds = get_health_thresholds()
+
         for eq in equipment:
             health_score = eq.get("health_score", 100)
-            
-            # Skip equipment with good health (above 80)
-            # Only generate predictions for equipment with health < 80
-            if health_score >= 80:
+
+            # Skip equipment with good health (above configured healthy threshold)
+            # Only generate predictions for equipment with health below healthy threshold
+            if health_score >= thresholds["healthy"]:
                 continue
 
             # Get site info
@@ -192,29 +195,29 @@ class PredictionCalculator:
         
         We use inverse health score as base probability, then adjust based on work orders/alarms.
         """
+        thresholds = get_health_thresholds()
         health_score = equipment.get("health_score", 100)
-        
+
         # Base probability calculation - more aggressive for degraded equipment
-        # Health score thresholds:
-        # - 80-100%: Healthy (no prediction)
-        # - 50-79%: Degraded (should generate predictions with 50%+ probability)
-        # - <50%: Critical (60%+ probability)
-        
-        if health_score >= 80:
+        # Health score thresholds from configured settings:
+        # - healthy-100%: Healthy (no prediction)
+        # - warning to healthy-1%: Degraded (should generate predictions with 50%+ probability)
+        # - critical to warning-1%: Critical (60%+ probability)
+
+        if health_score >= thresholds["healthy"]:
             return None  # Healthy equipment
-        
+
         # For degraded equipment, use a more aggressive probability scale
-        # Health 79% -> 50% prob, Health 50% -> 75% prob
         # This ensures all degraded equipment generates actionable predictions
-        if health_score < 50:
+        if health_score < thresholds["critical"]:
             # Critical equipment: 60-75% base probability
             base_probability = 75 - (health_score * 0.3)  # Scale from 60-75%
-        elif health_score < 70:
-            # Severely degraded (50-69%): 55-65% base probability
-            base_probability = 65 - ((health_score - 50) * 0.5)  # Scale from 65-55%
+        elif health_score < thresholds["warning"]:
+            # Severely degraded: 55-65% base probability
+            base_probability = 65 - ((health_score - thresholds["critical"]) * 0.5)
         else:
-            # Moderately degraded (70-79%): 50-55% base probability
-            base_probability = 55 - ((health_score - 70) * 0.5)  # Scale from 55-50%
+            # Moderately degraded: 50-55% base probability
+            base_probability = 55 - ((health_score - thresholds["warning"]) * 0.5)
         
         # Ensure minimum 50% for any degraded equipment
         base_probability = max(50, base_probability)
@@ -306,11 +309,12 @@ class PredictionCalculator:
 
         # Calculate predicted failure date (based on probability and health score)
         # Lower health score = sooner failure
-        if health_score < 30:
+        # Uses configured thresholds for determining timeframe
+        if health_score < thresholds["critical"]:
             timeframe_days = 14  # 2 weeks
-        elif health_score < 50:
+        elif health_score < thresholds["warning"]:
             timeframe_days = 30  # 1 month
-        elif health_score < 70:
+        elif health_score < thresholds["healthy"]:
             timeframe_days = 60  # 2 months
         else:
             timeframe_days = 90  # 3 months
@@ -433,9 +437,9 @@ class PredictionCalculator:
                 "latest_reading": {
                     "parameter": "health_score",
                     "value": health_score,
-                    "baseline": 80,
-                    "threshold": 50,
-                    "trend": "decreasing" if health_score < 70 else "stable"
+                    "baseline": thresholds["healthy"],
+                    "threshold": thresholds["warning"],
+                    "trend": "decreasing" if health_score < thresholds["healthy"] else "stable"
                 }
             },
             "contributing_factors": contributing_factors,
@@ -566,17 +570,18 @@ class PredictionCalculator:
         When no actual work order notes exist, generates realistic observations
         based on health score, age, and equipment type.
         """
+        thresholds = get_health_thresholds()
         notes = []
         age_factor = age_years / expected_life if expected_life > 0 else 0
 
-        # Health-based observations
-        if health_score < 50:
+        # Health-based observations (using configured thresholds)
+        if health_score < thresholds["critical"]:
             notes.append(f"Equipment showing significant degradation. Health score at {health_score}% - recommend urgent attention.")
             notes.append("Multiple performance indicators below acceptable thresholds. Schedule comprehensive inspection.")
-        elif health_score < 65:
+        elif health_score < thresholds["warning"]:
             notes.append(f"Health score declined to {health_score}%. Preventive maintenance recommended within 30 days.")
             notes.append("Monitoring shows gradual performance decline. Review maintenance schedule.")
-        elif health_score < 80:
+        elif health_score < thresholds["healthy"]:
             notes.append(f"Health score at {health_score}%. Normal wear patterns observed - continue monitoring.")
 
         # Age-based observations
@@ -617,7 +622,7 @@ class PredictionCalculator:
 
         for key, obs in type_observations.items():
             if key in eq_type.lower():
-                if health_score < 70:
+                if health_score < thresholds["warning"]:
                     notes.extend(obs)
                 else:
                     notes.append(obs[0])

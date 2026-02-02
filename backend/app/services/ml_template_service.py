@@ -298,6 +298,14 @@ class MLTemplateService:
         setpoint = diagnostic_context.get("setpoint")
         zone_id = diagnostic_context.get("zone_id", "")
 
+        # Step 0: Photo BEFORE repair
+        if current_step == "photo_before":
+            return {
+                "prompt": f"Please take a photo of the issue BEFORE you start the repair.\n\nDetected issue: {fault_description}",
+                "type": "photo",
+                "options": None
+            }
+
         # Step 1: Confirm the detected fault
         if current_step == "fault_confirmation":
             return {
@@ -343,7 +351,15 @@ class MLTemplateService:
                 "options": None
             }
 
-        # Step 4: Parts replaced (suggest from parts_required)
+        # Step 4: Photo AFTER repair
+        if current_step == "photo_after":
+            return {
+                "prompt": "Repair complete! Please take a photo showing the completed repair.",
+                "type": "photo",
+                "options": None
+            }
+
+        # Step 5: Parts replaced (suggest from parts_required)
         if current_step == "parts_replaced":
             parts = diagnostic_context.get("parts_required", [])
             if parts:
@@ -394,19 +410,23 @@ class MLTemplateService:
         # If we have diagnostic context, use context-aware flow
         if diagnostic_context and diagnostic_context.get("fault_type"):
             return [
+                "photo_before",        # Photo of issue BEFORE repair
                 "fault_confirmation",  # Confirm detected fault
                 "root_cause",          # Select root cause from options
                 "repair_action",       # What was done
-                "parts_replaced",      # Photo of parts
+                "photo_after",         # Photo AFTER repair complete
+                "parts_replaced",      # Photo of replacement part label
                 "verification_reading" # Confirm repair worked
             ]
 
         # Otherwise use standard breakdown flow
         return [
+            "photo_before",        # Photo of issue BEFORE repair
             "fault_description",
             "root_cause",
             "diagnostic_steps",
             "repair_action",
+            "photo_after",         # Photo AFTER repair complete
             "parts_replaced"
         ]
 
@@ -505,17 +525,22 @@ class MLTemplateService:
             if field in extracted:
                 completed_steps.append(step)
 
-        # Parts always needs photo - text mention isn't enough
+        # Photo steps always need actual photos - they can't be completed via text
         remaining_steps = [s for s in flow if s not in completed_steps]
 
         # If parts were mentioned in text, still need photo but acknowledge the info
         if "parts_info" in extracted and "parts_replaced" in remaining_steps:
             extracted["parts_mentioned"] = extracted["parts_info"]
 
+        # Count how many photo steps are remaining
+        photo_steps = ["photo_before", "photo_after", "parts_replaced"]
+        remaining_photo_steps = [s for s in remaining_steps if s in photo_steps]
+
         return {
             "extracted": extracted,
             "completed_steps": completed_steps,
             "remaining_steps": remaining_steps,
-            "needs_photo": "parts_replaced" in remaining_steps,
-            "all_text_complete": len([s for s in remaining_steps if s != "parts_replaced"]) == 0
+            "needs_photo": len(remaining_photo_steps) > 0,
+            "remaining_photos": remaining_photo_steps,
+            "all_text_complete": len([s for s in remaining_steps if s not in photo_steps]) == 0
         }

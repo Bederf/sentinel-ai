@@ -20,7 +20,7 @@ DATA_DIR = Path(__file__).parent.parent / "data"
 
 
 def load_alerts() -> list[dict]:
-    """Load alerts from JSON file AND simulation."""
+    """Load alerts from JSON file, Supabase database, AND simulation."""
     alerts = []
 
     # Load static alerts from JSON
@@ -29,6 +29,57 @@ def load_alerts() -> list[dict]:
         with open(alerts_file) as f:
             static_alerts = json.load(f)
             alerts.extend(static_alerts)
+
+    # Load active alerts from Supabase database
+    try:
+        from app.database.repositories.alert_repository import AlertRepository
+        from app.database.supabase_client import get_supabase_client
+
+        alert_repo = AlertRepository()
+        db_alerts = alert_repo.get_all(status="active")
+
+        # Get equipment and building lookups for enrichment
+        client = get_supabase_client()
+        equipment_resp = client.table("equipment").select("id, name, code, building_id").execute()
+        buildings_resp = client.table("buildings").select("id, name, code").execute()
+
+        eq_lookup = {eq["id"]: eq for eq in (equipment_resp.data or [])}
+        building_lookup = {b["id"]: b for b in (buildings_resp.data or [])}
+
+        for da in db_alerts:
+            equipment = eq_lookup.get(da.get("equipment_id"), {})
+            building = building_lookup.get(da.get("building_id"), {})
+
+            # Convert database alert to standard format
+            alert = {
+                "id": da["id"],
+                "anomaly_id": None,
+                "equipment_id": da.get("equipment_id", ""),
+                "site_id": building.get("code", "site-002"),
+                "type": da.get("type", "health_degradation"),
+                "severity": da.get("severity", "warning"),
+                "status": da.get("status", "active"),
+                "title": da.get("title", "Equipment Alert"),
+                "message": da.get("message", ""),
+                "created_at": da.get("created_at", datetime.now().isoformat()),
+                "updated_at": da.get("updated_at", da.get("created_at", datetime.now().isoformat())),
+                "acknowledged": da.get("status") == "acknowledged",
+                "acknowledged_by": da.get("acknowledged_by"),
+                "acknowledged_at": da.get("acknowledged_at"),
+                "priority": 1 if da.get("severity") == "critical" else 2 if da.get("severity") == "warning" else 3,
+                "category": "hvac",
+                "estimated_cost_zar": 15000.0 if da.get("severity") == "critical" else 5000.0,
+                "potential_damage_zar": 150000.0 if da.get("severity") == "critical" else 50000.0,
+                "equipment_name": equipment.get("name", "Unknown"),
+                "site_name": building.get("name", "Unknown"),
+                "health_score": None,
+                "fault_codes": [],
+                "is_database": True
+            }
+            alerts.append(alert)
+    except Exception as e:
+        # If Supabase not available, continue without database alerts
+        pass
 
     # Load live alerts from simulation
     try:
@@ -39,7 +90,7 @@ def load_alerts() -> list[dict]:
                 "id": sa["id"],
                 "anomaly_id": None,
                 "equipment_id": sa["equipment_id"],
-                "site_id": sa.get("site_id", "site-001"),
+                "site_id": sa.get("site_id", "site-002"),
                 "type": sa["type"],
                 "severity": sa["severity"],
                 "status": sa["status"],
@@ -55,7 +106,7 @@ def load_alerts() -> list[dict]:
                 "estimated_cost_zar": 15000.0 if sa["severity"] == "critical" else 5000.0,
                 "potential_damage_zar": 150000.0 if sa["severity"] == "critical" else 50000.0,
                 "equipment_name": sa["equipment_name"],
-                "site_name": sa.get("site_name", "SENTINEL Demo Site"),
+                "site_name": sa.get("site_name", "Sandton City Office Tower"),
                 "health_score": sa.get("health_score"),
                 "fault_codes": sa.get("fault_codes", []),
                 "is_simulation": True
@@ -465,20 +516,33 @@ async def create_alert(request: CreateAlertRequest) -> CreateAlertResponse:
 @router.post("/alerts/{alert_id}/acknowledge")
 async def acknowledge_alert(alert_id: str, acknowledged_by: str = "operator"):
     """Acknowledge an alert."""
-    from app.database.supabase_client import get_supabase_client
 
-    client = get_supabase_client()
+    # Handle simulation alerts (SIM-ALERT-*)
+    if alert_id.startswith("SIM-ALERT-"):
+        success = simulation_service.acknowledge_alert(alert_id, acknowledged_by)
+        if success:
+            return {"status": "acknowledged", "alert_id": alert_id}
+        else:
+            raise HTTPException(status_code=404, detail=f"Simulation alert {alert_id} not found")
 
-    result = client.table("alerts").update({
-        "status": "acknowledged",
-        "acknowledged_at": datetime.now().isoformat(),
-        "acknowledged_by": acknowledged_by
-    }).eq("id", alert_id).execute()
+    # Handle database alerts
+    try:
+        from app.database.supabase_client import get_supabase_client
+        client = get_supabase_client()
 
-    if not result.data:
-        raise HTTPException(status_code=404, detail=f"Alert {alert_id} not found")
+        result = client.table("alerts").update({
+            "status": "acknowledged",
+            "acknowledged_at": datetime.now().isoformat(),
+            "acknowledged_by": acknowledged_by
+        }).eq("id", alert_id).execute()
 
-    return {"status": "acknowledged", "alert_id": alert_id}
+        if not result.data:
+            raise HTTPException(status_code=404, detail=f"Alert {alert_id} not found")
+
+        return {"status": "acknowledged", "alert_id": alert_id}
+    except Exception as e:
+        # If Supabase fails, the alert might be from static JSON (not acknowledgeable)
+        raise HTTPException(status_code=404, detail=f"Alert {alert_id} not found or cannot be acknowledged")
 
 
 class DispatchWorkOrderRequest(BaseModel):

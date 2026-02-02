@@ -12,6 +12,8 @@ from pathlib import Path
 from typing import Optional
 from dataclasses import dataclass, field
 
+from app.services.health_threshold_service import get_health_thresholds
+
 logger = logging.getLogger(__name__)
 
 DATA_DIR = Path(__file__).parent.parent / "data"
@@ -425,11 +427,12 @@ class ConceptDataLoader:
         return recommendations
 
     def get_assets_at_risk(self) -> list[dict]:
-        """Get all assets with health score below threshold."""
+        """Get all assets with health score below configured warning threshold."""
         at_risk = []
+        thresholds = get_health_thresholds()
         for asset in self.assets:
             health = self.calculate_health_score(asset.asset_code)
-            if health.get("health_score", 100) < 60:
+            if health.get("health_score", 100) < thresholds["warning"]:
                 at_risk.append(health)
 
         return sorted(at_risk, key=lambda x: x.get("health_score", 100))
@@ -443,11 +446,12 @@ class ConceptDataLoader:
 
         health_scores = []
         critical_assets = []
+        thresholds = get_health_thresholds()
 
         for asset in building_assets:
             health = self.calculate_health_score(asset.asset_code)
             health_scores.append(health.get("health_score", 0))
-            if health.get("health_score", 100) < 50:
+            if health.get("health_score", 100) < thresholds["critical"]:
                 critical_assets.append(health)
 
         return {

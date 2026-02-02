@@ -38,17 +38,22 @@ interface OptimizationRecommendationModalProps {
 
 /**
  * Format confidence score as percentage
+ * API returns 0-1, we display as 0-100%
  */
 function formatConfidence(confidence: number): string {
-  return `${Math.round(confidence)}%`;
+  // Handle both 0-1 and 0-100 scales
+  const pct = confidence <= 1 ? confidence * 100 : confidence;
+  return `${Math.round(pct)}%`;
 }
 
 /**
  * Get confidence color based on score
+ * Handles both 0-1 and 0-100 scales
  */
 function getConfidenceColor(confidence: number): string {
-  if (confidence >= 80) return "text-green-400";
-  if (confidence >= 60) return "text-yellow-400";
+  const pct = confidence <= 1 ? confidence * 100 : confidence;
+  if (pct >= 80) return "text-green-400";
+  if (pct >= 60) return "text-yellow-400";
   return "text-orange-400";
 }
 
@@ -139,7 +144,7 @@ export function OptimizationRecommendationModal({
       // Build setpoints array from recommendations
       const setpointsToApply = recommendation.recommendations.map((rec) => ({
         equipment_id: rec.equipment_id,
-        point: "setpoint", // Default point name - backend will map to actual point
+        point_name: rec.point_name || "setpoint",
         value: rec.recommended_value,
       }));
 

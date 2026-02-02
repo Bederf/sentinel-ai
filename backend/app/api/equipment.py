@@ -14,6 +14,7 @@ import httpx
 from app.database.repositories.equipment_repository import EquipmentRepository
 from app.database.repositories.sensor_repository import SensorRepository
 from app.services.csv_loader import AssetData, AlarmData as CSVAlarmData
+from app.services.health_threshold_service import get_health_thresholds
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -56,10 +57,15 @@ def _derive_health_score(condition: str, age_years: int, expected_life: int) -> 
 
 
 def _derive_status(condition: str, health_score: int) -> str:
-    """Derive status from condition and health score."""
-    if condition.lower() == "poor" or health_score < 40:
+    """Derive status from condition and health score using configured thresholds."""
+    thresholds = get_health_thresholds()
+
+    # Poor condition always critical, otherwise use health score
+    if condition.lower() == "poor":
         return "critical"
-    elif condition.lower() == "fair" or health_score < 70:
+    elif health_score < thresholds["critical"]:
+        return "critical"
+    elif condition.lower() == "fair" or health_score < thresholds["warning"]:
         return "warning"
     return "normal"
 

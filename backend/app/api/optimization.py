@@ -420,7 +420,7 @@ async def analyze_optimization(request: AnalyzeRequest) -> Dict[str, Any]:
                 site["error_message"] = "Recommendation failed safety validation"
 
             # Add to history
-            if "optimization_history" not in site:
+            if not site.get("optimization_history"):
                 site["optimization_history"] = []
 
             history_entry = OptimizationHistoryEntry(
@@ -629,7 +629,7 @@ async def approve_optimization(
                 site["last_recommendation"] = None
 
                 # Add to history
-                if "optimization_history" not in site:
+                if not site.get("optimization_history"):
                     site["optimization_history"] = []
 
                 history_entry = OptimizationHistoryEntry(
@@ -652,7 +652,7 @@ async def approve_optimization(
                 site["optimization_status"] = OptimizationStatus.ERROR.value
 
                 # Add to history
-                if "optimization_history" not in site:
+                if not site.get("optimization_history"):
                     site["optimization_history"] = []
 
                 history_entry = OptimizationHistoryEntry(

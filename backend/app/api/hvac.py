@@ -14,6 +14,8 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from app.services.health_threshold_service import get_health_status
+
 router = APIRouter(prefix="/hvac", tags=["hvac"])
 
 # Data paths
@@ -206,19 +208,6 @@ def calculate_equipment_health(equipment: dict) -> dict:
     }
 
 
-def get_health_status(score: float) -> str:
-    """Get health status string from score."""
-    settings = load_json(SETTINGS_PATH)
-    thresholds = settings.get("healthThresholds", {"healthy": 80, "warning": 60, "critical": 0})
-
-    if score >= thresholds.get("healthy", 80):
-        return "healthy"
-    elif score >= thresholds.get("warning", 60):
-        return "attention"
-    else:
-        return "critical"
-
-
 # ========== HVAC Overview ==========
 
 @router.get("/overview/{site_id}")
@@ -279,11 +268,14 @@ async def get_hvac_overview(site_id: str):
                 "zone_id": zone.get("zone_id"),
             })
 
+    # Get configured thresholds for alert generation
+    thresholds = get_health_thresholds()
+
     for eq in hvac_equipment:
-        if eq.get("health_score", 85) < 70:
+        if eq.get("health_score", 85) < thresholds["warning"]:
             alerts.append({
                 "type": "equipment_health",
-                "priority": "high" if eq.get("health_score", 85) < 60 else "medium",
+                "priority": "high" if eq.get("health_score", 85) < thresholds["critical"] else "medium",
                 "title": f"Low Health: {eq.get('name')}",
                 "description": f"Health score {eq.get('health_score')}% - service may be required",
                 "equipment_id": eq.get("id"),

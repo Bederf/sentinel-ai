@@ -183,6 +183,46 @@ class IntegrationRepository:
         }).eq('id', mapping_id).execute()
         return response.data[0]
 
+    def get_unmatched_points(
+        self,
+        building_id: Optional[str] = None,
+        limit: int = 10,
+        offset: int = 0,
+    ) -> Dict[str, Any]:
+        """
+        Get unmatched points for the monitoring dashboard.
+
+        Returns points with match_confidence = 'unmatched'.
+        """
+        try:
+            query = self.client.table('point_asset_mappings').select(
+                "id,bms_point_id,created_at",
+                count='exact'
+            ).eq('match_confidence', 'unmatched')
+
+            if building_id:
+                query = query.eq('building_id', building_id)
+
+            query = query.range(offset, offset + limit - 1).order('created_at', desc=True)
+            response = query.execute()
+
+            # Transform to expected format
+            points = []
+            for p in (response.data or []):
+                points.append({
+                    'point_id': p.get('id'),
+                    'point_name': p.get('bms_point_id'),
+                    'last_seen': p.get('created_at'),
+                    'occurrence_count': 1,  # Default since we don't track this yet
+                })
+
+            return {
+                'points': points,
+                'total': response.count or len(points),
+            }
+        except Exception:
+            return {'points': [], 'total': 0}
+
     # ==================== Ingested Data ====================
 
     def insert_alarms(self, alarms: List[Dict[str, Any]]) -> int:

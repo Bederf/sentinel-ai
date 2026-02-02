@@ -830,3 +830,89 @@ async def suspend_building(
         last_validated_at=datetime.utcnow(),
         notes=notes or "Manually suspended",
     )
+
+
+# ==================== Demo Seeding ====================
+
+@router.get("/unmatched-points")
+async def get_unmatched_points(
+    building_id: Optional[str] = Query(None, description="Filter by building ID"),
+    limit: int = Query(10, ge=1, le=100, description="Number of results"),
+    offset: int = Query(0, ge=0, description="Pagination offset"),
+):
+    """
+    Get unmatched points for monitoring dashboard.
+
+    Returns BMS points that haven't been mapped to CAFM assets yet.
+    """
+    result = integration_repo.get_unmatched_points(building_id, limit, offset)
+    return result
+
+
+@router.post("/demo/seed-integration-data")
+async def seed_integration_data():
+    """
+    Seed demo integration data for the monitoring dashboard.
+
+    Creates demo point_asset_mappings and column_mappings for testing.
+    This is for demo purposes only.
+    """
+    import uuid
+
+    # Get Sandton building UUID
+    building = building_repo.get_by_id("site-002")
+    if not building:
+        raise HTTPException(status_code=404, detail="Sandton building not found")
+
+    building_id = building['id']
+
+    # Get existing log source
+    sources = integration_repo.get_log_sources(building_id=building_id)
+    if not sources:
+        raise HTTPException(status_code=404, detail="No log sources found. Create one first.")
+
+    source_id = sources[0]['id']
+
+    # Seed point_asset_mappings
+    point_mappings = [
+        # Exact matches (verified)
+        {"bms_point_id": "BMS.HVAC.CHW.001.SupplyTemp", "extracted_asset_id": "CHW-001", "cafm_asset_id": "CAFM-CHW-001", "parameter_name": "Supply Temperature", "parameter_type": "analog", "match_confidence": "exact", "is_verified": True},
+        {"bms_point_id": "BMS.HVAC.CHW.001.ReturnTemp", "extracted_asset_id": "CHW-001", "cafm_asset_id": "CAFM-CHW-001", "parameter_name": "Return Temperature", "parameter_type": "analog", "match_confidence": "exact", "is_verified": True},
+        {"bms_point_id": "BMS.HVAC.AHU.L1.SupplyFan", "extracted_asset_id": "AHU-L1-001", "cafm_asset_id": "CAFM-AHU-001", "parameter_name": "Supply Fan Status", "parameter_type": "binary", "match_confidence": "exact", "is_verified": True},
+        {"bms_point_id": "BMS.HVAC.AHU.L1.ReturnTemp", "extracted_asset_id": "AHU-L1-001", "cafm_asset_id": "CAFM-AHU-001", "parameter_name": "Return Air Temp", "parameter_type": "analog", "match_confidence": "exact", "is_verified": True},
+        {"bms_point_id": "BMS.HVAC.Boiler.001.Status", "extracted_asset_id": "BLR-001", "cafm_asset_id": "CAFM-BLR-001", "parameter_name": "Run Status", "parameter_type": "binary", "match_confidence": "exact", "is_verified": True},
+        {"bms_point_id": "BMS.HVAC.CT.001.FanSpeed", "extracted_asset_id": "CT-001", "cafm_asset_id": "CAFM-CT-001", "parameter_name": "Fan Speed", "parameter_type": "analog", "match_confidence": "exact", "is_verified": True},
+        {"bms_point_id": "BMS.ELEC.Main.kWh", "extracted_asset_id": "MTR-MAIN", "cafm_asset_id": "CAFM-MTR-001", "parameter_name": "Energy Consumption", "parameter_type": "analog", "match_confidence": "exact", "is_verified": True},
+        # Fuzzy matches (not verified)
+        {"bms_point_id": "BMS.HVAC.CHW.001.CondenserPres", "extracted_asset_id": "CHW-001", "cafm_asset_id": "CAFM-CHW-001", "parameter_name": "Condenser Pressure", "parameter_type": "analog", "match_confidence": "fuzzy", "is_verified": False},
+        {"bms_point_id": "BMS.HVAC.AHU.L2.DamperPos", "extracted_asset_id": "AHU-L2-001", "cafm_asset_id": "CAFM-AHU-002", "parameter_name": "Damper Position", "parameter_type": "analog", "match_confidence": "fuzzy", "is_verified": False},
+        # Manual matches
+        {"bms_point_id": "BMS.HVAC.FCU.L3.ZoneTemp", "extracted_asset_id": "FCU-L3-001", "cafm_asset_id": None, "parameter_name": "Zone Temperature", "parameter_type": "analog", "match_confidence": "manual", "is_verified": True},
+        # Unmatched points
+        {"bms_point_id": "BMS.Legacy.Sensor42", "extracted_asset_id": None, "cafm_asset_id": None, "parameter_name": None, "parameter_type": None, "match_confidence": "unmatched", "is_verified": False},
+        {"bms_point_id": "BMS.Unknown.PointX", "extracted_asset_id": None, "cafm_asset_id": None, "parameter_name": None, "parameter_type": None, "match_confidence": "unmatched", "is_verified": False},
+    ]
+
+    mappings_created = integration_repo.bulk_upsert_point_mappings(building_id, point_mappings)
+
+    # Seed column_mappings for the log source
+    # Schema: source_column, sentinel_field, transform, transform_params (jsonb)
+    column_mappings = [
+        {"source_column": "TIMESTAMP", "sentinel_field": "occurred_at", "transform": "datetime", "transform_params": {"format": "YYYY-MM-DD HH:MI:SS"}},
+        {"source_column": "POINT_ID", "sentinel_field": "point_id", "transform": None, "transform_params": None},
+        {"source_column": "VALUE", "sentinel_field": "value", "transform": "number", "transform_params": None},
+        {"source_column": "ALARM_CODE", "sentinel_field": "alarm_code", "transform": None, "transform_params": None},
+        {"source_column": "DESCRIPTION", "sentinel_field": "description", "transform": None, "transform_params": None},
+        {"source_column": "SEVERITY", "sentinel_field": "severity", "transform": "uppercase", "transform_params": None},
+    ]
+
+    mappings_saved = integration_repo.save_column_mappings(source_id, column_mappings)
+
+    return {
+        "success": True,
+        "building_id": building_id,
+        "source_id": source_id,
+        "point_mappings_created": mappings_created,
+        "column_mappings_created": len(mappings_saved),
+        "message": "Demo integration data seeded successfully"
+    }

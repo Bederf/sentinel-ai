@@ -24,8 +24,7 @@ from app.models.baseline import (
     ComparisonResult,
     DeviationStatus
 )
-from app.services.influx_service import get_influx_service
-from app.services.aggregate_functions import AggregateFunctions
+from app.services.influxdb_service import get_influxdb_service
 from app.database.repositories.baseline_repository import BaselineRepository
 
 logger = logging.getLogger(__name__)
@@ -36,8 +35,7 @@ class BaselineService:
 
     def __init__(self):
         self.repository = BaselineRepository()
-        self.influx_service = get_influx_service()
-        self.aggregate_functions = AggregateFunctions()
+        self.influx_service = get_influxdb_service()
 
     async def capture_equipment_baseline(
         self,

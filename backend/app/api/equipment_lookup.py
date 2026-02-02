@@ -450,11 +450,11 @@ async def _natural_language_search(
     """
     query_lower = query.lower()
 
-    # Extract fault code patterns
+    # Extract fault code patterns - ordered from most specific to least specific
     fault_patterns = [
-        r'(?:fault|error|code|alarm)\s*[:#]?\s*([a-zA-Z0-9_-]+)',  # fault E4, error 29
-        r'([A-Z]+[_-]?\d+)',  # E4, FAULT_001, ALARM_1
-        r'(?:^|\s)([EFAUHLueh]\d+)(?:\s|$)',  # E4, F1, A1, H1, L1, U4
+        r'([A-Z]+[_-]?\d+)',  # FAULT_001, ALARM_1, E4 - catches codes with prefix
+        r'(?:^|\s)([EFAUHLueh]\d+)(?:\s|$)',  # E4, F1, A1, H1, L1, U4 - single letter codes
+        r'(?:fault|error|code|alarm)\s*[:#]?\s*([a-zA-Z0-9_-]+)',  # "fault E4", "error 29"
     ]
 
     fault_code = None

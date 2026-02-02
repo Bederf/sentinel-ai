@@ -2,6 +2,7 @@
 
 import json
 import logging
+import sys
 from typing import AsyncGenerator, Any
 
 from anthropic import Anthropic, APIError, AuthenticationError, RateLimitError
@@ -12,6 +13,23 @@ from app.services.chat_tools import CHAT_TOOLS, execute_tool
 from app.services.cross_system_analyzer import get_cross_system_analyzer
 
 logger = logging.getLogger(__name__)
+
+# Suppress anthropic library stderr spam
+class StderrFilter:
+    """Filter to suppress anthropic rate limit stderr spam"""
+    def __init__(self):
+        self.original_stderr = sys.stderr
+
+    def write(self, text):
+        # Suppress the HTTP 429 error messages from anthropic
+        if "rate_limit_error" not in text and "request_id:" not in text:
+            self.original_stderr.write(text)
+
+    def flush(self):
+        self.original_stderr.flush()
+
+# Apply the filter
+sys.stderr = StderrFilter()
 
 # Base FM-focused system prompt for building management intelligence
 FM_SYSTEM_PROMPT_BASE = """You are an AI assistant specializing in Facilities Management (FM) and Building Management Systems (BMS). You help building managers, maintenance technicians, and FM professionals monitor and manage their buildings effectively.

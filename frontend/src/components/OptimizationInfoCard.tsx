@@ -147,7 +147,7 @@ export function OptimizationInfoCard({
       // Note: recommendation uses device_id and point_name fields
       console.log("[OptimizationInfoCard] Current recommendation:", currentRecommendation);
       const setpointsToApply = currentRecommendation?.recommendations.map((rec) => ({
-        device_id: (rec as any).device_id,
+        device_id: (rec as any).device_id || (rec as any).equipment_id,
         point_name: (rec as any).point_name || "setpoint",
         value: rec.recommended_value,
       })) || [];

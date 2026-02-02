@@ -13,6 +13,9 @@ from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, asdict
 import logging
 
+from app.services.health_threshold_service import get_health_thresholds
+from app.services.clawd_integration.alert_notifier import alert_notifier
+
 logger = logging.getLogger(__name__)
 
 @dataclass
@@ -50,16 +53,11 @@ class BMSimulationService:
         self.alert_history: List[Dict[str, Any]] = []
         self._alert_id_counter = 1000
 
-        # Health thresholds for status changes
-        self.health_thresholds = {
-            "normal": 70,      # Above 70% = normal operation
-            "warning": 50,     # 50-70% = warning state
-            "critical": 20,    # 20-50% = critical, needs immediate attention
-            "down": 20         # Below 20% = equipment fails/goes down
-        }
-
         # Simulation configuration
         self.config = {
+            "site_id": "site-002",  # Only simulate equipment for Sandton
+            "site_name": "Sandton City Office Tower",
+            "use_supabase_equipment": True,  # Load real equipment from Supabase
             "enable_faults": True,
             "enable_sensor_drift": True,
             "enable_load_variation": True,
@@ -103,43 +101,123 @@ class BMSimulationService:
         self.is_running = False
 
     async def _initialize_equipment(self):
-        """Initialize simulated equipment"""
+        """Initialize simulated equipment from Supabase or fallback to generated"""
         self.equipment = {}
+        site_id = self.config.get("site_id", "site-002")
+        site_name = self.config.get("site_name", "Sandton City Office Tower")
+
+        # Try to load equipment from Supabase
+        if self.config.get("use_supabase_equipment", True):
+            try:
+                from app.database.supabase_client import get_supabase_client
+                client = get_supabase_client()
+
+                # Get building UUID for site-002
+                building_result = client.table('buildings').select('id').eq('code', site_id).execute()
+                if building_result.data:
+                    building_uuid = building_result.data[0]['id']
+
+                    # Get equipment for this building (HVAC types only for simulation)
+                    hvac_types = ['ahu', 'fcu', 'vav', 'chiller', 'cooling_tower', 'ups', 'generator']
+                    equipment_result = (
+                        client.table('equipment')
+                        .select('code, name, type, manufacturer, location, health_score, status')
+                        .eq('building_id', building_uuid)
+                        .in_('type', hvac_types)
+                        .limit(50)  # Limit to 50 equipment items for simulation
+                        .execute()
+                    )
+
+                    if equipment_result.data:
+                        for eq in equipment_result.data:
+                            equipment_state = self._create_from_supabase(eq, site_id, site_name)
+                            self.equipment[equipment_state.id] = equipment_state
+
+                        logger.info(f"Loaded {len(self.equipment)} equipment from Supabase for {site_id}")
+                        return
+
+            except Exception as e:
+                logger.warning(f"Failed to load Supabase equipment, using generated: {e}")
+
+        # Fallback: Generate equipment with site_id
+        logger.info(f"Generating simulated equipment for {site_id}")
 
         # Generate AHUs (Air Handling Units)
         for i in range(self.config["equipment_count"]["ahu"]):
-            ahu = self._create_ahu(i)
+            ahu = self._create_ahu(i, site_id, site_name)
             self.equipment[ahu.id] = ahu
 
         # Generate Chillers
         for i in range(self.config["equipment_count"]["chiller"]):
-            chiller = self._create_chiller(i)
+            chiller = self._create_chiller(i, site_id, site_name)
             self.equipment[chiller.id] = chiller
 
         # Generate FCUs (Fan Coil Units)
         for i in range(self.config["equipment_count"]["fcu"]):
-            fcu = self._create_fcu(i)
+            fcu = self._create_fcu(i, site_id, site_name)
             self.equipment[fcu.id] = fcu
 
         # Generate UPS
         for i in range(self.config["equipment_count"]["ups"]):
-            ups = self._create_ups(i)
+            ups = self._create_ups(i, site_id, site_name)
             self.equipment[ups.id] = ups
 
         # Generate sensors
         for sensor_type in ["temperature_sensor", "pressure_sensor", "flow_sensor"]:
             for i in range(self.config["equipment_count"][sensor_type]):
-                sensor = self._create_sensor(sensor_type, i)
+                sensor = self._create_sensor(sensor_type, i, site_id, site_name)
                 self.equipment[sensor.id] = sensor
 
-    def _create_ahu(self, index: int) -> EquipmentState:
+    def _create_from_supabase(self, eq: dict, site_id: str, site_name: str) -> EquipmentState:
+        """Create EquipmentState from Supabase equipment record"""
+        eq_type = eq.get('type', 'unknown')
+        return EquipmentState(
+            id=eq.get('code', f"EQ-{random.randint(1000, 9999)}"),
+            name=eq.get('name', 'Unknown Equipment'),
+            type=eq_type,
+            manufacturer=eq.get('manufacturer', 'Generic'),
+            location=eq.get('location', site_name),
+            health_score=float(eq.get('health_score', 85) or 85),
+            status=eq.get('status', 'running'),
+            temperature=self._get_default_temp(eq_type),
+            pressure=self._get_default_pressure(eq_type),
+            power_consumption=self._get_default_power(eq_type),
+            runtime_hours=random.uniform(1000, 5000),
+            last_maintenance=datetime.now() - timedelta(days=random.randint(30, 90)),
+            fault_codes=[],
+            sensor_readings=self._get_default_readings(eq_type),
+            timestamp=datetime.now(),
+        )
+
+    def _get_default_temp(self, eq_type: str) -> float:
+        defaults = {"chiller": 7.0, "ahu": 22.0, "fcu": 21.0, "vav": 21.5}
+        return defaults.get(eq_type, 22.0) + random.uniform(-2, 2)
+
+    def _get_default_pressure(self, eq_type: str) -> float:
+        defaults = {"chiller": 2.2, "ahu": 1.1, "fcu": 0.5}
+        return defaults.get(eq_type, 1.0) + random.uniform(-0.1, 0.1)
+
+    def _get_default_power(self, eq_type: str) -> float:
+        defaults = {"chiller": 150, "ahu": 20, "fcu": 2, "vav": 0.5, "ups": 50, "generator": 0}
+        return defaults.get(eq_type, 5) * random.uniform(0.8, 1.2)
+
+    def _get_default_readings(self, eq_type: str) -> dict:
+        if eq_type == "chiller":
+            return {"evap_temp": 6.5, "cond_temp": 32, "oil_pressure": 2.2}
+        elif eq_type == "ahu":
+            return {"supply_temp": 20, "return_temp": 24, "fan_speed": 0.8}
+        elif eq_type in ("fcu", "vav"):
+            return {"supply_temp": 18, "room_temp": 22, "fan_speed": 0.6}
+        return {"value": random.uniform(0, 100)}
+
+    def _create_ahu(self, index: int, site_id: str = "site-002", site_name: str = "Sandton") -> EquipmentState:
         """Create an AHU (Air Handling Unit)"""
         return EquipmentState(
-            id=f"AHU-L{index+1:02d}-01",
+            id=f"{site_id}-AHU-L{index+1:02d}-01",
             name=f"Air Handling Unit L{index+1}",
             type="ahu",
             manufacturer=random.choice(["Carrier", "York", "Trane", "Daikin"]),
-            location=f"Level {index+1}",
+            location=f"{site_name} Level {index+1}",
             health_score=random.uniform(85, 95),
             status="running",
             temperature=random.uniform(20, 24),
@@ -157,14 +235,14 @@ class BMSimulationService:
             timestamp=datetime.now()
         )
 
-    def _create_chiller(self, index: int) -> EquipmentState:
+    def _create_chiller(self, index: int, site_id: str = "site-002", site_name: str = "Sandton") -> EquipmentState:
         """Create a chiller unit"""
         return EquipmentState(
-            id=f"CH-{index+1:02d}",
+            id=f"{site_id}-CH-{index+1:02d}",
             name=f"Chiller {index+1}",
             type="chiller",
             manufacturer=random.choice(["Carrier", "York", "Trane", "Daikin"]),
-            location="Basement",
+            location=f"{site_name} Basement",
             health_score=random.uniform(80, 90),
             status="running",
             temperature=random.uniform(6, 10),
@@ -182,17 +260,17 @@ class BMSimulationService:
             timestamp=datetime.now()
         )
 
-    def _create_fcu(self, index: int) -> EquipmentState:
+    def _create_fcu(self, index: int, site_id: str = "site-002", site_name: str = "Sandton") -> EquipmentState:
         """Create a Fan Coil Unit"""
         zone = (index // 4) + 1
         unit = (index % 4) + 1
 
         return EquipmentState(
-            id=f"FCU-Z{zone:02d}-{unit:02d}",
+            id=f"{site_id}-FCU-Z{zone:02d}-{unit:02d}",
             name=f"Fan Coil Unit Zone {zone} Unit {unit}",
             type="fcu",
             manufacturer=random.choice(["Carrier", "York", "Trane", "Daikin"]),
-            location=f"Zone {zone}, Unit {unit}",
+            location=f"{site_name} Zone {zone}, Unit {unit}",
             health_score=random.uniform(75, 95),
             status=random.choice(["running", "standby"]),
             temperature=random.uniform(20, 24),
@@ -210,14 +288,14 @@ class BMSimulationService:
             timestamp=datetime.now()
         )
 
-    def _create_ups(self, index: int) -> EquipmentState:
+    def _create_ups(self, index: int, site_id: str = "site-002", site_name: str = "Sandton") -> EquipmentState:
         """Create a UPS unit"""
         return EquipmentState(
-            id=f"UPS-{index+1:02d}",
+            id=f"{site_id}-UPS-{index+1:02d}",
             name=f"UPS {index+1}",
             type="ups",
             manufacturer=random.choice(["APC", "Eaton", "Vertiv"]),
-            location="Server Room",
+            location=f"{site_name} Server Room",
             health_score=random.uniform(90, 98),
             status="normal",
             temperature=random.uniform(18, 22),
@@ -235,7 +313,7 @@ class BMSimulationService:
             timestamp=datetime.now()
         )
 
-    def _create_sensor(self, sensor_type: str, index: int) -> EquipmentState:
+    def _create_sensor(self, sensor_type: str, index: int, site_id: str = "site-002", site_name: str = "Sandton") -> EquipmentState:
         """Create a sensor device"""
         sensor_configs = {
             "temperature_sensor": {
@@ -265,11 +343,11 @@ class BMSimulationService:
         base_value = config.get("base_value", config.get(f"base_{sensor_type.split('_')[0]}", 0))
 
         return EquipmentState(
-            id=f"{config['prefix']}-{index+1:03d}",
+            id=f"{site_id}-{config['prefix']}-{index+1:03d}",
             name=f"{sensor_type.replace('_', ' ').title()} {index+1}",
             type=config["type"],
             manufacturer=random.choice(config["manufacturers"]),
-            location=f"Zone {(index % 5) + 1}",
+            location=f"{site_name} Zone {(index % 5) + 1}",
             health_score=random.uniform(95, 100),
             status="active",
             temperature=22.0,
@@ -507,15 +585,18 @@ class BMSimulationService:
 
     def _update_equipment_status(self, equipment: EquipmentState, old_health: float):
         """Update equipment status based on health and generate alerts"""
+        # Get centralized health thresholds
+        thresholds = get_health_thresholds()
+
         new_health = equipment.health_score
         old_status = equipment.status
 
-        # Determine new status based on health thresholds
-        if new_health >= self.health_thresholds["normal"]:
+        # Determine new status based on centralized health thresholds
+        if new_health >= thresholds["healthy"]:
             new_status = "running" if equipment.type in ["ahu", "chiller", "fcu"] else "normal" if equipment.type == "ups" else "active"
-        elif new_health >= self.health_thresholds["warning"]:
+        elif new_health >= thresholds["warning"]:
             new_status = "warning"
-        elif new_health >= self.health_thresholds["critical"]:
+        elif new_health >= thresholds["critical"]:
             new_status = "critical"
         else:
             new_status = "down"
@@ -540,11 +621,16 @@ class BMSimulationService:
             elif new_status == "warning" and old_status in ["running", "normal", "active"]:
                 self._generate_alert(equipment, "warning", f"{equipment.name} health degrading - maintenance recommended")
 
-        # Health threshold crossing alerts
-        if old_health >= 50 and new_health < 50:
-            self._generate_alert(equipment, "health_critical", f"{equipment.name} health dropped below 50% - risk of failure")
-        elif old_health >= 30 and new_health < 30:
-            self._generate_alert(equipment, "health_danger", f"{equipment.name} health at {new_health:.0f}% - FAILURE IMMINENT")
+        # Health threshold crossing alerts (using centralized thresholds)
+        if old_health >= thresholds["healthy"] and new_health < thresholds["healthy"]:
+            self._generate_alert(equipment, "health_critical",
+                f"{equipment.name} health dropped below {thresholds['healthy']}% - maintenance required")
+        elif old_health >= thresholds["warning"] and new_health < thresholds["warning"]:
+            self._generate_alert(equipment, "health_danger",
+                f"{equipment.name} health at {new_health:.0f}% - risk of failure increasing")
+        elif old_health >= thresholds["critical"] and new_health < thresholds["critical"]:
+            self._generate_alert(equipment, "health_critical",
+                f"{equipment.name} health at {new_health:.0f}% - CRITICAL - immediate attention required")
 
     def _check_comfort_alerts(self, equipment: EquipmentState, current_time: datetime):
         """Check for comfort/operational issues that can be fixed remotely"""
@@ -658,8 +744,8 @@ class BMSimulationService:
             "id": f"SIM-ALERT-{self._alert_id_counter}",
             "equipment_id": equipment.id,
             "equipment_name": equipment.name,
-            "site_id": "site-001",
-            "site_name": "SENTINEL Demo Site",
+            "site_id": self.config.get("site_id", "site-002"),
+            "site_name": self.config.get("site_name", "Sandton City Office Tower"),
             "type": alert_type,
             "severity": severity,
             "priority": priority_map.get(severity, 2),
@@ -684,6 +770,22 @@ class BMSimulationService:
             self.alert_history = self.alert_history[-500:]
 
         logger.info(f"SENTINEL ALERT: [{severity.upper()}] {message}")
+
+        # Send Telegram notification for warning and critical alerts
+        if severity in ["warning", "critical"]:
+            telegram_alert = {
+                "id": alert["id"],
+                "building_name": alert["site_name"],
+                "zone_name": equipment.location,
+                "equipment_name": equipment.name,
+                "type": alert_type.replace("_", " ").title(),
+                "severity": severity,
+                "message": message,
+                "health_score": equipment.health_score,
+                "suggested_action": alert.get("suggested_action"),
+            }
+            # Use sync version since this runs in async context but we don't want to block
+            alert_notifier.send_alert_sync(telegram_alert)
 
     def get_active_alerts(self) -> List[Dict[str, Any]]:
         """Get all active alerts from simulation"""

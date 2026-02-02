@@ -10,6 +10,7 @@ import { Card, Title, Text, Grid, Tab, TabGroup, TabList, TabPanel, TabPanels, B
 import { useModules, useCriticalRecommendations } from '../../contexts/ModuleContext';
 import { MODULE_COLORS } from '../../lib/moduleRegistry';
 import type { ModuleType } from '../../lib/moduleRegistry';
+import { useHealthThresholds } from '../../hooks/useHealthThresholds';
 import { AIRecommendationsPanel } from './AIRecommendationsPanel';
 import { ModuleSelector } from './ModuleSelector';
 import { IntegrationStatusBar } from './IntegrationStatusBar';
@@ -61,6 +62,7 @@ export function ModularDashboard({
 }: ModularDashboardProps) {
   const { activeModules, addRecommendation, setSite } = useModules();
   const criticalRecs = useCriticalRecommendations();
+  const { thresholds } = useHealthThresholds();
   const [activeTab, setActiveTab] = useState(0);
 
   // Set site on mount
@@ -193,7 +195,7 @@ export function ModularDashboard({
             <Badge color={MODULE_COLORS[m.module_type] || 'gray'} size="xs">
               {m.module_type.toUpperCase()}
             </Badge>
-            {m.health_score < 80 && (
+            {m.health_score < thresholds.healthy && (
               <Badge color="amber" size="xs">{m.health_score.toFixed(0)}%</Badge>
             )}
           </Flex>
@@ -233,7 +235,10 @@ export function ModularDashboard({
                     </Text>
                   </div>
                   <div className="text-right">
-                    <Badge color={m.health_score >= 80 ? 'green' : m.health_score >= 50 ? 'amber' : 'red'}>
+                    <Badge color={
+                      m.health_score >= thresholds.healthy ? 'green' :
+                      m.health_score >= thresholds.warning ? 'amber' : 'red'
+                    }>
                       Health: {m.health_score.toFixed(0)}%
                     </Badge>
                     <Badge color="green" size="xs" className="ml-2">

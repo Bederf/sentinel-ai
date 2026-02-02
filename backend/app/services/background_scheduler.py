@@ -334,5 +334,63 @@ class BackgroundSchedulerService:
             logger.error(f"Failed to run optimization analysis: {e}")
 
 
+    def add_prediction_generation_job(self, interval_seconds: int = 300):
+        """
+        Add a job to generate predictions periodically.
+
+        Scans equipment health scores and creates predictions for at-risk equipment.
+
+        Args:
+            interval_seconds: How often to run (default: 300 seconds = 5 minutes)
+        """
+        # Remove existing job if it exists
+        if self.scheduler.get_job('generate_predictions'):
+            self.scheduler.remove_job('generate_predictions')
+            logger.info("Removed existing prediction generation job")
+
+        # Add new job
+        self.scheduler.add_job(
+            func=self._run_prediction_generation,
+            trigger=IntervalTrigger(seconds=interval_seconds),
+            id='generate_predictions',
+            name='Generate Predictions for At-Risk Equipment',
+            replace_existing=True
+        )
+        logger.info(f"Added prediction generation job with {interval_seconds}s interval")
+
+    def _run_prediction_generation(self):
+        """
+        Wrapper to run prediction generation (runs in background).
+
+        Handles async execution from sync scheduler context.
+        """
+        try:
+            import asyncio
+            from app.services.prediction_generator import get_prediction_generator
+
+            logger.info("Running scheduled prediction generation...")
+
+            generator = get_prediction_generator()
+
+            # Run async function in new event loop
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+            try:
+                result = loop.run_until_complete(
+                    generator.generate_predictions_for_all_sites()
+                )
+                logger.info(
+                    f"Prediction generation complete: {result['generated']} generated, "
+                    f"{result['skipped_duplicate']} skipped (duplicate), "
+                    f"{result['resolved']} resolved"
+                )
+            finally:
+                loop.close()
+
+        except Exception as e:
+            logger.error(f"Failed to run prediction generation: {e}")
+
+
 # Global scheduler instance
 scheduler_service = BackgroundSchedulerService()

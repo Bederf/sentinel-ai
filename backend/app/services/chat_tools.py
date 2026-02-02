@@ -16,6 +16,7 @@ from typing import Any
 
 from app.services.device_abstraction import device_manager
 from app.models.device import DeviceStatus
+from app.services.health_threshold_service import get_health_thresholds
 
 logger = logging.getLogger(__name__)
 
@@ -299,10 +300,11 @@ async def get_system_status(site_id: str | None = None) -> dict[str, Any]:
         critical_alerts = [a for a in active_alerts if a.get("severity") == "critical"]
         warning_alerts = [a for a in active_alerts if a.get("severity") == "warning"]
 
-        # Equipment health summary
-        healthy_equipment = [e for e in equipment if e.get("health_score", 0) >= 80]
-        degraded_equipment = [e for e in equipment if 50 <= e.get("health_score", 0) < 80]
-        critical_equipment = [e for e in equipment if e.get("health_score", 0) < 50]
+        # Equipment health summary (using configured thresholds)
+        thresholds = get_health_thresholds()
+        healthy_equipment = [e for e in equipment if e.get("health_score", 0) >= thresholds["healthy"]]
+        degraded_equipment = [e for e in equipment if thresholds["warning"] <= e.get("health_score", 0) < thresholds["healthy"]]
+        critical_equipment = [e for e in equipment if e.get("health_score", 0) < thresholds["warning"]]
 
         # High-priority predictions
         urgent_predictions = [p for p in predictions if p.get("probability_percent", 0) >= 70]
@@ -433,6 +435,9 @@ async def get_equipment_health(
         equipment = load_json("equipment.json")
         predictions = load_json("predictions.json")
 
+        # Get configured thresholds
+        thresholds = get_health_thresholds()
+
         # Filter equipment
         if equipment_id:
             equipment = [e for e in equipment if e["id"] == equipment_id]
@@ -441,11 +446,11 @@ async def get_equipment_health(
 
         if status_filter:
             if status_filter == "critical":
-                equipment = [e for e in equipment if e.get("health_score", 100) < 50]
+                equipment = [e for e in equipment if e.get("health_score", 100) < thresholds["critical"]]
             elif status_filter == "warning":
-                equipment = [e for e in equipment if 50 <= e.get("health_score", 100) < 80]
+                equipment = [e for e in equipment if thresholds["critical"] <= e.get("health_score", 100) < thresholds["healthy"]]
             elif status_filter == "normal":
-                equipment = [e for e in equipment if e.get("health_score", 100) >= 80]
+                equipment = [e for e in equipment if e.get("health_score", 100) >= thresholds["healthy"]]
 
         # Build predictions lookup
         pred_by_equipment = {}
@@ -471,13 +476,13 @@ async def get_equipment_health(
                 "status": eq.get("status", "unknown"),
                 "last_service": eq.get("last_service"),
                 "failure_risk_percent": highest_risk,
-                "maintenance_due": eq.get("health_score", 100) < 70 or highest_risk > 60,
+                "maintenance_due": eq.get("health_score", 100) < thresholds["warning"] or highest_risk > 60,
             }
 
-            # Add recommendation if needed
-            if item["health_score"] < 50:
+            # Add recommendation if needed (using configured thresholds)
+            if item["health_score"] < thresholds["critical"]:
                 item["recommendation"] = "Schedule immediate maintenance - equipment health critical"
-            elif item["health_score"] < 70:
+            elif item["health_score"] < thresholds["warning"]:
                 item["recommendation"] = "Plan preventive maintenance within 2 weeks"
             elif highest_risk > 70:
                 item["recommendation"] = f"High failure risk ({highest_risk}%) - schedule inspection"
@@ -492,9 +497,9 @@ async def get_equipment_health(
             "count": len(equipment_list),
             "equipment": equipment_list,
             "summary": {
-                "critical_count": len([e for e in equipment_list if e["health_score"] < 50]),
-                "warning_count": len([e for e in equipment_list if 50 <= e["health_score"] < 80]),
-                "healthy_count": len([e for e in equipment_list if e["health_score"] >= 80]),
+                "critical_count": len([e for e in equipment_list if e["health_score"] < thresholds["critical"]]),
+                "warning_count": len([e for e in equipment_list if thresholds["critical"] <= e["health_score"] < thresholds["healthy"]]),
+                "healthy_count": len([e for e in equipment_list if e["health_score"] >= thresholds["healthy"]]),
                 "maintenance_due_count": len([e for e in equipment_list if e.get("maintenance_due")]),
             }
         }

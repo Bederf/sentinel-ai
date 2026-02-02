@@ -103,13 +103,13 @@
   },
   "011-stc-fcu-001": {
     "room_temp": 22.8,
-    "room_temp_setpoint": 22.0,
+    "room_temp_setpoint": 23,
     "fan_speed": 2,
     "valve_position": 45
   },
   "011-stc-zone-001": {
     "zone_temp": 22.5,
-    "zone_cooling_setpoint": 22.0,
+    "zone_cooling_setpoint": 23.1,
     "zone_heating_setpoint": 20.0,
     "mode": 1
   },

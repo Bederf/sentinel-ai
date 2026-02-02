@@ -27,9 +27,17 @@ import {
   Wrench,
   Activity,
   Users,
+  LayoutGrid,
 } from "lucide-react";
 
 export type View = "dashboard" | "chat" | "technician" | "control" | "control-audit" | "optimization" | "settings" | "integrations" | "occupancy";
+
+interface SidebarProps {
+  currentView: View;
+  onViewChange: (view: View) => void;
+  version?: string;
+  onCustomizeDashboard?: () => void;
+}
 
 interface SidebarProps {
   currentView: View;
@@ -56,7 +64,7 @@ const navItems: NavItem[] = [
   { id: "integrations", label: "Integrations", icon: Activity, description: "BMS Integration Health" },
 ];
 
-export function Sidebar({ currentView, onViewChange, version = "1.0" }: SidebarProps) {
+export function Sidebar({ currentView, onViewChange, version = "1.0", onCustomizeDashboard }: SidebarProps) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(true); // Start minimized
@@ -207,6 +215,35 @@ export function Sidebar({ currentView, onViewChange, version = "1.0" }: SidebarP
             );
           })}
 
+          {/* Customize Dashboard Button */}
+          {onCustomizeDashboard && (
+            <div className="mt-4 mx-3">
+              <button
+                onClick={() => {
+                  onCustomizeDashboard();
+                  setIsMobileOpen(false);
+                }}
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 md:justify-center lg:justify-start"
+                style={{
+                  background: "rgba(245, 158, 11, 0.1)",
+                  border: "1px solid rgba(245, 158, 11, 0.3)",
+                  color: "var(--color-sentinel-amber)",
+                }}
+              >
+                <LayoutGrid className="h-5 w-5 flex-shrink-0" />
+                <div className={`flex flex-col items-start md:hidden ${isCollapsed ? 'lg:hidden' : 'lg:flex'}`}>
+                  <span className="font-medium text-sm">Customize</span>
+                  <span
+                    className="text-xs"
+                    style={{ color: "var(--color-grafana-text-disabled)" }}
+                  >
+                    Dashboard Cards
+                  </span>
+                </div>
+              </button>
+            </div>
+          )}
+
           {/* About Section */}
           <div
             className="mt-4 pt-4 mx-3"
@@ -214,7 +251,7 @@ export function Sidebar({ currentView, onViewChange, version = "1.0" }: SidebarP
           >
             <button
               onClick={() => setIsAboutOpen(!isAboutOpen)}
-              className="w-full flex items-center gap-3 px-1 py-2 transition-all duration-150 md:justify-center lg:justify-start"
+              className={`w-full flex items-center gap-3 px-1 py-2 transition-all duration-150 md:justify-center ${isCollapsed ? 'lg:justify-center' : 'lg:justify-start'}`}
               style={{
                 color: isAboutOpen
                   ? "var(--color-sentinel-text-primary)"
@@ -227,17 +264,17 @@ export function Sidebar({ currentView, onViewChange, version = "1.0" }: SidebarP
                   color: isAboutOpen ? "var(--color-sentinel-amber)" : "var(--color-sentinel-text-secondary)",
                 }}
               />
-              <span className="font-medium text-sm md:hidden lg:block flex-1 text-left">About</span>
+              <span className={`font-medium text-sm md:hidden ${isCollapsed ? 'lg:hidden' : 'lg:block'} flex-1 text-left`}>About</span>
               {isAboutOpen ? (
-                <ChevronDown className="h-4 w-4 md:hidden lg:block" />
+                <ChevronDown className={`h-4 w-4 md:hidden ${isCollapsed ? 'lg:hidden' : 'lg:block'}`} />
               ) : (
-                <ChevronRight className="h-4 w-4 md:hidden lg:block" />
+                <ChevronRight className={`h-4 w-4 md:hidden ${isCollapsed ? 'lg:hidden' : 'lg:block'}`} />
               )}
             </button>
 
             {/* Expandable about section */}
             {isAboutOpen && (
-              <div className="mt-2 md:hidden lg:block">
+              <div className={`mt-2 md:hidden ${isCollapsed ? 'lg:hidden' : 'lg:block'}`}>
                 <div
                   className="rounded p-3 text-xs space-y-3"
                   style={{

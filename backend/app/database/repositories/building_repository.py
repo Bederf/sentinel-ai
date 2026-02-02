@@ -96,6 +96,21 @@ class BuildingRepository:
 
         return response.count or 0
 
+    def get_at_risk_equipment_count(self, building_uuid: str) -> int:
+        """Get the count of at-risk equipment (warning/critical status) for a building.
+
+        Args:
+            building_uuid: Building UUID
+
+        Returns:
+            Number of equipment with warning or critical status
+        """
+        response = self.client.table('equipment').select("id", count="exact").eq(
+            'building_id', building_uuid
+        ).in_('status', ['warning', 'critical']).execute()
+
+        return response.count or 0
+
     def create(self, building_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new building.
 

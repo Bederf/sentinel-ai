@@ -25,16 +25,19 @@ interface PredictionCardProps {
     id: string;
     equipment_name: string;
     site_name: string;
+    site_id: string;
     equipment_type: string;
     prediction_type: string;
     probability_percent: number;
     confidence: "high" | "medium" | "low";
     predicted_failure_date: string;
     timeframe_days: number;
-    severity: "critical" | "high" | "medium" | "low";
+    severity: "critical" | "warning" | "high" | "medium" | "low";
     evidence: {
-      repeat_work_orders: number;
-      asset_age_years: number;
+      repeat_work_orders?: number;
+      asset_age_years?: number;
+      health_score?: number;
+      health_trend?: string;
     };
   };
   onClick?: () => void;
@@ -54,6 +57,12 @@ function getSeverityConfig(severity: string): {
         color: "var(--color-sentinel-red)",
         bg: "rgba(220, 38, 38, 0.15)",
         label: "CRITICAL",
+      };
+    case "warning":
+      return {
+        color: "var(--color-sentinel-amber)",
+        bg: "rgba(245, 158, 11, 0.15)",
+        label: "WARNING",
       };
     case "high":
       return {
@@ -276,6 +285,10 @@ export function PredictionCard({ prediction, onClick }: PredictionCardProps) {
             </span>
             <span style={{ color: "var(--color-sentinel-text-disabled)" }}>•</span>
             <span style={{ color: "var(--color-sentinel-text-secondary)" }}>
+              Site ID: {prediction.site_id}
+            </span>
+            <span style={{ color: "var(--color-sentinel-text-disabled)" }}>•</span>
+            <span style={{ color: "var(--color-sentinel-text-secondary)" }}>
               {prediction.equipment_type}
             </span>
           </div>
@@ -322,7 +335,7 @@ export function PredictionCard({ prediction, onClick }: PredictionCardProps) {
             style={{ background: "var(--color-sentinel-bg-secondary)" }}
           >
             <div className="flex items-center gap-1 mb-1">
-              <Wrench
+              <Activity
                 className="h-3 w-3"
                 style={{ color: "var(--color-sentinel-blue)" }}
               />
@@ -330,7 +343,7 @@ export function PredictionCard({ prediction, onClick }: PredictionCardProps) {
                 className="text-xs"
                 style={{ color: "var(--color-sentinel-text-disabled)" }}
               >
-                Repeat Calls
+                Health Score
               </span>
             </div>
             <span
@@ -340,7 +353,15 @@ export function PredictionCard({ prediction, onClick }: PredictionCardProps) {
                 fontVariantNumeric: "tabular-nums",
               }}
             >
-              {prediction.evidence.repeat_work_orders}
+              {prediction.evidence?.health_score ?? "N/A"}
+              {prediction.evidence?.health_score !== undefined && (
+                <span
+                  className="text-xs ml-1"
+                  style={{ color: "var(--color-sentinel-text-disabled)" }}
+                >
+                  %
+                </span>
+              )}
             </span>
           </div>
           <div
@@ -356,23 +377,18 @@ export function PredictionCard({ prediction, onClick }: PredictionCardProps) {
                 className="text-xs"
                 style={{ color: "var(--color-sentinel-text-disabled)" }}
               >
-                Asset Age
+                Health Trend
               </span>
             </div>
             <span
-              className="text-lg font-medium"
+              className="text-lg font-medium capitalize"
               style={{
-                color: "#a78bfa",
-                fontVariantNumeric: "tabular-nums",
+                color: prediction.evidence?.health_trend === "declining"
+                  ? "var(--color-sentinel-red)"
+                  : "#a78bfa",
               }}
             >
-              {prediction.evidence.asset_age_years}
-              <span
-                className="text-xs ml-1"
-                style={{ color: "var(--color-sentinel-text-disabled)" }}
-              >
-                yrs
-              </span>
+              {prediction.evidence?.health_trend ?? "N/A"}
             </span>
           </div>
         </div>

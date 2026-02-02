@@ -22,6 +22,7 @@ from app.models.module_registry import (
     SiteModuleConfig, RecommendationType, RecommendationPriority,
     MODULE_DEFINITIONS, INTEGRATION_DEFINITIONS
 )
+from app.services.health_threshold_service import get_health_thresholds
 
 logger = logging.getLogger(__name__)
 
@@ -441,8 +442,9 @@ class ModuleRegistryService:
                 module.health_score = health_score
                 module.last_telemetry = telemetry_timestamp or datetime.utcnow().isoformat()
 
-                # Generate health recommendation if needed
-                if health_score < 70:
+                # Generate health recommendation if needed (using configured thresholds)
+                thresholds = get_health_thresholds()
+                if health_score < thresholds["warning"]:
                     self.add_recommendation(
                         site_id,
                         AIRecommendation(
@@ -450,7 +452,7 @@ class ModuleRegistryService:
                             timestamp=datetime.utcnow().isoformat(),
                             source_module=module_type,
                             recommendation_type=RecommendationType.MAINTENANCE,
-                            priority=RecommendationPriority.HIGH if health_score < 50 else RecommendationPriority.MEDIUM,
+                            priority=RecommendationPriority.HIGH if health_score < thresholds["critical"] else RecommendationPriority.MEDIUM,
                             title=f"{module_type.value.upper()} Module Health Warning",
                             description=f"Module health at {health_score:.0f}%. Investigation recommended.",
                             confidence=0.9,

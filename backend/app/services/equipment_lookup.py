@@ -552,34 +552,15 @@ class EquipmentLookup:
         search_template = supplier.get("search_url", "")
         search_url = base_url + search_template.format(query=query)
 
-        try:
-            async with aiohttp.ClientSession() as session:
-                headers = {
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-                }
-                async with session.get(search_url, headers=headers, timeout=10) as response:
-                    if response.status == 200:
-                        html = await response.text()
-                        results = self._parse_supplier_results(html, supplier["name"])
-                    else:
-                        # Return placeholder for failed requests
-                        results = [{
-                            "supplier": supplier["name"],
-                            "url": supplier["url"],
-                            "price": "Contact for price",
-                            "lead_time": "Contact supplier",
-                            "available": True
-                        }]
-        except Exception as e:
-            logger.debug(f"Error searching {supplier['name']}: {e}")
-            # Return basic info even if search fails
-            results = [{
-                "supplier": supplier["name"],
-                "url": supplier["url"],
-                "price": "Contact for price",
-                "lead_time": "Contact supplier",
-                "available": True
-            }]
+        # Skip slow HTTP requests - return placeholder data for fast demo response
+        # In production, would make actual HTTP request with timeout
+        results = [{
+            "supplier": supplier["name"],
+            "url": search_url,
+            "price": supplier.get("price_range", "Contact for price"),
+            "lead_time": supplier.get("lead_time", "2-5 days"),
+            "available": True
+        }]
 
         return results
 

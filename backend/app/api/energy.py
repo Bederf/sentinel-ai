@@ -1,36 +1,80 @@
 """Energy consumption API endpoints."""
 
 import json
+import logging
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 import random
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, HTTPException
 from pydantic import BaseModel
 
+from app.database.repositories.energy_consumption_repository import get_energy_consumption_repository
+from app.services.building_loader import BuildingDataLoader
+
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 # Load data files
 DATA_DIR = Path(__file__).parent.parent / "data"
 
+# Initialize building loader
+_building_loader = None
 
-def load_sites() -> list[dict]:
-    """Load sites from JSON file."""
-    sites_file = DATA_DIR / "sites.json"
-    if sites_file.exists():
-        with open(sites_file) as f:
-            return json.load(f)
-    return []
+
+def get_building_loader():
+    """Get or initialize building loader."""
+    global _building_loader
+    if _building_loader is None:
+        _building_loader = BuildingDataLoader()
+    return _building_loader
 
 
 def load_equipment() -> list[dict]:
-    """Load equipment from JSON file."""
-    equipment_file = DATA_DIR / "equipment.json"
-    if equipment_file.exists():
-        with open(equipment_file) as f:
-            return json.load(f)
-    return []
+    """Load equipment from Supabase."""
+    from app.database.supabase_client import get_supabase_client
+
+    client = get_supabase_client()
+
+    # Get all equipment from Supabase with building info (paginated to handle >1000 records)
+    all_equipment = []
+    offset = 0
+    batch_size = 1000
+
+    while True:
+        result = (
+            client.table('equipment')
+            .select('*, buildings(code, name)')
+            .range(offset, offset + batch_size - 1)
+            .execute()
+        )
+
+        if not result.data:
+            break
+
+        all_equipment.extend(result.data)
+        offset += batch_size
+
+        if len(result.data) < batch_size:
+            break
+
+    # Map to the format expected by generate_energy_data
+    equipment = []
+    for eq in all_equipment:
+        building = eq.get('buildings')
+        if building:
+            equipment.append({
+                'id': eq.get('id'),
+                'site_id': building.get('code'),  # Use building code instead of UUID
+                'type': eq.get('type'),
+                'name': eq.get('name'),
+                'manufacturer': eq.get('manufacturer'),
+                'model': eq.get('model'),
+                'capacity': eq.get('capacity') or eq.get('rated_capacity') or '10kW',
+            })
+
+    return equipment
 
 
 # Equipment types for energy categorization
@@ -164,6 +208,65 @@ def generate_energy_data(
     return result
 
 
+def get_energy_from_supabase(
+    building_id: Optional[str],
+    days: int,
+) -> tuple[list[EnergyDataPoint], bool]:
+    """Get energy consumption data from Supabase.
+
+    Args:
+        building_id: Optional building code to filter by
+        days: Number of days of data
+
+    Returns:
+        Tuple of (data points, success flag)
+    """
+    from app.database.supabase_client import get_supabase_client
+
+    try:
+        repo = get_energy_consumption_repository()
+        client = get_supabase_client()
+
+        # Get consumption records
+        if building_id:
+            records = repo.get_by_building(building_id, days)
+        else:
+            records = repo.get_all_buildings(days)
+
+        if not records:
+            return [], False
+
+        # Get building info from Supabase for names
+        result = client.table('buildings').select('code, name').execute()
+        building_names = {}
+        for b in result.data or []:
+            building_names[b.get("code")] = b.get("name") or b.get("code")
+
+        # Convert to EnergyDataPoint format
+        data = []
+        for record in records:
+            bid = record["building_id"]
+            site_name = building_names.get(bid, bid)
+
+            data.append(
+                EnergyDataPoint(
+                    date=record["date"],
+                    site_id=bid,
+                    site_name=site_name,
+                    hvac_kwh=float(record["hvac_kwh"] or 0),
+                    lighting_kwh=float(record["lighting_kwh"] or 0),
+                    other_kwh=float(record["other_kwh"] or 0),
+                    total_kwh=float(record["total_kwh"] or 0),
+                )
+            )
+
+        return data, True
+
+    except Exception as e:
+        logger.warning(f"Failed to get energy data from Supabase: {e}")
+        return [], False
+
+
 @router.get("/energy", response_model=EnergyResponse)
 async def get_energy(
     site_id: Optional[str] = Query(None, description="Filter by site ID"),
@@ -182,8 +285,62 @@ async def get_energy(
         - lighting_kwh: Lighting systems
         - other_kwh: Other equipment (UPS, generators, etc.)
         - total_kwh: Sum of all categories
+
+    Note:
+        Tries to load from Supabase first. Falls back to mock data if unavailable.
     """
-    sites = load_sites()
+    # Try Supabase first
+    supabase_data, success = get_energy_from_supabase(site_id, days)
+    if success and supabase_data:
+        logger.info(f"Using Supabase energy data ({len(supabase_data)} records)")
+        return EnergyResponse(
+            days=days,
+            site_id=site_id,
+            data=supabase_data,
+        )
+
+    # Fall back to mock data generation using Supabase buildings
+    logger.info("Supabase energy data empty, using mock generation")
+
+    from app.database.supabase_client import get_supabase_client
+
+    try:
+        client = get_supabase_client()
+        result = client.table('buildings').select('code, name, sqm').execute()
+        sites = []
+        for b in result.data or []:
+            sites.append({
+                "id": b.get("code"),
+                "name": b.get("name"),
+                "sqm": b.get("sqm") or 1000,
+            })
+    except Exception as e:
+        logger.warning(f"Failed to load buildings from Supabase: {e}")
+        sites = []
+
+    # If still no sites, use building_loader
+    if not sites:
+        building_loader = get_building_loader()
+        buildings = building_loader.get_all_buildings()
+
+        for b in buildings:
+            if hasattr(b, 'to_dict'):
+                b_dict = b.to_dict()
+            elif isinstance(b, dict):
+                b_dict = b
+            else:
+                b_dict = {"id": getattr(b, "id", "unknown"), "name": getattr(b, "name", "Unknown")}
+
+            metadata = b_dict.get("metadata", {})
+            if not isinstance(metadata, dict):
+                metadata = {}
+
+            sites.append({
+                "id": b_dict.get("id"),
+                "name": b_dict.get("display_name") or b_dict.get("name") or b_dict.get("id"),
+                "sqm": metadata.get("sqm", 1000),
+            })
+
     equipment = load_equipment()
 
     data = generate_energy_data(sites, equipment, days=days, site_id=site_id)
@@ -193,3 +350,90 @@ async def get_energy(
         site_id=site_id,
         data=data,
     )
+
+
+@router.post("/energy/seed")
+async def seed_energy_data(
+    building_id: Optional[str] = Query(None, description="Building code to seed (default: all)"),
+    days: int = Query(90, ge=1, le=365, description="Number of days to seed"),
+) -> dict:
+    """
+    Seed energy consumption data for demo purposes.
+
+    Uses the mock data generator and stores results in Supabase.
+
+    Args:
+        building_id: Optional building code (default: all buildings)
+        days: Number of days to seed (default 90)
+
+    Returns:
+        Dictionary with seeding results
+    """
+    from app.database.supabase_client import get_supabase_client
+
+    try:
+        repo = get_energy_consumption_repository()
+        client = get_supabase_client()
+
+        # Get buildings from Supabase (has all 10 sites)
+        if building_id:
+            result = client.table('buildings').select('id, code, name, sqm').eq('code', building_id).execute()
+        else:
+            result = client.table('buildings').select('id, code, name, sqm').execute()
+
+        if not result.data:
+            raise HTTPException(status_code=404, detail=f"Building {building_id} not found")
+
+        buildings = result.data
+
+        # Load equipment from Supabase with building codes
+        equipment = load_equipment()
+
+        # Generate data for each building
+        records_created = 0
+        end_date = datetime.now().date()
+        start_date = end_date - timedelta(days=days - 1)
+        building_codes = []
+
+        for building in buildings:
+            building_code = building.get("code", building.get("id"))
+            building_codes.append(building_code)
+
+            # Prepare site data for energy generator
+            sites = [{
+                "id": building_code,  # Use building code as site_id
+                "name": building.get("name", building_code),
+                "sqm": building.get("sqm") or 1000,
+            }]
+
+            # Generate mock data for this building
+            mock_data = generate_energy_data(sites, equipment, days=days, site_id=building_code)
+
+            # Batch upsert for efficiency
+            batch_records = []
+            for point in mock_data:
+                batch_records.append({
+                    "building_id": point.site_id,
+                    "date": point.date,
+                    "hvac_kwh": point.hvac_kwh,
+                    "lighting_kwh": point.lighting_kwh,
+                    "other_kwh": point.other_kwh,
+                })
+
+            if batch_records:
+                repo.batch_upsert(batch_records)
+                records_created += len(batch_records)
+
+        return {
+            "success": True,
+            "message": f"Seeded {records_created} energy consumption records",
+            "buildings": building_codes,
+            "days": days,
+            "date_range": f"{start_date} to {end_date}",
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to seed energy data: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

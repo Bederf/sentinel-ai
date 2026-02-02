@@ -32,7 +32,42 @@ DATA_DIR = Path(__file__).parent.parent / "data"
 
 
 def load_sites() -> List[Dict[str, Any]]:
-    """Load sites data from JSON file."""
+    """Load sites data from Supabase, with fallback to JSON file."""
+    from app.config.settings import settings
+
+    # Try Supabase first
+    if not settings.use_json_storage:
+        try:
+            from app.database.repositories.building_repository import BuildingRepository
+            repo = BuildingRepository()
+            buildings = repo.get_all()
+            if buildings:
+                sites = []
+                for b in buildings:
+                    site = {
+                        "id": b.get("code") or b.get("id"),
+                        "name": b.get("name"),
+                        "type": b.get("type", "commercial"),
+                        "sqm": b.get("sqm", 5000),
+                        "floors": b.get("floors", 1),
+                        "region": b.get("region", "Unknown"),
+                        "operating_hours": b.get("operating_hours", {"start": "08:00", "end": "18:00"}),
+                        "occupancy_pattern": b.get("occupancy_pattern", "office"),
+                        "optimization_enabled": b.get("optimization_enabled", False),
+                        "optimization_status": b.get("optimization_status", "unknown"),
+                        "optimization_settings": b.get("optimization_settings"),
+                        "last_recommendation": b.get("last_recommendation"),
+                        "last_optimization": b.get("last_optimization"),
+                        "optimization_history": b.get("optimization_history", []),
+                        "error_message": b.get("error_message"),
+                        "_uuid": b.get("id"),
+                    }
+                    sites.append(site)
+                return sites
+        except Exception as e:
+            logger.warning(f"Failed to load sites from Supabase: {e}")
+
+    # Fallback to JSON file
     filepath = DATA_DIR / "sites.json"
     if filepath.exists():
         with open(filepath) as f:

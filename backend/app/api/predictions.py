@@ -1,143 +1,177 @@
-"""Predictions API endpoints - AI-driven failure predictions."""
+"""Predictions API endpoints - AI-driven failure predictions from Supabase."""
 
-import json
-from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
-from app.services.prediction_calculator import PredictionCalculator
+
+from app.database.repositories.prediction_repository import PredictionRepository
+from app.services.prediction_generator import get_prediction_generator
 
 router = APIRouter()
 
-# Load data directory
-DATA_DIR = Path(__file__).parent.parent / "data"
 
+def format_prediction_for_frontend(pred: dict) -> dict:
+    """Format Supabase prediction data to match frontend expectations.
 
-def load_predictions() -> list[dict]:
-    """Load predictions - try calculated first, fallback to JSON."""
-    # Try to calculate predictions from data
-    # Use min_probability=50 to catch all degraded equipment (health < 80%)
-    try:
-        calculated = PredictionCalculator.calculate_predictions(min_probability=50)
-        if calculated:
-            return calculated
-    except Exception as e:
-        # If calculation fails, fall back to JSON
-        pass
-    
-    # Fallback to JSON file
-    predictions_file = DATA_DIR / "predictions.json"
-    if predictions_file.exists():
-        with open(predictions_file) as f:
-            return json.load(f)
-    return []
+    Transform Supabase data structure to match the JSON structure the frontend expects.
 
+    Maps database severity values to system states:
+    - critical → critical
+    - high/medium → warning
+    - low → healthy
+    """
+    # Extract related data
+    building = pred.get('building', {})
+    equipment = pred.get('equipment', {})
 
-def load_sites() -> list[dict]:
-    """Load sites from JSON file."""
-    sites_file = DATA_DIR / "sites.json"
-    if sites_file.exists():
-        with open(sites_file) as f:
-            return json.load(f)
-    return []
+    # Map database severity to system severity (critical, warning, healthy)
+    db_severity = pred['severity']
+    if db_severity == 'critical':
+        severity = 'critical'
+    elif db_severity in ('high', 'medium'):
+        severity = 'warning'
+    else:  # low or any other value
+        severity = 'healthy'
 
+    # Extract financial impact
+    financial_impact = {
+        'repair_cost_zar': pred.get('repair_cost_zar', 0),
+        'replacement_cost_zar': pred.get('replacement_cost_zar', 0),
+        'downtime_cost_per_hour_zar': pred.get('downtime_cost_per_hour_zar', 0),
+        'potential_loss_zar': pred.get('potential_loss_zar', 0),
+    }
 
-def load_equipment() -> list[dict]:
-    """Load equipment from JSON file."""
-    equipment_file = DATA_DIR / "equipment.json"
-    if equipment_file.exists():
-        with open(equipment_file) as f:
-            return json.load(f)
-    return []
+    return {
+        'id': pred['code'],  # Use code as frontend ID
+        'uuid': pred['id'],  # Keep UUID for reference
+        'equipment_id': equipment.get('code', pred['equipment_id']),
+        'equipment_name': equipment.get('name', 'Unknown'),
+        'equipment_type': equipment.get('type', 'unknown'),
+        'site_id': building.get('code', pred['building_id']),
+        'site_name': building.get('name', 'Unknown'),
+        'building_id': pred['building_id'],
 
+        # Prediction details
+        'prediction_type': pred['prediction_type'],
+        'probability_percent': pred['probability_percent'],
+        'confidence': pred['confidence'],
+        'predicted_failure_date': pred['predicted_failure_date'],
+        'timeframe_days': pred['timeframe_days'],
+        'severity': severity,  # Mapped to system values
 
-class PredictionResponse:
-    """Prediction response model (using dict for simplicity)."""
+        # Evidence
+        'evidence': pred.get('evidence', {}),
+        'contributing_factors': pred.get('contributing_factors', []),
+        'similar_failures': pred.get('similar_failures', []),
+
+        # Financial
+        'financial_impact': financial_impact,
+
+        # Status
+        'status': pred.get('status', 'active'),
+        'recommended_action': pred.get('recommended_action'),
+        'urgency': pred.get('urgency'),
+    }
 
 
 @router.get("/predictions")
 async def list_predictions(
-    site_id: Optional[str] = Query(None, description="Filter by site ID"),
+    building_code: Optional[str] = Query(None, description="Filter by building code (e.g., site-002)"),
     equipment_type: Optional[str] = Query(None, description="Filter by equipment type"),
-    severity: Optional[str] = Query(None, description="Filter by severity (critical/high/medium)"),
+    severity: Optional[str] = Query(None, description="Filter by severity (critical/high/medium/low)"),
     min_probability: Optional[int] = Query(None, description="Minimum probability percentage"),
 ) -> dict:
     """
-    List all AI-driven failure predictions.
+    List all AI-driven failure predictions from Supabase.
 
-    Returns predictions based on historical FM data:
-    - CAFM work orders (repeat calls, fault codes)
-    - BCC alarm logs (frequency, severity, patterns)
-    - Asset register (age, condition, expected life)
-    - Technician notes (observations, recommendations)
+    Returns predictions with building and equipment information joined.
 
     Query Parameters:
-    - site_id: Filter predictions for specific site
+    - building_code: Filter by building code (e.g., site-002)
     - equipment_type: Filter by equipment type (chiller, ahu, ups, etc.)
-    - severity: Filter by severity level (critical, high, medium)
+    - severity: Filter by severity level (critical, high, medium, low)
     - min_probability: Show only predictions above this probability
 
     Returns:
         Dictionary with predictions list and summary statistics
     """
-    predictions = load_predictions()
+    repo = PredictionRepository()
+
+    # Get predictions from Supabase with building and equipment data joined
+    query = repo.client.table('predictions').select("""
+        *,
+        building:buildings!inner(id, name, code),
+        equipment:equipment!inner(id, name, type)
+    """).eq('status', 'active')  # Only active predictions
 
     # Apply filters
-    if site_id:
-        predictions = [p for p in predictions if p["site_id"] == site_id]
-
-    if equipment_type:
-        predictions = [p for p in predictions if p["equipment_type"] == equipment_type]
+    if building_code:
+        # First get building UUID by code
+        building_result = repo.client.table('buildings').select('id').eq('code', building_code).execute()
+        if building_result.data:
+            query = query.eq('building_id', building_result.data[0]['id'])
+        else:
+            # Building not found, return empty results
+            return {
+                "predictions": [],
+                "total": 0,
+                "avg_probability": 0,
+                "by_severity": {"critical": 0, "high": 0, "medium": 0, "low": 0},
+            }
 
     if severity:
-        predictions = [p for p in predictions if p["severity"].lower() == severity.lower()]
+        query = query.eq('severity', severity)
 
     if min_probability is not None:
-        predictions = [p for p in predictions if p["probability_percent"] >= min_probability]
+        query = query.gte('probability_percent', min_probability)
+
+    response = query.execute()
+    predictions = response.data
+
+    # Format predictions for frontend
+    formatted_predictions = [format_prediction_for_frontend(p) for p in predictions]
+
+    # Filter by equipment_type after formatting (it's in the equipment object)
+    if equipment_type:
+        formatted_predictions = [
+            p for p in formatted_predictions
+            if p['equipment_type'].lower() == equipment_type.lower()
+        ]
 
     # Calculate summary statistics
-    total_predictions = len(predictions)
+    total = len(formatted_predictions)
 
-    if total_predictions > 0:
-        avg_probability = sum(p["probability_percent"] for p in predictions) / total_predictions
-        total_repair_cost = sum(p["financial_impact"]["repair_cost_zar"] for p in predictions)
-        total_potential_loss = sum(p["financial_impact"]["potential_loss_zar"] for p in predictions)
-        potential_savings = total_potential_loss - total_repair_cost
+    if total > 0:
+        avg_probability = sum(p['probability_percent'] for p in formatted_predictions) / total
+        total_repair = sum(p['financial_impact']['repair_cost_zar'] for p in formatted_predictions)
+        total_loss = sum(p['financial_impact']['potential_loss_zar'] for p in formatted_predictions)
     else:
         avg_probability = 0
-        total_repair_cost = 0
-        total_potential_loss = 0
-        potential_savings = 0
+        total_repair = 0
+        total_loss = 0
 
     # Count by severity
     severity_counts = {"critical": 0, "high": 0, "medium": 0, "low": 0}
-    for pred in predictions:
-        sev = pred["severity"].lower()
+    for pred in formatted_predictions:
+        sev = pred['severity'].lower()
         if sev in severity_counts:
             severity_counts[sev] += 1
 
-    # Count by equipment type
-    type_counts: dict[str, int] = {}
-    for pred in predictions:
-        eq_type = pred["equipment_type"]
-        type_counts[eq_type] = type_counts.get(eq_type, 0) + 1
-
     return {
-        "total": total_predictions,
+        "predictions": formatted_predictions,
+        "total": total,
         "avg_probability": round(avg_probability, 1),
-        "total_repair_cost_zar": total_repair_cost,
-        "total_potential_loss_zar": total_potential_loss,
-        "potential_savings_zar": potential_savings,
+        "total_repair_cost_zar": total_repair,
+        "total_potential_loss_zar": total_loss,
+        "potential_savings_zar": total_loss - total_repair,
         "by_severity": severity_counts,
-        "by_equipment_type": type_counts,
-        "predictions": predictions,
     }
 
 
-@router.get("/predictions/{prediction_id}")
-async def get_prediction(prediction_id: str) -> dict:
+@router.get("/predictions/{prediction_code}")
+async def get_prediction(prediction_code: str) -> dict:
     """
-    Get detailed prediction by ID.
+    Get detailed prediction by code.
 
     Returns complete prediction details including:
     - All evidence (work orders, alarms, technician notes)
@@ -147,7 +181,7 @@ async def get_prediction(prediction_id: str) -> dict:
     - Recommended actions
 
     Args:
-        prediction_id: Prediction ID (e.g., "pred-001")
+        prediction_code: Prediction code (e.g., "pred-001")
 
     Returns:
         Complete prediction details
@@ -155,13 +189,19 @@ async def get_prediction(prediction_id: str) -> dict:
     Raises:
         HTTPException 404: If prediction not found
     """
-    predictions = load_predictions()
+    repo = PredictionRepository()
 
-    prediction = next((p for p in predictions if p["id"] == prediction_id), None)
+    # Get prediction with joins
+    response = repo.client.table('predictions').select("""
+        *,
+        building:buildings!inner(id, name, code, address),
+        equipment:equipment!inner(id, name, type, manufacturer, model)
+    """).eq('code', prediction_code).execute()
 
-    if not prediction:
-        raise HTTPException(status_code=404, detail=f"Prediction {prediction_id} not found")
+    if not response.data:
+        raise HTTPException(status_code=404, detail=f"Prediction {prediction_code} not found")
 
+    prediction = format_prediction_for_frontend(response.data[0])
     return prediction
 
 
@@ -178,27 +218,68 @@ async def get_predictions_summary() -> dict:
 
     Use this for dashboard KPI cards.
     """
-    predictions = load_predictions()
+    repo = PredictionRepository()
+
+    # Get all active predictions
+    response = repo.client.table('predictions').select('*').eq('status', 'active').execute()
+    predictions = response.data
 
     total = len(predictions)
-    high_priority = sum(1 for p in predictions if p["probability_percent"] >= 80)
-    critical_count = sum(1 for p in predictions if p["severity"] == "critical")
+    high_priority = sum(1 for p in predictions if p['probability_percent'] >= 80)
+    critical_count = sum(1 for p in predictions if p['severity'] == 'critical')
 
     if total > 0:
-        avg_probability = sum(p["probability_percent"] for p in predictions) / total
-        total_repair = sum(p["financial_impact"]["repair_cost_zar"] for p in predictions)
-        total_damage = sum(p["financial_impact"]["potential_loss_zar"] for p in predictions)
+        avg_probability = sum(p['probability_percent'] for p in predictions) / total
+        total_repair = sum(p.get('repair_cost_zar', 0) for p in predictions)
+        total_loss = sum(p.get('potential_loss_zar', 0) for p in predictions)
     else:
         avg_probability = 0
         total_repair = 0
-        total_damage = 0
+        total_loss = 0
 
     return {
+        "predictions": predictions,  # Raw predictions for further processing
         "total_predictions": total,
         "high_priority_count": high_priority,
         "critical_count": critical_count,
         "avg_probability": round(avg_probability, 1),
         "total_repair_cost_zar": total_repair,
-        "total_potential_damage_zar": total_damage,
-        "potential_savings_zar": total_damage - total_repair,
+        "total_potential_damage_zar": total_loss,
+        "potential_savings_zar": total_loss - total_repair,
+    }
+
+
+@router.post("/predictions/generate")
+async def generate_predictions_manual() -> dict:
+    """
+    Manually trigger prediction generation for at-risk equipment.
+
+    This endpoint scans all equipment and generates predictions for those
+    with health scores below the threshold (default: 90%).
+
+    Features:
+    - Duplicate prevention: Won't create duplicate predictions for equipment
+      that already has an active prediction
+    - Auto-resolve: Resolves predictions for equipment that has improved
+    - Minimum probability: Only creates predictions above 60% probability
+
+    Returns:
+        Dictionary with generation results including:
+        - generated: Number of new predictions created
+        - skipped_duplicate: Predictions skipped due to existing active prediction
+        - skipped_low_probability: Predictions skipped due to low probability
+        - resolved: Number of predictions auto-resolved (equipment improved)
+        - errors: List of any errors encountered
+    """
+    generator = get_prediction_generator()
+    result = await generator.generate_predictions_for_all_sites()
+
+    return {
+        "status": "success" if not result.get("errors") else "partial",
+        "generated": result.get("generated", 0),
+        "skipped_duplicate": result.get("skipped_duplicate", 0),
+        "skipped_low_probability": result.get("skipped_low_probability", 0),
+        "resolved": result.get("resolved", 0),
+        "errors": result.get("errors", []),
+        "timestamp": result.get("timestamp"),
     }

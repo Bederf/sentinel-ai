@@ -74,6 +74,7 @@ export interface BuildingEquipmentItem {
   location: string;
   building_id: string;
   building_name: string;
+  site_id: string;
   details: Record<string, any>;
   controllable: boolean;
   health_factors?: {
@@ -871,6 +872,18 @@ export const api = {
   async getAlerts(): Promise<Alert[]> {
     const response = await fetchApi<{ total: number; alerts: Alert[] }>("/api/alerts");
     return response.alerts;
+  },
+
+  /**
+   * Acknowledge/mark an alert as read
+   * @param alertId - ID of the alert to acknowledge
+   * @param acknowledgedBy - Name of the person acknowledging (defaults to "operator")
+   */
+  async acknowledgeAlert(alertId: string, acknowledgedBy: string = "operator"): Promise<{ status: string; alert_id: string }> {
+    return fetchApi<{ status: string; alert_id: string }>(`/api/alerts/${alertId}/acknowledge`, {
+      method: "POST",
+      body: JSON.stringify({ acknowledged_by: acknowledgedBy }),
+    });
   },
 
   /**

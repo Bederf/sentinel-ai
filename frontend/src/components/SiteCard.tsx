@@ -370,15 +370,23 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
       />
 
       <div className="p-4 pl-5">
-        {/* Header: Name and Status */}
+        {/* Header: Site Number, Name and Status */}
         <div className="flex items-start justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <Building2
-              className="h-4 w-4"
-              style={{ color: "var(--color-sentinel-blue)" }}
-            />
+          <div className="flex flex-col gap-0.5">
+            <div className="flex items-center gap-2">
+              <Building2
+                className="h-4 w-4"
+                style={{ color: "var(--color-sentinel-blue)" }}
+              />
+              <span
+                className="text-xs font-medium uppercase tracking-wide"
+                style={{ color: "var(--color-sentinel-blue)" }}
+              >
+                {site.id}
+              </span>
+            </div>
             <span
-              className="font-medium text-sm"
+              className="font-medium text-sm ml-6"
               style={{ color: "var(--color-sentinel-text-primary)" }}
             >
               {site.name}
