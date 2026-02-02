@@ -14,7 +14,7 @@
 
 import { Building2, Cpu, AlertTriangle, MapPin, Shield, Clock } from "lucide-react";
 import { useState, useEffect } from "react";
-import api, { type Site, type OptimizationRecommendation, type BuildingEquipmentItem } from "../lib/api";
+import api, { type Site, type OptimizationRecommendation, type BuildingEquipmentItem, createWorkOrder } from "../lib/api";
 import { OptimizationStatusBadge } from "./OptimizationStatusBadge";
 import { OptimizationRecommendationModal } from "./OptimizationRecommendationModal";
 import { ExpandableRiskList } from "./ExpandableRiskList";
@@ -354,6 +354,28 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
     }
   };
 
+  // Handle work order creation from risk modal
+  const handleCreateWorkOrder = async (equipmentId: string) => {
+    const equipment = selectedRiskEquipment;
+    if (!equipment) return;
+
+    try {
+      const workOrder = await createWorkOrder({
+        site_id: site.id,
+        equipment_id: equipment.code || equipmentId,
+        fault_description: `${equipment.name} health at ${equipment.health}% - maintenance required`,
+        diagnosis: `Equipment health below threshold. Status: ${equipment.status}`,
+        priority: equipment.status === "critical" ? "high" : "medium",
+      });
+
+      // Show success notification (could use a toast library)
+      alert(`Work Order ${workOrder.id} created for ${equipment.name}`);
+    } catch (error) {
+      console.error("Failed to create work order:", error);
+      alert("Failed to create work order. Please try again.");
+    }
+  };
+
   return (
     <div
       className={`relative rounded-md overflow-hidden transition-all duration-150 ${onClick ? "cursor-pointer hover:brightness-110" : ""}`}
@@ -666,6 +688,7 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
           }}
           equipment={selectedRiskEquipment}
           onNavigateToControl={handleNavigateToControl}
+          onCreateWorkOrder={handleCreateWorkOrder}
         />
       )}
     </div>

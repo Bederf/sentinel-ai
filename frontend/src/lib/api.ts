@@ -2586,4 +2586,48 @@ export const classificationApi = {
   },
 };
 
+/**
+ * Create a work order for equipment
+ */
+export interface CreateWorkOrderParams {
+  site_id: string;
+  equipment_id: string;
+  fault_description: string;
+  diagnosis?: string;
+  priority?: "low" | "medium" | "high" | "critical";
+}
+
+export interface WorkOrderResponse {
+  id: string;
+  site_id: string;
+  equipment_id: string;
+  fault_description: string;
+  diagnosis: string;
+  priority: string;
+  status: string;
+  created_at: string;
+}
+
+export async function createWorkOrder(params: CreateWorkOrderParams): Promise<WorkOrderResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/work-orders/technician`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      site_id: params.site_id,
+      equipment_id: params.equipment_id,
+      fault_description: params.fault_description,
+      diagnosis: params.diagnosis || `Equipment health below threshold - maintenance required`,
+      priority: params.priority || "medium",
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to create work order: ${response.status}`);
+  }
+
+  return response.json();
+}
+
 export default api;

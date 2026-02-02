@@ -1,30 +1,47 @@
 """
-OpenAI ChatGPT Connector MCP SSE Endpoint
+OpenAI ChatGPT Connector & Microsoft 365 Copilot MCP Endpoint
 
-Implements MCP over SSE for OpenAI connectors with strict response formatting:
-- Exactly one content item of type "text"
-- Text field contains JSON-encoded string
+Implements MCP over **Streamable HTTP** transport for:
+- ChatGPT Deep Research connectors
+- Microsoft 365 Copilot declarative agents
+- Any MCP client supporting Streamable HTTP
 
-URL must end in /sse/ for OpenAI connectors.
+Primary endpoint: POST /api/mcp/openai/mcp
 
-Ref: https://platform.openai.com/docs/mcp
+Streamable HTTP is the recommended transport:
+- SSE is deprecated for M365 Copilot (after Aug 2025)
+- Simpler than SSE (no long-lived connections)
+- Works across WAF/proxy configurations
+
+Ref:
+- https://platform.openai.com/docs/mcp
+- https://modelcontextprotocol.io/specification/2025-06-18/basic/transports
+- https://learn.microsoft.com/en-us/microsoft-copilot-studio/mcp-add-existing-server-to-agent
 """
 
-import asyncio
 import json
 import logging
 from typing import Any, Dict, Optional
 from datetime import datetime
 
-from fastapi import APIRouter, Request
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Request, Header
+from fastapi.responses import JSONResponse, Response
 
 from app.mcp.openai_connector_server import get_openai_connector_server
 
 logger = logging.getLogger(__name__)
 
-# Note: URL ends with /sse which will become /sse/ with trailing slash
 router = APIRouter(prefix="/api/mcp/openai", tags=["MCP-OpenAI-Connector"])
+
+# Separate router for well-known endpoint (no prefix)
+wellknown_router = APIRouter(tags=["MCP-Discovery"])
+
+# CORS headers for all responses
+CORS_HEADERS = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Accept, Authorization, Cache-Control",
+}
 
 
 def as_single_text_content(payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -61,35 +78,29 @@ def as_single_text_error(error_message: str) -> Dict[str, Any]:
     }
 
 
-class OpenAIMCPServerSSE:
+class MCPStreamableHTTPHandler:
     """
-    MCP Server over SSE transport for OpenAI connectors.
+    MCP Server handler for Streamable HTTP transport.
 
-    Strict compliance with OpenAI connector requirements:
-    - Only search and fetch tools
-    - Single text content item responses
-    - JSON-encoded text field
+    Streamable HTTP transport spec:
+    - Client sends JSON-RPC via POST to MCP endpoint
+    - Server responds with JSON (or streams for long responses)
+    - Accept header: application/json, text/event-stream
     """
 
     def __init__(self):
         self.server = get_openai_connector_server()
-        self._message_queue: asyncio.Queue = asyncio.Queue()
-
-    async def send_sse(self, data: Dict) -> str:
-        """Format data as SSE event."""
-        return f"event: message\ndata: {json.dumps(data)}\n\n"
 
     async def handle_initialize(self, params: Dict) -> Dict:
         """Handle MCP initialize request."""
         client_info = params.get("clientInfo", {})
-        logger.info(f"OpenAI Connector: Client initializing - {client_info.get('name', 'unknown')}")
+        logger.info(f"MCP Initialize: {client_info.get('name', 'unknown')} v{client_info.get('version', '?')}")
 
         return {
             "protocolVersion": "2024-11-05",
             "serverInfo": {
                 "name": "sentinel-bms-connector",
-                "version": "1.0.0",
-                "description": "SENTINEL BMS Intelligence Platform - Building Management Data Connector"
+                "version": "1.0.0"
             },
             "capabilities": {
                 "tools": {}
@@ -97,45 +108,58 @@ class OpenAIMCPServerSSE:
         }
 
     async def handle_tools_list(self) -> Dict:
-        """List available tools (search and fetch only)."""
+        """List available tools."""
         tools = self.server.list_tools()
+        logger.debug(f"MCP tools/list: returning {len(tools)} tools")
         return {"tools": tools}
 
     async def handle_tools_call(self, params: Dict) -> Dict:
         """
-        Execute tool call with strict OpenAI connector response format.
+        Execute tool call with OpenAI connector response format.
 
         Returns exactly one content item of type text with JSON-encoded string.
         """
         tool_name = params.get("name")
         arguments = params.get("arguments", {})
 
-        logger.info(f"OpenAI Connector: Tool call - {tool_name}({arguments})")
+        logger.info(f"MCP tools/call: {tool_name}({json.dumps(arguments)[:100]})")
 
         try:
             result = await self.server.call_tool(tool_name, **arguments)
-            # Return single text content with JSON-encoded payload
             return as_single_text_content(result)
 
         except ValueError as e:
-            logger.warning(f"OpenAI Connector: Tool error - {e}")
+            logger.warning(f"MCP tool error: {e}")
             return as_single_text_error(str(e))
 
         except Exception as e:
-            logger.error(f"OpenAI Connector: Internal error - {e}", exc_info=True)
+            logger.error(f"MCP internal error: {e}", exc_info=True)
             return as_single_text_error(f"Internal error: {str(e)}")
 
-    async def handle_request(self, request: Dict) -> Optional[Dict]:
-        """Handle incoming JSON-RPC request."""
-        method = request.get("method")
-        params = request.get("params", {})
-        request_id = request.get("id")
+    async def handle_request(self, request_body: Dict) -> Dict:
+        """
+        Handle incoming JSON-RPC request.
 
-        logger.debug(f"OpenAI Connector: Request - {method}")
+        Returns full JSON-RPC response envelope.
+        """
+        method = request_body.get("method")
+        params = request_body.get("params", {})
+        request_id = request_body.get("id")
+
+        logger.debug(f"MCP request: method={method}, id={request_id}")
 
         try:
             if method == "initialize":
                 result = await self.handle_initialize(params)
+
+            elif method == "notifications/initialized":
+                # Client notification - no response needed for notifications
+                # But we still return empty result for Streamable HTTP
+                return {
+                    "jsonrpc": "2.0",
+                    "id": request_id,
+                    "result": {}
+                }
 
             elif method == "tools/list":
                 result = await self.handle_tools_list()
@@ -146,145 +170,133 @@ class OpenAIMCPServerSSE:
             elif method == "ping":
                 result = {}
 
-            elif method == "notifications/initialized":
-                # Client notification, no response needed
-                return None
-
             else:
+                logger.warning(f"MCP unknown method: {method}")
                 return {
+                    "jsonrpc": "2.0",
+                    "id": request_id,
                     "error": {
                         "code": -32601,
                         "message": f"Method not found: {method}"
                     }
                 }
 
-            return result
+            return {
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "result": result
+            }
 
         except Exception as e:
-            logger.error(f"OpenAI Connector: Request error - {e}", exc_info=True)
+            logger.error(f"MCP request error: {e}", exc_info=True)
             return {
+                "jsonrpc": "2.0",
+                "id": request_id,
                 "error": {
                     "code": -32603,
                     "message": f"Internal error: {str(e)}"
                 }
             }
 
-    async def event_stream(self, request: Request):
-        """Generate SSE events for MCP protocol."""
-        logger.info("OpenAI Connector: SSE connection established")
 
-        # Send server ready notification
-        yield await self.send_sse({
-            "jsonrpc": "2.0",
-            "method": "notifications/initialized",
-            "params": {}
-        })
-
-        try:
-            # Keep connection alive with periodic heartbeat
-            heartbeat_interval = 25  # seconds
-            last_heartbeat = datetime.now()
-
-            while True:
-                # Check for client disconnect
-                if await request.is_disconnected():
-                    logger.info("OpenAI Connector: Client disconnected")
-                    break
-
-                # Check message queue (non-blocking)
-                try:
-                    message = self._message_queue.get_nowait()
-                    yield await self.send_sse(message)
-                except asyncio.QueueEmpty:
-                    pass
-
-                # Send heartbeat
-                now = datetime.now()
-                if (now - last_heartbeat).total_seconds() >= heartbeat_interval:
-                    yield f": heartbeat\n\n"  # SSE comment for keepalive
-                    last_heartbeat = now
-
-                await asyncio.sleep(0.1)
-
-        except asyncio.CancelledError:
-            logger.info("OpenAI Connector: SSE connection cancelled")
-        except Exception as e:
-            logger.error(f"OpenAI Connector: SSE error - {e}", exc_info=True)
+# Singleton handler
+_mcp_handler: Optional[MCPStreamableHTTPHandler] = None
 
 
-# Singleton instance
-_openai_sse_server: Optional[OpenAIMCPServerSSE] = None
-
-
-def get_openai_sse_server() -> OpenAIMCPServerSSE:
-    """Get or create SSE server singleton."""
-    global _openai_sse_server
-    if _openai_sse_server is None:
-        _openai_sse_server = OpenAIMCPServerSSE()
-    return _openai_sse_server
+def get_mcp_handler() -> MCPStreamableHTTPHandler:
+    """Get or create MCP handler singleton."""
+    global _mcp_handler
+    if _mcp_handler is None:
+        _mcp_handler = MCPStreamableHTTPHandler()
+    return _mcp_handler
 
 
 # =============================================================================
-# SSE Endpoints
+# Streamable HTTP MCP Endpoint (Primary)
 # =============================================================================
 
-@router.get("/sse/")
-@router.get("/sse")
-async def openai_mcp_sse_endpoint(request: Request):
+@router.post("/mcp")
+async def mcp_streamable_http_endpoint(
+    request: Request,
+    accept: Optional[str] = Header(default="application/json")
+):
     """
-    SSE endpoint for OpenAI ChatGPT connectors.
+    Streamable HTTP MCP endpoint.
 
-    URL: /api/mcp/openai/sse/
+    This is the PRIMARY endpoint for:
+    - ChatGPT Deep Research connectors
+    - Microsoft 365 Copilot declarative agents
 
-    OpenAI connectors require the URL to end in /sse/
-    This endpoint provides server-sent events for MCP protocol.
+    URL: POST https://your-domain.com/api/mcp/openai/mcp
+
+    Accepts:
+    - Content-Type: application/json
+    - Accept: application/json, text/event-stream
+
+    Test with:
+        curl -X POST https://your-domain.com/api/mcp/openai/mcp \\
+          -H "Content-Type: application/json" \\
+          -H "Accept: application/json, text/event-stream" \\
+          -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
     """
-    server = get_openai_sse_server()
-    return StreamingResponse(
-        server.event_stream(request),
-        media_type="text/event-stream",
+    try:
+        body = await request.json()
+    except Exception as e:
+        logger.error(f"MCP invalid JSON: {e}")
+        return JSONResponse(
+            status_code=400,
+            content={
+                "jsonrpc": "2.0",
+                "id": None,
+                "error": {
+                    "code": -32700,
+                    "message": "Parse error: Invalid JSON"
+                }
+            },
+            headers=CORS_HEADERS
+        )
+
+    handler = get_mcp_handler()
+    response = await handler.handle_request(body)
+
+    return JSONResponse(
+        content=response,
+        headers=CORS_HEADERS
+    )
+
+
+@router.options("/mcp")
+async def mcp_options():
+    """Handle CORS preflight for MCP endpoint."""
+    return Response(
+        status_code=200,
         headers={
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Headers": "*",
-            "Access-Control-Allow-Methods": "GET, POST, OPTIONS"
+            **CORS_HEADERS,
+            "Access-Control-Max-Age": "86400",
         }
     )
 
 
-@router.post("/sse/")
-@router.post("/sse")
-async def openai_mcp_request_endpoint(request: Dict):
+@router.get("/mcp")
+async def mcp_get_info():
     """
-    HTTP POST endpoint for MCP tool calls.
+    GET on MCP endpoint returns server info.
 
-    OpenAI connectors send tool requests via POST to the SSE endpoint.
+    Useful for connector discovery and health checks.
     """
-    server = get_openai_sse_server()
-    response = await server.handle_request(request)
-
-    return {
-        "jsonrpc": "2.0",
-        "id": request.get("id"),
-        "result": response
-    }
-
-
-@router.options("/sse/")
-@router.options("/sse")
-async def openai_mcp_options():
-    """Handle CORS preflight for OpenAI connectors."""
-    from fastapi.responses import Response
-    return Response(
-        status_code=200,
-        headers={
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-            "Access-Control-Allow-Headers": "Content-Type, Accept, Authorization, Cache-Control",
-            "Access-Control-Max-Age": "86400",
-        }
+    server = get_openai_connector_server()
+    return JSONResponse(
+        content={
+            "name": "sentinel-bms-connector",
+            "version": "1.0.0",
+            "description": "SENTINEL BMS Intelligence Platform - Building Management Data Connector",
+            "protocol": "MCP",
+            "protocolVersion": "2024-11-05",
+            "transport": "streamable-http",
+            "tools": ["search", "fetch"],
+            "documents_indexed": len(server._documents or []) if server._documents else "not loaded"
+        },
+        headers=CORS_HEADERS
     )
 
 
@@ -296,27 +308,28 @@ async def openai_mcp_options():
 async def openai_connector_info():
     """Get connector information and available tools."""
     server = get_openai_connector_server()
-    return {
-        "name": "sentinel-bms-connector",
-        "version": "1.0.0",
-        "description": "SENTINEL BMS Intelligence Platform - Building Management Data Connector",
-        "mcp_version": "2024-11-05",
-        "sse_endpoint": "/api/mcp/openai/sse/",
-        "tools": server.list_tools(),
-        "capabilities": {
-            "search": "Search BMS data including buildings, equipment, alerts",
-            "fetch": "Retrieve full document content by ID"
-        }
-    }
+    return JSONResponse(
+        content={
+            "name": "sentinel-bms-connector",
+            "version": "1.0.0",
+            "description": "SENTINEL BMS Intelligence Platform - Building Management Data Connector",
+            "mcp_version": "2024-11-05",
+            "transport": "streamable-http",
+            "mcp_endpoint": "/api/mcp/openai/mcp",
+            "tools": server.list_tools(),
+            "capabilities": {
+                "search": "Search BMS data including buildings, equipment, alerts, predictions",
+                "fetch": "Retrieve full document content by ID"
+            }
+        },
+        headers=CORS_HEADERS
+    )
 
 
 @router.get("/health")
 async def openai_connector_health():
     """Health check endpoint - publicly accessible for external connectivity tests."""
-    from fastapi.responses import JSONResponse
-
     server = get_openai_connector_server()
-    # Trigger index build to check health
     server._ensure_index()
 
     return JSONResponse(
@@ -324,12 +337,11 @@ async def openai_connector_health():
             "status": "healthy",
             "documents_indexed": len(server._documents or []),
             "timestamp": datetime.now().isoformat(),
-            "mcp_endpoint": "/api/mcp/openai/sse/",
+            "mcp_endpoint": "/api/mcp/openai/mcp",
+            "transport": "streamable-http",
             "tools": ["search", "fetch"]
         },
-        headers={
-            "Access-Control-Allow-Origin": "*",
-        }
+        headers=CORS_HEADERS
     )
 
 
@@ -337,7 +349,10 @@ async def openai_connector_health():
 async def openai_connector_stats():
     """Get detailed index statistics."""
     server = get_openai_connector_server()
-    return server.get_stats()
+    return JSONResponse(
+        content=server.get_stats(),
+        headers=CORS_HEADERS
+    )
 
 
 @router.post("/refresh")
@@ -345,7 +360,116 @@ async def openai_connector_refresh():
     """Force refresh the document index."""
     server = get_openai_connector_server()
     server.refresh_index()
-    return {
-        "status": "refreshed",
-        "stats": server.get_stats()
-    }
+    return JSONResponse(
+        content={
+            "status": "refreshed",
+            "stats": server.get_stats()
+        },
+        headers=CORS_HEADERS
+    )
+
+
+# =============================================================================
+# Legacy SSE Endpoint (kept for backwards compatibility)
+# =============================================================================
+
+@router.get("/sse")
+@router.get("/sse/")
+async def sse_legacy_redirect():
+    """
+    Legacy SSE endpoint - redirects to info with deprecation notice.
+
+    SSE transport is deprecated for Microsoft 365 Copilot.
+    Use Streamable HTTP at /api/mcp/openai/mcp instead.
+    """
+    return JSONResponse(
+        content={
+            "message": "SSE transport is deprecated. Use Streamable HTTP instead.",
+            "mcp_endpoint": "/api/mcp/openai/mcp",
+            "documentation": "https://modelcontextprotocol.io/specification/2025-06-18/basic/transports"
+        },
+        headers=CORS_HEADERS
+    )
+
+
+@router.post("/sse")
+@router.post("/sse/")
+async def sse_legacy_post(request: Request):
+    """
+    Legacy SSE POST - forwards to Streamable HTTP handler.
+
+    For backwards compatibility with existing integrations.
+    """
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "Invalid JSON"},
+            headers=CORS_HEADERS
+        )
+
+    handler = get_mcp_handler()
+    response = await handler.handle_request(body)
+
+    return JSONResponse(
+        content=response,
+        headers=CORS_HEADERS
+    )
+
+
+@router.options("/sse")
+@router.options("/sse/")
+async def sse_options():
+    """Handle CORS preflight for legacy SSE endpoint."""
+    return Response(
+        status_code=200,
+        headers={
+            **CORS_HEADERS,
+            "Access-Control-Max-Age": "86400",
+        }
+    )
+
+
+# =============================================================================
+# Well-Known MCP Discovery Endpoint
+# =============================================================================
+
+@wellknown_router.get("/.well-known/mcp.json")
+async def mcp_discovery():
+    """
+    MCP Discovery endpoint for ChatGPT connectors and M365 Copilot.
+
+    This is the standard location for MCP server discovery.
+    Returns server info and endpoint URL.
+    """
+    return JSONResponse(
+        content={
+            "name": "sentinel-bms-connector",
+            "version": "1.0.0",
+            "description": "SENTINEL BMS Intelligence Platform - Building Management Data Connector",
+            "mcp": {
+                "version": "2024-11-05",
+                "transport": "streamable-http",
+                "endpoint": "/api/mcp/openai/mcp"
+            },
+            "tools": ["search", "fetch"],
+            "capabilities": {
+                "search": "Search BMS data including buildings, equipment, alerts, predictions",
+                "fetch": "Retrieve full document content by ID"
+            }
+        },
+        headers=CORS_HEADERS
+    )
+
+
+@wellknown_router.options("/.well-known/mcp.json")
+async def mcp_discovery_options():
+    """Handle CORS preflight for MCP discovery endpoint."""
+    return Response(
+        status_code=200,
+        headers={
+            **CORS_HEADERS,
+            "Access-Control-Max-Age": "86400",
+        }
+    )

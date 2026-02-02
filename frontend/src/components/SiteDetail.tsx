@@ -855,9 +855,19 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
               )}
 
               {(() => {
-                const filteredEquipment = selectedCategory
+                // Filter by category, then sort: warnings/critical first, then by health (lowest first)
+                const filteredEquipment = (selectedCategory
                   ? equipment.filter((eq) => eq.category === selectedCategory)
-                  : equipment;
+                  : equipment
+                ).sort((a, b) => {
+                  // Priority: critical > warning > normal
+                  const statusPriority = { critical: 0, warning: 1, normal: 2 };
+                  const aPriority = statusPriority[a.status as keyof typeof statusPriority] ?? 2;
+                  const bPriority = statusPriority[b.status as keyof typeof statusPriority] ?? 2;
+                  if (aPriority !== bPriority) return aPriority - bPriority;
+                  // Same status: sort by health (lowest first)
+                  return (a.health ?? 100) - (b.health ?? 100);
+                });
 
                 return filteredEquipment.length === 0 ? (
                   <div className="text-center py-12">

@@ -344,36 +344,34 @@ Context-Aware Data Collection
 ### Alert Notification Format
 
 ```
-🚨 CRITICAL ALERT - Sandton
+⚠️ WARNING ALERT - Sandton City Office Tower
 
-Zone: Zone-L10-C
+Zone: Level 10 Zone C
 Equipment: FCU-L10-03
-Type: fcu_valve_stuck
+Type: FCU
+Code: FCU-L10-03
 
 FCU valve stuck at 15% - insufficient chilled water flow
 
-Equipment Status:
-✅ AHU-L10-01: normal
-⚠️ FCU-L10-03: warning
-✅ VAV-L10-03: normal
+Time: 14:32:15
 
-Diagnosis: Valve actuator not responding
-Fault Code: E04
-
-Actions:
-  1. Check valve actuator power supply (24VAC)
-  2. Verify BMS control signal (0-10V)
-  3. Replace actuator if unresponsive
-
-Parts: Belimo LMV-D3 actuator
-Est. Repair: 2h
-
-Reply: /ack | /dispatch | /wo FCU-L10-03
+/WO_FCU_L10_03 - Create Work Order
+/note_FCU_L10_03 - Log note only
 ```
+
+**Important: Telegram Command Format**
+
+Telegram bot commands can only contain letters, numbers, and underscores. Commands end at hyphens or spaces. Therefore:
+
+- Equipment code `FCU-L10-03` becomes command `/WO_FCU_L10_03`
+- Clawdbot converts underscores back to dashes when looking up equipment
+- The actual equipment code is displayed in the `Code:` field for reference
 
 ### Alert Notifier Service
 
 **Location**: `backend/app/services/clawd_integration/alert_notifier.py`
+
+The alert notifier sends Telegram messages via the `clawdbot` CLI tool.
 
 ```python
 from app.services.clawd_integration.alert_notifier import alert_notifier
@@ -381,22 +379,74 @@ from app.services.clawd_integration.alert_notifier import alert_notifier
 # Send alert to FM team
 alert_notifier.send_alert_sync({
     "id": alert_id,
-    "building_name": "Sandton",
-    "zone_name": "Zone-L10-C",
+    "building_name": "Sandton City Office Tower",
+    "zone_name": "Level 10 Zone C",
     "equipment_name": "FCU-L10-03",
-    "equipment_code": "FCU-L10-03",
-    "type": "fcu_valve_stuck",
-    "severity": "critical",
-    "message": "FCU valve stuck at 15%",
-    "reading": 25.0,
-    "setpoint": 21.0
+    "equipment_code": "FCU-L10-03",  # Displayed as-is, converted to underscores for commands
+    "equipment_type": "fcu",
+    "severity": "warning",
+    "message": "Health score dropped from 92% to 65%. Maintenance recommended."
 })
 ```
 
-**Environment Variables**:
-```bash
-CLAWD_BOT_TOKEN=<telegram-bot-token>
-CLAWD_FM_CHAT_ID=<fm-group-chat-id>
+The notifier automatically:
+1. Formats the equipment code with underscores for clickable Telegram commands
+2. Includes the original code in the message body for reference
+3. Sends via `clawdbot message send` CLI
+
+**Configuration**:
+- FM Chat ID: Set in `alert_notifier.py` or via `CLAWD_FM_CHAT_ID` env var
+- Clawdbot must be installed and in PATH
+
+## Work Order Commands
+
+### `/WO_<equipment_code>` - Create Work Order
+
+When FM clicks the `/WO_` command in a Telegram alert, Clawdbot:
+
+1. Extracts equipment code (converts underscores back to dashes)
+2. Looks up equipment from SENTINEL API
+3. Creates a Concept Evolution-compatible work order
+4. Returns confirmation with job card number
+
+**Handler**: `clawd_ai_bridge.py:handle_wo_command()`
+
+**Example**:
+```
+User clicks: /WO_FCU_L12_03
+
+Clawdbot response:
+Work order created:
+
+JC-2026-0202143256 🟡
+
+• Site: Sandton City (SC-JHB-001)
+• Equipment: Fan Coil Unit Zone-L12-C
+• Code: FCU-L12-03
+• Priority: P3 - Medium (24hr SLA)
+• Issue: Health degradation - maintenance required
+
+Reply /email to send to maintenance team.
+```
+
+### `/note_<equipment_code>` - Log Note Only
+
+For alerts that don't require a work order (acknowledged but no action needed).
+
+**Handler**: `clawd_ai_bridge.py:handle_note_command()`
+
+**Example**:
+```
+User clicks: /note_FCU_L12_03
+
+Clawdbot response:
+📝 Note logged for FCU-L12-03
+
+Logged by: @username
+Time: 2026-02-02 14:35
+
+Alert acknowledged - no work order created.
+Equipment will continue to be monitored.
 ```
 
 ## Zone Diagnostics

@@ -391,6 +391,211 @@ class BackgroundSchedulerService:
         except Exception as e:
             logger.error(f"Failed to run prediction generation: {e}")
 
+    def add_recommendation_generation_job(self, interval_seconds: int = 600):
+        """
+        Add a job to generate AI recommendations periodically.
+
+        Scans all equipment and generates maintenance recommendations for at-risk equipment.
+
+        Args:
+            interval_seconds: How often to run (default: 600 seconds = 10 minutes)
+        """
+        # Remove existing job if it exists
+        if self.scheduler.get_job('generate_recommendations'):
+            self.scheduler.remove_job('generate_recommendations')
+            logger.info("Removed existing recommendation generation job")
+
+        # Add new job
+        self.scheduler.add_job(
+            func=self._run_recommendation_generation,
+            trigger=IntervalTrigger(seconds=interval_seconds),
+            id='generate_recommendations',
+            name='Generate AI Recommendations for At-Risk Equipment',
+            replace_existing=True
+        )
+        logger.info(f"Added recommendation generation job with {interval_seconds}s interval")
+
+    def _run_recommendation_generation(self):
+        """
+        Generate AI recommendations for all equipment below health threshold.
+        Uses real data: health scores, install dates, service history, alerts, predictions.
+        """
+        try:
+            from app.database.supabase_client import get_supabase_client
+            from app.services.maintenance_recommender import get_maintenance_recommender
+            from app.services.module_registry_service import ModuleRegistryService
+            from app.models.module_registry import (
+                AIRecommendation, ModuleType, RecommendationType, RecommendationPriority
+            )
+            import uuid
+            from datetime import datetime, timedelta
+
+            logger.info("Running scheduled AI recommendation generation...")
+
+            client = get_supabase_client()
+            recommender = get_maintenance_recommender(client)
+            module_registry = ModuleRegistryService()
+
+            # Get all equipment with health below 90% - include real data fields
+            response = client.table("equipment").select(
+                "id, code, name, type, health_score, building_id, status, "
+                "install_date, last_service, manufacturer, model"
+            ).lt("health_score", 90).execute()
+
+            at_risk_equipment = response.data if response.data else []
+            logger.info(f"Found {len(at_risk_equipment)} equipment below 90% health")
+
+            generated = 0
+            for eq in at_risk_equipment:
+                try:
+                    health = eq.get("health_score", 100)
+                    equipment_id = eq.get("id")
+
+                    # Get building/site code
+                    building_response = client.table("buildings").select("code, name").eq("id", eq.get("building_id")).execute()
+                    site_code = building_response.data[0]["code"] if building_response.data else "unknown"
+                    building_name = building_response.data[0]["name"] if building_response.data else "Unknown Building"
+
+                    # Get recent alerts for this equipment (last 30 days)
+                    alerts_response = client.table("alerts").select(
+                        "type, severity, created_at, message"
+                    ).eq("equipment_id", equipment_id).gte(
+                        "created_at", (datetime.now() - timedelta(days=30)).isoformat()
+                    ).order("created_at", desc=True).limit(5).execute()
+                    recent_alerts = alerts_response.data if alerts_response.data else []
+
+                    # Get existing prediction for this equipment
+                    prediction_response = client.table("predictions").select(
+                        "probability_percent, contributing_factors, evidence, recommended_action"
+                    ).eq("equipment_id", equipment_id).eq("status", "active").limit(1).execute()
+                    prediction = prediction_response.data[0] if prediction_response.data else None
+
+                    # Calculate days since last service
+                    days_since_service = None
+                    if eq.get("last_service"):
+                        try:
+                            last_service_date = datetime.fromisoformat(eq["last_service"].replace("Z", "+00:00"))
+                            days_since_service = (datetime.now(last_service_date.tzinfo) - last_service_date).days
+                        except:
+                            pass
+
+                    # Calculate equipment age in years
+                    equipment_age_years = None
+                    if eq.get("install_date"):
+                        try:
+                            install_date = datetime.fromisoformat(eq["install_date"].replace("Z", "+00:00"))
+                            equipment_age_years = (datetime.now(install_date.tzinfo) - install_date).days / 365
+                        except:
+                            pass
+
+                    # Build context-aware description
+                    context_parts = []
+                    context_parts.append(f"Health score: {health}%")
+
+                    if equipment_age_years:
+                        context_parts.append(f"Equipment age: {equipment_age_years:.1f} years")
+
+                    if days_since_service:
+                        if days_since_service > 180:
+                            context_parts.append(f"⚠️ Last serviced {days_since_service} days ago (overdue)")
+                        else:
+                            context_parts.append(f"Last serviced {days_since_service} days ago")
+                    elif days_since_service is None:
+                        context_parts.append("No service history recorded")
+
+                    if recent_alerts:
+                        alert_count = len(recent_alerts)
+                        context_parts.append(f"{alert_count} alert(s) in last 30 days")
+
+                    if prediction:
+                        prob = prediction.get("probability_percent", 0)
+                        if prob > 70:
+                            context_parts.append(f"🔴 High failure probability: {prob}%")
+                        elif prob > 50:
+                            context_parts.append(f"🟡 Moderate failure probability: {prob}%")
+
+                    # Generate recommendation using real context
+                    risk_level = "critical" if health < 50 else ("high" if health < 70 else "medium")
+                    recommendation = recommender._generate_fallback_recommendation(
+                        equipment_id=eq.get("code", eq["id"]),
+                        equipment_type=eq.get("type", "unknown"),
+                        risk_level=risk_level,
+                        predicted_failure="health_degradation"
+                    )
+
+                    # Enhance actions based on real data
+                    enhanced_actions = list(recommendation.immediate_actions)
+                    if days_since_service and days_since_service > 180:
+                        enhanced_actions.insert(0, "Schedule overdue preventive maintenance")
+                    if recent_alerts and len(recent_alerts) >= 3:
+                        enhanced_actions.insert(0, "Review recurring alert pattern")
+                    if prediction and prediction.get("probability_percent", 0) > 70:
+                        enhanced_actions.insert(0, prediction.get("recommended_action", "Address predicted failure"))
+
+                    # Determine priority based on multiple factors
+                    priority = RecommendationPriority.MEDIUM
+                    if health < 50 or (prediction and prediction.get("probability_percent", 0) > 80):
+                        priority = RecommendationPriority.CRITICAL
+                    elif health < 70 or (days_since_service and days_since_service > 365):
+                        priority = RecommendationPriority.HIGH
+
+                    description = ". ".join(context_parts)
+                    if enhanced_actions:
+                        description += f". Recommended: {enhanced_actions[0]}"
+
+                    ai_rec = AIRecommendation(
+                        recommendation_id=str(uuid.uuid4()),
+                        timestamp=datetime.now().isoformat(),
+                        source_module=ModuleType.HVAC,
+                        recommendation_type=RecommendationType.MAINTENANCE,
+                        priority=priority,
+                        title=f"Maintenance Required: {eq['name']}",
+                        description=description,
+                        confidence=0.90 if prediction else 0.75,
+                        related_modules=[],
+                        telemetry_context={
+                            "equipment_id": eq.get("code", eq["id"]),
+                            "equipment_type": eq.get("type", "unknown"),
+                            "health_score": health,
+                            "building_id": site_code,
+                            "building_name": building_name,
+                            "manufacturer": eq.get("manufacturer"),
+                            "model": eq.get("model"),
+                            "install_date": eq.get("install_date"),
+                            "last_service": eq.get("last_service"),
+                            "days_since_service": days_since_service,
+                            "equipment_age_years": round(equipment_age_years, 1) if equipment_age_years else None,
+                            "recent_alert_count": len(recent_alerts),
+                            "failure_probability": prediction.get("probability_percent") if prediction else None,
+                            "contributing_factors": prediction.get("contributing_factors") if prediction else None,
+                        },
+                        suggested_action={
+                            "type": "schedule_maintenance",
+                            "priority": recommendation.priority,
+                            "immediate_actions": enhanced_actions[:5],
+                            "evidence": [
+                                f"Health at {health}%",
+                                f"{len(recent_alerts)} alerts in 30 days" if recent_alerts else "No recent alerts",
+                                f"Service overdue by {days_since_service - 180} days" if days_since_service and days_since_service > 180 else None,
+                                f"Failure probability {prediction.get('probability_percent')}%" if prediction else None,
+                            ],
+                        },
+                        auto_actionable=False,
+                        acknowledged=False,
+                        resolved=False,
+                    )
+
+                    module_registry.add_recommendation(site_code, ai_rec)
+                    generated += 1
+
+                except Exception as e:
+                    logger.warning(f"Failed to generate recommendation for {eq.get('name', 'unknown')}: {e}")
+
+            logger.info(f"AI recommendation generation complete: {generated} generated")
+
+        except Exception as e:
+            logger.error(f"Failed to run recommendation generation: {e}")
+
 
 # Global scheduler instance
 scheduler_service = BackgroundSchedulerService()

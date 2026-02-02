@@ -91,6 +91,7 @@ app.include_router(complaints.router, tags=["comfort-complaints"])  # Comfort co
 app.include_router(mcp.router, tags=["mcp"])  # MCP (Model Context Protocol) for AI tool integration
 app.include_router(mcp_sse.router, tags=["mcp-sse"])  # MCP SSE transport for remote clients
 app.include_router(mcp_openai.router, tags=["mcp-openai"])  # MCP OpenAI ChatGPT connector
+app.include_router(mcp_openai.wellknown_router, tags=["mcp-discovery"])  # MCP well-known discovery
 app.include_router(buildings.router, tags=["buildings"])  # Building management (onboarding)
 app.include_router(generators.router, prefix="/api", tags=["generators"])  # Generator/SCADA
 app.include_router(energy_centre.router, prefix="/api", tags=["energy-centre"])  # Energy centre
@@ -131,12 +132,16 @@ async def startup_event():
     # When equipment health drops below 90%, a prediction is auto-generated
     scheduler_service.add_prediction_generation_job(interval_seconds=300)  # 5 minutes
 
-    # Start BMS simulation service (in-memory demo)
-    try:
-        await simulation_service.start_simulation()
-        print("BMS Simulation service started successfully")
-    except Exception as e:
-        print(f"Failed to start simulation service: {e}")
+    # Start AI recommendation generation job (runs every 10 minutes)
+    # Scans all equipment and generates maintenance recommendations for at-risk equipment
+    scheduler_service.add_recommendation_generation_job(interval_seconds=600)  # 10 minutes
+
+    # BMS simulation service - DISABLED for demo stability
+    # try:
+    #     await simulation_service.start_simulation()
+    #     print("BMS Simulation service started successfully")
+    # except Exception as e:
+    #     print(f"Failed to start simulation service: {e}")
 
     # Start health simulation service (writes to Supabase, triggers Clawd alerts)
     # Runs every hour between 08:00-17:00

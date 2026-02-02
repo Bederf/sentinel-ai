@@ -622,10 +622,8 @@ class BMSimulationService:
                 self._generate_alert(equipment, "warning", f"{equipment.name} health degrading - maintenance recommended")
 
         # Health threshold crossing alerts (using centralized thresholds)
-        if old_health >= thresholds["healthy"] and new_health < thresholds["healthy"]:
-            self._generate_alert(equipment, "health_critical",
-                f"{equipment.name} health dropped below {thresholds['healthy']}% - maintenance required")
-        elif old_health >= thresholds["warning"] and new_health < thresholds["warning"]:
+        # Note: 90% threshold alert removed - already covered by status transition to "warning"
+        if old_health >= thresholds["warning"] and new_health < thresholds["warning"]:
             self._generate_alert(equipment, "health_danger",
                 f"{equipment.name} health at {new_health:.0f}% - risk of failure increasing")
         elif old_health >= thresholds["critical"] and new_health < thresholds["critical"]:
@@ -778,6 +776,8 @@ class BMSimulationService:
                 "building_name": alert["site_name"],
                 "zone_name": equipment.location,
                 "equipment_name": equipment.name,
+                "equipment_code": equipment.id,
+                "equipment_type": equipment.type,
                 "type": alert_type.replace("_", " ").title(),
                 "severity": severity,
                 "message": message,

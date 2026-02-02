@@ -70,18 +70,31 @@ class Desk(BaseModel):
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Desk":
-        """Create instance from dictionary."""
+        """Create instance from dictionary.
+
+        Handles both JSON schema (near_diffuser as string ID) and
+        Supabase schema (near_diffuser as bool, diffuser_id as string).
+        """
+        # Handle near_diffuser: Supabase has bool + diffuser_id, JSON has string
+        near_diffuser_val = data.get("near_diffuser")
+        if isinstance(near_diffuser_val, bool):
+            # Supabase schema: use diffuser_id if near_diffuser is True
+            near_diffuser = data.get("diffuser_id") if near_diffuser_val else None
+        else:
+            # JSON schema: near_diffuser is already the ID string
+            near_diffuser = near_diffuser_val
+
         return cls(
             desk_id=data.get("desk_id", ""),
             floor=data.get("floor", ""),
             building=data.get("building", ""),
             zone_id=data.get("zone_id", ""),
             near_window=data.get("near_window", False),
-            orientation=data.get("orientation"),
-            near_diffuser=data.get("near_diffuser"),
+            orientation=data.get("orientation") or data.get("window_facing"),
+            near_diffuser=near_diffuser,
             near_printer=data.get("near_printer", False),
             department=data.get("department"),
-            occupant=data.get("occupant"),
+            occupant=data.get("occupant") or data.get("assigned_to"),
             x_coord=data.get("x_coord"),
             y_coord=data.get("y_coord"),
             dali_zone=data.get("dali_zone"),

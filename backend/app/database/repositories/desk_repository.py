@@ -32,23 +32,36 @@ class DeskRepository:
         return response.data
 
     def get_by_building_code(self, building_code: str) -> List[Dict[str, Any]]:
-        """Get desks by building code.
+        """Get desks by building code with zone_id resolved.
 
         Args:
-            building_code: Building code (e.g., 'sandton')
+            building_code: Building code (e.g., 'sandton' or 'site-002')
 
         Returns:
-            List of desks
+            List of desks with zone_id (string) from hvac_zones join
         """
         building_uuid = self.get_building_uuid(building_code)
         if not building_uuid:
             return []
 
-        response = self.client.table('desks').select("*").eq(
-            'building_id', building_uuid
-        ).execute()
+        # Join with hvac_zones to get zone_id string
+        response = self.client.table('desks').select(
+            "*, hvac_zones(zone_id, zone_name)"
+        ).eq('building_id', building_uuid).execute()
 
-        return response.data
+        # Flatten hvac_zones data into desk dict
+        desks = []
+        for desk in response.data:
+            hvac_zone = desk.pop('hvac_zones', None)
+            if hvac_zone:
+                desk['zone_id'] = hvac_zone.get('zone_id', '')
+                desk['zone_name'] = hvac_zone.get('zone_name', '')
+            else:
+                desk['zone_id'] = ''
+                desk['zone_name'] = ''
+            desks.append(desk)
+
+        return desks
 
     def get_by_desk_id(self, desk_id: str) -> Optional[Dict[str, Any]]:
         """Get desk by desk_id.

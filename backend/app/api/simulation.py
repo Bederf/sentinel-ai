@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 import logging
+import random
 
 from app.services.bms_simulation_service import create_simulation_service
 from app.services.health_threshold_service import get_health_status
@@ -583,10 +584,12 @@ async def trigger_demo_warnings(
     for eq in selected_equipment:
         try:
             old_health = eq.get("health_score", 92)
+            # Vary health scores for realistic demo (55-75% range)
+            new_health = random.randint(55, 75)
 
-            # Update health to warning state (65) and status to 'warning'
+            # Update health to warning state and status to 'warning'
             client.table("equipment").update({
-                "health_score": 65,
+                "health_score": new_health,
                 "status": "warning",
                 "updated_at": datetime.now().isoformat(),
             }).eq("id", eq["id"]).execute()
@@ -596,7 +599,7 @@ async def trigger_demo_warnings(
                 equipment_id=eq["id"],
                 building_id=building_id,
                 severity="warning",
-                message=f"Health score dropped from {old_health}% to 65%. Maintenance recommended.",
+                message=f"Health score dropped from {old_health}% to {new_health}%. Maintenance recommended.",
                 alert_type="health_degradation",
                 notify_telegram=True,
             )
@@ -606,7 +609,7 @@ async def trigger_demo_warnings(
                 "code": eq.get("code", ""),
                 "type": eq.get("type", ""),
                 "old_health": old_health,
-                "new_health": 65,
+                "new_health": new_health,
             })
 
             if alert_result.get("alert"):
@@ -651,13 +654,13 @@ async def trigger_demo_warnings(
                 recommendation_type=RecommendationType.MAINTENANCE,
                 priority=RecommendationPriority.HIGH,
                 title=f"Maintenance Required: {eq['name']}",
-                description=f"Health score dropped to 65%. {'; '.join(recommendation.immediate_actions[:2])}",
+                description=f"Health score dropped to {eq_info['new_health']}%. {'; '.join(recommendation.immediate_actions[:2])}",
                 confidence=0.85,
                 related_modules=[ModuleType.ENERGY] if "chiller" in eq.get("type", "").lower() else [],
                 telemetry_context={
                     "equipment_id": eq.get("code", eq["id"]),
                     "equipment_type": eq.get("type", "unknown"),
-                    "health_score": 65,
+                    "health_score": eq_info["new_health"],
                     "building_id": site_code,
                 },
                 suggested_action={

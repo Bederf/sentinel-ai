@@ -91,7 +91,8 @@ class EquipmentAlertService:
                 "zone_name": equipment.get("zone_name", "Building"),
                 "equipment_name": equipment.get("name", "Unknown"),
                 "equipment_code": equipment.get("code", ""),
-                "type": alert_type,
+                "equipment_type": equipment.get("type", "equipment"),
+                "type": severity.title(),  # "Warning" or "Critical"
                 "severity": severity,
                 "message": message,
             }
@@ -114,10 +115,26 @@ class EquipmentAlertService:
             response = self.supabase.table("equipment").select(
                 "id, code, name, type, health_score, building_id"
             ).eq("id", equipment_id).execute()
-            return response.data[0] if response.data else None
+            if not response.data:
+                return None
+            equipment = response.data[0]
+            # Parse zone from equipment name (e.g., "Zone-L12-C" → "Level 12 Zone C")
+            equipment["zone_name"] = self._parse_zone_from_name(equipment.get("name", ""))
+            return equipment
         except Exception as e:
             logger.error(f"Failed to get equipment: {e}")
             return None
+
+    def _parse_zone_from_name(self, name: str) -> str:
+        """Parse zone name from equipment name pattern like 'Zone-L12-C'."""
+        import re
+        # Match patterns like "Zone-L12-C" or "S001-Zone-L1-A"
+        match = re.search(r'Zone-L(\d+)-([A-Z])', name)
+        if match:
+            level = match.group(1)
+            zone_letter = match.group(2)
+            return f"Level {level} Zone {zone_letter}"
+        return "Building"
 
     def _get_building(self, building_id: str) -> Optional[Dict[str, Any]]:
         """Get building by UUID."""
