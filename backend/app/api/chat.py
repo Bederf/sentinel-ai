@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from app.services.claude_service import claude_service
 from app.services.demo_cache import DemoCache
 from app.services.work_order_service import work_order_service
+from app.services.doc_rag_service import search_documentation, get_doc_rag_system_prompt
 from app.config.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -23,6 +24,7 @@ class ChatRequest(BaseModel):
 
     message: str
     conversation_id: str | None = None
+    search_docs: bool = False  # When True, searches documentation RAG
 
 
 class ChatMetadata(BaseModel):
@@ -32,6 +34,31 @@ class ChatMetadata(BaseModel):
     command_result: dict | None = None
     work_order: dict | None = None
     citations: list[str] | None = None
+
+
+def format_sse_chunk(chunk: str) -> str:
+    """
+    Format a chunk for SSE transmission, handling newlines properly.
+
+    SSE format requires each line of multi-line content to have its own "data:" prefix.
+    If we send "data: hello\\nworld\\n\\n", the client would see:
+    - "data: hello" -> extracts "hello"
+    - "world" -> doesn't start with "data:" so it gets IGNORED!
+
+    This function handles newlines in chunks by sending each line with its own prefix.
+    """
+    if '\n' not in chunk:
+        # Simple case - no newlines
+        return f"data: {chunk}\n\n"
+
+    # Multi-line chunk - send each line with its own data: prefix
+    # The SSE spec says multi-line data should use multiple data: lines
+    lines = chunk.split('\n')
+    sse_lines = []
+    for line in lines:
+        sse_lines.append(f"data: {line}")
+    # Join with \n and add final \n\n separator
+    return '\n'.join(sse_lines) + '\n\n'
 
 
 async def generate_sse_stream(user_message: str, use_tools: bool = True) -> AsyncGenerator[str, None]:
@@ -51,13 +78,13 @@ async def generate_sse_stream(user_message: str, use_tools: bool = True) -> Asyn
         if use_tools:
             # Use tool-enabled streaming for device control capabilities
             async for chunk in claude_service.stream_response_with_tools(messages):
-                # Format as SSE data
-                yield f"data: {chunk}\n\n"
+                # Format as SSE data with proper newline handling
+                yield format_sse_chunk(chunk)
         else:
             # Use regular streaming without tools
             async for chunk in claude_service.stream_response(messages):
-                # Format as SSE data
-                yield f"data: {chunk}\n\n"
+                # Format as SSE data with proper newline handling
+                yield format_sse_chunk(chunk)
 
         # Send completion sentinel
         yield "data: [DONE]\n\n"
@@ -85,8 +112,53 @@ async def generate_static_sse(message: str) -> AsyncGenerator[str, None]:
     Yields:
         SSE-formatted message followed by completion sentinel
     """
-    yield f"data: {message}\n\n"
+    # Use format_sse_chunk to properly handle newlines in the message
+    yield format_sse_chunk(message)
     yield "data: [DONE]\n\n"
+
+
+async def generate_docs_sse_stream(user_message: str) -> AsyncGenerator[str, None]:
+    """
+    Generate SSE-formatted stream for documentation search mode.
+
+    Searches the documentation RAG first, then uses Claude to answer
+    based on the retrieved documentation + building context.
+
+    Args:
+        user_message: The user's question about SENTINEL documentation
+
+    Yields:
+        SSE-formatted data chunks
+    """
+    try:
+        # Search documentation RAG for relevant content
+        doc_results = await search_documentation(user_message)
+
+        # Build system prompt with documentation context
+        system_prompt = get_doc_rag_system_prompt(doc_results)
+
+        messages = [{"role": "user", "content": user_message}]
+
+        # Stream response with documentation context (no device control tools)
+        async for chunk in claude_service.stream_response(
+            messages,
+            system_prompt=system_prompt,
+            include_building_context=True  # Still include building data
+        ):
+            yield format_sse_chunk(chunk)
+
+        # Send completion sentinel
+        yield "data: [DONE]\n\n"
+
+    except ValueError as e:
+        logger.error(f"Configuration error: {e}")
+        yield f"data: Error: {str(e)}\n\n"
+        yield "data: [DONE]\n\n"
+
+    except Exception as e:
+        logger.error(f"Documentation chat error: {e}")
+        yield f"data: Error: {str(e)}\n\n"
+        yield "data: [DONE]\n\n"
 
 
 @router.post("/chat")
@@ -153,14 +225,8 @@ async def chat(request: ChatRequest) -> StreamingResponse:
 
             # Stream cached response with SSE format
             async def stream_cached_response() -> AsyncGenerator[str, None]:
-                # Stream line by line to simulate streaming behavior
-                lines = cached_response.split("\n")
-                for i, line in enumerate(lines):
-                    # Add newline to each line except the last if it doesn't have one
-                    if i < len(lines) - 1 or line.endswith("\n"):
-                        yield f"data: {line}\n\n"
-                    else:
-                        yield f"data: {line}\n\n"
+                # Use format_sse_chunk to properly handle newlines in cached response
+                yield format_sse_chunk(cached_response)
                 yield "data: [DONE]\n\n"
 
             return StreamingResponse(
@@ -180,6 +246,21 @@ async def chat(request: ChatRequest) -> StreamingResponse:
         raise HTTPException(
             status_code=503,
             detail="Claude AI is not configured. Set ANTHROPIC_API_KEY in environment.",
+        )
+
+    # 4. Check if documentation search mode is enabled
+    if request.search_docs:
+        logger.info("Documentation search mode enabled")
+        return StreamingResponse(
+            generate_docs_sse_stream(user_message),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+                "X-Response-Type": "ai_response",
+                "X-Search-Docs": "true",
+            },
         )
 
     return StreamingResponse(
@@ -208,6 +289,7 @@ async def chat_status():
             "building_context": True,
             "demo_cache": demo_mode,
             "tool_calling": True,  # Claude tool use enabled
+            "documentation_search": True,  # RAG-based documentation search
         },
     }
 

@@ -380,16 +380,20 @@ def save_sites(sites: List[Dict[str, Any]]):
 @router.post("/optimization/analyze")
 async def analyze_optimization(request: AnalyzeRequest) -> Dict[str, Any]:
     """
-    Analyze building conditions and generate optimization recommendations.
+    Analyze building conditions and generate multi-system optimization recommendations.
 
-    Uses AI to analyze current building telemetry, weather forecast, and
-    energy pricing to recommend optimal HVAC setpoints.
+    Uses AI to analyze current building telemetry, weather forecast, DALI lighting
+    occupancy, and energy pricing to recommend optimal HVAC and lighting setpoints.
 
     Args:
         request: Analysis request with site_id and optional conditions
 
     Returns:
-        OptimizationRecommendation with setpoint changes and projected savings
+        OptimizationRecommendation with:
+        - recommendations: List of HVAC and lighting setpoint changes
+        - projected_savings: Combined energy and cost savings (hvac_kwh, lighting_kwh)
+        - cross_system_recommendations: Coordinated HVAC+lighting actions for zones
+        - lighting_summary: Zone counts, occupancy stats, and estimated savings
     """
     try:
         logger.info(f"Analyzing optimization for site {request.site_id}")
@@ -407,16 +411,22 @@ async def analyze_optimization(request: AnalyzeRequest) -> Dict[str, Any]:
             request.site_id, recommendation
         )
 
+        # Build response summary
+        rec_dict = recommendation.to_dict()
+        hvac_count = len([r for r in rec_dict.get("recommendations", []) if r.get("system") != "lighting"])
+        lighting_count = len([r for r in rec_dict.get("recommendations", []) if r.get("system") == "lighting"])
+        cross_system_count = len(rec_dict.get("cross_system_recommendations", []) or [])
+
         # Update site status
         sites = load_sites()
         site = next((s for s in sites if s["id"] == request.site_id), None)
         if site:
             if validation["allowed"]:
                 site["optimization_status"] = OptimizationStatus.RECOMMENDATION_PENDING.value
-                site["last_recommendation"] = recommendation.to_dict()
+                site["last_recommendation"] = rec_dict
             else:
                 site["optimization_status"] = OptimizationStatus.WARNING.value
-                site["last_recommendation"] = recommendation.to_dict()
+                site["last_recommendation"] = rec_dict
                 site["error_message"] = "Recommendation failed safety validation"
 
             # Add to history
@@ -431,6 +441,9 @@ async def analyze_optimization(request: AnalyzeRequest) -> Dict[str, Any]:
                 details={
                     "confidence": recommendation.confidence,
                     "validation_passed": validation["allowed"],
+                    "hvac_recommendations": hvac_count,
+                    "lighting_recommendations": lighting_count,
+                    "cross_system_recommendations": cross_system_count,
                 }
             )
             site["optimization_history"].append(history_entry.to_dict())
@@ -443,8 +456,14 @@ async def analyze_optimization(request: AnalyzeRequest) -> Dict[str, Any]:
 
         return {
             "success": True,
-            "recommendation": recommendation.to_dict(),
+            "recommendation": rec_dict,
             "validation": validation,
+            "summary": {
+                "hvac_recommendations": hvac_count,
+                "lighting_recommendations": lighting_count,
+                "cross_system_recommendations": cross_system_count,
+                "total_recommendations": hvac_count + lighting_count,
+            },
         }
 
     except ValueError as e:

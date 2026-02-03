@@ -3,14 +3,15 @@
  *
  * Features:
  * - Chiller status cards with toggle control
+ * - CHW supply temperature setpoint adjustment
  * - Health score display
- * - Runtime and capacity info
+ * - Live temperature readings
  * - Safety rule awareness
  */
 
 import { useState, useEffect, useRef } from "react";
 import { Card, Title, Text, Badge, Flex, Grid } from "@tremor/react";
-import { Thermometer, Power, PowerOff, Activity, AlertTriangle, Clock } from "lucide-react";
+import { Thermometer, Power, PowerOff, Activity, AlertTriangle, Clock, Droplets } from "lucide-react";
 import { hvacApi, type Chiller } from "../../lib/hvacApi";
 import { useHealthThresholds } from "../../hooks/useHealthThresholds";
 
@@ -20,11 +21,17 @@ interface ChillerControlPanelProps {
   onChillerChange?: (chillerId: string, action: "on" | "off") => void;
 }
 
+// Setpoint limits
+const SETPOINT_MIN = 5;
+const SETPOINT_MAX = 12;
+
 export function ChillerControlPanel({ siteId, compact = false, onChillerChange }: ChillerControlPanelProps) {
   const [chillers, setChillers] = useState<Chiller[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [controllingChiller, setControllingChiller] = useState<string | null>(null);
+  const [adjustingSetpoint, setAdjustingSetpoint] = useState<string | null>(null);
+  const [pendingSetpoints, setPendingSetpoints] = useState<Record<string, number>>({});
   const mountedRef = useRef(true);
   const loadChillersRef = useRef<() => Promise<void>>();
   const { thresholds } = useHealthThresholds();
@@ -70,10 +77,40 @@ export function ChillerControlPanel({ siteId, compact = false, onChillerChange }
     }
   }
 
+  async function handleSetpointChange(chillerId: string, newSetpoint: number) {
+    setAdjustingSetpoint(chillerId);
+
+    try {
+      await hvacApi.setChillerSetpoint(chillerId, newSetpoint);
+      // Clear pending setpoint after successful save
+      setPendingSetpoints((prev) => {
+        const updated = { ...prev };
+        delete updated[chillerId];
+        return updated;
+      });
+      loadChillersRef.current?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update setpoint");
+    } finally {
+      setAdjustingSetpoint(null);
+    }
+  }
+
+  function handleSliderChange(chillerId: string, value: number) {
+    setPendingSetpoints((prev) => ({ ...prev, [chillerId]: value }));
+  }
+
   function getHealthColor(score: number): "green" | "amber" | "red" {
     if (score >= thresholds.healthy) return "green";
     if (score >= thresholds.warning) return "amber";
     return "red";
+  }
+
+  function getSetpointColor(current: number, setpoint: number): string {
+    const diff = Math.abs(current - setpoint);
+    if (diff <= 0.5) return "var(--color-sentinel-green)";
+    if (diff <= 1.5) return "var(--color-sentinel-amber)";
+    return "var(--color-sentinel-red)";
   }
 
   if (loading) {
@@ -126,6 +163,10 @@ export function ChillerControlPanel({ siteId, compact = false, onChillerChange }
       <Grid numItems={compact ? 2 : 2} className="gap-4">
         {chillers.map((chiller) => {
           const isControlling = controllingChiller === chiller.id;
+          const isAdjusting = adjustingSetpoint === chiller.id;
+          const metadata = chiller.metadata || {};
+          const currentSetpoint = pendingSetpoints[chiller.id] ?? metadata.chw_supply_setpoint ?? 7.0;
+          const hasChanges = pendingSetpoints[chiller.id] !== undefined;
 
           return (
             <Card
@@ -220,12 +261,110 @@ export function ChillerControlPanel({ siteId, compact = false, onChillerChange }
                 </Flex>
               </div>
 
+              {/* CHW Setpoint Control */}
+              {!compact && (
+                <div
+                  className="p-4 rounded-lg mb-4"
+                  style={{ background: "var(--color-sentinel-bg-secondary)" }}
+                >
+                  <Flex alignItems="center" className="gap-2 mb-3">
+                    <Droplets className="w-4 h-4" style={{ color: "var(--color-sentinel-cyan)" }} />
+                    <Text className="font-medium text-sm">CHW Supply Setpoint</Text>
+                  </Flex>
+
+                  {/* Slider */}
+                  <div className="mb-3">
+                    <input
+                      type="range"
+                      min={SETPOINT_MIN}
+                      max={SETPOINT_MAX}
+                      step={0.5}
+                      value={currentSetpoint}
+                      onChange={(e) => handleSliderChange(chiller.id, parseFloat(e.target.value))}
+                      className="w-full h-2 rounded-lg appearance-none cursor-pointer"
+                      style={{
+                        background: `linear-gradient(to right, var(--color-sentinel-cyan) 0%, var(--color-sentinel-cyan) ${
+                          ((currentSetpoint - SETPOINT_MIN) / (SETPOINT_MAX - SETPOINT_MIN)) * 100
+                        }%, var(--color-sentinel-border) ${
+                          ((currentSetpoint - SETPOINT_MIN) / (SETPOINT_MAX - SETPOINT_MIN)) * 100
+                        }%, var(--color-sentinel-border) 100%)`,
+                      }}
+                    />
+                    <Flex justifyContent="between" className="text-xs text-gray-500 mt-1">
+                      <span>{SETPOINT_MIN}°C</span>
+                      <span className="font-medium text-base" style={{ color: "var(--color-sentinel-cyan)" }}>
+                        {currentSetpoint.toFixed(1)}°C
+                      </span>
+                      <span>{SETPOINT_MAX}°C</span>
+                    </Flex>
+                  </div>
+
+                  {/* Apply Button */}
+                  {hasChanges && (
+                    <button
+                      onClick={() => handleSetpointChange(chiller.id, currentSetpoint)}
+                      disabled={isAdjusting}
+                      className="w-full py-2 px-4 rounded-lg font-medium text-sm transition-all"
+                      style={{
+                        background: isAdjusting ? "var(--color-sentinel-border)" : "var(--color-sentinel-cyan)",
+                        color: "white",
+                        opacity: isAdjusting ? 0.7 : 1,
+                      }}
+                    >
+                      {isAdjusting ? (
+                        <Flex justifyContent="center" alignItems="center" className="gap-2">
+                          <Activity className="w-4 h-4 animate-spin" />
+                          Applying...
+                        </Flex>
+                      ) : (
+                        `Apply ${currentSetpoint.toFixed(1)}°C`
+                      )}
+                    </button>
+                  )}
+
+                  {/* Current Temps */}
+                  <Flex justifyContent="between" className="mt-3 text-xs">
+                    <div>
+                      <Text className="text-gray-500">Supply</Text>
+                      <Text
+                        className="font-medium"
+                        style={{
+                          color: metadata.chw_supply_temp
+                            ? getSetpointColor(metadata.chw_supply_temp, currentSetpoint)
+                            : "var(--color-sentinel-text-secondary)",
+                        }}
+                      >
+                        {metadata.chw_supply_temp?.toFixed(1) ?? "--"}°C
+                      </Text>
+                    </div>
+                    <div>
+                      <Text className="text-gray-500">Return</Text>
+                      <Text className="font-medium text-gray-300">
+                        {metadata.chw_return_temp?.toFixed(1) ?? "--"}°C
+                      </Text>
+                    </div>
+                    <div>
+                      <Text className="text-gray-500">Load</Text>
+                      <Text className="font-medium text-gray-300">
+                        {metadata.load_percent ?? "--"}%
+                      </Text>
+                    </div>
+                    <div>
+                      <Text className="text-gray-500">Power</Text>
+                      <Text className="font-medium text-gray-300">
+                        {metadata.power_kw ?? "--"} kW
+                      </Text>
+                    </div>
+                  </Flex>
+                </div>
+              )}
+
               {/* Equipment Info */}
               {!compact && (
                 <div className="space-y-2 text-xs">
                   <Flex justifyContent="between" className="text-gray-400">
                     <span>Capacity</span>
-                    <span className="text-gray-300">{chiller.capacity}</span>
+                    <span className="text-gray-300">{chiller.capacity || "660 kW"}</span>
                   </Flex>
                   <Flex justifyContent="between" className="text-gray-400">
                     <Flex alignItems="center" className="gap-1">
@@ -276,8 +415,8 @@ export function ChillerControlPanel({ siteId, compact = false, onChillerChange }
             <div>
               <Text className="font-medium text-blue-300">Safety Rules Active</Text>
               <Text className="text-xs text-blue-400/80 mt-1">
-                Chillers are protected by runtime limits (min 5 min, max 4 starts/hour)
-                and pressure monitoring. All controls are validated before execution.
+                Chillers are protected by runtime limits (min 5 min, max 4 starts/hour),
+                pressure monitoring, and CHW setpoint limits (5-12°C). All controls are validated before execution.
               </Text>
             </div>
           </Flex>

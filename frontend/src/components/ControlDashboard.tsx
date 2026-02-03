@@ -28,6 +28,8 @@ import {
   ChevronUp,
   Shield,
   Building2,
+  X,
+  Bell,
 } from "lucide-react";
 import api from "../lib/api";
 import type { Device, Site, Prediction } from "../lib/api";
@@ -39,6 +41,15 @@ import { PredictionDetail } from "./PredictionDetail";
 
 interface ControlDashboardProps {
   onError?: (error: string) => void;
+}
+
+interface AlertContext {
+  message: string;
+  severity: string;
+  equipment_name: string;
+  created_at: string;
+  title?: string;
+  type?: string;
 }
 
 export function ControlDashboard({ onError }: ControlDashboardProps) {
@@ -54,16 +65,28 @@ export function ControlDashboard({ onError }: ControlDashboardProps) {
   const [recentActionsExpanded, setRecentActionsExpanded] = useState(true);
   const [auditRefreshTrigger, setAuditRefreshTrigger] = useState(0);
   const [pendingEquipmentSelection, setPendingEquipmentSelection] = useState<string | null>(null);
+  const [alertContext, setAlertContext] = useState<AlertContext | null>(null);
 
-  // Check for pre-selected equipment from Dashboard navigation
+  // Check for pre-selected equipment from Dashboard/Alert navigation
   useEffect(() => {
     const storedEquipmentId = sessionStorage.getItem("sentinel_selected_equipment");
     const storedSiteId = sessionStorage.getItem("sentinel_selected_site");
+    const storedAlertContext = sessionStorage.getItem("sentinel_alert_context");
 
     if (storedEquipmentId && storedSiteId) {
       // Map site ID to the format used in devices (e.g., "site-002" stays as-is for device matching)
       setSelectedSiteId(storedSiteId);
       setPendingEquipmentSelection(storedEquipmentId);
+
+      // Load alert context if available
+      if (storedAlertContext) {
+        try {
+          setAlertContext(JSON.parse(storedAlertContext));
+        } catch (e) {
+          console.error("Failed to parse alert context:", e);
+        }
+        sessionStorage.removeItem("sentinel_alert_context");
+      }
 
       // Clear from storage
       sessionStorage.removeItem("sentinel_selected_equipment");
@@ -292,9 +315,104 @@ export function ControlDashboard({ onError }: ControlDashboardProps) {
 
   return (
     <div
-      className="h-full overflow-hidden flex"
+      className="h-full overflow-hidden flex flex-col"
       style={{ background: "var(--color-sentinel-bg-canvas)" }}
     >
+      {/* Alert Context Banner - shown when navigating from an alert */}
+      {alertContext && (
+        <div
+          className="flex-none px-4 py-3 flex items-start gap-3 border-b"
+          style={{
+            background: alertContext.severity === "critical"
+              ? "rgba(220, 38, 38, 0.15)"
+              : alertContext.severity === "high"
+                ? "rgba(245, 158, 11, 0.15)"
+                : "rgba(59, 130, 246, 0.15)",
+            borderColor: alertContext.severity === "critical"
+              ? "rgba(220, 38, 38, 0.3)"
+              : alertContext.severity === "high"
+                ? "rgba(245, 158, 11, 0.3)"
+                : "rgba(59, 130, 246, 0.3)",
+          }}
+        >
+          <div
+            className="flex-none p-2 rounded"
+            style={{
+              background: alertContext.severity === "critical"
+                ? "rgba(220, 38, 38, 0.2)"
+                : alertContext.severity === "high"
+                  ? "rgba(245, 158, 11, 0.2)"
+                  : "rgba(59, 130, 246, 0.2)",
+            }}
+          >
+            <Bell
+              className="h-5 w-5"
+              style={{
+                color: alertContext.severity === "critical"
+                  ? "var(--color-sentinel-red)"
+                  : alertContext.severity === "high"
+                    ? "var(--color-sentinel-orange)"
+                    : "var(--color-sentinel-blue)",
+              }}
+            />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <span
+                className="text-xs font-medium px-2 py-0.5 rounded uppercase"
+                style={{
+                  background: alertContext.severity === "critical"
+                    ? "rgba(220, 38, 38, 0.3)"
+                    : alertContext.severity === "high"
+                      ? "rgba(245, 158, 11, 0.3)"
+                      : "rgba(59, 130, 246, 0.3)",
+                  color: alertContext.severity === "critical"
+                    ? "var(--color-sentinel-red)"
+                    : alertContext.severity === "high"
+                      ? "var(--color-sentinel-orange)"
+                      : "var(--color-sentinel-blue)",
+                }}
+              >
+                {alertContext.severity} Alert
+              </span>
+              <span
+                className="text-xs"
+                style={{ color: "var(--color-sentinel-text-secondary)" }}
+              >
+                {alertContext.equipment_name}
+              </span>
+            </div>
+            <p
+              className="text-sm"
+              style={{ color: "var(--color-sentinel-text-primary)" }}
+            >
+              {alertContext.message}
+            </p>
+            {alertContext.created_at && (
+              <p
+                className="text-xs mt-1"
+                style={{ color: "var(--color-sentinel-text-disabled)" }}
+              >
+                {new Date(alertContext.created_at).toLocaleString()}
+              </p>
+            )}
+          </div>
+          <button
+            onClick={() => setAlertContext(null)}
+            className="flex-none p-1 rounded hover:brightness-125 transition-colors"
+            style={{ background: "var(--color-sentinel-bg-secondary)" }}
+            aria-label="Dismiss alert context"
+          >
+            <X
+              className="h-4 w-4"
+              style={{ color: "var(--color-sentinel-text-secondary)" }}
+            />
+          </button>
+        </div>
+      )}
+
+      {/* Main Content */}
+      <div className="flex-1 overflow-hidden flex">
       {/* Left Column: Device List */}
       <div className="w-80 flex flex-col border-r" style={{ borderColor: "var(--color-sentinel-border)" }}>
         {/* Site Selector Dropdown */}
@@ -530,6 +648,7 @@ export function ControlDashboard({ onError }: ControlDashboardProps) {
             </div>
           )}
         </div>
+      </div>
       </div>
 
       {/* Risk Intelligence Detail Modal */}

@@ -40,7 +40,7 @@ def load_alerts() -> list[dict]:
 
         # Get equipment and building lookups for enrichment
         client = get_supabase_client()
-        equipment_resp = client.table("equipment").select("id, name, code, building_id").execute()
+        equipment_resp = client.table("equipment").select("id, name, code, building_id, metadata").execute()
         buildings_resp = client.table("buildings").select("id, name, code").execute()
 
         eq_lookup = {eq["id"]: eq for eq in (equipment_resp.data or [])}
@@ -49,6 +49,9 @@ def load_alerts() -> list[dict]:
         for da in db_alerts:
             equipment = eq_lookup.get(da.get("equipment_id"), {})
             building = building_lookup.get(da.get("building_id"), {})
+            # Extract device_id from equipment metadata for control navigation
+            metadata = equipment.get("metadata") or {}
+            device_id = metadata.get("device_id")
 
             # Convert database alert to standard format
             alert = {
@@ -59,8 +62,8 @@ def load_alerts() -> list[dict]:
                 "type": da.get("type", "health_degradation"),
                 "severity": da.get("severity", "warning"),
                 "status": da.get("status", "active"),
-                "title": da.get("title", "Equipment Alert"),
-                "message": da.get("message", ""),
+                "title": da.get("title") or "Equipment Alert",
+                "message": da.get("message") or "",
                 "created_at": da.get("created_at", datetime.now().isoformat()),
                 "updated_at": da.get("updated_at", da.get("created_at", datetime.now().isoformat())),
                 "acknowledged": da.get("status") == "acknowledged",
@@ -72,6 +75,7 @@ def load_alerts() -> list[dict]:
                 "potential_damage_zar": 150000.0 if da.get("severity") == "critical" else 50000.0,
                 "equipment_name": equipment.get("name", "Unknown"),
                 "site_name": building.get("name", "Unknown"),
+                "device_id": device_id,  # For control dashboard navigation
                 "health_score": None,
                 "fault_codes": [],
                 "is_database": True
@@ -170,6 +174,7 @@ class AlertResponse(BaseModel):
     # Enriched fields
     equipment_name: Optional[str] = None
     site_name: Optional[str] = None
+    device_id: Optional[str] = None  # Maps to mock_devices.json for control navigation
 
 
 class AlertListResponse(BaseModel):

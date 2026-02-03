@@ -14,6 +14,10 @@ from app.models.module_registry import (
     ModuleType, ModuleStatus, RecommendationPriority, RecommendationType,
     AIRecommendation, MODULE_DEFINITIONS
 )
+from app.database.supabase_client import get_supabase_client
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/modules", tags=["modules"])
 
@@ -251,46 +255,145 @@ async def get_recommendations(
     include_resolved: bool = False,
     limit: int = Query(50, ge=1, le=200)
 ):
-    """Get AI recommendations for a site."""
-    module_filter = None
-    if modules:
-        try:
-            module_filter = [ModuleType(m.strip()) for m in modules.split(",")]
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=f"Invalid module type: {e}")
+    """Get AI recommendations for a site from Supabase predictions."""
 
-    priority_filter = None
-    if priorities:
-        try:
-            priority_filter = [RecommendationPriority(p.strip()) for p in priorities.split(",")]
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=f"Invalid priority: {e}")
+    # Fetch from Supabase predictions table
+    recommendations = []
+    try:
+        client = get_supabase_client()
 
-    recs = module_registry.get_recommendations(
-        site_id=site_id,
-        module_filter=module_filter,
-        priority_filter=priority_filter,
-        include_resolved=include_resolved,
-        limit=limit
-    )
+        # Get building ID from site code
+        building_response = client.table("buildings").select("id").eq("code", site_id).limit(1).execute()
+        if not building_response.data:
+            # Try with 'sandton' mapping for legacy support
+            if site_id == "site-002":
+                building_response = client.table("buildings").select("id").ilike("name", "%sandton%").limit(1).execute()
 
-    return [
-        RecommendationResponse(
-            recommendation_id=r.recommendation_id,
-            timestamp=r.timestamp,
-            source_module=r.source_module.value,
-            recommendation_type=r.recommendation_type.value,
-            priority=r.priority.value,
-            title=r.title,
-            description=r.description,
-            confidence=r.confidence,
-            related_modules=[m.value for m in r.related_modules],
-            auto_actionable=r.auto_actionable,
-            acknowledged=r.acknowledged,
-            resolved=r.resolved
+        if building_response.data:
+            building_id = building_response.data[0]["id"]
+
+            # Query predictions with active status
+            query = client.table("predictions").select(
+                "id, code, equipment_id, prediction_type, probability_percent, "
+                "recommended_action, urgency, severity, status, created_at, "
+                "evidence, contributing_factors"
+            ).eq("building_id", building_id)
+
+            if not include_resolved:
+                query = query.eq("status", "active")
+
+            query = query.order("probability_percent", desc=True).limit(limit)
+
+            pred_response = query.execute()
+
+            # Get equipment names
+            equipment_ids = [p["equipment_id"] for p in pred_response.data if p.get("equipment_id")]
+            equipment_names = {}
+            if equipment_ids:
+                eq_response = client.table("equipment").select("id, name, type").in_("id", equipment_ids).execute()
+                equipment_names = {e["id"]: e for e in eq_response.data}
+
+            # Convert predictions to recommendations
+            for pred in pred_response.data:
+                eq_info = equipment_names.get(pred.get("equipment_id"), {})
+                eq_name = eq_info.get("name", "Unknown Equipment")
+                eq_type = eq_info.get("type", "").lower()
+
+                # Map urgency to priority
+                urgency = pred.get("urgency", "routine")
+                if urgency == "immediate" or pred.get("severity") == "critical":
+                    priority = "critical"
+                elif urgency == "soon" or pred.get("severity") == "warning":
+                    priority = "high"
+                elif urgency == "scheduled":
+                    priority = "medium"
+                else:
+                    priority = "low"
+
+                # Map equipment type to module
+                if eq_type in ["chiller", "ahu", "fcu", "vav", "pump"]:
+                    source_module = "hvac"
+                elif eq_type in ["luminaire", "lighting", "dali"]:
+                    source_module = "lighting"
+                elif eq_type in ["generator", "ups", "transformer", "meter"]:
+                    source_module = "energy"
+                else:
+                    source_module = "hvac"  # Default
+
+                # Apply filters
+                if modules:
+                    module_list = [m.strip().lower() for m in modules.split(",")]
+                    if source_module not in module_list:
+                        continue
+
+                if priorities:
+                    priority_list = [p.strip().lower() for p in priorities.split(",")]
+                    if priority not in priority_list:
+                        continue
+
+                recommendations.append(RecommendationResponse(
+                    recommendation_id=pred["code"],
+                    timestamp=pred.get("created_at", datetime.now().isoformat()),
+                    source_module=source_module,
+                    recommendation_type="maintenance",
+                    priority=priority,
+                    title=f"{eq_name}: {pred.get('prediction_type', 'Issue Detected')}",
+                    description=pred.get("recommended_action", "Review equipment status"),
+                    confidence=min(pred.get("probability_percent", 50) / 100, 1.0),
+                    related_modules=[],
+                    auto_actionable=False,
+                    acknowledged=False,
+                    resolved=pred.get("status") == "resolved"
+                ))
+
+    except Exception as e:
+        logger.warning(f"Failed to fetch recommendations from Supabase: {e}")
+
+    # Also try module registry for any additional recommendations
+    try:
+        module_filter = None
+        if modules:
+            try:
+                module_filter = [ModuleType(m.strip()) for m in modules.split(",")]
+            except ValueError:
+                pass
+
+        priority_filter = None
+        if priorities:
+            try:
+                priority_filter = [RecommendationPriority(p.strip()) for p in priorities.split(",")]
+            except ValueError:
+                pass
+
+        registry_recs = module_registry.get_recommendations(
+            site_id=site_id,
+            module_filter=module_filter,
+            priority_filter=priority_filter,
+            include_resolved=include_resolved,
+            limit=limit
         )
-        for r in recs
-    ]
+
+        for r in registry_recs:
+            # Avoid duplicates
+            if not any(rec.recommendation_id == r.recommendation_id for rec in recommendations):
+                recommendations.append(RecommendationResponse(
+                    recommendation_id=r.recommendation_id,
+                    timestamp=r.timestamp,
+                    source_module=r.source_module.value,
+                    recommendation_type=r.recommendation_type.value,
+                    priority=r.priority.value,
+                    title=r.title,
+                    description=r.description,
+                    confidence=r.confidence,
+                    related_modules=[m.value for m in r.related_modules],
+                    auto_actionable=r.auto_actionable,
+                    acknowledged=r.acknowledged,
+                    resolved=r.resolved
+                ))
+    except Exception as e:
+        logger.warning(f"Failed to fetch recommendations from module registry: {e}")
+
+    return recommendations[:limit]
 
 
 @router.post("/site/{site_id}/recommendations")

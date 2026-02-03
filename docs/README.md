@@ -34,13 +34,26 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - [MCP Tools Reference](03-api-reference/mcp-tools-reference.md) - Model Context Protocol tools
 
 ### ✨ Features
+
+#### Core Platform Features
+- **[Device Control & Safety Interlocks](04-features/06-device-control-safety.md)** - Protocol-agnostic device abstraction with safety validation (Phase 6)
+- **[Autonomous Decision Engine](04-features/09-autonomous-decisions.md)** - Bounded autonomy with multi-level escalation (Phase 9)
+- **[Load Shedding Optimization](04-features/10-load-shedding-optimization.md)** - Thermal runway, pre-cooling, generator coordination (Phase 10)
+- **[BMS/CAFM Integration & Onboarding](04-features/14-17-bms-cafm-integration.md)** - Data ingestion, onboarding wizard, go-live validation (Phases 14-17)
+- **[Building Systems Integration](04-features/21-24-building-systems-integration.md)** - DALI, Hybrid AI, Desk HVAC, SIMBIOT MCP (Phases 21-24)
+
+#### AI & Operations
 - **[AI Operations & Monitoring](04-features/ai-operations-monitoring.md)** - Day-to-day AI monitoring & recommendations (control-aware)
 - **[Health Scoring System](04-features/health-scoring-system.md)** - Equipment health calculation with configurable thresholds
 - **[44-02: Explainable AI for ML Predictions](04-features/44-02-explainable-ai.md)** - Natural language explanations for AI predictions (Phase 44-02)
+
+#### Asset Management Workflow
 - **[Asset Baseline Assessment](04-features/44-asset-baseline-assessment.md)** - Asset condition scoring and maintenance cost modeling (Phase 44)
 - **[Routine Inspection & Maintenance](04-features/45-routine-inspection-maintenance.md)** - Field inspection workflow with baseline tracking (Phase 45)
 - **[Repair Effectiveness & ML Feedback Loop](04-features/46-repair-effectiveness-ml-feedback.md)** - Post-repair health updates and ML learning (Phase 46)
 - **[Phases 44-46 Integration: Complete Asset Management Workflow](04-features/44-46-integration-workflow.md)** - Unified workflow from baseline to repair validation
+
+#### Additional Features
 - [Technician Chat](04-features/technician-chat.md) - Guided fault diagnosis (Phase 19)
 - [AI-Assisted Onboarding](04-features/ai-assisted-onboarding.md) - Import BMS data via MCP tools
 - [41 - ML Knowledge Capture](04-features/41-ml-knowledge-capture-01.md) - OCR and data collection
@@ -54,11 +67,15 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 
 ### 🛡️ Safety & Compliance
 - [Safety Interlocks Engine](06-safety-compliance/safety-interlocks-engine.md) - Safety validation
+- **[Data Privacy & Security Architecture](SECURITY-PRIVACY.md)** - Data sovereignty, local AI, air-gapped deployment, POPIA compliance
 
 ### 🔗 Integrations
 - [DALI-HVAC Integration](07-integrations/dali-hvac-integration.md) - Cross-system comfort diagnosis
 - [CAFM Schema](07-integrations/cafm-schema.md) - CAFM data model
 - [Energy Centre](07-integrations/energy-centre.md) - Generators, ATS, power metering, UPS
+- **[Asset Workflow Architecture](05-integrations/asset-workflow-architecture.md)** - SIMBIOT + Baseline + Inspection + ML integration (Phase 53-01)
+- **[Asset Lifecycle State Machine](05-integrations/asset-lifecycle-state-machine.md)** - 13 states from onboarding to monitoring (Phase 53-01)
+- **[Workflow Triggers & Automation](05-integrations/workflow-triggers.md)** - 5 automated triggers for ML → Inspection → Repair → Validation (Phase 53-02)
 
 ### 📦 Modules
 - [Module Registry](13-modules/module-registry.md) - Bolt-on module system architecture

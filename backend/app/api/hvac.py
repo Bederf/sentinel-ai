@@ -5,24 +5,34 @@ Complete HVAC system monitoring and control:
 - AHU/FCU/Chiller equipment status
 - Thermal runway calculations
 - Equipment health scores
+
+Data is read from Supabase (primary) with JSON fallback for config files.
 """
 
 import json
+import logging
 from pathlib import Path
 from typing import Optional, List
 from datetime import datetime, timedelta
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from app.services.health_threshold_service import get_health_status
+from app.services.health_threshold_service import get_health_status, get_health_thresholds
+from app.database.repositories.equipment_repository import EquipmentRepository
+from app.database.repositories.hvac_zone_repository import HVACZoneRepository
+from app.database.repositories.safety_rules_repository import SafetyRulesRepository
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/hvac", tags=["hvac"])
 
-# Data paths
+# Initialize repositories (Supabase)
+equipment_repo = EquipmentRepository()
+zone_repo = HVACZoneRepository()
+safety_repo = SafetyRulesRepository()
+
+# Config file paths (these remain as JSON)
 DATA_DIR = Path(__file__).parent.parent / "data"
-ZONES_PATH = DATA_DIR / "hvac_zones.json"
-EQUIPMENT_PATH = DATA_DIR / "equipment.json"
-SAFETY_RULES_PATH = DATA_DIR / "safety_rules.json"
 SETTINGS_PATH = DATA_DIR / "settings.json"
 HEALTH_CONFIG_PATH = DATA_DIR / "health_calculation_config.json"
 
@@ -37,6 +47,11 @@ class SetpointRequest(BaseModel):
 class ChillerControlRequest(BaseModel):
     """Request to control chiller on/off."""
     action: str = Field(..., pattern="^(on|off)$", description="Turn chiller on or off")
+
+
+class ChillerSetpointRequest(BaseModel):
+    """Request to change chiller CHW supply temperature setpoint."""
+    setpoint: float = Field(..., ge=5, le=12, description="CHW supply temperature setpoint in °C")
 
 
 class ZoneResponse(BaseModel):
@@ -62,17 +77,61 @@ class ZoneResponse(BaseModel):
 # ========== Helper Functions ==========
 
 def load_json(path: Path) -> list | dict:
-    """Load JSON data from file."""
+    """Load JSON data from file (for config files only)."""
     if not path.exists():
-        return [] if "zones" in str(path) or "equipment" in str(path) else {}
+        return {}
     with open(path) as f:
         return json.load(f)
 
 
-def save_json(path: Path, data: list | dict) -> None:
-    """Save JSON data to file."""
-    with open(path, "w") as f:
-        json.dump(data, f, indent=2)
+def get_equipment_from_supabase(site_id: Optional[str] = None, equipment_type: Optional[str] = None) -> list:
+    """Get equipment from Supabase.
+
+    Args:
+        site_id: Optional site code to filter by (e.g., 'site-002')
+        equipment_type: Optional equipment type filter
+
+    Returns:
+        List of equipment dictionaries
+    """
+    try:
+        if site_id:
+            equipment = equipment_repo.get_by_building_code(site_id)
+        else:
+            equipment = equipment_repo.get_all()
+
+        if equipment_type:
+            equipment = [e for e in equipment if e.get('type') == equipment_type]
+
+        return equipment
+    except Exception as e:
+        logger.error(f"Error fetching equipment from Supabase: {e}")
+        return []
+
+
+def get_zones_from_supabase(site_id: Optional[str] = None, floor: Optional[str] = None) -> list:
+    """Get HVAC zones from Supabase.
+
+    Args:
+        site_id: Optional site code to filter by
+        floor: Optional floor filter
+
+    Returns:
+        List of zone dictionaries
+    """
+    try:
+        if site_id:
+            zones = zone_repo.get_by_building_code(site_id)
+        else:
+            zones = zone_repo.get_all()
+
+        if floor:
+            zones = [z for z in zones if z.get('floor') == floor]
+
+        return zones
+    except Exception as e:
+        logger.error(f"Error fetching zones from Supabase: {e}")
+        return []
 
 
 def get_zone_limits(zone_id: str) -> tuple[float, float]:
@@ -81,25 +140,30 @@ def get_zone_limits(zone_id: str) -> tuple[float, float]:
     Returns (min_temp, max_temp) tuple.
     Zone-specific limits override global limits.
     """
-    rules = load_json(SAFETY_RULES_PATH)
     settings = load_json(SETTINGS_PATH)
 
     # Start with global control limits
     min_temp = settings.get("controlLimits", {}).get("temperature_setpoint", {}).get("min", 18)
     max_temp = settings.get("controlLimits", {}).get("temperature_setpoint", {}).get("max", 26)
 
-    # Check safety rules for zone-specific or global HVAC limits
-    for rule in rules:
-        if rule.get("enabled") and rule.get("rule_type") == "temperature_range":
-            # Zone-specific rule
-            if rule.get("device_id") == zone_id:
-                min_temp = rule.get("min_temp", min_temp)
-                max_temp = rule.get("max_temp", max_temp)
-                break
-            # Global HVAC zone rule (fallback)
-            elif rule.get("device_type") == "hvac" and rule.get("point_name") == "cooling_setpoint":
-                min_temp = rule.get("min_temp", min_temp)
-                max_temp = rule.get("max_temp", max_temp)
+    # Get safety rules from repository (Supabase)
+    try:
+        rules = safety_repo.get_all(enabled_only=True)
+
+        # Check safety rules for zone-specific or global HVAC limits
+        for rule in rules:
+            if rule.get("rule_type") == "temperature_range":
+                # Zone-specific rule
+                if rule.get("device_id") == zone_id:
+                    min_temp = rule.get("min_temp", min_temp)
+                    max_temp = rule.get("max_temp", max_temp)
+                    break
+                # Global HVAC zone rule (fallback)
+                elif rule.get("device_type") == "hvac" and rule.get("point_name") == "cooling_setpoint":
+                    min_temp = rule.get("min_temp", min_temp)
+                    max_temp = rule.get("max_temp", max_temp)
+    except Exception as e:
+        logger.warning(f"Error loading safety rules: {e}")
 
     return (min_temp, max_temp)
 
@@ -216,10 +280,10 @@ async def get_hvac_overview(site_id: str):
 
     Returns zones, equipment summary, and overall health.
     """
-    zones = load_json(ZONES_PATH)
-    equipment = load_json(EQUIPMENT_PATH)
+    zones = get_zones_from_supabase(site_id)
+    equipment = get_equipment_from_supabase(site_id)
 
-    # Filter equipment by site (using site_id prefix match for simplicity)
+    # Filter for HVAC equipment types
     hvac_types = ["ahu", "fcu", "chiller", "cooling_tower", "vav", "pump"]
     hvac_equipment = [e for e in equipment if e.get("type") in hvac_types]
 
@@ -302,10 +366,7 @@ async def list_zones(
     floor: Optional[str] = Query(None, description="Filter by floor"),
 ):
     """List all HVAC zones."""
-    zones = load_json(ZONES_PATH)
-
-    if floor:
-        zones = [z for z in zones if z.get("floor") == floor]
+    zones = get_zones_from_supabase(site_id, floor)
 
     # Enrich with temperature limits
     result = []
@@ -330,17 +391,16 @@ async def list_zones(
 @router.get("/zones/{zone_id}")
 async def get_zone(zone_id: str):
     """Get details for a specific zone."""
-    zones = load_json(ZONES_PATH)
+    zone = zone_repo.get_by_zone_id(zone_id)
 
-    zone = next((z for z in zones if z.get("zone_id") == zone_id), None)
     if not zone:
         raise HTTPException(status_code=404, detail=f"Zone {zone_id} not found")
 
     min_temp, max_temp = get_zone_limits(zone_id)
     deviation = zone.get("current_temp", 22) - zone.get("setpoint", 22)
 
-    # Get associated equipment health
-    equipment = load_json(EQUIPMENT_PATH)
+    # Get associated equipment health from Supabase
+    equipment = get_equipment_from_supabase()
     fcu = next((e for e in equipment if e.get("name") == zone.get("fcu_id")), None)
 
     return {
@@ -358,10 +418,9 @@ async def set_zone_temperature(zone_id: str, request: SetpointRequest):
 
     Validates against safety rules before applying.
     """
-    zones = load_json(ZONES_PATH)
+    zone = zone_repo.get_by_zone_id(zone_id)
 
-    zone_idx = next((i for i, z in enumerate(zones) if z.get("zone_id") == zone_id), None)
-    if zone_idx is None:
+    if not zone:
         raise HTTPException(status_code=404, detail=f"Zone {zone_id} not found")
 
     # Validate against safety limits
@@ -372,10 +431,12 @@ async def set_zone_temperature(zone_id: str, request: SetpointRequest):
             detail=f"Setpoint {request.setpoint}°C outside allowed range {min_temp}-{max_temp}°C"
         )
 
-    # Update zone setpoint
-    old_setpoint = zones[zone_idx].get("setpoint", 22)
-    zones[zone_idx]["setpoint"] = request.setpoint
-    save_json(ZONES_PATH, zones)
+    # Update zone setpoint in Supabase
+    old_setpoint = zone.get("setpoint", 22)
+    updated_zone = zone_repo.update_setpoint(zone_id, request.setpoint)
+
+    if not updated_zone:
+        raise HTTPException(status_code=500, detail="Failed to update zone setpoint")
 
     return {
         "success": True,
@@ -394,13 +455,10 @@ async def list_equipment(
     equipment_type: Optional[str] = Query(None, description="Filter by type (ahu, fcu, chiller, etc.)"),
 ):
     """List HVAC equipment with health scores."""
-    equipment = load_json(EQUIPMENT_PATH)
+    equipment = get_equipment_from_supabase(site_id)
 
     hvac_types = ["ahu", "fcu", "chiller", "cooling_tower", "vav", "pump", "crac"]
     result = [e for e in equipment if e.get("type") in hvac_types]
-
-    if site_id:
-        result = [e for e in result if e.get("site_id") == site_id]
 
     if equipment_type:
         result = [e for e in result if e.get("type") == equipment_type]
@@ -425,9 +483,11 @@ async def list_equipment(
 @router.get("/equipment/{equipment_id}")
 async def get_equipment(equipment_id: str):
     """Get details for specific equipment."""
-    equipment = load_json(EQUIPMENT_PATH)
+    # Try UUID first, then code
+    eq = equipment_repo.get_by_uuid(equipment_id)
+    if not eq:
+        eq = equipment_repo.get_by_id(equipment_id)
 
-    eq = next((e for e in equipment if e.get("id") == equipment_id), None)
     if not eq:
         raise HTTPException(status_code=404, detail=f"Equipment {equipment_id} not found")
 
@@ -446,14 +506,10 @@ async def get_equipment(equipment_id: str):
 @router.get("/chillers")
 async def list_chillers(site_id: Optional[str] = Query(None)):
     """List all chillers with status and health."""
-    equipment = load_json(EQUIPMENT_PATH)
-
-    chillers = [e for e in equipment if e.get("type") == "chiller"]
-    if site_id:
-        chillers = [c for c in chillers if c.get("site_id") == site_id]
+    equipment = get_equipment_from_supabase(site_id, equipment_type="chiller")
 
     result = []
-    for chiller in chillers:
+    for chiller in equipment:
         health = calculate_equipment_health(chiller)
         result.append({
             **chiller,
@@ -475,41 +531,128 @@ async def control_chiller(chiller_id: str, request: ChillerControlRequest):
 
     Validates against safety rules (runtime limits, pressure limits).
     """
-    equipment = load_json(EQUIPMENT_PATH)
+    # Try UUID first, then code
+    chiller = equipment_repo.get_by_uuid(chiller_id)
+    if not chiller:
+        chiller = equipment_repo.get_by_id(chiller_id)
 
-    chiller_idx = next((i for i, e in enumerate(equipment)
-                        if e.get("id") == chiller_id and e.get("type") == "chiller"), None)
-
-    if chiller_idx is None:
+    if not chiller or chiller.get("type") != "chiller":
         raise HTTPException(status_code=404, detail=f"Chiller {chiller_id} not found")
 
-    chiller = equipment[chiller_idx]
-
     # Check safety rules for runtime limits
-    rules = load_json(SAFETY_RULES_PATH)
-    for rule in rules:
-        if rule.get("enabled") and rule.get("rule_type") == "runtime_limit":
-            if rule.get("device_type") == "hvac" and "chiller" in rule.get("point_name", ""):
+    try:
+        rules = safety_repo.get_for_device("hvac", point_name="chiller")
+        for rule in rules:
+            if rule.get("rule_type") == "runtime_limit":
                 # In a real system, check actual runtime
                 # For demo, we just acknowledge the rule exists
                 pass
+    except Exception as e:
+        logger.warning(f"Error checking safety rules: {e}")
 
-    # Update status (simulated)
+    # Update status in Supabase
     old_status = chiller.get("status")
-    if request.action == "on":
-        equipment[chiller_idx]["status"] = "normal"
-    else:
-        equipment[chiller_idx]["status"] = "off"
+    new_status = "normal" if request.action == "on" else "off"
 
-    save_json(EQUIPMENT_PATH, equipment)
+    updated = equipment_repo.update_status(chiller.get("code"), new_status)
+
+    if not updated:
+        raise HTTPException(status_code=500, detail="Failed to update chiller status")
 
     return {
         "success": True,
         "chiller_id": chiller_id,
         "action": request.action,
         "old_status": old_status,
-        "new_status": equipment[chiller_idx]["status"],
+        "new_status": new_status,
         "message": f"Chiller {chiller.get('name')} turned {request.action}",
+    }
+
+
+@router.post("/chillers/{chiller_id}/setpoint")
+async def set_chiller_setpoint(chiller_id: str, request: ChillerSetpointRequest):
+    """Set chilled water supply temperature setpoint.
+
+    Validates against safety limits (5-12°C) before applying.
+    Updates the chw_supply_setpoint in equipment metadata.
+    """
+    # Try UUID first, then code
+    chiller = equipment_repo.get_by_uuid(chiller_id)
+    if not chiller:
+        chiller = equipment_repo.get_by_id(chiller_id)
+
+    if not chiller or chiller.get("type") != "chiller":
+        raise HTTPException(status_code=404, detail=f"Chiller {chiller_id} not found")
+
+    # Get safety limits
+    settings = load_json(SETTINGS_PATH)
+    control_limits = settings.get("controlLimits", {})
+    min_setpoint = control_limits.get("chiller_setpoint", {}).get("min", 5)
+    max_setpoint = control_limits.get("chiller_setpoint", {}).get("max", 12)
+
+    if request.setpoint < min_setpoint or request.setpoint > max_setpoint:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Setpoint {request.setpoint}°C outside allowed range {min_setpoint}-{max_setpoint}°C"
+        )
+
+    # Update metadata with new setpoint
+    metadata = chiller.get("metadata", {}) or {}
+    old_setpoint = metadata.get("chw_supply_setpoint", 7.0)
+    metadata["chw_supply_setpoint"] = request.setpoint
+
+    # Update in Supabase
+    try:
+        from app.database.supabase_client import get_supabase_client
+        client = get_supabase_client()
+        response = client.table("equipment").update(
+            {"metadata": metadata}
+        ).eq("id", chiller["id"]).execute()
+
+        if not response.data:
+            raise HTTPException(status_code=500, detail="Failed to update chiller setpoint")
+    except Exception as e:
+        logger.error(f"Error updating chiller setpoint: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return {
+        "success": True,
+        "chiller_id": chiller_id,
+        "chiller_name": chiller.get("name"),
+        "old_setpoint": old_setpoint,
+        "new_setpoint": request.setpoint,
+        "message": f"CHW supply setpoint changed from {old_setpoint}°C to {request.setpoint}°C",
+    }
+
+
+@router.get("/chillers/{chiller_id}/setpoint")
+async def get_chiller_setpoint(chiller_id: str):
+    """Get chilled water supply temperature setpoint and limits."""
+    # Try UUID first, then code
+    chiller = equipment_repo.get_by_uuid(chiller_id)
+    if not chiller:
+        chiller = equipment_repo.get_by_id(chiller_id)
+
+    if not chiller or chiller.get("type") != "chiller":
+        raise HTTPException(status_code=404, detail=f"Chiller {chiller_id} not found")
+
+    # Get safety limits
+    settings = load_json(SETTINGS_PATH)
+    control_limits = settings.get("controlLimits", {})
+
+    metadata = chiller.get("metadata", {}) or {}
+
+    return {
+        "chiller_id": chiller_id,
+        "chiller_name": chiller.get("name"),
+        "current_setpoint": metadata.get("chw_supply_setpoint", 7.0),
+        "current_supply_temp": metadata.get("chw_supply_temp"),
+        "current_return_temp": metadata.get("chw_return_temp"),
+        "limits": {
+            "min": control_limits.get("chiller_setpoint", {}).get("min", 5),
+            "max": control_limits.get("chiller_setpoint", {}).get("max", 12),
+            "unit": "°C",
+        },
     }
 
 
@@ -521,7 +664,7 @@ async def get_thermal_runway(site_id: str):
 
     Returns predicted temperature curves with and without pre-cooling.
     """
-    zones = load_json(ZONES_PATH)
+    zones = get_zones_from_supabase(site_id)
 
     # Calculate average current temperature
     avg_temp = sum(z.get("current_temp", 22) for z in zones) / len(zones) if zones else 22
@@ -611,10 +754,15 @@ async def get_thermal_runway(site_id: str):
 @router.get("/safety-limits")
 async def get_hvac_safety_limits():
     """Get all HVAC-related safety limits for UI enforcement."""
-    rules = load_json(SAFETY_RULES_PATH)
     settings = load_json(SETTINGS_PATH)
 
-    hvac_rules = [r for r in rules if r.get("device_type") == "hvac" and r.get("enabled")]
+    # Get HVAC rules from Supabase
+    try:
+        all_rules = safety_repo.get_all(enabled_only=True)
+        hvac_rules = [r for r in all_rules if r.get("device_type") == "hvac"]
+    except Exception as e:
+        logger.error(f"Error fetching safety rules: {e}")
+        hvac_rules = []
 
     control_limits = settings.get("controlLimits", {})
 

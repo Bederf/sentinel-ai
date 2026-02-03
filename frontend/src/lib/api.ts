@@ -177,6 +177,7 @@ export interface Alert {
   type?: string;
   status?: string;
   category?: string;
+  device_id?: string; // Maps to mock_devices.json for control navigation
 }
 
 // Anomaly prediction interface
@@ -750,11 +751,13 @@ async function fetchApi<T>(
  * @param message - User message to send
  * @param conversationId - Optional conversation ID for context
  * @param onChunk - Callback called for each text chunk received
+ * @param searchDocs - When true, searches documentation RAG instead of using device control tools
  */
 export async function streamChat(
   message: string,
   conversationId: string | undefined,
-  onChunk: (chunk: string) => void
+  onChunk: (chunk: string) => void,
+  searchDocs: boolean = false
 ): Promise<void> {
   const url = `${API_BASE_URL}/api/chat`;
 
@@ -766,6 +769,7 @@ export async function streamChat(
     body: JSON.stringify({
       message,
       conversation_id: conversationId,
+      search_docs: searchDocs,
     }),
   });
 
@@ -779,17 +783,22 @@ export async function streamChat(
 
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
+  let buffer = ""; // Buffer for incomplete lines across chunk boundaries
+  let eventDataLines: string[] = []; // Collect data lines for current SSE event
 
   try {
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
 
-      // Decode the chunk
-      const text = decoder.decode(value, { stream: true });
+      // Decode the chunk and append to buffer
+      buffer += decoder.decode(value, { stream: true });
 
-      // Parse SSE format: "data: <content>\n\n"
-      const lines = text.split("\n");
+      // Process complete lines from buffer
+      const lines = buffer.split("\n");
+      // Keep the last (potentially incomplete) line in the buffer
+      buffer = lines.pop() || "";
+
       for (const line of lines) {
         if (line.startsWith("data: ")) {
           const data = line.slice(6); // Remove "data: " prefix
@@ -799,9 +808,28 @@ export async function streamChat(
             return;
           }
 
-          // Call callback with the chunk
-          onChunk(data);
+          // Collect data line for this event
+          // SSE spec: consecutive "data:" lines are joined with newlines
+          eventDataLines.push(data);
+        } else if (line === "" && eventDataLines.length > 0) {
+          // Empty line marks end of SSE event
+          // Join all collected data lines with newlines and emit
+          const eventData = eventDataLines.join("\n");
+          onChunk(eventData);
+          eventDataLines = [];
         }
+      }
+    }
+
+    // Process any remaining data
+    if (eventDataLines.length > 0) {
+      const eventData = eventDataLines.join("\n");
+      onChunk(eventData);
+    }
+    if (buffer.startsWith("data: ")) {
+      const data = buffer.slice(6);
+      if (data && data !== "[DONE]") {
+        onChunk(data);
       }
     }
   } finally {

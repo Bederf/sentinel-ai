@@ -90,8 +90,9 @@ export function OptimizationStatusBadge({
       };
     }
 
-    // Has recommendation pending - amber lightbulb, pulsing
-    if (hasRecommendation && status === "recommendation_pending") {
+    // Has recommendation pending or warning - amber lightbulb, pulsing
+    // Pulse on warning too since there are still recommendations to review
+    if (hasRecommendation && (status === "recommendation_pending" || status === "warning")) {
       return {
         show: true,
         icon: Lightbulb,
@@ -102,8 +103,8 @@ export function OptimizationStatusBadge({
       };
     }
 
-    // Has recommendation but warning/rejected - amber lightbulb, no pulse
-    if (hasRecommendation && (status === "warning" || status === "unknown")) {
+    // Has recommendation but unknown status - amber lightbulb, no pulse
+    if (hasRecommendation && status === "unknown") {
       return {
         show: true,
         icon: Lightbulb,

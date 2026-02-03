@@ -63,9 +63,21 @@ export interface HVACEquipment {
   };
 }
 
+export interface ChillerMetadata {
+  running?: boolean;
+  power_kw?: number;
+  load_percent?: number;
+  chw_supply_temp?: number;
+  chw_return_temp?: number;
+  chw_supply_setpoint?: number;
+  condenser_temp?: number;
+  last_updated?: string;
+}
+
 export interface Chiller extends HVACEquipment {
   type: "chiller";
   is_running: boolean;
+  metadata?: ChillerMetadata;
 }
 
 // ============= Overview Interfaces =============
@@ -303,6 +315,42 @@ export const hvacApi = {
     return fetchApi(`/api/hvac/chillers/${chillerId}/control`, {
       method: "POST",
       body: JSON.stringify({ action }),
+    });
+  },
+
+  /**
+   * Get chiller CHW setpoint and limits
+   */
+  getChillerSetpoint: async (
+    chillerId: string
+  ): Promise<{
+    chiller_id: string;
+    chiller_name: string;
+    current_setpoint: number;
+    current_supply_temp: number | null;
+    current_return_temp: number | null;
+    limits: { min: number; max: number; unit: string };
+  }> => {
+    return fetchApi(`/api/hvac/chillers/${chillerId}/setpoint`);
+  },
+
+  /**
+   * Set chiller CHW supply temperature setpoint
+   */
+  setChillerSetpoint: async (
+    chillerId: string,
+    setpoint: number
+  ): Promise<{
+    success: boolean;
+    chiller_id: string;
+    chiller_name: string;
+    old_setpoint: number;
+    new_setpoint: number;
+    message: string;
+  }> => {
+    return fetchApi(`/api/hvac/chillers/${chillerId}/setpoint`, {
+      method: "POST",
+      body: JSON.stringify({ setpoint }),
     });
   },
 

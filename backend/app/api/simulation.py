@@ -22,12 +22,18 @@ simulation_service = create_simulation_service()
 
 @router.on_event("startup")
 async def startup_event():
-    """Start the simulation service on API startup"""
-    try:
-        await simulation_service.start_simulation()
-        logger.info("BMS Simulation service started successfully")
-    except Exception as e:
-        logger.error(f"Failed to start simulation service: {e}")
+    """Start the simulation service on API startup.
+
+    DISABLED: Simulation now starts manually via POST /api/simulation/start
+    This prevents alert spam during development/demos.
+    """
+    # Auto-start disabled - use POST /api/simulation/start to begin
+    logger.info("BMS Simulation ready (not auto-started). Use POST /api/simulation/start to begin.")
+    # try:
+    #     await simulation_service.start_simulation()
+    #     logger.info("BMS Simulation service started successfully")
+    # except Exception as e:
+    #     logger.error(f"Failed to start simulation service: {e}")
 
 @router.on_event("shutdown")
 async def shutdown_event():

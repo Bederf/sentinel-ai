@@ -2379,7 +2379,9 @@
       "building": "Sandton Office Park",
       "floor": "L12",
       "zone": "Level 12 North",
-      "zone_id": "Zone-L12-N"
+      "zone_id": "Zone-L12-N",
+      "room": "Level 12 North Open Plan",
+      "description": "L12, Level 12 North, Sandton Level 12 North FCU"
     },
     "metadata": {
       "building": "Sandton Office Park",
@@ -2444,7 +2446,9 @@
       "building": "Sandton Office Park",
       "floor": "L12",
       "zone": "Level 12 North",
-      "zone_id": "Zone-L12-N"
+      "zone_id": "Zone-L12-N",
+      "room": "Level 12 North Open Plan",
+      "description": "L12, Level 12 North, Sandton Level 12 North VAV"
     },
     "metadata": {
       "building": "Sandton Office Park",
@@ -2531,7 +2535,9 @@
       "building": "Sandton Office Park",
       "floor": "L12",
       "zone": "Level 12 South",
-      "zone_id": "Zone-L12-S"
+      "zone_id": "Zone-L12-S",
+      "room": "Level 12 South Open Plan",
+      "description": "L12, Level 12 South, Sandton Level 12 South FCU"
     },
     "metadata": {
       "building": "Sandton Office Park",
@@ -2596,7 +2602,9 @@
       "building": "Sandton Office Park",
       "floor": "L12",
       "zone": "Level 12 South",
-      "zone_id": "Zone-L12-S"
+      "zone_id": "Zone-L12-S",
+      "room": "Level 12 South Open Plan",
+      "description": "L12, Level 12 South, Sandton Level 12 South VAV"
     },
     "metadata": {
       "building": "Sandton Office Park",
@@ -2683,7 +2691,9 @@
       "building": "Sandton Office Park",
       "floor": "L11",
       "zone": "Level 11 North",
-      "zone_id": "Zone-L11-N"
+      "zone_id": "Zone-L11-N",
+      "room": "Level 11 North Open Plan",
+      "description": "L11, Level 11 North, Sandton Level 11 North FCU"
     },
     "metadata": {
       "building": "Sandton Office Park",
@@ -2748,7 +2758,9 @@
       "building": "Sandton Office Park",
       "floor": "L11",
       "zone": "Level 11 North",
-      "zone_id": "Zone-L11-N"
+      "zone_id": "Zone-L11-N",
+      "room": "Level 11 North Open Plan",
+      "description": "L11, Level 11 North, Sandton Level 11 North VAV"
     },
     "metadata": {
       "building": "Sandton Office Park",
@@ -2835,7 +2847,9 @@
       "building": "Sandton Office Park",
       "floor": "L11",
       "zone": "Level 11 South",
-      "zone_id": "Zone-L11-S"
+      "zone_id": "Zone-L11-S",
+      "room": "Level 11 South Open Plan",
+      "description": "L11, Level 11 South, Sandton Level 11 South FCU"
     },
     "metadata": {
       "building": "Sandton Office Park",
@@ -2900,7 +2914,9 @@
       "building": "Sandton Office Park",
       "floor": "L11",
       "zone": "Level 11 South",
-      "zone_id": "Zone-L11-S"
+      "zone_id": "Zone-L11-S",
+      "room": "Level 11 South Open Plan",
+      "description": "L11, Level 11 South, Sandton Level 11 South VAV"
     },
     "metadata": {
       "building": "Sandton Office Park",
@@ -2987,7 +3003,9 @@
       "building": "Sandton Office Park",
       "floor": "L10",
       "zone": "Level 10 North",
-      "zone_id": "Zone-L10-N"
+      "zone_id": "Zone-L10-N",
+      "room": "Level 10 North Open Plan",
+      "description": "L10, Level 10 North, Sandton Level 10 North FCU"
     },
     "metadata": {
       "building": "Sandton Office Park",
@@ -3052,7 +3070,9 @@
       "building": "Sandton Office Park",
       "floor": "L10",
       "zone": "Level 10 North",
-      "zone_id": "Zone-L10-N"
+      "zone_id": "Zone-L10-N",
+      "room": "Level 10 North Open Plan",
+      "description": "L10, Level 10 North, Sandton Level 10 North VAV"
     },
     "metadata": {
       "building": "Sandton Office Park",
@@ -3152,7 +3172,8 @@
       "building": "Sandton Office Park",
       "floor": "L12",
       "zone": "Plant Room",
-      "room": "AHU Room L12"
+      "room": "AHU Room L12",
+      "description": "L12, Plant Room, Sandton L12 AHU"
     },
     "metadata": {
       "building": "Sandton Office Park",
@@ -3251,7 +3272,8 @@
       "building": "Sandton Office Park",
       "floor": "L11",
       "zone": "Plant Room",
-      "room": "AHU Room L11"
+      "room": "AHU Room L11",
+      "description": "L11, Plant Room, Sandton L11 AHU"
     },
     "metadata": {
       "building": "Sandton Office Park",
@@ -3350,7 +3372,8 @@
       "building": "Sandton Office Park",
       "floor": "L10",
       "zone": "Plant Room",
-      "room": "AHU Room L10"
+      "room": "AHU Room L10",
+      "description": "L10, Plant Room, Sandton L10 AHU"
     },
     "metadata": {
       "building": "Sandton Office Park",
@@ -3426,7 +3449,7 @@
       "zone": "Zone-L12-A",
       "room": "Ceiling L12",
       "description": "Level 12, Zone A",
-      "zone_type": "office",
+      "zone_type": "open_office",
       "exposure": "interior",
       "zone_priority": 3
     },
@@ -3435,7 +3458,7 @@
       "model": "DERA-500",
       "serial_number": "STC-VAV-L12-01",
       "installation_year": 2018,
-      "capacity_ls": 500
+      "capacity_kw": 500
     },
     "metadata": {
       "building": "Sandton City",
@@ -3514,7 +3537,7 @@
       "zone": "Zone-L12-B",
       "room": "Ceiling L12",
       "description": "Level 12, Zone B",
-      "zone_type": "office",
+      "zone_type": "open_office",
       "exposure": "interior",
       "zone_priority": 3
     },
@@ -3523,7 +3546,7 @@
       "model": "DERA-500",
       "serial_number": "STC-VAV-L12-02",
       "installation_year": 2018,
-      "capacity_ls": 500
+      "capacity_kw": 500
     },
     "metadata": {
       "building": "Sandton City",
@@ -3602,7 +3625,7 @@
       "zone": "Zone-L12-C",
       "room": "Ceiling L12",
       "description": "Level 12, Zone C",
-      "zone_type": "office",
+      "zone_type": "open_office",
       "exposure": "interior",
       "zone_priority": 3
     },
@@ -3611,7 +3634,7 @@
       "model": "DERA-500",
       "serial_number": "STC-VAV-L12-03",
       "installation_year": 2018,
-      "capacity_ls": 500
+      "capacity_kw": 500
     },
     "metadata": {
       "building": "Sandton City",
@@ -3690,7 +3713,7 @@
       "zone": "Zone-L12-D",
       "room": "Ceiling L12",
       "description": "Level 12, Zone D",
-      "zone_type": "office",
+      "zone_type": "open_office",
       "exposure": "interior",
       "zone_priority": 3
     },
@@ -3699,7 +3722,7 @@
       "model": "DERA-500",
       "serial_number": "STC-VAV-L12-04",
       "installation_year": 2018,
-      "capacity_ls": 500
+      "capacity_kw": 500
     },
     "metadata": {
       "building": "Sandton City",
@@ -3778,7 +3801,7 @@
       "zone": "Zone-L12-E",
       "room": "Ceiling L12",
       "description": "Level 12, Zone E",
-      "zone_type": "office",
+      "zone_type": "open_office",
       "exposure": "interior",
       "zone_priority": 3
     },
@@ -3787,7 +3810,7 @@
       "model": "DERA-500",
       "serial_number": "STC-VAV-L12-05",
       "installation_year": 2018,
-      "capacity_ls": 500
+      "capacity_kw": 500
     },
     "metadata": {
       "building": "Sandton City",
@@ -3866,7 +3889,7 @@
       "zone": "Zone-L11-A",
       "room": "Ceiling L11",
       "description": "Level 11, Zone A",
-      "zone_type": "office",
+      "zone_type": "open_office",
       "exposure": "interior",
       "zone_priority": 3
     },
@@ -3875,7 +3898,7 @@
       "model": "DERA-500",
       "serial_number": "STC-VAV-L11-01",
       "installation_year": 2018,
-      "capacity_ls": 500
+      "capacity_kw": 500
     },
     "metadata": {
       "building": "Sandton City",
@@ -3954,7 +3977,7 @@
       "zone": "Zone-L11-B",
       "room": "Ceiling L11",
       "description": "Level 11, Zone B",
-      "zone_type": "office",
+      "zone_type": "open_office",
       "exposure": "interior",
       "zone_priority": 3
     },
@@ -3963,7 +3986,7 @@
       "model": "DERA-500",
       "serial_number": "STC-VAV-L11-02",
       "installation_year": 2018,
-      "capacity_ls": 500
+      "capacity_kw": 500
     },
     "metadata": {
       "building": "Sandton City",
@@ -4042,7 +4065,7 @@
       "zone": "Zone-L11-C",
       "room": "Ceiling L11",
       "description": "Level 11, Zone C",
-      "zone_type": "office",
+      "zone_type": "open_office",
       "exposure": "interior",
       "zone_priority": 3
     },
@@ -4051,7 +4074,7 @@
       "model": "DERA-500",
       "serial_number": "STC-VAV-L11-03",
       "installation_year": 2018,
-      "capacity_ls": 500
+      "capacity_kw": 500
     },
     "metadata": {
       "building": "Sandton City",
@@ -4130,7 +4153,7 @@
       "zone": "Zone-L11-D",
       "room": "Ceiling L11",
       "description": "Level 11, Zone D",
-      "zone_type": "office",
+      "zone_type": "open_office",
       "exposure": "interior",
       "zone_priority": 3
     },
@@ -4139,7 +4162,7 @@
       "model": "DERA-500",
       "serial_number": "STC-VAV-L11-04",
       "installation_year": 2018,
-      "capacity_ls": 500
+      "capacity_kw": 500
     },
     "metadata": {
       "building": "Sandton City",
@@ -4218,7 +4241,7 @@
       "zone": "Zone-L11-E",
       "room": "Ceiling L11",
       "description": "Level 11, Zone E",
-      "zone_type": "office",
+      "zone_type": "open_office",
       "exposure": "interior",
       "zone_priority": 3
     },
@@ -4227,7 +4250,7 @@
       "model": "DERA-500",
       "serial_number": "STC-VAV-L11-05",
       "installation_year": 2018,
-      "capacity_ls": 500
+      "capacity_kw": 500
     },
     "metadata": {
       "building": "Sandton City",
@@ -4306,7 +4329,7 @@
       "zone": "Zone-L10-A",
       "room": "Ceiling L10",
       "description": "Level 10, Zone A",
-      "zone_type": "office",
+      "zone_type": "open_office",
       "exposure": "interior",
       "zone_priority": 3
     },
@@ -4315,7 +4338,7 @@
       "model": "DERA-500",
       "serial_number": "STC-VAV-L10-01",
       "installation_year": 2018,
-      "capacity_ls": 500
+      "capacity_kw": 500
     },
     "metadata": {
       "building": "Sandton City",
@@ -4394,7 +4417,7 @@
       "zone": "Zone-L10-B",
       "room": "Ceiling L10",
       "description": "Level 10, Zone B",
-      "zone_type": "office",
+      "zone_type": "open_office",
       "exposure": "interior",
       "zone_priority": 3
     },
@@ -4403,7 +4426,7 @@
       "model": "DERA-500",
       "serial_number": "STC-VAV-L10-02",
       "installation_year": 2018,
-      "capacity_ls": 500
+      "capacity_kw": 500
     },
     "metadata": {
       "building": "Sandton City",
@@ -4482,7 +4505,7 @@
       "zone": "Zone-L10-C",
       "room": "Ceiling L10",
       "description": "Level 10, Zone C",
-      "zone_type": "office",
+      "zone_type": "open_office",
       "exposure": "interior",
       "zone_priority": 3
     },
@@ -4491,7 +4514,7 @@
       "model": "DERA-500",
       "serial_number": "STC-VAV-L10-03",
       "installation_year": 2018,
-      "capacity_ls": 500
+      "capacity_kw": 500
     },
     "metadata": {
       "building": "Sandton City",
@@ -4570,7 +4593,7 @@
       "zone": "Zone-L10-D",
       "room": "Ceiling L10",
       "description": "Level 10, Zone D",
-      "zone_type": "office",
+      "zone_type": "open_office",
       "exposure": "interior",
       "zone_priority": 3
     },
@@ -4579,7 +4602,7 @@
       "model": "DERA-500",
       "serial_number": "STC-VAV-L10-04",
       "installation_year": 2018,
-      "capacity_ls": 500
+      "capacity_kw": 500
     },
     "metadata": {
       "building": "Sandton City",
@@ -4658,7 +4681,7 @@
       "zone": "Zone-L10-E",
       "room": "Ceiling L10",
       "description": "Level 10, Zone E",
-      "zone_type": "office",
+      "zone_type": "open_office",
       "exposure": "interior",
       "zone_priority": 3
     },
@@ -4667,7 +4690,7 @@
       "model": "DERA-500",
       "serial_number": "STC-VAV-L10-05",
       "installation_year": 2018,
-      "capacity_ls": 500
+      "capacity_kw": 500
     },
     "metadata": {
       "building": "Sandton City",

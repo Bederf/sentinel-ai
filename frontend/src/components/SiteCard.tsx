@@ -110,7 +110,6 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
   const [hasRecommendation, setHasRecommendation] = useState(false);
   const [showRecommendationModal, setShowRecommendationModal] = useState(false);
   const [currentRecommendation, setCurrentRecommendation] = useState<OptimizationRecommendation | null>(null);
-  const [, setLoadingRecommendation] = useState(false);
 
   // Expandable risk list state
   const [riskListExpanded, setRiskListExpanded] = useState(false);
@@ -253,7 +252,6 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
     if (!showRecommendationModal || !site.id) return;
 
     const fetchRecommendation = async () => {
-      setLoadingRecommendation(true);
       try {
         // For demo purposes, we'll fetch the full status and extract the recommendation
         const status = await api.getOptimizationStatus(site.id);
@@ -263,15 +261,16 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
           setCurrentRecommendation(status.last_recommendation);
         } else {
           // If no pending recommendation or empty recommendations, close modal
+          // and update hasRecommendation to prevent future clicks from opening empty modal
           setShowRecommendationModal(false);
           setCurrentRecommendation(null);
+          setHasRecommendation(false);
         }
       } catch (error) {
         console.error('Failed to fetch recommendation:', error);
         setShowRecommendationModal(false);
         setCurrentRecommendation(null);
-      } finally {
-        setLoadingRecommendation(false);
+        setHasRecommendation(false);
       }
     };
 
@@ -279,13 +278,30 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
   }, [showRecommendationModal, site.id]);
 
   // Handle optimization badge click - show modal if there's a recommendation to review
-  const handleOptimizationClick = (e: React.MouseEvent) => {
+  const handleOptimizationClick = async (e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent card click from firing
-    // Double-check there are actual recommendations before opening modal
-    if (hasRecommendation && currentRecommendation &&
-        currentRecommendation.recommendations &&
-        currentRecommendation.recommendations.length > 0) {
-      setShowRecommendationModal(true);
+
+    // Refresh status immediately to get latest recommendation state
+    try {
+      const status = await api.getOptimizationStatus(site.id);
+      const hasRecs = !!(status.last_recommendation &&
+                      status.last_recommendation.recommendations &&
+                      status.last_recommendation.recommendations.length > 0);
+
+      // Update hasRecommendation state to match reality
+      setHasRecommendation(hasRecs);
+
+      // Only open modal if there are actual recommendations
+      if (hasRecs) {
+        setCurrentRecommendation(status.last_recommendation);
+        setShowRecommendationModal(true);
+      }
+    } catch (error) {
+      console.error('Failed to refresh optimization status:', error);
+      // Fallback to opening modal if hasRecommendation was already true
+      if (hasRecommendation) {
+        setShowRecommendationModal(true);
+      }
     }
   };
 
@@ -362,7 +378,7 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
     try {
       const workOrder = await createWorkOrder({
         site_id: site.id,
-        equipment_id: equipment.code || equipmentId,
+        equipment_id: equipment.id || equipmentId,
         fault_description: `${equipment.name} health at ${equipment.health}% - maintenance required`,
         diagnosis: `Equipment health below threshold. Status: ${equipment.status}`,
         priority: equipment.status === "critical" ? "high" : "medium",

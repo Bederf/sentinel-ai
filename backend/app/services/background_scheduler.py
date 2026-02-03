@@ -85,18 +85,33 @@ class BackgroundSchedulerService:
             import random
             from app.models.audit_log import AuditActionType, AuditResultType, \
                 AuditActionType as AAT, AuditResultType as ART
+            from app.database.repositories.equipment_repository import EquipmentRepository
 
             logger.debug("Generating periodic demo audit data...")
 
-            # Demo devices
-            demo_devices = [
-                "chiller-gateway-001",
-                "ahu-level3-002",
-                "lighting-lobby-003",
-                "access-main-004",
-                "fire-pump-005",
-                "vav-office-006"
-            ]
+            # Get real equipment IDs from site-002
+            demo_devices = []
+            try:
+                equipment_repo = EquipmentRepository()
+                equipment_list = equipment_repo.get_by_building_code("site-002")
+                if equipment_list:
+                    # Sample controllable equipment types for realistic audit logs
+                    controllable_types = ['fcu', 'ahu', 'vav', 'chiller', 'lighting', 'pump', 'generator']
+                    demo_devices = [
+                        eq.get('code') or eq.get('equipment_id') or eq.get('id')
+                        for eq in equipment_list
+                        if any(t in (eq.get('type', '') or '').lower() for t in controllable_types)
+                    ][:20]  # Limit to 20 devices
+            except Exception as e:
+                logger.warning(f"Could not fetch site-002 equipment: {e}")
+
+            # Fallback to sample device IDs if none found
+            if not demo_devices:
+                demo_devices = [
+                    "FCU-L10-01", "FCU-L11-02", "FCU-L12-03",
+                    "AHU-L10-01", "VAV-L11-01", "DALI-L12-A",
+                    "GEN-001", "UPS-001", "ATS-001"
+                ]
 
             demo_users = ["operator-1", "operator-2", "system", "scheduler", "admin"]
             demo_points = ["setpoint", "fan_speed", "brightness", "status", "mode"]
@@ -436,17 +451,18 @@ class BackgroundSchedulerService:
             recommender = get_maintenance_recommender(client)
             module_registry = ModuleRegistryService()
 
-            # Get all equipment with health below 90% - include real data fields
+            # Get ALL equipment - generate recommendations for all, not just degraded
             response = client.table("equipment").select(
                 "id, code, name, type, health_score, building_id, status, "
                 "install_date, last_service, manufacturer, model"
-            ).lt("health_score", 90).execute()
+            ).execute()
 
-            at_risk_equipment = response.data if response.data else []
-            logger.info(f"Found {len(at_risk_equipment)} equipment below 90% health")
+            all_equipment = response.data if response.data else []
+            at_risk = len([eq for eq in all_equipment if eq.get("health_score", 100) < 90])
+            logger.info(f"Generating recommendations for {len(all_equipment)} equipment ({at_risk} at-risk)")
 
             generated = 0
-            for eq in at_risk_equipment:
+            for eq in all_equipment:
                 try:
                     health = eq.get("health_score", 100)
                     equipment_id = eq.get("id")
@@ -514,30 +530,78 @@ class BackgroundSchedulerService:
                         elif prob > 50:
                             context_parts.append(f"🟡 Moderate failure probability: {prob}%")
 
-                    # Generate recommendation using real context
-                    risk_level = "critical" if health < 50 else ("high" if health < 70 else "medium")
-                    recommendation = recommender._generate_fallback_recommendation(
-                        equipment_id=eq.get("code", eq["id"]),
-                        equipment_type=eq.get("type", "unknown"),
-                        risk_level=risk_level,
-                        predicted_failure="health_degradation"
-                    )
+                    # Determine recommendation type based on health
+                    is_healthy = health >= 90
 
-                    # Enhance actions based on real data
-                    enhanced_actions = list(recommendation.immediate_actions)
-                    if days_since_service and days_since_service > 180:
-                        enhanced_actions.insert(0, "Schedule overdue preventive maintenance")
-                    if recent_alerts and len(recent_alerts) >= 3:
-                        enhanced_actions.insert(0, "Review recurring alert pattern")
-                    if prediction and prediction.get("probability_percent", 0) > 70:
-                        enhanced_actions.insert(0, prediction.get("recommended_action", "Address predicted failure"))
+                    if is_healthy:
+                        # HEALTHY equipment: Preventive maintenance & optimization
+                        risk_level = "low"
+                        rec_type = RecommendationType.OPTIMIZATION
 
-                    # Determine priority based on multiple factors
-                    priority = RecommendationPriority.MEDIUM
-                    if health < 50 or (prediction and prediction.get("probability_percent", 0) > 80):
-                        priority = RecommendationPriority.CRITICAL
-                    elif health < 70 or (days_since_service and days_since_service > 365):
-                        priority = RecommendationPriority.HIGH
+                        # Generate preventive actions based on equipment type and service history
+                        enhanced_actions = []
+                        eq_type = eq.get("type", "").lower()
+
+                        # Service-based recommendations
+                        if days_since_service:
+                            if days_since_service > 90:
+                                enhanced_actions.append(f"Schedule preventive maintenance (last service {days_since_service} days ago)")
+                            if days_since_service > 180:
+                                enhanced_actions.append("Filter/belt inspection recommended")
+                        else:
+                            enhanced_actions.append("Establish maintenance schedule")
+
+                        # Type-specific optimization suggestions
+                        if "chiller" in eq_type:
+                            enhanced_actions.extend([
+                                "Review chilled water setpoint for optimization",
+                                "Check condenser approach temperature",
+                            ])
+                        elif "ahu" in eq_type or "fcu" in eq_type:
+                            enhanced_actions.extend([
+                                "Verify economizer operation",
+                                "Check supply air temperature setpoint",
+                            ])
+                        elif "vav" in eq_type:
+                            enhanced_actions.append("Review zone airflow minimums")
+                        elif "lighting" in eq_type or "luminaire" in eq_type:
+                            enhanced_actions.append("Verify daylight harvesting settings")
+                        elif "generator" in eq_type:
+                            enhanced_actions.append("Schedule monthly test run")
+                        else:
+                            enhanced_actions.append("Verify operational parameters")
+
+                        priority = RecommendationPriority.LOW
+                        title_prefix = "Optimization"
+
+                    else:
+                        # DEGRADED equipment: Maintenance recommendations
+                        risk_level = "critical" if health < 50 else ("high" if health < 70 else "medium")
+                        rec_type = RecommendationType.MAINTENANCE
+
+                        recommendation = recommender._generate_fallback_recommendation(
+                            equipment_id=eq.get("code", eq["id"]),
+                            equipment_type=eq.get("type", "unknown"),
+                            risk_level=risk_level,
+                            predicted_failure="health_degradation"
+                        )
+
+                        enhanced_actions = list(recommendation.immediate_actions)
+                        if days_since_service and days_since_service > 180:
+                            enhanced_actions.insert(0, "Schedule overdue preventive maintenance")
+                        if recent_alerts and len(recent_alerts) >= 3:
+                            enhanced_actions.insert(0, "Review recurring alert pattern")
+                        if prediction and prediction.get("probability_percent", 0) > 70:
+                            enhanced_actions.insert(0, prediction.get("recommended_action", "Address predicted failure"))
+
+                        # Determine priority based on multiple factors
+                        priority = RecommendationPriority.MEDIUM
+                        if health < 50 or (prediction and prediction.get("probability_percent", 0) > 80):
+                            priority = RecommendationPriority.CRITICAL
+                        elif health < 70 or (days_since_service and days_since_service > 365):
+                            priority = RecommendationPriority.HIGH
+
+                        title_prefix = "Maintenance Required"
 
                     description = ". ".join(context_parts)
                     if enhanced_actions:
@@ -547,9 +611,9 @@ class BackgroundSchedulerService:
                         recommendation_id=str(uuid.uuid4()),
                         timestamp=datetime.now().isoformat(),
                         source_module=ModuleType.HVAC,
-                        recommendation_type=RecommendationType.MAINTENANCE,
+                        recommendation_type=rec_type,
                         priority=priority,
-                        title=f"Maintenance Required: {eq['name']}",
+                        title=f"{title_prefix}: {eq['name']}",
                         description=description,
                         confidence=0.90 if prediction else 0.75,
                         related_modules=[],
@@ -570,8 +634,8 @@ class BackgroundSchedulerService:
                             "contributing_factors": prediction.get("contributing_factors") if prediction else None,
                         },
                         suggested_action={
-                            "type": "schedule_maintenance",
-                            "priority": recommendation.priority,
+                            "type": "optimize" if is_healthy else "schedule_maintenance",
+                            "priority": "low" if is_healthy else risk_level,
                             "immediate_actions": enhanced_actions[:5],
                             "evidence": [
                                 f"Health at {health}%",

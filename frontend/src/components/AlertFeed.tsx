@@ -28,6 +28,8 @@ interface AlertFeedProps {
   onAlertRead?: (alertId: string) => void;
   /** Callback when all alerts are cleared/marked as read */
   onClearAll?: () => void;
+  /** Callback when an alert is clicked - for navigation to equipment */
+  onAlertClick?: (alert: Alert) => void;
 }
 
 /**
@@ -102,6 +104,7 @@ export function AlertFeed({
   onRefresh,
   onAlertRead,
   onClearAll,
+  onAlertClick,
 }: AlertFeedProps) {
   const [alerts, setAlerts] = useState<Alert[]>(initialAlerts || []);
   const [loading, setLoading] = useState(!initialAlerts);
@@ -155,18 +158,25 @@ export function AlertFeed({
     fetchAlerts();
   };
 
-  // Handle alert click - mark as read
+  // Handle alert click - mark as read and navigate to equipment
   const handleAlertClick = async (alertId: string) => {
-    // If already read (acknowledged or locally marked), do nothing
     const alert = alerts.find(a => a.id === alertId);
-    if (alert?.acknowledged || locallyReadAlerts.has(alertId)) {
+    if (!alert) return;
+
+    // Always trigger navigation callback (even if already read)
+    if (onAlertClick) {
+      onAlertClick(alert);
+    }
+
+    // If already read (acknowledged or locally marked), skip marking as read
+    if (alert.acknowledged || locallyReadAlerts.has(alertId)) {
       return;
     }
 
     // Mark as locally read immediately for UI feedback
     setLocallyReadAlerts(prev => new Set(prev).add(alertId));
 
-    // Notify parent
+    // Notify parent about read status change
     if (onAlertRead) {
       onAlertRead(alertId);
     }

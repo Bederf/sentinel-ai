@@ -855,9 +855,9 @@ async def seed_integration_data():
     Seed demo integration data for the monitoring dashboard.
 
     Creates demo point_asset_mappings and column_mappings for testing.
-    This is for demo purposes only.
+    Uses REAL site-002 equipment IDs for realistic data.
     """
-    import uuid
+    import random
 
     # Get Sandton building UUID
     building = building_repo.get_by_id("site-002")
@@ -873,25 +873,56 @@ async def seed_integration_data():
 
     source_id = sources[0]['id']
 
-    # Seed point_asset_mappings
-    point_mappings = [
-        # Exact matches (verified)
-        {"bms_point_id": "BMS.HVAC.CHW.001.SupplyTemp", "extracted_asset_id": "CHW-001", "cafm_asset_id": "CAFM-CHW-001", "parameter_name": "Supply Temperature", "parameter_type": "analog", "match_confidence": "exact", "is_verified": True},
-        {"bms_point_id": "BMS.HVAC.CHW.001.ReturnTemp", "extracted_asset_id": "CHW-001", "cafm_asset_id": "CAFM-CHW-001", "parameter_name": "Return Temperature", "parameter_type": "analog", "match_confidence": "exact", "is_verified": True},
-        {"bms_point_id": "BMS.HVAC.AHU.L1.SupplyFan", "extracted_asset_id": "AHU-L1-001", "cafm_asset_id": "CAFM-AHU-001", "parameter_name": "Supply Fan Status", "parameter_type": "binary", "match_confidence": "exact", "is_verified": True},
-        {"bms_point_id": "BMS.HVAC.AHU.L1.ReturnTemp", "extracted_asset_id": "AHU-L1-001", "cafm_asset_id": "CAFM-AHU-001", "parameter_name": "Return Air Temp", "parameter_type": "analog", "match_confidence": "exact", "is_verified": True},
-        {"bms_point_id": "BMS.HVAC.Boiler.001.Status", "extracted_asset_id": "BLR-001", "cafm_asset_id": "CAFM-BLR-001", "parameter_name": "Run Status", "parameter_type": "binary", "match_confidence": "exact", "is_verified": True},
-        {"bms_point_id": "BMS.HVAC.CT.001.FanSpeed", "extracted_asset_id": "CT-001", "cafm_asset_id": "CAFM-CT-001", "parameter_name": "Fan Speed", "parameter_type": "analog", "match_confidence": "exact", "is_verified": True},
-        {"bms_point_id": "BMS.ELEC.Main.kWh", "extracted_asset_id": "MTR-MAIN", "cafm_asset_id": "CAFM-MTR-001", "parameter_name": "Energy Consumption", "parameter_type": "analog", "match_confidence": "exact", "is_verified": True},
-        # Fuzzy matches (not verified)
-        {"bms_point_id": "BMS.HVAC.CHW.001.CondenserPres", "extracted_asset_id": "CHW-001", "cafm_asset_id": "CAFM-CHW-001", "parameter_name": "Condenser Pressure", "parameter_type": "analog", "match_confidence": "fuzzy", "is_verified": False},
-        {"bms_point_id": "BMS.HVAC.AHU.L2.DamperPos", "extracted_asset_id": "AHU-L2-001", "cafm_asset_id": "CAFM-AHU-002", "parameter_name": "Damper Position", "parameter_type": "analog", "match_confidence": "fuzzy", "is_verified": False},
-        # Manual matches
-        {"bms_point_id": "BMS.HVAC.FCU.L3.ZoneTemp", "extracted_asset_id": "FCU-L3-001", "cafm_asset_id": None, "parameter_name": "Zone Temperature", "parameter_type": "analog", "match_confidence": "manual", "is_verified": True},
-        # Unmatched points
+    # Get REAL equipment from site-002
+    equipment_list = equipment_repo.get_by_building_code("site-002")
+    if not equipment_list:
+        # Fallback: try get_all with building_id filter
+        equipment_list = equipment_repo.get_all(building_id="site-002")
+    if not equipment_list:
+        raise HTTPException(status_code=404, detail="No equipment found for site-002")
+
+    # Build point mappings from real equipment
+    point_mappings = []
+    parameter_templates = {
+        'fcu': [('ZoneTemp', 'Zone Temperature', 'analog'), ('FanSpeed', 'Fan Speed', 'analog'), ('ValvePos', 'Valve Position', 'analog')],
+        'ahu': [('SupplyTemp', 'Supply Air Temp', 'analog'), ('ReturnTemp', 'Return Air Temp', 'analog'), ('FanStatus', 'Fan Status', 'binary')],
+        'vav': [('DamperPos', 'Damper Position', 'analog'), ('FlowRate', 'Air Flow Rate', 'analog')],
+        'chiller': [('ChwSupply', 'CHW Supply Temp', 'analog'), ('ChwReturn', 'CHW Return Temp', 'analog'), ('LoadPct', 'Load Percentage', 'analog')],
+        'generator': [('RunStatus', 'Run Status', 'binary'), ('Voltage', 'Output Voltage', 'analog'), ('Frequency', 'Frequency', 'analog')],
+        'lighting': [('LightLevel', 'Light Level', 'analog'), ('OccStatus', 'Occupancy Status', 'binary')],
+        'sensor': [('Reading', 'Sensor Reading', 'analog')],
+    }
+
+    confidences = ['exact', 'exact', 'exact', 'fuzzy', 'fuzzy', 'manual']  # Weighted towards exact
+
+    for eq in equipment_list[:50]:  # Limit to 50 equipment items
+        eq_id = eq.get('code') or eq.get('equipment_id') or eq.get('id')
+        eq_type = (eq.get('type') or 'sensor').lower()
+        eq_name = eq.get('name') or eq_id
+
+        # Get parameter templates for this equipment type
+        params = parameter_templates.get(eq_type, [('Value', 'Value', 'analog')])
+
+        for param_suffix, param_name, param_type in params:
+            bms_point_id = f"BMS.{eq_id}.{param_suffix}"
+            confidence = random.choice(confidences)
+
+            point_mappings.append({
+                "bms_point_id": bms_point_id,
+                "extracted_asset_id": eq_id,
+                "cafm_asset_id": f"CAFM-{eq_id}" if confidence != 'unmatched' else None,
+                "parameter_name": param_name,
+                "parameter_type": param_type,
+                "match_confidence": confidence,
+                "is_verified": confidence in ['exact', 'manual'],
+            })
+
+    # Add a few unmatched points for realism
+    point_mappings.extend([
         {"bms_point_id": "BMS.Legacy.Sensor42", "extracted_asset_id": None, "cafm_asset_id": None, "parameter_name": None, "parameter_type": None, "match_confidence": "unmatched", "is_verified": False},
         {"bms_point_id": "BMS.Unknown.PointX", "extracted_asset_id": None, "cafm_asset_id": None, "parameter_name": None, "parameter_type": None, "match_confidence": "unmatched", "is_verified": False},
-    ]
+        {"bms_point_id": "BMS.Orphan.TempSensor", "extracted_asset_id": None, "cafm_asset_id": None, "parameter_name": None, "parameter_type": None, "match_confidence": "unmatched", "is_verified": False},
+    ])
 
     mappings_created = integration_repo.bulk_upsert_point_mappings(building_id, point_mappings)
 

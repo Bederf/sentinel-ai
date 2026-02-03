@@ -21,14 +21,35 @@ from app.models.optimization import (
     OptimizationHistoryEntry,
 )
 from app.models.device import Device, DeviceType, DevicePoint, ZoneType, ExposureDirection
+from app.models.dali import ZoneOccupancy, ZoneLighting
 from app.services.claude_service import claude_service
 from app.services.device_abstraction import device_manager
 from app.services.safety_interlocks import safety_engine
+from app.services.dali_service import get_dali_service
 
 logger = logging.getLogger(__name__)
 
 # Data directory for sites
 DATA_DIR = Path(__file__).parent.parent / "data"
+
+
+async def ensure_device_manager_initialized() -> None:
+    """Ensure device manager is initialized with mock devices if not already."""
+    if not device_manager._initialized:
+        logger.info("Device manager not initialized, loading mock devices...")
+        try:
+            mock_devices_path = DATA_DIR / "mock_devices.json"
+            if mock_devices_path.exists():
+                with open(mock_devices_path) as f:
+                    devices_data = json.load(f)
+                await device_manager.initialize(devices_data)
+                logger.info(f"Device manager initialized with {len(devices_data)} devices")
+            else:
+                logger.warning("mock_devices.json not found, initializing empty device manager")
+                await device_manager.initialize([])
+        except Exception as e:
+            logger.error(f"Failed to initialize device manager: {e}")
+            await device_manager.initialize([])
 
 
 def load_sites() -> List[Dict[str, Any]]:
@@ -121,6 +142,9 @@ class AIOptimizerService:
         if not site:
             raise ValueError(f"Site {site_id} not found")
 
+        # Ensure device manager is initialized
+        await ensure_device_manager_initialized()
+
         # Gather current conditions if not provided
         if not current_conditions:
             current_conditions = await self._gather_current_conditions(site_id)
@@ -136,22 +160,29 @@ class AIOptimizerService:
         # Get site devices for context
         devices = await device_manager.list_devices_by_site(site_id)
         hvac_devices = [d for d in devices if d.device_type == DeviceType.HVAC]
+        lighting_devices = [d for d in devices if d.device_type == DeviceType.LIGHTING]
+
+        # Fetch DALI lighting zone data
+        dali_service = get_dali_service()
+        dali_zones = self._gather_dali_zone_data(dali_service, site_id)
 
         # Build optimization prompt for Claude
         prompt = self._build_optimization_prompt(
-            site, current_conditions, weather_forecast, energy_prices, hvac_devices
+            site, current_conditions, weather_forecast, energy_prices, hvac_devices,
+            lighting_devices, dali_zones
         )
 
         try:
             # Try to use Claude for analysis
             if self._claude_service.is_configured():
                 recommendation = await self._analyze_with_claude(
-                    site_id, prompt, current_conditions, hvac_devices
+                    site_id, prompt, current_conditions, hvac_devices, dali_zones
                 )
             else:
                 # Fall back to rule-based optimization
                 recommendation = self._analyze_with_rules(
-                    site_id, current_conditions, weather_forecast, energy_prices, hvac_devices
+                    site_id, current_conditions, weather_forecast, energy_prices,
+                    hvac_devices, dali_zones
                 )
 
             return recommendation
@@ -160,11 +191,12 @@ class AIOptimizerService:
             logger.error(f"Error analyzing building {site_id}: {e}")
             # Fall back to rule-based optimization
             return self._analyze_with_rules(
-                site_id, current_conditions, weather_forecast, energy_prices, hvac_devices
+                site_id, current_conditions, weather_forecast, energy_prices,
+                hvac_devices, dali_zones
             )
 
     async def _gather_current_conditions(self, site_id: str) -> Dict[str, Any]:
-        """Gather current building conditions from devices."""
+        """Gather current building conditions from devices and DALI sensors."""
         try:
             devices = await device_manager.list_devices_by_site(site_id)
 
@@ -175,6 +207,7 @@ class AIOptimizerService:
                 "occupancy": "high",
                 "equipment_status": "normal",
                 "timestamp": datetime.now().isoformat(),
+                "zone_occupancy": {},  # Real occupancy from DALI
             }
 
             # Try to get actual readings from devices
@@ -189,6 +222,49 @@ class AIOptimizerService:
                             except Exception:
                                 pass
 
+            # Get real occupancy data from DALI service
+            try:
+                dali_service = get_dali_service()
+                zones = dali_service.get_all_zones()
+
+                total_occupied = 0
+                total_zones = 0
+
+                for zone in zones:
+                    zone_id = zone.get("zone_id")
+                    if not zone_id:
+                        continue
+
+                    occupancy = dali_service.get_zone_occupancy(zone_id)
+                    if occupancy:
+                        total_zones += 1
+                        occ_pct = occupancy.occupancy_percent
+
+                        conditions["zone_occupancy"][zone_id] = {
+                            "occupancy_percent": occ_pct,
+                            "avg_lux": occupancy.avg_lux_level,
+                            "is_occupied": occ_pct > 10,
+                            "zone_name": occupancy.zone_name,
+                        }
+
+                        if occ_pct > 10:
+                            total_occupied += 1
+
+                # Calculate overall occupancy level from zone data
+                if total_zones > 0:
+                    occupancy_ratio = total_occupied / total_zones
+                    if occupancy_ratio > 0.7:
+                        conditions["occupancy"] = "high"
+                    elif occupancy_ratio > 0.4:
+                        conditions["occupancy"] = "medium"
+                    elif occupancy_ratio > 0.1:
+                        conditions["occupancy"] = "low"
+                    else:
+                        conditions["occupancy"] = "minimal"
+
+            except Exception as e:
+                logger.warning(f"Failed to get DALI occupancy data: {e}")
+
             return conditions
 
         except Exception as e:
@@ -201,6 +277,7 @@ class AIOptimizerService:
                 "occupancy": "medium",
                 "equipment_status": "normal",
                 "timestamp": datetime.now().isoformat(),
+                "zone_occupancy": {},
             }
 
     def _generate_mock_weather_forecast(self) -> Dict[str, Any]:
@@ -233,9 +310,14 @@ class AIOptimizerService:
         weather_forecast: Dict[str, Any],
         energy_prices: Dict[str, Any],
         hvac_devices: List[Device],
+        lighting_devices: Optional[List[Device]] = None,
+        dali_zones: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Build optimization prompt for Claude."""
-        prompt = f"""You are an expert HVAC optimization engineer. Analyze the following building data and recommend optimal setpoints for energy efficiency and occupant comfort.
+        lighting_devices = lighting_devices or []
+        dali_zones = dali_zones or {}
+
+        prompt = f"""You are an expert building optimization engineer specializing in HVAC and DALI lighting systems. Analyze the following building data and recommend optimal setpoints for energy efficiency and occupant comfort.
 
 **Building:** {site['name']} ({site['id']})
 - Type: {site['type']}
@@ -277,15 +359,21 @@ class AIOptimizerService:
 - Executive zones: 21-23°C (tighter comfort band)
 - Server rooms: 18-22°C (critical cooling)
 - Humidity: 30-65% RH
+- Lighting minimum: 10% (DALI level 25) in occupied zones for safety
+- Lighting minimum: 70% (DALI level 178) in emergency zones
+
+{self._format_lighting_section(lighting_devices, dali_zones)}
 
 **Your Task:**
 1. Analyze the current conditions vs outdoor weather
 2. Consider energy pricing (higher rates = more aggressive optimization)
 3. Apply zone-aware rules based on zone_type and exposure
 4. Recommend specific HVAC setpoint changes
-5. IMPORTANT: Use the EXACT point_name from the "Available Control Points" list above
-6. Project energy savings in ZAR per hour
-7. Ensure all recommendations are within safety limits for each zone type
+5. Recommend DALI lighting adjustments (dim level 0-254, use dim_level point)
+6. IMPORTANT: Use the EXACT point_name from the "Available Control Points" list above
+7. Project energy savings in ZAR per hour (include lighting savings)
+8. Ensure all recommendations are within safety limits for each zone type
+9. Prioritize cross-system coordination (e.g., unoccupied zones: raise HVAC AND dim lights)
 
 **Response Format (JSON):**
 ```json
@@ -298,13 +386,36 @@ class AIOptimizerService:
       "current_value": 22.0,
       "recommended_value": 23.0,
       "unit": "°C",
-      "reason": "Brief explanation"
+      "reason": "Brief explanation",
+      "system": "hvac"
+    }},
+    {{
+      "equipment_id": "zone-id",
+      "equipment_name": "Zone Name",
+      "point_name": "dim_level",
+      "current_value": 254,
+      "recommended_value": 51,
+      "unit": "level",
+      "reason": "Zone unoccupied - dim to 20%",
+      "system": "lighting"
+    }}
+  ],
+  "cross_system_recommendations": [
+    {{
+      "zone_id": "Zone-L11-S",
+      "zone_name": "Level 11 South",
+      "hvac_action": "Raise setpoint +2°C",
+      "lighting_action": "Dim to 20%",
+      "reason": "Zone unoccupied - coordinated energy savings",
+      "combined_savings_kw": 1.2
     }}
   ],
   "projected_savings": {{
-    "energy_kwh": 12.5,
-    "cost_zar_per_hour": 31.25,
-    "percentage_improvement": 8.5
+    "hvac_kwh": 12.5,
+    "lighting_kwh": 3.2,
+    "energy_kwh": 15.7,
+    "cost_zar_per_hour": 39.25,
+    "percentage_improvement": 12.5
   }},
   "confidence": 0.85,
   "reasoning": "Summary of why these changes are recommended"
@@ -321,6 +432,7 @@ Provide ONLY the JSON response, no additional text."""
         prompt: str,
         current_conditions: Dict[str, Any],
         hvac_devices: List[Device],
+        dali_zones: Optional[Dict[str, Any]] = None,
     ) -> OptimizationRecommendation:
         """Analyze using Claude AI."""
         try:
@@ -560,6 +672,141 @@ Provide ONLY the JSON response, no additional text."""
             lines.append(f"- {zone_type} ({exposure}, {priority}): {', '.join(devices)}")
         return "\n".join(lines)
 
+    # DALI Lighting Optimization Helper Methods
+
+    def _gather_dali_zone_data(self, dali_service, site_id: str) -> Dict[str, Any]:
+        """Gather DALI zone occupancy and lighting data for optimization.
+
+        Args:
+            dali_service: DALI service instance
+            site_id: Site to gather data for
+
+        Returns:
+            Dictionary with zone occupancy and lighting summaries
+        """
+        zone_data = {}
+
+        try:
+            # Get all zones from DALI service
+            zones = dali_service.get_all_zones()
+
+            for zone in zones:
+                zone_id = zone.get("zone_id")
+                if not zone_id:
+                    continue
+
+                # Get occupancy data
+                occupancy = dali_service.get_zone_occupancy(zone_id)
+                # Get lighting data
+                lighting = dali_service.get_zone_lighting(zone_id)
+
+                zone_data[zone_id] = {
+                    "zone_id": zone_id,
+                    "zone_name": zone.get("name", zone_id),
+                    "floor": zone.get("floor", "Unknown"),
+                    "area_sqm": zone.get("area_sqm", 0),
+                    "desk_count": zone.get("desk_count", 0),
+                    "active_scene": zone.get("active_scene"),
+                    "active_scene_name": zone.get("active_scene_name"),
+                    "occupancy": occupancy.to_dict() if occupancy else None,
+                    "lighting": lighting.to_dict() if lighting else None,
+                    # Computed optimization flags
+                    "is_occupied": occupancy.occupancy_percent > 10 if occupancy else True,
+                    "has_high_daylight": occupancy.avg_lux_level > 500 if occupancy else False,
+                    "is_over_lit": (
+                        lighting.avg_dim_level > 50 and
+                        occupancy.occupancy_percent < 20 if (lighting and occupancy) else False
+                    ),
+                }
+
+        except Exception as e:
+            logger.warning(f"Failed to gather DALI zone data: {e}")
+
+        return zone_data
+
+    def _format_lighting_section(
+        self,
+        lighting_devices: List[Device],
+        dali_zones: Dict[str, Any],
+    ) -> str:
+        """Format DALI lighting section for Claude prompt.
+
+        Args:
+            lighting_devices: List of lighting device objects
+            dali_zones: DALI zone data from _gather_dali_zone_data
+
+        Returns:
+            Formatted string for Claude prompt
+        """
+        if not dali_zones:
+            return ""
+
+        lines = []
+
+        # DALI Lighting System Summary
+        lines.append("**DALI Lighting System:**")
+        total_zones = len(dali_zones)
+        occupied_zones = sum(1 for z in dali_zones.values() if z.get("is_occupied"))
+        over_lit_zones = [z for z in dali_zones.values() if z.get("is_over_lit")]
+
+        lines.append(f"- Total zones: {total_zones}")
+        lines.append(f"- Occupied zones: {occupied_zones}")
+        lines.append(f"- Over-lit unoccupied zones (ENERGY WASTE): {len(over_lit_zones)}")
+
+        # List over-lit zones specifically
+        if over_lit_zones:
+            lines.append("\n**⚠️ Over-lit Unoccupied Zones (Priority for dimming):**")
+            for zone in over_lit_zones:
+                occ = zone.get("occupancy", {})
+                light = zone.get("lighting", {})
+                lines.append(
+                    f"- {zone['zone_name']}: "
+                    f"{occ.get('occupancy_percent', 0):.0f}% occupied, "
+                    f"lights at {light.get('avg_dim_level', 0):.0f}% ({light.get('total_power_w', 0):.0f}W)"
+                )
+
+        # Lighting Telemetry by Zone
+        lines.append("\n**Lighting Telemetry by Zone:**")
+        for zone_id, zone in dali_zones.items():
+            occ = zone.get("occupancy", {})
+            light = zone.get("lighting", {})
+
+            occ_pct = occ.get("occupancy_percent", 0) if occ else 0
+            avg_lux = occ.get("avg_lux_level", 0) if occ else 0
+            dim_level = light.get("avg_dim_level", 0) if light else 0
+            power_w = light.get("total_power_w", 0) if light else 0
+            faulty = light.get("faulty_count", 0) if light else 0
+            scene = zone.get("active_scene_name", "Manual")
+
+            status = "🟢" if zone.get("is_occupied") else "⚪"
+            lines.append(
+                f"- {status} {zone['zone_name']}: "
+                f"occupancy={occ_pct:.0f}%, lux={avg_lux:.0f}, "
+                f"dim={dim_level:.0f}%, power={power_w:.0f}W, scene={scene}"
+                + (f", faulty={faulty}" if faulty > 0 else "")
+            )
+
+        # Lighting Optimization Rules
+        lines.append("\n**Lighting Optimization Rules:**")
+        lines.append("- Daylight harvesting: When avg_lux > 500 (setpoint), dim proportionally")
+        lines.append("- Unoccupied zones: Dim to 20% (level 51) for safety lighting only")
+        lines.append("- Minimum brightness: 10% (level 25) in any occupied zone")
+        lines.append("- Emergency zones: Never below 70% (level 178)")
+        lines.append("- Scene override: Respect active scenes in meeting rooms during occupation")
+
+        return "\n".join(lines)
+
+    def _format_lighting_device_list(self, lighting_devices: List[Device]) -> str:
+        """Format lighting device list for Claude prompt."""
+        if not lighting_devices:
+            return "No lighting devices found"
+        lines = []
+        for d in lighting_devices:
+            lighting_type = getattr(d, 'lighting_type', 'unknown')
+            location = getattr(d, 'location', 'unknown location')
+            lines.append(f"- {d.id}: {d.name} ({lighting_type}) at {location}")
+        return "\n".join(lines)
+
     def _should_skip_zone_optimization(self, device: Device, zone_type: Optional[ZoneType]) -> bool:
         """Check if zone type should have restricted optimization.
 
@@ -647,9 +894,11 @@ Provide ONLY the JSON response, no additional text."""
         weather_forecast: Dict[str, Any],
         energy_prices: Dict[str, Any],
         hvac_devices: List[Device],
+        dali_zones: Optional[Dict[str, Any]] = None,
     ) -> OptimizationRecommendation:
-        """Fallback rule-based optimization."""
+        """Fallback rule-based optimization for HVAC and lighting."""
         logger.info(f"Using rule-based optimization for site {site_id}")
+        dali_zones = dali_zones or {}
 
         indoor_temp = current_conditions.get("indoor_temp", 22.0)
         outdoor_temp = current_conditions.get("outdoor_temp", 28.0)
@@ -827,15 +1076,102 @@ Provide ONLY the JSON response, no additional text."""
                             f"Reduce fan speed 10% for energy savings - moderate temperature differential allows lower airflow",
                         )
 
+        # ============================================================
+        # DALI Lighting Optimization Rules
+        # ============================================================
+        lighting_recommendations = []
+        cross_system_recommendations = []
+        lighting_savings_kw = 0.0
+
+        if dali_zones:
+            for zone_id, zone in dali_zones.items():
+                occupancy = zone.get("occupancy", {})
+                lighting = zone.get("lighting", {})
+                is_occupied = zone.get("is_occupied", True)
+                has_high_daylight = zone.get("has_high_daylight", False)
+
+                # Skip if no lighting data
+                if not lighting:
+                    continue
+
+                current_dim = lighting.get("avg_dim_level", 0)
+                total_power = lighting.get("total_power_w", 0)
+                zone_name = zone.get("zone_name", zone_id)
+                is_emergency = "emergency" in zone_name.lower()
+
+                # Rule 5: Unoccupied zone dimming
+                # Dim to 20% (level 51) if zone is unoccupied
+                if not is_occupied and current_dim > 25:  # 25 = ~10%, 51 = ~20%
+                    # Don't dim emergency zones below 70%
+                    target_dim = 178 if is_emergency else 51
+
+                    if current_dim > target_dim:
+                        power_saved = total_power * (1 - target_dim / 254)
+                        lighting_savings_kw += power_saved / 1000
+
+                        lighting_recommendations.append({
+                            "equipment_id": zone_id,
+                            "equipment_name": zone_name,
+                            "point_name": "dim_level",
+                            "current_value": int(current_dim * 254 / 100),  # Convert % to DALI level
+                            "recommended_value": target_dim,
+                            "unit": "level",
+                            "reason": f"Zone unoccupied ({occupancy.get('occupancy_percent', 0):.0f}% sensors active) - dim to {target_dim * 100 // 254}% for safety lighting",
+                            "system": "lighting",
+                        })
+
+                        # Add cross-system recommendation for coordinated action
+                        cross_system_recommendations.append({
+                            "zone_id": zone_id,
+                            "zone_name": zone_name,
+                            "hvac_action": "Raise setpoint +2°C",
+                            "lighting_action": f"Dim to {target_dim * 100 // 254}%",
+                            "reason": "Zone unoccupied - coordinated energy savings",
+                            "combined_savings_kw": round(power_saved / 1000 + 0.5, 2),  # Estimate HVAC savings
+                        })
+
+                # Rule 6: Daylight harvesting
+                # If lux > setpoint (500), dim proportionally
+                elif is_occupied and has_high_daylight and current_dim > 50:
+                    avg_lux = occupancy.get("avg_lux_level", 0)
+                    daylight_excess = (avg_lux - 500) / 500  # How much over setpoint
+                    dim_reduction = min(daylight_excess * 30, 40)  # Max 40% reduction
+
+                    target_dim = max(current_dim - dim_reduction, 30)  # Never below 30%
+
+                    if current_dim - target_dim > 10:  # Only recommend if meaningful
+                        power_saved = total_power * dim_reduction / 100
+                        lighting_savings_kw += power_saved / 1000
+
+                        lighting_recommendations.append({
+                            "equipment_id": zone_id,
+                            "equipment_name": zone_name,
+                            "point_name": "dim_level",
+                            "current_value": int(current_dim * 254 / 100),
+                            "recommended_value": int(target_dim * 254 / 100),
+                            "unit": "level",
+                            "reason": f"Daylight harvesting - avg lux {avg_lux:.0f} exceeds setpoint 500, dim to {target_dim:.0f}%",
+                            "system": "lighting",
+                        })
+
+        # Merge lighting recommendations with HVAC recommendations
+        for rec in lighting_recommendations:
+            recommendations.append(rec)
+
         # Sort recommendations by zone priority (critical zones first)
         recommendations = self._sort_recommendations_by_priority(recommendations, hvac_devices)
 
         # Calculate projected savings based on number and type of recommendations
-        base_savings = 5.0  # kWh base
-        energy_savings = base_savings + (len(recommendations) * 4.5)
+        hvac_recs = [r for r in recommendations if r.get("system") != "lighting"]
+        lighting_recs = [r for r in recommendations if r.get("system") == "lighting"]
+
+        hvac_savings = 5.0 + (len(hvac_recs) * 4.5)  # kWh base for HVAC
+        lighting_savings = lighting_savings_kw  # Calculated above for lighting
+
+        energy_savings = hvac_savings + lighting_savings
         energy_rate = energy_prices.get("current_rate", 2.50)
         cost_savings = energy_savings * energy_rate
-        percentage = min(8.0 + (len(recommendations) * 2.0), 15.0)
+        percentage = min(8.0 + (len(recommendations) * 1.5), 20.0)  # Higher cap with lighting
 
         reasoning_parts = []
         # Check for various cooling setpoint names
@@ -850,6 +1186,8 @@ Provide ONLY the JSON response, no additional text."""
             reasoning_parts.append("CHW temperature optimization")
         if any("fan_speed" in r["point_name"] for r in recommendations):
             reasoning_parts.append("fan speed optimization")
+        if lighting_recs:
+            reasoning_parts.append("DALI lighting optimization")
 
         # Add zone-aware context to reasoning
         zone_context = []
@@ -865,19 +1203,40 @@ Provide ONLY the JSON response, no additional text."""
             reasoning += f"Recommendations include: {', '.join(reasoning_parts)}. "
         if zone_context:
             reasoning += f"Zone-aware adjustments applied for: {', '.join(zone_context)} zones. "
+        if cross_system_recommendations:
+            reasoning += f"Coordinated {len(cross_system_recommendations)} cross-system optimizations. "
         reasoning += f"All recommendations within safety limits and sorted by zone priority."
+
+        # Build lighting summary
+        lighting_summary = None
+        if dali_zones:
+            total_zones = len(dali_zones)
+            occupied_zones = sum(1 for z in dali_zones.values() if z.get("is_occupied"))
+            over_lit_count = sum(1 for z in dali_zones.values() if z.get("is_over_lit"))
+            lighting_summary = {
+                "total_zones": total_zones,
+                "occupied_zones": occupied_zones,
+                "unoccupied_zones": total_zones - occupied_zones,
+                "over_lit_zones": over_lit_count,
+                "lighting_recommendations_count": len(lighting_recs),
+                "estimated_savings_kw": round(lighting_savings_kw, 2),
+            }
 
         return OptimizationRecommendation(
             site_id=site_id,
             timestamp=datetime.now().isoformat(),
             recommendations=recommendations,
             projected_savings={
+                "hvac_kwh": round(hvac_savings, 1),
+                "lighting_kwh": round(lighting_savings, 1),
                 "energy_kwh": round(energy_savings, 1),
                 "cost_zar_per_hour": round(cost_savings, 2),
                 "percentage_improvement": round(percentage, 1),
             },
             confidence=confidence + (0.05 * len(recommendations)),  # Higher confidence with more recommendations
             reasoning=reasoning,
+            cross_system_recommendations=cross_system_recommendations if cross_system_recommendations else None,
+            lighting_summary=lighting_summary,
         )
 
     async def analyze_building_load_shedding(

@@ -26,6 +26,7 @@ class OptimizationRecommendation:
     """AI-generated optimization recommendation for a building.
 
     Contains specific setpoint changes, projected savings, and confidence score.
+    Supports both HVAC and DALI lighting recommendations.
     """
 
     site_id: str
@@ -34,10 +35,13 @@ class OptimizationRecommendation:
     projected_savings: Dict[str, Any] = field(default_factory=dict)
     confidence: float = 0.0
     reasoning: str = ""
+    # Phase 3: Cross-system coordination
+    cross_system_recommendations: Optional[List[Dict[str, Any]]] = None
+    lighting_summary: Optional[Dict[str, Any]] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
-        return {
+        result = {
             "site_id": self.site_id,
             "timestamp": self.timestamp,
             "recommendations": self.recommendations,
@@ -45,6 +49,11 @@ class OptimizationRecommendation:
             "confidence": self.confidence,
             "reasoning": self.reasoning,
         }
+        if self.cross_system_recommendations:
+            result["cross_system_recommendations"] = self.cross_system_recommendations
+        if self.lighting_summary:
+            result["lighting_summary"] = self.lighting_summary
+        return result
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "OptimizationRecommendation":
@@ -56,6 +65,8 @@ class OptimizationRecommendation:
             projected_savings=data.get("projected_savings", {}),
             confidence=data.get("confidence", 0.0),
             reasoning=data.get("reasoning", ""),
+            cross_system_recommendations=data.get("cross_system_recommendations"),
+            lighting_summary=data.get("lighting_summary"),
         )
 
 

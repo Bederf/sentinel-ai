@@ -51,7 +51,10 @@ logger = logging.getLogger(__name__)
 # Data Models
 # ============================================================================
 
-class WorkflowState(str):
+from enum import Enum
+
+
+class WorkflowState(str, Enum):
     """Asset lifecycle states"""
     ONBOARDING = "onboarding"
     BASELINE_CAPTURE = "baseline_capture"

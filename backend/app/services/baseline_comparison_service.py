@@ -439,14 +439,6 @@ class BaselineComparisonService:
                 comparison_data = [["Element", "Baseline", "Current", "Deviation", "Status"]]
 
                 for dev in comparison.deviations:
-                    # Color code status
-                    if dev.severity == "critical":
-                        status_color = colors.red
-                    elif dev.severity == "warning":
-                        status_color = colors.orange
-                    else:
-                        status_color = colors.green
-
                     comparison_data.append([
                         dev.element_name,
                         f"{dev.baseline_value:.2f}",
@@ -456,15 +448,28 @@ class BaselineComparisonService:
                     ])
 
                 comparison_table = Table(comparison_data)
-                comparison_table.setStyle(TableStyle([
+
+                # Build table styles with color-coded status cells
+                comp_styles = [
                     ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
                     ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                     ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                     ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
                     ('FONTSIZE', (0, 0), (-1, 0), 12),
                     ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                    ('GRID', (0, 0), (-1, -1), 1, colors.black)
-                ]))
+                    ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ]
+
+                # Add color coding for status column (column index 4)
+                for i, dev in enumerate(comparison.deviations, start=1):  # start=1 to skip header row
+                    if dev.severity == "critical":
+                        comp_styles.append(('BACKGROUND', (4, i), (4, i), colors.red))
+                        comp_styles.append(('TEXTCOLOR', (4, i), (4, i), colors.whitesmoke))
+                    elif dev.severity == "warning":
+                        comp_styles.append(('BACKGROUND', (4, i), (4, i), colors.yellow))
+                        comp_styles.append(('TEXTCOLOR', (4, i), (4, i), colors.black))
+
+                comparison_table.setStyle(TableStyle(comp_styles))
                 story.append(comparison_table)
                 story.append(Spacer(1, 0.2*inch))
 

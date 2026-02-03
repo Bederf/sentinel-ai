@@ -97,19 +97,19 @@
   "011-stc-chiller-001": {
     "chw_supply_temp": 7.0,
     "chw_return_temp": 12.0,
-    "chw_supply_temp_setpoint": 7.0,
+    "chw_supply_temp_setpoint": 9.0,
     "chiller_status": 1,
     "compressor_amps": 145
   },
   "011-stc-fcu-001": {
     "room_temp": 22.8,
-    "room_temp_setpoint": 23,
+    "room_temp_setpoint": 23.0,
     "fan_speed": 2,
     "valve_position": 45
   },
   "011-stc-zone-001": {
     "zone_temp": 22.5,
-    "zone_cooling_setpoint": 23.1,
+    "zone_cooling_setpoint": 22.0,
     "zone_heating_setpoint": 20.0,
     "mode": 1
   },
@@ -173,5 +173,202 @@
     "room_temp_setpoint": 23.0,
     "fan_speed": 3,
     "valve_position": 75
+  },
+  "FCU-L12-03": {
+    "room_temp": 22.5,
+    "room_temp_setpoint": 22.0,
+    "fan_speed": 2,
+    "valve_position": 65,
+    "fcu_status": 1
+  },
+  "VAV-L12-03A": {
+    "damper_position": 70,
+    "airflow_setpoint": 350,
+    "airflow_actual": 340,
+    "reheat_valve": 0
+  },
+  "FCU-L12-04": {
+    "room_temp": 23.0,
+    "room_temp_setpoint": 22.0,
+    "fan_speed": 2,
+    "valve_position": 65,
+    "fcu_status": 1
+  },
+  "VAV-L12-04A": {
+    "damper_position": 70,
+    "airflow_setpoint": 350,
+    "airflow_actual": 340,
+    "reheat_valve": 0
+  },
+  "FCU-L11-01": {
+    "room_temp": 21.5,
+    "room_temp_setpoint": 19.0,
+    "fan_speed": 2,
+    "valve_position": 65,
+    "fcu_status": 1
+  },
+  "VAV-L11-01A": {
+    "damper_position": 70,
+    "airflow_setpoint": 350,
+    "airflow_actual": 340,
+    "reheat_valve": 0
+  },
+  "FCU-L11-02": {
+    "room_temp": 24.0,
+    "room_temp_setpoint": 19.0,
+    "fan_speed": 2,
+    "valve_position": 65,
+    "fcu_status": 1
+  },
+  "VAV-L11-02A": {
+    "damper_position": 70,
+    "airflow_setpoint": 350,
+    "airflow_actual": 340,
+    "reheat_valve": 0
+  },
+  "FCU-L10-01": {
+    "room_temp": 22.0,
+    "room_temp_setpoint": 22.0,
+    "fan_speed": 2,
+    "valve_position": 65,
+    "fcu_status": 1
+  },
+  "VAV-L10-01A": {
+    "damper_position": 70,
+    "airflow_setpoint": 350,
+    "airflow_actual": 340,
+    "reheat_valve": 0
+  },
+  "AHU-L12-01": {
+    "supply_air_temp": 14.0,
+    "supply_air_temp_setpoint": 14.0,
+    "return_air_temp": 23.0,
+    "fan_status": 1,
+    "fan_speed": 75,
+    "outside_air_damper": 25,
+    "chw_valve": 60
+  },
+  "AHU-L11-01": {
+    "supply_air_temp": 14.0,
+    "supply_air_temp_setpoint": 14.0,
+    "return_air_temp": 23.0,
+    "fan_status": 1,
+    "fan_speed": 75,
+    "outside_air_damper": 25,
+    "chw_valve": 60
+  },
+  "AHU-L10-01": {
+    "supply_air_temp": 14.0,
+    "supply_air_temp_setpoint": 14.0,
+    "return_air_temp": 23.0,
+    "fan_status": 1,
+    "fan_speed": 75,
+    "outside_air_damper": 25,
+    "chw_valve": 60
+  },
+  "002-stc-vav-l12-01": {
+    "damper_position": 40,
+    "airflow_actual": 200,
+    "airflow_setpoint": 85.0,
+    "discharge_air_temp": 14.5,
+    "heating_valve": 0
+  },
+  "002-stc-vav-l12-02": {
+    "damper_position": 50,
+    "airflow_actual": 250,
+    "airflow_setpoint": 85.0,
+    "discharge_air_temp": 14.5,
+    "heating_valve": 0
+  },
+  "002-stc-vav-l12-03": {
+    "damper_position": 50,
+    "airflow_actual": 250,
+    "airflow_setpoint": 85.0,
+    "discharge_air_temp": 14.5,
+    "heating_valve": 0
+  },
+  "002-stc-vav-l12-04": {
+    "damper_position": 50,
+    "airflow_actual": 250,
+    "airflow_setpoint": 85.0,
+    "discharge_air_temp": 14.5,
+    "heating_valve": 0
+  },
+  "002-stc-vav-l12-05": {
+    "damper_position": 49,
+    "airflow_actual": 245,
+    "airflow_setpoint": 85.0,
+    "discharge_air_temp": 14.5,
+    "heating_valve": 0
+  },
+  "002-stc-vav-l11-01": {
+    "damper_position": 70.0,
+    "airflow_actual": 215,
+    "airflow_setpoint": 250,
+    "discharge_air_temp": 14.5,
+    "heating_valve": 0
+  },
+  "002-stc-vav-l11-02": {
+    "damper_position": 70.0,
+    "airflow_actual": 230,
+    "airflow_setpoint": 250,
+    "discharge_air_temp": 14.5,
+    "heating_valve": 0
+  },
+  "002-stc-vav-l11-03": {
+    "damper_position": 52,
+    "airflow_actual": 260,
+    "airflow_setpoint": 250,
+    "discharge_air_temp": 14.5,
+    "heating_valve": 0
+  },
+  "002-stc-vav-l11-04": {
+    "damper_position": 40,
+    "airflow_actual": 200,
+    "airflow_setpoint": 250,
+    "discharge_air_temp": 14.5,
+    "heating_valve": 0
+  },
+  "002-stc-vav-l11-05": {
+    "damper_position": 46,
+    "airflow_actual": 230,
+    "airflow_setpoint": 250,
+    "discharge_air_temp": 14.5,
+    "heating_valve": 0
+  },
+  "002-stc-vav-l10-01": {
+    "damper_position": 49,
+    "airflow_actual": 245,
+    "airflow_setpoint": 250,
+    "discharge_air_temp": 14.5,
+    "heating_valve": 0
+  },
+  "002-stc-vav-l10-02": {
+    "damper_position": 40,
+    "airflow_actual": 200,
+    "airflow_setpoint": 250,
+    "discharge_air_temp": 14.5,
+    "heating_valve": 0
+  },
+  "002-stc-vav-l10-03": {
+    "damper_position": 95,
+    "airflow_actual": 475,
+    "airflow_setpoint": 250,
+    "discharge_air_temp": 14.5,
+    "heating_valve": 0
+  },
+  "002-stc-vav-l10-04": {
+    "damper_position": 50,
+    "airflow_actual": 250,
+    "airflow_setpoint": 250,
+    "discharge_air_temp": 14.5,
+    "heating_valve": 0
+  },
+  "002-stc-vav-l10-05": {
+    "damper_position": 45,
+    "airflow_actual": 225,
+    "airflow_setpoint": 250,
+    "discharge_air_temp": 14.5,
+    "heating_valve": 0
   }
 }

@@ -144,8 +144,8 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
         ]);
         setStats(statsData);
         setSites(sitesData);
-        // Filter predictions to show only critical and warning severity (API maps high→warning)
-        setPredictions(predictionsData.predictions.filter(p => p.severity === 'critical' || p.severity === 'warning'));
+        // Filter predictions to show only critical and high severity
+        setPredictions(predictionsData.predictions.filter(p => p.severity === 'critical' || p.severity === 'high'));
         setError(null);
 
         // Load at-risk equipment from ALL sites
@@ -256,10 +256,9 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
   const normalSites = sites.filter((s) => s.status === "normal").length;
   const warningSites = sites.filter((s) => s.status === "warning").length;
 
-  // Filter predictions to only show critical/warning severity
-  // Note: API maps database 'high'/'medium' to 'warning'
+  // Filter predictions to only show critical/high severity
   const criticalPredictions = predictions.filter(p =>
-    p.severity === 'critical' || p.severity === 'warning'
+    p.severity === 'critical' || p.severity === 'high'
   );
 
   // Calculate total potential savings from filtered predictions only
@@ -1033,7 +1032,7 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
             ) : predictions.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                 {predictions
-                  .filter(p => p.severity === 'critical' || p.severity === 'warning')
+                  .filter(p => p.severity === 'critical' || p.severity === 'high')
                   .map((prediction) => (
                   <PredictionCard
                     key={prediction.id}

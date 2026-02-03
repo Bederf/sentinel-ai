@@ -11,7 +11,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import type { FormEvent, KeyboardEvent } from "react";
-import { Send, MessageSquare, Bot } from "lucide-react";
+import { Send, MessageSquare, Bot, BookOpen } from "lucide-react";
 import { ChatMessage } from "./ChatMessage";
 import { streamChat } from "../lib/api";
 
@@ -26,6 +26,7 @@ export function Chat() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
+  const [searchDocs, setSearchDocs] = useState(false); // Toggle for documentation search mode
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -59,11 +60,11 @@ export function Chat() {
     try {
       let fullResponse = "";
 
-      // Stream the response
+      // Stream the response (pass searchDocs to enable documentation mode)
       await streamChat(trimmedInput, undefined, (chunk) => {
         fullResponse += chunk;
         setStreamingContent(fullResponse);
-      });
+      }, searchDocs);
 
       // When streaming completes, add assistant message with full content
       setMessages((prev) => [
@@ -159,8 +160,18 @@ export function Chat() {
                 className="text-xs mt-2"
                 style={{ color: "var(--color-grafana-text-disabled)" }}
               >
-                Ask about equipment status, alerts, or maintenance insights
+                {searchDocs
+                  ? "Ask about SENTINEL features, capabilities, or how things work"
+                  : "Ask about equipment status, alerts, or maintenance insights"}
               </p>
+              {!searchDocs && (
+                <p
+                  className="text-xs mt-1"
+                  style={{ color: "var(--color-grafana-text-disabled)" }}
+                >
+                  Toggle <strong>Docs</strong> to search system documentation
+                </p>
+              )}
             </div>
           </div>
         )}
@@ -213,6 +224,46 @@ export function Chat() {
           background: "var(--color-grafana-bg-secondary)",
         }}
       >
+        {/* Documentation toggle */}
+        <div className="flex items-center gap-2 mb-3">
+          <button
+            type="button"
+            onClick={() => setSearchDocs(!searchDocs)}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs transition-all"
+            style={{
+              background: searchDocs
+                ? "rgba(50, 116, 217, 0.2)"
+                : "var(--color-grafana-bg-panel)",
+              border: searchDocs
+                ? "1px solid var(--color-grafana-blue)"
+                : "1px solid var(--color-grafana-border)",
+              color: searchDocs
+                ? "var(--color-grafana-blue)"
+                : "var(--color-grafana-text-secondary)",
+            }}
+            title={searchDocs ? "Documentation mode: ON" : "Documentation mode: OFF"}
+          >
+            <BookOpen className="w-3.5 h-3.5" />
+            <span>Docs</span>
+            <span
+              className="w-2 h-2 rounded-full"
+              style={{
+                background: searchDocs
+                  ? "var(--color-grafana-blue)"
+                  : "var(--color-grafana-text-disabled)",
+              }}
+            />
+          </button>
+          {searchDocs && (
+            <span
+              className="text-xs"
+              style={{ color: "var(--color-grafana-text-disabled)" }}
+            >
+              Searching SENTINEL documentation
+            </span>
+          )}
+        </div>
+
         <div className="flex gap-2 md:gap-3">
           <input
             ref={inputRef}
@@ -220,7 +271,7 @@ export function Chat() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask about building management..."
+            placeholder={searchDocs ? "Ask about SENTINEL features..." : "Ask about building management..."}
             disabled={isLoading}
             className="flex-1 px-3 py-2 md:px-4 md:py-2 text-sm md:text-base rounded focus:outline-none disabled:cursor-not-allowed"
             style={{

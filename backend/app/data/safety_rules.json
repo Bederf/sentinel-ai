@@ -185,5 +185,62 @@
     "created_at": "2026-01-27T13:49:12.016629",
     "updated_at": "2026-01-27T13:49:12.016632",
     "validation_logic": "value >= 20.0"
+  },
+  {
+    "id": "lighting_min_brightness",
+    "name": "Minimum Lighting Brightness (Occupied)",
+    "rule_type": "brightness_limit",
+    "severity": "block",
+    "description": "DALI lighting must maintain minimum 10% (level 25) brightness in occupied zones for safety",
+    "device_type": "lighting",
+    "device_id": null,
+    "point_name": "dim_level",
+    "enabled": true,
+    "metadata": {
+      "applies_to": "occupied_zones",
+      "dali_level_min": 25
+    },
+    "created_at": "2026-02-03T10:00:00.000000+00:00",
+    "updated_at": "2026-02-03T10:00:00.000000+00:00",
+    "min_brightness": 10,
+    "max_brightness": 100
+  },
+  {
+    "id": "lighting_emergency_min",
+    "name": "Emergency Lighting Minimum",
+    "rule_type": "brightness_limit",
+    "severity": "block",
+    "description": "Emergency lighting circuits must never go below 70% (DALI level 178) for egress safety",
+    "device_type": "lighting",
+    "device_id": null,
+    "point_name": "dim_level",
+    "enabled": true,
+    "metadata": {
+      "applies_to": "emergency_zones",
+      "dali_level_min": 178
+    },
+    "created_at": "2026-02-03T10:00:00.000000+00:00",
+    "updated_at": "2026-02-03T10:00:00.000000+00:00",
+    "min_brightness": 70,
+    "max_brightness": 100
+  },
+  {
+    "id": "lighting_unoccupied_max",
+    "name": "Unoccupied Zone Lighting Maximum",
+    "rule_type": "brightness_limit",
+    "severity": "warning",
+    "description": "Unoccupied zones should not exceed 30% (DALI level 76) brightness - energy waste",
+    "device_type": "lighting",
+    "device_id": null,
+    "point_name": "dim_level",
+    "enabled": true,
+    "metadata": {
+      "applies_to": "unoccupied_zones",
+      "dali_level_max": 76
+    },
+    "created_at": "2026-02-03T10:00:00.000000+00:00",
+    "updated_at": "2026-02-03T10:00:00.000000+00:00",
+    "min_brightness": 0,
+    "max_brightness": 30
   }
 ]

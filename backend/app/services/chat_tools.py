@@ -17,6 +17,7 @@ from typing import Any
 from app.services.device_abstraction import device_manager
 from app.models.device import DeviceStatus
 from app.services.health_threshold_service import get_health_thresholds
+from app.database.supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
 
@@ -272,39 +273,69 @@ async def control_device(
 
 async def get_system_status(site_id: str | None = None) -> dict[str, Any]:
     """
-    Get overall BMS system status including alerts, anomalies, and equipment health.
+    Get overall BMS system status including alerts, anomalies, and equipment health from Supabase.
 
     Args:
-        site_id: Optional site ID to filter status
+        site_id: Optional site ID/code to filter status (e.g., 'site-002')
 
     Returns:
         Dictionary with system status, active alerts, predicted issues, and recommendations
     """
     try:
-        sites = load_json("sites.json")
-        equipment = load_json("equipment.json")
-        alerts = load_json("alerts.json")
-        anomalies = load_json("anomalies.json")
-        predictions = load_json("predictions.json")
+        client = get_supabase_client()
+        thresholds = get_health_thresholds()
 
-        # Filter by site if provided
+        # Get building info
+        building_uuid = None
+        building_name = None
         if site_id:
-            sites = [s for s in sites if s["id"] == site_id]
-            equipment = [e for e in equipment if e.get("site_id") == site_id]
-            alerts = [a for a in alerts if a.get("site_id") == site_id]
-            anomalies = [a for a in anomalies if a.get("site_id") == site_id]
-            predictions = [p for p in predictions if p.get("site_id") == site_id]
+            building_resp = client.table("buildings").select("id, name, code").eq("code", site_id).execute()
+            if building_resp.data:
+                building_uuid = building_resp.data[0]["id"]
+                building_name = building_resp.data[0]["name"]
+            else:
+                return {
+                    "success": False,
+                    "error": f"Site '{site_id}' not found in the system",
+                    "available_sites": "Use get_equipment_health without site_id to see all sites"
+                }
+
+        # Get equipment for site
+        eq_query = client.table("equipment").select("id, code, name, type, health_score, status, last_service")
+        if building_uuid:
+            eq_query = eq_query.eq("building_id", building_uuid)
+        eq_resp = eq_query.execute()
+        equipment = eq_resp.data if eq_resp.data else []
+
+        # Get alerts for site
+        alerts_query = client.table("alerts").select("id, type, severity, message, status, created_at, equipment_id")
+        if building_uuid:
+            alerts_query = alerts_query.eq("building_id", building_uuid)
+        alerts_resp = alerts_query.execute()
+        alerts = alerts_resp.data if alerts_resp.data else []
+
+        # Get predictions for site
+        pred_query = client.table("predictions").select(
+            "id, equipment_id, prediction_type, probability_percent, status, equipment(code, name, building_id)"
+        ).eq("status", "active")
+        pred_resp = pred_query.execute()
+        predictions = pred_resp.data if pred_resp.data else []
+        if building_uuid:
+            predictions = [p for p in predictions if p.get("equipment", {}).get("building_id") == building_uuid]
+
+        # Count sites
+        sites_resp = client.table("buildings").select("id").execute()
+        total_sites = len(sites_resp.data) if sites_resp.data else 0
 
         # Active alerts summary
         active_alerts = [a for a in alerts if a.get("status") == "active"]
         critical_alerts = [a for a in active_alerts if a.get("severity") == "critical"]
         warning_alerts = [a for a in active_alerts if a.get("severity") == "warning"]
 
-        # Equipment health summary (using configured thresholds)
-        thresholds = get_health_thresholds()
-        healthy_equipment = [e for e in equipment if e.get("health_score", 0) >= thresholds["healthy"]]
-        degraded_equipment = [e for e in equipment if thresholds["warning"] <= e.get("health_score", 0) < thresholds["healthy"]]
-        critical_equipment = [e for e in equipment if e.get("health_score", 0) < thresholds["warning"]]
+        # Equipment health summary
+        healthy_equipment = [e for e in equipment if (e.get("health_score") or 100) >= thresholds["healthy"]]
+        degraded_equipment = [e for e in equipment if thresholds["warning"] <= (e.get("health_score") or 100) < thresholds["healthy"]]
+        critical_equipment = [e for e in equipment if (e.get("health_score") or 100) < thresholds["warning"]]
 
         # High-priority predictions
         urgent_predictions = [p for p in predictions if p.get("probability_percent", 0) >= 70]
@@ -312,9 +343,11 @@ async def get_system_status(site_id: str | None = None) -> dict[str, Any]:
         # Build status response
         status = {
             "success": True,
+            "site_id": site_id,
+            "site_name": building_name,
             "timestamp": datetime.now().isoformat(),
             "summary": {
-                "total_sites": len(sites),
+                "total_sites": total_sites if not site_id else 1,
                 "total_equipment": len(equipment),
                 "equipment_healthy": len(healthy_equipment),
                 "equipment_degraded": len(degraded_equipment),
@@ -334,16 +367,15 @@ async def get_system_status(site_id: str | None = None) -> dict[str, Any]:
                 "type": "alert",
                 "id": alert["id"],
                 "severity": "critical",
-                "title": alert.get("title", "Unknown"),
-                "site": alert.get("site_id"),
-                "equipment": alert.get("equipment_id"),
-                "estimated_cost": alert.get("estimated_cost_zar", 0),
+                "title": alert.get("type", "Alert"),
+                "message": alert.get("message"),
+                "equipment_id": alert.get("equipment_id"),
             })
 
         for eq in critical_equipment[:5]:
             status["critical_issues"].append({
                 "type": "equipment_health",
-                "id": eq["id"],
+                "id": eq.get("code") or eq["id"],
                 "name": eq["name"],
                 "health_score": eq.get("health_score", 0),
                 "status": eq.get("status"),
@@ -361,16 +393,23 @@ async def get_system_status(site_id: str | None = None) -> dict[str, Any]:
         if len(critical_equipment) > 0:
             status["recommendations"].append({
                 "priority": "high",
-                "action": "Schedule maintenance for degraded equipment",
-                "details": f"{len(critical_equipment)} equipment items below 50% health",
+                "action": "Schedule maintenance for critical equipment",
+                "details": f"{len(critical_equipment)} equipment items below {thresholds['warning']}% health",
+            })
+
+        if len(degraded_equipment) > 0:
+            status["recommendations"].append({
+                "priority": "medium",
+                "action": "Plan preventive maintenance",
+                "details": f"{len(degraded_equipment)} equipment items showing degradation",
             })
 
         for pred in urgent_predictions[:3]:
+            eq_info = pred.get("equipment", {}) or {}
             status["recommendations"].append({
                 "priority": "medium",
-                "action": f"Preventive maintenance: {pred.get('equipment_name', 'Unknown')}",
-                "details": f"{pred.get('probability_percent', 0)}% failure probability within {pred.get('timeframe_days', 0)} days",
-                "potential_savings": pred.get("financial_impact", {}).get("potential_loss_zar", 0) - pred.get("financial_impact", {}).get("repair_cost_zar", 0),
+                "action": f"Preventive maintenance: {eq_info.get('name', 'Unknown')}",
+                "details": f"{pred.get('probability_percent', 0)}% failure probability predicted",
             })
 
         return status
@@ -421,10 +460,10 @@ async def get_equipment_health(
     status_filter: str | None = None
 ) -> dict[str, Any]:
     """
-    Get equipment health status and maintenance information.
+    Get equipment health status and maintenance information from Supabase.
 
     Args:
-        site_id: Optional site ID to filter
+        site_id: Optional site ID/code to filter (e.g., 'site-002')
         equipment_id: Optional specific equipment ID
         status_filter: Filter by status (critical, warning, normal)
 
@@ -432,27 +471,55 @@ async def get_equipment_health(
         Dictionary with equipment health details and maintenance recommendations
     """
     try:
-        equipment = load_json("equipment.json")
-        predictions = load_json("predictions.json")
-
-        # Get configured thresholds
+        client = get_supabase_client()
         thresholds = get_health_thresholds()
 
-        # Filter equipment
-        if equipment_id:
-            equipment = [e for e in equipment if e["id"] == equipment_id]
-        elif site_id:
-            equipment = [e for e in equipment if e.get("site_id") == site_id]
+        # Build equipment query from Supabase
+        query = client.table("equipment").select(
+            "id, code, name, type, health_score, status, last_service, "
+            "install_date, manufacturer, model, location, metadata, building_id, buildings(code, name, floors, sqm)"
+        )
 
+        # Filter by site if provided
+        if site_id:
+            # First get building UUID from site code
+            building_resp = client.table("buildings").select("id").eq("code", site_id).execute()
+            if building_resp.data:
+                building_uuid = building_resp.data[0]["id"]
+                query = query.eq("building_id", building_uuid)
+            else:
+                return {
+                    "success": False,
+                    "error": f"Site '{site_id}' not found",
+                    "count": 0,
+                    "equipment": []
+                }
+
+        # Filter by equipment ID if provided
+        if equipment_id:
+            query = query.eq("code", equipment_id)
+
+        # Filter by health status
         if status_filter:
             if status_filter == "critical":
-                equipment = [e for e in equipment if e.get("health_score", 100) < thresholds["critical"]]
+                query = query.lt("health_score", thresholds["critical"])
             elif status_filter == "warning":
-                equipment = [e for e in equipment if thresholds["critical"] <= e.get("health_score", 100) < thresholds["healthy"]]
+                query = query.gte("health_score", thresholds["critical"]).lt("health_score", thresholds["healthy"])
             elif status_filter == "normal":
-                equipment = [e for e in equipment if e.get("health_score", 100) >= thresholds["healthy"]]
+                query = query.gte("health_score", thresholds["healthy"])
 
-        # Build predictions lookup
+        # Execute query
+        equipment_resp = query.order("health_score").execute()
+        equipment_data = equipment_resp.data if equipment_resp.data else []
+
+        # Get predictions from Supabase
+        pred_query = client.table("predictions").select(
+            "equipment_id, probability_percent, status"
+        ).eq("status", "active")
+        pred_resp = pred_query.execute()
+        predictions = pred_resp.data if pred_resp.data else []
+
+        # Build predictions lookup by equipment_id
         pred_by_equipment = {}
         for pred in predictions:
             eq_id = pred.get("equipment_id")
@@ -463,44 +530,332 @@ async def get_equipment_health(
 
         # Build response
         equipment_list = []
-        for eq in equipment:
-            eq_preds = pred_by_equipment.get(eq["id"], [])
+        for eq in equipment_data:
+            eq_id = eq.get("id")
+            eq_preds = pred_by_equipment.get(eq_id, [])
             highest_risk = max([p.get("probability_percent", 0) for p in eq_preds], default=0)
+            health_score = eq.get("health_score", 100) or 100
+
+            # Get site code from joined building
+            building_info = eq.get("buildings", {}) or {}
+            eq_site_id = building_info.get("code", "unknown")
+
+            # Extract sensor reading from metadata if available
+            metadata = eq.get("metadata") or {}
+            current_reading = metadata.get("current_reading")
+            reading_unit = metadata.get("unit")
+            setpoint = metadata.get("setpoint")
 
             item = {
-                "id": eq["id"],
-                "name": eq["name"],
-                "type": eq["type"],
-                "site_id": eq.get("site_id"),
-                "health_score": eq.get("health_score", 100),
+                "id": eq.get("code") or eq.get("id"),
+                "name": eq.get("name"),
+                "type": eq.get("type"),
+                "site_id": eq_site_id,
+                "location": eq.get("location"),
+                "health_score": health_score,
                 "status": eq.get("status", "unknown"),
                 "last_service": eq.get("last_service"),
+                "manufacturer": eq.get("manufacturer"),
+                "model": eq.get("model"),
                 "failure_risk_percent": highest_risk,
-                "maintenance_due": eq.get("health_score", 100) < thresholds["warning"] or highest_risk > 60,
+                "maintenance_due": health_score < thresholds["warning"] or highest_risk > 60,
             }
 
-            # Add recommendation if needed (using configured thresholds)
-            if item["health_score"] < thresholds["critical"]:
+            # Add all metadata readings based on equipment type
+            if metadata:
+                # Common readings
+                if current_reading is not None:
+                    item["current_reading"] = current_reading
+                    item["unit"] = reading_unit
+                if setpoint is not None:
+                    item["setpoint"] = setpoint
+
+                # CO2 sensors
+                if "co2" in item["name"].lower():
+                    item["unit"] = "ppm"
+
+                # Occupancy sensors
+                if metadata.get("occupied") is not None:
+                    item["occupied"] = metadata.get("occupied")
+                    item["occupant_count"] = metadata.get("occupant_count", 0)
+
+                # Lighting
+                if metadata.get("brightness_percent") is not None:
+                    item["brightness_percent"] = metadata.get("brightness_percent")
+                    item["is_on"] = metadata.get("is_on", False)
+                    item["power_watts"] = metadata.get("power_watts", 0)
+
+                # Daylight sensors
+                if metadata.get("current_lux") is not None:
+                    item["current_lux"] = metadata.get("current_lux")
+                    item["lux_setpoint"] = metadata.get("lux_setpoint")
+
+                # HVAC (VAV, FCU, AHU)
+                if metadata.get("supply_temp") is not None:
+                    item["supply_temp"] = metadata.get("supply_temp")
+                    item["return_temp"] = metadata.get("return_temp")
+                if metadata.get("airflow_cfm") is not None:
+                    item["airflow_cfm"] = metadata.get("airflow_cfm")
+                    item["damper_position_percent"] = metadata.get("damper_position_percent")
+                if metadata.get("fan_speed") is not None:
+                    item["fan_speed"] = metadata.get("fan_speed")
+
+                # Chillers
+                if metadata.get("chw_supply_temp") is not None:
+                    item["chw_supply_temp"] = metadata.get("chw_supply_temp")
+                    item["chw_return_temp"] = metadata.get("chw_return_temp")
+                    item["load_percent"] = metadata.get("load_percent")
+                    item["power_kw"] = metadata.get("power_kw")
+
+                # Generators (DSE8610 controller data)
+                if metadata.get("fuel_level_percent") is not None:
+                    item["generator_status"] = metadata.get("status")
+                    item["control_mode"] = metadata.get("control_mode")
+                    item["fuel_level_percent"] = metadata.get("fuel_level_percent")
+                    item["runtime_hours"] = metadata.get("runtime_hours")
+                    item["kwh_total"] = metadata.get("kwh_total")
+                    # Engine
+                    item["engine_rpm"] = metadata.get("engine_rpm")
+                    item["engine_temp_c"] = metadata.get("engine_temp_c")
+                    item["coolant_temp_c"] = metadata.get("coolant_temp")
+                    item["oil_temp_c"] = metadata.get("oil_temp_c")
+                    item["oil_pressure_kpa"] = metadata.get("oil_pressure_kpa")
+                    item["battery_voltage"] = metadata.get("battery_voltage")
+                    # Output (when running)
+                    item["output_kw"] = metadata.get("output_kw")
+                    item["output_kva"] = metadata.get("output_kva")
+                    item["frequency_hz"] = metadata.get("frequency_hz")
+                    # Mains monitoring
+                    item["mains_healthy"] = metadata.get("mains_healthy")
+                    item["load_transfer_status"] = metadata.get("load_transfer_status")
+                    # Alarms
+                    item["alarm_active"] = metadata.get("alarm_active")
+                    item["alarm_count"] = metadata.get("alarm_count")
+                    item["comms_status"] = metadata.get("comms_status")
+
+                # Power meters
+                if metadata.get("kw") is not None:
+                    item["kw"] = metadata.get("kw")
+                    item["kwh_today"] = metadata.get("kwh_today")
+                    item["power_factor"] = metadata.get("power_factor")
+
+                # UPS
+                if metadata.get("battery_percent") is not None:
+                    item["battery_percent"] = metadata.get("battery_percent")
+                    item["load_percent"] = metadata.get("load_percent")
+                    item["runtime_minutes"] = metadata.get("runtime_minutes")
+
+                # BMS/SCADA (Desigo CC)
+                if metadata.get("total_data_points") is not None:
+                    item["total_data_points"] = metadata.get("total_data_points")
+                    item["online_devices"] = metadata.get("online_devices")
+                    item["offline_devices"] = metadata.get("offline_devices")
+                    item["active_alarms"] = metadata.get("active_alarms")
+                    item["unacknowledged_alarms"] = metadata.get("unacknowledged_alarms")
+                    item["alarms_today"] = metadata.get("alarms_today")
+                    item["subsystems"] = metadata.get("subsystems")
+                    item["protocols"] = metadata.get("protocols")
+                    # Energy
+                    item["current_demand_kw"] = metadata.get("current_demand_kw")
+                    item["peak_demand_kw"] = metadata.get("peak_demand_kw")
+                    item["energy_today_kwh"] = metadata.get("energy_today_kwh")
+                    item["cost_today_zar"] = metadata.get("cost_today_zar")
+                    item["load_shedding_stage"] = metadata.get("load_shedding_stage")
+                    # System
+                    item["active_users"] = metadata.get("active_users")
+                    item["historian_status"] = metadata.get("historian_status")
+                    item["trend_logs_active"] = metadata.get("trend_logs_active")
+                    item["active_schedules"] = metadata.get("active_schedules")
+                    item["uptime_days"] = metadata.get("uptime_days")
+
+                # BMS Controllers (Desigo PXC)
+                if metadata.get("points_configured") is not None:
+                    item["points_configured"] = metadata.get("points_configured")
+                    item["points_online"] = metadata.get("points_online")
+                    item["communication_status"] = metadata.get("communication_status")
+                    item["firmware"] = metadata.get("firmware")
+                    item["uptime_hours"] = metadata.get("uptime_hours")
+
+            # Add recommendation if needed
+            if health_score < thresholds["critical"]:
                 item["recommendation"] = "Schedule immediate maintenance - equipment health critical"
-            elif item["health_score"] < thresholds["warning"]:
+            elif health_score < thresholds["warning"]:
                 item["recommendation"] = "Plan preventive maintenance within 2 weeks"
             elif highest_risk > 70:
                 item["recommendation"] = f"High failure risk ({highest_risk}%) - schedule inspection"
 
             equipment_list.append(item)
 
-        # Sort by health score (worst first)
-        equipment_list.sort(key=lambda x: x["health_score"])
+        # Get building info for site summary
+        building_info = {}
+        if site_id:
+            building_resp = client.table("buildings").select("name, code, floors, sqm, address").eq("code", site_id).execute()
+            if building_resp.data:
+                b = building_resp.data[0]
+                building_info = {
+                    "name": b.get("name"),
+                    "code": b.get("code"),
+                    "floors": b.get("floors"),
+                    "sqm": b.get("sqm"),
+                    "address": b.get("address"),
+                }
+
+        # Calculate summaries for different sensor/equipment types
+
+        # Temperature sensors
+        temp_readings = [e.get("current_reading") for e in equipment_list
+            if e.get("current_reading") is not None and "temperature" in e.get("name", "").lower()]
+        temp_summary = {}
+        if temp_readings:
+            temp_summary = {
+                "average": round(sum(temp_readings) / len(temp_readings), 1),
+                "min": min(temp_readings),
+                "max": max(temp_readings),
+                "sensor_count": len(temp_readings),
+                "unit": "°C"
+            }
+
+        # CO2 sensors
+        co2_readings = [e.get("current_reading") for e in equipment_list
+            if e.get("current_reading") is not None and "co2" in e.get("name", "").lower()]
+        co2_summary = {}
+        if co2_readings:
+            co2_summary = {
+                "average": round(sum(co2_readings) / len(co2_readings)),
+                "min": min(co2_readings),
+                "max": max(co2_readings),
+                "sensor_count": len(co2_readings),
+                "unit": "ppm"
+            }
+
+        # Occupancy
+        occ_sensors = [e for e in equipment_list if e.get("occupied") is not None]
+        occupancy_summary = {}
+        if occ_sensors:
+            occupied_count = len([e for e in occ_sensors if e.get("occupied")])
+            total_occupants = sum(e.get("occupant_count", 0) for e in occ_sensors)
+            occupancy_summary = {
+                "zones_occupied": occupied_count,
+                "zones_vacant": len(occ_sensors) - occupied_count,
+                "total_occupants": total_occupants,
+                "occupancy_rate_percent": round(occupied_count / len(occ_sensors) * 100)
+            }
+
+        # Lighting
+        light_groups = [e for e in equipment_list if e.get("brightness_percent") is not None]
+        lighting_summary = {}
+        if light_groups:
+            lights_on = [e for e in light_groups if e.get("is_on")]
+            total_power = sum(e.get("power_watts", 0) for e in lights_on)
+            avg_brightness = round(sum(e.get("brightness_percent", 0) for e in lights_on) / len(lights_on)) if lights_on else 0
+            lighting_summary = {
+                "zones_on": len(lights_on),
+                "zones_off": len(light_groups) - len(lights_on),
+                "average_brightness_percent": avg_brightness,
+                "total_power_watts": total_power
+            }
+
+        # Daylight sensors
+        lux_readings = [e.get("current_lux") for e in equipment_list if e.get("current_lux") is not None]
+        daylight_summary = {}
+        if lux_readings:
+            daylight_summary = {
+                "average_lux": round(sum(lux_readings) / len(lux_readings)),
+                "min_lux": min(lux_readings),
+                "max_lux": max(lux_readings),
+                "sensor_count": len(lux_readings)
+            }
+
+        # HVAC (chillers)
+        chillers = [e for e in equipment_list if e.get("chw_supply_temp") is not None]
+        chiller_summary = {}
+        if chillers:
+            chiller_summary = {
+                "count": len(chillers),
+                "avg_load_percent": round(sum(e.get("load_percent", 0) for e in chillers) / len(chillers)),
+                "total_power_kw": sum(e.get("power_kw", 0) for e in chillers),
+                "avg_chw_supply_temp": round(sum(e.get("chw_supply_temp", 0) for e in chillers) / len(chillers), 1)
+            }
+
+        # Energy (power meters)
+        meters = [e for e in equipment_list if e.get("kw") is not None]
+        energy_summary = {}
+        if meters:
+            energy_summary = {
+                "total_kw": round(sum(e.get("kw", 0) for e in meters), 1),
+                "total_kwh_today": sum(e.get("kwh_today", 0) for e in meters),
+                "avg_power_factor": round(sum(e.get("power_factor", 0) for e in meters) / len(meters), 2)
+            }
+
+        # Generators (DSE8610)
+        generators = [e for e in equipment_list if e.get("fuel_level_percent") is not None]
+        generator_summary = {}
+        if generators:
+            running_gens = [g for g in generators if g.get("generator_status") == "running"]
+            alarm_gens = [g for g in generators if g.get("alarm_active")]
+            generator_summary = {
+                "count": len(generators),
+                "status": "all_standby" if not running_gens else f"{len(running_gens)}_running",
+                "running_count": len(running_gens),
+                "avg_fuel_level_percent": round(sum(e.get("fuel_level_percent", 0) for e in generators) / len(generators)),
+                "total_kwh": sum(e.get("kwh_total", 0) for e in generators),
+                "total_runtime_hours": sum(e.get("runtime_hours", 0) for e in generators),
+                "mains_healthy": all(e.get("mains_healthy", True) for e in generators),
+                "load_transfer_status": generators[0].get("load_transfer_status") if generators else None,
+                "alarms_active": len(alarm_gens),
+                "comms_online": len([g for g in generators if g.get("comms_status") == "online"])
+            }
+            if running_gens:
+                generator_summary["total_output_kw"] = sum(g.get("output_kw", 0) for g in running_gens)
+                generator_summary["avg_frequency_hz"] = round(sum(g.get("frequency_hz", 0) for g in running_gens) / len(running_gens), 1)
+
+        # BMS/SCADA (Desigo CC)
+        bms_systems = [e for e in equipment_list if e.get("total_data_points") is not None]
+        bms_controllers = [e for e in equipment_list if e.get("points_configured") is not None]
+        bms_summary = {}
+        if bms_systems:
+            bms = bms_systems[0]  # Main SCADA head-end
+            bms_summary = {
+                "head_end": bms.get("name"),
+                "total_data_points": bms.get("total_data_points"),
+                "online_devices": bms.get("online_devices"),
+                "offline_devices": bms.get("offline_devices"),
+                "active_alarms": bms.get("active_alarms"),
+                "unacknowledged_alarms": bms.get("unacknowledged_alarms"),
+                "subsystems_count": len(bms.get("subsystems", {})),
+                "protocols": bms.get("protocols"),
+                "current_demand_kw": bms.get("current_demand_kw"),
+                "energy_today_kwh": bms.get("energy_today_kwh"),
+                "cost_today_zar": bms.get("cost_today_zar"),
+                "load_shedding_stage": bms.get("load_shedding_stage"),
+                "active_users": bms.get("active_users"),
+                "uptime_days": bms.get("uptime_days"),
+                "controllers": len(bms_controllers),
+                "total_controller_points": sum(c.get("points_configured", 0) for c in bms_controllers)
+            }
 
         return {
             "success": True,
             "count": len(equipment_list),
+            "site_id": site_id,
+            "building": building_info,
             "equipment": equipment_list,
-            "summary": {
+            "health_summary": {
                 "critical_count": len([e for e in equipment_list if e["health_score"] < thresholds["critical"]]),
                 "warning_count": len([e for e in equipment_list if thresholds["critical"] <= e["health_score"] < thresholds["healthy"]]),
                 "healthy_count": len([e for e in equipment_list if e["health_score"] >= thresholds["healthy"]]),
                 "maintenance_due_count": len([e for e in equipment_list if e.get("maintenance_due")]),
+            },
+            "readings": {
+                "temperature": temp_summary,
+                "co2": co2_summary,
+                "occupancy": occupancy_summary,
+                "lighting": lighting_summary,
+                "daylight": daylight_summary,
+                "chillers": chiller_summary,
+                "energy": energy_summary,
+                "generators": generator_summary,
+                "bms_scada": bms_summary
             }
         }
     except Exception as e:
@@ -514,10 +869,10 @@ async def get_alerts_and_anomalies(
     include_resolved: bool = False
 ) -> dict[str, Any]:
     """
-    Get active alerts and detected anomalies.
+    Get active alerts and detected anomalies from Supabase.
 
     Args:
-        site_id: Optional site ID to filter
+        site_id: Optional site ID/code to filter (e.g., 'site-002')
         severity: Filter by severity (critical, warning, info)
         include_resolved: Include resolved/acknowledged alerts
 
@@ -525,56 +880,85 @@ async def get_alerts_and_anomalies(
         Dictionary with alerts and anomalies
     """
     try:
-        alerts = load_json("alerts.json")
-        anomalies = load_json("anomalies.json")
+        client = get_supabase_client()
 
-        # Filter alerts
+        # Get building UUID if site_id provided
+        building_uuid = None
+        if site_id:
+            building_resp = client.table("buildings").select("id").eq("code", site_id).execute()
+            if building_resp.data:
+                building_uuid = building_resp.data[0]["id"]
+
+        # Build alerts query
+        alerts_query = client.table("alerts").select(
+            "id, type, severity, message, status, created_at, resolved_at, "
+            "equipment_id, building_id, buildings(code, name), equipment(code, name)"
+        )
+
         if not include_resolved:
-            alerts = [a for a in alerts if a.get("status") == "active"]
-        if site_id:
-            alerts = [a for a in alerts if a.get("site_id") == site_id]
+            alerts_query = alerts_query.eq("status", "active")
+        if building_uuid:
+            alerts_query = alerts_query.eq("building_id", building_uuid)
         if severity:
-            alerts = [a for a in alerts if a.get("severity") == severity]
+            alerts_query = alerts_query.eq("severity", severity)
 
-        # Filter anomalies
-        if site_id:
-            anomalies = [a for a in anomalies if a.get("site_id") == site_id]
+        alerts_resp = alerts_query.order("created_at", desc=True).limit(20).execute()
+        alerts_data = alerts_resp.data if alerts_resp.data else []
 
-        # Sort by priority/urgency
-        alerts.sort(key=lambda a: a.get("priority", 99))
-        anomalies.sort(key=lambda a: {"critical": 0, "high": 1, "medium": 2, "low": 3}.get(a.get("urgency", "low"), 4))
+        # Build predictions query (as anomalies)
+        pred_query = client.table("predictions").select(
+            "id, equipment_id, prediction_type, probability_percent, contributing_factors, "
+            "recommended_action, status, created_at, equipment(code, name, building_id)"
+        ).eq("status", "active")
+
+        if building_uuid:
+            # Filter by equipment's building
+            pred_resp = pred_query.execute()
+            predictions_data = [
+                p for p in (pred_resp.data or [])
+                if p.get("equipment", {}).get("building_id") == building_uuid
+            ]
+        else:
+            pred_resp = pred_query.limit(10).execute()
+            predictions_data = pred_resp.data if pred_resp.data else []
 
         # Format alerts
         formatted_alerts = []
-        for alert in alerts[:20]:
+        for alert in alerts_data:
+            building_info = alert.get("buildings", {}) or {}
+            equipment_info = alert.get("equipment", {}) or {}
             formatted_alerts.append({
                 "id": alert["id"],
                 "severity": alert.get("severity"),
-                "title": alert.get("title"),
-                "description": alert.get("description"),
-                "site_id": alert.get("site_id"),
-                "equipment_id": alert.get("equipment_id"),
-                "estimated_cost_zar": alert.get("estimated_cost_zar", 0),
+                "title": alert.get("type", "Alert"),
+                "description": alert.get("message"),
+                "site_id": building_info.get("code"),
+                "site_name": building_info.get("name"),
+                "equipment_id": equipment_info.get("code"),
+                "equipment_name": equipment_info.get("name"),
+                "status": alert.get("status"),
                 "created_at": alert.get("created_at"),
             })
 
-        # Format anomalies
+        # Format predictions as anomalies
         formatted_anomalies = []
-        for anomaly in anomalies[:10]:
+        for pred in predictions_data[:10]:
+            equipment_info = pred.get("equipment", {}) or {}
             formatted_anomalies.append({
-                "id": anomaly["id"],
-                "type": anomaly.get("type"),
-                "urgency": anomaly.get("urgency"),
-                "site_id": anomaly.get("site_id"),
-                "equipment_id": anomaly.get("equipment_id"),
-                "predicted_failure": anomaly.get("predicted_failure"),
-                "confidence": anomaly.get("confidence"),
-                "repair_cost_zar": anomaly.get("repair_cost_zar", 0),
-                "damage_cost_zar": anomaly.get("damage_cost_zar", 0),
+                "id": pred["id"],
+                "type": pred.get("prediction_type"),
+                "urgency": "critical" if pred.get("probability_percent", 0) > 80 else "high" if pred.get("probability_percent", 0) > 60 else "medium",
+                "equipment_id": equipment_info.get("code"),
+                "equipment_name": equipment_info.get("name"),
+                "predicted_failure": pred.get("prediction_type"),
+                "probability_percent": pred.get("probability_percent"),
+                "contributing_factors": pred.get("contributing_factors"),
+                "recommended_action": pred.get("recommended_action"),
             })
 
         return {
             "success": True,
+            "site_id": site_id,
             "alerts": {
                 "count": len(formatted_alerts),
                 "items": formatted_alerts,
@@ -584,10 +968,10 @@ async def get_alerts_and_anomalies(
                 "items": formatted_anomalies,
             },
             "summary": {
-                "total_active_alerts": len([a for a in alerts if a.get("status") == "active"]),
-                "critical_alerts": len([a for a in alerts if a.get("severity") == "critical"]),
-                "total_estimated_cost": sum(a.get("estimated_cost_zar", 0) for a in alerts),
-                "total_potential_damage": sum(a.get("damage_cost_zar", 0) for a in anomalies),
+                "total_active_alerts": len([a for a in formatted_alerts if a.get("status") == "active"]),
+                "critical_alerts": len([a for a in formatted_alerts if a.get("severity") == "critical"]),
+                "warning_alerts": len([a for a in formatted_alerts if a.get("severity") == "warning"]),
+                "high_risk_predictions": len([a for a in formatted_anomalies if a.get("probability_percent", 0) > 70]),
             }
         }
     except Exception as e:

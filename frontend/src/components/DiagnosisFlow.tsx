@@ -112,19 +112,32 @@ export default function DiagnosisFlow({
 
       const data = await response.json();
 
+      // Handle response format - backend returns flow object with session details
+      const flow = data.flow || data;
+      const sessionId = flow.session_id || data.session_id;
+
       // Update session state
       setSession({
-        session_id: data.session_id,
-        state: data.state,
-        equipment: data.equipment,
-        fault_code: data.fault_code,
+        session_id: sessionId,
+        state: flow.state || data.state,
+        equipment: flow.equipment || data.equipment,
+        fault_code: flow.fault_code || data.fault_code,
         current_step_index: 0,
         checkpoints: [],
         created_at: new Date().toISOString()
       });
 
-      // Set current check if present
-      if (data.check) {
+      // Set current check - backend may return "questions" array or "check" object
+      if (data.questions && data.questions.length > 0) {
+        const firstQuestion = data.questions[0];
+        setCurrentCheck({
+          id: firstQuestion.id,
+          question: firstQuestion.question,
+          options: firstQuestion.options,
+          step_number: 1,
+          total_steps: data.questions.length
+        });
+      } else if (data.check) {
         setCurrentCheck({
           id: data.check.id,
           question: data.check.question,
@@ -169,12 +182,16 @@ export default function DiagnosisFlow({
 
       const data = await apiResponse.json();
 
+      // Handle response format - backend returns flow object
+      const flow = data.flow || data;
+      const newState = flow.state || data.state;
+
       // Update session with new checkpoint
       setSession(prev => {
         if (!prev) return prev;
         return {
           ...prev,
-          state: data.state,
+          state: newState,
           current_step_index: prev.current_step_index + 1,
           checkpoints: [
             ...prev.checkpoints,
@@ -189,7 +206,7 @@ export default function DiagnosisFlow({
       });
 
       // Handle next state
-      if (data.state === 'complete') {
+      if (newState === 'complete') {
         // Diagnosis complete - get summary
         const summaryResponse = await fetch(
           `${API_BASE_URL}/api/diagnosis/${session.session_id}`,
@@ -201,6 +218,24 @@ export default function DiagnosisFlow({
           onComplete?.(summary);
         }
         setCurrentCheck(null);
+      } else if (data.questions && data.questions.length > 0) {
+        // Backend returns questions array - find next unanswered question
+        const answeredIds = session.checkpoints.map(c => c.id);
+        answeredIds.push(currentCheck.id); // Include current one being answered
+        const nextQuestion = data.questions.find((q: { id: string }) => !answeredIds.includes(q.id));
+
+        if (nextQuestion) {
+          setCurrentCheck({
+            id: nextQuestion.id,
+            question: nextQuestion.question,
+            options: nextQuestion.options,
+            step_number: currentCheck.step_number + 1,
+            total_steps: data.questions.length
+          });
+        } else {
+          // All questions answered, move to checking state
+          setCurrentCheck(null);
+        }
       } else if (data.check) {
         // Move to next checkpoint
         setCurrentCheck({
@@ -210,9 +245,19 @@ export default function DiagnosisFlow({
           step_number: data.progress?.current || (currentCheck.step_number + 1),
           total_steps: data.progress?.total || currentCheck.total_steps
         });
-      } else if (data.type === 'analysis') {
-        // Analysis result - wait for resolution
+      } else if (data.type === 'analysis' || data.type === 'diagnosis') {
+        // Analysis/diagnosis result - show completion
         setCurrentCheck(null);
+        if (onComplete && data.diagnosis) {
+          onComplete({
+            session_id: session.session_id,
+            equipment: session.equipment || {},
+            fault_code: session.fault_code,
+            checkpoints_completed: session.checkpoints.length + 1,
+            total_duration: 'N/A',
+            diagnosis_result: data.diagnosis.summary || data.message
+          });
+        }
       }
 
       setCustomResponse('');
