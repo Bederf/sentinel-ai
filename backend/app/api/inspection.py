@@ -14,7 +14,7 @@ Provides endpoints for:
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException, Depends, Query, status
+from fastapi import APIRouter, HTTPException, Depends, Query, Path, status
 from pydantic import BaseModel
 
 from app.models.inspection import (
@@ -31,7 +31,8 @@ from app.models.inspection import (
     InspectionDeficiencyCreate,
     InspectionOverviewResponse,
     InspectionTaskStatus,
-    InspectionPriority
+    InspectionPriority,
+    DeficiencySeverity
 )
 from app.services.inspection_scheduler import get_inspection_scheduler
 from app.services.auth_service import get_current_user
@@ -241,7 +242,7 @@ async def list_inspection_tasks(
     description="Get inspection tasks due within specified days"
 )
 async def get_due_inspections(
-    days_ahead: int = Query(7, ge=1, le=365, description="Days ahead to check"),
+    days_ahead: int = Path(..., ge=1, le=365, description="Days ahead to check"),
     assigned_to: Optional[str] = Query(None, description="Filter by technician"),
     equipment_id: Optional[str] = Query(None, description="Filter by equipment"),
     current_user: User = Depends(get_current_user)
