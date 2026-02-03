@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { Clock, Wifi, WifiOff, Bell, X } from "lucide-react";
 import { Toaster } from "sonner";
 import { formatTime } from "./lib/timeFormat";
-import api from "./lib/api";
+import api, { type Alert } from "./lib/api";
 import { Chat } from "./components/Chat";
 import TechnicianChat from "./components/TechnicianChat";
 import { Dashboard } from "./components/Dashboard";
@@ -16,6 +16,7 @@ import { PinEntry } from "./components/PinEntry";
 import { AlertFeed } from "./components/AlertFeed";
 import { CalendarPicker } from "./components/CalendarPicker";
 import { IntegrationMonitoringPage } from "./components/IntegrationMonitoringPage";
+import { AssetWorkflowDashboard } from "./components/AssetWorkflowDashboard";
 import { OccupancyPanel } from "./components/OccupancyPanel";
 
 interface HealthStatus {
@@ -125,6 +126,32 @@ function App() {
   // Handle when all alerts are cleared
   const handleClearAllAlerts = () => {
     setUnreadAlertCount(0);
+  };
+
+  // Handle alert click - navigate to equipment in control dashboard
+  const handleAlertClick = (alert: Alert) => {
+    // Store selection in sessionStorage for ControlDashboard to pick up
+    // Use device_id if available (maps to mock_devices.json), fallback to equipment_id
+    const deviceId = alert.device_id || alert.equipment_id;
+    if (deviceId && alert.site_id) {
+      sessionStorage.setItem("sentinel_selected_equipment", deviceId);
+      sessionStorage.setItem("sentinel_selected_site", alert.site_id);
+      // Store alert details for context display
+      sessionStorage.setItem("sentinel_alert_context", JSON.stringify({
+        message: alert.message,
+        severity: alert.severity,
+        equipment_name: alert.equipment_name,
+        created_at: alert.created_at,
+        title: alert.title,
+        type: alert.type,
+      }));
+    }
+
+    // Close alerts panel
+    setShowAlertsPanel(false);
+
+    // Navigate to control dashboard
+    setCurrentView("control");
   };
 
   const formatDate = (date: Date) => {
@@ -324,6 +351,7 @@ function App() {
                     refreshInterval={30000}
                     onAlertRead={handleAlertRead}
                     onClearAll={handleClearAllAlerts}
+                    onAlertClick={handleAlertClick}
                   />
                 </div>
               </div>
@@ -480,6 +508,10 @@ function App() {
           ) : currentView === "occupancy" ? (
             <div className="h-full overflow-y-auto p-4 md:p-6">
               <OccupancyPanel compact={false} />
+            </div>
+          ) : currentView === "workflow" ? (
+            <div className="h-full overflow-y-auto">
+              <AssetWorkflowDashboard />
             </div>
           ) : (
             <div className="h-full p-4 md:p-6">

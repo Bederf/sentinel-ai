@@ -27,10 +27,11 @@ import {
   Wrench,
   Activity,
   Users,
+  GitBranch,
   LayoutGrid,
 } from "lucide-react";
 
-export type View = "dashboard" | "chat" | "technician" | "control" | "control-audit" | "optimization" | "settings" | "integrations" | "occupancy";
+export type View = "dashboard" | "chat" | "technician" | "control" | "control-audit" | "optimization" | "settings" | "integrations" | "occupancy" | "workflow";
 
 interface SidebarProps {
   currentView: View;
@@ -61,6 +62,7 @@ const navItems: NavItem[] = [
   { id: "control", label: "Control", icon: Shield, description: "Building Controls" },
   { id: "control-audit", label: "Control Audit", icon: ClipboardList, description: "Control System Logs" },
   { id: "settings", label: "Settings", icon: SettingsIcon, description: "System Configuration" },
+  { id: "workflow", label: "Asset Workflow", icon: GitBranch, description: "Lifecycle Management" },
   { id: "integrations", label: "Integrations", icon: Activity, description: "BMS Integration Health" },
 ];
 
