@@ -32,7 +32,9 @@ from app.models.inspection import (
     InspectionOverviewResponse,
     InspectionTaskStatus,
     InspectionPriority,
-    DeficiencySeverity
+    DeficiencySeverity,
+    InspectionSubmission,
+    InspectionScheduleSummary
 )
 from app.services.inspection_scheduler import get_inspection_scheduler
 from app.services.auth_service import get_current_user
@@ -714,3 +716,196 @@ async def get_deficiency_statistics(
 
     stats = await scheduler.repository.get_deficiency_statistics(equipment_id, days_back)
     return stats
+
+
+# ============================================================================
+# Mobile Inspection Submission Endpoints
+# ============================================================================
+
+@router.post(
+    "/submit-weekly",
+    response_model=InspectionTask,
+    status_code=status.HTTP_201_CREATED,
+    summary="Submit weekly inspection results",
+    description="Submit inspection with checklist responses, measurements, and photos (mobile-friendly)"
+)
+async def submit_weekly_inspection(
+    submission: InspectionSubmission,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Submit inspection results from mobile interface.
+
+    Creates a completed inspection task with:
+    - Checklist responses stored in checklist_data
+    - Measurements extracted and stored separately
+    - Photo attachments linked
+    - Deficiency count calculated from responses
+    """
+    from app.services.checklist_service import get_checklist_service
+    from datetime import date
+    import uuid
+
+    scheduler = get_inspection_scheduler()
+    checklist_service = get_checklist_service()
+    repo = scheduler.repository
+
+    # Load template
+    template = checklist_service.get_template(submission.template_id)
+    if not template:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Template {submission.template_id} not found"
+        )
+
+    # Calculate completion status
+    completion_status = checklist_service.calculate_completion_status(
+        template, submission.checklist_responses
+    )
+
+    # Generate task number
+    task_number = f"INS-{datetime.now().strftime('%Y%m%d')}-{str(uuid.uuid4())[:8].upper()}"
+
+    # Determine overall status from completion
+    if completion_status["critical_count"] > 0:
+        overall_status = "fail"
+    elif completion_status["warning_count"] > 0 or completion_status["failed_tolerances"] > 0:
+        overall_status = "partial"
+    else:
+        overall_status = "pass"
+
+    # Create task data
+    task_data = {
+        "task_name": f"Weekly Inspection - {submission.equipment_id}",
+        "task_description": f"Weekly routine inspection using template {submission.template_id}",
+        "equipment_id": submission.equipment_id,
+        "scheduled_date": datetime.now(),
+        "due_date": datetime.now(),
+        "status": "completed",
+        "priority": "normal",
+        "completed_date": datetime.now(),
+        "completed_by": submission.submitted_by or current_user.username,
+        "estimated_duration_minutes": template.get("estimated_duration_minutes", 15),
+        "actual_duration_minutes": submission.duration_minutes,
+        "completion_notes": submission.notes,
+        "checklist_template_id": submission.template_id
+    }
+
+    task = await repo.create_inspection_task(task_data)
+
+    # Create inspection result
+    result_data = {
+        "task_id": task.id,
+        "equipment_id": submission.equipment_id,
+        "inspected_by": submission.submitted_by or current_user.username,
+        "inspection_date": datetime.now(),
+        "overall_status": overall_status,
+        "item_results": submission.checklist_responses,
+        "deficiencies_found": completion_status["critical_count"] + completion_status["warning_count"],
+        "critical_findings": completion_status["critical_count"],
+        "general_notes": submission.notes,
+        "photo_urls": [p.file_url for p in submission.photos] if submission.photos else []
+    }
+
+    await repo.create_inspection_result(result_data)
+
+    # Store measurements
+    measurements = checklist_service.prepare_measurements_for_db(
+        template, submission.checklist_responses, task.id
+    )
+    for measurement in measurements:
+        measurement["result_id"] = task.id
+        measurement["equipment_id"] = submission.equipment_id
+        measurement["measured_by"] = submission.submitted_by or current_user.username
+        measurement["measurement_date"] = datetime.now()
+        await repo.create_inspection_measurement(measurement)
+
+    return task
+
+
+@router.get(
+    "/schedule",
+    response_model=List[InspectionScheduleSummary],
+    summary="Get inspection schedule",
+    description="Get upcoming inspections for user or equipment"
+)
+async def get_inspection_schedule(
+    equipment_id: Optional[str] = Query(None, description="Filter by equipment ID"),
+    days_ahead: int = Query(30, ge=1, le=365, description="Days ahead to include"),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get inspection schedule for mobile view.
+
+    Returns active schedules with next due dates within the specified timeframe.
+    """
+    from datetime import timedelta
+
+    scheduler = get_inspection_scheduler()
+
+    if equipment_id:
+        schedules = await scheduler.repository.get_active_schedules(equipment_id)
+    else:
+        schedules = await scheduler.repository.get_active_schedules()
+
+    # Filter to only active schedules with next due date within range
+    cutoff_date = datetime.now() + timedelta(days=days_ahead)
+
+    result = []
+    for schedule in schedules:
+        if not schedule.is_active:
+            continue
+
+        # Skip if next due date is beyond cutoff
+        if schedule.next_due_date and schedule.next_due_date > cutoff_date:
+            continue
+
+        result.append(InspectionScheduleSummary(
+            id=schedule.id,
+            equipment_id=schedule.equipment_id,
+            schedule_name=schedule.schedule_name,
+            frequency_type=schedule.frequency_type.value if hasattr(schedule.frequency_type, 'value') else str(schedule.frequency_type),
+            frequency_interval=schedule.frequency_days,
+            inspection_type="routine",
+            checklist_template_id=None,  # Could be added to schedule model later
+            priority="normal" if schedule.frequency_type != "weekly" else "high",
+            duration_minutes=schedule.estimated_duration_minutes or 30,
+            next_due_date=schedule.next_due_date,
+            is_active=schedule.is_active
+        ))
+
+    return result
+
+
+@router.get(
+    "/history/{equipment_id}",
+    response_model=List[InspectionTask],
+    summary="Get inspection history",
+    description="Get historical inspections for equipment with trending"
+)
+async def get_inspection_history(
+    equipment_id: str = Path(..., description="Equipment ID"),
+    months: int = Query(12, ge=1, le=60, description="Months of history to return"),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get inspection history for equipment.
+
+    Returns completed inspection tasks with results for trending analysis.
+    """
+    from datetime import timedelta
+
+    scheduler = get_inspection_scheduler()
+
+    start_date = datetime.now() - timedelta(days=months * 30)
+
+    tasks = await scheduler.repository.get_tasks_in_date_range(
+        start_date=start_date,
+        end_date=datetime.now(),
+        equipment_id=equipment_id
+    )
+
+    # Filter to completed tasks only
+    completed_tasks = [t for t in tasks if t.status == InspectionTaskStatus.COMPLETED]
+
+    return completed_tasks

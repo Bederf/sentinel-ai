@@ -496,3 +496,65 @@ class InspectionDeficiencySummary(BaseModel):
     by_severity: Dict[str, int]
     resolved: int
     unresolved: int
+
+
+# ============================================================================
+# Mobile Inspection Submission Models
+# ============================================================================
+
+class InspectionPhoto(BaseModel):
+    """Photo attachment for inspection."""
+    file_url: str = Field(..., description="URL to uploaded photo")
+    file_name: str = Field(..., description="Original file name")
+    description: Optional[str] = Field(None, description="Photo description/context")
+    element_id: Optional[str] = Field(None, description="Associated element ID")
+
+
+class InspectionSubmission(BaseModel):
+    """Mobile inspection submission request."""
+    equipment_id: str = Field(..., description="Equipment being inspected")
+    template_id: str = Field(..., description="Checklist template ID")
+    checklist_responses: Dict[str, Any] = Field(..., description="Item ID to response mapping")
+    photos: List[InspectionPhoto] = Field(default_factory=list, description="Photo attachments")
+    duration_minutes: int = Field(default=15, description="Actual inspection duration")
+    notes: Optional[str] = Field(None, description="General inspection notes")
+    submitted_by: str = Field(default="technician", description="Who submitted the inspection")
+    submitted_at: Optional[datetime] = Field(None, description="Submission timestamp")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "equipment_id": "chiller-001",
+                "template_id": "chiller_weekly",
+                "checklist_responses": {
+                    "compressor_condition": "ok",
+                    "refrigerant_pressure": {"value": 12.5, "notes": "Normal range"},
+                    "oil_level": "ok"
+                },
+                "photos": [
+                    {
+                        "file_url": "https://storage.example.com/photo1.jpg",
+                        "file_name": "compressor_photo.jpg",
+                        "description": "Compressor visual inspection"
+                    }
+                ],
+                "duration_minutes": 25,
+                "notes": "Equipment running smoothly",
+                "submitted_by": "John Smith"
+            }
+        }
+
+
+class InspectionScheduleSummary(BaseModel):
+    """Simplified schedule for mobile display."""
+    id: str
+    equipment_id: str
+    schedule_name: str
+    frequency_type: str
+    frequency_interval: Optional[int] = None
+    inspection_type: str
+    checklist_template_id: Optional[str] = None
+    priority: str
+    duration_minutes: int
+    next_due_date: Optional[datetime] = None
+    is_active: bool = True
