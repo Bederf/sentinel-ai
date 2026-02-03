@@ -22,7 +22,7 @@ from app.models.inspection import (
     InspectionMeasurement,
     InspectionMeasurementCreate
 )
-from app.database.supabase_client import supabase
+from app.database.supabase_client import get_supabase_client
 
 
 class InspectionRepository:
@@ -38,19 +38,19 @@ class InspectionRepository:
         schedule_data["created_at"] = datetime.now().isoformat()
         schedule_data["updated_at"] = datetime.now().isoformat()
 
-        result = supabase.table("inspection_schedules").insert(schedule_data).execute()
+        result = get_supabase_client().table("inspection_schedules").insert(schedule_data).execute()
         return InspectionSchedule(**result.data[0])
 
     async def get_inspection_schedule(self, schedule_id: str) -> Optional[InspectionSchedule]:
         """Get inspection schedule by ID."""
-        result = supabase.table("inspection_schedules").select("*").eq("id", schedule_id).execute()
+        result = get_supabase_client().table("inspection_schedules").select("*").eq("id", schedule_id).execute()
         if result.data:
             return InspectionSchedule(**result.data[0])
         return None
 
     async def get_active_schedules(self, equipment_id: Optional[str] = None) -> List[InspectionSchedule]:
         """Get all active inspection schedules."""
-        query = supabase.table("inspection_schedules").select("*").eq("is_active", True)
+        query = get_supabase_client().table("inspection_schedules").select("*").eq("is_active", True)
 
         if equipment_id:
             query = query.eq("equipment_id", equipment_id)
@@ -60,21 +60,21 @@ class InspectionRepository:
 
     async def update_schedule_last_generated(self, schedule_id: str, last_generated_date: datetime):
         """Update schedule last_generated_date."""
-        supabase.table("inspection_schedules").update({
+        get_supabase_client().table("inspection_schedules").update({
             "last_generated_date": last_generated_date,
             "updated_at": datetime.now().isoformat()
         }).eq("id", schedule_id).execute()
 
     async def update_schedule_next_due(self, schedule_id: str, next_due_date: datetime):
         """Update schedule next_due_date."""
-        supabase.table("inspection_schedules").update({
+        get_supabase_client().table("inspection_schedules").update({
             "next_due_date": next_due_date,
             "updated_at": datetime.now().isoformat()
         }).eq("id", schedule_id).execute()
 
     async def deactivate_schedule(self, schedule_id: str):
         """Deactivate an inspection schedule."""
-        supabase.table("inspection_schedules").update({
+        get_supabase_client().table("inspection_schedules").update({
             "is_active": False,
             "updated_at": datetime.now().isoformat()
         }).eq("id", schedule_id).execute()
@@ -89,19 +89,19 @@ class InspectionRepository:
         task_data["created_at"] = datetime.now().isoformat()
         task_data["updated_at"] = datetime.now().isoformat()
 
-        result = supabase.table("inspection_tasks").insert(task_data).execute()
+        result = get_supabase_client().table("inspection_tasks").insert(task_data).execute()
         return InspectionTask(**result.data[0])
 
     async def get_inspection_task(self, task_id: str) -> Optional[InspectionTask]:
         """Get inspection task by ID."""
-        result = supabase.table("inspection_tasks").select("*").eq("id", task_id).execute()
+        result = get_supabase_client().table("inspection_tasks").select("*").eq("id", task_id).execute()
         if result.data:
             return InspectionTask(**result.data[0])
         return None
 
     async def get_tasks_due_before(self, due_date: datetime, assigned_to: Optional[str] = None, equipment_id: Optional[str] = None) -> List[InspectionTask]:
         """Get inspection tasks due before specified date."""
-        query = supabase.table("inspection_tasks").select("*").eq("status", "scheduled").lt("due_date", due_date.isoformat())
+        query = get_supabase_client().table("inspection_tasks").select("*").eq("status", "scheduled").lt("due_date", due_date.isoformat())
 
         if assigned_to:
             query = query.eq("assigned_to", assigned_to)
@@ -113,7 +113,7 @@ class InspectionRepository:
 
     async def get_overdue_tasks(self, overdue_date: datetime, assigned_to: Optional[str] = None, equipment_id: Optional[str] = None) -> List[InspectionTask]:
         """Get overdue inspection tasks."""
-        query = supabase.table("inspection_tasks").select("*").eq("status", "scheduled").lt("due_date", overdue_date.isoformat())
+        query = get_supabase_client().table("inspection_tasks").select("*").eq("status", "scheduled").lt("due_date", overdue_date.isoformat())
 
         if assigned_to:
             query = query.eq("assigned_to", assigned_to)
@@ -142,7 +142,7 @@ class InspectionRepository:
         if "actual_duration_minutes" in kwargs:
             update_data["actual_duration_minutes"] = kwargs["actual_duration_minutes"]
 
-        result = supabase.table("inspection_tasks").update(update_data).eq("id", task_id).execute()
+        result = get_supabase_client().table("inspection_tasks").update(update_data).eq("id", task_id).execute()
         if result.data:
             return InspectionTask(**result.data[0])
         return None
@@ -160,7 +160,7 @@ class InspectionRepository:
             existing_notes = task.completion_notes or ""
             update_data["completion_notes"] = f"{existing_notes}\n{scheduling_notes}".strip()
 
-        result = supabase.table("inspection_tasks").update(update_data).eq("id", task_id).execute()
+        result = get_supabase_client().table("inspection_tasks").update(update_data).eq("id", task_id).execute()
         if result.data:
             return InspectionTask(**result.data[0])
         return None
@@ -173,14 +173,14 @@ class InspectionRepository:
             "updated_at": datetime.now().isoformat()
         }
 
-        result = supabase.table("inspection_tasks").update(update_data).eq("id", task_id).execute()
+        result = get_supabase_client().table("inspection_tasks").update(update_data).eq("id", task_id).execute()
         if result.data:
             return InspectionTask(**result.data[0])
         return None
 
     async def get_tasks_in_date_range(self, start_date: datetime, end_date: datetime, assigned_to: Optional[str] = None, equipment_id: Optional[str] = None) -> List[InspectionTask]:
         """Get tasks within date range."""
-        query = supabase.table("inspection_tasks").select("*").gte("scheduled_date", start_date.isoformat()).lte("scheduled_date", end_date.isoformat())
+        query = get_supabase_client().table("inspection_tasks").select("*").gte("scheduled_date", start_date.isoformat()).lte("scheduled_date", end_date.isoformat())
 
         if assigned_to:
             query = query.eq("assigned_to", assigned_to)
@@ -192,7 +192,7 @@ class InspectionRepository:
 
     async def get_tasks_by_equipment(self, equipment_id: str, status: Optional[str] = None, limit: int = 100) -> List[InspectionTask]:
         """Get tasks for specific equipment."""
-        query = supabase.table("inspection_tasks").select("*").eq("equipment_id", equipment_id)
+        query = get_supabase_client().table("inspection_tasks").select("*").eq("equipment_id", equipment_id)
 
         if status:
             query = query.eq("status", status)
@@ -204,7 +204,7 @@ class InspectionRepository:
         """Get count of completed tasks in last N days."""
         start_date = datetime.now() - timedelta(days=days_back)
 
-        query = supabase.table("inspection_tasks").select("id").eq("status", "completed").gte("completed_date", start_date.isoformat())
+        query = get_supabase_client().table("inspection_tasks").select("id").eq("status", "completed").gte("completed_date", start_date.isoformat())
 
         if equipment_id:
             query = query.eq("equipment_id", equipment_id)
@@ -222,24 +222,24 @@ class InspectionRepository:
         result_data["created_at"] = datetime.now().isoformat()
         result_data["updated_at"] = datetime.now().isoformat()
 
-        result = supabase.table("inspection_results").insert(result_data).execute()
+        result = get_supabase_client().table("inspection_results").insert(result_data).execute()
         return InspectionResult(**result.data[0])
 
     async def get_inspection_result(self, result_id: str) -> Optional[InspectionResult]:
         """Get inspection result by ID."""
-        result = supabase.table("inspection_results").select("*").eq("id", result_id).execute()
+        result = get_supabase_client().table("inspection_results").select("*").eq("id", result_id).execute()
         if result.data:
             return InspectionResult(**result.data[0])
         return None
 
     async def get_results_by_task(self, task_id: str) -> List[InspectionResult]:
         """Get inspection results for a task."""
-        result = supabase.table("inspection_results").select("*").eq("task_id", task_id).order("inspection_date", desc=True).execute()
+        result = get_supabase_client().table("inspection_results").select("*").eq("task_id", task_id).order("inspection_date", desc=True).execute()
         return [InspectionResult(**row) for row in result.data]
 
     async def get_results_by_equipment(self, equipment_id: str, limit: int = 50) -> List[InspectionResult]:
         """Get inspection results for equipment."""
-        result = supabase.table("inspection_results").select("*").eq("equipment_id", equipment_id).order("inspection_date", desc=True).limit(limit).execute()
+        result = get_supabase_client().table("inspection_results").select("*").eq("equipment_id", equipment_id).order("inspection_date", desc=True).limit(limit).execute()
         return [InspectionResult(**row) for row in result.data]
 
     # ============================================================================
@@ -252,19 +252,19 @@ class InspectionRepository:
         deficiency_data["reported_date"] = datetime.now().isoformat()
         deficiency_data["updated_at"] = datetime.now().isoformat()
 
-        result = supabase.table("inspection_deficiencies").insert(deficiency_data).execute()
+        result = get_supabase_client().table("inspection_deficiencies").insert(deficiency_data).execute()
         return InspectionDeficiency(**result.data[0])
 
     async def get_inspection_deficiency(self, deficiency_id: str) -> Optional[InspectionDeficiency]:
         """Get inspection deficiency by ID."""
-        result = supabase.table("inspection_deficiencies").select("*").eq("id", deficiency_id).execute()
+        result = get_supabase_client().table("inspection_deficiencies").select("*").eq("id", deficiency_id).execute()
         if result.data:
             return InspectionDeficiency(**result.data[0])
         return None
 
     async def get_deficiencies_by_equipment(self, equipment_id: str, resolved: Optional[bool] = None) -> List[InspectionDeficiency]:
         """Get deficiencies for equipment."""
-        query = supabase.table("inspection_deficiencies").select("*").eq("equipment_id", equipment_id)
+        query = get_supabase_client().table("inspection_deficiencies").select("*").eq("equipment_id", equipment_id)
 
         if resolved is not None:
             query = query.eq("is_resolved", resolved)
@@ -274,7 +274,7 @@ class InspectionRepository:
 
     async def get_unresolved_deficiencies(self, equipment_id: Optional[str] = None, severity: Optional[str] = None) -> List[InspectionDeficiency]:
         """Get unresolved deficiencies."""
-        query = supabase.table("inspection_deficiencies").select("*").eq("is_resolved", False)
+        query = get_supabase_client().table("inspection_deficiencies").select("*").eq("is_resolved", False)
 
         if equipment_id:
             query = query.eq("equipment_id", equipment_id)
@@ -294,7 +294,7 @@ class InspectionRepository:
             "updated_at": datetime.now().isoformat()
         }
 
-        result = supabase.table("inspection_deficiencies").update(update_data).eq("id", deficiency_id).execute()
+        result = get_supabase_client().table("inspection_deficiencies").update(update_data).eq("id", deficiency_id).execute()
         if result.data:
             return InspectionDeficiency(**result.data[0])
         return None
@@ -307,7 +307,7 @@ class InspectionRepository:
             "updated_at": datetime.now().isoformat()
         }
 
-        result = supabase.table("inspection_deficiencies").update(update_data).eq("id", deficiency_id).execute()
+        result = get_supabase_client().table("inspection_deficiencies").update(update_data).eq("id", deficiency_id).execute()
         if result.data:
             return InspectionDeficiency(**result.data[0])
         return None
@@ -327,7 +327,7 @@ class InspectionRepository:
         }
 
         # Get schedule counts
-        query = supabase.table("inspection_schedules").select("id")
+        query = get_supabase_client().table("inspection_schedules").select("id")
         if equipment_id:
             query = query.eq("equipment_id", equipment_id)
 
@@ -338,7 +338,7 @@ class InspectionRepository:
         stats["active_schedules"] = len(active_schedules.data)
 
         # Get task statistics
-        task_query = supabase.table("inspection_tasks").select("status", count="exact")
+        task_query = get_supabase_client().table("inspection_tasks").select("status", count="exact")
         if equipment_id:
             task_query = task_query.eq("equipment_id", equipment_id)
 
@@ -347,9 +347,9 @@ class InspectionRepository:
 
         # Get status breakdown
         if equipment_id:
-            status_result = supabase.table("inspection_tasks").select("status").eq("equipment_id", equipment_id).execute()
+            status_result = get_supabase_client().table("inspection_tasks").select("status").eq("equipment_id", equipment_id).execute()
         else:
-            status_result = supabase.table("inspection_tasks").select("status").execute()
+            status_result = get_supabase_client().table("inspection_tasks").select("status").execute()
 
         for row in status_result.data:
             status = row["status"]
@@ -361,7 +361,7 @@ class InspectionRepository:
         """Get deficiency statistics."""
         start_date = datetime.now() - timedelta(days=days_back)
 
-        query = supabase.table("inspection_deficiencies").select("severity, is_resolved").gte("reported_date", start_date.isoformat())
+        query = get_supabase_client().table("inspection_deficiencies").select("severity, is_resolved").gte("reported_date", start_date.isoformat())
         if equipment_id:
             query = query.eq("equipment_id", equipment_id)
 
@@ -395,17 +395,17 @@ class InspectionRepository:
         measurement_data["id"] = str(uuid.uuid4())
         measurement_data["created_at"] = datetime.now().isoformat()
 
-        result = supabase.table("inspection_measurements").insert(measurement_data).execute()
+        result = get_supabase_client().table("inspection_measurements").insert(measurement_data).execute()
         return InspectionMeasurement(**result.data[0])
 
     async def get_measurements_by_result(self, result_id: str) -> List[InspectionMeasurement]:
         """Get all measurements for an inspection result."""
-        result = supabase.table("inspection_measurements").select("*").eq("result_id", result_id).order("measurement_date").execute()
+        result = get_supabase_client().table("inspection_measurements").select("*").eq("result_id", result_id).order("measurement_date").execute()
         return [InspectionMeasurement(**row) for row in result.data]
 
     async def get_measurements_by_equipment(self, equipment_id: str, measurement_type: Optional[str] = None, limit: int = 100) -> List[InspectionMeasurement]:
         """Get measurements for equipment."""
-        query = supabase.table("inspection_measurements").select("*").eq("equipment_id", equipment_id)
+        query = get_supabase_client().table("inspection_measurements").select("*").eq("equipment_id", equipment_id)
 
         if measurement_type:
             query = query.eq("measurement_type", measurement_type)
@@ -415,7 +415,7 @@ class InspectionRepository:
 
     async def get_measurements_with_deviations(self, equipment_id: Optional[str] = None, status: str = "warning") -> List[InspectionMeasurement]:
         """Get measurements with baseline deviations."""
-        query = supabase.table("inspection_measurements").select("*").in_("deviation_status", [status, "critical"])
+        query = get_supabase_client().table("inspection_measurements").select("*").in_("deviation_status", [status, "critical"])
 
         if equipment_id:
             query = query.eq("equipment_id", equipment_id)
