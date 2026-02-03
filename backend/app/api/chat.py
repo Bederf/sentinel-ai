@@ -186,7 +186,7 @@ async def chat(request: ChatRequest) -> StreamingResponse:
         raise HTTPException(status_code=400, detail="Message cannot be empty")
 
     user_message = request.message.strip()
-    logger.info(f"Chat request: conversation_id={request.conversation_id}, message={user_message[:50]}...")
+    logger.info(f"Chat request: conversation_id={request.conversation_id}, search_docs={request.search_docs}, message={user_message[:50]}...")
 
     # 1. Check for work order requests
     wo_detection = work_order_service.detect_work_order_request(user_message)
