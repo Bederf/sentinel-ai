@@ -12,6 +12,7 @@ from app.services.claude_service import claude_service
 from app.services.demo_cache import DemoCache
 from app.services.work_order_service import work_order_service
 from app.services.doc_rag_service import search_documentation, get_doc_rag_system_prompt
+from app.services.feature_request_logger import log_chat_query
 from app.config.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -197,6 +198,8 @@ async def chat(request: ChatRequest) -> StreamingResponse:
                 detail="Claude AI is not configured. Set ANTHROPIC_API_KEY in environment.",
             )
         logger.info("Documentation search mode enabled")
+        # Log query for feature request tracking
+        log_chat_query(user_message)
         return StreamingResponse(
             generate_docs_sse_stream(user_message),
             media_type="text/event-stream",

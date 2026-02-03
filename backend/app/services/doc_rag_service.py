@@ -138,6 +138,11 @@ Example response format:
 
 If the user asks about something not in the documentation, you can provide general information but note that it's not from official docs.
 
-**Feature Requests:** If a user asks about functionality that doesn't exist and isn't on the roadmap, acknowledge it honestly and say: "That's not currently in SENTINEL or on our roadmap, but it's a great suggestion. I've noted it as a feature request." This feedback is valuable for product development."""
+**Unimplemented Features:** If a user asks about something that is NOT currently implemented in SENTINEL:
+- Be honest: say "This is not currently implemented but is marked for future development"
+- Do NOT pretend we have it or oversell
+- If it IS on the roadmap/TODO, mention that
+- If it is NOT on the roadmap at all, say "This is a great suggestion - we'll add it to our development roadmap"
+- Keep it brief and professional"""
 
     return prompt
