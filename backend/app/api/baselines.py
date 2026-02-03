@@ -191,103 +191,80 @@ async def compare_to_baseline(
     Calculates deviations for each metric and determines overall status.
     Deviations beyond tolerance trigger warning/critical alerts.
 
-    Comparison logic:
-    - deviation_percent = |current - baseline| / baseline * 100
-    - status = normal if deviation <= tolerance
-    - status = warning if deviation > tolerance but < 2*tolerance
-    - status = critical if deviation >= 2*tolerance
+    Uses BaselineComparisonService for deviation detection.
 
-    This is a placeholder implementation. Full comparison service
-    will be implemented in Phase 54-02.
+    Integration with workflow triggers:
+    - Deviations > 20% trigger baseline deviation alert
+    - Critical deviations create inspection tasks
     """
     try:
-        repo = get_baseline_repository()
+        from app.services.baseline_comparison_service import get_baseline_comparison_service
+        from app.services.workflow_triggers import get_trigger_engine, BaselineComparison as WorkflowBaselineComparison
 
-        # Get active baseline
-        baseline = await repo.get_active_equipment_baseline(equipment_id)
-        if not baseline:
-            raise HTTPException(
-                status_code=404,
-                detail=f"No active baseline found for equipment {equipment_id}"
+        # Get comparison service
+        comparison_service = get_baseline_comparison_service()
+
+        # Perform comparison
+        comparison = await comparison_service.compare_to_baseline(
+            equipment_id=equipment_id,
+            current_data=request.current_values
+        )
+
+        # Build deviations dict for response
+        deviations_dict = {}
+        for dev in comparison.deviations:
+            deviations_dict[dev.element_name] = ComparisonResult(
+                baseline=dev.baseline_value,
+                current=dev.current_value,
+                deviation_percent=dev.deviation_percent,
+                status=DeviationStatus(dev.severity)
             )
-
-        # Perform comparison (simplified for now)
-        deviations = {}
-        max_deviation = 0.0
-        critical_count = 0
-        warning_count = 0
-
-        for metric_name, current_value in request.current_values.items():
-            # Extract baseline data
-            baseline_data = baseline.baseline_values.get(metric_name)
-
-            if not baseline_data:
-                logger.warning(f"Metric {metric_name} not found in baseline")
-                continue
-
-            # Handle both simple values and complex structures
-            if isinstance(baseline_data, dict):
-                baseline_value = baseline_data.get("value")
-                tolerance = baseline_data.get("tolerance", 10)  # Default 10%
-            else:
-                baseline_value = baseline_data
-                tolerance = 10  # Default 10% tolerance
-
-            # Calculate deviation
-            if baseline_value != 0:
-                deviation_percent = abs(current_value - baseline_value) / baseline_value * 100
-            else:
-                deviation_percent = 0.0
-
-            # Determine status
-            if deviation_percent >= tolerance * 2:
-                status = DeviationStatus.CRITICAL
-                critical_count += 1
-            elif deviation_percent > tolerance:
-                status = DeviationStatus.WARNING
-                warning_count += 1
-            else:
-                status = DeviationStatus.NORMAL
-
-            # Track max deviation
-            if deviation_percent > max_deviation:
-                max_deviation = deviation_percent
-
-            # Create comparison result
-            deviations[metric_name] = ComparisonResult(
-                baseline=float(baseline_value),
-                current=float(current_value),
-                deviation_percent=round(deviation_percent, 2),
-                status=status
-            )
-
-        # Determine overall status
-        if critical_count > 0:
-            overall_status = DeviationStatus.CRITICAL
-        elif warning_count > 0:
-            overall_status = DeviationStatus.WARNING
-        else:
-            overall_status = DeviationStatus.NORMAL
 
         # Build response
         response = ComparisonResponse(
             equipment_id=equipment_id,
-            baseline_id=baseline.id,
-            baseline_date=baseline.baseline_date,
-            comparison_date=datetime.now(),
-            overall_status=overall_status,
-            max_deviation_percent=round(max_deviation, 2),
-            deviations=deviations,
-            comparison_notes=f"Compared {len(deviations)} metrics: {critical_count} critical, {warning_count} warning"
+            baseline_id=comparison.baseline_id,
+            baseline_date=comparison.baseline_date,
+            comparison_date=comparison.comparison_date,
+            overall_status=comparison.overall_status,
+            max_deviation_percent=comparison.max_deviation_percent,
+            deviations=deviations_dict,
+            comparison_notes=comparison.summary
         )
 
         logger.info(
-            f"Comparison for {equipment_id}: {overall_status.value}, "
-            f"max deviation: {max_deviation:.2f}%"
+            f"Comparison for {equipment_id}: {comparison.overall_status.value}, "
+            f"max deviation: {comparison.max_deviation_percent:.2f}%"
         )
+
+        # Trigger workflow alert if significant deviation
+        if comparison.max_deviation_percent > 20.0:
+            try:
+                trigger_engine = get_trigger_engine()
+                workflow_comparison = WorkflowBaselineComparison(
+                    equipment_id=equipment_id,
+                    baseline_id=comparison.baseline_id,
+                    comparison_date=comparison.comparison_date,
+                    max_deviation_percent=comparison.max_deviation_percent,
+                    deviating_metrics={d.element_name: d.deviation_percent for d in comparison.deviations},
+                    within_threshold=False
+                )
+
+                trigger_result = await trigger_engine.on_baseline_deviation(
+                    equipment_id=equipment_id,
+                    comparison=workflow_comparison
+                )
+
+                logger.info(f"Workflow trigger result: {trigger_result.action_taken}")
+
+            except Exception as trigger_error:
+                logger.error(f"Failed to trigger workflow alert: {trigger_error}")
+                # Don't fail the request if workflow trigger fails
 
         return response
 
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     except HTTPException:
         raise
     except Exception as e:
@@ -315,6 +292,65 @@ async def get_baseline_summary(equipment_id: str) -> Dict[str, Any]:
 
     except Exception as e:
         logger.error(f"Error getting baseline summary for {equipment_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{equipment_id}/report")
+async def get_baseline_report(
+    equipment_id: str,
+    baseline_id: Optional[str] = Query(None, description="Specific baseline ID (uses latest if None)")
+):
+    """
+    Generate PDF baseline report.
+
+    Returns PDF file with:
+    - Equipment details and baseline date
+    - Baseline values table
+    - Current comparison (if available)
+    - Color-coded deviations (red=critical, yellow=warning)
+    - Technician notes section
+    """
+    try:
+        from fastapi.responses import Response
+        from app.services.baseline_comparison_service import get_baseline_comparison_service
+        from datetime import datetime
+
+        comparison_service = get_baseline_comparison_service()
+        repo = get_baseline_repository()
+
+        # Get baseline
+        if baseline_id:
+            baseline = await repo.get_baseline_by_id(baseline_id)
+        else:
+            baseline = await repo.get_active_equipment_baseline(equipment_id)
+
+        if not baseline:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No baseline found for equipment {equipment_id}"
+            )
+
+        # Generate PDF report
+        pdf_bytes = await comparison_service.generate_baseline_report(
+            equipment_id=equipment_id,
+            baseline=baseline,
+            comparison=None  # Could optionally include latest comparison
+        )
+
+        # Return PDF file
+        filename = f"baseline_{equipment_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}"
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating report for {equipment_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
