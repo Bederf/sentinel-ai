@@ -8,7 +8,7 @@ Phase 45: Routine Inspection & Maintenance
 
 import logging
 from datetime import datetime, timedelta
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, Any
 import asyncio
 
 from app.models.inspection import (
