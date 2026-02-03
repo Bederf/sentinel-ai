@@ -367,6 +367,63 @@ class InspectionDeficiency(InspectionDeficiencyBase):
 
 
 # ============================================================================
+# Inspection Measurement Models
+# ============================================================================
+
+class InspectionMeasurementBase(BaseModel):
+    """Base model for inspection measurements."""
+    result_id: str = Field(..., description="Source inspection result ID")
+    task_id: str = Field(..., description="Source inspection task ID")
+    equipment_id: str = Field(..., description="Equipment being measured")
+
+    measurement_type: str = Field(..., description="Type: temperature, pressure, vibration, etc.")
+    measurement_point: str = Field(..., description="Sensor ID or measurement location")
+
+    measured_value: float = Field(..., description="The measured value")
+    unit: str = Field(..., description="Unit of measurement: C, bar, mm/s, dBA, etc.")
+
+    measurement_date: datetime = Field(..., description="When measurement was taken")
+    measured_by: str = Field(..., description="Who took the measurement")
+
+    # Baseline comparison (optional)
+    baseline_value: Optional[float] = Field(None, description="Baseline value for comparison")
+    baseline_deviation_percent: Optional[float] = Field(None, description="Deviation from baseline as percentage")
+    deviation_status: Optional[str] = Field(None, description="Status: normal, warning, critical")
+
+    notes: Optional[str] = Field(None, description="Additional notes")
+
+
+class InspectionMeasurementCreate(InspectionMeasurementBase):
+    """Model for creating inspection measurement."""
+    pass
+
+
+class InspectionMeasurement(InspectionMeasurementBase):
+    """Model for inspection measurement record."""
+    id: str = Field(..., description="Measurement ID")
+    created_at: datetime
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "id": "123e4567-e89b-12d3-a456-426614174004",
+                "result_id": "123e4567-e89b-12d3-a456-426614174002",
+                "task_id": "123e4567-e89b-12d3-a456-426614174001",
+                "equipment_id": "generator-001",
+                "measurement_type": "vibration",
+                "measurement_point": "engine_block_top",
+                "measured_value": 3.5,
+                "unit": "mm/s",
+                "measurement_date": "2026-03-01T10:45:00Z",
+                "measured_by": "John Smith",
+                "baseline_value": 3.2,
+                "baseline_deviation_percent": 9.4,
+                "deviation_status": "normal"
+            }
+        }
+
+
+# ============================================================================
 # Request/Response Models
 # ============================================================================
 

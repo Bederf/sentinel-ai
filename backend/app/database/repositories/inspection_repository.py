@@ -10,7 +10,7 @@ Handles CRUD operations for:
 Phase 45: Routine Inspection & Maintenance
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
 import uuid
 
@@ -19,7 +19,8 @@ from app.models.inspection import (
     InspectionTask,
     InspectionResult,
     InspectionDeficiency,
-    InspectionMeasurement
+    InspectionMeasurement,
+    InspectionMeasurementCreate
 )
 from app.database.supabase_client import supabase
 
@@ -384,3 +385,40 @@ class InspectionRepository:
                 stats["unresolved"] += 1
 
         return stats
+
+    # ============================================================================
+    # Inspection Measurement Operations
+    # ============================================================================
+
+    async def create_inspection_measurement(self, measurement_data: Dict[str, Any]) -> InspectionMeasurement:
+        """Create a new inspection measurement record."""
+        measurement_data["id"] = str(uuid.uuid4())
+        measurement_data["created_at"] = datetime.now().isoformat()
+
+        result = supabase.table("inspection_measurements").insert(measurement_data).execute()
+        return InspectionMeasurement(**result.data[0])
+
+    async def get_measurements_by_result(self, result_id: str) -> List[InspectionMeasurement]:
+        """Get all measurements for an inspection result."""
+        result = supabase.table("inspection_measurements").select("*").eq("result_id", result_id).order("measurement_date").execute()
+        return [InspectionMeasurement(**row) for row in result.data]
+
+    async def get_measurements_by_equipment(self, equipment_id: str, measurement_type: Optional[str] = None, limit: int = 100) -> List[InspectionMeasurement]:
+        """Get measurements for equipment."""
+        query = supabase.table("inspection_measurements").select("*").eq("equipment_id", equipment_id)
+
+        if measurement_type:
+            query = query.eq("measurement_type", measurement_type)
+
+        result = query.order("measurement_date", desc=True).limit(limit).execute()
+        return [InspectionMeasurement(**row) for row in result.data]
+
+    async def get_measurements_with_deviations(self, equipment_id: Optional[str] = None, status: str = "warning") -> List[InspectionMeasurement]:
+        """Get measurements with baseline deviations."""
+        query = supabase.table("inspection_measurements").select("*").in_("deviation_status", [status, "critical"])
+
+        if equipment_id:
+            query = query.eq("equipment_id", equipment_id)
+
+        result = query.order("measurement_date", desc=True).execute()
+        return [InspectionMeasurement(**row) for row in result.data]

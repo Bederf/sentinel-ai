@@ -188,6 +188,16 @@ class BaselineRepository:
         result = get_supabase_client().table("equipment_elements").select("*").eq("equipment_id", equipment_id).order("element_id").execute()
         return [EquipmentElement(**row) for row in result.data]
 
+    async def get_element_by_id(
+        self,
+        element_id: str
+    ) -> Optional[EquipmentElement]:
+        """Get equipment element by its UUID."""
+        result = get_supabase_client().table("equipment_elements").select("*").eq("id", element_id).execute()
+        if result.data:
+            return EquipmentElement(**result.data[0])
+        return None
+
     # ============================================================================
     # Element Baseline Operations
     # ============================================================================
