@@ -188,7 +188,30 @@ async def chat(request: ChatRequest) -> StreamingResponse:
     user_message = request.message.strip()
     logger.info(f"Chat request: conversation_id={request.conversation_id}, search_docs={request.search_docs}, message={user_message[:50]}...")
 
-    # 1. Check for work order requests
+    # 1. Documentation search mode takes priority - this is Q&A, not device control
+    #    No work order detection or demo cache in docs mode
+    if request.search_docs:
+        if not claude_service.is_configured():
+            raise HTTPException(
+                status_code=503,
+                detail="Claude AI is not configured. Set ANTHROPIC_API_KEY in environment.",
+            )
+        logger.info("Documentation search mode enabled")
+        return StreamingResponse(
+            generate_docs_sse_stream(user_message),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+                "X-Response-Type": "ai_response",
+                "X-Search-Docs": "true",
+            },
+        )
+
+    # 2. System chat mode (search_docs=false) - work orders and device control
+
+    # Check for work order requests
     wo_detection = work_order_service.detect_work_order_request(user_message)
     if wo_detection and wo_detection.get("detected"):
         logger.info(f"Detected work order request: {wo_detection}")
@@ -214,7 +237,7 @@ async def chat(request: ChatRequest) -> StreamingResponse:
             },
         )
 
-    # 2. Check demo cache if DEMO_MODE is enabled
+    # Check demo cache if DEMO_MODE is enabled
     demo_mode = os.getenv("DEMO_MODE", "false").lower() == "true"
     if demo_mode:
         demo_cache = DemoCache()
@@ -223,9 +246,7 @@ async def chat(request: ChatRequest) -> StreamingResponse:
             logger.info(f"Using cached demo response for query")
             citations = demo_cache.get_citations(user_message)
 
-            # Stream cached response with SSE format
             async def stream_cached_response() -> AsyncGenerator[str, None]:
-                # Use format_sse_chunk to properly handle newlines in cached response
                 yield format_sse_chunk(cached_response)
                 yield "data: [DONE]\n\n"
 
@@ -241,26 +262,10 @@ async def chat(request: ChatRequest) -> StreamingResponse:
                 },
             )
 
-    # 3. Regular AI chat with building context and tool calling
     if not claude_service.is_configured():
         raise HTTPException(
             status_code=503,
             detail="Claude AI is not configured. Set ANTHROPIC_API_KEY in environment.",
-        )
-
-    # 4. Check if documentation search mode is enabled
-    if request.search_docs:
-        logger.info("Documentation search mode enabled")
-        return StreamingResponse(
-            generate_docs_sse_stream(user_message),
-            media_type="text/event-stream",
-            headers={
-                "Cache-Control": "no-cache",
-                "Connection": "keep-alive",
-                "X-Accel-Buffering": "no",
-                "X-Response-Type": "ai_response",
-                "X-Search-Docs": "true",
-            },
         )
 
     return StreamingResponse(
