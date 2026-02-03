@@ -36,7 +36,8 @@ from app.api import data_quality  # Phase 42-03 Data quality monitoring
 from app.api import survival  # Phase 43-03 Survival analysis (Cox PH)
 from app.api import classification  # Phase 43-04 Failure type classification (Random Forest)
 from app.api import rag  # Phase 44 RAG (Retrieval-Augmented Generation)
-# from app.api import baseline  # Phase 44 Asset Baseline Assessment - TODO: Fix import errors
+from app.api import workflow  # Phase 53 Workflow orchestration & triggers
+from app.api import baselines  # Phase 54-01 Equipment Baseline Assessment
 # from app.api import inspection  # Phase 45 Routine Inspection & Maintenance - TODO: Fix import errors
 from app.middleware.audit_middleware import AuditMiddleware
 from app.services.background_scheduler import scheduler_service
@@ -109,7 +110,8 @@ app.include_router(data_quality.router)  # Phase 42-03 Data quality monitoring
 app.include_router(survival.router)  # Phase 43-03 Survival analysis
 app.include_router(classification.router, prefix="/api/classification", tags=["classification"])  # Phase 43-04 Failure type classification
 app.include_router(rag.router, tags=["rag"])  # Phase 44 RAG with pgvector
-# app.include_router(baseline.router)  # Phase 44 Asset Baseline Assessment - TODO: Fix import errors
+app.include_router(workflow.router, tags=["workflow"])  # Phase 53 Workflow orchestration & triggers
+app.include_router(baselines.router, tags=["baselines"])  # Phase 54-01 Equipment Baseline Assessment
 # app.include_router(inspection.router)  # Phase 45 Routine Inspection & Maintenance - TODO: Fix import errors
 
 
@@ -133,7 +135,9 @@ async def startup_event():
     scheduler_service.add_prediction_generation_job(interval_seconds=300)  # 5 minutes
 
     # Start AI recommendation generation job (runs every 10 minutes)
-    # Scans all equipment and generates maintenance recommendations for at-risk equipment
+    # Scans ALL equipment and generates recommendations:
+    # - Healthy equipment (>=90%): Optimization & preventive maintenance
+    # - At-risk equipment (<90%): Maintenance & repair recommendations
     scheduler_service.add_recommendation_generation_job(interval_seconds=600)  # 10 minutes
 
     # BMS simulation service - DISABLED for demo stability
@@ -145,11 +149,12 @@ async def startup_event():
 
     # Start health simulation service (writes to Supabase, triggers Clawd alerts)
     # Runs every hour between 08:00-17:00
-    try:
-        await health_simulation_service.start()
-        print("Health simulation service started (hourly, 08:00-17:00)")
-    except Exception as e:
-        print(f"Failed to start health simulation service: {e}")
+    # DISABLED: Start manually via POST /api/simulation/health-sim/start
+    # try:
+    #     await health_simulation_service.start()
+    #     print("Health simulation service started (hourly, 08:00-17:00)")
+    # except Exception as e:
+    #     print(f"Failed to start health simulation service: {e}")
 
 
 @app.on_event("shutdown")
