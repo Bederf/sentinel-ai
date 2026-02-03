@@ -2614,6 +2614,338 @@ export const classificationApi = {
   },
 };
 
+// ============= Inspection API Interfaces (Phase 55) =============
+
+// Inspection schedule for mobile display
+export interface InspectionScheduleItem {
+  id: string;
+  equipment_id: string;
+  schedule_name: string;
+  frequency_type: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'annual' | 'custom';
+  frequency_interval: number | null;
+  inspection_type: string;
+  checklist_template_id: string | null;
+  priority: string;
+  duration_minutes: number;
+  next_due_date: string | null;  // ISO date string
+  is_active: boolean;
+}
+
+// Inspection task record
+export interface InspectionTaskItem {
+  id: string;
+  task_name: string;
+  equipment_id: string;
+  status: 'scheduled' | 'in_progress' | 'completed' | 'overdue' | 'cancelled';
+  priority: string;
+  due_date: string;
+  completed_date?: string;
+  estimated_duration_minutes: number;
+  actual_duration_minutes?: number;
+  checklist_data?: any;  // Template and responses
+  deficiencies_found?: number;
+  completion_notes?: string;
+  created_at: string;
+}
+
+// Checklist template structure
+export interface ChecklistTemplateItem {
+  template_id: string;
+  equipment_type: string;
+  template_name: string;
+  inspection_type: string;
+  estimated_duration_minutes: number;
+  checklist_items: ChecklistItemDef[];
+}
+
+// Checklist item definition
+export interface ChecklistItemDef {
+  category: string;
+  item_id: string;
+  question: string;
+  item_type: 'checklist' | 'measurement' | 'visual_inspection';
+  options?: Array<{ label: string; value: string }>;
+  parameter_name?: string;
+  unit?: string;
+  tolerance_min?: number;
+  tolerance_max?: number;
+  required: boolean;
+  photos_required: boolean;
+}
+
+// Photo attachment for inspection
+export interface InspectionPhotoAttachment {
+  file_url: string;
+  file_name: string;
+  description?: string;
+  element_id?: string;
+}
+
+// Inspection submission request
+export interface InspectionSubmissionRequest {
+  equipment_id: string;
+  template_id: string;
+  checklist_responses: Record<string, any>;
+  photos: InspectionPhotoAttachment[];
+  duration_minutes: number;
+  notes?: string;
+  submitted_by?: string;
+}
+
+// Inspection history response with trending
+export interface InspectionHistoryResponse {
+  equipment_id: string;
+  tasks: InspectionTaskItem[];
+  trending?: {
+    ok_count: number;
+    warning_count: number;
+    critical_count: number;
+  };
+}
+
+// Inspection API methods
+export const inspectionApi = {
+  /**
+   * Submit weekly inspection results
+   * @param submission - Inspection submission data
+   */
+  submitInspection: async (submission: InspectionSubmissionRequest): Promise<InspectionTaskItem> => {
+    const response = await fetch(`${API_BASE_URL}/api/inspection/submit-weekly`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(submission)
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Failed to submit inspection' }));
+      throw new Error(error.detail || 'Failed to submit inspection');
+    }
+    return response.json();
+  },
+
+  /**
+   * Get inspection schedule
+   * @param params - Optional filters
+   */
+  getSchedule: async (params?: { equipment_id?: string; daysAhead?: number }): Promise<InspectionScheduleItem[]> => {
+    const url = new URL(`${API_BASE_URL}/api/inspection/schedule`);
+    if (params?.equipment_id) url.searchParams.set('equipment_id', params.equipment_id);
+    if (params?.daysAhead) url.searchParams.set('days_ahead', params.daysAhead.toString());
+
+    const response = await fetch(url.toString());
+    if (!response.ok) throw new Error('Failed to get inspection schedule');
+    return response.json();
+  },
+
+  /**
+   * Get inspection history for equipment
+   * @param equipmentId - Equipment ID
+   * @param months - Months of history (default: 12)
+   */
+  getHistory: async (equipmentId: string, months: number = 12): Promise<InspectionTaskItem[]> => {
+    const response = await fetch(`${API_BASE_URL}/api/inspection/history/${equipmentId}?months=${months}`);
+    if (!response.ok) throw new Error('Failed to get inspection history');
+    return response.json();
+  },
+
+  /**
+   * Get checklist template for equipment type
+   * Loads embedded template data (can be extended to fetch from backend)
+   * @param equipmentType - Equipment type (chiller, ahu, etc.)
+   * @param inspectionType - Inspection type (default: routine)
+   */
+  getChecklistTemplate: async (equipmentType: string, inspectionType: string = 'routine'): Promise<ChecklistTemplateItem> => {
+    // Embedded templates for offline/fast access
+    // In production, could fetch from backend: /api/inspection/templates/{type}
+    const templates: Record<string, ChecklistTemplateItem> = {
+      'chiller_weekly': {
+        template_id: 'chiller_weekly',
+        equipment_type: 'chiller',
+        template_name: 'Weekly Chiller Inspection',
+        inspection_type: 'routine',
+        estimated_duration_minutes: 30,
+        checklist_items: [
+          {
+            category: 'Compressor',
+            item_id: 'compressor_condition',
+            question: 'Compressor operating condition',
+            item_type: 'checklist',
+            options: [
+              { label: 'Normal', value: 'ok' },
+              { label: 'Abnormal noise/vibration', value: 'warning' },
+              { label: 'Not operating', value: 'critical' }
+            ],
+            required: true,
+            photos_required: false
+          },
+          {
+            category: 'Refrigerant',
+            item_id: 'refrigerant_pressure',
+            question: 'Refrigerant pressure (bar)',
+            item_type: 'measurement',
+            parameter_name: 'refrigerant_pressure',
+            unit: 'bar',
+            tolerance_min: 8,
+            tolerance_max: 15,
+            required: true,
+            photos_required: false
+          },
+          {
+            category: 'Oil System',
+            item_id: 'oil_level',
+            question: 'Oil level condition',
+            item_type: 'checklist',
+            options: [
+              { label: 'Normal', value: 'ok' },
+              { label: 'Low', value: 'warning' },
+              { label: 'Critical', value: 'critical' }
+            ],
+            required: true,
+            photos_required: false
+          }
+        ]
+      },
+      'ahu_weekly': {
+        template_id: 'ahu_weekly',
+        equipment_type: 'ahu',
+        template_name: 'Weekly AHU Inspection',
+        inspection_type: 'routine',
+        estimated_duration_minutes: 25,
+        checklist_items: [
+          {
+            category: 'Filters',
+            item_id: 'filter_condition',
+            question: 'Filter condition',
+            item_type: 'checklist',
+            options: [
+              { label: 'Clean', value: 'ok' },
+              { label: 'Moderately dirty', value: 'warning' },
+              { label: 'Blocked/Replace required', value: 'critical' }
+            ],
+            required: true,
+            photos_required: true
+          },
+          {
+            category: 'Fan',
+            item_id: 'fan_vibration',
+            question: 'Fan vibration (mm/s)',
+            item_type: 'measurement',
+            parameter_name: 'fan_vibration',
+            unit: 'mm/s',
+            tolerance_min: 0,
+            tolerance_max: 4.5,
+            required: true,
+            photos_required: false
+          }
+        ]
+      },
+      'generator_weekly': {
+        template_id: 'generator_weekly',
+        equipment_type: 'generator',
+        template_name: 'Weekly Generator Inspection',
+        inspection_type: 'routine',
+        estimated_duration_minutes: 35,
+        checklist_items: [
+          {
+            category: 'Engine',
+            item_id: 'engine_oil_level',
+            question: 'Engine oil level',
+            item_type: 'checklist',
+            options: [
+              { label: 'Full', value: 'ok' },
+              { label: 'Low - top up required', value: 'warning' },
+              { label: 'Critical - do not start', value: 'critical' }
+            ],
+            required: true,
+            photos_required: false
+          },
+          {
+            category: 'Fuel',
+            item_id: 'fuel_level_percent',
+            question: 'Fuel tank level (%)',
+            item_type: 'measurement',
+            parameter_name: 'fuel_level_percent',
+            unit: '%',
+            tolerance_min: 25,
+            tolerance_max: 100,
+            required: true,
+            photos_required: false
+          }
+        ]
+      }
+    };
+
+    const key = `${equipmentType}_weekly`;
+    const template = templates[key];
+
+    if (!template) {
+      // Return a generic template if specific one not found
+      return {
+        template_id: `${equipmentType}_generic`,
+        equipment_type: equipmentType,
+        template_name: `${equipmentType.charAt(0).toUpperCase() + equipmentType.slice(1)} Inspection`,
+        inspection_type: inspectionType,
+        estimated_duration_minutes: 20,
+        checklist_items: [
+          {
+            category: 'General',
+            item_id: 'general_condition',
+            question: 'Overall equipment condition',
+            item_type: 'checklist',
+            options: [
+              { label: 'Good', value: 'ok' },
+              { label: 'Fair - monitor', value: 'warning' },
+              { label: 'Poor - attention needed', value: 'critical' }
+            ],
+            required: true,
+            photos_required: false
+          }
+        ]
+      };
+    }
+
+    return template;
+  },
+
+  /**
+   * Get inspection overview for equipment
+   * @param equipmentId - Equipment ID
+   */
+  getOverview: async (equipmentId: string): Promise<{
+    equipment_id: string;
+    active_schedules: number;
+    scheduled_tasks: number;
+    in_progress_tasks: number;
+    overdue_tasks: number;
+    completed_last_30_days: number;
+    open_deficiencies: number;
+    critical_deficiencies: number;
+  }> => {
+    const response = await fetch(`${API_BASE_URL}/api/inspection/summary/equipment/${equipmentId}`);
+    if (!response.ok) throw new Error('Failed to get inspection overview');
+    return response.json();
+  },
+
+  /**
+   * Get inspection statistics
+   * @param equipmentId - Optional equipment ID filter
+   */
+  getStatistics: async (equipmentId?: string): Promise<{
+    total_schedules: number;
+    active_schedules: number;
+    total_tasks_generated: number;
+    tasks_by_status: Record<string, number>;
+    overdue_tasks: number;
+    completed_last_30_days: number;
+  }> => {
+    const url = equipmentId
+      ? `${API_BASE_URL}/api/inspection/statistics?equipment_id=${equipmentId}`
+      : `${API_BASE_URL}/api/inspection/statistics`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('Failed to get inspection statistics');
+    return response.json();
+  }
+};
+
 /**
  * Create a work order for equipment
  */
