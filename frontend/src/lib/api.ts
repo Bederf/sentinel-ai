@@ -757,7 +757,7 @@ export async function streamChat(
   message: string,
   conversationId: string | undefined,
   onChunk: (chunk: string) => void,
-  searchDocs: boolean = false
+  searchDocs: boolean = true
 ): Promise<void> {
   const url = `${API_BASE_URL}/api/chat`;
 

@@ -24,7 +24,7 @@ class ChatRequest(BaseModel):
 
     message: str
     conversation_id: str | None = None
-    search_docs: bool = False  # When True, searches documentation RAG
+    search_docs: bool = True  # Default to documentation RAG mode
 
 
 class ChatMetadata(BaseModel):

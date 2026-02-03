@@ -26,7 +26,7 @@ export function Chat() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
-  const [searchDocs, setSearchDocs] = useState(false); // Toggle for documentation search mode
+  const [searchDocs, setSearchDocs] = useState(true); // Default to documentation search mode
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
