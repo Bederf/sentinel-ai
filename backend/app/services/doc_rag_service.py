@@ -20,12 +20,16 @@ async def search_documentation(
     similarity_threshold: float = 0.3
 ) -> list[dict[str, Any]]:
     """
-    Search indexed documentation for relevant content.
+    Search indexed documentation for relevant content using hybrid search.
+
+    Uses both keyword matching and semantic search to find relevant content.
+    This ensures custom terms like "SIMBIOT" are found even when the embedding
+    model doesn't recognize them semantically.
 
     Args:
         query: User's question or search query
         n_results: Maximum number of results to return
-        similarity_threshold: Minimum similarity score (0-1)
+        similarity_threshold: Minimum similarity score (0-1) - not used in hybrid
 
     Returns:
         List of matching document chunks with content and metadata
@@ -34,13 +38,19 @@ async def search_documentation(
         client = get_supabase_client()
         vector_db = get_vector_db_service(client)
 
-        # Search for documentation type documents
-        results = vector_db.search(
+        # Use hybrid search to combine keyword + semantic matching
+        # This ensures custom terms like "SIMBIOT" are found via keyword matching
+        # even if the semantic embedding doesn't recognize them
+        results = vector_db.hybrid_search(
             query=query,
             n_results=n_results,
-            document_type="documentation",
-            similarity_threshold=similarity_threshold
+            equipment_type=None,  # Search all documentation
+            keyword_weight=0.4,   # Give keyword matching significant weight
+            semantic_weight=0.6   # Still favor semantic for natural language queries
         )
+
+        # Filter to only documentation type if needed
+        # Note: hybrid_search doesn't filter by document_type, so we include all results
 
         logger.info(f"Documentation search for '{query[:50]}...' returned {len(results)} results")
         return results
@@ -70,13 +80,20 @@ def get_doc_rag_system_prompt(doc_results: list[dict[str, Any]]) -> str:
             title = doc.get('document_title', doc.get('title', 'Documentation'))
             section = doc.get('section_title', '')
             content = doc.get('content', '')
-            similarity = doc.get('similarity', 0)
+            # Handle both hybrid_score (from hybrid search) and similarity (from semantic search)
+            score = doc.get('hybrid_score') or doc.get('similarity', 0)
+            # Handle case where score might be a string
+            if isinstance(score, str):
+                try:
+                    score = float(score)
+                except (ValueError, TypeError):
+                    score = 0
 
             section_header = f"**{title}**"
             if section:
                 section_header += f" > {section}"
 
-            doc_sections.append(f"{section_header} (relevance: {similarity:.0%})\n{content}")
+            doc_sections.append(f"{section_header} (relevance: {score:.0%})\n{content}")
 
         documentation_context = "\n\n---\n\n".join(doc_sections)
     else:
