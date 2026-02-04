@@ -4367,5 +4367,326 @@
       "safety_status": "safe",
       "safety_note": "Operating normally"
     }
+  },
+  {
+    "id": "S002-FIRE-G-001",
+    "name": "Sandton Fire Alarm Panel",
+    "device_type": "fire_safety",
+    "protocol": "bacnet",
+    "site_id": "site-002",
+    "life_safety": true,
+    "points": {
+      "panel_status": {
+        "name": "panel_status",
+        "point_type": "multistate_value",
+        "description": "Fire alarm panel overall status",
+        "unit": "",
+        "default_value": 2,
+        "writable": false,
+        "metadata": {
+          "states": {"0": "normal", "1": "alarm", "2": "fault", "3": "disabled"}
+        }
+      },
+      "zone_alarm_active": {
+        "name": "zone_alarm_active",
+        "point_type": "binary_value",
+        "description": "Any zone alarm currently active",
+        "unit": "",
+        "default_value": false,
+        "writable": false
+      },
+      "battery_voltage": {
+        "name": "battery_voltage",
+        "point_type": "analog_input",
+        "description": "Panel backup battery voltage",
+        "unit": "V",
+        "min_value": 20.0,
+        "max_value": 30.0,
+        "default_value": 25.2,
+        "writable": false
+      },
+      "detector_fault_count": {
+        "name": "detector_fault_count",
+        "point_type": "analog_input",
+        "description": "Number of detectors in fault state",
+        "unit": "",
+        "min_value": 0,
+        "max_value": 200,
+        "default_value": 1,
+        "writable": false
+      },
+      "last_test_date": {
+        "name": "last_test_date",
+        "point_type": "analog_value",
+        "description": "Last system test date (encoded as YYYYMMDD)",
+        "unit": "",
+        "default_value": 20260120,
+        "writable": false
+      }
+    },
+    "device_location": {
+      "building": "Sandton City Office Tower",
+      "floor": "G",
+      "zone": "Fire Control Room",
+      "room": "FCR-001",
+      "description": "Ground Floor Fire Control Room",
+      "zone_type": "plant_room",
+      "exposure": "interior",
+      "zone_priority": 1
+    },
+    "equipment": {
+      "manufacturer": "Siemens",
+      "model": "Cerberus PRO FC726",
+      "serial_number": "STC-FIRE-726-001",
+      "installation_year": 2020,
+      "capacity_kw": 0.5
+    },
+    "metadata": {
+      "building": "Sandton City Office Tower",
+      "building_id": "site-002",
+      "floor": 0,
+      "zone": "Fire Control Room",
+      "location": "Ground Floor Fire Control Room",
+      "serves": "Entire building fire detection and alarm",
+      "critical": true,
+      "safety_device": true,
+      "safety_status": "warning",
+      "safety_note": "1 detector fault on Zone L1-C"
+    }
+  },
+  {
+    "id": "S002-DAMPER-L0-001",
+    "name": "L0 Supply Damper A",
+    "device_type": "fire_safety",
+    "protocol": "bacnet",
+    "site_id": "site-002",
+    "life_safety": true,
+    "points": {
+      "position": {
+        "name": "position",
+        "point_type": "analog_input",
+        "description": "Damper position percentage",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 100,
+        "writable": false
+      },
+      "status": {
+        "name": "status",
+        "point_type": "multistate_value",
+        "description": "Damper operational status",
+        "unit": "",
+        "default_value": 0,
+        "writable": false,
+        "metadata": {
+          "states": {"0": "open", "1": "closed", "2": "transit", "3": "fault"}
+        }
+      },
+      "command": {
+        "name": "command",
+        "point_type": "binary_value",
+        "description": "Damper open/close command (priority 1 fire system only)",
+        "unit": "",
+        "default_value": true,
+        "writable": true,
+        "priority": 1
+      }
+    },
+    "device_location": {
+      "building": "Sandton City Office Tower",
+      "floor": "L0",
+      "zone": "Zone-L0-B",
+      "room": "AHU-L0",
+      "description": "Level 0 AHU supply duct damper",
+      "zone_type": "plant_room",
+      "exposure": "interior",
+      "zone_priority": 1
+    },
+    "equipment": {
+      "manufacturer": "Belimo",
+      "model": "BF24-SR-T",
+      "serial_number": "STC-DMR-L0-001",
+      "installation_year": 2020,
+      "capacity_kw": 0.02
+    },
+    "metadata": {
+      "building": "Sandton City Office Tower",
+      "building_id": "site-002",
+      "floor": 10,
+      "zone": "Zone-L0-B",
+      "location": "Level 0 AHU supply duct",
+      "serves": "Zone-L0-B smoke containment",
+      "critical": true,
+      "safety_device": true,
+      "safety_status": "safe",
+      "safety_note": "Normal - fully open"
+    }
+  },
+  {
+    "id": "S002-DAMPER-L0-002",
+    "name": "L0 Return Damper B",
+    "device_type": "fire_safety",
+    "protocol": "bacnet",
+    "site_id": "site-002",
+    "life_safety": true,
+    "points": {
+      "position": {"name": "position", "point_type": "analog_input", "description": "Damper position percentage", "unit": "%", "min_value": 0, "max_value": 100, "default_value": 100, "writable": false},
+      "status": {"name": "status", "point_type": "multistate_value", "description": "Damper operational status", "unit": "", "default_value": 0, "writable": false, "metadata": {"states": {"0": "open", "1": "closed", "2": "transit", "3": "fault"}}},
+      "command": {"name": "command", "point_type": "binary_value", "description": "Damper open/close command", "unit": "", "default_value": true, "writable": true, "priority": 1}
+    },
+    "device_location": {"building": "Sandton City Office Tower", "floor": "L0", "zone": "Zone-L0-D", "room": "AHU-L0", "description": "Level 0 AHU return duct damper", "zone_type": "plant_room", "exposure": "interior", "zone_priority": 1},
+    "equipment": {"manufacturer": "Belimo", "model": "BF24-SR-T", "serial_number": "STC-DMR-L0-002", "installation_year": 2020, "capacity_kw": 0.02},
+    "metadata": {"building": "Sandton City Office Tower", "building_id": "site-002", "floor": 10, "zone": "Zone-L0-D", "location": "Level 0 AHU return duct", "serves": "Zone-L0-D smoke containment", "critical": true, "safety_device": true, "safety_status": "safe", "safety_note": "Normal - fully open"}
+  },
+  {
+    "id": "S002-DAMPER-L1-001",
+    "name": "L1 Supply Damper A",
+    "device_type": "fire_safety",
+    "protocol": "bacnet",
+    "site_id": "site-002",
+    "life_safety": true,
+    "points": {
+      "position": {"name": "position", "point_type": "analog_input", "description": "Damper position percentage", "unit": "%", "min_value": 0, "max_value": 100, "default_value": 35, "writable": false},
+      "status": {"name": "status", "point_type": "multistate_value", "description": "Damper operational status", "unit": "", "default_value": 3, "writable": false, "metadata": {"states": {"0": "open", "1": "closed", "2": "transit", "3": "fault"}}},
+      "command": {"name": "command", "point_type": "binary_value", "description": "Damper open/close command", "unit": "", "default_value": true, "writable": true, "priority": 1}
+    },
+    "device_location": {"building": "Sandton City Office Tower", "floor": "L1", "zone": "Zone-L1-A", "room": "AHU-L1", "description": "Level 1 AHU supply duct damper - STUCK AT 35%", "zone_type": "plant_room", "exposure": "interior", "zone_priority": 1},
+    "equipment": {"manufacturer": "Belimo", "model": "BF24-SR-T", "serial_number": "STC-DMR-L1-001", "installation_year": 2020, "capacity_kw": 0.02},
+    "metadata": {"building": "Sandton City Office Tower", "building_id": "site-002", "floor": 11, "zone": "Zone-L1-A", "location": "Level 1 AHU supply duct", "serves": "Zone-L1-A smoke containment", "critical": true, "safety_device": true, "safety_status": "alarm", "safety_note": "FAULT - Damper stuck at 35%, target 100%"}
+  },
+  {
+    "id": "S002-DAMPER-L1-002",
+    "name": "L1 Return Damper B",
+    "device_type": "fire_safety",
+    "protocol": "bacnet",
+    "site_id": "site-002",
+    "life_safety": true,
+    "points": {
+      "position": {"name": "position", "point_type": "analog_input", "description": "Damper position percentage", "unit": "%", "min_value": 0, "max_value": 100, "default_value": 100, "writable": false},
+      "status": {"name": "status", "point_type": "multistate_value", "description": "Damper operational status", "unit": "", "default_value": 0, "writable": false, "metadata": {"states": {"0": "open", "1": "closed", "2": "transit", "3": "fault"}}},
+      "command": {"name": "command", "point_type": "binary_value", "description": "Damper open/close command", "unit": "", "default_value": true, "writable": true, "priority": 1}
+    },
+    "device_location": {"building": "Sandton City Office Tower", "floor": "L1", "zone": "Zone-L1-C", "room": "AHU-L1", "description": "Level 1 AHU return duct damper", "zone_type": "plant_room", "exposure": "interior", "zone_priority": 1},
+    "equipment": {"manufacturer": "Belimo", "model": "BF24-SR-T", "serial_number": "STC-DMR-L1-002", "installation_year": 2020, "capacity_kw": 0.02},
+    "metadata": {"building": "Sandton City Office Tower", "building_id": "site-002", "floor": 11, "zone": "Zone-L1-C", "location": "Level 1 AHU return duct", "serves": "Zone-L1-C smoke containment", "critical": true, "safety_device": true, "safety_status": "safe", "safety_note": "Normal - fully open"}
+  },
+  {
+    "id": "S002-DAMPER-L2-001",
+    "name": "L2 Supply Damper A",
+    "device_type": "fire_safety",
+    "protocol": "bacnet",
+    "site_id": "site-002",
+    "life_safety": true,
+    "points": {
+      "position": {"name": "position", "point_type": "analog_input", "description": "Damper position percentage", "unit": "%", "min_value": 0, "max_value": 100, "default_value": 100, "writable": false},
+      "status": {"name": "status", "point_type": "multistate_value", "description": "Damper operational status", "unit": "", "default_value": 0, "writable": false, "metadata": {"states": {"0": "open", "1": "closed", "2": "transit", "3": "fault"}}},
+      "command": {"name": "command", "point_type": "binary_value", "description": "Damper open/close command", "unit": "", "default_value": true, "writable": true, "priority": 1}
+    },
+    "device_location": {"building": "Sandton City Office Tower", "floor": "L2", "zone": "Zone-L2-A", "room": "AHU-L2", "description": "Level 2 AHU supply duct damper", "zone_type": "plant_room", "exposure": "interior", "zone_priority": 1},
+    "equipment": {"manufacturer": "Belimo", "model": "BF24-SR-T", "serial_number": "STC-DMR-L2-001", "installation_year": 2020, "capacity_kw": 0.02},
+    "metadata": {"building": "Sandton City Office Tower", "building_id": "site-002", "floor": 12, "zone": "Zone-L2-A", "location": "Level 2 AHU supply duct", "serves": "Zone-L2-A smoke containment", "critical": true, "safety_device": true, "safety_status": "safe", "safety_note": "Normal - fully open"}
+  },
+  {
+    "id": "S002-DAMPER-L2-002",
+    "name": "L2 Return Damper B",
+    "device_type": "fire_safety",
+    "protocol": "bacnet",
+    "site_id": "site-002",
+    "life_safety": true,
+    "points": {
+      "position": {"name": "position", "point_type": "analog_input", "description": "Damper position percentage", "unit": "%", "min_value": 0, "max_value": 100, "default_value": 100, "writable": false},
+      "status": {"name": "status", "point_type": "multistate_value", "description": "Damper operational status", "unit": "", "default_value": 0, "writable": false, "metadata": {"states": {"0": "open", "1": "closed", "2": "transit", "3": "fault"}}},
+      "command": {"name": "command", "point_type": "binary_value", "description": "Damper open/close command", "unit": "", "default_value": true, "writable": true, "priority": 1}
+    },
+    "device_location": {"building": "Sandton City Office Tower", "floor": "L2", "zone": "Zone-L2-D", "room": "AHU-L2", "description": "Level 2 AHU return duct damper", "zone_type": "plant_room", "exposure": "interior", "zone_priority": 1},
+    "equipment": {"manufacturer": "Belimo", "model": "BF24-SR-T", "serial_number": "STC-DMR-L2-002", "installation_year": 2020, "capacity_kw": 0.02},
+    "metadata": {"building": "Sandton City Office Tower", "building_id": "site-002", "floor": 12, "zone": "Zone-L2-D", "location": "Level 2 AHU return duct", "serves": "Zone-L2-D smoke containment", "critical": true, "safety_device": true, "safety_status": "safe", "safety_note": "Normal - fully open"}
+  },
+  {
+    "id": "S002-PRESS-G-001",
+    "name": "Stairwell A Pressurization Fan",
+    "device_type": "fire_safety",
+    "protocol": "bacnet",
+    "site_id": "site-002",
+    "life_safety": true,
+    "points": {
+      "fan_status": {
+        "name": "fan_status",
+        "point_type": "multistate_value",
+        "description": "Pressurization fan operational status",
+        "unit": "",
+        "default_value": 0,
+        "writable": false,
+        "metadata": {
+          "states": {"0": "off", "1": "running", "2": "fault"}
+        }
+      },
+      "speed_pct": {
+        "name": "speed_pct",
+        "point_type": "analog_input",
+        "description": "Fan speed percentage",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 0,
+        "writable": false
+      },
+      "differential_pressure_pa": {
+        "name": "differential_pressure_pa",
+        "point_type": "analog_input",
+        "description": "Stairwell differential pressure",
+        "unit": "Pa",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 0,
+        "writable": false
+      }
+    },
+    "device_location": {
+      "building": "Sandton City Office Tower",
+      "floor": "G",
+      "zone": "Stairwell-A",
+      "room": "SW-A-FAN",
+      "description": "Ground Floor Stairwell A pressurization fan room",
+      "zone_type": "stairwell",
+      "exposure": "interior",
+      "zone_priority": 1
+    },
+    "equipment": {
+      "manufacturer": "Fläkt Group",
+      "model": "STPF-1000",
+      "serial_number": "STC-PRESS-001",
+      "installation_year": 2020,
+      "capacity_kw": 7.5
+    },
+    "metadata": {
+      "building": "Sandton City Office Tower",
+      "building_id": "site-002",
+      "floor": 0,
+      "zone": "Stairwell-A",
+      "location": "Ground Floor Stairwell A fan room",
+      "serves": "Stairwell A pressurization (all floors)",
+      "critical": true,
+      "safety_device": true,
+      "safety_status": "safe",
+      "safety_note": "Standby - activates on fire alarm"
+    }
+  },
+  {
+    "id": "S002-PRESS-G-002",
+    "name": "Stairwell B Pressurization Fan",
+    "device_type": "fire_safety",
+    "protocol": "bacnet",
+    "site_id": "site-002",
+    "life_safety": true,
+    "points": {
+      "fan_status": {"name": "fan_status", "point_type": "multistate_value", "description": "Pressurization fan operational status", "unit": "", "default_value": 0, "writable": false, "metadata": {"states": {"0": "off", "1": "running", "2": "fault"}}},
+      "speed_pct": {"name": "speed_pct", "point_type": "analog_input", "description": "Fan speed percentage", "unit": "%", "min_value": 0, "max_value": 100, "default_value": 0, "writable": false},
+      "differential_pressure_pa": {"name": "differential_pressure_pa", "point_type": "analog_input", "description": "Stairwell differential pressure", "unit": "Pa", "min_value": 0, "max_value": 100, "default_value": 0, "writable": false}
+    },
+    "device_location": {"building": "Sandton City Office Tower", "floor": "G", "zone": "Stairwell-B", "room": "SW-B-FAN", "description": "Ground Floor Stairwell B pressurization fan room", "zone_type": "stairwell", "exposure": "interior", "zone_priority": 1},
+    "equipment": {"manufacturer": "Fläkt Group", "model": "STPF-1000", "serial_number": "STC-PRESS-002", "installation_year": 2020, "capacity_kw": 7.5},
+    "metadata": {"building": "Sandton City Office Tower", "building_id": "site-002", "floor": 0, "zone": "Stairwell-B", "location": "Ground Floor Stairwell B fan room", "serves": "Stairwell B pressurization (all floors)", "critical": true, "safety_device": true, "safety_status": "safe", "safety_note": "Standby - activates on fire alarm"}
   }
 ]
