@@ -38,6 +38,7 @@ from app.api import classification  # Phase 43-04 Failure type classification (R
 from app.api import rag  # Phase 44 RAG (Retrieval-Augmented Generation)
 from app.api import workflow  # Phase 53 Workflow orchestration & triggers
 from app.api import baselines  # Phase 54-01 Equipment Baseline Assessment
+from app.api import condition  # Phase 56-01 Condition trending & degradation analysis
 # from app.api import inspection  # Phase 45 Routine Inspection & Maintenance - TODO: Fix import errors
 from app.middleware.audit_middleware import AuditMiddleware
 from app.services.background_scheduler import scheduler_service
@@ -112,6 +113,7 @@ app.include_router(classification.router, prefix="/api/classification", tags=["c
 app.include_router(rag.router, tags=["rag"])  # Phase 44 RAG with pgvector
 app.include_router(workflow.router, tags=["workflow"])  # Phase 53 Workflow orchestration & triggers
 app.include_router(baselines.router, tags=["baselines"])  # Phase 54-01 Equipment Baseline Assessment
+app.include_router(condition.router, tags=["condition"])  # Phase 56-01 Condition trending & degradation
 # app.include_router(inspection.router)  # Phase 45 Routine Inspection & Maintenance - TODO: Fix import errors
 
 
