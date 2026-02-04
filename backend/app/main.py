@@ -50,6 +50,7 @@ from app.api import niagara_discovery  # Phase 60-03 Niagara point discovery
 from app.api import fire  # Phase 61-01 Fire & Life Safety
 # from app.api import inspection  # Phase 45 Routine Inspection & Maintenance - TODO: Fix import errors
 from app.middleware.audit_middleware import AuditMiddleware
+from app.middleware.security_logging import SecurityLoggingMiddleware
 from app.services.background_scheduler import scheduler_service
 from app.api.simulation import simulation_service  # BMS simulation service
 from app.services.health_simulation_service import health_simulation_service  # Supabase health simulation
@@ -70,7 +71,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Add audit middleware
+# Add security logging middleware (Phase 63 - FSR compliance)
+# SecurityLoggingMiddleware runs first (outermost), captures all security events
+app.add_middleware(SecurityLoggingMiddleware)
+
+# Add audit middleware (existing - captures device control actions)
 app.add_middleware(AuditMiddleware)
 
 # Include routers

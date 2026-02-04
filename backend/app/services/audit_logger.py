@@ -3,6 +3,10 @@
 Thread-safe audit logging service for recording all control actions,
 safety validations, and system events. Uses JSON file storage for demo
 with in-memory buffer and periodic flush.
+
+Enhanced (Phase 63): Adds structured JSON logging output alongside
+file-based logging. Structured logs are collected by Promtail and
+shipped to Loki for centralised aggregation and SIEM alerting.
 """
 
 import json
@@ -10,11 +14,15 @@ import logging
 import threading
 from pathlib import Path
 from typing import List, Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.models.audit_log import AuditLogEntry, AuditActionType, AuditResultType
 
 logger = logging.getLogger(__name__)
+
+# Structured audit logger for Loki/SIEM ingestion
+# Outputs JSON-structured audit events to Python logging (collected by Promtail)
+audit_structured_logger = logging.getLogger("sentinel.audit")
 
 
 class AuditLogger:
@@ -221,6 +229,103 @@ class AuditLogger:
         )
 
         return self._add_entry(entry)
+
+    def log_security_event(
+        self,
+        event_type: str,
+        severity: str = "info",
+        user: str = "system",
+        source_ip: Optional[str] = None,
+        user_agent: Optional[str] = None,
+        result: AuditResultType = AuditResultType.SUCCESS,
+        error_message: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None
+    ) -> str:
+        """Log a security-relevant event with structured output.
+
+        BMS-specific security event types:
+        - DEVICE_CONTROL: Device setpoint or state change
+        - SAFETY_OVERRIDE: Safety rule override attempt
+        - BMS_COMMAND: BMS command execution
+        - SETPOINT_CHANGE: Critical setpoint modification
+        - ACCESS_DENIED: Authorization failure
+        - AUTH_FAILURE: Authentication failure
+        - SUSPICIOUS_REQUEST: Suspicious request pattern detected
+        - CONFIG_CHANGE: System configuration change
+
+        Args:
+            event_type: Security event classification
+            severity: Event severity (critical, high, medium, low, info)
+            user: User ID or "system"
+            source_ip: Client IP address
+            user_agent: Client user agent string
+            result: Event result
+            error_message: Error details if applicable
+            metadata: Additional event context
+        """
+        entry = AuditLogEntry(
+            action=AuditActionType.SYSTEM_EVENT,
+            user=user,
+            result=result,
+            error_message=error_message,
+            metadata={
+                "event_type": event_type,
+                "severity": severity,
+                "source_ip": source_ip,
+                "user_agent": user_agent,
+                **(metadata or {})
+            }
+        )
+
+        entry_id = self._add_entry(entry)
+
+        # Also emit to structured logger for Loki/SIEM
+        self._emit_structured_log(entry, event_type, severity, source_ip, user_agent)
+
+        return entry_id
+
+    def _emit_structured_log(
+        self,
+        entry: AuditLogEntry,
+        event_type: str,
+        severity: str,
+        source_ip: Optional[str] = None,
+        user_agent: Optional[str] = None
+    ) -> None:
+        """Emit structured JSON log for Promtail/Loki ingestion.
+
+        This produces a JSON log line that Promtail can parse and
+        label for efficient querying in Grafana/Loki.
+        """
+        try:
+            structured_event = {
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "audit_id": entry.id,
+                "event_type": event_type,
+                "severity": severity,
+                "action": entry.action.value,
+                "user": entry.user,
+                "device_id": entry.device_id,
+                "point_name": entry.point_name,
+                "result": entry.result.value,
+                "source_ip": source_ip,
+                "user_agent": user_agent[:200] if user_agent else None,
+                "correlation_id": entry.correlation_id,
+                "component": "sentinel-audit",
+                "error_message": entry.error_message,
+                "metadata": entry.metadata
+            }
+
+            log_message = json.dumps(structured_event, default=str)
+
+            if severity in ("critical", "high"):
+                audit_structured_logger.warning(log_message)
+            elif severity == "medium":
+                audit_structured_logger.info(log_message)
+            else:
+                audit_structured_logger.debug(log_message)
+        except Exception as e:
+            logger.error(f"Failed to emit structured audit log: {e}")
 
     def _add_entry(self, entry: AuditLogEntry) -> str:
         """Add entry to buffer and flush if needed."""

@@ -1,0 +1,280 @@
+# Grafana Alert Rules for SENTINEL BMS Intelligence
+# SIEM-equivalent security alerting via Loki LogQL queries
+# Phase 63 - FSR Domain 4.13 (Information Security Incident Detection)
+#
+# Alert destinations: Grafana log (can be extended to email/webhook/Telegram)
+# All rules use Loki datasource for log-based alerting
+
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: SENTINEL Security Alerts
+    folder: Security
+    interval: 1m
+    rules:
+      # ================================================================
+      # Rule 1: Failed Login Attempts (Brute Force Detection)
+      # Trigger: >5 auth failures from same IP within 5 minutes
+      # ================================================================
+      - uid: sentinel-failed-logins
+        title: "Failed Login Attempts - Possible Brute Force"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: loki
+            model:
+              expr: |
+                sum by (source_ip) (
+                  count_over_time(
+                    {job="sentinel-docker"} |= "AUTH_FAILURE" [5m]
+                  )
+                )
+              queryType: range
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    params: [5]
+                    type: gt
+        noDataState: OK
+        execErrState: Alerting
+        for: 0s
+        annotations:
+          summary: "Multiple failed login attempts detected from {{ $labels.source_ip }}"
+          description: "More than 5 failed authentication attempts from the same IP address within 5 minutes. Possible brute force attack."
+          severity: "high"
+          fsr_domain: "4.13"
+        labels:
+          alert_type: "brute_force"
+          severity: "high"
+
+      # ================================================================
+      # Rule 2: Suspicious Path Patterns (SQLi / Path Traversal)
+      # Trigger: Any request matching injection or traversal patterns
+      # ================================================================
+      - uid: sentinel-suspicious-paths
+        title: "Suspicious Path Pattern Detected"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: loki
+            model:
+              expr: |
+                count_over_time(
+                  {job="sentinel-docker"} |= "SUSPICIOUS_PATH" [5m]
+                )
+              queryType: range
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    params: [1]
+                    type: gt
+        noDataState: OK
+        execErrState: Alerting
+        for: 0s
+        annotations:
+          summary: "Suspicious path pattern detected in HTTP request"
+          description: "SQL injection, path traversal, or other malicious path pattern detected in incoming request. Review source IP and block if necessary."
+          severity: "high"
+          fsr_domain: "4.13"
+        labels:
+          alert_type: "injection_attempt"
+          severity: "high"
+
+      # ================================================================
+      # Rule 3: Unusual API Activity (DDoS / Abuse Detection)
+      # Trigger: >100 requests from single IP within 1 minute
+      # ================================================================
+      - uid: sentinel-api-abuse
+        title: "Unusual API Activity - Rate Limit"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 60
+              to: 0
+            datasourceUid: loki
+            model:
+              expr: |
+                sum by (source_ip) (
+                  count_over_time(
+                    {job="sentinel-docker", container_name="bms-backend"} [1m]
+                  )
+                )
+              queryType: range
+          - refId: C
+            relativeTimeRange:
+              from: 60
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    params: [100]
+                    type: gt
+        noDataState: OK
+        execErrState: OK
+        for: 0s
+        annotations:
+          summary: "Unusual API activity from {{ $labels.source_ip }}"
+          description: "More than 100 requests from a single IP within 1 minute. Possible DDoS, credential stuffing, or API abuse."
+          severity: "medium"
+          fsr_domain: "4.13"
+        labels:
+          alert_type: "api_abuse"
+          severity: "medium"
+
+      # ================================================================
+      # Rule 4: After-Hours Admin Access
+      # Trigger: Sensitive endpoint access outside 06:00-22:00 SAST
+      # ================================================================
+      - uid: sentinel-afterhours-access
+        title: "After-Hours Sensitive Endpoint Access"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: loki
+            model:
+              expr: |
+                count_over_time(
+                  {job="sentinel-docker"} |= "SENSITIVE_ENDPOINT_ACCESS"
+                    | json
+                    | __error__=""
+                    | timestamp != ""
+                  [5m]
+                )
+              queryType: range
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    params: [1]
+                    type: gt
+        noDataState: OK
+        execErrState: OK
+        for: 0s
+        annotations:
+          summary: "Sensitive endpoint accessed outside business hours"
+          description: "Access to BMS control, safety, or configuration endpoints detected outside normal business hours (06:00-22:00 SAST). Review for unauthorized access."
+          severity: "medium"
+          fsr_domain: "4.13"
+        labels:
+          alert_type: "afterhours_access"
+          severity: "medium"
+
+      # ================================================================
+      # Rule 5: Error Spike (Application Health)
+      # Trigger: >10 5xx responses within 5 minutes
+      # ================================================================
+      - uid: sentinel-error-spike
+        title: "Server Error Spike"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: loki
+            model:
+              expr: |
+                count_over_time(
+                  {job="sentinel-docker"} |= "SERVER_ERROR" [5m]
+                )
+              queryType: range
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    params: [10]
+                    type: gt
+        noDataState: OK
+        execErrState: Alerting
+        for: 0s
+        annotations:
+          summary: "High rate of server errors detected"
+          description: "More than 10 HTTP 5xx errors within 5 minutes. Application may be under attack or experiencing critical failures."
+          severity: "high"
+          fsr_domain: "4.13"
+        labels:
+          alert_type: "error_spike"
+          severity: "high"
+
+      # ================================================================
+      # Rule 6: Audit Log Gap (Tamper Detection)
+      # Trigger: No audit entries for >30 minutes during business hours
+      # ================================================================
+      - uid: sentinel-audit-gap
+        title: "Audit Log Gap Detected"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 1800
+              to: 0
+            datasourceUid: loki
+            model:
+              expr: |
+                count_over_time(
+                  {job="sentinel-docker", container_name="bms-backend"} |= "audit" [30m]
+                )
+              queryType: range
+          - refId: C
+            relativeTimeRange:
+              from: 1800
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    params: [1]
+                    type: lt
+        noDataState: Alerting
+        execErrState: Alerting
+        for: 5m
+        annotations:
+          summary: "No audit log entries for more than 30 minutes"
+          description: "The SENTINEL audit system has not produced any log entries for over 30 minutes during active hours. This may indicate logging service failure, log tampering, or system outage."
+          severity: "critical"
+          fsr_domain: "4.13"
+        labels:
+          alert_type: "audit_gap"
+          severity: "critical"
