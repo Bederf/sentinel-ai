@@ -1381,6 +1381,278 @@ async def diagnose_comfort_complaint(
         }
 
 
+# ---------------------------------------------------------------------------
+# Niagara point discovery chat tools (Phase 60-03)
+# ---------------------------------------------------------------------------
+
+async def discover_niagara_points(
+    device_ip: str,
+    site_id: str = "site-002",
+) -> dict[str, Any]:
+    """
+    Trigger Niagara BACnet point discovery and AI classification.
+
+    Scans a BACnet device for all points, classifies them using
+    Haystack/Brick ontology, and groups into equipment entities.
+
+    Args:
+        device_ip: IP address of the BACnet device (JACE/Supervisor)
+        site_id: SENTINEL site ID for mapping
+
+    Returns:
+        Discovery summary with equipment counts and confidence breakdown
+    """
+    try:
+        from app.services.niagara.point_discovery import get_point_discovery_service
+        from app.services.niagara.point_classifier import get_point_classifier
+        from app.services.niagara.mapping_service import get_mapping_service
+
+        discovery_service = get_point_discovery_service()
+        mapping_service = get_mapping_service()
+        classifier = get_point_classifier()
+
+        # Run discovery
+        result = await discovery_service.discover_and_classify(
+            device_ip=device_ip,
+            site_id=site_id,
+            use_demo=True,
+        )
+
+        if result.status == "error":
+            return {
+                "success": False,
+                "error": f"Discovery failed: {result.error}",
+            }
+
+        # Auto-generate mappings
+        classified_points = classifier.classify_points(result.raw_points)
+        mappings = mapping_service.map_points_to_equipment(
+            classified_points, site_id
+        )
+        mapping_service.save_mappings(result.discovery_id, mappings, site_id)
+
+        # Build summary
+        summary = result.summary
+        equipment_ids = summary.get("equipment_ids", {})
+        equipment_list = []
+        for eq_type, ids in equipment_ids.items():
+            equipment_list.append(f"{len(ids)} {eq_type}(s): {', '.join(ids)}")
+
+        confidence = summary.get("confidence_counts", {})
+
+        return {
+            "success": True,
+            "discovery_id": result.discovery_id,
+            "device_ip": device_ip,
+            "site_id": site_id,
+            "points_discovered": summary.get("total_points", 0),
+            "equipment_identified": equipment_list,
+            "confidence_breakdown": {
+                "high": confidence.get("high", 0),
+                "medium": confidence.get("medium", 0),
+                "low": confidence.get("low", 0),
+                "unknown": confidence.get("unknown", 0),
+            },
+            "needs_review": summary.get("needs_review", 0),
+            "message": (
+                f"Discovered {summary.get('total_points', 0)} points on {device_ip}. "
+                f"Grouped into {len(equipment_ids)} equipment types. "
+                f"{summary.get('needs_review', 0)} points need manual review."
+            ),
+        }
+
+    except Exception as e:
+        logger.error(f"Error in discover_niagara_points: {e}")
+        return {"success": False, "error": str(e)}
+
+
+async def review_point_mapping(
+    discovery_id: str,
+) -> dict[str, Any]:
+    """
+    Get mapping summary for FM team review.
+
+    Returns equipment list with classified points, confidence scores,
+    and items needing review.
+
+    Args:
+        discovery_id: Discovery identifier from discover_niagara_points
+
+    Returns:
+        Mapping summary with equipment, confidence, and review checklist
+    """
+    try:
+        from app.services.niagara.mapping_service import get_mapping_service
+
+        mapping_service = get_mapping_service()
+        mappings = mapping_service.get_mappings(discovery_id)
+
+        if mappings is None:
+            return {
+                "success": False,
+                "error": f"Discovery '{discovery_id}' not found. Run discover_niagara_points first.",
+            }
+
+        # Build review summary
+        equipment_summary = []
+        total_points = 0
+        low_confidence_items = []
+
+        for eid, mapping in mappings.items():
+            if eid == "UNASSIGNED":
+                for p in mapping.points:
+                    low_confidence_items.append(
+                        f"  - {p.get('original_name', 'unknown')}: unclassified"
+                    )
+                continue
+
+            point_count = len(mapping.points)
+            total_points += point_count
+            equipment_summary.append(
+                f"  {eid} ({mapping.equipment_type}): {point_count} points [{mapping.confidence} confidence]"
+            )
+
+            # Flag low confidence points
+            for p in mapping.points:
+                if p.get("confidence") in ("low", "unknown"):
+                    low_confidence_items.append(
+                        f"  - {p.get('original_name', 'unknown')} in {eid}: {p.get('confidence', 'unknown')} confidence"
+                    )
+
+        # Run validation
+        validation = mapping_service.validate_mappings(mappings)
+
+        return {
+            "success": True,
+            "discovery_id": discovery_id,
+            "equipment_count": len([e for e in mappings if e != "UNASSIGNED"]),
+            "total_points": total_points,
+            "equipment_summary": equipment_summary,
+            "needs_review": low_confidence_items,
+            "validation_warnings": validation.warnings[:10],
+            "orphan_count": len(validation.orphan_points),
+            "message": (
+                f"Mapping for discovery {discovery_id}: "
+                f"{len(equipment_summary)} equipment entities, {total_points} points. "
+                f"{len(low_confidence_items)} items need review."
+            ),
+        }
+
+    except Exception as e:
+        logger.error(f"Error in review_point_mapping: {e}")
+        return {"success": False, "error": str(e)}
+
+
+async def approve_point_mapping(
+    discovery_id: str,
+    approved_by: str = "chat_user",
+) -> dict[str, Any]:
+    """
+    Approve and activate a point mapping.
+
+    Creates equipment models from approved mappings and integrates
+    them into SENTINEL for monitoring and control.
+
+    Args:
+        discovery_id: Discovery identifier to approve
+        approved_by: Name of the approver
+
+    Returns:
+        Approval result with equipment created count
+    """
+    try:
+        from app.services.niagara.mapping_service import get_mapping_service
+
+        mapping_service = get_mapping_service()
+        mappings = mapping_service.get_mappings(discovery_id)
+
+        if mappings is None:
+            return {
+                "success": False,
+                "error": f"Discovery '{discovery_id}' not found.",
+            }
+
+        result = mapping_service.approve_mappings(discovery_id, approved_by)
+
+        if result.get("success"):
+            return {
+                "success": True,
+                "discovery_id": discovery_id,
+                "equipment_created": result.get("equipment_created", 0),
+                "approved_by": approved_by,
+                "message": (
+                    f"Approved! Created {result['equipment_created']} equipment models. "
+                    f"Equipment is now active in SENTINEL for monitoring and control."
+                ),
+            }
+        else:
+            return {
+                "success": False,
+                "error": result.get("error", "Approval failed"),
+            }
+
+    except Exception as e:
+        logger.error(f"Error in approve_point_mapping: {e}")
+        return {"success": False, "error": str(e)}
+
+
+async def correct_point_classification(
+    discovery_id: str,
+    point_name: str,
+    correct_equipment_id: str | None = None,
+    correct_point_type: str | None = None,
+    correct_equipment_type: str | None = None,
+) -> dict[str, Any]:
+    """
+    Manually correct a point classification.
+
+    Use this when the AI classification is wrong. You can reassign
+    a point to a different equipment, change its type, or update
+    the equipment type.
+
+    Args:
+        discovery_id: Discovery identifier containing the point
+        point_name: Original BACnet point name to correct
+        correct_equipment_id: New equipment to assign point to
+        correct_point_type: Corrected point type (sensor/setpoint/command/status/alarm)
+        correct_equipment_type: Corrected equipment type (chiller/ahu/fcu/etc.)
+
+    Returns:
+        Correction result with changes applied
+    """
+    try:
+        from app.services.niagara.mapping_service import get_mapping_service
+
+        mapping_service = get_mapping_service()
+        result = mapping_service.correct_point(
+            discovery_id=discovery_id,
+            point_name=point_name,
+            new_equipment_id=correct_equipment_id,
+            new_point_type=correct_point_type,
+            new_equipment_type=correct_equipment_type,
+        )
+
+        if result.get("success"):
+            return {
+                "success": True,
+                "point_name": point_name,
+                "corrections": result.get("corrections", []),
+                "message": (
+                    f"Point '{point_name}' corrected: {', '.join(result.get('corrections', []))}. "
+                    f"Confidence set to 'manual' (verified by human)."
+                ),
+            }
+        else:
+            return {
+                "success": False,
+                "error": result.get("error", "Correction failed"),
+            }
+
+    except Exception as e:
+        logger.error(f"Error in correct_point_classification: {e}")
+        return {"success": False, "error": str(e)}
+
+
 # Password for accessing proprietary system methodology
 # Uses the same PIN as frontend splash screen for consistency
 METHODOLOGY_PASSWORD = "27921"
@@ -1712,6 +1984,89 @@ CHAT_TOOLS = [
             },
             "required": ["desk_id", "complaint_type"]
         }
+    },
+    {
+        "name": "discover_niagara_points",
+        "description": "Scan a Niagara BACnet device to discover all BMS points. Uses AI classification with Haystack/Brick ontology to identify equipment types (chiller, AHU, FCU, VAV, pump, etc.) and point types (sensor, setpoint, command, status). Returns a discovery_id for reviewing and approving the mapping. Use this when an FM team needs to onboard a new building or BMS controller.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "device_ip": {
+                    "type": "string",
+                    "description": "IP address of the BACnet device to scan (e.g., '192.168.1.100')"
+                },
+                "site_id": {
+                    "type": "string",
+                    "description": "SENTINEL site ID (e.g., 'site-002')",
+                    "default": "site-002"
+                }
+            },
+            "required": ["device_ip"]
+        }
+    },
+    {
+        "name": "review_point_mapping",
+        "description": "Get a summary of discovered Niagara points and their AI classification for review. Shows equipment groupings, confidence levels, and items needing manual review. Use this after discover_niagara_points to let the FM team verify the auto-classification before approving.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "discovery_id": {
+                    "type": "string",
+                    "description": "Discovery ID returned from discover_niagara_points"
+                }
+            },
+            "required": ["discovery_id"]
+        }
+    },
+    {
+        "name": "approve_point_mapping",
+        "description": "Approve a Niagara point mapping after review. This activates the auto-generated equipment models in SENTINEL for monitoring and control. Only use after reviewing the mapping with review_point_mapping.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "discovery_id": {
+                    "type": "string",
+                    "description": "Discovery ID to approve"
+                },
+                "approved_by": {
+                    "type": "string",
+                    "description": "Name of the person approving (defaults to 'chat_user')",
+                    "default": "chat_user"
+                }
+            },
+            "required": ["discovery_id"]
+        }
+    },
+    {
+        "name": "correct_point_classification",
+        "description": "Manually correct a point that was misclassified by the AI. Use this when reviewing a mapping and finding incorrect equipment assignment or point type. You can move a point to a different equipment, change its type, or fix the equipment type.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "discovery_id": {
+                    "type": "string",
+                    "description": "Discovery ID containing the point"
+                },
+                "point_name": {
+                    "type": "string",
+                    "description": "Original BACnet point name to correct (e.g., 'CH-1_CHW_Supply_Temp')"
+                },
+                "correct_equipment_id": {
+                    "type": "string",
+                    "description": "New equipment ID to assign the point to (optional)"
+                },
+                "correct_point_type": {
+                    "type": "string",
+                    "description": "Corrected point type",
+                    "enum": ["sensor", "setpoint", "command", "status", "alarm"]
+                },
+                "correct_equipment_type": {
+                    "type": "string",
+                    "description": "Corrected equipment type (chiller, ahu, fcu, vav, pump, boiler, etc.)"
+                }
+            },
+            "required": ["discovery_id", "point_name"]
+        }
     }
 ]
 
@@ -1729,6 +2084,10 @@ TOOL_HANDLERS = {
     "get_system_methodology": get_system_methodology,
     "lookup_desk": lookup_desk,
     "diagnose_comfort_complaint": diagnose_comfort_complaint,
+    "discover_niagara_points": discover_niagara_points,
+    "review_point_mapping": review_point_mapping,
+    "approve_point_mapping": approve_point_mapping,
+    "correct_point_classification": correct_point_classification,
 }
 
 

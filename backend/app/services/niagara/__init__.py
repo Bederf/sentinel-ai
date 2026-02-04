@@ -1,5 +1,6 @@
-"""Niagara BACnet/IP integration services.
+"""Niagara integration services.
 
 Provides BACnet/IP client for Tridium Niagara JACE/Supervisor communication,
-device discovery, point read/write operations, and COV subscriptions.
+oBIX REST API for historical data, AI-assisted point discovery and
+classification, and point-to-equipment mapping for rapid commissioning.
 """

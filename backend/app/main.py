@@ -46,6 +46,7 @@ from app.api import remote_commands  # Phase 59-02 Remote command execution
 from app.api import dispatch  # Phase 59-03 Smart dispatch & task bundling
 from app.api import niagara  # Phase 60-02 Niagara oBIX integration
 from app.api import niagara_bacnet  # Phase 60-01 Niagara BACnet/IP integration
+from app.api import niagara_discovery  # Phase 60-03 Niagara point discovery
 # from app.api import inspection  # Phase 45 Routine Inspection & Maintenance - TODO: Fix import errors
 from app.middleware.audit_middleware import AuditMiddleware
 from app.services.background_scheduler import scheduler_service
@@ -129,6 +130,7 @@ app.include_router(remote_commands.router, prefix="/api/remote", tags=["remote-o
 app.include_router(dispatch.router, prefix="/api/dispatch", tags=["dispatch"])  # Phase 59-03 Smart dispatch
 app.include_router(niagara.router, tags=["niagara-obix"])  # Phase 60-02 Niagara oBIX integration
 app.include_router(niagara_bacnet.router, tags=["niagara-bacnet"])  # Phase 60-01 Niagara BACnet/IP integration
+app.include_router(niagara_discovery.router, tags=["niagara-discovery"])  # Phase 60-03 Niagara point discovery
 # app.include_router(inspection.router)  # Phase 45 Routine Inspection & Maintenance - TODO: Fix import errors
 
 
