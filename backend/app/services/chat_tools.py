@@ -1771,6 +1771,74 @@ async def get_system_methodology(password: str, topic: str | None = None) -> dic
     }
 
 
+async def get_fire_system_status() -> dict[str, Any]:
+    """
+    Get fire and life safety system status including active alarms,
+    damper positions, pressurization, and system health.
+
+    Returns:
+        Structured fire system status report
+    """
+    try:
+        from app.services.fire_system_service import get_fire_system_service
+        svc = get_fire_system_service()
+
+        status = svc.get_system_status()
+        health = svc.get_system_health()
+        zones = svc.get_zones()
+        dampers = svc.get_damper_status()
+        press = svc.get_pressurization_status()
+
+        # Build structured response
+        sections = []
+
+        # Panel status
+        sections.append(f"## Fire Alarm Panel\n- Status: {status.panel_status.value.upper()}\n- Battery: {status.battery_voltage}V\n- Last Test: {status.last_test_date or 'Unknown'}")
+
+        # Active alarms
+        if status.active_alarms:
+            alarm_lines = []
+            for a in status.active_alarms:
+                alarm_lines.append(f"  - [{a.severity.value.upper()}] {a.alarm_type.value}: {a.description} (Zone: {a.zone_id})")
+            sections.append(f"## Active Alarms ({len(status.active_alarms)})\n" + "\n".join(alarm_lines))
+        else:
+            sections.append("## Active Alarms\nNone - all zones normal")
+
+        # Zones summary
+        zones_with_alarms = sum(1 for z in zones if any(a.zone_id == z.zone_id for a in status.active_alarms))
+        total_detectors = sum(z.smoke_detectors + z.heat_detectors + z.beam_detectors + z.manual_call_points for z in zones)
+        sections.append(f"## Zones\n- Total: {len(zones)} zones across 3 floors\n- With active alarms: {zones_with_alarms}\n- Total detectors: {total_detectors}")
+
+        # Dampers
+        fault_dampers = [d for d in dampers if d.status.value == "fault"]
+        if fault_dampers:
+            damper_lines = [f"  - {d.damper_id}: STUCK at {d.position}% (target {d.target_position}%)" for d in fault_dampers]
+            sections.append(f"## Smoke Dampers\n- Total: {len(dampers)}\n- Faults: {len(fault_dampers)}\n" + "\n".join(damper_lines))
+        else:
+            sections.append(f"## Smoke Dampers\n- Total: {len(dampers)}\n- All healthy (open position)")
+
+        # Pressurization
+        sections.append(f"## Stairwell Pressurization\n- Fans: {len(press)}\n- Status: {'All standby' if all(p.fan_status.value == 'off' for p in press) else 'Active'}")
+
+        # Health
+        sections.append(f"## System Health\n- Overall: {health.overall_health.value.upper()}\n- Panel Comms: {health.panel_comms}\n- Battery: {health.battery_status}\n- Detector Faults: {health.detector_faults}\n- Damper Faults: {health.damper_faults}")
+
+        return {
+            "success": True,
+            "report": "\n\n".join(sections),
+            "panel_status": status.panel_status.value,
+            "active_alarm_count": len(status.active_alarms),
+            "overall_health": health.overall_health.value,
+            "battery_voltage": status.battery_voltage,
+            "damper_faults": health.damper_faults,
+            "detector_faults": health.detector_faults,
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting fire system status: {e}")
+        return {"error": str(e)}
+
+
 # Tool definitions for Claude API
 CHAT_TOOLS = [
     {
@@ -2067,6 +2135,15 @@ CHAT_TOOLS = [
             },
             "required": ["discovery_id", "point_name"]
         }
+    },
+    {
+        "name": "get_fire_system_status",
+        "description": "Get fire and life safety system status including active alarms, damper positions, stairwell pressurization, and system health. Use this when someone asks about fire safety, fire alarms, smoke dampers, or life safety systems. Returns panel status, active alarm count, zone summary, damper health, pressurization status, and battery voltage.",
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+            "required": []
+        }
     }
 ]
 
@@ -2088,6 +2165,7 @@ TOOL_HANDLERS = {
     "review_point_mapping": review_point_mapping,
     "approve_point_mapping": approve_point_mapping,
     "correct_point_classification": correct_point_classification,
+    "get_fire_system_status": get_fire_system_status,
 }
 
 
