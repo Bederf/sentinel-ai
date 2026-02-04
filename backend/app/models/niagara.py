@@ -124,3 +124,155 @@ class OBIXConfigResponse(BaseModel):
     success: bool = Field(..., description="Whether configuration was applied")
     message: str = Field("", description="Status message")
     connected: bool = Field(False, description="Whether connected after config")
+
+
+# ===========================================================================
+# BACnet/IP Models
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# BACnet Device Discovery
+# ---------------------------------------------------------------------------
+
+class BACnetDeviceInfo(BaseModel):
+    """A BACnet device discovered via WhoIs/IAm."""
+
+    device_id: int = Field(..., description="BACnet device instance number")
+    ip_address: str = Field(..., description="Device IP address")
+    vendor_name: str = Field("Unknown", description="Device vendor name")
+    model_name: str = Field("", description="Device model name")
+    firmware_version: str = Field("", description="Device firmware version")
+    object_name: str = Field("", description="BACnet object name")
+
+
+class BACnetDiscoverRequest(BaseModel):
+    """Request parameters for BACnet device discovery."""
+
+    timeout: float = Field(5.0, description="Discovery timeout in seconds", ge=1.0, le=30.0)
+
+
+class BACnetDiscoverResponse(BaseModel):
+    """Response for BACnet device discovery."""
+
+    count: int = Field(0, description="Number of devices discovered")
+    devices: List[BACnetDeviceInfo] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# BACnet Points
+# ---------------------------------------------------------------------------
+
+class BACnetPointInfo(BaseModel):
+    """A BACnet point/object discovered on a device."""
+
+    object_type: str = Field(..., description="BACnet object type (e.g., analogInput)")
+    instance: int = Field(..., description="Object instance number")
+    name: str = Field("", description="Point display name")
+    description: str = Field("", description="Point description")
+    units: str = Field("", description="Engineering units")
+    present_value: Optional[Any] = Field(None, description="Current value")
+    writable: bool = Field(False, description="Whether the point is writable")
+
+
+class BACnetPointDiscoveryRequest(BaseModel):
+    """Request parameters for point discovery on a device."""
+
+    object_types: Optional[List[str]] = Field(
+        None,
+        description="Filter by object types (e.g., ['analogInput', 'analogValue'])",
+    )
+    use_cache: bool = Field(True, description="Use cached point list if available")
+
+
+class BACnetPointDiscoveryResponse(BaseModel):
+    """Response for point discovery."""
+
+    device_id: int = Field(..., description="BACnet device instance number")
+    count: int = Field(0, description="Number of points discovered")
+    points: List[BACnetPointInfo] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# BACnet Read/Write
+# ---------------------------------------------------------------------------
+
+class BACnetPointReadResponse(BaseModel):
+    """Response for reading a single BACnet point."""
+
+    device_id: int = Field(..., description="BACnet device instance number")
+    object_type: str = Field(..., description="BACnet object type")
+    instance: int = Field(..., description="Object instance number")
+    property_name: str = Field("presentValue", description="Property read")
+    value: Optional[Any] = Field(None, description="Point value")
+    timestamp: str = Field("", description="Read timestamp (ISO 8601)")
+
+
+class BACnetPointWriteRequest(BaseModel):
+    """Request to write a value to a BACnet point."""
+
+    value: Any = Field(..., description="Value to write")
+    priority: int = Field(8, description="BACnet priority (1-16, default 8)", ge=1, le=16)
+
+
+class BACnetPointWriteResponse(BaseModel):
+    """Response for a BACnet write operation."""
+
+    success: bool = Field(..., description="Whether the write succeeded")
+    device_id: int = Field(..., description="BACnet device instance number")
+    object_type: str = Field(..., description="BACnet object type")
+    instance: int = Field(..., description="Object instance number")
+    value: Any = Field(None, description="Value written")
+    priority: int = Field(8, description="Priority used")
+    message: str = Field("", description="Status message")
+
+
+# ---------------------------------------------------------------------------
+# BACnet COV Subscriptions
+# ---------------------------------------------------------------------------
+
+class BACnetCOVPoint(BaseModel):
+    """A point to include in a COV subscription."""
+
+    object_type: str = Field(..., description="BACnet object type")
+    instance: int = Field(..., description="Object instance number")
+
+
+class BACnetCOVSubscribeRequest(BaseModel):
+    """Request to create a COV subscription."""
+
+    device_id: int = Field(..., description="BACnet device instance number")
+    points: List[BACnetCOVPoint] = Field(..., description="Points to subscribe to")
+    lifetime: int = Field(60, description="Subscription lifetime in seconds", ge=10, le=3600)
+
+
+class BACnetCOVSubscriptionResponse(BaseModel):
+    """Response for COV subscription creation."""
+
+    subscription_id: str = Field(..., description="Unique subscription identifier")
+    device_id: int = Field(..., description="BACnet device instance number")
+    points: List[BACnetCOVPoint] = Field(default_factory=list)
+    lifetime: int = Field(60, description="Subscription lifetime in seconds")
+    created_at: str = Field("", description="Creation timestamp (ISO 8601)")
+    expires_at: str = Field("", description="Expiration timestamp (ISO 8601)")
+    active: bool = Field(True, description="Whether subscription is active")
+
+
+class BACnetCOVSubscriptionListResponse(BaseModel):
+    """Response listing active COV subscriptions."""
+
+    count: int = Field(0, description="Number of active subscriptions")
+    subscriptions: List[BACnetCOVSubscriptionResponse] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# BACnet Client Status
+# ---------------------------------------------------------------------------
+
+class BACnetClientStatus(BaseModel):
+    """BACnet client health and status information."""
+
+    started: bool = Field(False, description="Whether the client is running")
+    port: int = Field(47808, description="BACnet port")
+    ip: Optional[str] = Field(None, description="Bound IP address")
+    active_subscriptions: int = Field(0, description="Number of active COV subscriptions")
+    cached_devices: int = Field(0, description="Number of cached device point lists")

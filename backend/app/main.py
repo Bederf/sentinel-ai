@@ -45,11 +45,13 @@ from app.api import remote_ops  # Phase 59-01 Remote operations monitoring
 from app.api import remote_commands  # Phase 59-02 Remote command execution
 from app.api import dispatch  # Phase 59-03 Smart dispatch & task bundling
 from app.api import niagara  # Phase 60-02 Niagara oBIX integration
+from app.api import niagara_bacnet  # Phase 60-01 Niagara BACnet/IP integration
 # from app.api import inspection  # Phase 45 Routine Inspection & Maintenance - TODO: Fix import errors
 from app.middleware.audit_middleware import AuditMiddleware
 from app.services.background_scheduler import scheduler_service
 from app.api.simulation import simulation_service  # BMS simulation service
 from app.services.health_simulation_service import health_simulation_service  # Supabase health simulation
+from app.services.simbiot_service import simbiot_service  # SIMBIOT Concept Evolution connector
 
 app = FastAPI(
     title=settings.app_name,
@@ -126,6 +128,7 @@ app.include_router(remote_ops.router, tags=["remote-ops"])  # Phase 59-01 Remote
 app.include_router(remote_commands.router, prefix="/api/remote", tags=["remote-ops"])  # Phase 59-02 Remote command execution
 app.include_router(dispatch.router, prefix="/api/dispatch", tags=["dispatch"])  # Phase 59-03 Smart dispatch
 app.include_router(niagara.router, tags=["niagara-obix"])  # Phase 60-02 Niagara oBIX integration
+app.include_router(niagara_bacnet.router, tags=["niagara-bacnet"])  # Phase 60-01 Niagara BACnet/IP integration
 # app.include_router(inspection.router)  # Phase 45 Routine Inspection & Maintenance - TODO: Fix import errors
 
 
@@ -170,12 +173,19 @@ async def startup_event():
     # except Exception as e:
     #     print(f"Failed to start health simulation service: {e}")
 
+    # SIMBIOT Concept Evolution connector
+    # Enable when FSI API credentials are configured
+    # from simbiot_concept import ConceptConfig
+    # config = ConceptConfig(api_base_url="https://developer.fsiservices.com", ...)
+    # await simbiot_service.initialise(config)
+
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """Cleanup background services on shutdown."""
     scheduler_service.stop()
     await health_simulation_service.stop()
+    await simbiot_service.shutdown()
 
 
 @app.get("/")
