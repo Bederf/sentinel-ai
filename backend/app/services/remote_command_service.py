@@ -2,17 +2,19 @@
 
 Provides safe remote command execution with:
 - Authorization checks (4-level model)
-- Safety guardrails (hardcoded, non-configurable)
-- Auto-expiring overrides (setpoint 4h, schedule 8h, door 5min)
+- Safety validation delegated to existing SafetyEngine (configurable via settings page)
+- Auto-expiring overrides (durations from remote_ops_config.json)
 - Rollback capability (revert to pre-command state)
-- Rate limiting (10 commands/user/hour)
+- Rate limiting (configurable via remote_ops_config.json)
 
 Phase 59-02: Remote Operations
 """
 
+import json
 import logging
 import uuid
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from app.models.remote_ops import AuthorizationLevel, COMMAND_AUTHORIZATION
@@ -23,28 +25,20 @@ from app.models.audit_log import AuditActionType, AuditResultType
 
 logger = logging.getLogger(__name__)
 
+DATA_DIR = Path(__file__).parent.parent / "data"
+CONFIG_FILE = DATA_DIR / "remote_ops_config.json"
+
 
 class RemoteCommandService:
-    """Singleton service for executing remote commands with safety guardrails.
+    """Singleton service for executing remote commands.
 
-    Safety guardrails are hardcoded and non-configurable to prevent
-    accidental or malicious override of safety limits.
+    Safety validation is delegated to the existing SafetyEngine which reads
+    configurable rules from safety_rules.json (managed via the settings page).
+    This service handles authorization, rate limiting, override lifecycle,
+    and rollback - not safety rule enforcement.
     """
 
     _instance: Optional["RemoteCommandService"] = None
-
-    # Hardcoded safety guardrails -- NOT configurable
-    _safety_guardrails = {
-        "max_setpoint_delta_celsius": 3.0,
-        "absolute_temp_min_celsius": 16.0,
-        "absolute_temp_max_celsius": 28.0,
-        "life_safety_device_types": ["fire_safety"],
-        "setpoint_override_hours": 4,
-        "schedule_override_hours": 8,
-        "door_unlock_minutes": 5,
-        "max_commands_per_user_per_hour": 10,
-        "rate_limit_warning_threshold": 8,
-    }
 
     def __new__(cls):
         if cls._instance is None:
@@ -60,8 +54,39 @@ class RemoteCommandService:
         self._rate_limit_counters: Dict[str, List[datetime]] = {}
         self._audit_logger = AuditLogger()
         self._auth_service = get_authorization_service()
+        self._config = self._load_config()
         self._initialized = True
-        logger.info("RemoteCommandService initialized with hardcoded safety guardrails")
+        logger.info("RemoteCommandService initialized (safety delegated to SafetyEngine)")
+
+    def _load_config(self) -> Dict[str, Any]:
+        """Load operational config from remote_ops_config.json."""
+        try:
+            if CONFIG_FILE.exists():
+                with open(CONFIG_FILE) as f:
+                    return json.load(f)
+        except Exception as e:
+            logger.warning(f"Could not load remote ops config: {e}")
+        return {}
+
+    @property
+    def _override_durations(self) -> Dict[str, Any]:
+        """Get override duration settings from config."""
+        defaults = {
+            "setpoint_override_hours": 4,
+            "schedule_override_hours": 8,
+            "door_unlock_minutes": 15,
+        }
+        configured = self._config.get("auto_expiring_overrides", {})
+        return {**defaults, **configured}
+
+    @property
+    def _rate_limit_config(self) -> Dict[str, int]:
+        """Get rate limit settings from config."""
+        rl = self._config.get("rate_limit", {})
+        return {
+            "max_commands_per_user_per_hour": rl.get("block_threshold", 10),
+            "warning_threshold": rl.get("warning_threshold", 8),
+        }
 
     # ------------------------------------------------------------------ #
     #  Core command execution
@@ -77,14 +102,14 @@ class RemoteCommandService:
         value: Optional[Any] = None,
         reason: str = "",
     ) -> Dict[str, Any]:
-        """Execute a remote command with full safety validation.
+        """Execute a remote command with authorization and safety validation.
 
         Steps:
         1. Check authorization level
         2. Check rate limiting
-        3. Validate command against safety guardrails
+        3. Command-specific authorization checks (fire panel, door unlock)
         4. Record pre-command state for rollback
-        5. Execute via device_manager
+        5. Execute via device_manager (SafetyEngine validates automatically)
         6. Log to audit
         7. Schedule auto-expiry if override type
         8. Return result with rollback info
@@ -131,23 +156,23 @@ class RemoteCommandService:
         if rate_result.get("warning"):
             safety_warnings.append(rate_result["warning"])
 
-        # 3. Command-specific safety validation
-        validation = await self._validate_command(
-            device_id, command_type, point, value, user_role
+        # 3. Command-specific authorization checks (not safety - these are role checks)
+        auth_result = self._check_command_authorization(
+            command_type, user_role, device_id
         )
-        if not validation["allowed"]:
+        if not auth_result["allowed"]:
             self._log_command(
                 command_id, user_id, user_role, device_id, command_type,
                 point, value, reason, success=False,
-                error=validation["error"],
+                error=auth_result["error"],
             )
             return {
                 "success": False,
                 "command_id": command_id,
-                "error": validation["error"],
-                "safety_warnings": validation.get("warnings", []),
+                "error": auth_result["error"],
+                "safety_warnings": auth_result.get("warnings", []),
             }
-        safety_warnings.extend(validation.get("warnings", []))
+        safety_warnings.extend(auth_result.get("warnings", []))
 
         # 4. Record pre-command state for rollback
         previous_value = None
@@ -158,7 +183,7 @@ class RemoteCommandService:
             except Exception as e:
                 logger.warning(f"Could not read current value for rollback: {e}")
 
-        # 5. Execute the command
+        # 5. Execute the command (SafetyEngine validates via device_manager pipeline)
         try:
             if command_type == "status_check":
                 # Status checks don't write anything
@@ -176,6 +201,8 @@ class RemoteCommandService:
                 }
 
             # For write commands, execute through device_manager
+            # device_manager.write_device_value() calls SafetyEngine.validate_control()
+            # which enforces all configured safety rules from safety_rules.json
             if point and value is not None:
                 success = await device_manager.write_device_value(
                     device_id, point, value, priority=8, user=user_id
@@ -197,7 +224,7 @@ class RemoteCommandService:
                 }
 
         except ValueError as e:
-            # Safety engine blocks will raise ValueError
+            # SafetyEngine blocks raise ValueError with descriptive message
             self._log_command(
                 command_id, user_id, user_role, device_id, command_type,
                 point, value, reason, success=False, error=str(e),
@@ -205,7 +232,7 @@ class RemoteCommandService:
             return {
                 "success": False,
                 "command_id": command_id,
-                "error": str(e),
+                "error": f"Safety validation failed: {e}",
                 "safety_warnings": safety_warnings,
             }
         except Exception as e:
@@ -278,16 +305,16 @@ class RemoteCommandService:
         command_type: str,
     ) -> datetime:
         """Register an auto-expiring override and return expiry time."""
-        guardrails = self._safety_guardrails
+        durations = self._override_durations
 
         if command_type == "setpoint_adjust":
-            duration = timedelta(hours=guardrails["setpoint_override_hours"])
+            duration = timedelta(hours=durations["setpoint_override_hours"])
         elif command_type == "schedule_override":
-            duration = timedelta(hours=guardrails["schedule_override_hours"])
+            duration = timedelta(hours=durations["schedule_override_hours"])
         elif command_type == "door_unlock":
-            duration = timedelta(minutes=guardrails["door_unlock_minutes"])
+            duration = timedelta(minutes=durations["door_unlock_minutes"])
         else:
-            duration = timedelta(hours=guardrails["setpoint_override_hours"])
+            duration = timedelta(hours=durations["setpoint_override_hours"])
 
         expires_at = datetime.now() + duration
 
@@ -355,7 +382,7 @@ class RemoteCommandService:
                     logger.info(
                         f"Auto-reverted override {cmd_id}: "
                         f"{override['device_id']}/{override['point']} "
-                        f"→ {override['original_value']}"
+                        f"-> {override['original_value']}"
                     )
                 except Exception as e:
                     logger.error(f"Failed to auto-revert override {cmd_id}: {e}")
@@ -454,7 +481,7 @@ class RemoteCommandService:
 
             logger.info(
                 f"Rollback {command_id}: {override['device_id']}/{override['point']} "
-                f"→ {override['original_value']} by {user_id}"
+                f"-> {override['original_value']} by {user_id}"
             )
 
             return {
@@ -523,73 +550,24 @@ class RemoteCommandService:
     #  Internal helpers
     # ------------------------------------------------------------------ #
 
-    async def _validate_command(
+    def _check_command_authorization(
         self,
-        device_id: str,
         command_type: str,
-        point: Optional[str],
-        value: Optional[Any],
         user_role: str,
+        device_id: str,
     ) -> Dict[str, Any]:
-        """Validate command against hardcoded safety guardrails.
+        """Check command-specific authorization requirements.
+
+        These are authorization checks (role-based), not safety guardrails.
+        Safety validation is handled by the SafetyEngine in the device_manager
+        write pipeline.
 
         Returns:
             Dict with allowed (bool), error (str), warnings (list).
         """
-        guardrails = self._safety_guardrails
         warnings: List[str] = []
 
-        # -- setpoint_adjust guardrails --
-        if command_type == "setpoint_adjust" and point and value is not None:
-            try:
-                new_val = float(value)
-            except (TypeError, ValueError):
-                return {"allowed": False, "error": "Setpoint value must be numeric", "warnings": []}
-
-            # Absolute range check
-            if new_val < guardrails["absolute_temp_min_celsius"] or new_val > guardrails["absolute_temp_max_celsius"]:
-                return {
-                    "allowed": False,
-                    "error": (
-                        f"Setpoint {new_val}°C outside absolute safe range "
-                        f"({guardrails['absolute_temp_min_celsius']}-"
-                        f"{guardrails['absolute_temp_max_celsius']}°C)"
-                    ),
-                    "warnings": [],
-                }
-
-            # Delta from current value check
-            try:
-                current = await device_manager.read_device_value(device_id, point)
-                current_val = float(current.value)
-                delta = abs(new_val - current_val)
-                if delta > guardrails["max_setpoint_delta_celsius"]:
-                    return {
-                        "allowed": False,
-                        "error": (
-                            f"Setpoint change of {delta:.1f}°C exceeds maximum "
-                            f"allowed delta of ±{guardrails['max_setpoint_delta_celsius']}°C "
-                            f"from current value {current_val}°C"
-                        ),
-                        "warnings": [],
-                    }
-            except Exception as e:
-                warnings.append(f"Could not verify delta from current value: {e}")
-
-        # -- equipment_start_stop guardrails --
-        if command_type == "equipment_start_stop":
-            device = await device_manager.get_device(device_id)
-            if device and device.device_type.value in guardrails["life_safety_device_types"]:
-                return {
-                    "allowed": False,
-                    "error": (
-                        f"Remote start/stop blocked for life-safety device "
-                        f"type '{device.device_type.value}'"
-                    ),
-                    "warnings": [],
-                }
-
-        # -- fire_panel_reset guardrails --
+        # Fire panel reset requires ENGINEER and gets ALARM-level audit
         if command_type == "fire_panel_reset":
             if not self._auth_service.check_authorization(
                 user_role, AuthorizationLevel.ENGINEER
@@ -600,7 +578,6 @@ class RemoteCommandService:
                     "warnings": [],
                 }
             warnings.append("ALARM: Fire panel reset is a critical operation - logged at ALARM level")
-            # Log at ALARM level
             self._audit_logger.log_system_event(
                 event_type="fire_panel_reset_attempt",
                 user=user_role,
@@ -612,18 +589,11 @@ class RemoteCommandService:
                 },
             )
 
-        # -- door_unlock guardrails --
+        # Door unlock - inform about auto-lock duration
         if command_type == "door_unlock":
-            if not self._auth_service.check_authorization(
-                user_role, AuthorizationLevel.OPERATOR
-            ):
-                return {
-                    "allowed": False,
-                    "error": "Door unlock requires at least OPERATOR level",
-                    "warnings": [],
-                }
+            durations = self._override_durations
             warnings.append(
-                f"Door will auto-lock after {guardrails['door_unlock_minutes']} minutes"
+                f"Door will auto-lock after {durations['door_unlock_minutes']} minutes"
             )
 
         return {"allowed": True, "error": None, "warnings": warnings}
@@ -636,7 +606,7 @@ class RemoteCommandService:
         """
         now = datetime.now()
         one_hour_ago = now - timedelta(hours=1)
-        guardrails = self._safety_guardrails
+        rl = self._rate_limit_config
 
         # Clean old entries
         if user_id in self._rate_limit_counters:
@@ -647,13 +617,15 @@ class RemoteCommandService:
             self._rate_limit_counters[user_id] = []
 
         count = len(self._rate_limit_counters[user_id])
+        max_commands = rl["max_commands_per_user_per_hour"]
+        warning_threshold = rl["warning_threshold"]
 
         # Block at max
-        if count >= guardrails["max_commands_per_user_per_hour"]:
+        if count >= max_commands:
             return {
                 "blocked": True,
                 "message": (
-                    f"Maximum {guardrails['max_commands_per_user_per_hour']} "
+                    f"Maximum {max_commands} "
                     f"commands per hour exceeded ({count} in last hour)"
                 ),
                 "warning": None,
@@ -661,8 +633,8 @@ class RemoteCommandService:
 
         # Warning at threshold
         warning = None
-        if count >= guardrails["rate_limit_warning_threshold"]:
-            remaining = guardrails["max_commands_per_user_per_hour"] - count
+        if count >= warning_threshold:
+            remaining = max_commands - count
             warning = f"Rate limit warning: {remaining} commands remaining this hour"
 
         # Record this command

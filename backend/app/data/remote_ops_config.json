@@ -54,6 +54,13 @@
     "description": "Overrides automatically expire after these durations to prevent unattended changes"
   },
 
+  "rate_limit": {
+    "warning_threshold": 8,
+    "block_threshold": 10,
+    "window_hours": 1,
+    "description": "Rate limiting for remote commands per user per hour"
+  },
+
   "demo_users": [
     {
       "user_id": "view_user",
