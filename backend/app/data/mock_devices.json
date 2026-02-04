@@ -1,6 +1,6 @@
 [
   {
-    "id": "001-gwc-chiller-001",
+    "id": "S001-CHILLER-B1-001",
     "name": "Gateway Chiller",
     "device_type": "hvac",
     "protocol": "mock",
@@ -13,7 +13,7 @@
         "name": "chw_supply_temp",
         "point_type": "analog_input",
         "description": "Chilled water supply temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 5.0,
         "max_value": 15.0,
         "default_value": 7.2,
@@ -23,7 +23,7 @@
         "name": "chw_return_temp",
         "point_type": "analog_input",
         "description": "Chilled water return temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 10.0,
         "max_value": 20.0,
         "default_value": 12.5,
@@ -49,7 +49,7 @@
         "name": "chw_supply_temp_setpoint",
         "point_type": "analog_value",
         "description": "Chilled water supply temperature setpoint",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 5.0,
         "max_value": 12.0,
         "default_value": 7.0,
@@ -68,8 +68,8 @@
       }
     },
     "device_location": {
-      "building": "Gateway Theatre",
-      "floor": "Basement",
+      "building": "Gateway Centre",
+      "floor": "B1",
       "zone": "Plant Room",
       "room": "MR1",
       "description": "Basement Plant Room, Mechanical Room 1",
@@ -85,8 +85,8 @@
       "capacity_kw": 200
     },
     "metadata": {
-      "building": "Gateway Theatre",
-      "building_id": "gateway",
+      "building": "Gateway Centre",
+      "building_id": "site-001",
       "floor": -1,
       "zone": "Plant Room",
       "location": "Basement Plant Room",
@@ -100,7 +100,7 @@
     }
   },
   {
-    "id": "001-gwc-ahu-001",
+    "id": "S001-AHU-L3-001",
     "name": "Level 3 AHU",
     "device_type": "hvac",
     "protocol": "mock",
@@ -113,7 +113,7 @@
         "name": "supply_air_temp",
         "point_type": "analog_input",
         "description": "Supply air temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 15.0,
         "max_value": 25.0,
         "default_value": 18.5,
@@ -123,7 +123,7 @@
         "name": "return_air_temp",
         "point_type": "analog_input",
         "description": "Return air temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 20.0,
         "max_value": 30.0,
         "default_value": 24.5,
@@ -163,8 +163,8 @@
       }
     },
     "device_location": {
-      "building": "Gateway Theatre",
-      "floor": "FL3",
+      "building": "Gateway Centre",
+      "floor": "L3",
       "zone": "Executive Wing",
       "room": "MR1",
       "description": "Floor 3, Executive Wing, Mechanical Room 1",
@@ -180,8 +180,8 @@
       "capacity_kw": 50
     },
     "metadata": {
-      "building": "Gateway Theatre",
-      "building_id": "gateway",
+      "building": "Gateway Centre",
+      "building_id": "site-001",
       "floor": 3,
       "zone": "Executive Wing",
       "location": "Level 3 Plant Room",
@@ -192,7 +192,7 @@
     }
   },
   {
-    "id": "001-gwc-vav-001",
+    "id": "S001-VAV-L3-001",
     "name": "Office VAV - CTO Suite",
     "device_type": "hvac",
     "protocol": "mock",
@@ -204,7 +204,7 @@
         "name": "room_temp",
         "point_type": "analog_input",
         "description": "Room temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 16.0,
         "max_value": 32.0,
         "default_value": 26.0,
@@ -214,7 +214,7 @@
         "name": "room_temp_setpoint",
         "point_type": "analog_value",
         "description": "Room temperature setpoint",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 18.0,
         "max_value": 26.0,
         "default_value": 24.0,
@@ -248,8 +248,8 @@
       }
     },
     "device_location": {
-      "building": "Gateway Theatre",
-      "floor": "FL3",
+      "building": "Gateway Centre",
+      "floor": "L3",
       "zone": "Executive Wing",
       "room": "OR301",
       "description": "Floor 3, Executive Wing, Office Room 301 (CTO Office)",
@@ -265,19 +265,19 @@
       "capacity_kw": 1.2
     },
     "metadata": {
-      "building": "Gateway Theatre",
-      "building_id": "gateway",
+      "building": "Gateway Centre",
+      "building_id": "site-001",
       "floor": 3,
       "zone": "Executive Wing",
       "location": "CTO Office Suite 301",
       "serves": "CTO Office",
       "occupant": "CTO",
       "safety_status": "warning",
-      "safety_note": "Room temperature 26\u00b0C above comfort range (22-24\u00b0C) - adjust setpoint to restore comfort"
+      "safety_note": "Room temperature 26°C above comfort range (22-24°C) - adjust setpoint to restore comfort"
     }
   },
   {
-    "id": "001-gwc-light-001",
+    "id": "S001-DALI-G-001",
     "name": "Lobby Lighting Panel",
     "device_type": "lighting",
     "protocol": "mock",
@@ -335,8 +335,8 @@
       }
     },
     "device_location": {
-      "building": "Gateway Theatre",
-      "floor": "Ground",
+      "building": "Gateway Centre",
+      "floor": "G",
       "zone": "Lobby",
       "room": "ER1",
       "description": "Ground Floor, Lobby, Electrical Room 1",
@@ -351,8 +351,8 @@
       "installation_year": 2015
     },
     "metadata": {
-      "building": "Gateway Theatre",
-      "building_id": "gateway",
+      "building": "Gateway Centre",
+      "building_id": "site-001",
       "floor": 0,
       "zone": "Lobby",
       "location": "Ground Floor Main Lobby",
@@ -364,7 +364,7 @@
     }
   },
   {
-    "id": "001-gwc-acc-001",
+    "id": "S001-ACC-G-001",
     "name": "Main Entrance Access Control",
     "device_type": "security",
     "protocol": "mock",
@@ -415,8 +415,8 @@
       }
     },
     "device_location": {
-      "building": "Gateway Theatre",
-      "floor": "Ground",
+      "building": "Gateway Centre",
+      "floor": "G",
       "zone": "Entrance",
       "room": "LR1",
       "description": "Ground Floor, Main Entrance, Lobby Reception 1",
@@ -431,8 +431,8 @@
       "installation_year": 2018
     },
     "metadata": {
-      "building": "Gateway Theatre",
-      "building_id": "gateway",
+      "building": "Gateway Centre",
+      "building_id": "site-001",
       "floor": 0,
       "zone": "Entrance",
       "location": "Ground Floor Main Entrance",
@@ -444,7 +444,7 @@
     }
   },
   {
-    "id": "001-gwc-fire-001",
+    "id": "S001-FIRE-B1-001",
     "name": "Fire Pump Controller",
     "device_type": "fire_safety",
     "protocol": "mock",
@@ -505,8 +505,8 @@
       }
     },
     "device_location": {
-      "building": "Gateway Theatre",
-      "floor": "Basement",
+      "building": "Gateway Centre",
+      "floor": "B1",
       "zone": "Fire Systems",
       "room": "MR1",
       "description": "Basement, Fire Systems, Mechanical Room 1",
@@ -521,8 +521,8 @@
       "installation_year": 2005
     },
     "metadata": {
-      "building": "Gateway Theatre",
-      "building_id": "gateway",
+      "building": "Gateway Centre",
+      "building_id": "site-001",
       "floor": -1,
       "zone": "Fire Systems",
       "location": "Basement Fire Pump Room",
@@ -535,7 +535,7 @@
     }
   },
   {
-    "id": "001-gwc-zone-001",
+    "id": "S001-BMS-L2-001",
     "name": "Main Zone Controller - Floors 1-3",
     "device_type": "hvac",
     "protocol": "mock",
@@ -546,7 +546,7 @@
         "name": "zone_temp",
         "point_type": "analog_input",
         "description": "Average zone temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 16.0,
         "max_value": 30.0,
         "default_value": 23.2,
@@ -556,7 +556,7 @@
         "name": "zone_cooling_setpoint",
         "point_type": "analog_value",
         "description": "Zone cooling temperature setpoint",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 20.0,
         "max_value": 26.0,
         "default_value": 23.0,
@@ -566,7 +566,7 @@
         "name": "zone_heating_setpoint",
         "point_type": "analog_value",
         "description": "Zone heating temperature setpoint",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 18.0,
         "max_value": 24.0,
         "default_value": 20.0,
@@ -625,8 +625,8 @@
       }
     },
     "device_location": {
-      "building": "Gateway Theatre",
-      "floor": "FL2",
+      "building": "Gateway Centre",
+      "floor": "L2",
       "zone": "Main Office Area",
       "room": "MR1",
       "description": "Floor 2, Main Office Area, Mechanical Room 1 (BMS Room)",
@@ -641,8 +641,8 @@
       "installation_year": 2010
     },
     "metadata": {
-      "building": "Gateway Theatre",
-      "building_id": "gateway",
+      "building": "Gateway Centre",
+      "building_id": "site-001",
       "floor": "1-3",
       "zone": "Main Office Area",
       "location": "BMS Room Level 2",
@@ -653,7 +653,7 @@
     }
   },
   {
-    "id": "001-gwc-chw-001",
+    "id": "S001-MTR-B1-001",
     "name": "Chilled Water System - Primary Loop",
     "device_type": "hvac",
     "protocol": "mock",
@@ -664,7 +664,7 @@
         "name": "chw_supply_temp",
         "point_type": "analog_input",
         "description": "Chilled water supply temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 4.0,
         "max_value": 15.0,
         "default_value": 7.0,
@@ -674,7 +674,7 @@
         "name": "chw_return_temp",
         "point_type": "analog_input",
         "description": "Chilled water return temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 8.0,
         "max_value": 20.0,
         "default_value": 12.0,
@@ -684,7 +684,7 @@
         "name": "chw_supply_temp_setpoint",
         "point_type": "analog_value",
         "description": "CHW supply temperature setpoint",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 5.0,
         "max_value": 12.0,
         "default_value": 7.0,
@@ -722,8 +722,8 @@
       }
     },
     "device_location": {
-      "building": "Gateway Theatre",
-      "floor": "Basement",
+      "building": "Gateway Centre",
+      "floor": "B1",
       "zone": "Plant Room",
       "room": "MR1",
       "description": "Basement, Plant Room, Mechanical Room 1",
@@ -738,25 +738,25 @@
       "installation_year": 2005
     },
     "metadata": {
-      "building": "Gateway Theatre",
-      "building_id": "gateway",
+      "building": "Gateway Centre",
+      "building_id": "site-001",
       "floor": -1,
       "zone": "Plant Room",
       "location": "Basement Plant Room",
       "serves": "All AHUs and FCUs",
       "chillers_connected": [
-        "001-gwc-chiller-001"
+        "S001-CHILLER-B1-001"
       ],
       "safety_status": "safe",
       "safety_note": "Primary loop operating normally, pump at 75% capacity"
     }
   },
   {
-    "id": "003-mmc-fcu-001",
+    "id": "S003-FCU-L1-001",
     "name": "Menlyn FCU-001",
     "device_type": "hvac",
     "protocol": "mock",
-    "site_id": "site-004",
+    "site_id": "site-003",
     "hvac_type": "fcu",
     "capacity": 6,
     "points": {
@@ -764,7 +764,7 @@
         "name": "room_temp",
         "point_type": "analog_input",
         "description": "Room temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 16.0,
         "max_value": 32.0,
         "default_value": 18.6,
@@ -774,7 +774,7 @@
         "name": "room_temp_setpoint",
         "point_type": "analog_value",
         "description": "Room temperature setpoint",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 18.0,
         "max_value": 26.0,
         "default_value": 22.0,
@@ -810,7 +810,7 @@
     },
     "device_location": {
       "building": "Menlyn Maine",
-      "floor": "FL1",
+      "floor": "L1",
       "zone": "Ground Floor",
       "room": "OR001",
       "description": "Floor 1, Ground Floor Zone, Office Room 001",
@@ -827,21 +827,21 @@
     },
     "metadata": {
       "building": "Menlyn Maine",
-      "building_id": "menlyn",
+      "building_id": "site-003",
       "floor": 1,
       "zone": "Ground Floor",
       "location": "Floor 1 Open Plan",
       "serves": "Ground floor office area",
       "safety_status": "safe",
-      "safety_note": "Room at 18.6\u00b0C - running cool"
+      "safety_note": "Room at 18.6°C - running cool"
     }
   },
   {
-    "id": "003-mmc-fcu-002",
+    "id": "S003-FCU-L2-002",
     "name": "Menlyn FCU-002",
     "device_type": "hvac",
     "protocol": "mock",
-    "site_id": "site-004",
+    "site_id": "site-003",
     "hvac_type": "fcu",
     "capacity": 6,
     "points": {
@@ -849,7 +849,7 @@
         "name": "room_temp",
         "point_type": "analog_input",
         "description": "Room temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 16.0,
         "max_value": 32.0,
         "default_value": 18.5,
@@ -859,7 +859,7 @@
         "name": "room_temp_setpoint",
         "point_type": "analog_value",
         "description": "Room temperature setpoint",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 18.0,
         "max_value": 26.0,
         "default_value": 22.0,
@@ -895,7 +895,7 @@
     },
     "device_location": {
       "building": "Menlyn Maine",
-      "floor": "FL2",
+      "floor": "L2",
       "zone": "Upper Floor",
       "room": "OR002",
       "description": "Floor 2, Upper Floor Zone, Office Room 002",
@@ -912,21 +912,21 @@
     },
     "metadata": {
       "building": "Menlyn Maine",
-      "building_id": "menlyn",
+      "building_id": "site-003",
       "floor": 2,
       "zone": "Upper Floor",
       "location": "Floor 2 Open Plan",
       "serves": "Upper floor office area",
       "safety_status": "safe",
-      "safety_note": "Room at 18.5\u00b0C - running cool"
+      "safety_note": "Room at 18.5°C - running cool"
     }
   },
   {
-    "id": "003-mmc-ahu-001",
+    "id": "S003-AHU-R-001",
     "name": "Menlyn AHU-1",
     "device_type": "hvac",
     "protocol": "mock",
-    "site_id": "site-004",
+    "site_id": "site-003",
     "hvac_type": "ahu",
     "capacity": 45,
     "efficiency": 2.9,
@@ -935,7 +935,7 @@
         "name": "supply_air_temp",
         "point_type": "analog_input",
         "description": "Supply air temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 12.0,
         "max_value": 25.0,
         "default_value": 14.5,
@@ -945,7 +945,7 @@
         "name": "return_air_temp",
         "point_type": "analog_input",
         "description": "Return air temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 18.0,
         "max_value": 30.0,
         "default_value": 21.0,
@@ -992,7 +992,7 @@
     },
     "device_location": {
       "building": "Menlyn Maine",
-      "floor": "Roof",
+      "floor": "R",
       "zone": "Plant Room",
       "room": "MR1",
       "description": "Roof Level, Plant Room, Mechanical Room 1",
@@ -1009,21 +1009,21 @@
     },
     "metadata": {
       "building": "Menlyn Maine",
-      "building_id": "menlyn",
+      "building_id": "site-003",
       "floor": 0,
       "zone": "Plant Room",
       "location": "Roof Plant Room",
       "serves": "Both floors",
       "safety_status": "safe",
-      "safety_note": "Return air at 21\u00b0C indicates space warmer than FCU readings"
+      "safety_note": "Return air at 21°C indicates space warmer than FCU readings"
     }
   },
   {
-    "id": "003-mmc-chiller-001",
+    "id": "S003-CHILLER-B1-001",
     "name": "Menlyn Chiller",
     "device_type": "hvac",
     "protocol": "mock",
-    "site_id": "site-004",
+    "site_id": "site-003",
     "hvac_type": "chiller",
     "capacity": 120,
     "efficiency": 3.2,
@@ -1032,7 +1032,7 @@
         "name": "chw_supply_temp",
         "point_type": "analog_input",
         "description": "Chilled water supply temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 4.0,
         "max_value": 15.0,
         "default_value": 6.8,
@@ -1042,7 +1042,7 @@
         "name": "chw_return_temp",
         "point_type": "analog_input",
         "description": "Chilled water return temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 8.0,
         "max_value": 20.0,
         "default_value": 11.5,
@@ -1052,7 +1052,7 @@
         "name": "chw_supply_temp_setpoint",
         "point_type": "analog_value",
         "description": "Chilled water supply temperature setpoint",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 5.0,
         "max_value": 12.0,
         "default_value": 7.0,
@@ -1097,7 +1097,7 @@
     },
     "device_location": {
       "building": "Menlyn Maine",
-      "floor": "Basement",
+      "floor": "B1",
       "zone": "Plant Room",
       "room": "MR1",
       "description": "Basement, Plant Room, Mechanical Room 1",
@@ -1114,18 +1114,18 @@
     },
     "metadata": {
       "building": "Menlyn Maine",
-      "building_id": "menlyn",
+      "building_id": "site-003",
       "floor": -1,
       "zone": "Plant Room",
       "location": "Basement Plant Room",
       "serves": "Entire building chilled water",
       "critical": true,
       "safety_status": "safe",
-      "safety_note": "CHW setpoint at 7\u00b0C - consider raising to 8\u00b0C for efficiency"
+      "safety_note": "CHW setpoint at 7°C - consider raising to 8°C for efficiency"
     }
   },
   {
-    "id": "011-stc-ahu-001",
+    "id": "S002-AHU-R-001",
     "name": "Sandton AHU-1",
     "device_type": "hvac",
     "protocol": "mock",
@@ -1138,7 +1138,7 @@
         "name": "supply_air_temp",
         "point_type": "analog_input",
         "description": "Supply air temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 12.0,
         "max_value": 25.0,
         "default_value": 15.2,
@@ -1148,7 +1148,7 @@
         "name": "return_air_temp",
         "point_type": "analog_input",
         "description": "Return air temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 18.0,
         "max_value": 30.0,
         "default_value": 23.5,
@@ -1194,8 +1194,8 @@
       }
     },
     "device_location": {
-      "building": "Sandton City",
-      "floor": "Roof",
+      "building": "Sandton City Office Tower",
+      "floor": "R",
       "zone": "Roof Level",
       "room": "MR1",
       "description": "Roof Level, Roof Zone, Mechanical Room 1",
@@ -1211,8 +1211,8 @@
       "capacity_kw": 80
     },
     "metadata": {
-      "building": "Sandton City",
-      "building_id": "sandton",
+      "building": "Sandton City Office Tower",
+      "building_id": "site-002",
       "floor": 0,
       "zone": "Roof Level",
       "location": "Roof Plant Room",
@@ -1222,7 +1222,7 @@
     }
   },
   {
-    "id": "011-stc-chiller-001",
+    "id": "S002-CHILLER-B1-001",
     "name": "Sandton Chiller CH-1",
     "device_type": "hvac",
     "protocol": "mock",
@@ -1235,7 +1235,7 @@
         "name": "chw_supply_temp",
         "point_type": "analog_input",
         "description": "Chilled water supply temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 4.0,
         "max_value": 15.0,
         "default_value": 7.0,
@@ -1245,7 +1245,7 @@
         "name": "chw_return_temp",
         "point_type": "analog_input",
         "description": "Chilled water return temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 8.0,
         "max_value": 20.0,
         "default_value": 12.0,
@@ -1255,7 +1255,7 @@
         "name": "chw_supply_temp_setpoint",
         "point_type": "analog_value",
         "description": "Chilled water supply temperature setpoint",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 5.0,
         "max_value": 12.0,
         "default_value": 7.0,
@@ -1289,8 +1289,8 @@
       }
     },
     "device_location": {
-      "building": "Sandton City",
-      "floor": "Basement",
+      "building": "Sandton City Office Tower",
+      "floor": "B1",
       "zone": "Chiller Plant Room",
       "room": "MR1",
       "description": "Basement, Chiller Plant Room, Mechanical Room 1",
@@ -1306,8 +1306,8 @@
       "capacity_kw": 220
     },
     "metadata": {
-      "building": "Sandton City",
-      "building_id": "sandton",
+      "building": "Sandton City Office Tower",
+      "building_id": "site-002",
       "floor": -1,
       "zone": "Chiller Plant Room",
       "location": "Basement Plant Room",
@@ -1318,7 +1318,7 @@
     }
   },
   {
-    "id": "011-stc-fcu-001",
+    "id": "S002-FCU-L1-001",
     "name": "Sandton FCU Floor 1",
     "device_type": "hvac",
     "protocol": "mock",
@@ -1330,7 +1330,7 @@
         "name": "room_temp",
         "point_type": "analog_input",
         "description": "Room temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 16.0,
         "max_value": 32.0,
         "default_value": 22.8,
@@ -1340,7 +1340,7 @@
         "name": "room_temp_setpoint",
         "point_type": "analog_value",
         "description": "Room temperature setpoint",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 18.0,
         "max_value": 26.0,
         "default_value": 22.0,
@@ -1375,8 +1375,8 @@
       }
     },
     "device_location": {
-      "building": "Sandton City",
-      "floor": "FL1",
+      "building": "Sandton City Office Tower",
+      "floor": "L1",
       "zone": "Floor 1 Office",
       "room": "OR001",
       "description": "Floor 1, Floor 1 Office Zone, Office Room 001",
@@ -1392,8 +1392,8 @@
       "capacity_kw": 8
     },
     "metadata": {
-      "building": "Sandton City",
-      "building_id": "sandton",
+      "building": "Sandton City Office Tower",
+      "building_id": "site-002",
       "floor": 1,
       "zone": "Floor 1 Office",
       "location": "Floor 1 Open Plan",
@@ -1403,7 +1403,7 @@
     }
   },
   {
-    "id": "011-stc-zone-001",
+    "id": "S002-BMS-L2-001",
     "name": "Sandton Zone Controller",
     "device_type": "hvac",
     "protocol": "mock",
@@ -1414,7 +1414,7 @@
         "name": "zone_temp",
         "point_type": "analog_input",
         "description": "Average zone temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 16.0,
         "max_value": 30.0,
         "default_value": 22.5,
@@ -1424,7 +1424,7 @@
         "name": "zone_cooling_setpoint",
         "point_type": "analog_value",
         "description": "Zone cooling temperature setpoint",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 20.0,
         "max_value": 26.0,
         "default_value": 22.0,
@@ -1434,7 +1434,7 @@
         "name": "zone_heating_setpoint",
         "point_type": "analog_value",
         "description": "Zone heating temperature setpoint",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 18.0,
         "max_value": 24.0,
         "default_value": 20.0,
@@ -1458,8 +1458,8 @@
       }
     },
     "device_location": {
-      "building": "Sandton City",
-      "floor": "FL2",
+      "building": "Sandton City Office Tower",
+      "floor": "L2",
       "zone": "Main Office Area",
       "room": "MR1",
       "description": "Floor 2, Main Office Area, Mechanical Room 1 (BMS Room)",
@@ -1474,8 +1474,8 @@
       "installation_year": 2015
     },
     "metadata": {
-      "building": "Sandton City",
-      "building_id": "sandton",
+      "building": "Sandton City Office Tower",
+      "building_id": "site-002",
       "floor": "1-3",
       "zone": "Main Office Area",
       "location": "BMS Room Level 2",
@@ -1485,11 +1485,11 @@
     }
   },
   {
-    "id": "002-rbk-ahu-001",
+    "id": "S004-AHU-R-001",
     "name": "Rosebank AHU-1",
     "device_type": "hvac",
     "protocol": "mock",
-    "site_id": "site-003",
+    "site_id": "site-004",
     "hvac_type": "ahu",
     "capacity": 30,
     "efficiency": 3.0,
@@ -1498,7 +1498,7 @@
         "name": "supply_air_temp",
         "point_type": "analog_input",
         "description": "Supply air temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 12.0,
         "max_value": 25.0,
         "default_value": 16.0,
@@ -1508,7 +1508,7 @@
         "name": "return_air_temp",
         "point_type": "analog_input",
         "description": "Return air temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 18.0,
         "max_value": 30.0,
         "default_value": 24.0,
@@ -1544,8 +1544,8 @@
       }
     },
     "device_location": {
-      "building": "Rosebank",
-      "floor": "Roof",
+      "building": "Rosebank Towers",
+      "floor": "R",
       "zone": "Roof",
       "room": "MR1",
       "description": "Roof Level, Roof Zone, Mechanical Room 1",
@@ -1561,8 +1561,8 @@
       "capacity_kw": 30
     },
     "metadata": {
-      "building": "Rosebank",
-      "building_id": "rosebank",
+      "building": "Rosebank Towers",
+      "building_id": "site-004",
       "floor": 0,
       "zone": "Roof",
       "location": "Roof Plant Room",
@@ -1572,11 +1572,11 @@
     }
   },
   {
-    "id": "002-rbk-split-001",
+    "id": "S004-SPLIT-L1-001",
     "name": "Rosebank AC-1 Banking Hall",
     "device_type": "hvac",
     "protocol": "mock",
-    "site_id": "site-003",
+    "site_id": "site-004",
     "hvac_type": "split_unit",
     "capacity": 7,
     "points": {
@@ -1584,7 +1584,7 @@
         "name": "room_temp",
         "point_type": "analog_input",
         "description": "Room temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 16.0,
         "max_value": 32.0,
         "default_value": 23.0,
@@ -1594,7 +1594,7 @@
         "name": "room_temp_setpoint",
         "point_type": "analog_value",
         "description": "Room temperature setpoint",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 18.0,
         "max_value": 28.0,
         "default_value": 22.0,
@@ -1635,8 +1635,8 @@
       }
     },
     "device_location": {
-      "building": "Rosebank",
-      "floor": "FL1",
+      "building": "Rosebank Towers",
+      "floor": "L1",
       "zone": "Banking Hall",
       "room": "OR001",
       "description": "Floor 1, Banking Hall Zone, Office Room 001",
@@ -1652,8 +1652,8 @@
       "capacity_kw": 7
     },
     "metadata": {
-      "building": "Rosebank",
-      "building_id": "rosebank",
+      "building": "Rosebank Towers",
+      "building_id": "site-004",
       "floor": 1,
       "zone": "Banking Hall",
       "location": "Banking Hall",
@@ -1663,11 +1663,11 @@
     }
   },
   {
-    "id": "006-vaw-ahu-001",
+    "id": "S006-AHU-R-001",
     "name": "V&A AHU-1",
     "device_type": "hvac",
     "protocol": "mock",
-    "site_id": "site-007",
+    "site_id": "site-006",
     "hvac_type": "ahu",
     "capacity": 65,
     "efficiency": 2.8,
@@ -1676,7 +1676,7 @@
         "name": "supply_air_temp",
         "point_type": "analog_input",
         "description": "Supply air temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 12.0,
         "max_value": 25.0,
         "default_value": 15.5,
@@ -1686,7 +1686,7 @@
         "name": "return_air_temp",
         "point_type": "analog_input",
         "description": "Return air temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 18.0,
         "max_value": 30.0,
         "default_value": 22.0,
@@ -1733,7 +1733,7 @@
     },
     "device_location": {
       "building": "V&A Waterfront",
-      "floor": "Roof",
+      "floor": "R",
       "zone": "Roof",
       "room": "MR1",
       "description": "Roof Level, Roof Zone, Mechanical Room 1",
@@ -1750,7 +1750,7 @@
     },
     "metadata": {
       "building": "V&A Waterfront",
-      "building_id": "waterfront",
+      "building_id": "site-006",
       "floor": 0,
       "zone": "Roof",
       "location": "Roof Plant Room",
@@ -1760,11 +1760,11 @@
     }
   },
   {
-    "id": "006-vaw-chiller-001",
+    "id": "S006-CHILLER-B1-001",
     "name": "V&A Chiller CH-1",
     "device_type": "hvac",
     "protocol": "mock",
-    "site_id": "site-007",
+    "site_id": "site-006",
     "hvac_type": "chiller",
     "capacity": 180,
     "efficiency": 3.2,
@@ -1773,7 +1773,7 @@
         "name": "chw_supply_temp",
         "point_type": "analog_input",
         "description": "Chilled water supply temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 4.0,
         "max_value": 15.0,
         "default_value": 7.2,
@@ -1783,7 +1783,7 @@
         "name": "chw_return_temp",
         "point_type": "analog_input",
         "description": "Chilled water return temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 8.0,
         "max_value": 20.0,
         "default_value": 12.5,
@@ -1793,7 +1793,7 @@
         "name": "chw_supply_temp_setpoint",
         "point_type": "analog_value",
         "description": "Chilled water supply temperature setpoint",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 5.0,
         "max_value": 12.0,
         "default_value": 7.0,
@@ -1828,7 +1828,7 @@
     },
     "device_location": {
       "building": "V&A Waterfront",
-      "floor": "Basement",
+      "floor": "B1",
       "zone": "Plant Room",
       "room": "MR1",
       "description": "Basement, Plant Room, Mechanical Room 1",
@@ -1845,7 +1845,7 @@
     },
     "metadata": {
       "building": "V&A Waterfront",
-      "building_id": "waterfront",
+      "building_id": "site-006",
       "floor": -1,
       "zone": "Plant Room",
       "location": "Basement Plant Room",
@@ -1856,11 +1856,11 @@
     }
   },
   {
-    "id": "006-vaw-fcu-001",
+    "id": "S006-FCU-L1-001",
     "name": "V&A FCU Floor 1",
     "device_type": "hvac",
     "protocol": "mock",
-    "site_id": "site-007",
+    "site_id": "site-006",
     "hvac_type": "fcu",
     "capacity": 8,
     "points": {
@@ -1868,7 +1868,7 @@
         "name": "room_temp",
         "point_type": "analog_input",
         "description": "Room temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 16.0,
         "max_value": 32.0,
         "default_value": 21.5,
@@ -1878,7 +1878,7 @@
         "name": "room_temp_setpoint",
         "point_type": "analog_value",
         "description": "Room temperature setpoint",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 18.0,
         "max_value": 26.0,
         "default_value": 22.0,
@@ -1914,7 +1914,7 @@
     },
     "device_location": {
       "building": "V&A Waterfront",
-      "floor": "FL1",
+      "floor": "L1",
       "zone": "Floor 1",
       "room": "OR001",
       "description": "Floor 1, Floor 1 Zone, Office Room 001",
@@ -1931,7 +1931,7 @@
     },
     "metadata": {
       "building": "V&A Waterfront",
-      "building_id": "waterfront",
+      "building_id": "site-006",
       "floor": 1,
       "zone": "Floor 1",
       "location": "Floor 1 Open Plan",
@@ -1941,11 +1941,11 @@
     }
   },
   {
-    "id": "011-umh-ahu-001",
+    "id": "S007-AHU-R-001",
     "name": "Umhlanga AHU-1",
     "device_type": "hvac",
     "protocol": "mock",
-    "site_id": "site-012",
+    "site_id": "site-007",
     "hvac_type": "ahu",
     "capacity": 55,
     "efficiency": 2.9,
@@ -1954,7 +1954,7 @@
         "name": "supply_air_temp",
         "point_type": "analog_input",
         "description": "Supply air temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 12.0,
         "max_value": 25.0,
         "default_value": 16.5,
@@ -1964,7 +1964,7 @@
         "name": "return_air_temp",
         "point_type": "analog_input",
         "description": "Return air temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 18.0,
         "max_value": 30.0,
         "default_value": 24.5,
@@ -2011,7 +2011,7 @@
     },
     "device_location": {
       "building": "Umhlanga Ridge",
-      "floor": "Roof",
+      "floor": "R",
       "zone": "Roof",
       "room": "MR1",
       "description": "Roof Level, Roof Zone, Mechanical Room 1",
@@ -2028,7 +2028,7 @@
     },
     "metadata": {
       "building": "Umhlanga Ridge",
-      "building_id": "umhlanga",
+      "building_id": "site-007",
       "floor": 0,
       "zone": "Roof",
       "location": "Roof Plant Room",
@@ -2038,11 +2038,11 @@
     }
   },
   {
-    "id": "011-umh-chiller-001",
+    "id": "S007-CHILLER-B1-001",
     "name": "Umhlanga Chiller CH-1",
     "device_type": "hvac",
     "protocol": "mock",
-    "site_id": "site-012",
+    "site_id": "site-007",
     "hvac_type": "chiller",
     "capacity": 150,
     "efficiency": 3.3,
@@ -2051,7 +2051,7 @@
         "name": "chw_supply_temp",
         "point_type": "analog_input",
         "description": "Chilled water supply temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 4.0,
         "max_value": 15.0,
         "default_value": 6.5,
@@ -2061,7 +2061,7 @@
         "name": "chw_return_temp",
         "point_type": "analog_input",
         "description": "Chilled water return temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 8.0,
         "max_value": 20.0,
         "default_value": 11.8,
@@ -2071,7 +2071,7 @@
         "name": "chw_supply_temp_setpoint",
         "point_type": "analog_value",
         "description": "Chilled water supply temperature setpoint",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 5.0,
         "max_value": 12.0,
         "default_value": 6.5,
@@ -2106,7 +2106,7 @@
     },
     "device_location": {
       "building": "Umhlanga Ridge",
-      "floor": "Basement",
+      "floor": "B1",
       "zone": "Plant Room",
       "room": "MR1",
       "description": "Basement, Plant Room, Mechanical Room 1",
@@ -2123,7 +2123,7 @@
     },
     "metadata": {
       "building": "Umhlanga Ridge",
-      "building_id": "umhlanga",
+      "building_id": "site-007",
       "floor": -1,
       "zone": "Plant Room",
       "location": "Basement Plant Room",
@@ -2134,11 +2134,11 @@
     }
   },
   {
-    "id": "011-umh-fcu-001",
+    "id": "S007-FCU-L1-001",
     "name": "Umhlanga FCU Floor 1",
     "device_type": "hvac",
     "protocol": "mock",
-    "site_id": "site-012",
+    "site_id": "site-007",
     "hvac_type": "fcu",
     "capacity": 8,
     "points": {
@@ -2146,7 +2146,7 @@
         "name": "room_temp",
         "point_type": "analog_input",
         "description": "Room temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 16.0,
         "max_value": 32.0,
         "default_value": 23.5,
@@ -2156,7 +2156,7 @@
         "name": "room_temp_setpoint",
         "point_type": "analog_value",
         "description": "Room temperature setpoint",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 18.0,
         "max_value": 26.0,
         "default_value": 23.0,
@@ -2192,7 +2192,7 @@
     },
     "device_location": {
       "building": "Umhlanga Ridge",
-      "floor": "FL1",
+      "floor": "L1",
       "zone": "Floor 1",
       "room": "OR001",
       "description": "Floor 1, Floor 1 Zone, Office Room 001",
@@ -2209,7 +2209,7 @@
     },
     "metadata": {
       "building": "Umhlanga Ridge",
-      "building_id": "umhlanga",
+      "building_id": "site-007",
       "floor": 1,
       "zone": "Floor 1",
       "location": "Floor 1 Open Plan",
@@ -2219,11 +2219,11 @@
     }
   },
   {
-    "id": "011-umh-fcu-002",
+    "id": "S007-FCU-L2-002",
     "name": "Umhlanga FCU Floor 2",
     "device_type": "hvac",
     "protocol": "mock",
-    "site_id": "site-012",
+    "site_id": "site-007",
     "hvac_type": "fcu",
     "capacity": 8,
     "points": {
@@ -2231,7 +2231,7 @@
         "name": "room_temp",
         "point_type": "analog_input",
         "description": "Room temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 16.0,
         "max_value": 32.0,
         "default_value": 24.0,
@@ -2241,7 +2241,7 @@
         "name": "room_temp_setpoint",
         "point_type": "analog_value",
         "description": "Room temperature setpoint",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 18.0,
         "max_value": 26.0,
         "default_value": 23.0,
@@ -2277,7 +2277,7 @@
     },
     "device_location": {
       "building": "Umhlanga Ridge",
-      "floor": "FL2",
+      "floor": "L2",
       "zone": "Floor 2",
       "room": "OR002",
       "description": "Floor 2, Floor 2 Zone, Office Room 002",
@@ -2294,7 +2294,7 @@
     },
     "metadata": {
       "building": "Umhlanga Ridge",
-      "building_id": "umhlanga",
+      "building_id": "site-007",
       "floor": 2,
       "zone": "Floor 2",
       "location": "Floor 2 Open Plan",
@@ -2304,11 +2304,11 @@
     }
   },
   {
-    "id": "FCU-L12-03",
+    "id": "S002-FCU-L2-C",
     "name": "Sandton Level 12 North FCU",
     "device_type": "hvac",
     "protocol": "mock",
-    "site_id": "sandton",
+    "site_id": "site-002",
     "hvac_type": "fcu",
     "capacity": 8,
     "points": {
@@ -2316,7 +2316,7 @@
         "name": "room_temp",
         "point_type": "analog_input",
         "description": "Room temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 16.0,
         "max_value": 32.0,
         "default_value": 22.5,
@@ -2326,7 +2326,7 @@
         "name": "room_temp_setpoint",
         "point_type": "analog_value",
         "description": "Room temperature setpoint",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 18.0,
         "max_value": 26.0,
         "default_value": 22.0,
@@ -2376,16 +2376,16 @@
       }
     },
     "device_location": {
-      "building": "Sandton Office Park",
-      "floor": "L12",
-      "zone": "Level 12 North",
+      "building": "Sandton City Office Tower",
+      "floor": "L2",
+      "zone": "Level 2 North",
       "zone_id": "Zone-L12-N",
       "room": "Level 12 North Open Plan",
-      "description": "L12, Level 12 North, Sandton Level 12 North FCU"
+      "description": "L2, Level 2 North, Sandton Level 2 North FCU"
     },
     "metadata": {
-      "building": "Sandton Office Park",
-      "building_id": "sandton",
+      "building": "Sandton City Office Tower",
+      "building_id": "site-002",
       "floor": "L12",
       "zone": "Level 12 North",
       "zone_id": "Zone-L12-N",
@@ -2393,78 +2393,11 @@
     }
   },
   {
-    "id": "VAV-L12-03A",
-    "name": "Sandton Level 12 North VAV",
-    "device_type": "hvac",
-    "protocol": "mock",
-    "site_id": "sandton",
-    "hvac_type": "vav",
-    "capacity": 500,
-    "points": {
-      "damper_position": {
-        "name": "damper_position",
-        "point_type": "analog_value",
-        "description": "VAV damper position",
-        "unit": "%",
-        "min_value": 0,
-        "max_value": 100,
-        "default_value": 70,
-        "writable": true
-      },
-      "airflow_setpoint": {
-        "name": "airflow_setpoint",
-        "point_type": "analog_value",
-        "description": "Airflow setpoint",
-        "unit": "CFM",
-        "min_value": 100,
-        "max_value": 500,
-        "default_value": 350,
-        "writable": true
-      },
-      "airflow_actual": {
-        "name": "airflow_actual",
-        "point_type": "analog_input",
-        "description": "Actual airflow",
-        "unit": "CFM",
-        "min_value": 0,
-        "max_value": 600,
-        "default_value": 340,
-        "writable": false
-      },
-      "reheat_valve": {
-        "name": "reheat_valve",
-        "point_type": "analog_value",
-        "description": "Reheat valve position",
-        "unit": "%",
-        "min_value": 0,
-        "max_value": 100,
-        "default_value": 0,
-        "writable": true
-      }
-    },
-    "device_location": {
-      "building": "Sandton Office Park",
-      "floor": "L12",
-      "zone": "Level 12 North",
-      "zone_id": "Zone-L12-N",
-      "room": "Level 12 North Open Plan",
-      "description": "L12, Level 12 North, Sandton Level 12 North VAV"
-    },
-    "metadata": {
-      "building": "Sandton Office Park",
-      "building_id": "sandton",
-      "floor": "L12",
-      "zone": "Level 12 North",
-      "zone_id": "Zone-L12-N",
-      "parent_ahu": "AHU-L12-01"
-    }
-  },
-  {
-    "id": "FCU-L12-04",
+    "id": "S002-FCU-L2-D",
     "name": "Sandton Level 12 South FCU",
     "device_type": "hvac",
     "protocol": "mock",
-    "site_id": "sandton",
+    "site_id": "site-002",
     "hvac_type": "fcu",
     "capacity": 8,
     "points": {
@@ -2472,7 +2405,7 @@
         "name": "room_temp",
         "point_type": "analog_input",
         "description": "Room temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 16.0,
         "max_value": 32.0,
         "default_value": 23.0,
@@ -2482,7 +2415,7 @@
         "name": "room_temp_setpoint",
         "point_type": "analog_value",
         "description": "Room temperature setpoint",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 18.0,
         "max_value": 26.0,
         "default_value": 22.0,
@@ -2532,16 +2465,16 @@
       }
     },
     "device_location": {
-      "building": "Sandton Office Park",
-      "floor": "L12",
-      "zone": "Level 12 South",
+      "building": "Sandton City Office Tower",
+      "floor": "L2",
+      "zone": "Level 2 South",
       "zone_id": "Zone-L12-S",
       "room": "Level 12 South Open Plan",
-      "description": "L12, Level 12 South, Sandton Level 12 South FCU"
+      "description": "L2, Level 2 South, Sandton Level 2 South FCU"
     },
     "metadata": {
-      "building": "Sandton Office Park",
-      "building_id": "sandton",
+      "building": "Sandton City Office Tower",
+      "building_id": "site-002",
       "floor": "L12",
       "zone": "Level 12 South",
       "zone_id": "Zone-L12-S",
@@ -2549,78 +2482,11 @@
     }
   },
   {
-    "id": "VAV-L12-04A",
-    "name": "Sandton Level 12 South VAV",
-    "device_type": "hvac",
-    "protocol": "mock",
-    "site_id": "sandton",
-    "hvac_type": "vav",
-    "capacity": 500,
-    "points": {
-      "damper_position": {
-        "name": "damper_position",
-        "point_type": "analog_value",
-        "description": "VAV damper position",
-        "unit": "%",
-        "min_value": 0,
-        "max_value": 100,
-        "default_value": 70,
-        "writable": true
-      },
-      "airflow_setpoint": {
-        "name": "airflow_setpoint",
-        "point_type": "analog_value",
-        "description": "Airflow setpoint",
-        "unit": "CFM",
-        "min_value": 100,
-        "max_value": 500,
-        "default_value": 350,
-        "writable": true
-      },
-      "airflow_actual": {
-        "name": "airflow_actual",
-        "point_type": "analog_input",
-        "description": "Actual airflow",
-        "unit": "CFM",
-        "min_value": 0,
-        "max_value": 600,
-        "default_value": 340,
-        "writable": false
-      },
-      "reheat_valve": {
-        "name": "reheat_valve",
-        "point_type": "analog_value",
-        "description": "Reheat valve position",
-        "unit": "%",
-        "min_value": 0,
-        "max_value": 100,
-        "default_value": 0,
-        "writable": true
-      }
-    },
-    "device_location": {
-      "building": "Sandton Office Park",
-      "floor": "L12",
-      "zone": "Level 12 South",
-      "zone_id": "Zone-L12-S",
-      "room": "Level 12 South Open Plan",
-      "description": "L12, Level 12 South, Sandton Level 12 South VAV"
-    },
-    "metadata": {
-      "building": "Sandton Office Park",
-      "building_id": "sandton",
-      "floor": "L12",
-      "zone": "Level 12 South",
-      "zone_id": "Zone-L12-S",
-      "parent_ahu": "AHU-L12-01"
-    }
-  },
-  {
-    "id": "FCU-L11-01",
+    "id": "S002-FCU-L1-A",
     "name": "Sandton Level 11 North FCU",
     "device_type": "hvac",
     "protocol": "mock",
-    "site_id": "sandton",
+    "site_id": "site-002",
     "hvac_type": "fcu",
     "capacity": 8,
     "points": {
@@ -2628,7 +2494,7 @@
         "name": "room_temp",
         "point_type": "analog_input",
         "description": "Room temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 16.0,
         "max_value": 32.0,
         "default_value": 21.5,
@@ -2638,7 +2504,7 @@
         "name": "room_temp_setpoint",
         "point_type": "analog_value",
         "description": "Room temperature setpoint",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 18.0,
         "max_value": 26.0,
         "default_value": 22.0,
@@ -2688,16 +2554,16 @@
       }
     },
     "device_location": {
-      "building": "Sandton Office Park",
-      "floor": "L11",
-      "zone": "Level 11 North",
+      "building": "Sandton City Office Tower",
+      "floor": "L1",
+      "zone": "Level 1 North",
       "zone_id": "Zone-L11-N",
       "room": "Level 11 North Open Plan",
-      "description": "L11, Level 11 North, Sandton Level 11 North FCU"
+      "description": "L1, Level 1 North, Sandton Level 1 North FCU"
     },
     "metadata": {
-      "building": "Sandton Office Park",
-      "building_id": "sandton",
+      "building": "Sandton City Office Tower",
+      "building_id": "site-002",
       "floor": "L11",
       "zone": "Level 11 North",
       "zone_id": "Zone-L11-N",
@@ -2705,78 +2571,11 @@
     }
   },
   {
-    "id": "VAV-L11-01A",
-    "name": "Sandton Level 11 North VAV",
-    "device_type": "hvac",
-    "protocol": "mock",
-    "site_id": "sandton",
-    "hvac_type": "vav",
-    "capacity": 500,
-    "points": {
-      "damper_position": {
-        "name": "damper_position",
-        "point_type": "analog_value",
-        "description": "VAV damper position",
-        "unit": "%",
-        "min_value": 0,
-        "max_value": 100,
-        "default_value": 70,
-        "writable": true
-      },
-      "airflow_setpoint": {
-        "name": "airflow_setpoint",
-        "point_type": "analog_value",
-        "description": "Airflow setpoint",
-        "unit": "CFM",
-        "min_value": 100,
-        "max_value": 500,
-        "default_value": 350,
-        "writable": true
-      },
-      "airflow_actual": {
-        "name": "airflow_actual",
-        "point_type": "analog_input",
-        "description": "Actual airflow",
-        "unit": "CFM",
-        "min_value": 0,
-        "max_value": 600,
-        "default_value": 340,
-        "writable": false
-      },
-      "reheat_valve": {
-        "name": "reheat_valve",
-        "point_type": "analog_value",
-        "description": "Reheat valve position",
-        "unit": "%",
-        "min_value": 0,
-        "max_value": 100,
-        "default_value": 0,
-        "writable": true
-      }
-    },
-    "device_location": {
-      "building": "Sandton Office Park",
-      "floor": "L11",
-      "zone": "Level 11 North",
-      "zone_id": "Zone-L11-N",
-      "room": "Level 11 North Open Plan",
-      "description": "L11, Level 11 North, Sandton Level 11 North VAV"
-    },
-    "metadata": {
-      "building": "Sandton Office Park",
-      "building_id": "sandton",
-      "floor": "L11",
-      "zone": "Level 11 North",
-      "zone_id": "Zone-L11-N",
-      "parent_ahu": "AHU-L11-01"
-    }
-  },
-  {
-    "id": "FCU-L11-02",
+    "id": "S002-FCU-L1-B",
     "name": "Sandton Level 11 South FCU",
     "device_type": "hvac",
     "protocol": "mock",
-    "site_id": "sandton",
+    "site_id": "site-002",
     "hvac_type": "fcu",
     "capacity": 8,
     "points": {
@@ -2784,7 +2583,7 @@
         "name": "room_temp",
         "point_type": "analog_input",
         "description": "Room temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 16.0,
         "max_value": 32.0,
         "default_value": 24.0,
@@ -2794,7 +2593,7 @@
         "name": "room_temp_setpoint",
         "point_type": "analog_value",
         "description": "Room temperature setpoint",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 18.0,
         "max_value": 26.0,
         "default_value": 22.0,
@@ -2844,16 +2643,16 @@
       }
     },
     "device_location": {
-      "building": "Sandton Office Park",
-      "floor": "L11",
-      "zone": "Level 11 South",
+      "building": "Sandton City Office Tower",
+      "floor": "L1",
+      "zone": "Level 1 South",
       "zone_id": "Zone-L11-S",
       "room": "Level 11 South Open Plan",
-      "description": "L11, Level 11 South, Sandton Level 11 South FCU"
+      "description": "L1, Level 1 South, Sandton Level 1 South FCU"
     },
     "metadata": {
-      "building": "Sandton Office Park",
-      "building_id": "sandton",
+      "building": "Sandton City Office Tower",
+      "building_id": "site-002",
       "floor": "L11",
       "zone": "Level 11 South",
       "zone_id": "Zone-L11-S",
@@ -2861,78 +2660,11 @@
     }
   },
   {
-    "id": "VAV-L11-02A",
-    "name": "Sandton Level 11 South VAV",
-    "device_type": "hvac",
-    "protocol": "mock",
-    "site_id": "sandton",
-    "hvac_type": "vav",
-    "capacity": 500,
-    "points": {
-      "damper_position": {
-        "name": "damper_position",
-        "point_type": "analog_value",
-        "description": "VAV damper position",
-        "unit": "%",
-        "min_value": 0,
-        "max_value": 100,
-        "default_value": 70,
-        "writable": true
-      },
-      "airflow_setpoint": {
-        "name": "airflow_setpoint",
-        "point_type": "analog_value",
-        "description": "Airflow setpoint",
-        "unit": "CFM",
-        "min_value": 100,
-        "max_value": 500,
-        "default_value": 350,
-        "writable": true
-      },
-      "airflow_actual": {
-        "name": "airflow_actual",
-        "point_type": "analog_input",
-        "description": "Actual airflow",
-        "unit": "CFM",
-        "min_value": 0,
-        "max_value": 600,
-        "default_value": 340,
-        "writable": false
-      },
-      "reheat_valve": {
-        "name": "reheat_valve",
-        "point_type": "analog_value",
-        "description": "Reheat valve position",
-        "unit": "%",
-        "min_value": 0,
-        "max_value": 100,
-        "default_value": 0,
-        "writable": true
-      }
-    },
-    "device_location": {
-      "building": "Sandton Office Park",
-      "floor": "L11",
-      "zone": "Level 11 South",
-      "zone_id": "Zone-L11-S",
-      "room": "Level 11 South Open Plan",
-      "description": "L11, Level 11 South, Sandton Level 11 South VAV"
-    },
-    "metadata": {
-      "building": "Sandton Office Park",
-      "building_id": "sandton",
-      "floor": "L11",
-      "zone": "Level 11 South",
-      "zone_id": "Zone-L11-S",
-      "parent_ahu": "AHU-L11-01"
-    }
-  },
-  {
-    "id": "FCU-L10-01",
+    "id": "S002-FCU-L0-A",
     "name": "Sandton Level 10 North FCU",
     "device_type": "hvac",
     "protocol": "mock",
-    "site_id": "sandton",
+    "site_id": "site-002",
     "hvac_type": "fcu",
     "capacity": 8,
     "points": {
@@ -2940,7 +2672,7 @@
         "name": "room_temp",
         "point_type": "analog_input",
         "description": "Room temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 16.0,
         "max_value": 32.0,
         "default_value": 22.0,
@@ -2950,7 +2682,7 @@
         "name": "room_temp_setpoint",
         "point_type": "analog_value",
         "description": "Room temperature setpoint",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 18.0,
         "max_value": 26.0,
         "default_value": 22.0,
@@ -3000,16 +2732,16 @@
       }
     },
     "device_location": {
-      "building": "Sandton Office Park",
-      "floor": "L10",
-      "zone": "Level 10 North",
+      "building": "Sandton City Office Tower",
+      "floor": "L0",
+      "zone": "Level 0 North",
       "zone_id": "Zone-L10-N",
       "room": "Level 10 North Open Plan",
-      "description": "L10, Level 10 North, Sandton Level 10 North FCU"
+      "description": "L0, Level 0 North, Sandton Level 0 North FCU"
     },
     "metadata": {
-      "building": "Sandton Office Park",
-      "building_id": "sandton",
+      "building": "Sandton City Office Tower",
+      "building_id": "site-002",
       "floor": "L10",
       "zone": "Level 10 North",
       "zone_id": "Zone-L10-N",
@@ -3017,78 +2749,11 @@
     }
   },
   {
-    "id": "VAV-L10-01A",
-    "name": "Sandton Level 10 North VAV",
-    "device_type": "hvac",
-    "protocol": "mock",
-    "site_id": "sandton",
-    "hvac_type": "vav",
-    "capacity": 500,
-    "points": {
-      "damper_position": {
-        "name": "damper_position",
-        "point_type": "analog_value",
-        "description": "VAV damper position",
-        "unit": "%",
-        "min_value": 0,
-        "max_value": 100,
-        "default_value": 70,
-        "writable": true
-      },
-      "airflow_setpoint": {
-        "name": "airflow_setpoint",
-        "point_type": "analog_value",
-        "description": "Airflow setpoint",
-        "unit": "CFM",
-        "min_value": 100,
-        "max_value": 500,
-        "default_value": 350,
-        "writable": true
-      },
-      "airflow_actual": {
-        "name": "airflow_actual",
-        "point_type": "analog_input",
-        "description": "Actual airflow",
-        "unit": "CFM",
-        "min_value": 0,
-        "max_value": 600,
-        "default_value": 340,
-        "writable": false
-      },
-      "reheat_valve": {
-        "name": "reheat_valve",
-        "point_type": "analog_value",
-        "description": "Reheat valve position",
-        "unit": "%",
-        "min_value": 0,
-        "max_value": 100,
-        "default_value": 0,
-        "writable": true
-      }
-    },
-    "device_location": {
-      "building": "Sandton Office Park",
-      "floor": "L10",
-      "zone": "Level 10 North",
-      "zone_id": "Zone-L10-N",
-      "room": "Level 10 North Open Plan",
-      "description": "L10, Level 10 North, Sandton Level 10 North VAV"
-    },
-    "metadata": {
-      "building": "Sandton Office Park",
-      "building_id": "sandton",
-      "floor": "L10",
-      "zone": "Level 10 North",
-      "zone_id": "Zone-L10-N",
-      "parent_ahu": "AHU-L10-01"
-    }
-  },
-  {
-    "id": "AHU-L12-01",
+    "id": "S002-AHU-L2-01",
     "name": "Sandton L12 AHU",
     "device_type": "hvac",
     "protocol": "mock",
-    "site_id": "sandton",
+    "site_id": "site-002",
     "hvac_type": "ahu",
     "capacity": 50,
     "points": {
@@ -3096,7 +2761,7 @@
         "name": "supply_air_temp",
         "point_type": "analog_input",
         "description": "Supply air temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 10.0,
         "max_value": 25.0,
         "default_value": 14.0,
@@ -3106,7 +2771,7 @@
         "name": "supply_air_temp_setpoint",
         "point_type": "analog_value",
         "description": "Supply air temperature setpoint",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 12.0,
         "max_value": 18.0,
         "default_value": 14.0,
@@ -3116,7 +2781,7 @@
         "name": "return_air_temp",
         "point_type": "analog_input",
         "description": "Return air temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 18.0,
         "max_value": 28.0,
         "default_value": 23.0,
@@ -3169,26 +2834,26 @@
       }
     },
     "device_location": {
-      "building": "Sandton Office Park",
-      "floor": "L12",
+      "building": "Sandton City Office Tower",
+      "floor": "L2",
       "zone": "Plant Room",
       "room": "AHU Room L12",
-      "description": "L12, Plant Room, Sandton L12 AHU"
+      "description": "L2, Plant Room, Sandton L2 AHU"
     },
     "metadata": {
-      "building": "Sandton Office Park",
-      "building_id": "sandton",
+      "building": "Sandton City Office Tower",
+      "building_id": "site-002",
       "floor": "L12",
       "serves": "All zones on L12",
       "critical": true
     }
   },
   {
-    "id": "AHU-L11-01",
+    "id": "S002-AHU-L1-01",
     "name": "Sandton L11 AHU",
     "device_type": "hvac",
     "protocol": "mock",
-    "site_id": "sandton",
+    "site_id": "site-002",
     "hvac_type": "ahu",
     "capacity": 50,
     "points": {
@@ -3196,7 +2861,7 @@
         "name": "supply_air_temp",
         "point_type": "analog_input",
         "description": "Supply air temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 10.0,
         "max_value": 25.0,
         "default_value": 14.0,
@@ -3206,7 +2871,7 @@
         "name": "supply_air_temp_setpoint",
         "point_type": "analog_value",
         "description": "Supply air temperature setpoint",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 12.0,
         "max_value": 18.0,
         "default_value": 14.0,
@@ -3216,7 +2881,7 @@
         "name": "return_air_temp",
         "point_type": "analog_input",
         "description": "Return air temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 18.0,
         "max_value": 28.0,
         "default_value": 23.0,
@@ -3269,26 +2934,26 @@
       }
     },
     "device_location": {
-      "building": "Sandton Office Park",
-      "floor": "L11",
+      "building": "Sandton City Office Tower",
+      "floor": "L1",
       "zone": "Plant Room",
       "room": "AHU Room L11",
-      "description": "L11, Plant Room, Sandton L11 AHU"
+      "description": "L1, Plant Room, Sandton L1 AHU"
     },
     "metadata": {
-      "building": "Sandton Office Park",
-      "building_id": "sandton",
+      "building": "Sandton City Office Tower",
+      "building_id": "site-002",
       "floor": "L11",
       "serves": "All zones on L11",
       "critical": true
     }
   },
   {
-    "id": "AHU-L10-01",
+    "id": "S002-AHU-L0-01",
     "name": "Sandton L10 AHU",
     "device_type": "hvac",
     "protocol": "mock",
-    "site_id": "sandton",
+    "site_id": "site-002",
     "hvac_type": "ahu",
     "capacity": 50,
     "points": {
@@ -3296,7 +2961,7 @@
         "name": "supply_air_temp",
         "point_type": "analog_input",
         "description": "Supply air temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 10.0,
         "max_value": 25.0,
         "default_value": 14.0,
@@ -3306,7 +2971,7 @@
         "name": "supply_air_temp_setpoint",
         "point_type": "analog_value",
         "description": "Supply air temperature setpoint",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 12.0,
         "max_value": 18.0,
         "default_value": 14.0,
@@ -3316,7 +2981,7 @@
         "name": "return_air_temp",
         "point_type": "analog_input",
         "description": "Return air temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 18.0,
         "max_value": 28.0,
         "default_value": 23.0,
@@ -3369,22 +3034,22 @@
       }
     },
     "device_location": {
-      "building": "Sandton Office Park",
-      "floor": "L10",
+      "building": "Sandton City Office Tower",
+      "floor": "L0",
       "zone": "Plant Room",
       "room": "AHU Room L10",
-      "description": "L10, Plant Room, Sandton L10 AHU"
+      "description": "L0, Plant Room, Sandton L0 AHU"
     },
     "metadata": {
-      "building": "Sandton Office Park",
-      "building_id": "sandton",
+      "building": "Sandton City Office Tower",
+      "building_id": "site-002",
       "floor": "L10",
       "serves": "All zones on L10",
       "critical": true
     }
   },
   {
-    "id": "002-stc-vav-l12-01",
+    "id": "S002-VAV-L2-A",
     "name": "Sandton VAV-L12-01",
     "device_type": "hvac",
     "protocol": "mock",
@@ -3426,7 +3091,7 @@
         "name": "discharge_air_temp",
         "point_type": "analog_input",
         "description": "Discharge air temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 10,
         "max_value": 30,
         "default_value": 14.5,
@@ -3444,11 +3109,11 @@
       }
     },
     "device_location": {
-      "building": "Sandton City",
-      "floor": "L12",
-      "zone": "Zone-L12-A",
+      "building": "Sandton City Office Tower",
+      "floor": "L2",
+      "zone": "Zone-L2-A",
       "room": "Ceiling L12",
-      "description": "Level 12, Zone A",
+      "description": "Level 2, Zone A",
       "zone_type": "open_office",
       "exposure": "interior",
       "zone_priority": 3
@@ -3461,8 +3126,8 @@
       "capacity_kw": 500
     },
     "metadata": {
-      "building": "Sandton City",
-      "building_id": "sandton",
+      "building": "Sandton City Office Tower",
+      "building_id": "site-002",
       "floor": 12,
       "zone": "Zone-L12-A",
       "location": "Level 12 Zone A ceiling",
@@ -3472,7 +3137,7 @@
     }
   },
   {
-    "id": "002-stc-vav-l12-02",
+    "id": "S002-VAV-L2-B",
     "name": "Sandton VAV-L12-02",
     "device_type": "hvac",
     "protocol": "mock",
@@ -3514,7 +3179,7 @@
         "name": "discharge_air_temp",
         "point_type": "analog_input",
         "description": "Discharge air temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 10,
         "max_value": 30,
         "default_value": 14.5,
@@ -3532,11 +3197,11 @@
       }
     },
     "device_location": {
-      "building": "Sandton City",
-      "floor": "L12",
-      "zone": "Zone-L12-B",
+      "building": "Sandton City Office Tower",
+      "floor": "L2",
+      "zone": "Zone-L2-B",
       "room": "Ceiling L12",
-      "description": "Level 12, Zone B",
+      "description": "Level 2, Zone B",
       "zone_type": "open_office",
       "exposure": "interior",
       "zone_priority": 3
@@ -3549,8 +3214,8 @@
       "capacity_kw": 500
     },
     "metadata": {
-      "building": "Sandton City",
-      "building_id": "sandton",
+      "building": "Sandton City Office Tower",
+      "building_id": "site-002",
       "floor": 12,
       "zone": "Zone-L12-B",
       "location": "Level 12 Zone B ceiling",
@@ -3560,7 +3225,7 @@
     }
   },
   {
-    "id": "002-stc-vav-l12-03",
+    "id": "S002-VAV-L2-C",
     "name": "Sandton VAV-L12-03",
     "device_type": "hvac",
     "protocol": "mock",
@@ -3602,7 +3267,7 @@
         "name": "discharge_air_temp",
         "point_type": "analog_input",
         "description": "Discharge air temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 10,
         "max_value": 30,
         "default_value": 14.5,
@@ -3620,11 +3285,11 @@
       }
     },
     "device_location": {
-      "building": "Sandton City",
-      "floor": "L12",
-      "zone": "Zone-L12-C",
+      "building": "Sandton City Office Tower",
+      "floor": "L2",
+      "zone": "Zone-L2-C",
       "room": "Ceiling L12",
-      "description": "Level 12, Zone C",
+      "description": "Level 2, Zone C",
       "zone_type": "open_office",
       "exposure": "interior",
       "zone_priority": 3
@@ -3637,8 +3302,8 @@
       "capacity_kw": 500
     },
     "metadata": {
-      "building": "Sandton City",
-      "building_id": "sandton",
+      "building": "Sandton City Office Tower",
+      "building_id": "site-002",
       "floor": 12,
       "zone": "Zone-L12-C",
       "location": "Level 12 Zone C ceiling",
@@ -3648,7 +3313,7 @@
     }
   },
   {
-    "id": "002-stc-vav-l12-04",
+    "id": "S002-VAV-L2-D",
     "name": "Sandton VAV-L12-04",
     "device_type": "hvac",
     "protocol": "mock",
@@ -3690,7 +3355,7 @@
         "name": "discharge_air_temp",
         "point_type": "analog_input",
         "description": "Discharge air temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 10,
         "max_value": 30,
         "default_value": 14.5,
@@ -3708,11 +3373,11 @@
       }
     },
     "device_location": {
-      "building": "Sandton City",
-      "floor": "L12",
-      "zone": "Zone-L12-D",
+      "building": "Sandton City Office Tower",
+      "floor": "L2",
+      "zone": "Zone-L2-D",
       "room": "Ceiling L12",
-      "description": "Level 12, Zone D",
+      "description": "Level 2, Zone D",
       "zone_type": "open_office",
       "exposure": "interior",
       "zone_priority": 3
@@ -3725,8 +3390,8 @@
       "capacity_kw": 500
     },
     "metadata": {
-      "building": "Sandton City",
-      "building_id": "sandton",
+      "building": "Sandton City Office Tower",
+      "building_id": "site-002",
       "floor": 12,
       "zone": "Zone-L12-D",
       "location": "Level 12 Zone D ceiling",
@@ -3736,7 +3401,7 @@
     }
   },
   {
-    "id": "002-stc-vav-l12-05",
+    "id": "S002-VAV-L2-E",
     "name": "Sandton VAV-L12-05",
     "device_type": "hvac",
     "protocol": "mock",
@@ -3778,7 +3443,7 @@
         "name": "discharge_air_temp",
         "point_type": "analog_input",
         "description": "Discharge air temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 10,
         "max_value": 30,
         "default_value": 14.5,
@@ -3796,11 +3461,11 @@
       }
     },
     "device_location": {
-      "building": "Sandton City",
-      "floor": "L12",
-      "zone": "Zone-L12-E",
+      "building": "Sandton City Office Tower",
+      "floor": "L2",
+      "zone": "Zone-L2-E",
       "room": "Ceiling L12",
-      "description": "Level 12, Zone E",
+      "description": "Level 2, Zone E",
       "zone_type": "open_office",
       "exposure": "interior",
       "zone_priority": 3
@@ -3813,8 +3478,8 @@
       "capacity_kw": 500
     },
     "metadata": {
-      "building": "Sandton City",
-      "building_id": "sandton",
+      "building": "Sandton City Office Tower",
+      "building_id": "site-002",
       "floor": 12,
       "zone": "Zone-L12-E",
       "location": "Level 12 Zone E ceiling",
@@ -3824,7 +3489,7 @@
     }
   },
   {
-    "id": "002-stc-vav-l11-01",
+    "id": "S002-VAV-L1-A",
     "name": "Sandton VAV-L11-01",
     "device_type": "hvac",
     "protocol": "mock",
@@ -3866,7 +3531,7 @@
         "name": "discharge_air_temp",
         "point_type": "analog_input",
         "description": "Discharge air temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 10,
         "max_value": 30,
         "default_value": 14.5,
@@ -3884,11 +3549,11 @@
       }
     },
     "device_location": {
-      "building": "Sandton City",
-      "floor": "L11",
-      "zone": "Zone-L11-A",
+      "building": "Sandton City Office Tower",
+      "floor": "L1",
+      "zone": "Zone-L1-A",
       "room": "Ceiling L11",
-      "description": "Level 11, Zone A",
+      "description": "Level 1, Zone A",
       "zone_type": "open_office",
       "exposure": "interior",
       "zone_priority": 3
@@ -3901,8 +3566,8 @@
       "capacity_kw": 500
     },
     "metadata": {
-      "building": "Sandton City",
-      "building_id": "sandton",
+      "building": "Sandton City Office Tower",
+      "building_id": "site-002",
       "floor": 11,
       "zone": "Zone-L11-A",
       "location": "Level 11 Zone A ceiling",
@@ -3912,7 +3577,7 @@
     }
   },
   {
-    "id": "002-stc-vav-l11-02",
+    "id": "S002-VAV-L1-B",
     "name": "Sandton VAV-L11-02",
     "device_type": "hvac",
     "protocol": "mock",
@@ -3954,7 +3619,7 @@
         "name": "discharge_air_temp",
         "point_type": "analog_input",
         "description": "Discharge air temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 10,
         "max_value": 30,
         "default_value": 14.5,
@@ -3972,11 +3637,11 @@
       }
     },
     "device_location": {
-      "building": "Sandton City",
-      "floor": "L11",
-      "zone": "Zone-L11-B",
+      "building": "Sandton City Office Tower",
+      "floor": "L1",
+      "zone": "Zone-L1-B",
       "room": "Ceiling L11",
-      "description": "Level 11, Zone B",
+      "description": "Level 1, Zone B",
       "zone_type": "open_office",
       "exposure": "interior",
       "zone_priority": 3
@@ -3989,8 +3654,8 @@
       "capacity_kw": 500
     },
     "metadata": {
-      "building": "Sandton City",
-      "building_id": "sandton",
+      "building": "Sandton City Office Tower",
+      "building_id": "site-002",
       "floor": 11,
       "zone": "Zone-L11-B",
       "location": "Level 11 Zone B ceiling",
@@ -4000,7 +3665,7 @@
     }
   },
   {
-    "id": "002-stc-vav-l11-03",
+    "id": "S002-VAV-L1-C",
     "name": "Sandton VAV-L11-03",
     "device_type": "hvac",
     "protocol": "mock",
@@ -4042,7 +3707,7 @@
         "name": "discharge_air_temp",
         "point_type": "analog_input",
         "description": "Discharge air temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 10,
         "max_value": 30,
         "default_value": 14.5,
@@ -4060,11 +3725,11 @@
       }
     },
     "device_location": {
-      "building": "Sandton City",
-      "floor": "L11",
-      "zone": "Zone-L11-C",
+      "building": "Sandton City Office Tower",
+      "floor": "L1",
+      "zone": "Zone-L1-C",
       "room": "Ceiling L11",
-      "description": "Level 11, Zone C",
+      "description": "Level 1, Zone C",
       "zone_type": "open_office",
       "exposure": "interior",
       "zone_priority": 3
@@ -4077,8 +3742,8 @@
       "capacity_kw": 500
     },
     "metadata": {
-      "building": "Sandton City",
-      "building_id": "sandton",
+      "building": "Sandton City Office Tower",
+      "building_id": "site-002",
       "floor": 11,
       "zone": "Zone-L11-C",
       "location": "Level 11 Zone C ceiling",
@@ -4088,7 +3753,7 @@
     }
   },
   {
-    "id": "002-stc-vav-l11-04",
+    "id": "S002-VAV-L1-D",
     "name": "Sandton VAV-L11-04",
     "device_type": "hvac",
     "protocol": "mock",
@@ -4130,7 +3795,7 @@
         "name": "discharge_air_temp",
         "point_type": "analog_input",
         "description": "Discharge air temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 10,
         "max_value": 30,
         "default_value": 14.5,
@@ -4148,11 +3813,11 @@
       }
     },
     "device_location": {
-      "building": "Sandton City",
-      "floor": "L11",
-      "zone": "Zone-L11-D",
+      "building": "Sandton City Office Tower",
+      "floor": "L1",
+      "zone": "Zone-L1-D",
       "room": "Ceiling L11",
-      "description": "Level 11, Zone D",
+      "description": "Level 1, Zone D",
       "zone_type": "open_office",
       "exposure": "interior",
       "zone_priority": 3
@@ -4165,8 +3830,8 @@
       "capacity_kw": 500
     },
     "metadata": {
-      "building": "Sandton City",
-      "building_id": "sandton",
+      "building": "Sandton City Office Tower",
+      "building_id": "site-002",
       "floor": 11,
       "zone": "Zone-L11-D",
       "location": "Level 11 Zone D ceiling",
@@ -4176,7 +3841,7 @@
     }
   },
   {
-    "id": "002-stc-vav-l11-05",
+    "id": "S002-VAV-L1-E",
     "name": "Sandton VAV-L11-05",
     "device_type": "hvac",
     "protocol": "mock",
@@ -4218,7 +3883,7 @@
         "name": "discharge_air_temp",
         "point_type": "analog_input",
         "description": "Discharge air temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 10,
         "max_value": 30,
         "default_value": 14.5,
@@ -4236,11 +3901,11 @@
       }
     },
     "device_location": {
-      "building": "Sandton City",
-      "floor": "L11",
-      "zone": "Zone-L11-E",
+      "building": "Sandton City Office Tower",
+      "floor": "L1",
+      "zone": "Zone-L1-E",
       "room": "Ceiling L11",
-      "description": "Level 11, Zone E",
+      "description": "Level 1, Zone E",
       "zone_type": "open_office",
       "exposure": "interior",
       "zone_priority": 3
@@ -4253,8 +3918,8 @@
       "capacity_kw": 500
     },
     "metadata": {
-      "building": "Sandton City",
-      "building_id": "sandton",
+      "building": "Sandton City Office Tower",
+      "building_id": "site-002",
       "floor": 11,
       "zone": "Zone-L11-E",
       "location": "Level 11 Zone E ceiling",
@@ -4264,7 +3929,7 @@
     }
   },
   {
-    "id": "002-stc-vav-l10-01",
+    "id": "S002-VAV-L0-A",
     "name": "Sandton VAV-L10-01",
     "device_type": "hvac",
     "protocol": "mock",
@@ -4306,7 +3971,7 @@
         "name": "discharge_air_temp",
         "point_type": "analog_input",
         "description": "Discharge air temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 10,
         "max_value": 30,
         "default_value": 14.5,
@@ -4324,11 +3989,11 @@
       }
     },
     "device_location": {
-      "building": "Sandton City",
-      "floor": "L10",
-      "zone": "Zone-L10-A",
+      "building": "Sandton City Office Tower",
+      "floor": "L0",
+      "zone": "Zone-L0-A",
       "room": "Ceiling L10",
-      "description": "Level 10, Zone A",
+      "description": "Level 0, Zone A",
       "zone_type": "open_office",
       "exposure": "interior",
       "zone_priority": 3
@@ -4341,8 +4006,8 @@
       "capacity_kw": 500
     },
     "metadata": {
-      "building": "Sandton City",
-      "building_id": "sandton",
+      "building": "Sandton City Office Tower",
+      "building_id": "site-002",
       "floor": 10,
       "zone": "Zone-L10-A",
       "location": "Level 10 Zone A ceiling",
@@ -4352,7 +4017,7 @@
     }
   },
   {
-    "id": "002-stc-vav-l10-02",
+    "id": "S002-VAV-L0-B",
     "name": "Sandton VAV-L10-02",
     "device_type": "hvac",
     "protocol": "mock",
@@ -4394,7 +4059,7 @@
         "name": "discharge_air_temp",
         "point_type": "analog_input",
         "description": "Discharge air temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 10,
         "max_value": 30,
         "default_value": 14.5,
@@ -4412,11 +4077,11 @@
       }
     },
     "device_location": {
-      "building": "Sandton City",
-      "floor": "L10",
-      "zone": "Zone-L10-B",
+      "building": "Sandton City Office Tower",
+      "floor": "L0",
+      "zone": "Zone-L0-B",
       "room": "Ceiling L10",
-      "description": "Level 10, Zone B",
+      "description": "Level 0, Zone B",
       "zone_type": "open_office",
       "exposure": "interior",
       "zone_priority": 3
@@ -4429,8 +4094,8 @@
       "capacity_kw": 500
     },
     "metadata": {
-      "building": "Sandton City",
-      "building_id": "sandton",
+      "building": "Sandton City Office Tower",
+      "building_id": "site-002",
       "floor": 10,
       "zone": "Zone-L10-B",
       "location": "Level 10 Zone B ceiling",
@@ -4440,7 +4105,7 @@
     }
   },
   {
-    "id": "002-stc-vav-l10-03",
+    "id": "S002-VAV-L0-C",
     "name": "Sandton VAV-L10-03",
     "device_type": "hvac",
     "protocol": "mock",
@@ -4482,7 +4147,7 @@
         "name": "discharge_air_temp",
         "point_type": "analog_input",
         "description": "Discharge air temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 10,
         "max_value": 30,
         "default_value": 14.5,
@@ -4500,11 +4165,11 @@
       }
     },
     "device_location": {
-      "building": "Sandton City",
-      "floor": "L10",
-      "zone": "Zone-L10-C",
+      "building": "Sandton City Office Tower",
+      "floor": "L0",
+      "zone": "Zone-L0-C",
       "room": "Ceiling L10",
-      "description": "Level 10, Zone C",
+      "description": "Level 0, Zone C",
       "zone_type": "open_office",
       "exposure": "interior",
       "zone_priority": 3
@@ -4517,8 +4182,8 @@
       "capacity_kw": 500
     },
     "metadata": {
-      "building": "Sandton City",
-      "building_id": "sandton",
+      "building": "Sandton City Office Tower",
+      "building_id": "site-002",
       "floor": 10,
       "zone": "Zone-L10-C",
       "location": "Level 10 Zone C ceiling",
@@ -4528,7 +4193,7 @@
     }
   },
   {
-    "id": "002-stc-vav-l10-04",
+    "id": "S002-VAV-L0-D",
     "name": "Sandton VAV-L10-04",
     "device_type": "hvac",
     "protocol": "mock",
@@ -4570,7 +4235,7 @@
         "name": "discharge_air_temp",
         "point_type": "analog_input",
         "description": "Discharge air temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 10,
         "max_value": 30,
         "default_value": 14.5,
@@ -4588,11 +4253,11 @@
       }
     },
     "device_location": {
-      "building": "Sandton City",
-      "floor": "L10",
-      "zone": "Zone-L10-D",
+      "building": "Sandton City Office Tower",
+      "floor": "L0",
+      "zone": "Zone-L0-D",
       "room": "Ceiling L10",
-      "description": "Level 10, Zone D",
+      "description": "Level 0, Zone D",
       "zone_type": "open_office",
       "exposure": "interior",
       "zone_priority": 3
@@ -4605,8 +4270,8 @@
       "capacity_kw": 500
     },
     "metadata": {
-      "building": "Sandton City",
-      "building_id": "sandton",
+      "building": "Sandton City Office Tower",
+      "building_id": "site-002",
       "floor": 10,
       "zone": "Zone-L10-D",
       "location": "Level 10 Zone D ceiling",
@@ -4616,7 +4281,7 @@
     }
   },
   {
-    "id": "002-stc-vav-l10-05",
+    "id": "S002-VAV-L0-E",
     "name": "Sandton VAV-L10-05",
     "device_type": "hvac",
     "protocol": "mock",
@@ -4658,7 +4323,7 @@
         "name": "discharge_air_temp",
         "point_type": "analog_input",
         "description": "Discharge air temperature",
-        "unit": "\u00b0C",
+        "unit": "°C",
         "min_value": 10,
         "max_value": 30,
         "default_value": 14.5,
@@ -4676,11 +4341,11 @@
       }
     },
     "device_location": {
-      "building": "Sandton City",
-      "floor": "L10",
-      "zone": "Zone-L10-E",
+      "building": "Sandton City Office Tower",
+      "floor": "L0",
+      "zone": "Zone-L0-E",
       "room": "Ceiling L10",
-      "description": "Level 10, Zone E",
+      "description": "Level 0, Zone E",
       "zone_type": "open_office",
       "exposure": "interior",
       "zone_priority": 3
@@ -4693,8 +4358,8 @@
       "capacity_kw": 500
     },
     "metadata": {
-      "building": "Sandton City",
-      "building_id": "sandton",
+      "building": "Sandton City Office Tower",
+      "building_id": "site-002",
       "floor": 10,
       "zone": "Zone-L10-E",
       "location": "Level 10 Zone E ceiling",
