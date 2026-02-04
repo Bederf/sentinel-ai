@@ -8,8 +8,9 @@ uvicorn[standard]==0.27.1
 pydantic==2.6.1
 pydantic-settings==2.1.0
 
-# HTTP Client (for future API calls)
+# HTTP Client
 httpx==0.26.0
+requests>=2.31.0
 
 # AI/LLM
 anthropic>=0.39.0

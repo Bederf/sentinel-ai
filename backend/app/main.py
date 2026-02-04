@@ -44,6 +44,7 @@ from app.api import repair_effectiveness  # Phase 57-01 Repair effectiveness val
 from app.api import remote_ops  # Phase 59-01 Remote operations monitoring
 from app.api import remote_commands  # Phase 59-02 Remote command execution
 from app.api import dispatch  # Phase 59-03 Smart dispatch & task bundling
+from app.api import niagara  # Phase 60-02 Niagara oBIX integration
 # from app.api import inspection  # Phase 45 Routine Inspection & Maintenance - TODO: Fix import errors
 from app.middleware.audit_middleware import AuditMiddleware
 from app.services.background_scheduler import scheduler_service
@@ -124,6 +125,7 @@ app.include_router(repair_effectiveness.router, tags=["repair-effectiveness"])  
 app.include_router(remote_ops.router, tags=["remote-ops"])  # Phase 59-01 Remote operations monitoring
 app.include_router(remote_commands.router, prefix="/api/remote", tags=["remote-ops"])  # Phase 59-02 Remote command execution
 app.include_router(dispatch.router, prefix="/api/dispatch", tags=["dispatch"])  # Phase 59-03 Smart dispatch
+app.include_router(niagara.router, tags=["niagara-obix"])  # Phase 60-02 Niagara oBIX integration
 # app.include_router(inspection.router)  # Phase 45 Routine Inspection & Maintenance - TODO: Fix import errors
 
 
