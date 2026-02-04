@@ -242,5 +242,65 @@
     "updated_at": "2026-02-03T10:00:00.000000+00:00",
     "min_brightness": 0,
     "max_brightness": 30
+  },
+  {
+    "id": "remote_setpoint_delta",
+    "name": "Remote Setpoint Delta Limit",
+    "rule_type": "custom",
+    "severity": "block",
+    "description": "Remote setpoint changes must not exceed ±3°C from current value to prevent thermal shock and equipment stress",
+    "device_type": null,
+    "device_id": null,
+    "point_name": null,
+    "enabled": true,
+    "metadata": {
+      "applies_to": "remote_commands",
+      "max_delta_celsius": 3.0,
+      "enforced_by": "RemoteCommandService"
+    },
+    "created_at": "2026-02-04T08:00:00.000000+00:00",
+    "updated_at": "2026-02-04T08:00:00.000000+00:00",
+    "validation_logic": "abs(value - current_value) <= 3.0"
+  },
+  {
+    "id": "remote_fire_panel",
+    "name": "Remote Fire Panel Reset Authorization",
+    "rule_type": "custom",
+    "severity": "block",
+    "description": "Fire panel reset via remote commands requires ENGINEER level authorization. All fire panel resets are logged at ALARM severity.",
+    "device_type": "fire_safety",
+    "device_id": null,
+    "point_name": null,
+    "enabled": true,
+    "metadata": {
+      "applies_to": "remote_commands",
+      "required_level": "ENGINEER",
+      "audit_severity": "ALARM",
+      "enforced_by": "RemoteCommandService"
+    },
+    "created_at": "2026-02-04T08:00:00.000000+00:00",
+    "updated_at": "2026-02-04T08:00:00.000000+00:00",
+    "validation_logic": "user_level >= 4"
+  },
+  {
+    "id": "remote_rate_limit",
+    "name": "Remote Command Rate Limit",
+    "rule_type": "custom",
+    "severity": "warning",
+    "description": "Remote commands are rate-limited to 10 per user per hour. Warning issued at 8 commands/hour, blocked at 10.",
+    "device_type": null,
+    "device_id": null,
+    "point_name": null,
+    "enabled": true,
+    "metadata": {
+      "applies_to": "remote_commands",
+      "warning_threshold": 8,
+      "block_threshold": 10,
+      "window_hours": 1,
+      "enforced_by": "RemoteCommandService"
+    },
+    "created_at": "2026-02-04T08:00:00.000000+00:00",
+    "updated_at": "2026-02-04T08:00:00.000000+00:00",
+    "validation_logic": "commands_in_last_hour < 10"
   }
 ]
