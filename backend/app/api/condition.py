@@ -1,17 +1,23 @@
 """
-Condition Analysis API (Phase 56-01)
+Condition Analysis API (Phase 56-01, 56-02)
 
-REST endpoints for element-level condition trending and degradation analysis.
+REST endpoints for element-level condition trending, degradation analysis,
+and remaining useful life (RUL) predictions.
 
 Endpoints:
-- GET  /api/condition/trends/{equipment_id}              - Equipment trend summary
+- GET  /api/condition/trends/{equipment_id}                - Equipment trend summary
 - GET  /api/condition/trends/{equipment_id}/{element_name} - Specific element trend
-- GET  /api/condition/degradation-rates/{equipment_id}    - All degradation rates
-- POST /api/condition/analyze-changes                     - Full analysis (ROADMAP spec)
+- GET  /api/condition/degradation-rates/{equipment_id}     - All degradation rates
+- POST /api/condition/analyze-changes                      - Full analysis (ROADMAP spec)
+- GET  /api/condition/rul/{equipment_id}                   - RUL prediction
+- GET  /api/condition/recommendations/{equipment_id}       - Service recommendations
+- GET  /api/condition/fleet-risk                           - Fleet-wide risk overview
 """
 
+import json
 import logging
-from typing import List
+from pathlib import Path
+from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Query
 
@@ -21,8 +27,12 @@ from app.models.condition import (
     DegradationRate,
     AnalyzeChangesRequest,
     TrendDirection,
+    EquipmentRUL,
+    ServiceRecommendation,
+    RiskLevel,
 )
 from app.services.element_trend_service import get_element_trend_service
+from app.services.rul_calculator import get_rul_calculator
 
 logger = logging.getLogger(__name__)
 
@@ -226,6 +236,134 @@ async def analyze_changes(request: AnalyzeChangesRequest):
             detail=f"Error analyzing changes: {str(e)}"
         )
 
+
+# ============================================================================
+# RUL Prediction Endpoints (Phase 56-02)
+# ============================================================================
+
+@router.get(
+    "/rul/{equipment_id}",
+    response_model=EquipmentRUL,
+    summary="Get equipment RUL prediction",
+    description="Returns Remaining Useful Life prediction for all elements of an equipment item."
+)
+async def get_equipment_rul(
+    equipment_id: str,
+    days: int = Query(default=90, ge=1, le=365, description="History window in days for trend calculation")
+):
+    """Get RUL prediction for equipment."""
+    try:
+        calculator = get_rul_calculator()
+        rul = await calculator.calculate_equipment_rul(equipment_id, days=days)
+        return rul
+    except Exception as e:
+        logger.error(f"Error calculating RUL for {equipment_id}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error calculating RUL: {str(e)}"
+        )
+
+
+@router.get(
+    "/recommendations/{equipment_id}",
+    response_model=List[ServiceRecommendation],
+    summary="Get service recommendations",
+    description="Returns prioritized service recommendations for degrading elements."
+)
+async def get_recommendations(
+    equipment_id: str,
+    days: int = Query(default=90, ge=1, le=365, description="History window in days")
+):
+    """Get service recommendations for equipment."""
+    try:
+        calculator = get_rul_calculator()
+        recommendations = await calculator.get_service_recommendations(equipment_id, days=days)
+        return recommendations
+    except Exception as e:
+        logger.error(f"Error generating recommendations for {equipment_id}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error generating recommendations: {str(e)}"
+        )
+
+
+@router.get(
+    "/fleet-risk",
+    response_model=List[EquipmentRUL],
+    summary="Get fleet-wide risk overview",
+    description="Returns RUL for all equipment, sorted by days until first threshold ascending."
+)
+async def get_fleet_risk(
+    risk_level: Optional[str] = Query(
+        default=None,
+        description="Filter by minimum risk level (low, medium, high, critical)"
+    ),
+    limit: int = Query(default=20, ge=1, le=100, description="Maximum results to return")
+):
+    """Get fleet-wide RUL risk overview."""
+    try:
+        # Load equipment list from equipment.json
+        equipment_path = Path(__file__).parent.parent / "data" / "equipment.json"
+        equipment_list = []
+
+        if equipment_path.exists():
+            with open(equipment_path, "r") as f:
+                equipment_list = json.load(f)
+        else:
+            logger.warning(f"Equipment data not found at {equipment_path}")
+            return []
+
+        calculator = get_rul_calculator()
+
+        # Calculate RUL for each equipment
+        all_ruls: List[EquipmentRUL] = []
+        for eq in equipment_list:
+            eq_id = eq.get("id", "")
+            if not eq_id:
+                continue
+
+            try:
+                rul = await calculator.calculate_equipment_rul(eq_id)
+                # Populate equipment_type from the data if not set
+                if not rul.equipment_type:
+                    rul.equipment_type = eq.get("type")
+                all_ruls.append(rul)
+            except Exception as e:
+                logger.debug(f"Skipping {eq_id} in fleet risk: {e}")
+                continue
+
+        # Filter by minimum risk level if specified
+        if risk_level:
+            risk_order = {
+                "low": 0, "medium": 1, "high": 2, "critical": 3
+            }
+            min_level = risk_order.get(risk_level.lower(), 0)
+            all_ruls = [
+                r for r in all_ruls
+                if risk_order.get(r.overall_risk_level.value, 0) >= min_level
+            ]
+
+        # Sort by days_until_first_threshold ascending (None = infinity at end)
+        all_ruls.sort(
+            key=lambda r: (
+                r.days_until_first_threshold if r.days_until_first_threshold is not None else float("inf")
+            )
+        )
+
+        # Apply limit
+        return all_ruls[:limit]
+
+    except Exception as e:
+        logger.error(f"Error calculating fleet risk: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error calculating fleet risk: {str(e)}"
+        )
+
+
+# ============================================================================
+# Helper Functions
+# ============================================================================
 
 def _infer_measurement_type(unit: str) -> str:
     """Infer measurement type from unit string."""
