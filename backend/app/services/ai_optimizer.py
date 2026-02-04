@@ -762,7 +762,7 @@ Provide ONLY the JSON response, no additional text."""
                 lines.append(
                     f"- {zone['zone_name']}: "
                     f"{occ.get('occupancy_percent', 0):.0f}% occupied, "
-                    f"lights at {light.get('avg_dim_level', 0):.0f}% ({light.get('total_power_w', 0):.0f}W)"
+                    f"lights at {light.get('avg_brightness', 0):.0f}% ({light.get('total_power_watts', 0):.0f}W)"
                 )
 
         # Lighting Telemetry by Zone
@@ -773,9 +773,9 @@ Provide ONLY the JSON response, no additional text."""
 
             occ_pct = occ.get("occupancy_percent", 0) if occ else 0
             avg_lux = occ.get("avg_lux_level", 0) if occ else 0
-            dim_level = light.get("avg_dim_level", 0) if light else 0
-            power_w = light.get("total_power_w", 0) if light else 0
-            faulty = light.get("faulty_count", 0) if light else 0
+            dim_level = light.get("avg_brightness", 0) if light else 0
+            power_w = light.get("total_power_watts", 0) if light else 0
+            faulty = light.get("faulty_luminaires", 0) if light else 0
             scene = zone.get("active_scene_name", "Manual")
 
             status = "🟢" if zone.get("is_occupied") else "⚪"
@@ -1094,8 +1094,8 @@ Provide ONLY the JSON response, no additional text."""
                 if not lighting:
                     continue
 
-                current_dim = lighting.get("avg_dim_level", 0)
-                total_power = lighting.get("total_power_w", 0)
+                current_dim = lighting.get("avg_brightness", 0)
+                total_power = lighting.get("total_power_watts", 0)
                 zone_name = zone.get("zone_name", zone_id)
                 is_emergency = "emergency" in zone_name.lower()
 

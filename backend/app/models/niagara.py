@@ -268,6 +268,12 @@ class BACnetCOVSubscriptionListResponse(BaseModel):
 # BACnet Client Status
 # ---------------------------------------------------------------------------
 
+class BACnetTestConnectionRequest(BaseModel):
+    """Request to test BACnet connectivity."""
+
+    timeout: int = Field(5, description="Discovery timeout in seconds", ge=1, le=30)
+
+
 class BACnetClientStatus(BaseModel):
     """BACnet client health and status information."""
 

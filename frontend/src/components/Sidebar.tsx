@@ -30,9 +30,10 @@ import {
   GitBranch,
   SlidersHorizontal,
   ShieldCheck,
+  Plug,
 } from "lucide-react";
 
-export type View = "dashboard" | "chat" | "technician" | "control" | "control-audit" | "optimization" | "settings" | "integrations" | "occupancy" | "workflow" | "security";
+export type View = "dashboard" | "chat" | "technician" | "control" | "control-audit" | "optimization" | "settings" | "integrations" | "occupancy" | "workflow" | "security" | "simbiot";
 
 interface SidebarProps {
   currentView: View;
@@ -64,6 +65,7 @@ const navItems: NavItem[] = [
   { id: "control-audit", label: "Control Audit", icon: ClipboardList, description: "Control System Logs" },
   { id: "settings", label: "Settings", icon: SettingsIcon, description: "System Configuration" },
   { id: "workflow", label: "Asset Workflow", icon: GitBranch, description: "Lifecycle Management" },
+  { id: "simbiot", label: "SIMBIOT", icon: Plug, description: "BMS Connection Wizard" },
   { id: "integrations", label: "Integrations", icon: Activity, description: "BMS Integration Health" },
   { id: "security", label: "Security", icon: ShieldCheck, description: "Access & CCTV" },
 ];

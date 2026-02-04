@@ -50,6 +50,7 @@ from app.api import niagara_discovery  # Phase 60-03 Niagara point discovery
 from app.api import fire  # Phase 61-01 Fire & Life Safety
 from app.api import security  # Phase 58-01 Security Module (access control, CCTV, occupancy)
 from app.api import inspection  # Phase 55 Routine Inspection & Maintenance
+from app.api import auth  # Authentication endpoints
 from app.middleware.audit_middleware import AuditMiddleware
 from app.middleware.security_logging import SecurityLoggingMiddleware
 from app.services.background_scheduler import scheduler_service
@@ -141,6 +142,7 @@ app.include_router(niagara_discovery.router, tags=["niagara-discovery"])  # Phas
 app.include_router(fire.router, tags=["fire"])  # Phase 61-01 Fire & Life Safety
 app.include_router(security.router, tags=["security"])  # Phase 58-01 Security Module
 app.include_router(inspection.router, tags=["inspection"])  # Phase 55 Routine Inspection & Maintenance
+app.include_router(auth.router)  # Authentication (email-based login)
 
 
 @app.on_event("startup")

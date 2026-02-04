@@ -292,9 +292,42 @@ class HybridAIService:
             yield f"[Claude rate limited - using {model}] {response}"
 
         except Exception as e:
-            # Other errors, log and re-raise
-            logger.error(f"Claude error (not rate limit): {e}")
-            raise
+            # Handle all other Claude API errors with Ollama fallback
+            # This includes: 500 Internal Server Error, 502 Bad Gateway, 503 Service Unavailable, etc.
+            error_type = type(e).__name__
+            logger.error(f"Claude API error ({error_type}): {e}")
+
+            # Check if this is a transient API error that warrants fallback
+            # APIError, APIConnectionError, and similar should trigger fallback
+            from anthropic import APIError, APIConnectionError, APITimeoutError
+
+            if isinstance(e, (APIError, APIConnectionError, APITimeoutError)):
+                logger.info("Claude API unavailable - falling back to Ollama")
+                routing = self.classify_task(message)
+
+                # Use Ollama instead
+                if routing["tier"] == 1:
+                    model = self.ollama_models["fast"]
+                else:
+                    model = self.ollama_models["balanced"]
+
+                try:
+                    response = await self.query_ollama(
+                        message,
+                        model=model,
+                        escalate_on_fail=False
+                    )
+                    # Prefix with fallback notice
+                    yield f"[Claude unavailable ({error_type}) - using {model}] {response}"
+                    return
+                except Exception as ollama_error:
+                    logger.error(f"Ollama fallback also failed: {ollama_error}")
+                    yield "I'm experiencing technical difficulties with both AI services. Please try again in a moment."
+                    return
+            else:
+                # For non-API errors (programming errors, etc.), re-raise
+                logger.error(f"Claude error (not transient API error): {e}")
+                raise
 
     async def stream_response(
         self,
@@ -353,6 +386,20 @@ class HybridAIService:
 
                 yield "[Claude rate limited] Cannot perform tool-based actions right now. Please try a simpler query."
                 return
+
+            except Exception as e:
+                # Handle all other Claude API errors during tool calling
+                from anthropic import APIError, APIConnectionError, APITimeoutError
+
+                error_type = type(e).__name__
+                logger.error(f"Claude API error during tool calling ({error_type}): {e}")
+
+                if isinstance(e, (APIError, APIConnectionError, APITimeoutError)):
+                    yield f"[Claude unavailable ({error_type})] Tool-based actions are temporarily unavailable. Please try again in a moment."
+                    return
+                else:
+                    # For non-API errors, re-raise
+                    raise
 
         # Check if Claude is in cooldown period
         if routing["provider"] == "anthropic":

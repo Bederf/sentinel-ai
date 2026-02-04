@@ -3,6 +3,7 @@
 import time
 import csv
 import io
+import uuid
 from typing import List, Optional, Literal
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, UploadFile, File, Query
@@ -23,11 +24,29 @@ from app.models.integration import (
 
 class IntegrationAlert(BaseModel):
     """An alert from integration health monitoring."""
+    id: str = ""
     type: str  # 'stale_data', 'high_error_rate', 'low_match_coverage'
     severity: str  # 'warning', 'critical'
     message: str
+    timestamp: str = ""
     value: Optional[float] = None
     threshold: Optional[float] = None
+
+
+class DALISourceHealth(BaseModel):
+    """Health status for a DALI lighting data source."""
+    site_id: str
+    source_name: str
+    source_type: str = "dali_lighting"
+    connection_type: str = "file_drop"
+    status: str  # healthy, degraded, offline
+    controllers_online: int = 0
+    controllers_total: int = 0
+    sensors_online: int = 0
+    sensors_total: int = 0
+    luminaires_total: int = 0
+    last_poll: Optional[str] = None
+    description: str = ""
 
 
 class IntegrationHealthSummary(BaseModel):
@@ -40,6 +59,7 @@ class IntegrationHealthSummary(BaseModel):
     unmatched_points: int
     recent_errors_count: int
     alerts: List[IntegrationAlert] = Field(default_factory=list)
+    dali_sources: List[DALISourceHealth] = Field(default_factory=list)
 
 
 class DataQualityMetrics(BaseModel):
@@ -56,6 +76,7 @@ class SyncJobSummary(BaseModel):
     """Summary of a sync job."""
     id: str
     log_source_id: str
+    source_name: Optional[str] = None
     status: str
     records_processed: Optional[int] = None
     records_inserted: Optional[int] = None
@@ -109,6 +130,30 @@ parser_service = LogParserService()
 matcher_service = PointMatcherService()
 
 
+_building_uuid_cache: dict[str, str] = {}
+
+
+def resolve_building_uuid(building_id: str) -> str:
+    """Resolve a site code (e.g. 'site-002') to the Supabase building UUID.
+
+    The frontend uses site codes from /api/sites, but integration tables
+    store building UUIDs. This bridges the two ID systems.
+    Results are cached for the lifetime of the process.
+    """
+    if building_id in _building_uuid_cache:
+        return _building_uuid_cache[building_id]
+
+    try:
+        building = building_repo.get_by_id(building_id)
+        if building:
+            resolved = building['id']
+            _building_uuid_cache[building_id] = resolved
+            return resolved
+    except Exception:
+        pass
+    return building_id
+
+
 # ==================== Log Sources ====================
 
 @router.get("/sources", response_model=List[LogSource])
@@ -118,8 +163,9 @@ async def list_log_sources(
     is_active: Optional[bool] = None,
 ):
     """List configured log sources."""
+    resolved_id = resolve_building_uuid(building_id) if building_id else None
     return integration_repo.get_log_sources(
-        building_id=building_id,
+        building_id=resolved_id,
         source_type=source_type,
         is_active=is_active,
     )
@@ -137,12 +183,14 @@ async def get_log_source(source_id: str):
 @router.post("/sources", response_model=LogSource, status_code=201)
 async def create_log_source(source: LogSourceCreate):
     """Create a new log source configuration."""
-    # Verify building exists
-    building = building_repo.get_by_uuid(source.building_id)
+    # Resolve site code to UUID and verify building exists
+    resolved_id = resolve_building_uuid(source.building_id)
+    building = building_repo.get_by_uuid(resolved_id)
     if not building:
         raise HTTPException(status_code=404, detail="Building not found")
 
     data = source.model_dump(exclude_none=True)
+    data['building_id'] = resolved_id
     return integration_repo.create_log_source(data)
 
 
@@ -244,11 +292,12 @@ async def match_points_to_assets(
 
     This is Step 3 of the setup wizard.
     """
+    resolved_id = resolve_building_uuid(building_id)
     # Get CAFM assets for building
-    cafm_assets = integration_repo.get_cafm_assets(building_id)
+    cafm_assets = integration_repo.get_cafm_assets(resolved_id)
     if not cafm_assets:
         # Fall back to equipment table if no CAFM sync yet
-        building = building_repo.get_by_uuid(building_id)
+        building = building_repo.get_by_uuid(resolved_id)
         if building:
             equipment = equipment_repo.get_by_building(building['id'])
             cafm_assets = [{'asset_tag': e['code'], 'description': e['name']} for e in equipment]
@@ -286,8 +335,9 @@ async def save_point_mappings(
     mappings: List[PointAssetMappingCreate],
 ):
     """Save point-to-asset mappings after review."""
+    resolved_id = resolve_building_uuid(building_id)
     mapping_dicts = [m.model_dump() for m in mappings]
-    count = integration_repo.bulk_upsert_point_mappings(building_id, mapping_dicts)
+    count = integration_repo.bulk_upsert_point_mappings(resolved_id, mapping_dicts)
     return {"saved": count}
 
 
@@ -311,8 +361,9 @@ async def get_all_point_mappings(
     Use this endpoint for monitoring dashboard overviews.
     For building-specific operations, use /buildings/{building_id}/point-mappings instead.
     """
+    resolved_id = resolve_building_uuid(building_id) if building_id else None
     return integration_repo.get_all_point_mappings(
-        building_id=building_id,
+        building_id=resolved_id,
         confidence=confidence,
         verified_only=verified_only,
         limit=limit,
@@ -327,8 +378,9 @@ async def get_point_mappings(
     verified_only: bool = False,
 ):
     """Get point-to-asset mappings for a building."""
+    resolved_id = resolve_building_uuid(building_id)
     return integration_repo.get_point_mappings(
-        building_id,
+        resolved_id,
         confidence=confidence,
         verified_only=verified_only,
     )
@@ -500,7 +552,8 @@ async def get_severity_mappings(source_id: Optional[str] = None):
 @router.get("/buildings/{building_id}/cafm-assets")
 async def get_cafm_assets(building_id: str):
     """Get synced CAFM assets for a building."""
-    return integration_repo.get_cafm_assets(building_id)
+    resolved_id = resolve_building_uuid(building_id)
+    return integration_repo.get_cafm_assets(resolved_id)
 
 
 @router.get("/buildings/{building_id}/alarms")
@@ -510,7 +563,8 @@ async def get_recent_alarms(
     severity: Optional[str] = None,
 ):
     """Get recent ingested alarms for a building."""
-    return integration_repo.get_recent_alarms(building_id, limit, severity)
+    resolved_id = resolve_building_uuid(building_id)
+    return integration_repo.get_recent_alarms(resolved_id, limit, severity)
 
 
 # ==================== Monitoring Endpoints ====================
@@ -530,7 +584,8 @@ async def get_integration_health(
     - Recent errors
     - Generated alerts for problematic conditions
     """
-    health = integration_repo.get_integration_health(building_id)
+    resolved_id = resolve_building_uuid(building_id) if building_id else None
+    health = integration_repo.get_integration_health(resolved_id)
 
     # Generate alerts based on conditions
     alerts: List[IntegrationAlert] = []
@@ -546,9 +601,11 @@ async def get_integration_health(
             hours_since_sync = (datetime.utcnow() - last_sync).total_seconds() / 3600
             if hours_since_sync > 24:
                 alerts.append(IntegrationAlert(
+                    id=str(uuid.uuid4()),
                     type='stale_data',
                     severity='warning' if hours_since_sync < 48 else 'critical',
                     message=f"Data is {int(hours_since_sync)} hours old. Last sync was {last_sync.strftime('%Y-%m-%d %H:%M')}.",
+                    timestamp=datetime.utcnow().isoformat(),
                     value=round(hours_since_sync, 1),
                     threshold=24,
                 ))
@@ -561,9 +618,11 @@ async def get_integration_health(
         error_ratio = health['recent_errors_count'] / health['active_sources']
         if error_ratio > 0.1:
             alerts.append(IntegrationAlert(
+                id=str(uuid.uuid4()),
                 type='high_error_rate',
                 severity='warning' if error_ratio < 0.25 else 'critical',
                 message=f"{health['recent_errors_count']} sync failures in the last 24 hours.",
+                timestamp=datetime.utcnow().isoformat(),
                 value=health['recent_errors_count'],
                 threshold=health['active_sources'] * 0.1,
             ))
@@ -573,12 +632,27 @@ async def get_integration_health(
         match_rate = (health['total_points_mapped'] - health['unmatched_points']) / health['total_points_mapped'] * 100
         if match_rate < 50:
             alerts.append(IntegrationAlert(
+                id=str(uuid.uuid4()),
                 type='low_match_coverage',
                 severity='warning' if match_rate > 25 else 'critical',
                 message=f"Only {match_rate:.0f}% of points are matched to assets. {health['unmatched_points']} points unmatched.",
+                timestamp=datetime.utcnow().isoformat(),
                 value=round(match_rate, 1),
                 threshold=50,
             ))
+
+    # Get DALI source health
+    dali_sources: List[DALISourceHealth] = []
+    try:
+        from app.services.dali_service import get_dali_service
+        dali_service = get_dali_service()
+        for dh in dali_service.get_sources_health():
+            # If filtering by building_id, only include matching site
+            if resolved_id and dh.get("site_id") != building_id:
+                continue
+            dali_sources.append(DALISourceHealth(**dh))
+    except Exception:
+        pass  # DALI service may not be available
 
     return IntegrationHealthSummary(
         sources_count=health['sources_count'],
@@ -589,6 +663,7 @@ async def get_integration_health(
         unmatched_points=health['unmatched_points'],
         recent_errors_count=health['recent_errors_count'],
         alerts=alerts,
+        dali_sources=dali_sources,
     )
 
 
@@ -605,7 +680,8 @@ async def get_quality_metrics(building_id: str):
     - overall_score: Weighted quality score (0-100)
     - trend: Quality trend ('improving', 'stable', 'degrading')
     """
-    metrics = integration_repo.get_quality_metrics(building_id)
+    resolved_id = resolve_building_uuid(building_id)
+    metrics = integration_repo.get_quality_metrics(resolved_id)
 
     return DataQualityMetrics(
         match_coverage=metrics['match_coverage'],
@@ -628,12 +704,22 @@ async def get_sync_jobs_summary(
     Returns list of sync jobs from the last N days (default 7, max 30).
     Includes job status, record counts, processing time, and timestamps.
     """
-    jobs = integration_repo.get_sync_jobs_summary(building_id, days)
+    resolved_id = resolve_building_uuid(building_id) if building_id else None
+    jobs = integration_repo.get_sync_jobs_summary(resolved_id, days)
+
+    # Look up source names for display
+    source_ids = list({job['log_source_id'] for job in jobs})
+    source_names: dict[str, str] = {}
+    if source_ids:
+        sources = integration_repo.get_log_sources_by_ids(source_ids)
+        for s in sources:
+            source_names[s['id']] = s.get('name') or s['id'][:8]
 
     return [
         SyncJobSummary(
             id=job['id'],
             log_source_id=job['log_source_id'],
+            source_name=source_names.get(job['log_source_id']),
             status=job['status'],
             records_processed=job.get('records_processed'),
             records_inserted=job.get('records_inserted'),
@@ -662,18 +748,21 @@ async def get_validation_checklist(building_id: str):
     - Data quality metrics
     - Configuration completeness
     """
-    checklist = integration_repo.get_validation_checklist(building_id)
+    resolved_id = resolve_building_uuid(building_id)
+    checklist = integration_repo.get_validation_checklist(resolved_id)
 
     # Get building name from building_repo if available
     try:
-        building = building_repo.get_by_uuid(building_id)
+        building = building_repo.get_by_uuid(resolved_id)
+        if not building:
+            building = building_repo.get_by_id(building_id)
         if building:
             checklist['building_name'] = building.get('name')
     except Exception:
         pass
 
     # Get current building status
-    status_record = integration_repo.get_building_status(building_id)
+    status_record = integration_repo.get_building_status(resolved_id)
     current_status = BuildingStatus(status_record['status']) if status_record else BuildingStatus.DRAFT
 
     return ValidationChecklist(
@@ -696,7 +785,8 @@ async def get_building_status(building_id: str):
     Returns the activation status (draft, pending_validation, active, suspended).
     If no status record exists, returns DRAFT.
     """
-    status_record = integration_repo.get_building_status(building_id)
+    resolved_id = resolve_building_uuid(building_id)
+    status_record = integration_repo.get_building_status(resolved_id)
 
     if not status_record:
         return BuildingStatusResponse(
@@ -720,12 +810,16 @@ async def validate_building(building_id: str):
     Runs validation checklist and updates building status to PENDING_VALIDATION
     if all critical checks pass. Returns the validation checklist.
     """
+    resolved_id = resolve_building_uuid(building_id)
+
     # Run validation checklist
-    checklist = integration_repo.get_validation_checklist(building_id)
+    checklist = integration_repo.get_validation_checklist(resolved_id)
 
     # Get building name if available
     try:
-        building = building_repo.get_by_uuid(building_id)
+        building = building_repo.get_by_uuid(resolved_id)
+        if not building:
+            building = building_repo.get_by_id(building_id)
         if building:
             checklist['building_name'] = building.get('name')
     except Exception:
@@ -735,13 +829,13 @@ async def validate_building(building_id: str):
     if checklist['can_activate']:
         new_status = BuildingStatus.PENDING_VALIDATION
         integration_repo.update_building_status(
-            building_id,
+            resolved_id,
             new_status.value,
             notes="Passed validation - ready for activation",
         )
     else:
         # Stay in DRAFT or current status if validation fails
-        current = integration_repo.get_building_status(building_id)
+        current = integration_repo.get_building_status(resolved_id)
         new_status = BuildingStatus(current['status']) if current else BuildingStatus.DRAFT
 
     return ValidationChecklist(
@@ -767,8 +861,10 @@ async def activate_building(building_id: str):
 
     Returns activation result with success/failure and any validation errors.
     """
+    resolved_id = resolve_building_uuid(building_id)
+
     # Check current status
-    current = integration_repo.get_building_status(building_id)
+    current = integration_repo.get_building_status(resolved_id)
     if not current or current['status'] != BuildingStatus.PENDING_VALIDATION.value:
         return ActivationResult(
             success=False,
@@ -779,7 +875,7 @@ async def activate_building(building_id: str):
         )
 
     # Run validation again to confirm
-    checklist = integration_repo.get_validation_checklist(building_id)
+    checklist = integration_repo.get_validation_checklist(resolved_id)
 
     if not checklist['can_activate']:
         return ActivationResult(
@@ -792,7 +888,7 @@ async def activate_building(building_id: str):
 
     # Activate the building
     integration_repo.update_building_status(
-        building_id,
+        resolved_id,
         BuildingStatus.ACTIVE.value,
         notes="Activated after successful validation",
     )
@@ -817,9 +913,10 @@ async def suspend_building(
     Sets the building status to SUSPENDED. Can be used to temporarily
     disable a building without losing configuration.
     """
+    resolved_id = resolve_building_uuid(building_id)
     notes = body.notes if body else None
     integration_repo.update_building_status(
-        building_id,
+        resolved_id,
         BuildingStatus.SUSPENDED.value,
         notes=notes or "Manually suspended",
     )
@@ -845,7 +942,8 @@ async def get_unmatched_points(
 
     Returns BMS points that haven't been mapped to CAFM assets yet.
     """
-    result = integration_repo.get_unmatched_points(building_id, limit, offset)
+    resolved_id = resolve_building_uuid(building_id) if building_id else None
+    result = integration_repo.get_unmatched_points(resolved_id, limit, offset)
     return result
 
 

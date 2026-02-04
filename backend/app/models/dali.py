@@ -240,17 +240,23 @@ class ZoneOccupancy:
     occupancy_percent: float
     avg_lux_level: float = 0.0
     max_lux_level: float = 0.0
+    floor: str = ""
+    status: str = "empty"
+    last_updated: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "zone_id": self.zone_id,
             "zone_name": self.zone_name,
+            "floor": self.floor,
             "total_sensors": self.total_sensors,
             "occupied_sensors": self.occupied_sensors,
             "occupancy_percent": self.occupancy_percent,
             "avg_lux_level": self.avg_lux_level,
             "max_lux_level": self.max_lux_level,
+            "status": self.status,
+            "last_updated": self.last_updated,
         }
 
 
@@ -265,6 +271,9 @@ class ZoneLighting:
     avg_dim_level: float
     total_power_w: float
     faulty_count: int = 0
+    floor: str = ""
+    energy_waste_detected: bool = False
+    energy_waste_reason: Optional[str] = None
     # Scenecom extended fields
     active_scene: Optional[int] = None  # Current scene number (1-8), None if manual
     active_scene_name: Optional[str] = None  # Scene name (e.g., "Working", "Presentation")
@@ -274,11 +283,14 @@ class ZoneLighting:
         return {
             "zone_id": self.zone_id,
             "zone_name": self.zone_name,
+            "floor": self.floor,
             "total_luminaires": self.total_luminaires,
             "active_luminaires": self.active_luminaires,
-            "avg_dim_level": self.avg_dim_level,
-            "total_power_w": self.total_power_w,
-            "faulty_count": self.faulty_count,
+            "faulty_luminaires": self.faulty_count,
+            "total_power_watts": self.total_power_w,
+            "avg_brightness": self.avg_dim_level,
+            "energy_waste_detected": self.energy_waste_detected,
+            "energy_waste_reason": self.energy_waste_reason,
             "active_scene": self.active_scene,
             "active_scene_name": self.active_scene_name,
         }
@@ -289,15 +301,27 @@ class FloorSummary:
     """Occupancy and lighting summary for a floor."""
 
     floor: str
+    floor_name: str = ""
     zones: List[ZoneOccupancy] = field(default_factory=list)
-    total_occupancy_percent: float = 0.0
-    total_power_kw: float = 0.0
+    total_zones: int = 0
+    total_sensors: int = 0
+    occupied_sensors: int = 0
+    occupancy_percent: float = 0.0
+    total_luminaires: int = 0
+    faulty_luminaires: int = 0
+    total_power_watts: float = 0.0
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "floor": self.floor,
+            "floor_name": self.floor_name,
+            "total_zones": self.total_zones,
+            "total_sensors": self.total_sensors,
+            "occupied_sensors": self.occupied_sensors,
+            "occupancy_percent": self.occupancy_percent,
+            "total_luminaires": self.total_luminaires,
+            "faulty_luminaires": self.faulty_luminaires,
+            "total_power_watts": self.total_power_watts,
             "zones": [z.to_dict() for z in self.zones],
-            "total_occupancy_percent": self.total_occupancy_percent,
-            "total_power_kw": self.total_power_kw,
         }

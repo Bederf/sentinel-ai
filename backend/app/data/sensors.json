@@ -4,7 +4,7 @@
     "equipment_id": "eqp-001",
     "site_id": "site-001",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "supply_air",
     "name": "AHU-1 Temperature"
   },
@@ -13,7 +13,7 @@
     "equipment_id": "eqp-001",
     "site_id": "site-001",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "return_air",
     "name": "AHU-1 Temperature"
   },
@@ -49,7 +49,7 @@
     "equipment_id": "eqp-002",
     "site_id": "site-001",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "supply_air",
     "name": "AHU-2 Temperature"
   },
@@ -58,7 +58,7 @@
     "equipment_id": "eqp-002",
     "site_id": "site-001",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "return_air",
     "name": "AHU-2 Temperature"
   },
@@ -94,7 +94,7 @@
     "equipment_id": "eqp-003",
     "site_id": "site-001",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "supply_air",
     "name": "AHU-7 Temperature"
   },
@@ -103,7 +103,7 @@
     "equipment_id": "eqp-003",
     "site_id": "site-001",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "return_air",
     "name": "AHU-7 Temperature"
   },
@@ -139,7 +139,7 @@
     "equipment_id": "eqp-004",
     "site_id": "site-001",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "supply_water",
     "name": "CH-1 Temperature"
   },
@@ -148,7 +148,7 @@
     "equipment_id": "eqp-004",
     "site_id": "site-001",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "return_water",
     "name": "CH-1 Temperature"
   },
@@ -184,7 +184,7 @@
     "equipment_id": "eqp-005",
     "site_id": "site-001",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "supply_water",
     "name": "CH-2 Temperature"
   },
@@ -193,7 +193,7 @@
     "equipment_id": "eqp-005",
     "site_id": "site-001",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "return_water",
     "name": "CH-2 Temperature"
   },
@@ -229,7 +229,7 @@
     "equipment_id": "eqp-006",
     "site_id": "site-001",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "water_in",
     "name": "CT-1 Temperature"
   },
@@ -238,7 +238,7 @@
     "equipment_id": "eqp-006",
     "site_id": "site-001",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "water_out",
     "name": "CT-1 Temperature"
   },
@@ -283,7 +283,7 @@
     "equipment_id": "eqp-007",
     "site_id": "site-001",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "cabinet",
     "name": "UPS-1 Temperature"
   },
@@ -319,7 +319,7 @@
     "equipment_id": "eqp-008",
     "site_id": "site-001",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "engine",
     "name": "GEN-1 Temperature"
   },
@@ -337,7 +337,7 @@
     "equipment_id": "eqp-009",
     "site_id": "site-001",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "winding",
     "name": "TX-1 Temperature"
   },
@@ -373,7 +373,7 @@
     "equipment_id": "eqp-011",
     "site_id": "site-001",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "room",
     "name": "FCU-001 Temperature"
   },
@@ -391,7 +391,7 @@
     "equipment_id": "eqp-012",
     "site_id": "site-001",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "room",
     "name": "FCU-002 Temperature"
   },
@@ -409,7 +409,7 @@
     "equipment_id": "eqp-013",
     "site_id": "site-002",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "supply_air",
     "name": "AHU-1 Temperature"
   },
@@ -418,7 +418,7 @@
     "equipment_id": "eqp-013",
     "site_id": "site-002",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "return_air",
     "name": "AHU-1 Temperature"
   },
@@ -454,7 +454,7 @@
     "equipment_id": "eqp-014",
     "site_id": "site-002",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "room",
     "name": "AC-1 Temperature"
   },
@@ -472,7 +472,7 @@
     "equipment_id": "eqp-015",
     "site_id": "site-002",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "room",
     "name": "AC-2 Temperature"
   },
@@ -517,7 +517,7 @@
     "equipment_id": "eqp-016",
     "site_id": "site-002",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "cabinet",
     "name": "UPS-1 Temperature"
   },
@@ -553,7 +553,7 @@
     "equipment_id": "eqp-017",
     "site_id": "site-002",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "engine",
     "name": "GEN-1 Temperature"
   },
@@ -607,7 +607,7 @@
     "equipment_id": "eqp-020",
     "site_id": "site-002",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "water",
     "name": "HWC-1 Temperature"
   },
@@ -625,7 +625,7 @@
     "equipment_id": "eqp-021",
     "site_id": "site-003",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "supply_air",
     "name": "AHU-1 Temperature"
   },
@@ -634,7 +634,7 @@
     "equipment_id": "eqp-021",
     "site_id": "site-003",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "return_air",
     "name": "AHU-1 Temperature"
   },
@@ -670,7 +670,7 @@
     "equipment_id": "eqp-022",
     "site_id": "site-003",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "supply_air",
     "name": "AHU-2 Temperature"
   },
@@ -679,7 +679,7 @@
     "equipment_id": "eqp-022",
     "site_id": "site-003",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "return_air",
     "name": "AHU-2 Temperature"
   },
@@ -715,7 +715,7 @@
     "equipment_id": "eqp-023",
     "site_id": "site-003",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "supply_water",
     "name": "CH-1 Temperature"
   },
@@ -724,7 +724,7 @@
     "equipment_id": "eqp-023",
     "site_id": "site-003",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "return_water",
     "name": "CH-1 Temperature"
   },
@@ -787,7 +787,7 @@
     "equipment_id": "eqp-024",
     "site_id": "site-003",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "cabinet",
     "name": "UPS-1 Temperature"
   },
@@ -823,7 +823,7 @@
     "equipment_id": "eqp-025",
     "site_id": "site-003",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "engine",
     "name": "GEN-1 Temperature"
   },
@@ -859,7 +859,7 @@
     "equipment_id": "eqp-027",
     "site_id": "site-003",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "outdoor",
     "name": "VRF-1 Temperature"
   },
@@ -877,7 +877,7 @@
     "equipment_id": "eqp-028",
     "site_id": "site-003",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "room",
     "name": "FCU-001 Temperature"
   },
@@ -895,7 +895,7 @@
     "equipment_id": "eqp-029",
     "site_id": "site-003",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "room",
     "name": "FCU-002 Temperature"
   },
@@ -931,7 +931,7 @@
     "equipment_id": "eqp-031",
     "site_id": "site-004",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "room",
     "name": "AC-1 Temperature"
   },
@@ -949,7 +949,7 @@
     "equipment_id": "eqp-032",
     "site_id": "site-004",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "room",
     "name": "AC-2 Temperature"
   },
@@ -967,7 +967,7 @@
     "equipment_id": "eqp-033",
     "site_id": "site-004",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "room",
     "name": "AC-3 Temperature"
   },
@@ -1012,7 +1012,7 @@
     "equipment_id": "eqp-034",
     "site_id": "site-004",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "cabinet",
     "name": "UPS-1 Temperature"
   },
@@ -1048,7 +1048,7 @@
     "equipment_id": "eqp-035",
     "site_id": "site-004",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "engine",
     "name": "GEN-1 Temperature"
   },
@@ -1084,7 +1084,7 @@
     "equipment_id": "eqp-037",
     "site_id": "site-004",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "water",
     "name": "HWC-1 Temperature"
   },
@@ -1102,7 +1102,7 @@
     "equipment_id": "eqp-038",
     "site_id": "site-005",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "supply_air",
     "name": "CRAC-1 Temperature"
   },
@@ -1111,7 +1111,7 @@
     "equipment_id": "eqp-038",
     "site_id": "site-005",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "return_air",
     "name": "CRAC-1 Temperature"
   },
@@ -1138,7 +1138,7 @@
     "equipment_id": "eqp-039",
     "site_id": "site-005",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "supply_air",
     "name": "CRAC-2 Temperature"
   },
@@ -1147,7 +1147,7 @@
     "equipment_id": "eqp-039",
     "site_id": "site-005",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "return_air",
     "name": "CRAC-2 Temperature"
   },
@@ -1174,7 +1174,7 @@
     "equipment_id": "eqp-040",
     "site_id": "site-005",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "supply_air",
     "name": "CRAC-3 Temperature"
   },
@@ -1183,7 +1183,7 @@
     "equipment_id": "eqp-040",
     "site_id": "site-005",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "return_air",
     "name": "CRAC-3 Temperature"
   },
@@ -1210,7 +1210,7 @@
     "equipment_id": "eqp-041",
     "site_id": "site-005",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "supply_air",
     "name": "CRAC-4 Temperature"
   },
@@ -1219,7 +1219,7 @@
     "equipment_id": "eqp-041",
     "site_id": "site-005",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "return_air",
     "name": "CRAC-4 Temperature"
   },
@@ -1246,7 +1246,7 @@
     "equipment_id": "eqp-042",
     "site_id": "site-005",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "supply_water",
     "name": "CH-1 Temperature"
   },
@@ -1255,7 +1255,7 @@
     "equipment_id": "eqp-042",
     "site_id": "site-005",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "return_water",
     "name": "CH-1 Temperature"
   },
@@ -1291,7 +1291,7 @@
     "equipment_id": "eqp-043",
     "site_id": "site-005",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "supply_water",
     "name": "CH-2 Temperature"
   },
@@ -1300,7 +1300,7 @@
     "equipment_id": "eqp-043",
     "site_id": "site-005",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "return_water",
     "name": "CH-2 Temperature"
   },
@@ -1363,7 +1363,7 @@
     "equipment_id": "eqp-044",
     "site_id": "site-005",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "cabinet",
     "name": "UPS-1 Temperature"
   },
@@ -1399,7 +1399,7 @@
     "equipment_id": "eqp-045",
     "site_id": "site-005",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "cabinet",
     "name": "UPS-2 Temperature"
   },
@@ -1435,7 +1435,7 @@
     "equipment_id": "eqp-046",
     "site_id": "site-005",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "engine",
     "name": "GEN-1 Temperature"
   },
@@ -1480,7 +1480,7 @@
     "equipment_id": "eqp-047",
     "site_id": "site-005",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "engine",
     "name": "GEN-2 Temperature"
   },
@@ -1498,7 +1498,7 @@
     "equipment_id": "eqp-048",
     "site_id": "site-005",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "winding",
     "name": "TX-1 Temperature"
   },
@@ -1588,7 +1588,7 @@
     "equipment_id": "eqp-053",
     "site_id": "site-006",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "supply_air",
     "name": "AHU-1 Temperature"
   },
@@ -1597,7 +1597,7 @@
     "equipment_id": "eqp-053",
     "site_id": "site-006",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "return_air",
     "name": "AHU-1 Temperature"
   },
@@ -1633,7 +1633,7 @@
     "equipment_id": "eqp-054",
     "site_id": "site-006",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "supply_air",
     "name": "AHU-2 Temperature"
   },
@@ -1642,7 +1642,7 @@
     "equipment_id": "eqp-054",
     "site_id": "site-006",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "return_air",
     "name": "AHU-2 Temperature"
   },
@@ -1678,7 +1678,7 @@
     "equipment_id": "eqp-055",
     "site_id": "site-006",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "supply_water",
     "name": "CH-1 Temperature"
   },
@@ -1687,7 +1687,7 @@
     "equipment_id": "eqp-055",
     "site_id": "site-006",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "return_water",
     "name": "CH-1 Temperature"
   },
@@ -1723,7 +1723,7 @@
     "equipment_id": "eqp-056",
     "site_id": "site-006",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "supply_water",
     "name": "CH-2 Temperature"
   },
@@ -1732,7 +1732,7 @@
     "equipment_id": "eqp-056",
     "site_id": "site-006",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "return_water",
     "name": "CH-2 Temperature"
   },
@@ -1768,7 +1768,7 @@
     "equipment_id": "eqp-057",
     "site_id": "site-006",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "water_in",
     "name": "CT-1 Temperature"
   },
@@ -1777,7 +1777,7 @@
     "equipment_id": "eqp-057",
     "site_id": "site-006",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "water_out",
     "name": "CT-1 Temperature"
   },
@@ -1822,7 +1822,7 @@
     "equipment_id": "eqp-058",
     "site_id": "site-006",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "cabinet",
     "name": "UPS-1 Temperature"
   },
@@ -1858,7 +1858,7 @@
     "equipment_id": "eqp-059",
     "site_id": "site-006",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "engine",
     "name": "GEN-1 Temperature"
   },
@@ -1876,7 +1876,7 @@
     "equipment_id": "eqp-060",
     "site_id": "site-006",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "winding",
     "name": "TX-1 Temperature"
   },
@@ -1912,7 +1912,7 @@
     "equipment_id": "eqp-062",
     "site_id": "site-006",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "room",
     "name": "FCU-001 Temperature"
   },
@@ -1930,7 +1930,7 @@
     "equipment_id": "eqp-063",
     "site_id": "site-006",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "room",
     "name": "FCU-002 Temperature"
   },
@@ -1966,7 +1966,7 @@
     "equipment_id": "eqp-065",
     "site_id": "site-007",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "supply_air",
     "name": "AHU-1 Temperature"
   },
@@ -1975,7 +1975,7 @@
     "equipment_id": "eqp-065",
     "site_id": "site-007",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "return_air",
     "name": "AHU-1 Temperature"
   },
@@ -2011,7 +2011,7 @@
     "equipment_id": "eqp-066",
     "site_id": "site-007",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "room",
     "name": "AC-1 Temperature"
   },
@@ -2029,7 +2029,7 @@
     "equipment_id": "eqp-067",
     "site_id": "site-007",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "room",
     "name": "AC-2 Temperature"
   },
@@ -2074,7 +2074,7 @@
     "equipment_id": "eqp-068",
     "site_id": "site-007",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "cabinet",
     "name": "UPS-1 Temperature"
   },
@@ -2110,7 +2110,7 @@
     "equipment_id": "eqp-069",
     "site_id": "site-007",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "engine",
     "name": "GEN-1 Temperature"
   },
@@ -2164,7 +2164,7 @@
     "equipment_id": "eqp-072",
     "site_id": "site-007",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "water",
     "name": "HWC-1 Temperature"
   },
@@ -2182,7 +2182,7 @@
     "equipment_id": "eqp-073",
     "site_id": "site-008",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "room",
     "name": "AC-1 Temperature"
   },
@@ -2200,7 +2200,7 @@
     "equipment_id": "eqp-074",
     "site_id": "site-008",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "room",
     "name": "AC-2 Temperature"
   },
@@ -2245,7 +2245,7 @@
     "equipment_id": "eqp-075",
     "site_id": "site-008",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "cabinet",
     "name": "UPS-1 Temperature"
   },
@@ -2281,7 +2281,7 @@
     "equipment_id": "eqp-076",
     "site_id": "site-008",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "engine",
     "name": "GEN-1 Temperature"
   },
@@ -2317,7 +2317,7 @@
     "equipment_id": "eqp-078",
     "site_id": "site-008",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "water",
     "name": "HWC-1 Temperature"
   },
@@ -2335,7 +2335,7 @@
     "equipment_id": "eqp-079",
     "site_id": "site-009",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "room",
     "name": "AC-1 Temperature"
   },
@@ -2353,7 +2353,7 @@
     "equipment_id": "eqp-080",
     "site_id": "site-009",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "room",
     "name": "AC-2 Temperature"
   },
@@ -2398,7 +2398,7 @@
     "equipment_id": "eqp-081",
     "site_id": "site-009",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "cabinet",
     "name": "UPS-1 Temperature"
   },
@@ -2434,7 +2434,7 @@
     "equipment_id": "eqp-082",
     "site_id": "site-009",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "engine",
     "name": "GEN-1 Temperature"
   },
@@ -2470,7 +2470,7 @@
     "equipment_id": "eqp-084",
     "site_id": "site-010",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "supply_air",
     "name": "AHU-1 Temperature"
   },
@@ -2479,7 +2479,7 @@
     "equipment_id": "eqp-084",
     "site_id": "site-010",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "return_air",
     "name": "AHU-1 Temperature"
   },
@@ -2515,7 +2515,7 @@
     "equipment_id": "eqp-085",
     "site_id": "site-010",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "room",
     "name": "AC-1 Temperature"
   },
@@ -2533,7 +2533,7 @@
     "equipment_id": "eqp-086",
     "site_id": "site-010",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "room",
     "name": "AC-2 Temperature"
   },
@@ -2578,7 +2578,7 @@
     "equipment_id": "eqp-087",
     "site_id": "site-010",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "cabinet",
     "name": "UPS-1 Temperature"
   },
@@ -2614,7 +2614,7 @@
     "equipment_id": "eqp-088",
     "site_id": "site-010",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "engine",
     "name": "GEN-1 Temperature"
   },
@@ -2668,7 +2668,7 @@
     "equipment_id": "eqp-091",
     "site_id": "site-011",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "supply_air",
     "name": "AHU-1 Temperature"
   },
@@ -2677,7 +2677,7 @@
     "equipment_id": "eqp-091",
     "site_id": "site-011",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "return_air",
     "name": "AHU-1 Temperature"
   },
@@ -2713,7 +2713,7 @@
     "equipment_id": "eqp-092",
     "site_id": "site-011",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "supply_air",
     "name": "AHU-2 Temperature"
   },
@@ -2722,7 +2722,7 @@
     "equipment_id": "eqp-092",
     "site_id": "site-011",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "return_air",
     "name": "AHU-2 Temperature"
   },
@@ -2758,7 +2758,7 @@
     "equipment_id": "eqp-093",
     "site_id": "site-011",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "supply_water",
     "name": "CH-1 Temperature"
   },
@@ -2767,7 +2767,7 @@
     "equipment_id": "eqp-093",
     "site_id": "site-011",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "return_water",
     "name": "CH-1 Temperature"
   },
@@ -2803,7 +2803,7 @@
     "equipment_id": "eqp-094",
     "site_id": "site-011",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "water_in",
     "name": "CT-1 Temperature"
   },
@@ -2812,7 +2812,7 @@
     "equipment_id": "eqp-094",
     "site_id": "site-011",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "water_out",
     "name": "CT-1 Temperature"
   },
@@ -2857,7 +2857,7 @@
     "equipment_id": "eqp-095",
     "site_id": "site-011",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "cabinet",
     "name": "UPS-1 Temperature"
   },
@@ -2893,7 +2893,7 @@
     "equipment_id": "eqp-096",
     "site_id": "site-011",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "engine",
     "name": "GEN-1 Temperature"
   },
@@ -2911,7 +2911,7 @@
     "equipment_id": "eqp-097",
     "site_id": "site-011",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "winding",
     "name": "TX-1 Temperature"
   },
@@ -2947,7 +2947,7 @@
     "equipment_id": "eqp-099",
     "site_id": "site-011",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "room",
     "name": "FCU-001 Temperature"
   },
@@ -2965,7 +2965,7 @@
     "equipment_id": "eqp-100",
     "site_id": "site-011",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "room",
     "name": "FCU-002 Temperature"
   },
@@ -3001,7 +3001,7 @@
     "equipment_id": "eqp-102",
     "site_id": "site-012",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "supply_air",
     "name": "AHU-1 Temperature"
   },
@@ -3010,7 +3010,7 @@
     "equipment_id": "eqp-102",
     "site_id": "site-012",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "return_air",
     "name": "AHU-1 Temperature"
   },
@@ -3046,7 +3046,7 @@
     "equipment_id": "eqp-103",
     "site_id": "site-012",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "supply_air",
     "name": "AHU-2 Temperature"
   },
@@ -3055,7 +3055,7 @@
     "equipment_id": "eqp-103",
     "site_id": "site-012",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "return_air",
     "name": "AHU-2 Temperature"
   },
@@ -3091,7 +3091,7 @@
     "equipment_id": "eqp-104",
     "site_id": "site-012",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "supply_water",
     "name": "CH-1 Temperature"
   },
@@ -3100,7 +3100,7 @@
     "equipment_id": "eqp-104",
     "site_id": "site-012",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "return_water",
     "name": "CH-1 Temperature"
   },
@@ -3163,7 +3163,7 @@
     "equipment_id": "eqp-105",
     "site_id": "site-012",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "cabinet",
     "name": "UPS-1 Temperature"
   },
@@ -3199,7 +3199,7 @@
     "equipment_id": "eqp-106",
     "site_id": "site-012",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "engine",
     "name": "GEN-1 Temperature"
   },
@@ -3217,7 +3217,7 @@
     "equipment_id": "eqp-107",
     "site_id": "site-012",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "winding",
     "name": "TX-1 Temperature"
   },
@@ -3253,7 +3253,7 @@
     "equipment_id": "eqp-109",
     "site_id": "site-012",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "room",
     "name": "FCU-001 Temperature"
   },
@@ -3271,7 +3271,7 @@
     "equipment_id": "eqp-110",
     "site_id": "site-012",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "room",
     "name": "FCU-002 Temperature"
   },
@@ -3289,7 +3289,7 @@
     "equipment_id": "eqp-111",
     "site_id": "site-013",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "room",
     "name": "AC-1 Temperature"
   },
@@ -3307,7 +3307,7 @@
     "equipment_id": "eqp-112",
     "site_id": "site-013",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "room",
     "name": "AC-2 Temperature"
   },
@@ -3352,7 +3352,7 @@
     "equipment_id": "eqp-113",
     "site_id": "site-013",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "cabinet",
     "name": "UPS-1 Temperature"
   },
@@ -3388,7 +3388,7 @@
     "equipment_id": "eqp-114",
     "site_id": "site-013",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "engine",
     "name": "GEN-1 Temperature"
   },
@@ -3442,7 +3442,7 @@
     "equipment_id": "eqp-117",
     "site_id": "site-013",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "water",
     "name": "HWC-1 Temperature"
   },
@@ -3460,7 +3460,7 @@
     "equipment_id": "eqp-118",
     "site_id": "site-014",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "supply_air",
     "name": "AHU-1 Temperature"
   },
@@ -3469,7 +3469,7 @@
     "equipment_id": "eqp-118",
     "site_id": "site-014",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "return_air",
     "name": "AHU-1 Temperature"
   },
@@ -3505,7 +3505,7 @@
     "equipment_id": "eqp-119",
     "site_id": "site-014",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "room",
     "name": "AC-1 Temperature"
   },
@@ -3523,7 +3523,7 @@
     "equipment_id": "eqp-120",
     "site_id": "site-014",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "room",
     "name": "AC-2 Temperature"
   },
@@ -3568,7 +3568,7 @@
     "equipment_id": "eqp-121",
     "site_id": "site-014",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "cabinet",
     "name": "UPS-1 Temperature"
   },
@@ -3604,7 +3604,7 @@
     "equipment_id": "eqp-122",
     "site_id": "site-014",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "engine",
     "name": "GEN-1 Temperature"
   },
@@ -3640,7 +3640,7 @@
     "equipment_id": "eqp-124",
     "site_id": "site-014",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "water",
     "name": "HWC-1 Temperature"
   },
@@ -3658,7 +3658,7 @@
     "equipment_id": "eqp-125",
     "site_id": "site-015",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "room",
     "name": "AC-1 Temperature"
   },
@@ -3676,7 +3676,7 @@
     "equipment_id": "eqp-126",
     "site_id": "site-015",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "room",
     "name": "AC-2 Temperature"
   },
@@ -3721,7 +3721,7 @@
     "equipment_id": "eqp-127",
     "site_id": "site-015",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "cabinet",
     "name": "UPS-1 Temperature"
   },
@@ -3757,7 +3757,7 @@
     "equipment_id": "eqp-128",
     "site_id": "site-015",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "engine",
     "name": "GEN-1 Temperature"
   },
@@ -3793,7 +3793,7 @@
     "equipment_id": "eqp-130",
     "site_id": "site-015",
     "type": "temperature",
-    "unit": "\u00b0C",
+    "unit": "°C",
     "location": "water",
     "name": "HWC-1 Temperature"
   },

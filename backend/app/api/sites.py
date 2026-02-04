@@ -357,8 +357,8 @@ def get_sites_from_supabase(
 
             # Fallback to legacy equipment count
             eq_count = repo.get_equipment_count(building_uuid) if building_uuid else 0
-            # Use at-risk equipment count (warning/critical status) for the "Risks" display
-            alert_count = repo.get_at_risk_equipment_count(building_uuid) if building_uuid else 0
+            # Count active alerts for the "Risks" display
+            alert_count = repo.get_alert_count(building_uuid, status='active') if building_uuid else 0
 
             # Get equipment status breakdown
             equipment_status = get_equipment_status_breakdown(building_uuid) if building_uuid else None
@@ -390,8 +390,8 @@ def get_site_from_supabase(site_id: str) -> tuple[Optional[dict], bool]:
 
         # Fallback to legacy equipment count
         eq_count = repo.get_equipment_count(building_uuid) if building_uuid else 0
-        # Use at-risk equipment count (warning/critical status) for the "Risks" display
-        alert_count = repo.get_at_risk_equipment_count(building_uuid) if building_uuid else 0
+        # Count active alerts for the "Risks" display
+        alert_count = repo.get_alert_count(building_uuid, status='active') if building_uuid else 0
 
         # Get equipment status breakdown
         equipment_status = get_equipment_status_breakdown(building_uuid) if building_uuid else None

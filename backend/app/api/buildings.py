@@ -606,11 +606,30 @@ async def get_building_equipment(building_id: str) -> dict:
         equipment_data = repo.get_by_building_code(site_code)
 
         if equipment_data:
-            # Get building name from Supabase first (needed in the loop)
+            # Get building info from Supabase (needed in the loop)
             from app.database.supabase_client import get_supabase_client
             client = get_supabase_client()
-            building_result = client.table("buildings").select("name").eq("code", site_code).execute()
+            building_result = client.table("buildings").select("id, name").eq("code", site_code).execute()
             building_name = building_result.data[0]["name"] if building_result.data else building_id
+            building_uuid = building_result.data[0]["id"] if building_result.data else None
+
+            # Cross-reference active alerts to derive equipment risk status
+            alert_severity_map: dict[str, str] = {}  # equipment_uuid -> highest severity
+            if building_uuid:
+                try:
+                    from app.database.repositories.alert_repository import AlertRepository
+                    alert_repo = AlertRepository()
+                    active_alerts = alert_repo.get_active_by_building(building_uuid)
+                    for alert in active_alerts:
+                        eq_uuid = alert.get("equipment_id")
+                        if eq_uuid:
+                            severity = alert.get("severity", "warning")
+                            existing = alert_severity_map.get(eq_uuid)
+                            if existing != "critical":
+                                if severity == "critical" or existing is None:
+                                    alert_severity_map[eq_uuid] = severity
+                except Exception as e:
+                    logger.warning(f"Failed to fetch alerts for equipment status: {e}")
 
             equipment_list = []
             categories = {}
@@ -620,6 +639,8 @@ async def get_building_equipment(building_id: str) -> dict:
                 eq_type = eq.get("type", "unknown").lower()
                 type_to_category = {
                     "sensor": "Sensors",
+                    "daylight_sensor": "Sensors",
+                    "occupancy_sensor": "Sensors",
                     "vav": "HVAC",
                     "ahu": "HVAC",
                     "fcu": "HVAC",
@@ -640,10 +661,25 @@ async def get_building_equipment(building_id: str) -> dict:
                     "feeder": "Energy Centre",
                     "dali_controller": "Lighting",
                     "luminaire": "Lighting",
+                    "luminaire_group": "Lighting",
+                    "bms_controller": "Building Systems",
+                    "bms_scada": "Building Systems",
+                    "lift-passenger": "Lifts",
                 }
                 category = type_to_category.get(eq_type, "Other")
                 status = eq.get("status", "normal")
                 health = eq.get("health_score", 85)
+
+                # Override status if equipment has active alerts
+                eq_uuid = eq.get("id")
+                if eq_uuid and eq_uuid in alert_severity_map:
+                    alert_sev = alert_severity_map[eq_uuid]
+                    if alert_sev == "critical" and status != "critical":
+                        status = "critical"
+                        health = min(health, 30)
+                    elif alert_sev == "warning" and status not in ("critical", "warning"):
+                        status = "warning"
+                        health = min(health, 60)
 
                 equipment_list.append({
                     "id": eq.get("code", eq.get("id")),
@@ -1041,16 +1077,35 @@ async def get_building_equipment(building_id: str) -> dict:
                     eq_type = eq.get("type", "unknown")
                     # Determine category based on type
                     type_to_category = {
+                        "sensor": "Sensors",
+                        "daylight_sensor": "Sensors",
+                        "occupancy_sensor": "Sensors",
                         "ahu": "HVAC",
                         "split_unit": "HVAC",
                         "fcu": "HVAC",
                         "chiller": "HVAC",
                         "cooling_tower": "HVAC",
+                        "vav": "HVAC",
+                        "hvac_zone": "HVAC",
                         "ups": "Energy Centre",
+                        "transformer": "Energy Centre",
+                        "mv_incomer": "Energy Centre",
+                        "lv_switchboard": "Energy Centre",
+                        "ats": "Energy Centre",
+                        "power_meter": "Energy Centre",
+                        "pfc_bank": "Energy Centre",
+                        "feeder": "Energy Centre",
                         "generator": "Generator Plant",
+                        "diesel_tank": "Generator Plant",
+                        "generator_group": "Generator Plant",
+                        "dali_controller": "Lighting",
+                        "luminaire": "Lighting",
+                        "luminaire_group": "Lighting",
                         "fire_panel": "Fire & Safety",
                         "bms_controller": "Building Systems",
+                        "bms_scada": "Building Systems",
                         "water_heater": "Building Systems",
+                        "lift-passenger": "Lifts",
                     }
                     category = type_to_category.get(eq_type, "Other")
                     status, health = get_status_health(eq.get("status", "normal"))

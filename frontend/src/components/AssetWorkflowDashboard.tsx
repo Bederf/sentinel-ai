@@ -1,18 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import {
-  Card,
-  Title,
-  Text,
-  Button,
-  Grid,
-  Col,
-  Badge,
-  Flex,
-  ListItem,
-  List,
-  Bold,
-  Callout
-} from '@tremor/react';
+import { useState, useEffect } from 'react';
 import {
   CheckCircle2,
   AlertTriangle,
@@ -21,8 +7,10 @@ import {
   TrendingUp,
   Activity,
   Calendar,
-  FileText,
-  Wrench
+  Wrench,
+  Shield,
+  ChevronRight,
+  ArrowLeft,
 } from 'lucide-react';
 
 // Types
@@ -181,6 +169,42 @@ const mockWorkflowState: Record<string, WorkflowState> = {
   }
 };
 
+function getStateColor(state: string) {
+  switch (state) {
+    case 'healthy': return 'var(--color-sentinel-green)';
+    case 'anomaly_detected': return 'var(--color-sentinel-amber)';
+    case 'inspection_pending': return 'var(--color-sentinel-amber)';
+    case 'deficiency_found': return 'var(--color-sentinel-red)';
+    case 'repair_in_progress': return 'var(--color-sentinel-blue)';
+    case 'validation_pending': return 'var(--color-sentinel-blue)';
+    default: return 'var(--color-sentinel-text-secondary)';
+  }
+}
+
+function getStateBgColor(state: string) {
+  switch (state) {
+    case 'healthy': return 'rgba(16, 185, 129, 0.15)';
+    case 'anomaly_detected': return 'rgba(245, 158, 11, 0.15)';
+    case 'inspection_pending': return 'rgba(245, 158, 11, 0.15)';
+    case 'deficiency_found': return 'rgba(220, 38, 38, 0.15)';
+    case 'repair_in_progress': return 'rgba(59, 130, 246, 0.15)';
+    case 'validation_pending': return 'rgba(59, 130, 246, 0.15)';
+    default: return 'rgba(139, 148, 158, 0.15)';
+  }
+}
+
+function getStateIcon(state: string) {
+  switch (state) {
+    case 'healthy': return CheckCircle2;
+    case 'anomaly_detected': return AlertTriangle;
+    case 'inspection_pending': return Clock;
+    case 'deficiency_found': return XCircle;
+    case 'repair_in_progress': return Wrench;
+    case 'validation_pending': return Activity;
+    default: return Activity;
+  }
+}
+
 export function AssetWorkflowDashboard() {
   const [equipment] = useState<Equipment[]>(mockEquipment);
   const [selectedEquipment, setSelectedEquipment] = useState<string | null>(null);
@@ -198,254 +222,590 @@ export function AssetWorkflowDashboard() {
     }
   }, [selectedEquipment]);
 
-  const getStateColor = (state: string) => {
-    switch (state) {
-      case 'healthy': return 'emerald';
-      case 'anomaly_detected': return 'amber';
-      case 'inspection_pending': return 'amber';
-      case 'deficiency_found': return 'rose';
-      case 'repair_in_progress': return 'blue';
-      case 'validation_pending': return 'blue';
-      default: return 'gray';
-    }
-  };
-
-  const getStateIcon = (state: string) => {
-    switch (state) {
-      case 'healthy': return CheckCircle2;
-      case 'anomaly_detected': return AlertTriangle;
-      case 'inspection_pending': return Clock;
-      case 'deficiency_found': return XCircle;
-      case 'repair_in_progress': return Wrench;
-      case 'validation_pending': return Activity;
-      default: return Activity;
-    }
-  };
-
   return (
-    <div className="p-6 bg-gray-50 min-h-screen">
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-6">
-          <Title>Asset Management Workflow</Title>
-          <Text className="mt-2">
-            Complete visibility from onboarding through repair validation
-          </Text>
+    <div
+      className="h-full overflow-y-auto p-4 md:p-6"
+      style={{ background: 'var(--color-sentinel-bg-canvas)' }}
+    >
+      {/* Page Header */}
+      <div className="mb-6">
+        <div className="flex items-center gap-3 mb-1">
+          <div
+            className="p-2 rounded"
+            style={{ background: 'rgba(59, 130, 246, 0.15)' }}
+          >
+            <Shield className="h-5 w-5" style={{ color: 'var(--color-sentinel-blue)' }} />
+          </div>
+          <div>
+            <h1
+              className="text-lg font-semibold"
+              style={{ color: 'var(--color-sentinel-text-primary)' }}
+            >
+              Asset Management Workflow
+            </h1>
+            <p
+              className="text-sm"
+              style={{ color: 'var(--color-sentinel-text-secondary)' }}
+            >
+              Complete visibility from onboarding through repair validation
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Equipment Fleet Panel */}
+      <div
+        className="rounded-md overflow-hidden mb-6"
+        style={{
+          background: 'var(--color-sentinel-bg-panel)',
+          border: '1px solid var(--color-sentinel-border)',
+        }}
+      >
+        {/* Panel Header */}
+        <div
+          className="p-4 flex items-center justify-between"
+          style={{ borderBottom: '1px solid var(--color-sentinel-border)' }}
+        >
+          <div className="flex items-center gap-3">
+            <h3
+              className="font-medium text-sm"
+              style={{ color: 'var(--color-sentinel-text-primary)' }}
+            >
+              Equipment Fleet
+            </h3>
+          </div>
+          <span
+            className="text-xs px-2 py-1 rounded"
+            style={{
+              background: 'rgba(16, 185, 129, 0.15)',
+              color: 'var(--color-sentinel-green)',
+            }}
+          >
+            {equipment.filter(e => e.current_state === 'healthy').length} healthy
+          </span>
         </div>
 
         {/* Equipment Grid */}
-        <div className="mb-8">
-          <h3 className="text-lg font-semibold mb-4">Equipment Fleet</h3>
-          <Grid numCols={1} numColsMd={2} numColsLg={3} className="gap-4">
+        <div className="p-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {equipment.map((eq) => {
               const StateIcon = getStateIcon(eq.current_state);
+              const isSelected = selectedEquipment === eq.equipment_id;
               return (
-                <Card
+                <div
                   key={eq.equipment_id}
-                  className="cursor-pointer hover:shadow-lg transition-shadow"
+                  className="p-4 rounded-md cursor-pointer transition-all"
+                  style={{
+                    background: isSelected
+                      ? 'var(--color-sentinel-bg-secondary)'
+                      : 'var(--color-sentinel-bg-primary)',
+                    border: isSelected
+                      ? '1px solid var(--color-sentinel-border-strong)'
+                      : '1px solid var(--color-sentinel-border)',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isSelected) e.currentTarget.style.borderColor = 'var(--color-sentinel-border-strong)';
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isSelected) e.currentTarget.style.borderColor = '';
+                  }}
                   onClick={() => setSelectedEquipment(eq.equipment_id)}
                 >
-                  <Flex justifyContent="space-between" alignItems="center">
-                    <div>
-                      <Text>{eq.type}</Text>
-                      <Title className="mt-1">{eq.name}</Title>
-                      <Text className="text-sm text-gray-500">{eq.equipment_id}</Text>
+                  <div className="flex items-center justify-between">
+                    <div className="min-w-0">
+                      <span
+                        className="text-xs uppercase tracking-wider"
+                        style={{ color: 'var(--color-sentinel-text-secondary)' }}
+                      >
+                        {eq.type}
+                      </span>
+                      <h4
+                        className="font-medium text-sm mt-1 truncate"
+                        style={{ color: 'var(--color-sentinel-text-primary)' }}
+                      >
+                        {eq.name}
+                      </h4>
+                      <span
+                        className="text-xs"
+                        style={{ color: 'var(--color-sentinel-text-disabled)' }}
+                      >
+                        {eq.equipment_id}
+                      </span>
                     </div>
-                    <Badge
-                      color={getStateColor(eq.current_state)}
-                      icon={StateIcon}
-                      size="lg"
-                    >
-                      {eq.current_state.replace(/_/g, ' ')}
-                    </Badge>
-                  </Flex>
-                </Card>
+                    <div className="flex items-center gap-2 ml-3 shrink-0">
+                      <span
+                        className="text-xs px-2 py-1 rounded-full font-medium flex items-center gap-1.5"
+                        style={{
+                          background: getStateBgColor(eq.current_state),
+                          color: getStateColor(eq.current_state),
+                        }}
+                      >
+                        <StateIcon className="h-3.5 w-3.5" />
+                        {eq.current_state.replace(/_/g, ' ')}
+                      </span>
+                      <ChevronRight
+                        className="h-4 w-4"
+                        style={{ color: 'var(--color-sentinel-text-disabled)' }}
+                      />
+                    </div>
+                  </div>
+                </div>
               );
             })}
-          </Grid>
+          </div>
         </div>
+      </div>
 
-        {/* Selected Equipment Detail */}
-        {selectedEquipment && !loading && workflowState && (
-          <EquipmentWorkflowDetail workflowState={workflowState} />
+      {/* Loading State */}
+      {loading && (
+        <div className="flex items-center justify-center py-12">
+          <Activity
+            className="h-6 w-6 animate-spin"
+            style={{ color: 'var(--color-sentinel-amber)' }}
+          />
+          <span
+            className="ml-3 text-sm"
+            style={{ color: 'var(--color-sentinel-text-secondary)' }}
+          >
+            Loading workflow data...
+          </span>
+        </div>
+      )}
+
+      {/* Selected Equipment Detail */}
+      {selectedEquipment && !loading && workflowState && (
+        <EquipmentWorkflowDetail
+          workflowState={workflowState}
+          onBack={() => setSelectedEquipment(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function EquipmentWorkflowDetail({
+  workflowState,
+  onBack,
+}: {
+  workflowState: WorkflowState;
+  onBack: () => void;
+}) {
+  const StateIcon = getStateIcon(workflowState.current_state);
+
+  return (
+    <div className="space-y-4">
+      {/* Header Panel */}
+      <div
+        className="rounded-md overflow-hidden"
+        style={{
+          background: 'var(--color-sentinel-bg-panel)',
+          border: '1px solid var(--color-sentinel-border)',
+        }}
+      >
+        <div className="p-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={onBack}
+              className="p-1.5 rounded transition-colors"
+              style={{ color: 'var(--color-sentinel-text-secondary)' }}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-sentinel-bg-secondary)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = ''}
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </button>
+            <div>
+              <h3
+                className="font-medium text-sm"
+                style={{ color: 'var(--color-sentinel-text-primary)' }}
+              >
+                {workflowState.equipment_id}
+              </h3>
+              <span
+                className="text-xs"
+                style={{ color: 'var(--color-sentinel-text-secondary)' }}
+              >
+                Workflow Status
+              </span>
+            </div>
+          </div>
+          <span
+            className="text-xs px-2.5 py-1 rounded-full font-medium flex items-center gap-1.5"
+            style={{
+              background: getStateBgColor(workflowState.current_state),
+              color: getStateColor(workflowState.current_state),
+            }}
+          >
+            <StateIcon className="h-3.5 w-3.5" />
+            {workflowState.current_state.replace(/_/g, ' ')}
+          </span>
+        </div>
+      </div>
+
+      {/* Summary Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard
+          label="Baselines"
+          value={String(workflowState.baseline_summary.total_baselines)}
+          icon={<TrendingUp className="h-5 w-5" />}
+          accentColor="var(--color-sentinel-blue)"
+        />
+        <StatCard
+          label="Last Inspection"
+          value={workflowState.inspection_status.status}
+          icon={<Calendar className="h-5 w-5" />}
+          accentColor="var(--color-sentinel-green)"
+        />
+        {workflowState.ml_prediction && (
+          <StatCard
+            label="Failure Risk"
+            value={`${Math.round(workflowState.ml_prediction.failure_probability * 100)}%`}
+            icon={<Activity className="h-5 w-5" />}
+            accentColor={
+              workflowState.ml_prediction.failure_probability > 0.5
+                ? 'var(--color-sentinel-red)'
+                : workflowState.ml_prediction.failure_probability > 0.2
+                ? 'var(--color-sentinel-amber)'
+                : 'var(--color-sentinel-green)'
+            }
+          />
         )}
+        <StatCard
+          label="Active Repairs"
+          value={String(workflowState.active_repairs.length)}
+          icon={<Wrench className="h-5 w-5" />}
+          accentColor="var(--color-sentinel-amber)"
+        />
+      </div>
+
+      {/* Workflow Timeline */}
+      <div
+        className="rounded-md overflow-hidden"
+        style={{
+          background: 'var(--color-sentinel-bg-panel)',
+          border: '1px solid var(--color-sentinel-border)',
+        }}
+      >
+        <div
+          className="p-4"
+          style={{ borderBottom: '1px solid var(--color-sentinel-border)' }}
+        >
+          <h3
+            className="font-medium text-sm"
+            style={{ color: 'var(--color-sentinel-text-primary)' }}
+          >
+            Workflow Timeline
+          </h3>
+        </div>
+        <div className="p-4 space-y-0">
+          {workflowState.state_history.map((transition, index) => {
+            const isLast = index === workflowState.state_history.length - 1;
+            return (
+              <div key={index} className="flex gap-3">
+                {/* Timeline line + dot */}
+                <div className="flex flex-col items-center">
+                  <div
+                    className="w-2.5 h-2.5 rounded-full shrink-0 mt-1.5"
+                    style={{
+                      background: isLast
+                        ? getStateColor(transition.to)
+                        : 'var(--color-sentinel-text-disabled)',
+                      boxShadow: isLast ? `0 0 8px ${getStateColor(transition.to)}` : 'none',
+                    }}
+                  />
+                  {!isLast && (
+                    <div
+                      className="w-px flex-1 my-1"
+                      style={{ background: 'var(--color-sentinel-border)' }}
+                    />
+                  )}
+                </div>
+                {/* Content */}
+                <div className={`pb-4 ${isLast ? '' : ''}`}>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="text-sm font-medium capitalize"
+                      style={{ color: 'var(--color-sentinel-text-primary)' }}
+                    >
+                      {transition.to.replace(/_/g, ' ')}
+                    </span>
+                    <span
+                      className="text-xs px-1.5 py-0.5 rounded"
+                      style={{
+                        background: 'var(--color-sentinel-bg-secondary)',
+                        color: 'var(--color-sentinel-text-disabled)',
+                      }}
+                    >
+                      from {transition.from.replace(/_/g, ' ')}
+                    </span>
+                  </div>
+                  <span
+                    className="text-xs"
+                    style={{ color: 'var(--color-sentinel-text-secondary)' }}
+                  >
+                    {transition.timestamp} &middot; {transition.trigger.replace(/_/g, ' ')}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ML Prediction */}
+      {workflowState.ml_prediction && workflowState.ml_prediction.failure_probability > 0.1 && (
+        <div
+          className="rounded-md overflow-hidden"
+          style={{
+            background: workflowState.ml_prediction.failure_probability > 0.5
+              ? 'linear-gradient(135deg, rgba(220, 38, 38, 0.12) 0%, var(--color-sentinel-bg-panel) 100%)'
+              : 'var(--color-sentinel-bg-panel)',
+            border: workflowState.ml_prediction.failure_probability > 0.5
+              ? '1px solid rgba(220, 38, 38, 0.3)'
+              : '1px solid var(--color-sentinel-border)',
+          }}
+        >
+          <div
+            className="p-4 flex items-center gap-3"
+            style={{ borderBottom: '1px solid var(--color-sentinel-border)' }}
+          >
+            <div
+              className="p-2 rounded"
+              style={{ background: 'rgba(245, 158, 11, 0.15)' }}
+            >
+              <Activity className="h-4 w-4" style={{ color: 'var(--color-sentinel-amber)' }} />
+            </div>
+            <h3
+              className="font-medium text-sm"
+              style={{ color: 'var(--color-sentinel-text-primary)' }}
+            >
+              ML Prediction
+            </h3>
+          </div>
+          <div className="p-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <span
+                  className="text-xs uppercase tracking-wider"
+                  style={{ color: 'var(--color-sentinel-text-secondary)' }}
+                >
+                  Failure Probability
+                </span>
+                <div
+                  className="text-2xl font-bold mt-1"
+                  style={{
+                    color: workflowState.ml_prediction.failure_probability > 0.5
+                      ? 'var(--color-sentinel-red)'
+                      : 'var(--color-sentinel-amber)',
+                  }}
+                >
+                  {Math.round(workflowState.ml_prediction.failure_probability * 100)}%
+                </div>
+                <span
+                  className="text-xs"
+                  style={{ color: 'var(--color-sentinel-text-secondary)' }}
+                >
+                  within {workflowState.ml_prediction.timeframe}
+                </span>
+              </div>
+              <div>
+                <span
+                  className="text-xs uppercase tracking-wider"
+                  style={{ color: 'var(--color-sentinel-text-secondary)' }}
+                >
+                  Confidence
+                </span>
+                <div
+                  className="text-sm font-medium mt-1 capitalize"
+                  style={{ color: 'var(--color-sentinel-text-primary)' }}
+                >
+                  {workflowState.ml_prediction.confidence}
+                </div>
+              </div>
+              <div>
+                <span
+                  className="text-xs uppercase tracking-wider"
+                  style={{ color: 'var(--color-sentinel-text-secondary)' }}
+                >
+                  Explanation
+                </span>
+                <p
+                  className="text-sm mt-1"
+                  style={{ color: 'var(--color-sentinel-text-primary)' }}
+                >
+                  {workflowState.ml_prediction.explanation}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Recent Inspection */}
+      {workflowState.inspection_status && (
+        <div
+          className="rounded-md overflow-hidden"
+          style={{
+            background: 'var(--color-sentinel-bg-panel)',
+            border: '1px solid var(--color-sentinel-border)',
+          }}
+        >
+          <div
+            className="p-4 flex items-center gap-3"
+            style={{ borderBottom: '1px solid var(--color-sentinel-border)' }}
+          >
+            <div
+              className="p-2 rounded"
+              style={{ background: 'rgba(16, 185, 129, 0.15)' }}
+            >
+              <Calendar className="h-4 w-4" style={{ color: 'var(--color-sentinel-green)' }} />
+            </div>
+            <h3
+              className="font-medium text-sm"
+              style={{ color: 'var(--color-sentinel-text-primary)' }}
+            >
+              Recent Inspection
+            </h3>
+          </div>
+          <div className="p-4">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span
+                  className="text-sm"
+                  style={{ color: 'var(--color-sentinel-text-secondary)' }}
+                >
+                  Date
+                </span>
+                <span
+                  className="text-sm font-medium"
+                  style={{ color: 'var(--color-sentinel-text-primary)' }}
+                >
+                  {workflowState.inspection_status.last_inspection}
+                </span>
+              </div>
+              <div
+                className="h-px"
+                style={{ background: 'var(--color-sentinel-border)' }}
+              />
+              <div className="flex items-center justify-between">
+                <span
+                  className="text-sm"
+                  style={{ color: 'var(--color-sentinel-text-secondary)' }}
+                >
+                  Status
+                </span>
+                <span
+                  className="text-xs px-2 py-0.5 rounded-full font-medium uppercase"
+                  style={{
+                    background: workflowState.inspection_status.status === 'pass'
+                      ? 'rgba(16, 185, 129, 0.15)'
+                      : 'rgba(245, 158, 11, 0.15)',
+                    color: workflowState.inspection_status.status === 'pass'
+                      ? 'var(--color-sentinel-green)'
+                      : 'var(--color-sentinel-amber)',
+                  }}
+                >
+                  {workflowState.inspection_status.status}
+                </span>
+              </div>
+              <div
+                className="h-px"
+                style={{ background: 'var(--color-sentinel-border)' }}
+              />
+              <div>
+                <span
+                  className="text-xs uppercase tracking-wider"
+                  style={{ color: 'var(--color-sentinel-text-secondary)' }}
+                >
+                  Findings
+                </span>
+                <p
+                  className="text-sm mt-1"
+                  style={{ color: 'var(--color-sentinel-text-primary)' }}
+                >
+                  {workflowState.inspection_status.findings}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Deviation Warning */}
+      {workflowState.baseline_summary.deviation_detected && (
+        <div
+          className="rounded-md overflow-hidden p-4 flex items-start gap-3"
+          style={{
+            background: 'rgba(245, 158, 11, 0.1)',
+            border: '1px solid rgba(245, 158, 11, 0.3)',
+          }}
+        >
+          <AlertTriangle
+            className="h-5 w-5 shrink-0 mt-0.5"
+            style={{ color: 'var(--color-sentinel-amber)' }}
+          />
+          <div>
+            <h4
+              className="text-sm font-medium"
+              style={{ color: 'var(--color-sentinel-amber)' }}
+            >
+              Baseline Deviation Detected
+            </h4>
+            <p
+              className="text-sm mt-1"
+              style={{ color: 'var(--color-sentinel-text-secondary)' }}
+            >
+              Significant deviation from baseline detected. Automated inspection task has been created.
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  icon,
+  accentColor,
+}: {
+  label: string;
+  value: string;
+  icon: React.ReactNode;
+  accentColor: string;
+}) {
+  return (
+    <div
+      className="rounded-md p-4"
+      style={{
+        background: 'var(--color-sentinel-bg-panel)',
+        border: '1px solid var(--color-sentinel-border)',
+      }}
+    >
+      <div className="flex items-start justify-between">
+        <div>
+          <span
+            className="text-xs uppercase tracking-wider"
+            style={{ color: 'var(--color-sentinel-text-secondary)' }}
+          >
+            {label}
+          </span>
+          <div
+            className="text-xl font-bold mt-1 capitalize"
+            style={{ color: 'var(--color-sentinel-text-primary)' }}
+          >
+            {value}
+          </div>
+        </div>
+        <div
+          className="p-2 rounded"
+          style={{ background: `${accentColor}20`, color: accentColor }}
+        >
+          {icon}
+        </div>
       </div>
     </div>
   );
 }
 
-function EquipmentWorkflowDetail({ workflowState }: { workflowState: WorkflowState }) {
-  const StateIcon = getStateIcon(workflowState.current_state);
-  
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <Card>
-        <Flex justifyContent="space-between" alignItems="center">
-          <div>
-            <Title>{workflowState.equipment_id}</Title>
-            <Text className="text-sm text-gray-500">Workflow Status</Text>
-          </div>
-          <Badge
-            color={getStateColor(workflowState.current_state)}
-            icon={StateIcon}
-            size="lg"
-          >
-            {workflowState.current_state.replace(/_/g, ' ')}
-          </Badge>
-        </Flex>
-      </Card>
-
-      {/* Summary Stats */}
-      <Grid numCols={1} numColsMd={2} numColsLg={4} className="gap-4">
-        <Card>
-          <Flex justifyContent="space-between" alignItems="start">
-            <div>
-              <Text>Baselines</Text>
-              <Title className="mt-2">{workflowState.baseline_summary.total_baselines}</Title>
-            </div>
-            <TrendingUp className="text-gray-400" />
-          </Flex>
-        </Card>
-
-        <Card>
-          <Flex justifyContent="space-between" alignItems="start">
-            <div>
-              <Text>Last Inspection</Text>
-              <Title className="mt-2">{workflowState.inspection_status.status}</Title>
-            </div>
-            <Calendar className="text-gray-400" />
-          </Flex>
-        </Card>
-
-        {workflowState.ml_prediction && (
-          <Card>
-            <Flex justifyContent="space-between" alignItems="start">
-              <div>
-                <Text>Failure Risk</Text>
-                <Title className="mt-2">
-                  {Math.round(workflowState.ml_prediction.failure_probability * 100)}%
-                </Title>
-              </div>
-              <Activity className="text-gray-400" />
-            </Flex>
-          </Card>
-        )}
-
-        <Card>
-          <Flex justifyContent="space-between" alignItems="start">
-            <div>
-              <Text>Active Repairs</Text>
-              <Title className="mt-2">{workflowState.active_repairs.length}</Title>
-            </div>
-            <Wrench className="text-gray-400" />
-          </Flex>
-        </Card>
-      </Grid>
-
-      {/* State History Timeline */}
-      <Card>
-        <Title className="mb-4">Workflow Timeline</Title>
-        <List>
-          {workflowState.state_history.map((transition, index) => (
-            <ListItem key={index}>
-              <div>
-                <Text>{transition.to.replace(/_/g, ' ')}</Text>
-                <Text className="text-sm text-gray-500">
-                  {transition.timestamp} - Triggered by {transition.trigger.replace(/_/g, ' ')}
-                </Text>
-              </div>
-              <Badge color="gray" size="sm">
-                {transition.from.replace(/_/g, ' ')}
-              </Badge>
-            </ListItem>
-          ))}
-        </List>
-      </Card>
-
-      {/* ML Prediction */}
-      {workflowState.ml_prediction && workflowState.ml_prediction.failure_probability > 0.1 && (
-        <Card>
-          <Title className="mb-4">ML Prediction</Title>
-          <div className="space-y-4">
-            <div>
-              <Text className="text-sm text-gray-500">Failure Probability</Text>
-              <Title className="mt-1">
-                {Math.round(workflowState.ml_prediction.failure_probability * 100)}%
-              </Title>
-              <Text className="text-sm">
-                within {workflowState.ml_prediction.timeframe}
-              </Text>
-              <Badge color="blue" size="sm" className="ml-2">
-                {workflowState.ml_prediction.confidence} confidence
-              </Badge>
-            </div>
-            <div>
-              <Text className="text-sm text-gray-500">Explanation</Text>
-              <Text className="mt-1">{workflowState.ml_prediction.explanation}</Text>
-            </div>
-          </div>
-        </Card>
-      )}
-
-      {/* Recent Inspection */}
-      {workflowState.inspection_status && (
-        <Card>
-          <Title className="mb-4">Recent Inspection</Title>
-          <div className="space-y-2">
-            <Flex justifyContent="space-between">
-              <Text>Date</Text>
-              <Bold>{workflowState.inspection_status.last_inspection}</Bold>
-            </Flex>
-            <Flex justifyContent="space-between">
-              <Text>Status</Text>
-              <Badge
-                color={workflowState.inspection_status.status === 'pass' ? 'emerald' : 'rose'}
-              >
-                {workflowState.inspection_status.status}
-              </Badge>
-            </Flex>
-            <div>
-              <Text className="text-sm text-gray-500">Findings</Text>
-              <Text className="mt-1">{workflowState.inspection_status.findings}</Text>
-            </div>
-          </div>
-        </Card>
-      )}
-
-      {/* Deviation Warning */}
-      {workflowState.baseline_summary.deviation_detected && (
-        <Callout
-          title="Baseline Deviation Detected"
-          icon={AlertTriangle}
-          color="amber"
-        >
-          Significant deviation from baseline detected. Automated inspection task has been created.
-        </Callout>
-      )}
-    </div>
-  );
-}
-
-function getStateColor(state: string): any {
-  switch (state) {
-    case 'healthy': return 'emerald';
-    case 'anomaly_detected': return 'amber';
-    case 'inspection_pending': return 'amber';
-    case 'deficiency_found': return 'rose';
-    case 'repair_in_progress': return 'blue';
-    case 'validation_pending': return 'blue';
-    default: return 'gray';
-  }
-}
-
-function getStateIcon(state: string) {
-  switch (state) {
-    case 'healthy': return CheckCircle2;
-    case 'anomaly_detected': return AlertTriangle;
-    case 'inspection_pending': return Clock;
-    case 'deficiency_found': return XCircle;
-    case 'repair_in_progress': return Wrench;
-    case 'validation_pending': return Activity;
-    default: return Activity;
-  }
-}
+export default AssetWorkflowDashboard;

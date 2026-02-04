@@ -235,8 +235,8 @@ async def generate_demo_audit_data() -> dict:
             "S002-CO2-L1-E",
         ]
 
-        # Demo users
-        demo_users = ["operator-1", "operator-2", "system", "scheduler", "admin"]
+        # Demo users (SENTINEL = AI auto-optimization)
+        demo_users = ["operator-1", "operator-2", "system", "scheduler", "admin", "SENTINEL"]
 
         # Demo points per device type (second segment of v2.0 ID: S###-TYPE-FLOOR-ZONE)
         demo_points_by_type = {
@@ -278,16 +278,20 @@ async def generate_demo_audit_data() -> dict:
                 new_value = old_value + random.randint(-5, 5)
 
                 # Random result (weighted toward success)
-                result_weights = {
-                    AuditResultType.SUCCESS: 70,
-                    AuditResultType.WARNING: 15,
-                    AuditResultType.BLOCKED: 10,
-                    AuditResultType.FAILED: 5
-                }
-                result = random.choices(
-                    list(result_weights.keys()),
-                    weights=list(result_weights.values())
-                )[0]
+                # SENTINEL entries are always success (AI validates before applying)
+                if user == "SENTINEL":
+                    result = AuditResultType.SUCCESS
+                else:
+                    result_weights = {
+                        AuditResultType.SUCCESS: 70,
+                        AuditResultType.WARNING: 15,
+                        AuditResultType.BLOCKED: 10,
+                        AuditResultType.FAILED: 5
+                    }
+                    result = random.choices(
+                        list(result_weights.keys()),
+                        weights=list(result_weights.values())
+                    )[0]
 
                 # Create safety validation based on result
                 safety_validation = None
@@ -315,6 +319,16 @@ async def generate_demo_audit_data() -> dict:
                         "details": "All safety checks passed"
                     }
 
+                # Build metadata - SENTINEL entries include AI optimization context
+                entry_metadata: dict = {
+                    "demo_data": True,
+                    "generated_at": timestamp.isoformat(),
+                    "priority": random.randint(8, 16),
+                }
+                if user == "SENTINEL":
+                    entry_metadata["source"] = "sentinel_auto_optimization"
+                    entry_metadata["confidence"] = round(random.uniform(0.72, 0.95), 2)
+
                 # Log the demo entry
                 audit_logger.log_control_action(
                     device_id=device_id,
@@ -325,11 +339,7 @@ async def generate_demo_audit_data() -> dict:
                     result=result,
                     safety_validation=safety_validation,
                     error_message=error_message,
-                    metadata={
-                        "demo_data": True,
-                        "generated_at": timestamp.isoformat(),
-                        "priority": random.randint(8, 16)
-                    }
+                    metadata=entry_metadata,
                 )
                 entries_created += 1
 

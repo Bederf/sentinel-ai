@@ -26,7 +26,12 @@ from app.services.vector_db import get_vector_db_service
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 
 # Directories to skip
-SKIP_DIRS = {'node_modules', 'venv', '.git', '__pycache__', 'dist', '.planning'}
+SKIP_DIRS = {'node_modules', 'venv', '.git', '__pycache__', 'dist'}
+
+# Specific .planning subdirs to include (everything else in .planning is skipped)
+PLANNING_INCLUDE_DIRS = {
+    '.planning/phases/64-risk-governance-foundation',
+}
 
 # Priority documentation files (indexed first)
 PRIORITY_DOCS = [
@@ -39,17 +44,38 @@ PRIORITY_DOCS = [
     'docs/06-safety-compliance/audit-logging.md',
     'docs/03-api-reference/mcp-tools-reference.md',
     'backend/README_MCP_INTEGRATION.md',
+    # Security & risk governance
+    'docs/SECURITY-PRIVACY.md',
+    'docs/08-security/information-security-framework.md',
+    'docs/08-security/information-security-policy.md',
+    'docs/08-security/data-privacy-policy.md',
+    'docs/08-security/incident-response-policy.md',
+    'docs/08-security/business-continuity-policy.md',
+    'docs/08-security/information-security-risk-register.md',
+    'docs/08-security/third-party-security-register.md',
+    '.planning/phases/64-risk-governance-foundation/FSR-GAP-ANALYSIS.md',
 ]
 
 
 def find_md_files(root: Path, skip_dirs: set) -> List[Path]:
-    """Find all .md files in project, excluding specified directories."""
+    """Find all .md files in project, excluding specified directories.
+
+    Files inside .planning/ are skipped UNLESS they fall under a
+    directory listed in PLANNING_INCLUDE_DIRS.
+    """
     md_files = []
 
     for path in root.rglob('*.md'):
         # Skip if any parent directory is in skip list
         if any(skip in path.parts for skip in skip_dirs):
             continue
+
+        # Special handling for .planning: skip unless in an included subdir
+        if '.planning' in path.parts:
+            relative = str(path.relative_to(root))
+            if not any(relative.startswith(inc) for inc in PLANNING_INCLUDE_DIRS):
+                continue
+
         md_files.append(path)
 
     return md_files
@@ -81,10 +107,18 @@ def get_doc_category(filepath: Path) -> str:
         return 'integrations'
     elif 'docs/06-safety' in path_str:
         return 'safety'
+    elif 'docs/07-integrations' in path_str:
+        return 'integrations'
+    elif 'docs/08-security' in path_str:
+        return 'security'
     elif 'docs/11-testing' in path_str:
         return 'testing'
     elif 'docs/14-south-africa' in path_str:
         return 'regional'
+    elif '.planning/phases/64-risk-governance' in path_str:
+        return 'security'
+    elif 'SECURITY-PRIVACY' in path_str:
+        return 'security'
     elif 'FEATURES.md' in path_str:
         return 'features'
     elif 'CLAUDE.md' in path_str:
@@ -197,6 +231,10 @@ async def main():
         "How does the safety system work?",
         "What is the hybrid AI architecture?",
         "How do I control devices?",
+        "What is the information security risk register?",
+        "How does incident response work?",
+        "What is the FirstRand security gap analysis?",
+        "POPIA data privacy policy",
     ]
 
     for query in test_queries:

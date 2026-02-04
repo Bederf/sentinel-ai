@@ -15,20 +15,25 @@ def format_prediction_for_frontend(pred: dict) -> dict:
 
     Transform Supabase data structure to match the JSON structure the frontend expects.
 
-    Maps database severity values to system states:
+    Maps database severity values to frontend states:
     - critical → critical
-    - high/medium → warning
+    - high → high
+    - medium → warning
     - low → healthy
     """
     # Extract related data
     building = pred.get('building', {})
     equipment = pred.get('equipment', {})
 
-    # Map database severity to system severity (critical, warning, healthy)
+    # Map database severity to frontend severity
+    # DB values: critical, high, medium, low
+    # Frontend expects: critical, high, warning, healthy
     db_severity = pred['severity']
     if db_severity == 'critical':
         severity = 'critical'
-    elif db_severity in ('high', 'medium'):
+    elif db_severity == 'high':
+        severity = 'high'
+    elif db_severity == 'medium':
         severity = 'warning'
     else:  # low or any other value
         severity = 'healthy'

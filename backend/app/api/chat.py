@@ -13,6 +13,7 @@ from app.services.demo_cache import DemoCache
 from app.services.work_order_service import work_order_service
 from app.services.doc_rag_service import search_documentation, get_doc_rag_system_prompt
 from app.services.feature_request_logger import log_chat_query
+from app.services.prompt_injection_guard import check_query_safety
 from app.config.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -187,6 +188,21 @@ async def chat(request: ChatRequest) -> StreamingResponse:
         raise HTTPException(status_code=400, detail="Message cannot be empty")
 
     user_message = request.message.strip()
+
+    # Security: Check for prompt injection attempts
+    is_safe, rejection_reason, injections = check_query_safety(user_message)
+    if not is_safe:
+        logger.warning(f"Prompt injection blocked: {injections[0].pattern} - {injections[0].description}")
+        logger.warning(f"Query: {user_message[:100]}...")
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "Security concern",
+                "message": rejection_reason,
+                "code": "PROMPT_INJECTION_DETECTED"
+            }
+        )
+
     logger.info(f"Chat request: conversation_id={request.conversation_id}, search_docs={request.search_docs}, message={user_message[:50]}...")
 
     # 1. Documentation search mode takes priority - this is Q&A, not device control

@@ -124,6 +124,7 @@ class PointDiscoveryService:
         site_id: str,
         device_bacnet_id: Optional[int] = None,
         use_demo: bool = True,
+        bms_vendor: Optional[str] = None,
     ) -> DiscoveryResult:
         """Run full point discovery and classification workflow.
 
@@ -198,6 +199,9 @@ class PointDiscoveryService:
     ) -> List[Dict[str, Any]]:
         """Discover points from BACnet device or demo data.
 
+        Auto-starts the BACnet client if BAC0 is installed and a real
+        device_bacnet_id is provided.
+
         Args:
             device_ip: Device IP address
             device_bacnet_id: BACnet device ID
@@ -209,17 +213,32 @@ class PointDiscoveryService:
         # Try BACnet discovery first
         client = self._get_bacnet_client()
 
-        if client.is_running and device_bacnet_id is not None:
-            try:
-                return await self._discover_from_bacnet(client, device_bacnet_id)
-            except BACnetException as e:
-                logger.warning(
-                    "BACnet discovery failed for device %d: %s. %s",
-                    device_bacnet_id, e,
-                    "Falling back to demo data." if use_demo else "No fallback.",
-                )
-                if not use_demo:
-                    raise
+        if device_bacnet_id is not None:
+            # Auto-start if not running and BAC0 is available
+            if not client.is_running:
+                try:
+                    logger.info("Auto-starting BACnet client for discovery...")
+                    await client.start()
+                except BACnetException as e:
+                    logger.warning(
+                        "BACnet auto-start failed: %s. %s",
+                        e,
+                        "Falling back to demo data." if use_demo else "No fallback.",
+                    )
+                    if not use_demo:
+                        raise
+
+            if client.is_running:
+                try:
+                    return await self._discover_from_bacnet(client, device_bacnet_id)
+                except BACnetException as e:
+                    logger.warning(
+                        "BACnet discovery failed for device %d: %s. %s",
+                        device_bacnet_id, e,
+                        "Falling back to demo data." if use_demo else "No fallback.",
+                    )
+                    if not use_demo:
+                        raise
 
         # Fall back to demo data
         if use_demo or self._demo_mode:

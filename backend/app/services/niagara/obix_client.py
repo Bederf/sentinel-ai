@@ -642,14 +642,9 @@ def get_obix_client() -> OBIXClient:
     """
     Get or create the singleton OBIXClient instance.
 
-    Configured from environment variables:
-    - NIAGARA_OBIX_HOST (default: localhost)
-    - NIAGARA_OBIX_PORT (default: 80)
-    - NIAGARA_OBIX_USERNAME (default: "")
-    - NIAGARA_OBIX_PASSWORD (default: "")
-    - NIAGARA_OBIX_HTTPS (default: false)
-    - NIAGARA_OBIX_TIMEOUT (default: 30)
-    - NIAGARA_OBIX_VERIFY_SSL (default: true)
+    Reads from environment variables directly so that runtime patches
+    (and the wizard's configure endpoint) take effect immediately.
+    Settings provides defaults when env vars are not set.
 
     Returns:
         Singleton OBIXClient instance.
@@ -657,13 +652,16 @@ def get_obix_client() -> OBIXClient:
     global _obix_client
 
     if _obix_client is None:
-        host = os.environ.get("NIAGARA_OBIX_HOST", "localhost")
-        port = int(os.environ.get("NIAGARA_OBIX_PORT", "80"))
-        username = os.environ.get("NIAGARA_OBIX_USERNAME", "")
-        password = os.environ.get("NIAGARA_OBIX_PASSWORD", "")
-        use_https = os.environ.get("NIAGARA_OBIX_HTTPS", "false").lower() in ("true", "1", "yes")
-        timeout = int(os.environ.get("NIAGARA_OBIX_TIMEOUT", "30"))
-        verify_ssl = os.environ.get("NIAGARA_OBIX_VERIFY_SSL", "true").lower() in ("true", "1", "yes")
+        from app.config.settings import settings
+
+        # Env vars take precedence (runtime-patchable), settings provide defaults
+        host = os.environ.get("NIAGARA_OBIX_HOST") or settings.niagara_obix_host or "localhost"
+        port = int(os.environ.get("NIAGARA_OBIX_PORT", "0")) or settings.niagara_obix_port or 80
+        username = os.environ.get("NIAGARA_OBIX_USERNAME") or settings.niagara_obix_username or ""
+        password = os.environ.get("NIAGARA_OBIX_PASSWORD") or settings.niagara_obix_password or ""
+        use_https = os.environ.get("NIAGARA_OBIX_HTTPS", "").lower() in ("true", "1", "yes") or settings.niagara_obix_https
+        timeout = int(os.environ.get("NIAGARA_OBIX_TIMEOUT", "0")) or settings.niagara_obix_timeout or 30
+        verify_ssl = os.environ.get("NIAGARA_OBIX_VERIFY_SSL", "").lower() not in ("false", "0", "no") if os.environ.get("NIAGARA_OBIX_VERIFY_SSL") else settings.niagara_obix_verify_ssl
 
         protocol = "https" if use_https else "http"
         base_url = f"{protocol}://{host}:{port}"

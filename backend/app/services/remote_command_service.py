@@ -200,6 +200,41 @@ class RemoteCommandService:
                     "rollback_available": False,
                 }
 
+            if command_type == "fault_reset":
+                result_data = await self._execute_fault_reset(
+                    device_id, user_id, reason
+                )
+                self._log_command(
+                    command_id, user_id, user_role, device_id, command_type,
+                    point, value, reason,
+                    success=result_data["success"],
+                    error=result_data.get("error"),
+                    previous_value=result_data.get("previous_status"),
+                )
+                self._audit_logger.log_control_action(
+                    device_id=device_id,
+                    point_name="fault_reset",
+                    user=user_id,
+                    old_value=result_data.get("previous_status"),
+                    new_value="normal",
+                    result=AuditResultType.SUCCESS if result_data["success"] else AuditResultType.FAILED,
+                    metadata={
+                        "source": "remote_command",
+                        "command_type": command_type,
+                        "command_id": command_id,
+                        "reason": reason,
+                        "equipment_updated": result_data.get("equipment_updated", False),
+                        "predictions_resolved": result_data.get("predictions_resolved", 0),
+                    },
+                )
+                return {
+                    "success": result_data["success"],
+                    "command_id": command_id,
+                    "data": result_data,
+                    "safety_warnings": safety_warnings,
+                    "rollback_available": False,
+                }
+
             # For write commands, execute through device_manager
             # device_manager.write_device_value() calls SafetyEngine.validate_control()
             # which enforces all configured safety rules from safety_rules.json
@@ -208,7 +243,7 @@ class RemoteCommandService:
                     device_id, point, value, priority=8, user=user_id
                 )
             else:
-                success = True  # Commands without point/value (e.g. fault_reset stub)
+                success = True  # Commands without point/value
 
             if not success:
                 self._log_command(
@@ -673,6 +708,124 @@ class RemoteCommandService:
             "device_type": device.device_type.value,
             "points": points_data,
         }
+
+    async def _execute_fault_reset(
+        self, device_id: str, user_id: str, reason: str
+    ) -> Dict[str, Any]:
+        """Execute a fault reset on a device/equipment.
+
+        Performs three actions:
+        1. Reset mock device status to ONLINE (if device exists in device_manager)
+        2. Update equipment status and health in Supabase
+        3. Resolve active predictions for the equipment
+
+        The device_id can be either a device_manager ID or an equipment code.
+
+        Args:
+            device_id: Device ID or equipment code
+            user_id: User performing the reset
+            reason: Reason for the fault reset
+
+        Returns:
+            Dict with success, previous_status, device_reset, equipment_updated,
+            predictions_resolved, and equipment_name.
+        """
+        from app.models.device import DeviceStatus
+
+        result = {
+            "success": False,
+            "device_id": device_id,
+            "previous_status": None,
+            "device_reset": False,
+            "equipment_updated": False,
+            "predictions_resolved": 0,
+            "equipment_name": None,
+        }
+
+        # 1. Try to reset mock device status via device_manager
+        device = await device_manager.get_device(device_id)
+        if device:
+            result["previous_status"] = device.status.value if device.status else "unknown"
+            result["equipment_name"] = device.name
+
+            if device.status == DeviceStatus.FAULT:
+                device.status = DeviceStatus.ONLINE
+                device.updated_at = datetime.now().isoformat()
+                result["device_reset"] = True
+                logger.info(
+                    f"Fault reset: device {device_id} status "
+                    f"{result['previous_status']} -> online"
+                )
+            else:
+                logger.info(
+                    f"Fault reset: device {device_id} was not in FAULT state "
+                    f"(was {result['previous_status']}), resetting anyway"
+                )
+                device.status = DeviceStatus.ONLINE
+                device.updated_at = datetime.now().isoformat()
+                result["device_reset"] = True
+        else:
+            logger.info(
+                f"Fault reset: device {device_id} not in device_manager, "
+                f"attempting Supabase equipment lookup"
+            )
+
+        # 2. Update equipment in Supabase
+        try:
+            from app.database.repositories.equipment_repository import EquipmentRepository
+            equip_repo = EquipmentRepository()
+            equipment = equip_repo.get_by_id(device_id)
+
+            if equipment:
+                previous_eq_status = equipment.get("status", "unknown")
+                previous_health = equipment.get("health_score", 0)
+                result["previous_status"] = result["previous_status"] or previous_eq_status
+                result["equipment_name"] = result["equipment_name"] or equipment.get("name")
+
+                # Reset to normal with healthy score
+                new_health = max(85, previous_health)
+                equip_repo.update(device_id, {
+                    "status": "normal",
+                    "health_score": new_health,
+                })
+                result["equipment_updated"] = True
+                logger.info(
+                    f"Fault reset: equipment {device_id} "
+                    f"status {previous_eq_status} -> normal, "
+                    f"health {previous_health} -> {new_health}"
+                )
+
+                # 3. Resolve active predictions for this equipment
+                try:
+                    from app.database.repositories.prediction_repository import PredictionRepository
+                    pred_repo = PredictionRepository()
+                    equipment_uuid = equipment.get("id")
+                    if equipment_uuid:
+                        resolved_count = pred_repo.resolve_by_equipment(equipment_uuid)
+                        result["predictions_resolved"] = resolved_count
+                        if resolved_count > 0:
+                            logger.info(
+                                f"Fault reset: resolved {resolved_count} active "
+                                f"predictions for equipment {device_id}"
+                            )
+                except Exception as e:
+                    logger.warning(f"Fault reset: failed to resolve predictions: {e}")
+
+            else:
+                logger.warning(f"Fault reset: equipment {device_id} not found in Supabase")
+
+        except Exception as e:
+            logger.warning(f"Fault reset: Supabase update failed: {e}")
+
+        # Success if we managed to reset anything
+        result["success"] = result["device_reset"] or result["equipment_updated"]
+
+        if not result["success"]:
+            result["error"] = (
+                f"Device/equipment {device_id} not found in device_manager or Supabase"
+            )
+
+        return result
 
     def _log_command(
         self,

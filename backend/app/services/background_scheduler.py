@@ -127,7 +127,7 @@ class BackgroundSchedulerService:
                     "S002-CO2-L1-E",
                 ]
 
-            demo_users = ["operator-1", "operator-2", "system", "scheduler", "admin"]
+            demo_users = ["operator-1", "operator-2", "system", "scheduler", "admin", "SENTINEL"]
             demo_points_by_type = {
                 "CHILLER": ["chw_supply_temp", "setpoint", "status", "mode", "runtime_hours"],
                 "AHU": ["supply_air_temp", "fan_speed", "setpoint", "status", "damper_position"],
@@ -157,10 +157,14 @@ class BackgroundSchedulerService:
                 old_value = random.randint(20, 25) if "setpoint" in point_name else random.randint(50, 100)
                 new_value = old_value + random.randint(-5, 5)
 
-                result = random.choices(
-                    [ART.SUCCESS, ART.WARNING, ART.BLOCKED, ART.FAILED],
-                    weights=[70, 15, 10, 5]
-                )[0]
+                # SENTINEL entries are always success (AI validates before applying)
+                if user == "SENTINEL":
+                    result = ART.SUCCESS
+                else:
+                    result = random.choices(
+                        [ART.SUCCESS, ART.WARNING, ART.BLOCKED, ART.FAILED],
+                        weights=[70, 15, 10, 5]
+                    )[0]
 
                 safety_validation = None
                 error_message = None
@@ -187,6 +191,16 @@ class BackgroundSchedulerService:
                         "details": "All safety checks passed"
                     }
 
+                # Build metadata - SENTINEL entries include AI optimization context
+                entry_metadata: dict = {
+                    "demo_data": True,
+                    "generated_at": datetime.now().isoformat(),
+                    "priority": random.randint(8, 16),
+                }
+                if user == "SENTINEL":
+                    entry_metadata["source"] = "sentinel_auto_optimization"
+                    entry_metadata["confidence"] = round(random.uniform(0.72, 0.95), 2)
+
                 audit_logger.log_control_action(
                     device_id=device_id,
                     point_name=point_name,
@@ -196,11 +210,7 @@ class BackgroundSchedulerService:
                     result=result,
                     safety_validation=safety_validation,
                     error_message=error_message,
-                    metadata={
-                        "demo_data": True,
-                        "generated_at": datetime.now().isoformat(),
-                        "priority": random.randint(8, 16)
-                    }
+                    metadata=entry_metadata,
                 )
                 entries_created += 1
 

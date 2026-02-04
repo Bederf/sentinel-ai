@@ -129,6 +129,7 @@ interface PredictionDetailProps {
   };
   isOpen: boolean;
   onClose: () => void;
+  onCreateWorkOrder?: (equipmentId: string, equipmentName: string) => void;
 }
 
 // Severity color configuration
@@ -160,7 +161,7 @@ function getConfidenceConfig(confidence: string) {
   }
 }
 
-export function PredictionDetail({ prediction, isOpen, onClose }: PredictionDetailProps) {
+export function PredictionDetail({ prediction, isOpen, onClose, onCreateWorkOrder }: PredictionDetailProps) {
   const [showCostBreakdown, setShowCostBreakdown] = useState(false);
 
   if (!isOpen) return null;
@@ -820,7 +821,7 @@ export function PredictionDetail({ prediction, isOpen, onClose }: PredictionDeta
           <div className="flex justify-end gap-3 pt-4">
             <button
               onClick={onClose}
-              className="px-4 py-2 rounded text-sm font-medium transition-colors"
+              className="px-4 py-2 rounded text-sm font-medium transition-colors cursor-pointer hover:brightness-110"
               style={{
                 background: "var(--color-grafana-bg-secondary)",
                 color: "var(--color-grafana-text-primary)",
@@ -830,7 +831,13 @@ export function PredictionDetail({ prediction, isOpen, onClose }: PredictionDeta
               Close
             </button>
             <button
-              className="px-4 py-2 rounded text-sm font-medium flex items-center gap-2 transition-colors"
+              onClick={() => {
+                if (onCreateWorkOrder) {
+                  onCreateWorkOrder(prediction.id, prediction.equipment_name);
+                }
+                onClose();
+              }}
+              className="px-4 py-2 rounded text-sm font-medium flex items-center gap-2 transition-colors cursor-pointer hover:brightness-110"
               style={{
                 background: severityConfig.color,
                 color: "white",

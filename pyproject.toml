@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "simbiot-concept-connector"
+version = "1.0.0"
+description = "SIMBIOT integration module: SENTINEL AI ↔ MRI Evolution (Concept) via FSI Public API"
+readme = "README.md"
+license = {text = "Proprietary — SENTINEL Platform"}
+requires-python = ">=3.10"
+authors = [
+    {name = "SENTINEL Platform Team"},
+]
+keywords = ["sentinel", "simbiot", "cafm", "mri-evolution", "concept-evolution", "fsi-api", "facilities-management"]
+
+dependencies = [
+    "httpx>=0.25.0",
+    "pydantic>=2.5.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.23",
+    "respx>=0.21",
+    "ruff>=0.3",
+]
+
+[tool.setuptools.packages.find]
+include = ["simbiot_concept*"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

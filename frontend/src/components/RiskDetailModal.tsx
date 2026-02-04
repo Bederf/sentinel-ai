@@ -24,7 +24,10 @@ import {
   Settings,
   ChevronRight,
   ClipboardList,
+  FileText,
+  Building2,
 } from "lucide-react";
+import { RecentActions } from "./RecentActions";
 import type { BuildingEquipmentItem } from "../lib/api";
 
 interface RiskDetailModalProps {
@@ -33,6 +36,8 @@ interface RiskDetailModalProps {
   equipment: BuildingEquipmentItem | null;
   onNavigateToControl?: (equipmentId: string) => void;
   onCreateWorkOrder?: (equipmentId: string) => void;
+  onNavigateToSite?: (siteId: string) => void;
+  showEquipmentLogs?: boolean;
 }
 
 /**
@@ -82,6 +87,33 @@ function getRecommendedAction(
 }
 
 /**
+ * Format equipment type for display
+ */
+function formatEquipmentType(type: string): string {
+  const typeLabels: Record<string, string> = {
+    luminaire_group: "LED Luminaires",
+    dali_controller: "DALI Controller",
+    daylight_sensor: "Daylight Sensor",
+    occupancy_sensor: "Occupancy Sensor",
+    bms_controller: "BMS Controller",
+    bms_scada: "BMS SCADA",
+    "lift-passenger": "Passenger Lift",
+    generator_group: "Generator Group",
+    diesel_tank: "Diesel Tank",
+    cooling_tower: "Cooling Tower",
+    split_unit: "Split Unit",
+    hvac_zone: "HVAC Zone",
+    mv_incomer: "MV Incomer",
+    lv_switchboard: "LV Switchboard",
+    power_meter: "Power Meter",
+    pfc_bank: "PFC Bank",
+    fire_panel: "Fire Panel",
+    water_heater: "Water Heater",
+  };
+  return typeLabels[type] || type.toUpperCase();
+}
+
+/**
  * Format factor label for display
  */
 function formatFactorLabel(key: string): string {
@@ -100,6 +132,8 @@ export function RiskDetailModal({
   equipment,
   onNavigateToControl,
   onCreateWorkOrder,
+  onNavigateToSite,
+  showEquipmentLogs = true,
 }: RiskDetailModalProps) {
   // Handle ESC key to close
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -147,7 +181,7 @@ export function RiskDetailModal({
       tabIndex={-1}
     >
       <div
-        className="relative w-full max-w-xl my-4 rounded-lg shadow-2xl flex flex-col"
+        className="relative w-full max-w-2xl my-4 rounded-lg shadow-2xl flex flex-col"
         style={{
           background: "var(--color-sentinel-bg-panel)",
           border: "1px solid var(--color-sentinel-border)",
@@ -199,7 +233,7 @@ export function RiskDetailModal({
                 className="text-sm"
                 style={{ color: "var(--color-sentinel-text-secondary)" }}
               >
-                {equipment.category} | {equipment.type} | {equipment.location}
+                {equipment.category} | {formatEquipmentType(equipment.type)} | {equipment.location}
               </div>
               <div
                 className="text-xs"
@@ -210,7 +244,7 @@ export function RiskDetailModal({
             </div>
             <button
               onClick={onClose}
-              className="p-1 rounded hover:bg-white/10 transition-colors"
+              className="p-1 rounded hover:bg-white/10 transition-colors cursor-pointer"
               style={{ color: "var(--color-sentinel-text-secondary)" }}
             >
               <X className="w-5 h-5" />
@@ -386,6 +420,32 @@ export function RiskDetailModal({
               </div>
             </div>
           </div>
+
+          {/* Recent Activity */}
+          {showEquipmentLogs && (
+            <div>
+              <h3
+                className="text-sm font-semibold mb-3 flex items-center gap-2"
+                style={{ color: "var(--color-sentinel-text-primary)" }}
+              >
+                <FileText className="w-4 h-4" />
+                Recent Activity
+              </h3>
+              <div
+                className="rounded-lg overflow-hidden"
+                style={{
+                  background: "var(--color-sentinel-bg-secondary)",
+                  border: "1px solid var(--color-sentinel-border)",
+                }}
+              >
+                <RecentActions
+                  deviceId={equipment.id}
+                  limit={5}
+                  autoRefresh={false}
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Action Buttons */}
@@ -399,7 +459,7 @@ export function RiskDetailModal({
                 onNavigateToControl(equipment.id);
                 onClose();
               }}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded font-medium transition-colors"
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded font-medium transition-colors cursor-pointer hover:brightness-110"
               style={{
                 background: "var(--color-sentinel-blue)",
                 color: "white",
@@ -417,7 +477,7 @@ export function RiskDetailModal({
                 onCreateWorkOrder(equipment.id);
                 onClose();
               }}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded font-medium transition-colors"
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded font-medium transition-colors cursor-pointer hover:brightness-110"
               style={{
                 background: "var(--color-sentinel-amber)",
                 color: "white",
@@ -428,9 +488,27 @@ export function RiskDetailModal({
             </button>
           )}
 
+          {onNavigateToSite && (
+            <button
+              onClick={() => {
+                onNavigateToSite(equipment.site_id);
+                onClose();
+              }}
+              className="flex items-center justify-center gap-2 px-4 py-2.5 rounded font-medium transition-colors cursor-pointer hover:brightness-110"
+              style={{
+                background: "var(--color-sentinel-bg-secondary)",
+                color: "var(--color-sentinel-text-primary)",
+                border: "1px solid var(--color-sentinel-border)",
+              }}
+            >
+              <Building2 className="w-4 h-4" />
+              View Site
+            </button>
+          )}
+
           <button
             onClick={onClose}
-            className="px-4 py-2.5 rounded font-medium transition-colors"
+            className="px-4 py-2.5 rounded font-medium transition-colors cursor-pointer hover:brightness-110"
             style={{
               background: "var(--color-sentinel-bg-secondary)",
               color: "var(--color-sentinel-text-primary)",

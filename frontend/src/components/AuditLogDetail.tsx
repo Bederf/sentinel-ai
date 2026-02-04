@@ -11,7 +11,7 @@
  * Follows Grafana modal design with dark theme.
  */
 
-import { X, Clock, User, Server, Settings, Shield, AlertTriangle } from "lucide-react";
+import { X, Clock, User, Server, Settings, Shield, AlertTriangle, Zap } from "lucide-react";
 import type { AuditLogEntryResponse } from "../lib/api";
 
 interface AuditLogDetailProps {
@@ -21,6 +21,8 @@ interface AuditLogDetailProps {
   isOpen: boolean;
   /** Callback when modal is closed */
   onClose: () => void;
+  /** Callback to navigate to device in Control Dashboard */
+  onViewDevice?: (deviceId: string) => void;
 }
 
 /**
@@ -110,6 +112,7 @@ export default function AuditLogDetail({
   log,
   isOpen,
   onClose,
+  onViewDevice,
 }: AuditLogDetailProps) {
   if (!isOpen) return null;
 
@@ -172,9 +175,21 @@ export default function AuditLogDetail({
                   User Information
                 </h3>
                 <div className="p-3 bg-gray-800/50 border border-gray-700 rounded">
-                  <div className="text-lg font-medium text-gray-200">
-                    {log.user}
-                  </div>
+                  {log.user === "SENTINEL" ? (
+                    <div className="flex items-center gap-2">
+                      <Zap className="w-5 h-5" style={{ color: "var(--color-sentinel-purple)" }} />
+                      <span className="text-lg font-medium" style={{ color: "var(--color-sentinel-purple)" }}>
+                        SENTINEL
+                      </span>
+                      <span className="text-xs px-2 py-0.5 rounded" style={{ background: "rgba(139, 92, 246, 0.15)", color: "var(--color-sentinel-purple)" }}>
+                        AI Auto
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="text-lg font-medium text-gray-200">
+                      {log.user}
+                    </div>
+                  )}
                   {log.correlation_id && (
                     <div className="mt-2 text-sm text-gray-400">
                       Correlation ID:{" "}
@@ -453,11 +468,11 @@ export default function AuditLogDetail({
               >
                 Close
               </button>
-              {log.device_id && (
+              {log.device_id && onViewDevice && (
                 <button
                   onClick={() => {
-                    // In a real app, this would navigate to the device
-                    console.log("Navigate to device:", log.device_id);
+                    onViewDevice(log.device_id!);
+                    onClose();
                   }}
                   className="px-4 py-2 text-sm bg-blue-900/30 text-blue-300 rounded-md hover:bg-blue-900/50 transition-colors"
                 >

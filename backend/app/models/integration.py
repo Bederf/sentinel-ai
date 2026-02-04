@@ -12,6 +12,7 @@ class SourceType(str, Enum):
     CAFM_ASSET = "cafm_asset"
     CAFM_WORKORDER = "cafm_workorder"
     BCC_ALARM = "bcc_alarm"
+    DALI_LIGHTING = "dali_lighting"
 
 
 class ConnectionType(str, Enum):
@@ -20,6 +21,7 @@ class ConnectionType(str, Enum):
     DATABASE = "database"
     API = "api"
     MANUAL_UPLOAD = "manual_upload"
+    NIAGARA_BACNET = "niagara_bacnet"
 
 
 class FileFormat(str, Enum):

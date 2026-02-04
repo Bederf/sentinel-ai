@@ -1,8 +1,8 @@
 import { useEffect, useState, useRef, useCallback } from "react";
-import { Clock, Wifi, WifiOff, Bell, X } from "lucide-react";
-import { Toaster } from "sonner";
+import { Clock, Wifi, WifiOff, Bell, X, LogOut } from "lucide-react";
+import { Toaster, toast } from "sonner";
 import { formatTime } from "./lib/timeFormat";
-import api, { type Alert } from "./lib/api";
+import api, { type Alert, type AuthUser } from "./lib/api";
 import { Chat } from "./components/Chat";
 import TechnicianChat from "./components/TechnicianChat";
 import { Dashboard } from "./components/Dashboard";
@@ -12,13 +12,14 @@ import { OptimizationPage } from "./pages/OptimizationPage";
 import { Settings } from "./components/Settings";
 import { Sidebar, type View } from "./components/Sidebar";
 import { SplashScreen } from "./components/SplashScreen";
-import { PinEntry } from "./components/PinEntry";
+import { EmailEntry } from "./components/EmailEntry";
 import { AlertFeed } from "./components/AlertFeed";
 import { CalendarPicker } from "./components/CalendarPicker";
 import { IntegrationMonitoringPage } from "./components/IntegrationMonitoringPage";
 import { AssetWorkflowDashboard } from "./components/AssetWorkflowDashboard";
 import { OccupancyPanel } from "./components/OccupancyPanel";
 import { SecurityDashboard } from "./components/SecurityDashboard";
+import { SimbiotPage } from "./components/SimbiotPage";
 
 interface HealthStatus {
   status: string;
@@ -27,16 +28,10 @@ interface HealthStatus {
 
 function App() {
   const [showSplash, setShowSplash] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    // Check if already authenticated in this session
-    const authStatus = sessionStorage.getItem("sentinel_authenticated") === "true";
-    console.log('Initial auth check:', sessionStorage.getItem("sentinel_authenticated"), '=>', authStatus);
-
-    // TEMPORARY: Force PIN screen to show for debugging
-    // Comment out the next line to restore normal behavior
-    // sessionStorage.removeItem("sentinel_authenticated");
-
-    return authStatus;
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => {
+    // Check for stored user on mount
+    const storedUser = localStorage.getItem("sentinel_user");
+    return storedUser ? JSON.parse(storedUser) : null;
   });
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -74,14 +69,6 @@ function App() {
     };
 
     checkHealth();
-
-    // Log authentication status for debugging
-    console.log('=== AUTH DEBUG ===');
-    console.log('showSplash:', showSplash);
-    console.log('isAuthenticated:', isAuthenticated);
-    console.log('sessionStorage:', sessionStorage.getItem("sentinel_authenticated"));
-    console.log('To reset PIN auth, run in console: sessionStorage.removeItem("sentinel_authenticated")');
-    console.log('==================');
 
     // Periodic health check every 30 seconds
     const healthInterval = setInterval(checkHealth, 30000);
@@ -169,11 +156,25 @@ function App() {
     if (!audioRef.current) {
       audioRef.current = new Audio('/audio/sentinel-logo.mp3');
     }
-    
+
     // Play audio
     audioRef.current.play().catch((error) => {
       console.error('Error playing audio:', error);
     });
+  };
+
+  const handleLogout = async () => {
+    try {
+      await api.logout();
+    } catch (err) {
+      console.error('Logout error:', err);
+    } finally {
+      // Clear local storage
+      localStorage.removeItem("sentinel_token");
+      localStorage.removeItem("sentinel_user");
+      setCurrentUser(null);
+      toast.success("Logged out successfully");
+    }
   };
 
   // Handle view changes - scroll to top and refresh when re-clicking same view
@@ -220,12 +221,12 @@ function App() {
     }} />;
   }
 
-  // Show PIN entry after splash if not authenticated
-  if (!isAuthenticated) {
-    console.log('Showing PIN entry (authenticated =', isAuthenticated, ')');
-    return <PinEntry onSuccess={() => {
-      console.log('PIN entry success, setting authenticated to true');
-      setIsAuthenticated(true);
+  // Show email entry if not authenticated
+  if (!currentUser) {
+    console.log('Showing email entry (user =', currentUser, ')');
+    return <EmailEntry onSuccess={(user, token) => {
+      console.log('Login success:', user);
+      setCurrentUser(user);
     }} />;
   }
 
@@ -282,6 +283,7 @@ function App() {
                  currentView === "integrations" ? "Integration Monitoring" :
                  currentView === "occupancy" ? "DALI Occupancy" :
                  currentView === "security" ? "Security" :
+                 currentView === "simbiot" ? "SIMBIOT" :
                  "AI Assistant"}
               </h1>
             </div>
@@ -495,6 +497,38 @@ function App() {
                 />
               )}
             </div>
+
+            {/* User info and logout */}
+            {currentUser && (
+              <div className="hidden md:flex items-center gap-2 pl-2 border-l" style={{ borderColor: "var(--color-sentinel-border)" }}>
+                <div className="text-right">
+                  <div
+                    className="text-xs font-medium"
+                    style={{ color: "var(--color-sentinel-text-primary)" }}
+                  >
+                    {currentUser.full_name}
+                  </div>
+                  <div
+                    className="text-xs"
+                    style={{ color: "var(--color-sentinel-text-disabled)" }}
+                  >
+                    {currentUser.role}
+                  </div>
+                </div>
+                <button
+                  onClick={handleLogout}
+                  className="p-2 rounded-md transition-colors hover:brightness-110"
+                  style={{
+                    background: "var(--color-sentinel-bg-secondary)",
+                    border: "1px solid var(--color-sentinel-border)",
+                  }}
+                  aria-label="Logout"
+                  title="Logout"
+                >
+                  <LogOut className="h-4 w-4" style={{ color: "var(--color-sentinel-text-secondary)" }} />
+                </button>
+              </div>
+            )}
           </div>
         </header>
 
@@ -541,6 +575,8 @@ function App() {
             </div>
           ) : currentView === "security" ? (
             <SecurityDashboard />
+          ) : currentView === "simbiot" ? (
+            <SimbiotPage />
           ) : (
             <div className="h-full p-4 md:p-6">
               <div className="h-full max-w-4xl mx-auto">

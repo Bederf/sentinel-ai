@@ -24,7 +24,6 @@ import {
   Plus,
   X,
 } from "lucide-react";
-import { Badge, Callout, Title } from "@tremor/react";
 import { monitoringApi } from "../lib/api";
 import { formatDateTime } from "../lib/timeFormat";
 import { GoLiveChecklist } from "./GoLiveChecklist";
@@ -103,58 +102,115 @@ interface AlertItemProps {
 }
 
 function AlertItem({ alert, onDismiss }: AlertItemProps) {
-  const severityColors = {
-    critical: { bg: "rose", text: "var(--color-sentinel-red)" },
-    warning: { bg: "amber", text: "var(--color-sentinel-amber)" },
-    info: { bg: "blue", text: "var(--color-sentinel-blue)" },
+  const severityConfig = {
+    critical: {
+      color: "var(--color-sentinel-red)",
+      bg: "rgba(220, 38, 38, 0.1)",
+      border: "rgba(220, 38, 38, 0.3)",
+    },
+    warning: {
+      color: "var(--color-sentinel-amber)",
+      bg: "rgba(245, 158, 11, 0.1)",
+      border: "rgba(245, 158, 11, 0.3)",
+    },
+    info: {
+      color: "var(--color-sentinel-blue)",
+      bg: "rgba(59, 130, 246, 0.1)",
+      border: "rgba(59, 130, 246, 0.3)",
+    },
   };
 
-  const colors = severityColors[alert.severity];
+  const config = severityConfig[alert.severity];
 
   return (
-    <Callout
-      title={alert.type.replace(/_/g, " ").toUpperCase()}
-      color={colors.bg as "rose" | "amber" | "blue"}
-      className="mb-2"
+    <div
+      className="rounded-md p-4 flex items-start gap-3"
+      style={{
+        background: config.bg,
+        border: `1px solid ${config.border}`,
+      }}
     >
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-sm">{alert.message}</p>
-          <p className="text-xs mt-1 opacity-70">
-            {formatDateTime(alert.timestamp)}
-          </p>
+      <AlertTriangle
+        className="h-4 w-4 shrink-0 mt-0.5"
+        style={{ color: config.color }}
+      />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <span
+              className="text-xs font-medium uppercase tracking-wider"
+              style={{ color: config.color }}
+            >
+              {alert.type.replace(/_/g, " ")}
+            </span>
+            <p
+              className="text-sm mt-1"
+              style={{ color: "var(--color-sentinel-text-primary)" }}
+            >
+              {alert.message}
+            </p>
+            <span
+              className="text-xs mt-1 block"
+              style={{ color: "var(--color-sentinel-text-disabled)" }}
+            >
+              {formatDateTime(alert.timestamp)}
+            </span>
+          </div>
+          <button
+            onClick={() => onDismiss(alert.id)}
+            className="px-2 py-1 text-xs rounded shrink-0 transition-colors hover:opacity-80"
+            style={{
+              background: "var(--color-sentinel-bg-secondary)",
+              color: "var(--color-sentinel-text-secondary)",
+              border: "1px solid var(--color-sentinel-border)",
+            }}
+          >
+            Dismiss
+          </button>
         </div>
-        <button
-          onClick={() => onDismiss(alert.id)}
-          className="px-2 py-1 text-xs rounded hover:opacity-80 transition-colors"
-          style={{
-            background: "var(--color-sentinel-bg-secondary)",
-            color: "var(--color-sentinel-text-secondary)",
-            border: "1px solid var(--color-sentinel-border)",
-          }}
-        >
-          Dismiss
-        </button>
       </div>
-    </Callout>
+    </div>
   );
 }
 
 // Status badge component
 function StatusBadge({ status }: { status: SyncJobSummary["status"] }) {
-  const statusStyles = {
-    success: { color: "green", text: "Success" },
-    failed: { color: "red", text: "Failed" },
-    running: { color: "blue", text: "Running" },
-    partial: { color: "amber", text: "Partial" },
+  const statusStyles: Record<string, { color: string; bg: string; text: string }> = {
+    success: {
+      color: "var(--color-sentinel-green)",
+      bg: "rgba(16, 185, 129, 0.15)",
+      text: "Success",
+    },
+    failed: {
+      color: "var(--color-sentinel-red)",
+      bg: "rgba(220, 38, 38, 0.15)",
+      text: "Failed",
+    },
+    running: {
+      color: "var(--color-sentinel-blue)",
+      bg: "rgba(59, 130, 246, 0.15)",
+      text: "Running",
+    },
+    partial: {
+      color: "var(--color-sentinel-amber)",
+      bg: "rgba(245, 158, 11, 0.15)",
+      text: "Partial",
+    },
   };
 
-  const style = statusStyles[status];
+  const style = statusStyles[status] || statusStyles.running;
 
   return (
-    <Badge color={style.color as "green" | "red" | "blue" | "amber"}>
+    <span
+      className="text-xs px-2 py-0.5 rounded-full font-medium inline-flex items-center gap-1"
+      style={{ background: style.bg, color: style.color }}
+    >
+      {status === "success" && <CheckCircle className="h-3 w-3" />}
+      {status === "failed" && <X className="h-3 w-3" />}
+      {status === "running" && <RefreshCw className="h-3 w-3 animate-spin" />}
+      {status === "partial" && <AlertTriangle className="h-3 w-3" />}
       {style.text}
-    </Badge>
+    </span>
   );
 }
 
@@ -167,7 +223,9 @@ function formatDuration(ms: number): string {
 
 // Format relative time
 function formatRelativeTime(dateStr: string): string {
+  if (!dateStr) return "—";
   const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return "—";
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
   const diffMins = Math.floor(diffMs / 60000);
@@ -178,6 +236,13 @@ function formatRelativeTime(dateStr: string): string {
   if (diffMins < 60) return `${diffMins} minutes ago`;
   if (diffHours < 24) return `${diffHours} hours ago`;
   return `${diffDays} days ago`;
+}
+
+// Truncate UUID for display
+function truncateId(id: string): string {
+  if (!id) return "—";
+  if (id.length > 12) return `${id.slice(0, 8)}...`;
+  return id;
 }
 
 // Main component
@@ -333,11 +398,32 @@ export function IntegrationMonitoringPage() {
         className="h-full flex items-center justify-center"
         style={{ background: "var(--color-sentinel-bg-canvas)" }}
       >
-        <Callout title="Error" color="rose" className="max-w-md">
-          <p>{error}</p>
+        <div
+          className="rounded-md p-6 max-w-md text-center"
+          style={{
+            background: "rgba(220, 38, 38, 0.1)",
+            border: "1px solid rgba(220, 38, 38, 0.3)",
+          }}
+        >
+          <AlertTriangle
+            className="h-8 w-8 mx-auto mb-3"
+            style={{ color: "var(--color-sentinel-red)" }}
+          />
+          <h3
+            className="text-sm font-medium mb-2"
+            style={{ color: "var(--color-sentinel-red)" }}
+          >
+            Error
+          </h3>
+          <p
+            className="text-sm mb-4"
+            style={{ color: "var(--color-sentinel-text-secondary)" }}
+          >
+            {error}
+          </p>
           <button
             onClick={handleRefresh}
-            className="mt-4 px-4 py-2 rounded text-sm flex items-center gap-2"
+            className="px-4 py-2 rounded text-sm flex items-center gap-2 mx-auto transition-colors hover:opacity-80"
             style={{
               background: "var(--color-sentinel-bg-secondary)",
               border: "1px solid var(--color-sentinel-border)",
@@ -347,7 +433,7 @@ export function IntegrationMonitoringPage() {
             <RefreshCw className="w-4 h-4" />
             Retry
           </button>
-        </Callout>
+        </div>
       </div>
     );
   }
@@ -595,9 +681,9 @@ export function IntegrationMonitoringPage() {
                       syncJobsPage * syncJobsPerPage,
                       (syncJobsPage + 1) * syncJobsPerPage
                     )
-                    .map((job) => (
+                    .map((job, index) => (
                       <tr
-                        key={job.id}
+                        key={job.id || `sync-job-${index}`}
                         className="border-t"
                         style={{
                           borderColor: "var(--color-sentinel-border)",
@@ -605,7 +691,7 @@ export function IntegrationMonitoringPage() {
                         }}
                       >
                         <td className="px-4 py-3">
-                          {job.source_name || job.log_source_id}
+                          {job.source_name || truncateId(job.log_source_id)}
                         </td>
                         <td className="px-4 py-3">
                           <StatusBadge status={job.status} />
@@ -704,18 +790,45 @@ export function IntegrationMonitoringPage() {
             </div>
           </div>
 
-          <Badge color="amber">{unmatchedTotal} unmatched</Badge>
+          <span
+            className="text-xs px-2 py-1 rounded-full font-medium"
+            style={{
+              background: "rgba(245, 158, 11, 0.15)",
+              color: "var(--color-sentinel-amber)",
+            }}
+          >
+            {unmatchedTotal} unmatched
+          </span>
         </div>
 
         {unmatchedTotal > 0 && (
-          <Callout
-            title="Action Required"
-            color="amber"
-            className="m-4"
+          <div
+            className="m-4 rounded-md p-3 flex items-start gap-3"
+            style={{
+              background: "rgba(245, 158, 11, 0.1)",
+              border: "1px solid rgba(245, 158, 11, 0.3)",
+            }}
           >
-            Unmatched points won't trigger alerts or predictions. Review and map
-            them to assets.
-          </Callout>
+            <AlertTriangle
+              className="h-4 w-4 shrink-0 mt-0.5"
+              style={{ color: "var(--color-sentinel-amber)" }}
+            />
+            <div>
+              <span
+                className="text-xs font-medium"
+                style={{ color: "var(--color-sentinel-amber)" }}
+              >
+                Action Required
+              </span>
+              <p
+                className="text-sm mt-0.5"
+                style={{ color: "var(--color-sentinel-text-secondary)" }}
+              >
+                Unmatched points won't trigger alerts or predictions. Review and map
+                them to assets.
+              </p>
+            </div>
+          </div>
         )}
 
         <div className="overflow-x-auto">
@@ -757,9 +870,9 @@ export function IntegrationMonitoringPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {unmatchedPoints.map((point) => (
+                  {unmatchedPoints.map((point, index) => (
                     <tr
-                      key={point.point_id}
+                      key={point.point_id || `unmatched-${index}`}
                       className="border-t"
                       style={{
                         borderColor: "var(--color-sentinel-border)",
@@ -778,8 +891,8 @@ export function IntegrationMonitoringPage() {
                       </td>
                       <td className="px-4 py-3">{point.occurrence_count}</td>
                       <td className="px-4 py-3 text-right">
-                        <a
-                          href="/integrations/wizard"
+                        <button
+                          onClick={() => setShowWizard(true)}
                           className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors hover:opacity-80"
                           style={{
                             background: "var(--color-sentinel-bg-secondary)",
@@ -789,7 +902,7 @@ export function IntegrationMonitoringPage() {
                         >
                           Review
                           <ChevronRight className="w-3 h-3" />
-                        </a>
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -848,7 +961,12 @@ export function IntegrationMonitoringPage() {
       {/* Section 5: Go-Live Validation */}
       {selectedBuildingId && (
         <div className="mt-6">
-          <Title className="mb-4">Go-Live Validation</Title>
+          <h2
+            className="text-lg font-semibold mb-4"
+            style={{ color: "var(--color-sentinel-text-primary)" }}
+          >
+            Go-Live Validation
+          </h2>
           <GoLiveChecklist buildingId={selectedBuildingId} />
         </div>
       )}
@@ -893,6 +1011,7 @@ export function IntegrationMonitoringPage() {
           </div>
         </div>
       )}
+
     </div>
   );
 }

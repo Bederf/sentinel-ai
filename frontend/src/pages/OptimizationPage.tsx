@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import { Table, TableHead, TableRow, TableHeaderCell, TableBody, TableCell, Button } from "@tremor/react";
 import api from "../lib/api";
-import type { EskomStatusResponse, ThermalRunwayResponse } from "../lib/api";
+import type { OptimizationScenario, OptimizationStatusResponse } from "../lib/api";
 import { OptimizationPanel } from "../components/OptimizationPanel";
 
 // Sentinel-styled Badge component
@@ -109,10 +109,12 @@ interface OptimizationPageProps {
 
 export function OptimizationPage({ onError }: OptimizationPageProps) {
   // State
-  const [_eskomStatus, setEskomStatus] = useState<EskomStatusResponse | null>(null);
-  const [_thermalRunway, setThermalRunway] = useState<ThermalRunwayResponse | null>(null);
+  const [allScenarios, setAllScenarios] = useState<OptimizationScenario[]>([]);
   const [scenarios, setScenarios] = useState<ScenarioComparison[]>([]);
   const [actionHistory, setActionHistory] = useState<ActionHistoryItem[]>([]);
+  const [kpis, setKpis] = useState<{ energySavings: number; comfortExtension: number; fuelSavings: number; costSavings: number }>({
+    energySavings: 0, comfortExtension: 0, fuelSavings: 0, costSavings: 0,
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -124,80 +126,71 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
     const loadOptimizationData = async () => {
       try {
         setLoading(true);
-        const [statusData, thermalData] = await Promise.all([
-          api.getEskomStatus(undefined),
-          api.getThermalRunway("gateway-theatre"),
-        ]);
-        setEskomStatus(statusData);
-        setThermalRunway(thermalData);
 
-        // Load mock scenario comparisons
-        setScenarios([
-          {
+        // Fetch scenarios and optimization status in parallel
+        const [scenarioData, statusData] = await Promise.all([
+          api.getOptimizationScenarios().catch(() => [] as OptimizationScenario[]),
+          api.getOptimizationStatus("site-001").catch(() => null as OptimizationStatusResponse | null),
+        ]);
+
+        setAllScenarios(scenarioData);
+
+        // Build scenario comparison rows from real data
+        // Add a "baseline" row (no pre-cooling) plus each scenario
+        const comparisonRows: ScenarioComparison[] = [];
+
+        if (scenarioData.length > 0) {
+          // Baseline = without precooling from the first scenario
+          const first = scenarioData[0];
+          comparisonRows.push({
             id: "baseline",
             name: "Without Pre-cooling",
-            runwayExtension: "52 min",
+            runwayExtension: `${first.thermal_runway.without_precooling} min`,
             energySavings: "0%",
             costSavings: 0,
-            successRate: "68%",
-          },
-          {
-            id: "sentinel",
-            name: "SENTINEL Optimized",
-            runwayExtension: "108 min",
-            energySavings: "12%",
-            costSavings: 1250,
-            successRate: "94%",
-          },
-          {
-            id: "aggressive",
-            name: "Aggressive Pre-cooling",
-            runwayExtension: "142 min",
-            energySavings: "8%",
-            costSavings: 980,
-            successRate: "89%",
-          },
-        ]);
+            successRate: "N/A",
+          });
 
-        // Load mock action history
-        setActionHistory([
-          {
-            timestamp: "2026-01-27 14:45:00",
-            action: "Initiate pre-cooling sequence",
-            status: "completed",
-            user: "Auto (SENTINEL)",
-          },
-          {
-            timestamp: "2026-01-27 14:50:00",
-            action: "Adjust CHW setpoint: 6°C → 5°C",
-            status: "completed",
-            user: "Auto (SENTINEL)",
-          },
-          {
-            timestamp: "2026-01-27 14:55:00",
-            action: "Increase AHU fan speed: 70% → 90%",
-            status: "completed",
-            user: "Auto (SENTINEL)",
-          },
-          {
-            timestamp: "2026-01-27 15:00:00",
-            action: "Switch to ventilation only mode",
-            status: "completed",
-            user: "Auto (SENTINEL)",
-          },
-          {
-            timestamp: "2026-01-27 15:30:00",
-            action: "Verify pre-cooling complete: 20.5°C achieved",
-            status: "completed",
-            user: "Auto (SENTINEL)",
-          },
-          {
-            timestamp: "2026-01-27 16:00:00",
-            action: "Load shedding begins - monitoring building drift",
-            status: "pending",
-            user: "System",
-          },
-        ]);
+          for (const s of scenarioData) {
+            comparisonRows.push({
+              id: s.scenario_id,
+              name: s.site_name,
+              runwayExtension: `${s.thermal_runway.with_precooling} min`,
+              energySavings: `${s.savings.energy_savings_percent}%`,
+              costSavings: s.savings.total_savings_zar,
+              successRate: s.thermal_runway.comfort_maintained ? "Yes" : "No",
+            });
+          }
+        }
+        setScenarios(comparisonRows);
+
+        // Compute aggregate KPIs from all scenarios
+        if (scenarioData.length > 0) {
+          const avgEnergy = Math.round(scenarioData.reduce((sum, s) => sum + s.savings.energy_savings_percent, 0) / scenarioData.length);
+          const avgComfort = Math.round(scenarioData.reduce((sum, s) => sum + s.savings.comfort_extension_minutes, 0) / scenarioData.length);
+          const avgFuel = Math.round(scenarioData.reduce((sum, s) => sum + s.savings.fuel_savings_percent, 0) / scenarioData.length);
+          const avgCost = Math.round(scenarioData.reduce((sum, s) => sum + s.savings.total_savings_zar, 0) / scenarioData.length);
+          setKpis({ energySavings: avgEnergy, comfortExtension: avgComfort, fuelSavings: avgFuel, costSavings: avgCost });
+        }
+
+        // Build action history from optimization status
+        if (statusData?.optimization_history && statusData.optimization_history.length > 0) {
+          const historyItems: ActionHistoryItem[] = statusData.optimization_history
+            .slice(-10)
+            .reverse()
+            .map((entry) => ({
+              timestamp: new Date(entry.timestamp).toLocaleString(),
+              action: entry.action,
+              status: entry.result === "success" ? "completed" as const
+                : entry.result === "error" ? "failed" as const
+                : "pending" as const,
+              user: entry.user || "System",
+            }));
+          setActionHistory(historyItems);
+        } else {
+          // No history yet - show empty
+          setActionHistory([]);
+        }
 
         setError(null);
       } catch (err) {
@@ -218,19 +211,31 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
     setShowConfirmModal(true);
   };
 
-  const confirmExecution = () => {
-    // Simulate optimization execution
-    console.log(`Executing optimization scenario: ${selectedScenario}`);
+  const confirmExecution = async () => {
     setShowConfirmModal(false);
 
-    // Add to action history
-    const newAction: ActionHistoryItem = {
-      timestamp: new Date().toLocaleString(),
-      action: `Execute optimization: ${scenarios.find(s => s.id === selectedScenario)?.name}`,
-      status: "completed",
-      user: "Operator",
-    };
-    setActionHistory([newAction, ...actionHistory]);
+    // Find the matching scenario's site_id for precooling
+    const matchedScenario = allScenarios.find((s) => s.scenario_id === selectedScenario);
+    const targetSiteId = matchedScenario?.site_id || "site-001";
+
+    try {
+      const result = await api.startPrecooling(targetSiteId, selectedScenario || undefined);
+      const newAction: ActionHistoryItem = {
+        timestamp: new Date().toLocaleString(),
+        action: `Execute: ${matchedScenario?.site_name || selectedScenario} — ${result.message}`,
+        status: result.success ? "completed" : "failed",
+        user: "Operator",
+      };
+      setActionHistory([newAction, ...actionHistory]);
+    } catch (err) {
+      const newAction: ActionHistoryItem = {
+        timestamp: new Date().toLocaleString(),
+        action: `Execute: ${matchedScenario?.site_name || selectedScenario} — Failed`,
+        status: "failed",
+        user: "Operator",
+      };
+      setActionHistory([newAction, ...actionHistory]);
+    }
   };
 
   if (loading) {
@@ -350,13 +355,13 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
                 className="text-2xl font-semibold"
                 style={{ color: "var(--color-sentinel-text-primary)" }}
               >
-                12%
+                {kpis.energySavings}%
               </div>
               <div
                 className="text-sm"
                 style={{ color: "var(--color-sentinel-green)" }}
               >
-                ↓ R1,250 per outage
+                avg. across sites
               </div>
             </div>
             <div
@@ -387,13 +392,13 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
                 className="text-2xl font-semibold"
                 style={{ color: "var(--color-sentinel-text-primary)" }}
               >
-                56 min
+                {kpis.comfortExtension} min
               </div>
               <div
                 className="text-sm"
                 style={{ color: "var(--color-sentinel-green)" }}
               >
-                ↓ 108% longer
+                avg. extension
               </div>
             </div>
             <div
@@ -424,13 +429,13 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
                 className="text-2xl font-semibold"
                 style={{ color: "var(--color-sentinel-text-primary)" }}
               >
-                20%
+                {kpis.fuelSavings}%
               </div>
               <div
                 className="text-sm"
                 style={{ color: "var(--color-sentinel-green)" }}
               >
-                ↓ R850 per outage
+                avg. fuel savings
               </div>
             </div>
             <div
@@ -461,13 +466,13 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
                 className="text-2xl font-semibold"
                 style={{ color: "var(--color-sentinel-text-primary)" }}
               >
-                R2,100
+                {formatZAR(kpis.costSavings)}
               </div>
               <div
                 className="text-sm"
                 style={{ color: "var(--color-sentinel-green)" }}
               >
-                per 4hr outage
+                avg. per outage
               </div>
             </div>
             <div
@@ -634,6 +639,13 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
           {/* Panel Content */}
           <div className="p-4">
             <div className="space-y-3">
+              {actionHistory.length === 0 && (
+                <div className="p-4 rounded text-center" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                  <span className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                    No optimization actions yet
+                  </span>
+                </div>
+              )}
               {actionHistory.map((item, idx) => (
                 <div
                   key={idx}

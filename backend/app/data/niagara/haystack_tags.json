@@ -95,6 +95,36 @@
       "brick_class": "Level_Sensor",
       "unit": "%",
       "point_type": "sensor"
+    },
+    "brightness": {
+      "keywords": ["brightness", "dim", "dimming", "intensity", "led_level", "light_level"],
+      "brick_class": "Brightness_Sensor",
+      "unit": "%",
+      "point_type": "sensor"
+    },
+    "lux": {
+      "keywords": ["lux", "illuminance", "daylight_level", "light_intensity"],
+      "brick_class": "Luminance_Sensor",
+      "unit": "lux",
+      "point_type": "sensor"
+    },
+    "color_temperature": {
+      "keywords": ["color_temp", "cct", "kelvin", "colour_temp"],
+      "brick_class": "Color_Temperature_Sensor",
+      "unit": "K",
+      "point_type": "sensor"
+    },
+    "lamp_status": {
+      "keywords": ["lamp_status", "lamp_fail", "lamp_fault", "ballast_fail", "led_fault", "emergency_battery"],
+      "brick_class": "Lamp_Status",
+      "unit": "",
+      "point_type": "status"
+    },
+    "scene": {
+      "keywords": ["scene", "scene_select", "scene_activate", "lighting_scene"],
+      "brick_class": "Scene_Command",
+      "unit": "",
+      "point_type": "command"
     }
   },
   "equipment_patterns": {
@@ -149,9 +179,19 @@
       "typical_points": ["primary_voltage", "secondary_voltage", "oil_temp", "load_percent"]
     },
     "dali_controller": {
-      "regex": "dali|light[._-]?controller|luminaire|lighting",
-      "brick_class": "Lighting_Equipment",
-      "typical_points": ["brightness", "power_state", "lux_level", "occupancy"]
+      "regex": "dali[-_]?ctrl|dali[-_]?controller|scenecom|tridonic|dali[-_]?gw|lighting[-_]?controller",
+      "brick_class": "DALI_Controller",
+      "typical_points": ["status", "channel_count", "bus_fault", "power_state"]
+    },
+    "luminaire": {
+      "regex": "luminaire|lum[-_]?\\d|led[-_]?downlight|led[-_]?panel|led[-_]?strip|linear[-_]?led|light[-_]?fitting",
+      "brick_class": "Luminaire",
+      "typical_points": ["brightness", "power_state", "lamp_status", "color_temp", "emergency_battery"]
+    },
+    "light_sensor": {
+      "regex": "pir[-_]?daylight|daylight[-_]?sensor|lux[-_]?sensor|light[-_]?sensor|illuminance",
+      "brick_class": "Light_Sensor",
+      "typical_points": ["lux", "occupancy", "daylight_level"]
     },
     "meter": {
       "regex": "meter|mtr|metering|power[._-]?meter",
@@ -174,7 +214,9 @@
     "A": ["amp", "amps", "ampere", "amperes"],
     "V": ["volt", "volts", "vac", "vdc"],
     "Hz": ["hz", "hertz"],
-    "RPM": ["rpm", "revolutions_per_minute"]
+    "RPM": ["rpm", "revolutions_per_minute"],
+    "K": ["kelvin", "k", "color_temp"],
+    "lux": ["lux", "lx", "illuminance"]
   },
   "demo_points": [
     {"name": "CH-1_CHW_Supply_Temp", "description": "Chiller 1 Chilled Water Supply Temperature", "object_type": "analogInput", "units": "degC", "value": 6.5},
@@ -224,6 +266,15 @@
     {"name": "ZONE-L1_Humidity", "description": "Level 1 Humidity Sensor", "object_type": "analogInput", "units": "%", "value": 55},
     {"name": "ZONE-L2_CO2", "description": "Level 2 CO2 Sensor", "object_type": "analogInput", "units": "ppm", "value": 720},
     {"name": "UPS-1_Battery_Level", "description": "UPS 1 Battery Level", "object_type": "analogInput", "units": "%", "value": 98},
-    {"name": "UPS-1_Load_Percent", "description": "UPS 1 Load Percentage", "object_type": "analogInput", "units": "%", "value": 45}
+    {"name": "UPS-1_Load_Percent", "description": "UPS 1 Load Percentage", "object_type": "analogInput", "units": "%", "value": 45},
+    {"name": "DALI-L1-A_Brightness", "description": "DALI Zone L1-A Dimming Level", "object_type": "analogOutput", "units": "%", "value": 85},
+    {"name": "DALI-L1-A_Occupancy", "description": "DALI Zone L1-A PIR Occupancy", "object_type": "binaryInput", "units": "", "value": 1},
+    {"name": "DALI-L1-A_Lux", "description": "DALI Zone L1-A Daylight Sensor", "object_type": "analogInput", "units": "lux", "value": 450},
+    {"name": "DALI-L1-A_Lamp_Status", "description": "DALI Zone L1-A Lamp Fault", "object_type": "binaryInput", "units": "", "value": 0},
+    {"name": "DALI-L2-B_Brightness", "description": "DALI Zone L2-B Dimming Level", "object_type": "analogOutput", "units": "%", "value": 70},
+    {"name": "DALI-L2-B_Occupancy", "description": "DALI Zone L2-B Presence", "object_type": "binaryInput", "units": "", "value": 0},
+    {"name": "DALI-L2-B_Color_Temp", "description": "DALI Zone L2-B Color Temperature", "object_type": "analogOutput", "units": "K", "value": 4000},
+    {"name": "DALI-CTRL-L1_Status", "description": "DALI Controller L1 Online Status", "object_type": "binaryInput", "units": "", "value": 1},
+    {"name": "DALI-CTRL-L1_Bus_Fault", "description": "DALI Controller L1 Bus Fault", "object_type": "binaryInput", "units": "", "value": 0}
   ]
 }

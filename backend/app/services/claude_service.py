@@ -249,9 +249,9 @@ def build_system_prompt_with_context() -> str:
         building_occupancy = analyzer.dali.get_building_occupancy()
         lighting_context = f"""
 ## Real-Time Occupancy (from 1,315 DALI sensors)
-- Overall building occupancy: {building_occupancy['overall_occupancy_percent']:.0f}%
+- Overall building occupancy: {building_occupancy['occupancy_percent']:.0f}%
 - Total sensors: {building_occupancy['total_sensors']}
-- Currently occupied: {building_occupancy['total_occupied']}
+- Currently occupied: {building_occupancy['occupied_sensors']}
 
 **For comfort complaints:**
 - You can check specific zone occupancy and daylight levels

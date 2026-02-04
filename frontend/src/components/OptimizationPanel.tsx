@@ -11,12 +11,15 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@tremor/react";
-import { Zap, Clock, Thermometer, CheckCircle, Play, Eye } from "lucide-react";
+import { Zap, Clock, Thermometer, CheckCircle, Play, Square, Eye, Building2, ChevronDown, ShieldCheck } from "lucide-react";
 import { ThermalRunwayChart } from "./ThermalRunwayChart";
+import api from "../lib/api";
 import type {
   EskomStatusResponse,
   SiteScheduleResponse,
-  ThermalRunwayResponse
+  ThermalRunwayResponse,
+  OptimizationScenario,
+  Site,
 } from "../lib/api";
 
 // Sentinel-styled Badge component
@@ -85,69 +88,21 @@ interface OptimizationPanelProps {
   compact?: boolean;
 }
 
-// Mock data for development
-const mockEskomStatus: EskomStatusResponse = {
-  current_stage: 4,
-  updated_at: new Date().toISOString(),
-  next_stages: [
-    { stage: 4, start_time: "16:00", end_time: "18:30" },
-    { stage: 3, start_time: "18:30", end_time: "20:30" },
-    { stage: 2, start_time: "20:30", end_time: "22:30" }
-  ],
-  area_schedules: {}
-};
-
-const mockSiteSchedule: SiteScheduleResponse = {
-  site_id: "site-001",
-  site_name: "Gateway Theatre",
-  current_stage: 4,
-  schedules: [
-    { stage: 4, start_time: "16:00", end_time: "18:30" },
-    { stage: 3, start_time: "20:00", end_time: "22:00" }
-  ],
-  next_outage: { stage: 4, start_time: "16:00", end_time: "18:30" }
-};
-
-const mockThermalRunway: ThermalRunwayResponse = {
-  site_id: "site-001",
-  site_name: "Gateway Theatre",
-  current_temperature: 22.4,
-  comfort_limit: 26.0,
-  thermal_runway_minutes: 52,
-  comfort_breach_time: "16:52",
-  calculation_method: "thermal_model",
-  building_params: {
-    thermal_mass: 0.8,
-    insulation_factor: 0.6,
-    internal_heat_gain: 0.5
-  },
-  weather_forecast: {
-    outside_temp: 32.0,
-    solar_load: 0.7,
-    humidity: 65
-  }
-};
-
-const mockPrecoolingSchedule = {
-  start: "14:45",
-  duration_minutes: 45,
-  target_temp: 20.0,
-  actions: [
-    { time: "14:45", action: "CHW setpoint", value: "6°C → 5°C", description: "Reduce chilled water setpoint" },
-    { time: "14:50", action: "AHU fan speed", value: "70% → 85%", description: "Increase air circulation" },
-    { time: "15:00", action: "Night purge", value: "Enabled", description: "Use outside air cooling" },
-    { time: "15:15", action: "VAV optimization", value: "Balanced", description: "Uniform cooling distribution" },
-    { time: "15:30", action: "Temperature check", value: "20.5°C", description: "Target achieved" }
-  ],
-  energy_impact_kwh: 85,
-  peak_demand_increase_percent: 12
-};
-
-const mockGeneratorReadiness = [
-  { check: "Generator test", status: "PASSED", time: "13:45" },
-  { check: "UPS status", status: "96% capacity", time: "Current" },
-  { check: "Fuel level", status: "85%", time: "Current" }
-];
+// Helper to build generator readiness display from scenario data
+function buildGeneratorReadiness(scenario: OptimizationScenario | null): Array<{ check: string; status: string; time: string }> {
+  if (!scenario?.generator_readiness) return [];
+  const gr = scenario.generator_readiness;
+  return [
+    {
+      check: "Generator test",
+      status: gr.test_passed ? "PASSED" : "FAILED",
+      time: gr.last_test ? new Date(gr.last_test).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "Unknown",
+    },
+    { check: "UPS status", status: gr.ups_status === "online" ? "Online" : gr.ups_status, time: "Current" },
+    { check: "Fuel level", status: `${gr.fuel_level_percent}%`, time: "Current" },
+    { check: "Est. runtime", status: `${gr.estimated_runtime_hours}h (${gr.load_capacity_kw} kW)`, time: "Current" },
+  ];
+}
 
 // Get stage badge variant
 function getStageVariant(stage: number): "success" | "warning" | "error" | "info" {
@@ -157,23 +112,111 @@ function getStageVariant(stage: number): "success" | "warning" | "error" | "info
   return "error";
 }
 
-export function OptimizationPanel({ siteId = "site-001", scenarioId, compact = false }: OptimizationPanelProps) {
-  const [eskomStatus, setEskomStatus] = useState<EskomStatusResponse | null>(mockEskomStatus);
-  const [siteSchedule, setSiteSchedule] = useState<SiteScheduleResponse | null>(mockSiteSchedule);
-  const [thermalRunway, setThermalRunway] = useState<ThermalRunwayResponse | null>(mockThermalRunway);
-  const [loading, setLoading] = useState(false);
+export function OptimizationPanel({ siteId: initialSiteId = "site-001", scenarioId, compact = false }: OptimizationPanelProps) {
+  const [selectedSiteId, setSelectedSiteId] = useState(initialSiteId);
+  const [sites, setSites] = useState<Site[]>([]);
+  const [eskomStatus, setEskomStatus] = useState<EskomStatusResponse | null>(null);
+  const [siteSchedule, setSiteSchedule] = useState<SiteScheduleResponse | null>(null);
+  const [thermalRunway, setThermalRunway] = useState<ThermalRunwayResponse | null>(null);
+  const [scenario, setScenario] = useState<OptimizationScenario | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  // Load data on mount
+  // Precooling state
+  const [precoolingStatus, setPrecoolingStatus] = useState<"idle" | "starting" | "running" | "stopped">("idle");
+  const [precoolingActions, setPrecoolingActions] = useState<any[]>([]);
+
+  // Fetch sites on mount
   useEffect(() => {
-    // TODO: Replace with actual API calls
-    setLoading(true);
-    setTimeout(() => {
-      setEskomStatus(mockEskomStatus);
-      setSiteSchedule(mockSiteSchedule);
-      setThermalRunway(mockThermalRunway);
-      setLoading(false);
-    }, 500);
-  }, [siteId, scenarioId]);
+    async function loadSites() {
+      try {
+        const sitesData = await api.getSites();
+        setSites(sitesData);
+      } catch (err) {
+        console.error("Failed to fetch sites:", err);
+      }
+    }
+    loadSites();
+  }, []);
+
+  // Check precooling status on mount / site change
+  useEffect(() => {
+    const checkPrecooling = async () => {
+      try {
+        const status = await api.getPrecoolingStatus(selectedSiteId);
+        if (status.status === "running") {
+          setPrecoolingStatus("running");
+          setPrecoolingActions(status.actions || []);
+        } else {
+          setPrecoolingStatus("idle");
+          setPrecoolingActions([]);
+        }
+      } catch {
+        // Ignore - precooling status is optional
+      }
+    };
+    checkPrecooling();
+  }, [selectedSiteId]);
+
+  const handleStartPrecooling = async () => {
+    if (precoolingStatus === "starting") return;
+    setPrecoolingStatus("starting");
+    try {
+      const result = await api.startPrecooling(selectedSiteId, scenarioId);
+      if (result.success) {
+        setPrecoolingStatus(result.status === "already_running" ? "running" : "running");
+        setPrecoolingActions(result.actions || []);
+      }
+    } catch (error) {
+      console.error("Failed to start precooling:", error);
+      setPrecoolingStatus("idle");
+    }
+  };
+
+  const handleStopPrecooling = async () => {
+    try {
+      const result = await api.stopPrecooling(selectedSiteId);
+      if (result.success) {
+        setPrecoolingStatus("idle");
+        setPrecoolingActions([]);
+      }
+    } catch (error) {
+      console.error("Failed to stop precooling:", error);
+    }
+  };
+
+  // Load data on mount / site change
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchData() {
+      setLoading(true);
+      try {
+        // Fetch eskom status, site schedule, thermal runway, and scenarios in parallel
+        const [eskomData, scheduleData, thermalData, scenarios] = await Promise.all([
+          api.getEskomStatus().catch(() => null),
+          api.getSiteEskomStatus(selectedSiteId).catch(() => null),
+          api.getThermalRunway(selectedSiteId).catch(() => null),
+          api.getOptimizationScenarios().catch(() => [] as OptimizationScenario[]),
+        ]);
+        if (cancelled) return;
+
+        setEskomStatus(eskomData);
+        setSiteSchedule(scheduleData);
+        setThermalRunway(thermalData);
+
+        // Find matching scenario: by scenarioId prop, or by site_id
+        let matched = scenarioId
+          ? scenarios.find((s) => s.scenario_id === scenarioId) ?? null
+          : scenarios.find((s) => s.site_id === selectedSiteId) ?? scenarios[0] ?? null;
+        setScenario(matched);
+      } catch (err) {
+        console.error("Failed to load optimization data:", err);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    fetchData();
+    return () => { cancelled = true; };
+  }, [selectedSiteId, scenarioId]);
 
   if (loading) {
     return (
@@ -194,6 +237,9 @@ export function OptimizationPanel({ siteId = "site-001", scenarioId, compact = f
     );
   }
 
+  const currentStage = eskomStatus?.current_stage ?? 0;
+  const isLoadShedding = currentStage > 0;
+
   if (compact) {
     return (
       <div
@@ -211,43 +257,54 @@ export function OptimizationPanel({ siteId = "site-001", scenarioId, compact = f
                 Load Shedding Optimization
               </span>
             </div>
-            <SentinelBadge variant="success">Active</SentinelBadge>
+            <SentinelBadge variant={isLoadShedding ? getStageVariant(currentStage) : "success"}>
+              {isLoadShedding ? `Stage ${currentStage}` : "No Load Shedding"}
+            </SentinelBadge>
           </div>
 
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                Current Stage
-              </span>
-              <SentinelBadge variant={getStageVariant(eskomStatus?.current_stage || 0)} size="lg">
-                Stage {eskomStatus?.current_stage || 0}
-              </SentinelBadge>
-            </div>
+          {isLoadShedding ? (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                  Current Stage
+                </span>
+                <SentinelBadge variant={getStageVariant(currentStage)} size="lg">
+                  Stage {currentStage}
+                </SentinelBadge>
+              </div>
 
-            <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between">
+                <span className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                  Next Outage
+                </span>
+                <span className="text-sm font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                  {siteSchedule?.next_outage ?
+                    `${siteSchedule.next_outage.start_time} - ${siteSchedule.next_outage.end_time}` :
+                    "None scheduled"}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                  Thermal Runway
+                </span>
+                <span className="text-sm font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                  {thermalRunway?.thermal_runway_minutes || 0} min
+                </span>
+              </div>
+
+              <Button size="xs" variant="secondary" icon={Eye}>
+                View Details
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 py-2">
+              <ShieldCheck className="h-4 w-4" style={{ color: "var(--color-sentinel-green)" }} />
               <span className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                Next Outage
-              </span>
-              <span className="text-sm font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>
-                {siteSchedule?.next_outage ?
-                  `${siteSchedule.next_outage.start_time} - ${siteSchedule.next_outage.end_time}` :
-                  "None scheduled"}
+                Grid supply is stable — no outages scheduled
               </span>
             </div>
-
-            <div className="flex items-center justify-between">
-              <span className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                Thermal Runway
-              </span>
-              <span className="text-sm font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>
-                {thermalRunway?.thermal_runway_minutes || 0} min
-              </span>
-            </div>
-
-            <Button size="xs" variant="secondary" icon={Eye}>
-              View Details
-            </Button>
-          </div>
+          )}
         </div>
       </div>
     );
@@ -256,27 +313,68 @@ export function OptimizationPanel({ siteId = "site-001", scenarioId, compact = f
   return (
     <div className="mt-6 space-y-6">
       {/* Header Section */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="font-medium text-base mb-1" style={{ color: "var(--color-sentinel-text-primary)" }}>
-            Load Shedding Optimization
-          </h2>
-          <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-            Optimize building comfort and energy use during load shedding
-          </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          {/* Building Selector */}
+          <div className="relative min-w-[200px]">
+            <Building2
+              className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4"
+              style={{ color: "var(--color-sentinel-text-secondary)" }}
+            />
+            <select
+              value={selectedSiteId}
+              onChange={(e) => setSelectedSiteId(e.target.value)}
+              className="w-full pl-9 pr-8 py-2 text-sm rounded appearance-none cursor-pointer"
+              style={{
+                background: "var(--color-sentinel-bg-secondary)",
+                border: "1px solid var(--color-sentinel-border)",
+                color: "var(--color-sentinel-text-primary)",
+              }}
+            >
+              {sites.map((site) => (
+                <option key={site.id} value={site.id}>
+                  {site.name}
+                </option>
+              ))}
+            </select>
+            <ChevronDown
+              className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 pointer-events-none"
+              style={{ color: "var(--color-sentinel-text-secondary)" }}
+            />
+          </div>
+          <div>
+            <h2 className="font-medium text-base mb-1" style={{ color: "var(--color-sentinel-text-primary)" }}>
+              Load Shedding Optimization
+            </h2>
+            <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+              Optimize building comfort and energy use during load shedding
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
-          <SentinelBadge variant="success" size="lg">
-            Active Monitoring
+          <SentinelBadge variant={isLoadShedding ? getStageVariant(currentStage) : "success"} size="lg">
+            {isLoadShedding ? `Stage ${currentStage} Active` : "No Load Shedding"}
           </SentinelBadge>
-          <Button size="xs" variant="secondary" icon={Play}>
-            Start Pre-cool
-          </Button>
+          {precoolingStatus === "running" ? (
+            <Button size="xs" variant="secondary" icon={Square} onClick={handleStopPrecooling}>
+              Stop Pre-cool
+            </Button>
+          ) : (
+            <Button
+              size="xs"
+              variant="secondary"
+              icon={Play}
+              onClick={handleStartPrecooling}
+              loading={precoolingStatus === "starting"}
+            >
+              Start Pre-cool
+            </Button>
+          )}
         </div>
       </div>
 
-      {/* Three Column Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {/* Stacked Cards */}
+      <div className="space-y-6">
         {/* Left Column: Eskom Status */}
         <div
           className="rounded-md overflow-hidden"
@@ -301,58 +399,94 @@ export function OptimizationPanel({ siteId = "site-001", scenarioId, compact = f
                 Eskom Status
               </span>
             </div>
-            <SentinelBadge variant={getStageVariant(eskomStatus?.current_stage || 0)} size="lg">
-              Stage {eskomStatus?.current_stage || 0}
+            <SentinelBadge variant={getStageVariant(currentStage)} size="lg">
+              {isLoadShedding ? `Stage ${currentStage}` : "No Load Shedding"}
             </SentinelBadge>
           </div>
 
           {/* Card Content */}
           <div className="p-4 space-y-4">
-            <div>
-              <span className="text-sm font-medium mb-2 block" style={{ color: "var(--color-sentinel-text-primary)" }}>
-                Next Outages
-              </span>
-              <div className="space-y-2">
-                {siteSchedule?.schedules?.map((schedule, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-center justify-between p-2 rounded"
-                    style={{ background: "var(--color-sentinel-bg-secondary)" }}
-                  >
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-4 w-4" style={{ color: "var(--color-sentinel-text-disabled)" }} />
-                      <span className="text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
-                        {schedule.start_time} - {schedule.end_time}
-                      </span>
-                    </div>
-                    <SentinelBadge variant={getStageVariant(schedule.stage)} size="sm">
-                      Stage {schedule.stage}
-                    </SentinelBadge>
+            {isLoadShedding ? (
+              <>
+                <div>
+                  <span className="text-sm font-medium mb-2 block" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                    Next Outages
+                  </span>
+                  <div className="space-y-2">
+                    {siteSchedule?.schedules?.length ? (
+                      siteSchedule.schedules.map((schedule, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between p-2 rounded"
+                          style={{ background: "var(--color-sentinel-bg-secondary)" }}
+                        >
+                          <div className="flex items-center gap-2">
+                            <Clock className="h-4 w-4" style={{ color: "var(--color-sentinel-text-disabled)" }} />
+                            <span className="text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                              {schedule.start_time} - {schedule.end_time}
+                            </span>
+                          </div>
+                          <SentinelBadge variant={getStageVariant(schedule.stage)} size="sm">
+                            Stage {schedule.stage}
+                          </SentinelBadge>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="p-2 rounded" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                        <span className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                          No area schedule available
+                        </span>
+                      </div>
+                    )}
                   </div>
-                ))}
-              </div>
-            </div>
+                </div>
 
-            <div>
-              <span className="text-sm font-medium mb-2 block" style={{ color: "var(--color-sentinel-text-primary)" }}>
-                Area Status
-              </span>
-              <div className="p-3 rounded" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
-                <span className="text-sm font-medium block mb-1" style={{ color: "var(--color-sentinel-text-primary)" }}>
-                  {siteSchedule?.site_name}
+                <div>
+                  <span className="text-sm font-medium mb-2 block" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                    Area Status
+                  </span>
+                  <div className="p-3 rounded" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                    <span className="text-sm font-medium block mb-1" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                      {siteSchedule?.area_name || siteSchedule?.site_name}
+                    </span>
+                    <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                      {siteSchedule?.next_outage ?
+                        `Next outage: ${siteSchedule.next_outage.start_time}-${siteSchedule.next_outage.end_time}` :
+                        "No outages scheduled for this area"}
+                    </span>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-6 gap-3">
+                <div
+                  className="p-3 rounded-full"
+                  style={{ background: "rgba(16, 185, 129, 0.15)" }}
+                >
+                  <ShieldCheck className="h-8 w-8" style={{ color: "var(--color-sentinel-green)" }} />
+                </div>
+                <span className="text-sm font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                  No Load Shedding Active
                 </span>
-                <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                  {siteSchedule?.next_outage ?
-                    `Next outage: ${siteSchedule.next_outage.start_time}-${siteSchedule.next_outage.end_time}` :
-                    "No outages scheduled"}
+                <span className="text-xs text-center" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                  The national grid is stable. No outages are currently scheduled.
+                  {eskomStatus?.source === "eskomsepush" && " Data from EskomSePush."}
+                  {eskomStatus?.source === "not_configured" && " Configure EskomSePush API for live data."}
                 </span>
               </div>
-            </div>
+            )}
 
             <div className="pt-2" style={{ borderTop: "1px solid var(--color-sentinel-border)" }}>
-              <span className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>
-                Updated: {new Date(eskomStatus?.updated_at || "").toLocaleTimeString()}
-              </span>
+              <div className="flex items-center justify-between">
+                <span className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>
+                  Updated: {new Date(eskomStatus?.updated_at || "").toLocaleTimeString()}
+                </span>
+                {eskomStatus?.source && (
+                  <span className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>
+                    Source: {eskomStatus.source === "eskomsepush" ? "EskomSePush" : eskomStatus.source === "not_configured" ? "Not configured" : "Unavailable"}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -391,20 +525,45 @@ export function OptimizationPanel({ siteId = "site-001", scenarioId, compact = f
           {/* Card Content */}
           {thermalRunway && (
             <div className="p-4 space-y-4">
-              <ThermalRunwayChart
-                data={{
-                  time_points: ["14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00", "18:30"],
-                  without_precooling: [22.4, 23.1, 24.0, 24.9, 25.7, 26.5, 27.3, 28.1, 28.9],
-                  with_precooling: [22.4, 21.8, 21.2, 21.5, 22.1, 22.9, 23.8, 24.7, 25.5]
-                }}
-                outagePeriod={{ start: "16:00", end: "18:30" }}
-                metrics={{
-                  runwayWithout: 52,
-                  runwayWith: 108,
-                  comfortBreachTime: "16:52",
-                  recoveryTime: "19:00"
-                }}
-              />
+              {scenario?.visualization_data ? (
+                <ThermalRunwayChart
+                  data={{
+                    time_points: scenario.visualization_data.thermal_curve.map(([min]) => {
+                      const base = scenario.current_conditions?.time_of_day || "14:00";
+                      const [h, m] = base.split(":").map(Number);
+                      const totalMin = h * 60 + m + min;
+                      return `${String(Math.floor(totalMin / 60)).padStart(2, "0")}:${String(totalMin % 60).padStart(2, "0")}`;
+                    }),
+                    without_precooling: scenario.visualization_data.thermal_curve.map(([, temp]) => temp),
+                    with_precooling: scenario.visualization_data.precooling_curve.map(([, temp]) => temp),
+                  }}
+                  outagePeriod={{
+                    start: scenario.load_shedding.start,
+                    end: scenario.load_shedding.end,
+                  }}
+                  metrics={{
+                    runwayWithout: scenario.thermal_runway.without_precooling,
+                    runwayWith: scenario.thermal_runway.with_precooling,
+                    comfortBreachTime: scenario.thermal_runway.comfort_breach_time,
+                    recoveryTime: scenario.restart_plan?.estimated_restoration_time || "",
+                  }}
+                />
+              ) : (
+                <ThermalRunwayChart
+                  data={{
+                    time_points: [],
+                    without_precooling: [],
+                    with_precooling: [],
+                  }}
+                  outagePeriod={{ start: "", end: "" }}
+                  metrics={{
+                    runwayWithout: thermalRunway.thermal_runway_minutes,
+                    runwayWith: thermalRunway.thermal_runway_minutes,
+                    comfortBreachTime: thermalRunway.comfort_breach_time || "",
+                    recoveryTime: "",
+                  }}
+                />
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-3 rounded" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
@@ -412,10 +571,10 @@ export function OptimizationPanel({ siteId = "site-001", scenarioId, compact = f
                     Without Pre-cooling
                   </span>
                   <span className="text-xl font-bold block mb-1" style={{ color: "var(--color-sentinel-text-primary)" }}>
-                    52 min
+                    {scenario ? scenario.thermal_runway.without_precooling : thermalRunway.thermal_runway_minutes} min
                   </span>
                   <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                    Breach at 16:52
+                    Breach at {scenario?.thermal_runway.comfort_breach_time || thermalRunway.comfort_breach_time || "N/A"}
                   </span>
                 </div>
                 <div
@@ -429,10 +588,13 @@ export function OptimizationPanel({ siteId = "site-001", scenarioId, compact = f
                     With SENTINEL
                   </span>
                   <span className="text-xl font-bold block mb-1" style={{ color: "var(--color-sentinel-blue)" }}>
-                    1h 48min
+                    {(() => {
+                      const mins = scenario?.thermal_runway.with_precooling || thermalRunway.thermal_runway_minutes;
+                      return mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}min` : `${mins} min`;
+                    })()}
                   </span>
                   <span className="text-xs" style={{ color: "var(--color-sentinel-blue)", opacity: 0.8 }}>
-                    Comfort maintained
+                    {scenario?.thermal_runway.comfort_maintained ? "Comfort maintained" : "Comfort at risk"}
                   </span>
                 </div>
               </div>
@@ -464,9 +626,19 @@ export function OptimizationPanel({ siteId = "site-001", scenarioId, compact = f
                 Pre-cooling Schedule
               </span>
             </div>
-            <Button size="xs" variant="primary" icon={Play}>
-              Start Now
-            </Button>
+            {precoolingStatus === "running" ? (
+              <SentinelBadge variant="success" size="sm">Running</SentinelBadge>
+            ) : (
+              <Button
+                size="xs"
+                variant="primary"
+                icon={Play}
+                onClick={handleStartPrecooling}
+                loading={precoolingStatus === "starting"}
+              >
+                Start Now
+              </Button>
+            )}
           </div>
 
           {/* Card Content */}
@@ -476,27 +648,44 @@ export function OptimizationPanel({ siteId = "site-001", scenarioId, compact = f
                 Timeline
               </span>
               <div className="space-y-2">
-                {mockPrecoolingSchedule.actions.map((action, idx) => (
+                {(scenario?.pre_cooling_schedule?.actions || []).map((action, idx) => (
                   <div
                     key={idx}
                     className="flex items-start gap-3 p-2 rounded"
-                    style={{ background: "var(--color-sentinel-bg-secondary)" }}
+                    style={{
+                      background: precoolingStatus === "running"
+                        ? "rgba(16, 185, 129, 0.1)"
+                        : "var(--color-sentinel-bg-secondary)",
+                      border: precoolingStatus === "running"
+                        ? "1px solid rgba(16, 185, 129, 0.2)"
+                        : "1px solid transparent",
+                    }}
                   >
                     <div className="flex-shrink-0 w-12">
-                      <SentinelBadge variant="info" size="sm">
+                      <SentinelBadge variant={precoolingStatus === "running" ? "success" : "info"} size="sm">
                         {action.time}
                       </SentinelBadge>
                     </div>
                     <div className="flex-grow">
                       <span className="text-sm font-medium block mb-1" style={{ color: "var(--color-sentinel-text-primary)" }}>
-                        {action.action}
+                        {action.action.replace(/_/g, " ")}
                       </span>
                       <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                         {action.value} • {action.description}
                       </span>
                     </div>
+                    {precoolingStatus === "running" && (
+                      <CheckCircle className="h-4 w-4 flex-shrink-0 mt-0.5" style={{ color: "var(--color-sentinel-green)" }} />
+                    )}
                   </div>
                 ))}
+                {(!scenario?.pre_cooling_schedule?.actions || scenario.pre_cooling_schedule.actions.length === 0) && (
+                  <div className="p-3 rounded text-center" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                    <span className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                      No scenario data for this site
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -505,7 +694,7 @@ export function OptimizationPanel({ siteId = "site-001", scenarioId, compact = f
                 Generator Readiness
               </span>
               <div className="space-y-2">
-                {mockGeneratorReadiness.map((check, idx) => (
+                {buildGeneratorReadiness(scenario).map((check, idx) => (
                   <div
                     key={idx}
                     className="flex items-center justify-between p-2 rounded"
@@ -536,7 +725,7 @@ export function OptimizationPanel({ siteId = "site-001", scenarioId, compact = f
                   Energy Impact
                 </span>
                 <span className="text-sm font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>
-                  +85 kWh (+12%)
+                  +{scenario?.pre_cooling_schedule?.energy_impact_kwh ?? 0} kWh (+{scenario?.pre_cooling_schedule?.peak_demand_increase_percent ?? 0}%)
                 </span>
               </div>
               <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>

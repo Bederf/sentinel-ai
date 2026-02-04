@@ -44,6 +44,10 @@ class DiscoverRequest(BaseModel):
     use_demo: bool = Field(
         True, description="Use demo data when BACnet device unavailable"
     )
+    bms_vendor: Optional[str] = Field(
+        None,
+        description="BMS vendor identifier (niagara, desigo, metasys, honeywell, schneider, trend, generic)",
+    )
 
 
 class DiscoverResponse(BaseModel):
@@ -139,6 +143,7 @@ async def discover_and_classify(request: DiscoverRequest):
             site_id=request.site_id,
             device_bacnet_id=request.device_bacnet_id,
             use_demo=request.use_demo,
+            bms_vendor=request.bms_vendor,
         )
 
         if result.status == "error":
@@ -162,6 +167,7 @@ async def discover_and_classify(request: DiscoverRequest):
             "state": WorkflowState.PENDING_REVIEW,
             "device_ip": request.device_ip,
             "site_id": request.site_id,
+            "bms_vendor": request.bms_vendor,
             "points_count": len(result.classified_points),
             "equipment_count": len(result.summary.get("unique_equipment", {})),
         }
@@ -266,11 +272,16 @@ async def approve_mapping(
 
         if result.get("success"):
             # Update workflow state
+            workflow_info = _workflow_states.get(discovery_id, {})
             _workflow_states[discovery_id] = {
-                **_workflow_states.get(discovery_id, {}),
+                **workflow_info,
                 "state": WorkflowState.ACTIVATED,
                 "approved_by": approved_by,
             }
+
+            # Check if any approved equipment is DALI type and auto-register
+            site_id = workflow_info.get("site_id", "")
+            _register_dali_if_discovered(discovery_id, site_id, mappings)
 
             return ApproveResponse(
                 success=True,
@@ -286,6 +297,58 @@ async def approve_mapping(
     except Exception as e:
         logger.error("Approval failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ---------------------------------------------------------------------------
+# DALI auto-registration after approval
+# ---------------------------------------------------------------------------
+
+DALI_EQUIPMENT_TYPES = {"dali_controller", "luminaire", "light_sensor"}
+
+
+def _register_dali_if_discovered(
+    discovery_id: str,
+    site_id: str,
+    mappings: Dict[str, Any],
+):
+    """Check approved mappings for DALI equipment and auto-register with DALIService."""
+    if not site_id:
+        return
+
+    has_dali = False
+    for mapping in mappings.values():
+        eq_type = ""
+        if hasattr(mapping, "equipment_type"):
+            eq_type = mapping.equipment_type or ""
+        elif isinstance(mapping, dict):
+            eq_type = mapping.get("equipment_type", "")
+        if eq_type.lower() in DALI_EQUIPMENT_TYPES:
+            has_dali = True
+            break
+
+    if not has_dali:
+        return
+
+    try:
+        from app.services.dali_service import get_dali_service
+        dali_service = get_dali_service()
+        site_name = site_id  # Default; could resolve from building registry
+        try:
+            from app.database.repositories.building_repository import BuildingRepository
+            building_repo = BuildingRepository()
+            building = building_repo.get_by_id(site_id)
+            if building:
+                site_name = building.get("name", site_id)
+        except Exception:
+            pass
+
+        dali_service.register_niagara_site(site_id, site_name)
+        logger.info(
+            "DALI lighting system discovered and registered for %s (discovery %s)",
+            site_name, discovery_id,
+        )
+    except Exception as e:
+        logger.error("Failed to auto-register DALI site %s: %s", site_id, e)
 
 
 # ---------------------------------------------------------------------------

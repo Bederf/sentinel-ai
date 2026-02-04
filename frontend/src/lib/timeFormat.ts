@@ -8,8 +8,10 @@
  * @param date - Date object or ISO string
  * @returns Formatted time string (e.g., "14:30", "23:45")
  */
-export function formatTime(date: Date | string): string {
+export function formatTime(date: Date | string | null | undefined): string {
+  if (!date) return 'N/A';
   const d = typeof date === 'string' ? new Date(date) : date;
+  if (isNaN(d.getTime())) return 'N/A';
   return d.toLocaleTimeString('en-ZA', {
     hour: '2-digit',
     minute: '2-digit',
@@ -22,8 +24,10 @@ export function formatTime(date: Date | string): string {
  * @param date - Date object or ISO string
  * @returns Formatted date and time string (e.g., "30 Jan 2026, 14:30")
  */
-export function formatDateTime(date: Date | string): string {
+export function formatDateTime(date: Date | string | null | undefined): string {
+  if (!date) return 'N/A';
   const d = typeof date === 'string' ? new Date(date) : date;
+  if (isNaN(d.getTime())) return 'N/A';
   return d.toLocaleString('en-ZA', {
     day: '2-digit',
     month: 'short',
@@ -67,8 +71,10 @@ export function formatRelativeTime(timestamp: string | null): string {
  * @param date - Date object or ISO string
  * @returns Formatted date string (e.g., "30 Jan 2026")
  */
-export function formatDate(date: Date | string): string {
+export function formatDate(date: Date | string | null | undefined): string {
+  if (!date) return 'N/A';
   const d = typeof date === 'string' ? new Date(date) : date;
+  if (isNaN(d.getTime())) return 'N/A';
   return d.toLocaleDateString('en-ZA', {
     day: '2-digit',
     month: 'short',

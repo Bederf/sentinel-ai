@@ -26,6 +26,7 @@ from app.models.niagara import (
     BACnetPointReadResponse,
     BACnetPointWriteRequest,
     BACnetPointWriteResponse,
+    BACnetTestConnectionRequest,
 )
 from app.services.niagara.bacnet_client import (
     BACnetDeviceNotFoundError,
@@ -83,6 +84,56 @@ async def discover_devices(request: BACnetDiscoverRequest = BACnetDiscoverReques
         return BACnetDiscoverResponse(count=0, devices=[])
     except BACnetException as e:
         logger.error("Device discovery failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ---------------------------------------------------------------------------
+# POST /api/niagara/bacnet/test-connection - Test BACnet connectivity
+# ---------------------------------------------------------------------------
+
+
+@router.post("/test-connection", response_model=BACnetDiscoverResponse)
+async def test_bacnet_connection(
+    request: BACnetTestConnectionRequest = BACnetTestConnectionRequest(),
+):
+    """
+    Test BACnet/IP connectivity by auto-starting the client and running WhoIs.
+
+    Unlike POST /discover, this endpoint auto-starts the BACnet client if not
+    running, making it suitable for the wizard's connection test step.
+    """
+    client = get_bacnet_client()
+
+    if not client.is_running:
+        try:
+            await client.start()
+        except BACnetException as e:
+            raise HTTPException(
+                status_code=503,
+                detail=f"BACnet client failed to start: {e}",
+            )
+
+    try:
+        discovered = await client.discover_devices(timeout=request.timeout)
+
+        devices = [
+            BACnetDeviceInfo(
+                device_id=d.device_id,
+                ip_address=d.ip_address,
+                vendor_name=d.vendor_name,
+                model_name=d.model_name,
+                firmware_version=d.firmware_version,
+                object_name=d.object_name,
+            )
+            for d in discovered
+        ]
+
+        return BACnetDiscoverResponse(count=len(devices), devices=devices)
+
+    except BACnetTimeoutError:
+        return BACnetDiscoverResponse(count=0, devices=[])
+    except BACnetException as e:
+        logger.error("BACnet connection test failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 

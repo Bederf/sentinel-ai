@@ -5,6 +5,7 @@ REST endpoints for Tridonic Scenecom DALI-2 lighting system.
 """
 
 import logging
+from datetime import datetime
 from fastapi import APIRouter, HTTPException, Query
 from typing import List, Optional
 
@@ -161,7 +162,7 @@ async def get_building_occupancy() -> dict:
 
 @router.get("/stats")
 async def get_dali_stats() -> dict:
-    """Get DALI system statistics."""
+    """Get DALI system statistics (flat structure for frontend DALIStats)."""
     service = get_dali_service()
     controllers = service.get_controllers()
     sensors = service.get_sensors()
@@ -169,23 +170,32 @@ async def get_dali_stats() -> dict:
 
     occupied = sum(1 for s in sensors if s.occupancy)
     faulty_lum = sum(1 for l in luminaires if l.fault_status)
+    faulty_sensors = sum(1 for s in sensors if s.sensor_type == "switch" or
+                         (hasattr(s, 'last_updated') and s.last_updated is None))
     total_power = sum(l.power_consumption for l in luminaires)
 
+    # Count energy waste zones
+    energy_waste_count = 0
+    for zone in service.get_all_zones():
+        zone_id = zone["zone_id"]
+        occ = service.get_zone_occupancy(zone_id)
+        lighting = service.get_zone_lighting(zone_id)
+        if occ and lighting and occ.occupancy_percent < 20 and lighting.active_luminaires > 0:
+            energy_waste_count += 1
+
+    # Estimate energy today (power * assumed 8 business hours)
+    energy_today_kwh = round(total_power / 1000 * 8, 1)
+
     return {
-        "controllers": {
-            "total": len(controllers),
-            "online": sum(1 for c in controllers if c.status == "online"),
-            "offline": sum(1 for c in controllers if c.status == "offline")
-        },
-        "sensors": {
-            "total": len(sensors),
-            "occupied": occupied,
-            "occupancy_percent": round(occupied / len(sensors) * 100, 1) if sensors else 0
-        },
-        "luminaires": {
-            "total": len(luminaires),
-            "active": sum(1 for l in luminaires if l.current_level > 0),
-            "faulty": faulty_lum,
-            "total_power_kw": round(total_power / 1000, 2)
-        }
+        "total_controllers": len(controllers),
+        "online_controllers": sum(1 for c in controllers if c.status == "online"),
+        "total_sensors": len(sensors),
+        "online_sensors": len(sensors) - faulty_sensors,
+        "total_luminaires": len(luminaires),
+        "faulty_luminaires": faulty_lum,
+        "current_occupancy_percent": round(occupied / len(sensors) * 100, 1) if sensors else 0,
+        "current_power_watts": round(total_power, 1),
+        "energy_today_kwh": energy_today_kwh,
+        "energy_waste_alerts": energy_waste_count,
+        "last_sync": datetime.now().isoformat(),
     }

@@ -16,118 +16,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { RefreshCw, Users, Lightbulb, AlertTriangle, Cpu, Eye, Zap, Building2, ChevronDown } from "lucide-react";
 import { OccupancyHeatmap } from "./OccupancyHeatmap";
-import { api } from "../lib/api";
+import { api, daliApi } from "../lib/api";
 import type { BuildingOccupancy, DALIStats, ZoneLighting, Site } from "../lib/api";
-
-// Mock data for development until backend API is ready
-const mockBuildingOccupancy: BuildingOccupancy = {
-  building_id: "bldg-001",
-  building_name: "Discovery Place",
-  total_floors: 3,
-  total_zones: 12,
-  total_sensors: 1315,
-  occupied_sensors: 428,
-  occupancy_percent: 33,
-  total_luminaires: 619,
-  faulty_luminaires: 7,
-  total_power_watts: 48500,
-  energy_waste_zones: 2,
-  last_updated: new Date().toISOString(),
-  floors: [
-    {
-      floor: "L12",
-      floor_name: "Level 12 - Executive",
-      total_zones: 4,
-      total_sensors: 285,
-      occupied_sensors: 142,
-      occupancy_percent: 50,
-      total_luminaires: 145,
-      faulty_luminaires: 2,
-      total_power_watts: 12800,
-      zones: [
-        { zone_id: "z-12-a", zone_name: "Executive Suite A", floor: "L12", total_sensors: 65, occupied_sensors: 45, occupancy_percent: 69, avg_lux_level: 420, status: "moderate", last_updated: new Date().toISOString() },
-        { zone_id: "z-12-b", zone_name: "Executive Suite B", floor: "L12", total_sensors: 70, occupied_sensors: 52, occupancy_percent: 74, avg_lux_level: 380, status: "busy", last_updated: new Date().toISOString() },
-        { zone_id: "z-12-c", zone_name: "Boardroom Wing", floor: "L12", total_sensors: 80, occupied_sensors: 35, occupancy_percent: 44, avg_lux_level: 550, status: "moderate", last_updated: new Date().toISOString() },
-        { zone_id: "z-12-d", zone_name: "Reception Area", floor: "L12", total_sensors: 70, occupied_sensors: 10, occupancy_percent: 14, avg_lux_level: 600, status: "quiet", last_updated: new Date().toISOString() },
-      ],
-    },
-    {
-      floor: "L11",
-      floor_name: "Level 11 - Operations",
-      total_zones: 4,
-      total_sensors: 520,
-      occupied_sensors: 182,
-      occupancy_percent: 35,
-      total_luminaires: 260,
-      faulty_luminaires: 3,
-      total_power_watts: 19500,
-      zones: [
-        { zone_id: "z-11-a", zone_name: "Open Plan North", floor: "L11", total_sensors: 180, occupied_sensors: 75, occupancy_percent: 42, avg_lux_level: 380, status: "moderate", last_updated: new Date().toISOString() },
-        { zone_id: "z-11-b", zone_name: "Open Plan South", floor: "L11", total_sensors: 180, occupied_sensors: 62, occupancy_percent: 34, avg_lux_level: 420, status: "quiet", last_updated: new Date().toISOString() },
-        { zone_id: "z-11-c", zone_name: "Meeting Rooms", floor: "L11", total_sensors: 80, occupied_sensors: 38, occupancy_percent: 48, avg_lux_level: 350, status: "moderate", last_updated: new Date().toISOString() },
-        { zone_id: "z-11-d", zone_name: "Break Area", floor: "L11", total_sensors: 80, occupied_sensors: 7, occupancy_percent: 9, avg_lux_level: 480, status: "empty", last_updated: new Date().toISOString() },
-      ],
-    },
-    {
-      floor: "L10",
-      floor_name: "Level 10 - Support",
-      total_zones: 4,
-      total_sensors: 510,
-      occupied_sensors: 104,
-      occupancy_percent: 20,
-      total_luminaires: 214,
-      faulty_luminaires: 2,
-      total_power_watts: 16200,
-      zones: [
-        { zone_id: "z-10-a", zone_name: "Call Center", floor: "L10", total_sensors: 200, occupied_sensors: 58, occupancy_percent: 29, avg_lux_level: 360, status: "quiet", last_updated: new Date().toISOString() },
-        { zone_id: "z-10-b", zone_name: "Training Room", floor: "L10", total_sensors: 100, occupied_sensors: 12, occupancy_percent: 12, avg_lux_level: 520, status: "quiet", last_updated: new Date().toISOString() },
-        { zone_id: "z-10-c", zone_name: "IT Support", floor: "L10", total_sensors: 110, occupied_sensors: 32, occupancy_percent: 29, avg_lux_level: 340, status: "quiet", last_updated: new Date().toISOString() },
-        { zone_id: "z-10-d", zone_name: "Storage Wing", floor: "L10", total_sensors: 100, occupied_sensors: 2, occupancy_percent: 2, avg_lux_level: 180, status: "empty", last_updated: new Date().toISOString() },
-      ],
-    },
-  ],
-};
-
-const mockDALIStats: DALIStats = {
-  total_controllers: 24,
-  online_controllers: 23,
-  total_sensors: 1315,
-  online_sensors: 1298,
-  total_luminaires: 619,
-  faulty_luminaires: 7,
-  current_occupancy_percent: 33,
-  current_power_watts: 48500,
-  energy_today_kwh: 312,
-  energy_waste_alerts: 2,
-  last_sync: new Date().toISOString(),
-};
-
-const mockZoneLighting: Record<string, ZoneLighting> = {
-  "z-11-d": {
-    zone_id: "z-11-d",
-    zone_name: "Break Area",
-    floor: "L11",
-    total_luminaires: 20,
-    active_luminaires: 18,
-    faulty_luminaires: 0,
-    total_power_watts: 1440,
-    avg_brightness: 85,
-    energy_waste_detected: true,
-    energy_waste_reason: "Zone at 9% occupancy but 90% lighting",
-  },
-  "z-10-d": {
-    zone_id: "z-10-d",
-    zone_name: "Storage Wing",
-    floor: "L10",
-    total_luminaires: 12,
-    active_luminaires: 10,
-    faulty_luminaires: 0,
-    total_power_watts: 850,
-    avg_brightness: 70,
-    energy_waste_detected: true,
-    energy_waste_reason: "Zone empty but lighting active",
-  },
-};
 
 // Get occupancy color based on percentage
 function getOccupancyColor(percent: number): string {
@@ -165,23 +55,36 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
         setIsRefreshing(true);
       }
 
-      // TODO: Replace with actual API calls when backend is ready
-      // const [occupancy, stats] = await Promise.all([
-      //   daliApi.getBuildingOccupancy(),
-      //   daliApi.getStats(),
-      // ]);
+      const [occupancy, stats] = await Promise.all([
+        daliApi.getBuildingOccupancy(),
+        daliApi.getStats(),
+      ]);
 
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Fetch lighting for energy waste zones (low occupancy)
+      const wasteZoneLighting: Record<string, ZoneLighting> = {};
+      for (const floor of occupancy.floors) {
+        for (const zone of floor.zones) {
+          if (zone.occupancy_percent < 20) {
+            try {
+              const lighting = await daliApi.getZoneLighting(zone.zone_id);
+              if (lighting.energy_waste_detected) {
+                wasteZoneLighting[zone.zone_id] = lighting;
+              }
+            } catch {
+              // Zone may not have lighting data
+            }
+          }
+        }
+      }
 
-      setBuildingOccupancy(mockBuildingOccupancy);
-      setDaliStats(mockDALIStats);
-      setZoneLighting(mockZoneLighting);
+      setBuildingOccupancy(occupancy);
+      setDaliStats(stats);
+      setZoneLighting(wasteZoneLighting);
       setLastUpdated(new Date());
       setError(null);
     } catch (err) {
       console.error("Failed to fetch occupancy data:", err);
-      setError("Failed to load occupancy data");
+      setError("Failed to load occupancy data. Check that the backend is running.");
     } finally {
       setLoading(false);
       setIsRefreshing(false);

@@ -17,6 +17,7 @@ import {
   CheckCircle,
   Clock,
   Lightbulb,
+  Zap,
 } from "lucide-react";
 import { OptimizationToggle } from "./OptimizationToggle";
 import { OptimizationRecommendationModal } from "./OptimizationRecommendationModal";
@@ -46,15 +47,12 @@ export function OptimizationInfoCard({
   const [loading, setLoading] = useState(true);
   const [showRecommendationModal, setShowRecommendationModal] = useState(false);
 
-  // Fetch optimization status
+  // Derive mode from toggle: ON = automatic, OFF = supervised
+  const isAutomatic = optimizationEnabled;
+
+  // Always fetch optimization status (both modes run optimization)
   useEffect(() => {
     console.log("[OptimizationInfoCard] Component mounted", { siteId, optimizationEnabled });
-
-    if (!optimizationEnabled) {
-      setOptimizationStatus("unknown");
-      setLoading(false);
-      return;
-    }
 
     const fetchStatus = async () => {
       try {
@@ -77,42 +75,6 @@ export function OptimizationInfoCard({
     const interval = setInterval(fetchStatus, 30000);
     return () => clearInterval(interval);
   }, [siteId, optimizationEnabled]);
-
-  if (!optimizationEnabled) {
-    return (
-      <div
-        className="rounded-md p-4"
-        style={{
-          background: "var(--color-sentinel-bg-panel)",
-          border: "1px solid var(--color-sentinel-border)",
-        }}
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Brain
-              className="h-5 w-5"
-              style={{ color: "var(--color-sentinel-text-disabled)" }}
-            />
-            <div>
-              <h3
-                className="font-medium"
-                style={{ color: "var(--color-sentinel-text-primary)" }}
-              >
-                AI Optimization
-              </h3>
-              <p
-                className="text-sm"
-                style={{ color: "var(--color-sentinel-text-secondary)" }}
-              >
-                Enable AI-powered optimization for this building
-              </p>
-            </div>
-          </div>
-          <OptimizationToggle siteId={siteId} enabled={false} />
-        </div>
-      </div>
-    );
-  }
 
   if (loading) {
     return (
@@ -223,13 +185,29 @@ export function OptimizationInfoCard({
               className="text-sm"
               style={{ color: "var(--color-sentinel-text-secondary)" }}
             >
-              Last updated: {formatRelativeTime(lastOptimization)}
+              {isAutomatic
+                ? "Auto-applying changes"
+                : "Recommendations require approval"}
+              {lastOptimization && ` \u00B7 Last: ${formatRelativeTime(lastOptimization)}`}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-3">
-          {/* Show success checkmark when optimized */}
-          {optimizationStatus === "optimized" && (
+          {/* Automatic mode: show auto-applied indicator */}
+          {isAutomatic && optimizationStatus === "optimized" && (
+            <div
+              className="p-2 rounded"
+              style={{
+                background: "rgba(16, 185, 129, 0.2)",
+                border: "1px solid var(--color-sentinel-green)",
+              }}
+              title="AI auto-applied optimizations"
+            >
+              <Zap className="h-4 w-4" style={{ color: "var(--color-sentinel-green)" }} />
+            </div>
+          )}
+          {/* Supervised mode: show success checkmark when optimized (manually approved) */}
+          {!isAutomatic && optimizationStatus === "optimized" && (
             <div
               className="p-2 rounded"
               style={{
@@ -241,8 +219,8 @@ export function OptimizationInfoCard({
               <CheckCircle className="h-4 w-4" style={{ color: "var(--color-sentinel-green)" }} />
             </div>
           )}
-          {/* Show recommendation button when pending */}
-          {currentRecommendation && optimizationStatus === "recommendation_pending" && (
+          {/* Supervised mode: show recommendation button when pending */}
+          {!isAutomatic && currentRecommendation && (optimizationStatus === "recommendation_pending" || optimizationStatus === "warning") && (
             <button
               onClick={() => setShowRecommendationModal(true)}
               className="p-2 rounded transition-all hover:scale-110 animate-pulse"
@@ -250,12 +228,12 @@ export function OptimizationInfoCard({
                 background: "rgba(245, 158, 11, 0.2)",
                 border: "1px solid var(--color-sentinel-amber)",
               }}
-              title="View recommendation"
+              title="View recommendation - approval required"
             >
               <Lightbulb className="h-4 w-4" style={{ color: "var(--color-sentinel-amber)" }} />
             </button>
           )}
-          <OptimizationToggle siteId={siteId} enabled={true} />
+          <OptimizationToggle siteId={siteId} enabled={optimizationEnabled} />
         </div>
       </div>
 
@@ -305,33 +283,33 @@ export function OptimizationInfoCard({
             <div className="flex items-center gap-2 mb-1">
               <Clock
                 className="h-4 w-4"
-                style={{ color: "var(--color-sentinel-blue)" }}
+                style={{ color: isAutomatic ? "var(--color-sentinel-green)" : "var(--color-sentinel-blue)" }}
               />
               <span
                 className="text-xs"
                 style={{ color: "var(--color-sentinel-text-secondary)" }}
               >
-                Analysis
+                Mode
               </span>
             </div>
             <div
               className="text-lg font-semibold"
               style={{ color: "var(--color-sentinel-text-primary)" }}
             >
-              Every 15 min
+              {isAutomatic ? "Automatic" : "Supervised"}
             </div>
             <div
               className="text-xs"
               style={{ color: "var(--color-sentinel-text-secondary)" }}
             >
-              Automatic
+              {isAutomatic ? "AI auto-applies" : "Human approval"}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Recommendation Modal */}
-      {showRecommendationModal && currentRecommendation && (
+      {/* Recommendation Modal - only in supervised mode */}
+      {!isAutomatic && showRecommendationModal && currentRecommendation && (
         <OptimizationRecommendationModal
           isOpen={showRecommendationModal}
           onClose={() => setShowRecommendationModal(false)}

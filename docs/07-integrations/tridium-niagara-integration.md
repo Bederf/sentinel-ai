@@ -2,7 +2,7 @@
 title: "SENTINEL-Tridium Niagara Integration Guide"
 type: "guide"
 status: "approved"
-version: "2.0.0"
+version: "2.1.0"
 created: "2026-02-04"
 updated: "2026-02-04"
 author: "Sentinel Development Team"
@@ -528,23 +528,46 @@ Options:
 
 ## Configuration
 
-### Environment Variables
+### Option A: Configure via Wizard UI (Recommended)
+
+The **Niagara Connection Wizard** on the Integration Monitoring page configures the oBIX connection interactively. No `.env` changes needed — enter host/port/credentials in Step 1 and the backend is configured at runtime.
+
+### Option B: Environment Variables
+
+All Niagara settings are defined in `backend/app/config/settings.py` and loaded from `backend/.env`:
 
 ```bash
-# BACnet/IP
-NIAGARA_BACNET_PORT=47808          # BACnet/IP port (default)
-NIAGARA_BACNET_LOCAL_IP=auto       # Local IP for BAC0
-
 # oBIX REST API
 NIAGARA_OBIX_HOST=192.168.1.100   # Niagara Supervisor IP
 NIAGARA_OBIX_PORT=443             # HTTPS port
 NIAGARA_OBIX_USERNAME=sentinel-service
 NIAGARA_OBIX_PASSWORD=<secure>
 NIAGARA_OBIX_HTTPS=true           # Use HTTPS (recommended)
+NIAGARA_OBIX_TIMEOUT=30           # Connection timeout (seconds)
+NIAGARA_OBIX_VERIFY_SSL=true      # Verify TLS certificate
+
+# BACnet/IP
+NIAGARA_BACNET_PORT=47808          # BACnet/IP port (default)
+NIAGARA_BACNET_LOCAL_IP=           # Local bind IP (blank = auto-detect)
 
 # Fox WebSocket (optional, N4.15+)
 NIAGARA_FOX_WS_ENABLED=false
 NIAGARA_FOX_WS_URL=wss://192.168.1.100/foxwss
+```
+
+Environment variables take precedence over Settings defaults when both are set.
+
+### BACnet Auto-Start
+
+The BACnet client (BAC0) auto-starts when `discover-and-classify` is called with a real device ID. No manual startup step required. If BAC0 fails to initialize (e.g. port conflict, network issue), the system falls back to demo data when `use_demo=true`.
+
+### Dependencies
+
+BAC0 is listed in `backend/requirements.txt` and must be installed:
+
+```bash
+cd backend && source venv/bin/activate
+pip install BAC0>=24.3.25
 ```
 
 ## Common Pitfalls
@@ -703,6 +726,33 @@ graph TB
 ### The Pitch
 
 > "You already invested in Tridium Niagara. That was smart — it normalised your building data. Now SENTINEL sits on top and makes that data actually useful to your FM team, without them needing to open a single Niagara graphic or understand a BACnet address. They just ask questions on WhatsApp."
+
+## Frontend: Niagara Connection Wizard
+
+The Integration Monitoring page includes a **Connect to BMS** button that opens a 4-step guided wizard for connecting to a Niagara supervisor without leaving the browser.
+
+### Wizard Steps
+
+| Step | Action | API Called |
+|------|--------|-----------|
+| 1. Connect | Enter supervisor IP/port/credentials, test connection | `POST /api/niagara/obix/config` |
+| 2. Discover | AI scans BACnet points and classifies into equipment groups | `POST /api/niagara/discover-and-classify` |
+| 3. Review | FM team reviews equipment/point mappings, checks confidence | `GET /api/niagara/mappings/{id}` |
+| 4. Approve | Confirm and activate monitoring | `POST /api/niagara/mappings/{id}/approve` |
+
+### Demo Mode
+
+Toggle **Use Demo Data** in Step 1 to skip real connections and use pre-seeded Sandton City discovery data. Useful for demonstrations and testing the full approval workflow.
+
+### Files
+
+| File | Purpose |
+|------|---------|
+| `frontend/src/components/NiagaraConnectionWizard.tsx` | 4-step wizard component |
+| `frontend/src/components/IntegrationMonitoringPage.tsx` | Host page (button + modal) |
+| `frontend/src/lib/api.ts` | `niagaraApi` client + TypeScript interfaces |
+
+See [Niagara Connection Wizard feature doc](../04-features/niagara-connection-wizard.md) for full UI specification.
 
 ## Implementation Status
 

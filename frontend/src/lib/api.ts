@@ -352,6 +352,7 @@ export interface EskomStatusResponse {
   updated_at: string;
   next_stages: LoadSheddingStage[];
   area_schedules: Record<string, LoadSheddingStage[]>;
+  source: string; // "eskomsepush" | "not_configured" | "unavailable"
 }
 
 // Site-specific schedule response interface
@@ -361,6 +362,8 @@ export interface SiteScheduleResponse {
   current_stage: number;
   schedules: LoadSheddingStage[];
   next_outage: LoadSheddingStage | null;
+  area_name?: string;
+  source: string; // "eskomsepush" | "not_configured" | "unavailable"
 }
 
 // Thermal runway response interface
@@ -712,10 +715,14 @@ async function fetchApi<T>(
 ): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
 
+  // Get JWT token from localStorage if available
+  const token = localStorage.getItem("sentinel_token");
+
   const response = await fetch(url, {
     ...options,
     headers: {
       "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options?.headers,
     },
   });
@@ -761,10 +768,14 @@ export async function streamChat(
 ): Promise<void> {
   const url = `${API_BASE_URL}/api/chat`;
 
+  // Get JWT token from localStorage if available
+  const token = localStorage.getItem("sentinel_token");
+
   const response = await fetch(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: JSON.stringify({
       message,
@@ -3056,11 +3067,26 @@ export interface BACnetDevice {
   object_name: string;
 }
 
+// BMS vendor type
+export type BMSVendor = 'niagara' | 'desigo' | 'metasys' | 'honeywell' | 'schneider' | 'trend' | 'generic';
+
+// BACnet test connection request
+export interface BACnetTestConnectionRequest {
+  timeout?: number;
+}
+
+// BACnet test connection response (reuses BACnet device types)
+export interface BACnetTestConnectionResponse {
+  count: number;
+  devices: BACnetDevice[];
+}
+
 export interface DiscoverClassifyRequest {
   device_ip: string;
   site_id: string;
   device_bacnet_id?: number;
   use_demo: boolean;
+  bms_vendor?: BMSVendor;
 }
 
 export interface DiscoverClassifyResponse {
@@ -3117,6 +3143,12 @@ export const niagaraApi = {
   getOBIXStatus: () =>
     fetchApi<NiagaraConnectionStatus>('/api/niagara/obix/status'),
 
+  testBACnetConnection: (req?: BACnetTestConnectionRequest) =>
+    fetchApi<BACnetTestConnectionResponse>('/api/niagara/bacnet/test-connection', {
+      method: 'POST',
+      body: JSON.stringify(req || {}),
+    }),
+
   discoverAndClassify: (req: DiscoverClassifyRequest) =>
     fetchApi<DiscoverClassifyResponse>('/api/niagara/discover-and-classify', {
       method: 'POST',
@@ -3138,6 +3170,9 @@ export const niagaraApi = {
       { method: 'POST', body: JSON.stringify(correction) },
     ),
 };
+
+/** Backward-compatible alias for niagaraApi */
+export const bmsApi = niagaraApi;
 
 // ============= Security Module Interfaces (Phase 58) =============
 
@@ -3290,4 +3325,69 @@ export const securityApi = {
     ),
 };
 
-export default api;
+// ============= Authentication API =============
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  full_name: string;
+  role: "admin" | "operator" | "developer" | "auditor";
+}
+
+export interface LoginResponse {
+  token: string;
+  user: AuthUser;
+  expires_at: string;
+}
+
+export interface VerifyResponse {
+  valid: boolean;
+  user?: AuthUser;
+}
+
+export const authApi = {
+  /** Login with email address */
+  login: (email: string) =>
+    fetchApi<LoginResponse>(`/api/auth/login?email=${encodeURIComponent(email)}`, {
+      method: "POST",
+    }),
+
+  /** Verify a JWT token */
+  verify: (token: string) =>
+    fetchApi<VerifyResponse>(`/api/auth/verify?token=${encodeURIComponent(token)}`, {
+      method: "POST",
+    }),
+
+  /** Get current user info */
+  me: () =>
+    fetchApi<AuthUser>("/api/auth/me", {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("sentinel_token") || ""}`,
+      },
+    }),
+
+  /** Logout */
+  logout: () =>
+    fetchApi<{ message: string }>("/api/auth/logout", { method: "POST" }),
+};
+
+// Export API object with logout method for use in components
+const apiWithAuth = {
+  ...api,
+  logout: async () => {
+    const token = localStorage.getItem("sentinel_token");
+    const response = await fetch(`${API_BASE_URL}/api/auth/logout`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+    if (!response.ok) {
+      throw new Error(`Logout failed: ${response.statusText}`);
+    }
+    return response.json();
+  },
+};
+
+export default apiWithAuth;

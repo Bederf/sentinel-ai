@@ -882,8 +882,16 @@ _client_instance: Optional[NiagaraBACnetClient] = None
 
 
 def get_bacnet_client() -> NiagaraBACnetClient:
-    """Get or create the singleton BACnet client instance."""
+    """Get or create the singleton BACnet client instance.
+
+    Reads port and local IP from Settings (which loads from .env).
+    """
     global _client_instance
     if _client_instance is None:
-        _client_instance = NiagaraBACnetClient()
+        from app.config.settings import settings
+
+        ip = settings.niagara_bacnet_local_ip or None
+        port = settings.niagara_bacnet_port
+
+        _client_instance = NiagaraBACnetClient(ip=ip, port=port)
     return _client_instance

@@ -15,6 +15,7 @@ import sys
 import os
 import re
 import hashlib
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -29,6 +30,11 @@ from app.services.vector_db import get_vector_db_service
 PROJECT_ROOT = Path(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 DOCS_DIR = PROJECT_ROOT / "docs"
 
+# Extra directories outside docs/ to scan for RAG ingestion
+EXTRA_SCAN_DIRS = [
+    PROJECT_ROOT / ".planning" / "phases" / "64-risk-governance-foundation",
+]
+
 # Map doc directories to equipment types and document types
 DOC_CATEGORY_MAP = {
     "01-getting-started": ("general", "system_documentation"),
@@ -39,12 +45,18 @@ DOC_CATEGORY_MAP = {
     "05-integrations": ("general", "integration_guide"),
     "06-safety-compliance": ("general", "safety_procedure"),
     "07-integrations": ("general", "integration_guide"),
+    "08-security": ("security", "security_policy"),
     "08-ai-ml": ("general", "system_documentation"),
     "11-testing": ("general", "system_documentation"),
     "12-development": ("general", "system_documentation"),
     "13-modules": ("general", "system_documentation"),
     "14-south-africa-context": ("general", "system_documentation"),
     "16-glossary": ("general", "system_documentation"),
+}
+
+# Map extra scan dirs to categories (for files outside docs/)
+EXTRA_DIR_CATEGORY_MAP = {
+    "64-risk-governance-foundation": ("security", "security_policy"),
 }
 
 # Override equipment_type for specific files
@@ -133,20 +145,34 @@ def extract_keywords(content: str, frontmatter: dict) -> list:
 
 def get_doc_code(filepath: Path) -> str:
     """Generate unique code for document from its path."""
-    relative = filepath.relative_to(DOCS_DIR)
-    return f"DOC-{str(relative).replace('/', '-').replace('.md', '').upper()}"
+    try:
+        relative = filepath.relative_to(DOCS_DIR)
+        return f"DOC-{str(relative).replace('/', '-').replace('.md', '').upper()}"
+    except ValueError:
+        # File is outside docs/ (e.g. .planning/)
+        relative = filepath.relative_to(PROJECT_ROOT)
+        return f"DOC-{str(relative).replace('/', '-').replace('.md', '').upper()}"
 
 
 def get_doc_category(filepath: Path) -> tuple:
     """Get equipment_type and document_type for a file based on its directory."""
-    relative = filepath.relative_to(DOCS_DIR)
-    parts = relative.parts
+    # Check if file is inside docs/
+    try:
+        relative = filepath.relative_to(DOCS_DIR)
+        parts = relative.parts
 
-    # Check directory mapping
-    if parts[0] in DOC_CATEGORY_MAP:
-        equipment_type, document_type = DOC_CATEGORY_MAP[parts[0]]
-    else:
+        # Check directory mapping
+        if parts[0] in DOC_CATEGORY_MAP:
+            equipment_type, document_type = DOC_CATEGORY_MAP[parts[0]]
+        else:
+            equipment_type, document_type = "general", "system_documentation"
+    except ValueError:
+        # File is outside docs/ — check extra dir mappings
         equipment_type, document_type = "general", "system_documentation"
+        for dir_name, category in EXTRA_DIR_CATEGORY_MAP.items():
+            if dir_name in filepath.parts:
+                equipment_type, document_type = category
+                break
 
     # Check filename overrides
     filename = filepath.name
@@ -178,12 +204,20 @@ async def main():
     print(f"Docs directory: {DOCS_DIR}")
     print(f"Force re-ingest: {force}")
 
-    # Collect all markdown files
+    # Collect all markdown files from docs/
     md_files = sorted(DOCS_DIR.rglob("*.md"))
     # Exclude templates directory
     md_files = [f for f in md_files if '/_templates/' not in str(f)]
 
-    print(f"\nFound {len(md_files)} markdown files")
+    # Also collect from extra scan directories
+    extra_count = 0
+    for extra_dir in EXTRA_SCAN_DIRS:
+        if extra_dir.exists():
+            extra_files = sorted(extra_dir.rglob("*.md"))
+            md_files.extend(extra_files)
+            extra_count += len(extra_files)
+
+    print(f"\nFound {len(md_files)} markdown files ({extra_count} from extra scan dirs)")
 
     if force:
         print("\n[FORCE] Deleting existing system documentation entries...")
@@ -207,8 +241,13 @@ async def main():
 
     print(f"\nProcessing documents...")
 
-    for filepath in md_files:
-        relative = filepath.relative_to(DOCS_DIR)
+    for i, filepath in enumerate(md_files):
+        # Display path relative to project root (works for any file location)
+        try:
+            relative = filepath.relative_to(DOCS_DIR)
+        except ValueError:
+            relative = filepath.relative_to(PROJECT_ROOT)
+
         code = get_doc_code(filepath)
         equipment_type, document_type = get_doc_category(filepath)
 
@@ -244,45 +283,57 @@ async def main():
             except Exception:
                 pass
 
-        # Add document
-        try:
-            doc_data = {
-                'code': code,
-                'title': title,
-                'document_type': document_type,
-                'equipment_type': equipment_type,
-                'full_text': text_content,
-                'source': 'system_docs',
-                'summary': summary,
-                'keywords': keywords,
-                'indexing_status': 'pending'
-            }
+        # Add document with retry logic
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                doc_data = {
+                    'code': code,
+                    'title': title,
+                    'document_type': document_type,
+                    'equipment_type': equipment_type,
+                    'full_text': text_content,
+                    'source': 'system_docs',
+                    'summary': summary,
+                    'keywords': keywords,
+                    'indexing_status': 'pending'
+                }
 
-            result = client.table('documents').insert(doc_data).execute()
-            if result.data:
-                doc_id = result.data[0]['id']
+                result = client.table('documents').insert(doc_data).execute()
+                if result.data:
+                    doc_id = result.data[0]['id']
 
-                # Chunk and embed with section-aware markdown chunking
-                # + context-enhanced embeddings (title/heading/type prepended)
-                chunk_count = vector_db.chunk_and_embed_markdown(
-                    doc_id,
-                    doc_title=title,
-                    doc_type=document_type,
-                )
-                print(f"  ADD: {relative} ({chunk_count} chunks, type={document_type})")
-                added += 1
-            else:
-                print(f"  ERROR (no data): {relative}")
-                errors += 1
+                    # Chunk and embed with section-aware markdown chunking
+                    # + context-enhanced embeddings (title/heading/type prepended)
+                    chunk_count = vector_db.chunk_and_embed_markdown(
+                        doc_id,
+                        doc_title=title,
+                        doc_type=document_type,
+                    )
+                    print(f"  ADD: {relative} ({chunk_count} chunks, type={document_type})")
+                    added += 1
+                else:
+                    print(f"  ERROR (no data): {relative}")
+                    errors += 1
+                break  # Success, exit retry loop
 
-        except Exception as e:
-            error_msg = str(e)
-            if 'duplicate key' in error_msg:
-                print(f"  SKIP (duplicate): {relative}")
-                skipped += 1
-            else:
-                print(f"  ERROR: {relative}: {error_msg[:100]}")
-                errors += 1
+            except Exception as e:
+                error_msg = str(e)
+                if 'duplicate key' in error_msg:
+                    print(f"  SKIP (duplicate): {relative}")
+                    skipped += 1
+                    break
+                elif attempt < max_retries - 1:
+                    wait = (attempt + 1) * 2
+                    print(f"  RETRY ({attempt + 1}/{max_retries}): {relative} — waiting {wait}s...")
+                    time.sleep(wait)
+                else:
+                    print(f"  ERROR: {relative}: {error_msg[:100]}")
+                    errors += 1
+
+        # Throttle to avoid overwhelming Supabase connection pool
+        if (i + 1) % 5 == 0:
+            time.sleep(0.5)
 
     # Summary
     print(f"\n{'=' * 55}")
@@ -314,6 +365,11 @@ async def main():
         ("safety interlocks engine", None),
         ("remote operations dispatch", None),
         ("obix historical data alarms", None),
+        ("information security risk register", None),
+        ("incident response policy", None),
+        ("data privacy POPIA compliance", None),
+        ("FirstRand supplier security assessment", None),
+        ("business continuity disaster recovery", None),
     ]
 
     for query, eq_type in test_queries:

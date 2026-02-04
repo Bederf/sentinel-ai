@@ -21,6 +21,7 @@ import {
   RefreshCw,
   ChevronRight,
   Download,
+  Zap,
 } from "lucide-react";
 import api from "../lib/api";
 import type {
@@ -32,6 +33,7 @@ import { LoadingCard } from "./LoadingCard";
 
 interface ControlAuditTrailProps {
   onError?: (error: string) => void;
+  onViewDevice?: (deviceId: string) => void;
 }
 
 /**
@@ -106,7 +108,7 @@ function getActionDisplayName(action: string): string {
   return actionMap[action] || action.replace("_", " ").toUpperCase();
 }
 
-export function ControlAuditTrail({ onError }: ControlAuditTrailProps) {
+export function ControlAuditTrail({ onError, onViewDevice }: ControlAuditTrailProps) {
   // State
   const [logs, setLogs] = useState<AuditLogEntryResponse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -555,7 +557,16 @@ export function ControlAuditTrail({ onError }: ControlAuditTrailProps) {
                       </div>
                     </td>
                     <td className="py-4 px-4">
-                      <div className="text-sm text-gray-300">{log.user}</div>
+                      {log.user === "SENTINEL" ? (
+                        <div className="flex items-center gap-1.5">
+                          <Zap className="w-3.5 h-3.5" style={{ color: "var(--color-sentinel-purple)" }} />
+                          <span className="text-sm font-medium" style={{ color: "var(--color-sentinel-purple)" }}>
+                            SENTINEL
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="text-sm text-gray-300">{log.user}</div>
+                      )}
                     </td>
                     <td className="py-4 px-4">
                       <div className="text-sm font-medium text-gray-300">
@@ -642,6 +653,7 @@ export function ControlAuditTrail({ onError }: ControlAuditTrailProps) {
             setShowDetail(false);
             setSelectedLog(null);
           }}
+          onViewDevice={onViewDevice}
         />
       )}
     </div>

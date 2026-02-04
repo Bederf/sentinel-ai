@@ -15,6 +15,8 @@ import { useState, useEffect, useMemo } from "react";
 import {
   Building2,
   AlertTriangle,
+  AlertCircle,
+  XCircle,
   Cpu,
   Shield,
   Bell,
@@ -37,8 +39,9 @@ import {
   verticalListSortingStrategy,
   arrayMove,
 } from '@dnd-kit/sortable';
-import api from "../lib/api";
+import api, { createWorkOrder } from "../lib/api";
 import type { DashboardStats, Site, Prediction, EnergyDataPoint, BuildingEquipmentItem } from "../lib/api";
+import { toast } from "sonner";
 import { SortableKPICard } from "./SortableKPICard";
 import { DashboardSection } from "./DashboardSection";
 import { SiteCard } from "./SiteCard";
@@ -47,6 +50,7 @@ import { SiteDetail } from "./SiteDetail";
 import { EnergyChart } from "./EnergyChart";
 import { PredictionCard } from "./PredictionCard";
 import { PredictionDetail } from "./PredictionDetail";
+import { RiskDetailModal } from "./RiskDetailModal";
 import { ROISummaryCard } from "./ROISummaryCard";
 import { OccupancyPanel } from "./OccupancyPanel";
 import ComfortComplaintPanel from "./ComfortComplaintPanel";
@@ -102,6 +106,10 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
 
   // At-risk equipment state (warning/critical status)
   const [atRiskEquipment, setAtRiskEquipment] = useState<BuildingEquipmentItem[]>([]);
+
+  // Risk detail modal state
+  const [selectedRiskEquipment, setSelectedRiskEquipment] = useState<BuildingEquipmentItem | null>(null);
+  const [showRiskModal, setShowRiskModal] = useState(false);
 
   // Drag and drop state
   const [sectionOrder, setSectionOrder] = useState<DashboardSectionId[]>([
@@ -311,6 +319,71 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
     setSelectedPrediction(null);
   };
 
+  // Create work order from prediction detail modal
+  const handleCreateWorkOrderFromPrediction = async (equipmentId: string, equipmentName: string) => {
+    const prediction = selectedPrediction;
+    if (!prediction) return;
+
+    try {
+      const priority = prediction.severity === "critical" ? "critical" as const : "high" as const;
+      await createWorkOrder({
+        site_id: prediction.site_id || "",
+        equipment_id: equipmentId,
+        fault_description: `${equipmentName} - ${prediction.prediction_type.replace(/_/g, " ")}. ${prediction.probability_percent}% failure probability within ${prediction.timeframe_days} days.`,
+        priority,
+      });
+      toast.success(`Work order created for ${equipmentName}`);
+    } catch (err) {
+      console.error("Failed to create work order:", err);
+      toast.error("Failed to create work order");
+    }
+  };
+
+  // Handle risk card click - open detail modal
+  const handleRiskCardClick = (equipment: BuildingEquipmentItem) => {
+    setSelectedRiskEquipment(equipment);
+    setShowRiskModal(true);
+  };
+
+  // Close risk detail modal
+  const closeRiskModal = () => {
+    setShowRiskModal(false);
+    setSelectedRiskEquipment(null);
+  };
+
+  // Navigate to site from risk modal
+  const handleNavigateToSiteFromModal = (siteId: string) => {
+    closeRiskModal();
+    setSelectedSiteId(siteId);
+  };
+
+  // Navigate to control from risk modal
+  const handleControlFromRiskModal = (equipmentId: string) => {
+    const siteId = selectedRiskEquipment?.site_id || "";
+    closeRiskModal();
+    handleEquipmentControlNavigate(equipmentId, siteId);
+  };
+
+  // Create work order from risk modal
+  const handleCreateWorkOrder = async (equipmentId: string) => {
+    const equipment = selectedRiskEquipment;
+    if (!equipment) return;
+
+    try {
+      const priority = equipment.status === "critical" ? "critical" as const : "high" as const;
+      await createWorkOrder({
+        site_id: equipment.site_id,
+        equipment_id: equipmentId,
+        fault_description: `${equipment.name} - Health score ${equipment.health}% (${equipment.status}). Scheduled maintenance required.`,
+        priority,
+      });
+      toast.success(`Work order created for ${equipment.name}`);
+    } catch (err) {
+      console.error("Failed to create work order:", err);
+      toast.error("Failed to create work order");
+    }
+  };
+
   // Handle KPI card drag end
   const handleKPIDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -425,15 +498,15 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
       },
       'kpi-active-risks': {
         title: "Active Risks",
-        value: ((stats as any).equipment_warning_count || 0) + ((stats as any).equipment_critical_count || 0),
+        value: (stats as any).active_alerts || 0,
         icon: <Bell className="h-5 w-5" />,
         // Show critical count if any
-        delta: (stats as any).equipment_critical_count > 0
-          ? -((stats as any).equipment_critical_count * 10)
+        delta: (stats as any).critical_alerts > 0
+          ? -((stats as any).critical_alerts * 10)
           : undefined,
         isInverseTrend: true,
-        deltaText: (stats as any).equipment_critical_count > 0
-          ? `${(stats as any).equipment_critical_count} critical`
+        deltaText: (stats as any).critical_alerts > 0
+          ? `${(stats as any).critical_alerts} critical`
           : undefined,
         accentColor: "orange" as const,
       },
@@ -756,7 +829,7 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
                   : "linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(245, 158, 11, 0.1) 100%)",
                 border: `1px solid ${highestRisk.status === "critical" ? "rgba(220, 38, 38, 0.4)" : "rgba(245, 158, 11, 0.4)"}`,
               }}
-              onClick={() => setSelectedSiteId(highestRisk.site_id)}
+              onClick={() => handleRiskCardClick(highestRisk)}
             >
               <div className="p-5">
                 <div className="flex items-start justify-between mb-4">
@@ -864,7 +937,7 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
                       className="text-sm font-medium"
                       style={{ color: "var(--color-sentinel-text-primary)" }}
                     >
-                      {highestRisk.status === "critical" ? "Immediate" : "Schedule"}
+                      {highestRisk.status === "critical" ? "Immediate Action Required" : "Schedule Maintenance"}
                     </div>
                   </div>
                 </div>
@@ -928,8 +1001,8 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
             )}
           </div>
 
-          {/* At-Risk Equipment Section - REMOVED */}
-          {/* {atRiskEquipment.length > 0 && (
+          {/* At-Risk Equipment List */}
+          {atRiskEquipment.length > 0 && (
             <div
               className="p-4"
               style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}
@@ -953,10 +1026,7 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
                         ? "rgba(220, 38, 38, 0.3)"
                         : "rgba(245, 158, 11, 0.3)"}`,
                     }}
-                    onClick={() => {
-                      // Navigate to site detail for this equipment
-                      setSelectedSiteId("site-002");
-                    }}
+                    onClick={() => handleRiskCardClick(equip)}
                   >
                     <div className="flex items-center gap-3">
                       {equip.status === "critical" ? (
@@ -981,7 +1051,7 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
                           className="text-xs"
                           style={{ color: "var(--color-sentinel-text-secondary)" }}
                         >
-                          {equip.building_name} • {equip.building_id}
+                          {equip.building_name}
                         </div>
                       </div>
                     </div>
@@ -1015,7 +1085,7 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
                 ))}
               </div>
             </div>
-          )} */}
+          )}
 
           {/* Predictions Grid */}
           <div className="p-4">
@@ -1031,9 +1101,7 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
               </div>
             ) : predictions.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                {predictions
-                  .filter(p => p.severity === 'critical' || p.severity === 'high')
-                  .map((prediction) => (
+                {predictions.map((prediction) => (
                   <PredictionCard
                     key={prediction.id}
                     prediction={prediction}
@@ -1126,6 +1194,19 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
             prediction={selectedPrediction}
             isOpen={isPredictionDetailOpen}
             onClose={closePredictionDetail}
+            onCreateWorkOrder={handleCreateWorkOrderFromPrediction}
+          />
+        )}
+
+        {/* Risk Detail Modal */}
+        {showRiskModal && selectedRiskEquipment && (
+          <RiskDetailModal
+            isOpen={showRiskModal}
+            onClose={closeRiskModal}
+            equipment={selectedRiskEquipment}
+            onNavigateToControl={handleControlFromRiskModal}
+            onCreateWorkOrder={handleCreateWorkOrder}
+            onNavigateToSite={handleNavigateToSiteFromModal}
           />
         )}
 
