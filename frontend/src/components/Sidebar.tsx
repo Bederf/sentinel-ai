@@ -28,10 +28,11 @@ import {
   Activity,
   Users,
   GitBranch,
-  LayoutGrid,
+  SlidersHorizontal,
+  ShieldCheck,
 } from "lucide-react";
 
-export type View = "dashboard" | "chat" | "technician" | "control" | "control-audit" | "optimization" | "settings" | "integrations" | "occupancy" | "workflow";
+export type View = "dashboard" | "chat" | "technician" | "control" | "control-audit" | "optimization" | "settings" | "integrations" | "occupancy" | "workflow" | "security";
 
 interface SidebarProps {
   currentView: View;
@@ -64,9 +65,10 @@ const navItems: NavItem[] = [
   { id: "settings", label: "Settings", icon: SettingsIcon, description: "System Configuration" },
   { id: "workflow", label: "Asset Workflow", icon: GitBranch, description: "Lifecycle Management" },
   { id: "integrations", label: "Integrations", icon: Activity, description: "BMS Integration Health" },
+  { id: "security", label: "Security", icon: ShieldCheck, description: "Access & CCTV" },
 ];
 
-export function Sidebar({ currentView, onViewChange, version = "1.0", onCustomizeDashboard }: SidebarProps) {
+export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomizeDashboard }: SidebarProps) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(true); // Start minimized
@@ -232,7 +234,7 @@ export function Sidebar({ currentView, onViewChange, version = "1.0", onCustomiz
                   color: "var(--color-sentinel-amber)",
                 }}
               >
-                <LayoutGrid className="h-5 w-5 flex-shrink-0" />
+                <SlidersHorizontal className="h-5 w-5 flex-shrink-0" />
                 <div className={`flex flex-col items-start md:hidden ${isCollapsed ? 'lg:hidden' : 'lg:flex'}`}>
                   <span className="font-medium text-sm">Customize</span>
                   <span
@@ -301,6 +303,36 @@ export function Sidebar({ currentView, onViewChange, version = "1.0", onCustomiz
                       className="font-medium mb-1"
                       style={{ color: "var(--color-sentinel-text-primary)" }}
                     >
+                      Active Modules
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[
+                        { name: "Energy", icon: "⚡" },
+                        { name: "HVAC", icon: "❄" },
+                        { name: "Lighting", icon: "💡" },
+                        { name: "ML", icon: "🧠" },
+                      ].map((mod) => (
+                        <span
+                          key={mod.name}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium"
+                          style={{
+                            background: "rgba(245, 158, 11, 0.15)",
+                            border: "1px solid rgba(245, 158, 11, 0.3)",
+                            color: "var(--color-sentinel-amber)",
+                          }}
+                        >
+                          <span>{mod.icon}</span>
+                          {mod.name}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div
+                      className="font-medium mb-1"
+                      style={{ color: "var(--color-sentinel-text-primary)" }}
+                    >
                       Key Capabilities
                     </div>
                     <ul
@@ -352,7 +384,7 @@ export function Sidebar({ currentView, onViewChange, version = "1.0", onCustomiz
                       <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                       </svg>
-                      <span>Equipment Reference (PDF)</span>
+                      <span>Equipment Reference</span>
                     </a>
                   </div>
 
@@ -379,7 +411,7 @@ export function Sidebar({ currentView, onViewChange, version = "1.0", onCustomiz
             className={`text-xs text-center md:hidden ${isCollapsed ? 'lg:hidden' : 'lg:block'}`}
             style={{ color: "var(--color-sentinel-text-disabled)" }}
           >
-            <span style={{ color: "var(--color-sentinel-amber)" }}>SENTINEL</span> v{version || "1.0"}
+            <span style={{ color: "var(--color-sentinel-amber)" }}>SENTINEL</span> v{version || "13.0"}
           </div>
           <div className="hidden md:flex lg:hidden justify-center">
             <div

@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { Clock, Wifi, WifiOff, Bell, X } from "lucide-react";
 import { Toaster } from "sonner";
 import { formatTime } from "./lib/timeFormat";
@@ -18,6 +18,7 @@ import { CalendarPicker } from "./components/CalendarPicker";
 import { IntegrationMonitoringPage } from "./components/IntegrationMonitoringPage";
 import { AssetWorkflowDashboard } from "./components/AssetWorkflowDashboard";
 import { OccupancyPanel } from "./components/OccupancyPanel";
+import { SecurityDashboard } from "./components/SecurityDashboard";
 
 interface HealthStatus {
   status: string;
@@ -40,7 +41,8 @@ function App() {
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [currentView, setCurrentView] = useState<View>("dashboard");
+  const [currentView, setCurrentView] = useState<View>("chat");
+  const [viewRefreshKey, setViewRefreshKey] = useState(0);
   const [showCardLibrary, setShowCardLibrary] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showAlertsPanel, setShowAlertsPanel] = useState(false);
@@ -151,7 +153,7 @@ function App() {
     setShowAlertsPanel(false);
 
     // Navigate to control dashboard
-    setCurrentView("control");
+    handleViewChange("control");
   };
 
   const formatDate = (date: Date) => {
@@ -173,6 +175,21 @@ function App() {
       console.error('Error playing audio:', error);
     });
   };
+
+  // Handle view changes - scroll to top and refresh when re-clicking same view
+  const handleViewChange = useCallback((view: View) => {
+    if (view === currentView) {
+      // Same view re-clicked: scroll to top and bump refresh key
+      const main = document.querySelector('main');
+      if (main) {
+        const scrollable = main.firstElementChild as HTMLElement | null;
+        scrollable?.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+      setViewRefreshKey(k => k + 1);
+    } else {
+      setCurrentView(view);
+    }
+  }, [currentView]);
 
   // Close alerts panel when clicking outside
   useEffect(() => {
@@ -220,8 +237,8 @@ function App() {
       {/* Sidebar Navigation */}
       <Sidebar
         currentView={currentView}
-        onViewChange={setCurrentView}
-        version={health?.version || "1.0"}
+        onViewChange={handleViewChange}
+        version={health?.version || "13.0"}
         onCustomizeDashboard={() => setShowCardLibrary(true)}
       />
 
@@ -256,7 +273,7 @@ function App() {
                 className="text-base font-medium"
                 style={{ color: "var(--color-sentinel-text-primary)" }}
               >
-                {currentView === "dashboard" ? "Risk Dashboard" :
+                {currentView === "dashboard" ? "Dashboard" :
                  currentView === "control" ? "Control Dashboard" :
                  currentView === "control-audit" ? "Control Audit Trail" :
                  currentView === "optimization" ? "Load Shedding Optimization" :
@@ -264,6 +281,7 @@ function App() {
                  currentView === "technician" ? "Technician Chat" :
                  currentView === "integrations" ? "Integration Monitoring" :
                  currentView === "occupancy" ? "DALI Occupancy" :
+                 currentView === "security" ? "Security" :
                  "AI Assistant"}
               </h1>
             </div>
@@ -487,14 +505,22 @@ function App() {
         >
           {currentView === "dashboard" ? (
             <Dashboard
-              onViewChange={setCurrentView}
+              key={viewRefreshKey}
+              onViewChange={handleViewChange}
               openCardLibrary={showCardLibrary}
               onCardLibraryClose={() => setShowCardLibrary(false)}
             />
           ) : currentView === "control" ? (
             <ControlDashboard onError={(error) => setError(error)} />
           ) : currentView === "control-audit" ? (
-            <ControlAuditTrail onError={(error) => setError(error)} />
+            <ControlAuditTrail
+              onError={(error) => setError(error)}
+              onViewDevice={(deviceId) => {
+                sessionStorage.setItem("sentinel_selected_equipment", deviceId);
+                sessionStorage.setItem("sentinel_selected_site", "site-002");
+                handleViewChange("control");
+              }}
+            />
           ) : currentView === "optimization" ? (
             <OptimizationPage onError={(error) => setError(error)} />
           ) : currentView === "settings" ? (
@@ -513,6 +539,8 @@ function App() {
             <div className="h-full overflow-y-auto">
               <AssetWorkflowDashboard />
             </div>
+          ) : currentView === "security" ? (
+            <SecurityDashboard />
           ) : (
             <div className="h-full p-4 md:p-6">
               <div className="h-full max-w-4xl mx-auto">
