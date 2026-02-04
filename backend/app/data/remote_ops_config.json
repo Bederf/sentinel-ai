@@ -1,0 +1,114 @@
+{
+  "version": "1.0",
+  "description": "Remote operations configuration - authorization matrix, safety guardrails, and demo users",
+
+  "command_authorization": {
+    "status_check": {
+      "required_level": 1,
+      "description": "View equipment and building status"
+    },
+    "setpoint_adjust": {
+      "required_level": 3,
+      "description": "Adjust temperature and pressure setpoints"
+    },
+    "schedule_override": {
+      "required_level": 3,
+      "description": "Override HVAC and lighting schedules"
+    },
+    "equipment_start_stop": {
+      "required_level": 4,
+      "description": "Start or stop equipment remotely"
+    },
+    "fault_reset": {
+      "required_level": 4,
+      "description": "Reset equipment fault conditions"
+    },
+    "fire_panel_reset": {
+      "required_level": 4,
+      "description": "Reset fire panel alarms (requires ENGINEER level)"
+    },
+    "door_unlock": {
+      "required_level": 2,
+      "description": "Unlock access-controlled doors"
+    }
+  },
+
+  "safety_guardrails": {
+    "max_temperature_adjustment_celsius": 3.0,
+    "temperature_adjustment_description": "Maximum +/- 3 degrees C from current setpoint",
+    "equipment_types_no_remote_start": [
+      "fire_pump",
+      "fire_panel",
+      "smoke_damper",
+      "emergency_generator"
+    ],
+    "fire_panel_reset_required_level": 4,
+    "require_reason_for_override": true,
+    "require_reason_for_start_stop": true
+  },
+
+  "auto_expiring_overrides": {
+    "setpoint_override_hours": 4,
+    "schedule_override_hours": 8,
+    "door_unlock_minutes": 15,
+    "description": "Overrides automatically expire after these durations to prevent unattended changes"
+  },
+
+  "demo_users": [
+    {
+      "user_id": "view_user",
+      "username": "view_user",
+      "email": "viewer@sentinel.bms",
+      "role": "viewer",
+      "full_name": "View Only User",
+      "description": "Can only view building status and readings"
+    },
+    {
+      "user_id": "operator_user",
+      "username": "operator_user",
+      "email": "operator@sentinel.bms",
+      "role": "operator",
+      "full_name": "Building Operator",
+      "description": "Can run diagnostics and unlock doors"
+    },
+    {
+      "user_id": "tech_user",
+      "username": "tech_user",
+      "email": "tech@sentinel.bms",
+      "role": "technician",
+      "full_name": "Field Technician",
+      "description": "Can adjust setpoints and override schedules"
+    },
+    {
+      "user_id": "engineer_user",
+      "username": "engineer_user",
+      "email": "engineer@sentinel.bms",
+      "role": "engineer",
+      "full_name": "Building Engineer",
+      "description": "Full remote operations access including equipment control and fault reset"
+    }
+  ],
+
+  "authorization_levels": {
+    "1": {
+      "name": "VIEW_ONLY",
+      "label": "View Only",
+      "description": "Can view building status, equipment readings, and active alarms"
+    },
+    "2": {
+      "name": "OPERATOR",
+      "label": "Operator",
+      "description": "All View Only permissions plus diagnostics, dispatch assessment, and door unlock"
+    },
+    "3": {
+      "name": "TECHNICIAN",
+      "label": "Technician",
+      "description": "All Operator permissions plus setpoint adjustments and schedule overrides"
+    },
+    "4": {
+      "name": "ENGINEER",
+      "label": "Engineer",
+      "description": "Full access including equipment start/stop, fault reset, and fire panel reset"
+    }
+  }
+}
