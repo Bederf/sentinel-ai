@@ -1,5 +1,6 @@
 """Vector database service using Supabase + pgvector."""
 from typing import List, Optional, Dict, Any
+import re
 import logging
 
 logger = logging.getLogger(__name__)
@@ -147,6 +148,234 @@ class VectorDBService:
             i += chunk_size - overlap
 
         return chunks
+
+    def _split_markdown_into_chunks(
+        self,
+        text: str,
+        max_chunk_size: int = 800,
+        overlap_ratio: float = 0.15
+    ) -> List[Dict[str, Any]]:
+        """Split markdown text into section-aware chunks with heading paths.
+
+        Inspired by aimthelaw's legal document chunking:
+        - Respects heading boundaries (never splits mid-section)
+        - Tracks heading hierarchy for each chunk
+        - Uses paragraph-level splitting within large sections
+        - Local overlap only within the same section
+        """
+        chunks = []
+        lines = text.split('\n')
+
+        # Build sections from heading structure
+        sections = []
+        current_headings = {}  # level -> heading text
+        current_lines = []
+        current_level = 0
+
+        for line in lines:
+            heading_match = re.match(r'^(#{1,4})\s+(.+)$', line)
+            if heading_match:
+                # Save accumulated content as a section
+                if current_lines:
+                    content = '\n'.join(current_lines).strip()
+                    if content:
+                        heading_path = [
+                            current_headings[k]
+                            for k in sorted(current_headings.keys())
+                            if k <= current_level
+                        ]
+                        sections.append({
+                            'content': content,
+                            'heading_path': list(heading_path),
+                            'section_title': current_headings.get(current_level, ''),
+                            'level': current_level,
+                        })
+                    current_lines = []
+
+                level = len(heading_match.group(1))
+                heading_text = heading_match.group(2).strip()
+                current_level = level
+                current_headings[level] = heading_text
+                # Clear deeper headings
+                for k in list(current_headings.keys()):
+                    if k > level:
+                        del current_headings[k]
+            else:
+                current_lines.append(line)
+
+        # Don't forget the last section
+        if current_lines:
+            content = '\n'.join(current_lines).strip()
+            if content:
+                heading_path = [
+                    current_headings[k]
+                    for k in sorted(current_headings.keys())
+                    if k <= current_level
+                ]
+                sections.append({
+                    'content': content,
+                    'heading_path': list(heading_path),
+                    'section_title': current_headings.get(current_level, ''),
+                    'level': current_level,
+                })
+
+        # Process each section into chunks
+        overlap_chars = int(max_chunk_size * overlap_ratio)
+
+        for section in sections:
+            section_text = section['content']
+
+            if len(section_text) <= max_chunk_size:
+                # Section fits in one chunk
+                if section_text.strip():
+                    chunks.append({
+                        'content': section_text.strip(),
+                        'section': section['section_title'],
+                        'heading_path': section['heading_path'],
+                    })
+            else:
+                # Split large sections at paragraph boundaries
+                paragraphs = re.split(r'\n\s*\n', section_text)
+                current_chunk = ''
+
+                for para in paragraphs:
+                    para = para.strip()
+                    if not para:
+                        continue
+
+                    if len(current_chunk) + len(para) + 2 <= max_chunk_size:
+                        current_chunk = (current_chunk + '\n\n' + para).strip()
+                    else:
+                        # Save current chunk
+                        if current_chunk.strip():
+                            chunks.append({
+                                'content': current_chunk.strip(),
+                                'section': section['section_title'],
+                                'heading_path': section['heading_path'],
+                            })
+                        # Start new chunk with overlap from end of previous
+                        if overlap_chars > 0 and current_chunk:
+                            overlap_text = current_chunk[-overlap_chars:]
+                            current_chunk = overlap_text + '\n\n' + para
+                        else:
+                            current_chunk = para
+
+                        # Handle paragraphs larger than max_chunk_size
+                        if len(current_chunk) > max_chunk_size:
+                            # Split by sentences
+                            sentences = re.split(r'(?<=[.!?])\s+', current_chunk)
+                            current_chunk = ''
+                            for sentence in sentences:
+                                if len(current_chunk) + len(sentence) + 1 <= max_chunk_size:
+                                    current_chunk = (current_chunk + ' ' + sentence).strip()
+                                else:
+                                    if current_chunk.strip():
+                                        chunks.append({
+                                            'content': current_chunk.strip(),
+                                            'section': section['section_title'],
+                                            'heading_path': section['heading_path'],
+                                        })
+                                    current_chunk = sentence
+
+                # Don't forget remaining content
+                if current_chunk.strip():
+                    chunks.append({
+                        'content': current_chunk.strip(),
+                        'section': section['section_title'],
+                        'heading_path': section['heading_path'],
+                    })
+
+        return chunks
+
+    def chunk_and_embed_markdown(
+        self,
+        document_id: str,
+        doc_title: str = '',
+        doc_type: str = '',
+        max_chunk_size: int = 800,
+    ) -> int:
+        """Chunk markdown document with section awareness and context-enhanced embeddings.
+
+        Uses heading-aware chunking and prepends context headers to improve
+        embedding quality (document title + heading path + type).
+        Original content is stored without the header.
+        """
+        doc = self.client.table('documents').select('*').eq('id', document_id).single().execute()
+        document = doc.data
+        if not document:
+            logger.error(f"Document not found: {document_id}")
+            return 0
+
+        self.client.table('documents').update({
+            'indexing_status': 'chunking'
+        }).eq('id', document_id).execute()
+
+        text = document.get('full_text', '')
+        if not text:
+            return 0
+
+        title = doc_title or document.get('title', '')
+        dtype = doc_type or document.get('document_type', '')
+
+        # Use markdown-aware chunking
+        chunks = self._split_markdown_into_chunks(text, max_chunk_size)
+
+        if not chunks:
+            return 0
+
+        # Build context-enhanced texts for embedding (not for storage)
+        embed_texts = []
+        for chunk in chunks:
+            heading_path = ' > '.join(chunk.get('heading_path', []))
+            context_header = f"Document: {title}\n"
+            if heading_path:
+                context_header += f"Section: {heading_path}\n"
+            if dtype:
+                context_header += f"Type: {dtype}\n"
+            context_header += "---\n"
+            embed_texts.append(context_header + chunk['content'])
+
+        # Generate embeddings from context-enhanced text
+        embeddings = self.embedding_service.embed_batch(embed_texts)
+
+        # Store chunks with original content (no context header)
+        chunk_records = []
+        for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
+            heading_path = chunk.get('heading_path', [])
+            chunk_records.append({
+                'document_id': document_id,
+                'chunk_index': i,
+                'content': chunk['content'],
+                'content_length': len(chunk['content']),
+                'section_title': chunk.get('section', ''),
+                'embedding': embedding,
+                'equipment_type': document['equipment_type'],
+                'document_type': document['document_type'],
+                'manufacturer': document.get('manufacturer'),
+                'model': document.get('model'),
+                'keywords': document.get('keywords'),
+                'failure_modes': document.get('failure_modes'),
+                'metadata': {
+                    'heading_path': heading_path,
+                    'context_enhanced': True,
+                }
+            })
+
+        if chunk_records:
+            # Insert in batches to avoid payload limits
+            batch_size = 50
+            for j in range(0, len(chunk_records), batch_size):
+                batch = chunk_records[j:j + batch_size]
+                self.client.table('document_chunks').insert(batch).execute()
+
+        self.client.table('documents').update({
+            'indexing_status': 'embedded',
+            'indexed_at': 'now()',
+            'chunk_count': len(chunk_records)
+        }).eq('id', document_id).execute()
+
+        logger.info(f"Indexed markdown document {document_id}: {len(chunk_records)} chunks (section-aware)")
+        return len(chunk_records)
 
     def search(
         self,
