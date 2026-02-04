@@ -72,6 +72,13 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - [Safety Interlocks Engine](06-safety-compliance/safety-interlocks-engine.md) - Safety validation
 - **[Data Privacy & Security Architecture](SECURITY-PRIVACY.md)** - Data sovereignty, local AI, air-gapped deployment, POPIA compliance
 
+### 🔒 Security & Governance
+- **[Security Documentation Suite](08-security/README.md)** - Complete security policy suite for FSR supplier onboarding
+- [Information Security Framework](08-security/information-security-framework.md) - Governance structure, ISO role, policy hierarchy
+- [Information Security Strategy](08-security/information-security-strategy.md) - Maturity targets, remediation roadmap
+- [Information Security Policy](08-security/information-security-policy.md) - Overarching policy covering all 18 FSR domains
+- [Acceptable Usage Policy](08-security/acceptable-usage-policy.md) - Infrastructure, communication, and data handling rules
+
 ### 🔗 Integrations
 - [DALI-HVAC Integration](07-integrations/dali-hvac-integration.md) - Cross-system comfort diagnosis
 - [CAFM Schema](07-integrations/cafm-schema.md) - CAFM data model
