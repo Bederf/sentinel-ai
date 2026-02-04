@@ -47,3 +47,6 @@ lxml>=5.0.0
 
 # Report Generation
 reportlab>=4.0.0
+
+# BACnet/IP Protocol (Niagara Integration)
+BAC0>=24.3.25

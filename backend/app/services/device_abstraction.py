@@ -338,11 +338,12 @@ class DeviceManager:
     async def _create_adapter(self, device: Device) -> None:
         """Create appropriate adapter for device protocol."""
         from app.services.mock_devices import MockDeviceAdapter
+        from app.services.niagara.bacnet_adapter import NiagaraBACnetAdapter
 
         # Map protocol to adapter class
         adapter_map = {
             "mock": MockDeviceAdapter,
-            # Future: "bacnet": BACnetDeviceAdapter,
+            "bacnet": NiagaraBACnetAdapter,
             # Future: "modbus": ModbusDeviceAdapter,
         }
 
