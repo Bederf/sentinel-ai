@@ -1,0 +1,380 @@
+# =============================================================================
+# SENTINEL BMS Intelligence - Security Scanning Pipeline
+# =============================================================================
+#
+# Automated application security testing:
+# - SAST (Static Application Security Testing) for Python and frontend
+# - Dependency vulnerability scanning (pip-audit, npm audit)
+# - Container image scanning (Trivy)
+# - Secrets detection (gitleaks)
+#
+# Addresses FSR domains:
+#   4.9  Application Security (current 2.5 -> target 4.0 HIGH gap)
+#   4.10 Vulnerability Management (current 3.0 -> target 4.0 MEDIUM gap)
+#
+# Remediation SLAs:
+#   Critical: 7 days | High: 14 days | Medium: 30 days
+#
+# Ported from AimTheLaw CI/CD pipeline, adapted for SENTINEL structure.
+# =============================================================================
+
+name: Security Scan
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - '.planning/**'
+      - '*.md'
+      - 'simbiot_concept/**'
+  pull_request:
+    branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - '.planning/**'
+      - '*.md'
+      - 'simbiot_concept/**'
+  schedule:
+    # Weekly scan: Monday 06:00 UTC (08:00 SAST)
+    - cron: '0 6 * * 1'
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  # ===========================================================================
+  # Job 1: Python SAST (Static Application Security Testing)
+  # ===========================================================================
+  sast-python:
+    name: Python SAST (Bandit)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Bandit
+        run: pip install bandit[toml]
+
+      - name: Run Bandit SAST Scan
+        run: |
+          echo "Running Python SAST scan with Bandit..."
+          bandit -r backend/app/ \
+            -f json \
+            -o bandit-report.json \
+            --severity-level medium \
+            --confidence-level medium \
+            -x backend/app/data \
+            || true
+
+          # Also output human-readable format
+          bandit -r backend/app/ \
+            -f screen \
+            --severity-level medium \
+            --confidence-level medium \
+            -x backend/app/data \
+            || true
+
+      - name: Check for High/Critical Findings
+        run: |
+          if [ -f bandit-report.json ]; then
+            # Count high and critical severity findings
+            HIGH_COUNT=$(python3 -c "
+          import json
+          with open('bandit-report.json') as f:
+              data = json.load(f)
+          high_crit = [r for r in data.get('results', []) if r.get('issue_severity') in ('HIGH', 'CRITICAL')]
+          print(len(high_crit))
+          " 2>/dev/null || echo "0")
+
+            echo "High/Critical findings: $HIGH_COUNT"
+
+            if [ "$HIGH_COUNT" -gt "0" ]; then
+              echo "::error::Found $HIGH_COUNT high/critical severity findings in Python code"
+              exit 1
+            fi
+          fi
+
+      - name: Upload Bandit Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-sast-report
+          path: bandit-report.json
+          retention-days: 90
+
+  # ===========================================================================
+  # Job 2: Frontend SAST (npm audit)
+  # ===========================================================================
+  sast-frontend:
+    name: Frontend Security Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Dependencies
+        run: cd frontend && npm ci
+
+      - name: Run npm audit
+        run: |
+          echo "Running frontend dependency audit..."
+          cd frontend
+          npm audit --json > npm-audit-report.json || true
+
+          # Display human-readable output
+          npm audit --audit-level=high || true
+
+      - name: Check for Critical Vulnerabilities
+        run: |
+          cd frontend
+          if [ -f npm-audit-report.json ]; then
+            CRITICAL_COUNT=$(python3 -c "
+          import json
+          with open('npm-audit-report.json') as f:
+              data = json.load(f)
+          vulns = data.get('vulnerabilities', {})
+          critical = sum(1 for v in vulns.values() if v.get('severity') == 'critical')
+          print(critical)
+          " 2>/dev/null || echo "0")
+
+            echo "Critical vulnerabilities: $CRITICAL_COUNT"
+
+            if [ "$CRITICAL_COUNT" -gt "0" ]; then
+              echo "::error::Found $CRITICAL_COUNT critical vulnerabilities in frontend dependencies"
+              exit 1
+            fi
+          fi
+
+      - name: Upload npm Audit Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-audit-report
+          path: frontend/npm-audit-report.json
+          retention-days: 90
+
+  # ===========================================================================
+  # Job 3: Python Dependency Vulnerability Check
+  # ===========================================================================
+  dependency-check:
+    name: Dependency Vulnerability Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Audit Tools
+        run: pip install pip-audit safety
+
+      - name: Run pip-audit
+        run: |
+          echo "Running pip-audit on backend dependencies..."
+          pip-audit \
+            -r backend/requirements.txt \
+            -f json \
+            -o pip-audit-report.json \
+            --desc \
+            || true
+
+          # Human-readable output
+          pip-audit -r backend/requirements.txt || true
+
+      - name: Run Safety Check
+        run: |
+          echo "Running Safety vulnerability check..."
+          safety check \
+            -r backend/requirements.txt \
+            --json \
+            --output safety-report.json \
+            || true
+
+          # Human-readable output
+          safety check -r backend/requirements.txt || true
+
+      - name: Check for Critical/High Vulnerabilities
+        run: |
+          if [ -f pip-audit-report.json ]; then
+            VULN_COUNT=$(python3 -c "
+          import json
+          with open('pip-audit-report.json') as f:
+              data = json.load(f)
+          # pip-audit returns list of dependencies with vulnerabilities
+          vulns = [d for d in data.get('dependencies', []) if d.get('vulns')]
+          print(len(vulns))
+          " 2>/dev/null || echo "0")
+
+            echo "Vulnerable dependencies: $VULN_COUNT"
+
+            if [ "$VULN_COUNT" -gt "5" ]; then
+              echo "::warning::Found $VULN_COUNT vulnerable dependencies - review required"
+            fi
+          fi
+
+      - name: Upload Dependency Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-audit-reports
+          path: |
+            pip-audit-report.json
+            safety-report.json
+          retention-days: 90
+
+  # ===========================================================================
+  # Job 4: Container Image Scanning (Trivy)
+  # ===========================================================================
+  container-scan:
+    name: Container Scan (Trivy)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Build Backend Docker Image
+        run: |
+          echo "Building backend Docker image for scanning..."
+          docker build -t sentinel-backend:scan -f backend/Dockerfile backend/
+
+      - name: Run Trivy Container Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'sentinel-backend:scan'
+          format: 'json'
+          output: 'trivy-container-report.json'
+          severity: 'CRITICAL,HIGH'
+          ignore-unfixed: true
+
+      - name: Run Trivy Container Scan (Table Output)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'sentinel-backend:scan'
+          format: 'table'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+          ignore-unfixed: true
+
+      - name: Run Trivy Filesystem Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: 'backend/'
+          format: 'json'
+          output: 'trivy-fs-report.json'
+          severity: 'CRITICAL,HIGH'
+          security-checks: 'vuln,secret'
+
+      - name: Check for Critical Container Findings
+        run: |
+          if [ -f trivy-container-report.json ]; then
+            CRITICAL_COUNT=$(python3 -c "
+          import json
+          with open('trivy-container-report.json') as f:
+              data = json.load(f)
+          critical = 0
+          for result in data.get('Results', []):
+              for vuln in result.get('Vulnerabilities', []):
+                  if vuln.get('Severity') == 'CRITICAL':
+                      critical += 1
+          print(critical)
+          " 2>/dev/null || echo "0")
+
+            echo "Critical container vulnerabilities: $CRITICAL_COUNT"
+
+            if [ "$CRITICAL_COUNT" -gt "0" ]; then
+              echo "::error::Found $CRITICAL_COUNT critical vulnerabilities in container image"
+              exit 1
+            fi
+          fi
+
+      - name: Upload Trivy Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-scan-reports
+          path: |
+            trivy-container-report.json
+            trivy-fs-report.json
+          retention-days: 90
+
+  # ===========================================================================
+  # Job 5: Secrets Detection (Gitleaks)
+  # ===========================================================================
+  secrets-scan:
+    name: Secrets Detection (Gitleaks)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ===========================================================================
+  # Report Aggregation
+  # ===========================================================================
+  security-summary:
+    name: Security Scan Summary
+    runs-on: ubuntu-latest
+    needs: [sast-python, sast-frontend, dependency-check, container-scan, secrets-scan]
+    if: always()
+
+    steps:
+      - name: Download All Reports
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+        continue-on-error: true
+
+      - name: Generate Summary
+        run: |
+          echo "# SENTINEL Security Scan Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Scan | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
+
+          # Check job results from needs context
+          echo "| Python SAST (Bandit) | ${{ needs.sast-python.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Frontend Audit (npm) | ${{ needs.sast-frontend.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Dependency Check | ${{ needs.dependency-check.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Container Scan (Trivy) | ${{ needs.container-scan.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Secrets Detection (Gitleaks) | ${{ needs.secrets-scan.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "## Remediation SLAs" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Severity | SLA | Action |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-----|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Critical | 7 days | Immediate remediation required |" >> $GITHUB_STEP_SUMMARY
+          echo "| High | 14 days | Prioritize in current sprint |" >> $GITHUB_STEP_SUMMARY
+          echo "| Medium | 30 days | Schedule in backlog |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "*FSR Domains: 4.9 (Application Security), 4.10 (Vulnerability Management)*" >> $GITHUB_STEP_SUMMARY
+          echo "*Reports retained for 90 days as audit evidence*" >> $GITHUB_STEP_SUMMARY
