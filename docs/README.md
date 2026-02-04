@@ -77,6 +77,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - [CAFM Schema](07-integrations/cafm-schema.md) - CAFM data model
 - [Energy Centre](07-integrations/energy-centre.md) - Generators, ATS, power metering, UPS
 - **[Tridium Niagara Integration](07-integrations/tridium-niagara-integration.md)** - BACnet/IP, oBIX, AI point discovery for Niagara JACE/Supervisor
+- **[SIMBIOT Concept Connector](07-integrations/simbiot-concept-connector.md)** - MRI Evolution CAFM integration via FSI API (auto work orders, status polling, asset sync)
 - **[Asset Workflow Architecture](05-integrations/asset-workflow-architecture.md)** - SIMBIOT + Baseline + Inspection + ML integration (Phase 53-01)
 - **[Asset Lifecycle State Machine](05-integrations/asset-lifecycle-state-machine.md)** - 13 states from onboarding to monitoring (Phase 53-01)
 - **[Workflow Triggers & Automation](05-integrations/workflow-triggers.md)** - 5 automated triggers for ML → Inspection → Repair → Validation (Phase 53-02)
