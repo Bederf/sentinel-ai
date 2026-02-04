@@ -1,941 +1,590 @@
 ---
 title: "Repair Effectiveness & ML Feedback Loop"
-type: "guide"
+type: "technical"
 status: "approved"
-version: "46"
-date: "2026-02-01"
+version: "2.0.0"
+created: "2026-02-01"
+updated: "2026-02-04"
+author: "Sentinel Development Team"
+tags: [repair-effectiveness, ml-feedback, cost-benefit, escalation, health-scoring, followup]
+related:
+  - "04-features/44-asset-baseline-assessment.md"
+  - "04-features/45-routine-inspection-maintenance.md"
+  - "04-features/43-ml-model-development.md"
+  - "04-features/health-scoring-system.md"
+  - "05-integrations/44-46-integration-workflow.md"
+domain: "bms"
+audience: "developers"
+complexity: "intermediate"
+estimated_read_time: 20
 ---
 
 # Repair Effectiveness & ML Feedback Loop
 
-Phase 46 documents the critical feedback loop where asset health scores improve or deteriorate based on service/repair effectiveness. When technicians perform repairs and record post-repair measurements, the ML models update health scores, learn which repairs are most effective, and continuously improve failure predictions.
+Phase 57 closes the feedback loop between repairs and ML predictions. When a repair is completed, the system validates whether it was effective, feeds the outcome back into ML models for continuous learning, schedules appropriate follow-ups, and calculates cost-benefit in ZAR.
 
 ## Overview
 
+The system implements a full automated pipeline:
+
+1. **Repair Verification** - Compare pre/post-repair baselines to produce effectiveness scores
+2. **ML Feedback** - Feed repair outcomes into ML models for continuous learning
+3. **Follow-up Scheduling** - Auto-schedule re-inspections or escalations based on outcome
+4. **Cost-Benefit Analysis** - Calculate ROI in ZAR by equipment type
+
 ```mermaid
 graph TB
-    subgraph Before Service
-        Baseline[Asset Baseline: Health 58%]
-        Issues[Issues: Oil leak, High vibration]
-        Predictions[Failure Prediction: 42% in 12 months]
+    subgraph "Repair Completion"
+        RC[Repair Completed Trigger]
+        RO[Record Repair Outcome]
     end
 
-    subgraph Service/Repair Action
-        Repair[Technician Performs Repair]
-        Record[Record Repair Actions & Parts]
-        PostMeasure[Post-Repair Measurements]
-        Verify[Quality Verification]
+    subgraph "Effectiveness Validation"
+        VR[Validate Repair]
+        PB[Pre-Repair Baseline]
+        PR[Post-Repair Readings]
+        ES[Effectiveness Score 0-100]
+        HS[Health Score Update]
     end
 
-    subgraph ML Model Input
-        FeedData[Feed Data to ML Models]
-        NewReadings[New Sensor Readings]
-        RepairDetails[Repair Type, Parts, Technician]
-        Effectiveness[Repair Effectiveness Score]
+    subgraph "ML Feedback Loop"
+        MF[Record ML Feedback]
+        TD[Generate Training Data]
+        PA[Track Prediction Accuracy]
     end
 
-    subgraph ML Processing
-        Compare[Pre/Post Comparison]
-        DetectImprove[Detect Improvement/Deterioration]
-        UpdateScore[Update Health Score]
-        UpdateModel[Update Prediction Model]
-        Learn[Learn Repair Effectiveness]
+    subgraph "Follow-up & Cost"
+        FS[Schedule Follow-up]
+        CB[Cost-Benefit Analysis]
+        EC[Escalation Check]
     end
 
-    subgraph After Service
-        NewHealth[New Health Score: 78%]
-        NewPredictions[Updated Predictions: 12% failure in 12m]
-        NextService[Optimized Next Service: 90 days]
-        EffectivenessDB[Repair Effectiveness Database]
-    end
-
-    Baseline --> Repair
-    Issues --> Repair
-    Repair --> Record
-    Record --> PostMeasure
-    PostMeasure --> Verify
-    Verify --> FeedData
-    FeedData --> NewReadings
-    FeedData --> RepairDetails
-    NewReadings --> Compare
-    RepairDetails --> UpdateModel
-    Compare --> DetectImprove
-    DetectImprove --> UpdateScore
-    DetectImprove --> Learn
-    UpdateScore --> NewHealth
-    UpdateModel --> NewPredictions
-    Learn --> EffectivenessDB
-    EffectivenessDB --> NextService
+    RC --> VR
+    RO --> VR
+    PB --> VR
+    PR --> VR
+    VR --> ES
+    VR --> HS
+    ES --> MF
+    MF --> TD
+    MF --> PA
+    ES --> FS
+    ES --> CB
+    FS --> EC
 ```
 
-## How It Works
+## Architecture
 
-### Step 1: Before Service - Health Baseline
+### Backend Components
 
-```json
-{
-  "equipment_id": "GEN-SAN-001",
-  "assessment_date": "2026-04-01",
-  "event": "pre_repair_baseline",
+| File | Responsibility |
+|------|---------------|
+| `backend/app/models/repair_effectiveness.py` | Pydantic models: RepairOutcome, EffectivenessScore, ElementImprovement, HealthScoreUpdate, RepairHistoryEntry |
+| `backend/app/services/repair_effectiveness_service.py` | Core service: validate_repair, health scoring, repair history, fleet summary |
+| `backend/app/models/ml_feedback.py` | Pydantic models: MLFeedbackRecord, TrainingDataPoint, PredictionAccuracy, MLFeedbackSummary |
+| `backend/app/services/ml_feedback_service.py` | ML feedback: record outcomes, generate training data, track accuracy |
+| `backend/app/services/followup_scheduler.py` | Follow-up scheduling, cost-benefit analysis, escalation management |
+| `backend/app/api/repair_effectiveness.py` | 8 REST endpoints for repair effectiveness |
+| `backend/app/api/ml_feedback.py` | 5 REST endpoints for ML feedback |
+| `backend/app/services/workflow_triggers.py` | Automated trigger integration (calls ML feedback + follow-up on repair validation) |
+| `backend/app/services/workflow_orchestrator.py` | Orchestrator integration (calls ML feedback on repair validation) |
 
-  "health_status": {
-    "health_score": 58,
-    "condition_category": "POOR",
-    "risk_level": "HIGH",
-    "failure_probability_12m": 0.42
-  },
+### Service Integration
 
-  "critical_elements": [
-    {
-      "element_id": "oil_system_leak",
-      "status": "active",
-      "severity": "medium",
-      "measurement": "2_drops_per_minute"
-    },
-    {
-      "element_id": "vibration_signature",
-      "status": "worsening",
-      "severity": "high",
-      "measurement": "2.3_mm_s_rms",
-      "baseline": "1.8_mm_s_rms",
-      "deviation_percent": 28
-    },
-    {
-      "element_id": "exhaust_temperature",
-      "status": "elevated",
-      "severity": "medium",
-      "measurement": "440_celsius_at_100_load",
-      "spec_limit": "450_celsius"
-    }
-  ],
+All services use the singleton pattern with factory functions:
 
-  "ai_predictions": {
-    "predicted_failure_date": "2026-08-15",
-    "confidence": 0.78,
-    "days_until_predicted_failure": 135,
-    "recommended_repair": "bearing_replacement_and_oil_pan_gasket"
-  }
-}
+```python
+from app.services.repair_effectiveness_service import get_repair_effectiveness_service
+from app.services.ml_feedback_service import get_ml_feedback_service
+from app.services.followup_scheduler import get_followup_scheduler
 ```
 
-### Step 2: Service/Repair Performed
+Integration with existing services:
+- **BaselineComparisonService** - Element-by-element deviation detection
+- **ElementTrendService** - Trend-based health scoring (stable/degrading/improving)
+- **BaselineRepository** - Fetch pre/post repair baselines
+- **WorkflowTriggerEngine** - Automated pipeline trigger after repair completion
 
-Technician performs repair and records detailed information:
+## Repair Effectiveness Service
+
+### Effectiveness Scoring
+
+The `validate_repair()` method compares pre-repair baselines to post-repair readings:
+
+1. Fetch pre-repair baseline from repository (baseline_type=PRE_REPAIR)
+2. Get post-repair readings (from API or simulated for demo)
+3. Calculate per-element improvement as percentage of deviation recovered
+4. Overall effectiveness = average of element improvements, capped at 0-100
 
 ```json
 {
   "work_order_id": "WO-2026-0876",
-  "equipment_id": "GEN-SAN-001",
-  "repair_date": "2026-04-15",
-  "technician": "Mike Johnson",
-  "technician_id": "tech-0156",
-  "technician_skill_level": "senior",
-  "service_type": "corrective_maintenance",
-
-  "repair_actions": [
-    {
-      "action": "replaced_oil_pan_gasket",
-      "components_accessed": ["oil_pan", "gasket_surface"],
-      "difficulty": "medium",
-      "hours_spent": 2.5
+  "equipment_id": "S002-CHILLER-B1-001",
+  "effectiveness_score": 78.5,
+  "repair_successful": true,
+  "back_to_baseline": false,
+  "health_score_before": 60.0,
+  "health_score_after": 90.0,
+  "health_improvement": 30.0,
+  "element_improvements": {
+    "chw_supply_temp": {
+      "element_name": "chw_supply_temp",
+      "pre_value": 9.5,
+      "post_value": 7.8,
+      "baseline_value": 7.2,
+      "improvement_percent": 73.9,
+      "back_to_baseline": true,
+      "status": "improved"
     },
-    {
-      "action": "replaced_main_bearing",
-      "components_accessed": ["crankcase", "bearing_housing"],
-      "difficulty": "high",
-      "hours_spent": 4.0
-    },
-    {
-      "action": "adjusted_engine_mounts",
-      "components_accessed": ["engine_mounts"],
-      "difficulty": "low",
-      "hours_spent": 1.0
-    }
-  ],
-
-  "parts_used": [
-    {
-      "part_number": "GEN-OPGASKET-001",
-      "description": "Oil pan gasket kit",
-      "quantity": 1,
-      "condition": "new_oem"
-    },
-    {
-      "part_number": "GEN-BEARING-001",
-      "description": "Main bearing set",
-      "quantity": 1,
-      "condition": "new_oem"
-    },
-    {
-      "part_number": "BOLT-M10x50",
-      "description": "Mounting bolts",
-      "quantity": 8,
-      "condition": "new"
-    }
-  ],
-
-  "tools_required": ["torque_wrench", "bearing_puller", "engine_hoist"],
-
-  "quality_verification": {
-    "inspection_performed": true,
-    "inspector": "Sarah Williams",
-    "verification_tests": ["torque_check", "oil_pressure_test"],
-    "all_tests_passed": true,
-    "repair_quality_rating": "excellent"
-  }
-}
-```
-
-### Step 3: Post-Repair Measurements
-
-Technician captures post-repair measurements and provides them to ML models:
-
-```json
-{
-  "measurement_date": "2026-04-15",
-  "post_repair_measurements": {
-    "oil_system_leak": {
-      "visual_inspection": "no_leak_detected",
-      "photo_verification": "img_20260415_093045.jpg",
-      "measurement_method": "clean_dry_paper_under_pan",
-      "drips_per_hour": 0,
-      "improvement_vs_baseline": "100_percent_resolved"
-    },
-
-    "vibration_signature": {
-      "measurement_time": "2026-04-15T14:30:00Z",
-      "engine_state": "full_load_100_percent",
-      "drive_end_rms": 1.2,
-      "non_drive_end_rms": 1.1,
-      "top_of_engine_rms": 1.0,
-      "dominant_frequency": 25,
-      "baseline_rms": 2.3,
-      "improvement_percent": 48,
-      "measurement_tool": "vibration_analyzer_v3",
-      "calibration_date": "2026-03-01"
-    },
-
-    "exhaust_temperature": {
-      "ambient_temperature": 22,
-      "measurements_at_load": {
-        "25_percent_load": 375,
-        "50_percent_load": 395,
-        "75_percent_load": 410,
-        "100_percent_load": 425
-      },
-      "baseline_temp_100_load": 440,
-      "improvement_percent": 3.4
-    },
-
-    "engine_performance": {
-      "fuel_efficiency_improvement": "2.1_percent",
-      "noise_level_dba": 78,
-      "baseline_noise_dba": 85,
-      "oil_pressure_at_idle": 45,
-      "oil_pressure_at_full_load": 60,
-      "coolant_temperature_stabilized": 82
-    }
-  },
-
-  "repair_effectiveness_assessment": {
-    "overall_effectiveness": "excellent",
-    "elements_resolved": 2,
-    "elements_improved": 1,
-    "elements_unchanged": 0,
-    "elements_worsened": 0
-  }
-}
-```
-
-### Step 4: ML Model Processing
-
-System processes the before/after data and updates models:
-
-```python
-class PostRepairEvaluator:
-    def evaluate_repair_effectiveness(self, pre_repair_state, post_repair_state, repair_details):
-        """
-        Evaluates repair effectiveness and updates ML models.
-        Called automatically after post-repair data submission.
-        """
-
-        equipment_id = post_repair_state["equipment_id"]
-
-        # 1. Retrieve pre-repair baseline
-        pre_baseline = self.get_baseline(equipment_id, date="pre_repair")
-
-        # 2. Compare each element
-        element_improvements = []
-        for element_id in post_repair_state["post_repair_measurements"]:
-            baseline_element = pre_baseline["critical_elements"].get(element_id)
-            post_element = post_repair_state["post_repair_measurements"][element_id]
-
-            improvement_score = self.calculate_element_improvement(
-                baseline=baseline_element,
-                post_repair=post_element,
-                element_type=element_id
-            )
-            element_improvements.append({
-                "element_id": element_id,
-                "improvement_score": improvement_score,
-                "status_resolved": improvement_score > 10
-            })
-
-        # 3. Calculate overall health improvement
-        original_health = pre_baseline["health_status"]["health_score"]
-
-        new_health_score = self.recalculate_health_score(
-            original_score=original_health,
-            element_improvements=element_improvements,
-            repair_quality=repair_details.get("quality_verification_passed"),
-            technician_skill=repair_details.get("technician_skill_level")
-        )
-
-        # 4. Update prediction models
-        prediction_update = self.update_prediction_models(
-            equipment_id=equipment_id,
-            health_improvement=new_health_score - original_health,
-            repair_type=repair_details["service_type"],
-            repair_actions=repair_details["repair_actions"]
-        )
-
-        # 5. Learn repair effectiveness
-        repair_learned = self.learn_repair_effectiveness(
-            equipment_type=pre_baseline["equipment_type"],
-            repair_actions=repair_details["repair_actions"],
-            health_improvement=new_health_score - original_health,
-            time_to_effectiveness=7  # days until improvement verified
-        )
-
-        # 6. Update asset profile
-        self.update_asset_profile(
-            equipment_id=equipment_id,
-            new_health_score=new_health_score,
-            element_improvements=element_improvements,
-            repair_effectiveness_score=repair_learned["effectiveness_score"]
-        )
-
-        return {
-            "equipment_id": equipment_id,
-            "previous_health_score": original_health,
-            "new_health_score": new_health_score,
-            "improvement": new_health_score - original_health,
-            "element_improvements": element_improvements,
-            "failure_probability_update": prediction_update,
-            "repair_learned": repair_learned
-        }
-```
-
-**Processing Result Example:**
-
-```json
-{
-  "equipment_id": "GEN-SAN-001",
-  "previous_health_score": 58,
-  "new_health_score": 78,
-  "improvement": 20,
-
-  "element_improvements": [
-    {
-      "element_id": "oil_system_leak",
-      "baseline_status": "leaking_2_drops_per_min",
-      "post_repair_status": "no_leak",
-      "improvement_score": 15,
-      "status_resolved": true
-    },
-    {
-      "element_id": "vibration_signature",
-      "baseline_status": "2.3_mm_s_rms",
-      "post_repair_status": "1.2_mm_s_rms",
-      "improvement_score": 8,
-      "improvement_percent": 48,
-      "status_resolved": true
-    },
-    {
-      "element_id": "exhaust_temperature",
-      "baseline_status": "440_celsius",
-      "post_repair_status": "425_celsius",
-      "improvement_score": 2,
-      "status_resolved": false,
-      "notes": "improved_but_not_fully_resolved"
-    }
-  ],
-
-  "failure_probability_update": {
-    "previous_probability_12m": 0.42,
-    "new_probability_12m": 0.12,
-    "improvement_factor": 3.5,
-    "prediction_model_version": "v2.3.1",
-    "model_confidence": 0.87,
-    "next_failure_predicted": "2027-04-15"
-  },
-
-  "repair_learned": {
-    "repair_type": "bearing_replacement_and_gasket",
-    "effectiveness_score": 0.92,
-    "average_health_improvement": 18,
-    "time_to_improvement_days": 7,
-    "ml_confidence": "high",
-    "will_recommend_in_future": true
-  },
-
-  "asset_profile_updated": {
-    "health_score_evolution": [
-      {"date": "2026-02-01", "score": 58, "source": "baseline_assessment"},
-      {"date": "2026-04-01", "score": 58, "source": "pre_repair"},
-      {"date": "2026-04-15", "score": 78, "source": "post_repair"}
-    ],
-    "last_service_date": "2026-04-15",
-    "next_service_recommended": "2026-07-15",
-    "service_interval_optimized": "90_days"
-  }
-}
-```
-
-### Step 5: Updated Health Status & Learning
-
-#### 5A. Updated Health Status
-
-Asset profile shows health improvement:
-
-```json
-{
-  "equipment_id": "GEN-SAN-001",
-  "assessment_date": "2026-04-15",
-  "event": "post_repair_health_update",
-
-  "health_status": {
-    "health_score": 78,
-    "condition_category": "FAIR",
-    "risk_level": "MEDIUM",
-    "failure_probability_12m": 0.12,
-    "improvement": "+20_points_vs_baseline",
-    "improvement_date": "2026-04-15",
-    "days_since_repair": 0
-  },
-
-  "health_score_evolution": [
-    {"date": "2026-02-01", "score": 58, "source": "baseline", "condition": "POOR"},
-    {"date": "2026-03-01", "score": 60, "source": "monthly_inspection", "condition": "FAIR"},
-    {"date": "2026-04-01", "score": 58, "source": "pre_repair", "condition": "POOR"},
-    {"date": "2026-04-15", "score": 78, "source": "post_repair", "condition": "FAIR"}
-  ],
-
-  "critical_elements_status_post_repair": {
-    "oil_system_leak": {
-      "status": "resolved",
-      "improvement_score": 15,
-      "next_check": "2026-05-15"
-    },
-    "vibration_signature": {
-      "status": "resolved",
-      "improvement_score": 8,
-      "next_check": "2026-05-15"
-    },
-    "exhaust_temperature": {
-      "status": "improved",
-      "improvement_score": 2,
-      "next_check": "2026-04-30"
-    }
-  },
-
-  "service_history": [
-    {
-      "date": "2026-04-15",
-      "type": "bearing_replacement_and_gasket",
-      "technician": "Mike Johnson",
-      "health_improvement": "+20",
-      "immediate_effectiveness": "excellent",
-      "parts_used": ["bearing_kit", "oil_pan_gasket"]
-    }
-  ]
-}
-```
-
-#### 5B. ML Model Learning & Updates
-
-System learns from repair effectiveness:
-
-```json
-{
-  "ml_model_updates": {
-    "prediction_model_updated": true,
-    "model_version": "v2.3.1",
-    "update_description": "Incorporated repair effectiveness data from GEN-SAN-001",
-
-    "learned_patterns": [
-      {
-        "pattern": "bearing_replacement_effectiveness",
-        "equipment_type": "generator",
-        "average_health_improvement": 18,
-        "success_rate": 0.92,
-        "time_to_improvement_days": 7,
-        "confidence": 0.87,
-        "will_recommend_for_similar_issue": true
-      },
-      {
-        "pattern": "vibration_correlation_with_bearings",
-        "correlation_strength": 0.94,
-        "predictive_power": "High",
-        "early_warning_days": 30
-      }
-    ],
-
-    "updated_failure_predictions": {
-      "next_30_days": 0.03,
-      "next_90_days": 0.08,
-      "next_12_months": 0.12,
-      "previous_12_month_prediction": 0.42,
-      "improvement_factor": 3.5
-    },
-
-    "repair_effectiveness_database": {
-      "bearing_replacement": {
-        "total_performed": 12,
-        "successful": 11,
-        "average_improvement": 16.5,
-        "cost_effectiveness": "high"
-      },
-      "oil_pan_gasket": {
-        "total_performed": 8,
-        "successful": 8,
-        "average_improvement": 12,
-        "cost_effectiveness": "high"
-      }
+    "vibration_rms": {
+      "element_name": "vibration_rms",
+      "pre_value": 3.2,
+      "post_value": 1.5,
+      "baseline_value": 1.2,
+      "improvement_percent": 85.0,
+      "back_to_baseline": false,
+      "status": "improved"
     }
   }
 }
 ```
 
-#### 5C. Deterioration Scenario (When Repair is Ineffective)
+**Success threshold:** effectiveness_score >= 50% is considered a successful repair.
 
-Not all repairs result in improvement. When repairs are ineffective, the system detects deterioration:
+### Health Score Calculation
 
-```json
-{
-  "scenario": "deterioration_despite_repair",
-  "equipment_id": "AHU-L12-02",
+Equipment health scores are calculated from element trend directions using the ElementTrendService:
 
-  "pre_repair": {
-    "health_score": 65,
-    "issue": "minor_vibration",
-    "baseline_rms": 1.5
-  },
+| Trend Direction | Score |
+|----------------|-------|
+| stable | 100 |
+| improving | 90 |
+| degrading | 70 |
+| rapid_degrading | 30 |
 
-  "repair_performed": {
-    "action": "adjusted_fan_belts",
-    "technician_skill": "junior",
-    "hours_spent": 1.5
-  },
+The overall health score is the weighted average across all tracked elements.
 
-  "post_repair": {
-    "health_score": 62,
-    "change": -3,
-    "vibration_rms": 1.8,
-    "worsening_percent": 20,
-    "reason": "belt_tension_incorrect"
-  },
+Deviation-based scoring (used during repair validation):
+- Base score: 100
+- Critical deviation (>30% from baseline): -20 points per element
+- Warning deviation (>15% from baseline): -10 points per element
+- Minimum score: 0
 
-  "ml_learning": {
-    "belt_adjustment_effectiveness": "low_with_junior_tech",
-    "recommended_skills": "senior_tech_required",
-    "better_repair_for_this_issue": "replace_bearings_or_motor"
-  }
-}
-```
+## ML Feedback Service
 
-## Repair Effectiveness Patterns
+### Feedback Recording
 
-### Effective Repairs (Improve Health Score)
-
-Based on ML learning across fleet:
+When a repair is validated, the outcome is recorded for ML learning:
 
 ```json
 {
-  "repair_type_ranking": [
-    {
-      "repair": "bearing_replacement_senior_tech",
-      "average_improvement": 18,
-      "success_rate": 0.92,
-      "cost_effectiveness": "high",
-      "recommended_for": ["vibration_isses", "bearing_wear"]
-    },
-    {
-      "repair": "oil_pan_gasket_replacement",
-      "average_improvement": 12,
-      "success_rate": 0.98,
-      "cost_effectiveness": "high",
-      "recommended_for": ["oil_leaks"]
-    },
-    {
-      "repair": "filter_replacement",
-      "average_improvement": 8,
-      "success_rate": 0.95,
-      "cost_effectiveness": "medium",
-      "recommended_for": ["elevated_dp", "reduced_airflow"]
-    },
-    {
-      "repair": "belt_adjustment",
-      "average_improvement": 5,
-      "success_rate": 0.75,
-      "cost_effectiveness": "low",
-      "notes": "effectiveness_depends_on_tech_skill"
-    }
-  ]
-}
-```
-
-### Ineffective Repairs (Minimal/Deterioration)
-
-ML tracks repairs that don't work:
-
-```json
-{
-  "ineffective_patterns": [
-    {
-      "repair": "belt_adjustment_for_bearing_issue",
-      "average_improvement": -2,
-      "success_rate": 0.15,
-      "reason": "root_cause_not_addressed",
-      "better_alternative": "bearing_replacement"
-    },
-    {
-      "repair": "filter_cleaning_instead_of_replacement",
-      "average_improvement": 1,
-      "success_rate": 0.30,
-      "reason": "temporary_solution",
-      "better_alternative": "filter_replacement"
-    }
-  ]
-}
-```
-
-## Service Interval Optimization
-
-Based on repair effectiveness, AI optimizes next service date:
-
-```python
-def optimize_next_service(self, current_health, repair_effectiveness):
-    """
-    Optimizes next service interval based on:
-    1. Current health score after repair
-    2. Repair effectiveness (how much improvement was achieved)
-    3. Historical degradation patterns
-    """
-
-    if repair_effectiveness["improvement"] > 15:
-        # Major improvement - extend interval
-        base_interval = 90  # days
-        extension_factor = 1.5
-        next_service_days = base_interval * extension_factor
-        confidence = "high"
-
-    elif repair_effectiveness["improvement"] > 5:
-        # Moderate improvement - standard interval
-        next_service_days = 60
-        confidence = "medium"
-
-    else:
-        # Minimal improvement - shorten interval
-        next_service_days = 30
-        confidence = "low"
-        reasoning = "monitor_closely_for_further_degradation"
-
-    return {
-        "next_service_recommended": next_service_days,
-        "confidence": confidence,
-        "based_on_improvement": repair_effectiveness["improvement"]
-    }
-```
-
-**Example Optimization:**
-
-```json
-{
-  "equipment_id": "GEN-SAN-001",
-  "repair_date": "2026-04-15",
-  "health_improvement": 20,
-
-  "service_optimization": {
-    "original_interval_recommended": "30_days",
-    "ai_optimized_interval": "90_days",
-    "reasoning": "major_health_improvement_achieved",
-    "confidence": "high",
-    "monitoring_setup": {
-      "continuous_monitoring": "enabled",
-      "alert_if_health_drops": 70,
-      "trigger_re_inspection": "if_vibration_increases_10_percent"
-    }
-  }
-}
-```
-
-## API Reference
-
-### Submit Repair Data
-
-```http
-POST /api/repair/submit-repair-record
-
-Request:
-{
+  "id": "fb-a1b2c3d4",
+  "equipment_id": "S002-CHILLER-B1-001",
   "work_order_id": "WO-2026-0876",
-  "equipment_id": "GEN-SAN-001",
-  "repair_date": "2026-04-15",
-  "technician_id": "tech-0156",
-
-  "repair_actions": [...],
-  "parts_used": [...],
-  "post_repair_measurements": {...},
-  "quality_verification": {...}
-}
-
-Response:
-{
-  "repair_id": "repair-20260415-001",
-  "status": "processed",
-  "health_improvement": 20,
-  "models_updated": true
+  "feedback_type": "repair_outcome",
+  "repair_successful": true,
+  "effectiveness_score": 78.5,
+  "prediction_was_correct": true,
+  "recorded_at": "2026-02-04T14:30:00Z"
 }
 ```
 
-### Get Repair Effectiveness Data
+### Training Data Generation
 
-```http
-GET /api/repair/effectiveness/{equipment_type}
+The service generates `TrainingDataPoint` records for ML model retraining:
 
-Response:
+```json
 {
-  "repair_type_ranking": [...],
-  "success_rates_by_technician_skill": {...},
-  "cost_effectiveness_analysis": {...}
+  "equipment_id": "S002-CHILLER-B1-001",
+  "equipment_type": "chiller",
+  "features": {"chw_supply_temp": 9.5, "vibration_rms": 3.2},
+  "label": "failed",
+  "failure_type": "compressor_bearing",
+  "repair_effectiveness": 78.5,
+  "source": "repair_outcome"
 }
 ```
 
-### Update Health Score After Repair
+### Prediction Accuracy Tracking
 
-```http
-POST /api/equipment/update-health-post-repair
+Per-model accuracy metrics are tracked:
 
-Request:
+```json
 {
-  "equipment_id": "GEN-SAN-001",
-  "new_health_score": 78,
-  "improvement": 20,
-  "repair_id": "repair-20260415-001"
+  "model_type": "lstm",
+  "total_predictions": 45,
+  "correct_predictions": 38,
+  "false_positives": 4,
+  "false_negatives": 3,
+  "accuracy_percent": 84.4,
+  "precision": 0.90,
+  "recall": 0.93
 }
 ```
 
-## Best Practices
+## Follow-up Scheduling
 
-### 1. Always Record Post-Service Measurements
+### Scheduling Rules
 
-**Why:** Without post-repair data, ML cannot:
-- Update health scores accurately
-- Learn repair effectiveness
-- Improve future predictions
-- Optimize service intervals
+The `FollowupSchedulerService` uses 4 rules based on repair outcome:
 
-**Minimum Required:**
-- Measurement date
-- Key parameters (same as baseline)
-- Visual verification (photos)
-- Repair actions performed
+| Condition | Follow-up Type | Schedule | Priority |
+|-----------|---------------|----------|----------|
+| Successful, score >= 80% | re_inspection | 30 days | low |
+| Successful, score < 80% | re_inspection | 7 days | medium |
+| Failed (1st failure) | re_repair | 3 days | high |
+| Failed (2nd+ failure) | escalation | 1 day | critical |
 
-### 2. Document Repair Quality
+### Cost-Benefit Analysis (ZAR)
 
-**Critical Factors for ML Learning:**
-- Technician skill level (affects effectiveness)
-- Parts quality (OEM vs aftermarket)
-- Hours spent (rushed vs thorough)
-- Verification tests passed
+Equipment-type-specific failure cost estimates:
+
+| Equipment Type | Estimated Failure Cost (ZAR) |
+|---------------|------|
+| Chiller | R50,000 |
+| AHU | R30,000 |
+| FCU | R15,000 |
+| Generator | R40,000 |
+| Pump | R10,000 |
+| VAV | R8,000 |
+| DALI | R5,000 |
+
+**Calculation:**
+```
+cost_avoidance = failure_cost × (effectiveness_score / 100) - repair_cost
+roi_percent = (cost_avoidance / repair_cost) × 100
+cost_effective = roi_percent > 0
+```
 
 **Example:**
 ```json
 {
-  "repair_quality": "excellent",
-  "verification_tests": ["oil_pressure", "vibration_check"],
-  "all_tests_passed": true,
-  "technician_notes": """
-    Installation went smoothly.
-    Torque specs verified.
-    Bearing clearance within spec.
-  """
+  "work_order_id": "WO-2026-0876",
+  "equipment_id": "S002-CHILLER-B1-001",
+  "repair_cost": 5000.0,
+  "estimated_failure_cost": 50000.0,
+  "cost_avoidance": 37500.0,
+  "roi_percent": 750.0,
+  "effectiveness_score": 85.0,
+  "cost_effective": true
 }
 ```
 
-### 3. Track Long-Term Repair Effectiveness
+### Escalation Levels
 
-**Success Metrics:**
-- Health score remains stable/improved for 90+ days
-- No repeat repairs for same issue
-- Failure predictions remain low
-- Service intervals can be extended
+For recurring repair failures:
 
-**Failure Indicators:**
-- Health degrades again within 30 days
-- Multiple repairs for same issue
-- Predictions don't improve after repair
-- Issue recurs frequently
+| Level | Trigger | Recommended Action |
+|-------|---------|-------------------|
+| 1 | 1 failed repair | Re-repair with different approach |
+| 2 | 2 failed repairs | Specialist review |
+| 3 | 3+ failed repairs | Replacement assessment |
 
-### 4. Use Repair Data for Vendor Evaluation
+## API Reference
 
-**Vendor Scorecard (Auto-Generated):**
+### Repair Effectiveness Endpoints (8)
+
+#### POST /api/repair-effectiveness/validate
+
+Validate repair effectiveness by comparing pre/post baselines.
+
+```http
+POST /api/repair-effectiveness/validate
+Content-Type: application/json
+
+{
+  "equipment_id": "S002-CHILLER-B1-001",
+  "work_order_id": "WO-2026-0876",
+  "post_repair_readings": {
+    "chw_supply_temp": 7.8,
+    "vibration_rms": 1.5
+  }
+}
 ```
-Bearing Supplier: SKF
-├─ 12 purchases
-├─ 11 successful (92%)
-├─ 1 failure (resolved by warranty)
-└─ Average improvement: 16 points
-   → RECOMMENDED
 
-Bearing Supplier: Generic Brand
-├─ 4 purchases
-├─ 2 successful (50%)
-├─ 2 premature failures
-└─ Average improvement: 8 points
-   → NOT RECOMMENDED
+Returns `EffectivenessScore` with element-level improvements and health scores.
+
+#### POST /api/repair-effectiveness/record-outcome
+
+Record repair outcome metadata before validation.
+
+```http
+POST /api/repair-effectiveness/record-outcome
+Content-Type: application/json
+
+{
+  "equipment_id": "S002-CHILLER-B1-001",
+  "work_order_id": "WO-2026-0876",
+  "repair_type": "compressor_bearing_replacement",
+  "repair_date": "2026-02-04T10:00:00Z",
+  "technician": "John Smith",
+  "parts_used": ["bearing_kit", "oil_seal"],
+  "labor_hours": 6.0,
+  "repair_cost": 5000.0,
+  "fault_description": "Excessive vibration from compressor bearing wear",
+  "actions_taken": "Replaced main bearing and resealed oil system"
+}
 ```
 
-### 5. Continuous Improvement Loop
+#### GET /api/repair-effectiveness/health/{equipment_id}
 
-**Monthly Review:**
-```python
-# AI analyzes repair effectiveness monthly
-def continuous_improvement_review(self):
-    ineffective_repairs = self.db.query("""
-        SELECT repair_type, COUNT(*) as count, AVG(improvement) as avg_imp
-        FROM repairs
-        WHERE improvement < 0
-        GROUP BY repair_type
-        ORDER BY count DESC
-    """)
+Get current equipment health score calculated from element trend directions.
 
-    for repair in ineffective_repairs:
-        if repair["count"] > 3 and repair["avg_imp"] < -2:
-            # Flag for review
-            self.flag_for_training(repair["repair_type"])
-            self.update_maintenance_guidelines(repair["repair_type"])
+```http
+GET /api/repair-effectiveness/health/S002-CHILLER-B1-001
 ```
+
+Returns `HealthScoreUpdate` with previous/new score and contributing factors.
+
+#### GET /api/repair-effectiveness/history/{equipment_id}
+
+Get repair history sorted by date (newest first).
+
+```http
+GET /api/repair-effectiveness/history/S002-CHILLER-B1-001
+```
+
+Returns list of `RepairHistoryEntry` with effectiveness scores and costs.
+
+#### GET /api/repair-effectiveness/summary
+
+Fleet-wide effectiveness summary.
+
+```http
+GET /api/repair-effectiveness/summary
+```
+
+```json
+{
+  "total_repairs": 12,
+  "avg_effectiveness": 72.3,
+  "success_rate": 83.3,
+  "total_cost": 45000.0,
+  "repairs_by_type": {
+    "compressor_bearing_replacement": 3,
+    "filter_replacement": 5,
+    "belt_adjustment": 4
+  }
+}
+```
+
+#### GET /api/repair-effectiveness/followups
+
+Get pending follow-up tasks with optional filters.
+
+```http
+GET /api/repair-effectiveness/followups?equipment_id=S002-CHILLER-B1-001&status=scheduled
+```
+
+Returns list of `FollowupTask` sorted by scheduled date.
+
+#### GET /api/repair-effectiveness/cost-benefit/{work_order_id}
+
+Get cost-benefit analysis for a specific repair.
+
+```http
+GET /api/repair-effectiveness/cost-benefit/WO-2026-0876
+```
+
+Returns `CostBenefitAnalysis` with ROI in ZAR. Returns 404 if no analysis exists.
+
+#### GET /api/repair-effectiveness/escalations/{equipment_id}
+
+Check escalation status for equipment.
+
+```http
+GET /api/repair-effectiveness/escalations/S002-CHILLER-B1-001
+```
+
+Returns `EscalationRecord` or `{"escalation_level": 0, "message": "No escalation needed"}`.
+
+### ML Feedback Endpoints (5)
+
+#### POST /api/ml-feedback/record
+
+Record repair feedback for ML learning.
+
+```http
+POST /api/ml-feedback/record
+Content-Type: application/json
+
+{
+  "equipment_id": "S002-CHILLER-B1-001",
+  "work_order_id": "WO-2026-0876",
+  "effectiveness_score": 78.5,
+  "repair_successful": true,
+  "failure_type": "compressor_bearing",
+  "prediction_id": "pred-001"
+}
+```
+
+#### GET /api/ml-feedback/training-data
+
+Generate training dataset for ML model retraining.
+
+```http
+GET /api/ml-feedback/training-data?equipment_type=chiller
+```
+
+Returns list of `TrainingDataPoint` records.
+
+#### GET /api/ml-feedback/accuracy/{model_type}
+
+Get prediction accuracy for a specific ML model.
+
+```http
+GET /api/ml-feedback/accuracy/lstm
+```
+
+Returns `PredictionAccuracy` with accuracy, precision, and recall metrics.
+
+#### GET /api/ml-feedback/equipment/{equipment_id}
+
+Get all ML feedback records for an equipment.
+
+```http
+GET /api/ml-feedback/equipment/S002-CHILLER-B1-001
+```
+
+#### GET /api/ml-feedback/summary
+
+Get overall ML feedback summary for dashboard display.
+
+```http
+GET /api/ml-feedback/summary
+```
+
+```json
+{
+  "total_feedback_records": 45,
+  "repair_outcomes_recorded": 38,
+  "predictions_evaluated": 32,
+  "avg_prediction_accuracy": 84.4,
+  "model_accuracies": {
+    "lstm": {"accuracy_percent": 86.2, "precision": 0.91, "recall": 0.88},
+    "autoencoder": {"accuracy_percent": 82.1, "precision": 0.85, "recall": 0.90}
+  },
+  "training_data_points": 152
+}
+```
+
+## Workflow Integration
+
+The repair effectiveness pipeline is triggered automatically via `WorkflowTriggerEngine.validate_repair_effectiveness()`:
+
+```mermaid
+sequenceDiagram
+    participant WF as WorkflowTriggers
+    participant RE as RepairEffectivenessService
+    participant ML as MLFeedbackService
+    participant FS as FollowupScheduler
+
+    WF->>WF: validate_repair_effectiveness(equipment_id, work_order_id, pre_baseline, post_baseline)
+    WF->>WF: Calculate element improvements
+    WF->>WF: Determine effectiveness score
+    WF->>ML: _record_ml_feedback(equipment_id, work_order_id, effectiveness)
+    ML->>ML: record_repair_feedback()
+    ML->>ML: generate_training_data_point()
+    WF->>FS: schedule_followup(equipment_id, work_order_id, score, successful)
+    FS->>FS: Apply scheduling rules
+    WF->>FS: calculate_cost_benefit(work_order_id, equipment_id, cost, score)
+    FS->>FS: Calculate ROI in ZAR
+    WF->>WF: Audit log (all results)
+```
+
+The `_record_ml_feedback()` stubs in both `workflow_triggers.py` and `workflow_orchestrator.py` have been replaced with real calls to `MLFeedbackService.record_repair_feedback()`, wrapped in try/except for graceful degradation.
+
+## Data Models
+
+### RepairOutcome
+Records repair event metadata: equipment_id, work_order_id, repair_type, repair_date, technician, parts_used, labor_hours, repair_cost, fault_description, actions_taken.
+
+### EffectivenessScore
+Computed validation result: pre/post baseline IDs, effectiveness_score (0-100), element_improvements dict, repair_successful, back_to_baseline, health_score_before/after.
+
+### ElementImprovement
+Per-element detail: pre_value, post_value, baseline_value, improvement_percent, back_to_baseline, status (improved/unchanged/worsened).
+
+### MLFeedbackRecord
+ML feedback entry: feedback_type (repair_outcome/prediction_accuracy/anomaly_confirmation), prediction linkage, predicted vs actual failure comparison.
+
+### TrainingDataPoint
+Flattened feature+label format for ML retraining: features dict (sensor readings), label (failed/repaired/healthy), failure_type, days_to_failure.
+
+### FollowupTask
+Scheduled follow-up: followup_type (re_inspection/re_repair/escalation), scheduled_date, priority (low/medium/high/critical), status (scheduled/completed/cancelled).
+
+### CostBenefitAnalysis
+ROI calculation: repair_cost, estimated_failure_cost, cost_avoidance, roi_percent, cost_effective boolean.
+
+### EscalationRecord
+Escalation for recurring failures: escalation_level (1-3), failed_repair_count, total_repair_cost, recommended_action.
+
+## Best Practices
+
+### 1. Always Record Repair Outcomes
+
+Without post-repair data, the system cannot:
+- Calculate effectiveness scores
+- Update health scores accurately
+- Learn which repairs work
+- Schedule appropriate follow-ups
+- Calculate cost-benefit
+
+### 2. Use the Full Pipeline
+
+The recommended flow is:
+1. `POST /api/repair-effectiveness/record-outcome` - Record repair details
+2. `POST /api/repair-effectiveness/validate` - Validate effectiveness
+3. Check `/api/repair-effectiveness/followups` - Review scheduled follow-ups
+4. Check `/api/repair-effectiveness/cost-benefit/{wo_id}` - Review ROI
+
+### 3. Monitor Escalations
+
+Equipment with recurring failures will escalate automatically. Review escalations regularly:
+- Level 1: Standard re-repair, may need different approach
+- Level 2: Bring in specialist, root cause likely missed
+- Level 3: Consider equipment replacement - repair is no longer cost-effective
+
+### 4. Review Cost-Benefit Trends
+
+Track ROI by equipment type to identify:
+- Which equipment types are most cost-effective to repair
+- When replacement becomes cheaper than repeated repairs
+- Which repair types deliver best ROI
 
 ## Troubleshooting
 
-### Health Score Didn't Improve After Repair
+### Health Score Not Updating
+- Verify ElementTrendService has data for the equipment
+- Check that trend summaries return element_trends (not empty)
+- Fallback: health score returns previous value if trends unavailable
 
-**Possible Causes:**
-1. Incomplete repair (didn't address root cause)
-2. Secondary issue not detected
-3. Measurement error
-4. Repair performed incorrectly
+### ML Feedback Not Recording
+- Check logs for "ML feedback recording failed (non-critical)" warnings
+- Service uses graceful degradation - failures don't block the pipeline
+- Verify MLFeedbackService imports correctly: `from app.services.ml_feedback_service import get_ml_feedback_service`
 
-**Investigation Steps:**
-```bash
-# Check post-repair measurements
-GET /api/repair/post-repair-data/{repair_id}
+### Follow-ups Not Scheduling
+- Check logs for "Follow-up scheduling failed (non-critical)" warnings
+- Verify FollowupSchedulerService imports: `from app.services.followup_scheduler import get_followup_scheduler`
+- Follow-up scheduling is non-blocking - failures don't affect effectiveness validation
 
-# Compare to pre-repair baseline
-POST /api/repair/compare-pre-post
-
-# Review technician notes
-GET /api/repair/technician-notes/{repair_id}
-
-# Get AI analysis
-GET /api/repair/ai-analysis/{repair_id}
-```
-
-### Health Score Worsened After Repair
-
-**Immediate Actions:**
-1. Inspect repair quality
-2. Check if new issues introduced
-3. Verify measurements correct
-4. Consider different repair approach
-
-**ML Learning:**
-```json
-{
-  "repair_id": "repair-20260415-089",
-  "health_change": -8,
-  "likely_causes": [
-    "repair_performed_incorrectly",
-    "secondary_issue_not_addressed",
-    "parts_quality_issue"
-  ],
-  "recommended_action": "schedule_urgent_re_inspection"
-}
-```
-
-### Predictions Not Updating
-
-**Check:**
-1. Post-repair data submitted within 7 days
-2. Measurements sufficient (all critical elements)
-3. Model training job running
-4. No data quality issues
-
-**Force Model Update:**
-```http
-POST /api/ml/trigger-model-retraining
-{
-  "equipment_id": "GEN-SAN-001",
-  "reason": "post_repair_data_submitted"
-}
-```
-
-## Examples by Improvement Level
-
-### Major Improvement (+15+ points)
-```
-Equipment: GEN-SAN-001
-Repair: Bearing replacement + oil pan gasket
-Pre-Repair:  58% (POOR)
-Post-Repair: 78% (FAIR)
-Improvement: +20 points
-
-ML Learned: Bearing replacement highly effective
-Recommendation: Use this repair for similar issues
-Next Service: Extended from 30 to 90 days
-```
-
-### Moderate Improvement (+5-15 points)
-```
-Equipment: AHU-L11-01
-Repair: Filter replacement + belt adjustment
-Pre-Repair:  72% (FAIR)
-Post-Repair: 80% (GOOD)
-Improvement: +8 points
-
-ML Learned: Standard PM effective for this equipment
-Recommendation: Continue scheduled maintenance
-Next Service: Standard 60-day interval maintained
-```
-
-### Minimal/Deterioration (<5 points or negative)
-```
-Equipment: PUMP-L10-03
-Repair: Belt tightening (when issue was bearing wear)
-Pre-Repair:  65% (FAIR)
-Post-Repair: 62% (FAIR)
-Change:      -3 points (DETERIORATION)
-
-ML Learned: Belt tightening ineffective for bearing issues
-Recommendation: Suggest bearing replacement instead
-Alert: Create urgent work order for root cause
-```
+### Cost-Benefit Shows R0 Repair Cost
+- Default repair_cost is 0.0 when called from workflow triggers (cost not always available from trigger context)
+- For accurate ROI, record repair cost via `POST /record-outcome` before validation
 
 ## Related Documentation
 
-- [Routine Inspection & Maintenance](45-routine-inspection-maintenance.md) - Field inspection workflow
-- [Asset Baseline Assessment](44-asset-baseline-assessment.md) - Initial equipment baseline
-- [ML Model Development](43-ml-model-development.md) - LSTM and Autoencoder details
-- [Condition Scorer](../services/condition_scorer.py) - Health score calculation
-- [Maintenance Recommender](../services/maintenance_recommender.py) - AI repair suggestions
+- [Asset Baseline Assessment](44-asset-baseline-assessment.md) - Pre-repair baseline capture
+- [Routine Inspection & Maintenance](45-routine-inspection-maintenance.md) - Inspection workflow
+- [Integration Workflow](../05-integrations/44-46-integration-workflow.md) - End-to-end baseline-to-repair workflow
+- [Health Scoring System](health-scoring-system.md) - Health score calculation details
+- [ML Model Development](43-ml-model-development.md) - LSTM and Autoencoder models
 
-## Support
+## Changelog
 
-For repair effectiveness questions:
-
-1. Review repair history: `GET /api/repair/history/{equipment_id}`
-2. Check ML model status: `GET /api/ml/models/status`
-3. View effectiveness DB: `GET /api/repair/effectiveness/{equipment_type}`
-4. Logs: `logs/repair_processor.log`, `logs/ml_model_updates.log`
+| Version | Date | Changes |
+|---------|------|---------|
+| 1.0.0 | 2026-02-01 | Initial conceptual design document |
+| 2.0.0 | 2026-02-04 | Updated to reflect Phase 57 implementation: 13 real API endpoints, 3 services, workflow integration, ZAR cost-benefit |
