@@ -1,0 +1,158 @@
+<!--
+  SENTINEL BMS Intelligence - Custom Wazuh Rules
+  Host-Based Intrusion Detection - Custom Detection Rules
+
+  FSR Domain 4.13: Incident Detection
+  Custom rules for SENTINEL-specific monitoring scenarios.
+
+  Rule ID range: 100100-100199 (custom local rules)
+-->
+
+<group name="local,sentinel,">
+
+  <!-- ============================================================ -->
+  <!-- Docker Container Monitoring                                  -->
+  <!-- Detect unexpected container lifecycle events                 -->
+  <!-- ============================================================ -->
+
+  <!-- Docker container started outside expected deployment -->
+  <rule id="100100" level="8">
+    <decoded_as>json</decoded_as>
+    <field name="event_type">container_start</field>
+    <description>Docker container started - verify deployment window</description>
+    <group>docker,sentinel,</group>
+  </rule>
+
+  <!-- Docker container stopped unexpectedly -->
+  <rule id="100101" level="10">
+    <decoded_as>json</decoded_as>
+    <field name="event_type">container_stop</field>
+    <description>Docker container stopped - check for service disruption</description>
+    <group>docker,sentinel,</group>
+  </rule>
+
+  <!-- New Docker image pulled (supply chain monitoring) -->
+  <rule id="100102" level="6">
+    <decoded_as>json</decoded_as>
+    <field name="event_type">image_pull</field>
+    <description>New Docker image pulled - verify supply chain integrity</description>
+    <group>docker,sentinel,supply_chain,</group>
+  </rule>
+
+  <!-- ============================================================ -->
+  <!-- Credential and Configuration File Monitoring                 -->
+  <!-- FIM alerts for sensitive SENTINEL files                      -->
+  <!-- ============================================================ -->
+
+  <!-- /etc/passwd or /etc/shadow modified -->
+  <rule id="100110" level="12">
+    <if_sid>550</if_sid>
+    <match>/etc/passwd|/etc/shadow</match>
+    <description>CRITICAL: System credential file modified - possible account manipulation</description>
+    <group>sentinel,credential_change,</group>
+  </rule>
+
+  <!-- SSH key added or modified -->
+  <rule id="100111" level="10">
+    <if_sid>550</if_sid>
+    <match>/.ssh/authorized_keys|/.ssh/id_rsa</match>
+    <description>SSH key file modified - verify authorized access</description>
+    <group>sentinel,ssh_key_change,</group>
+  </rule>
+
+  <!-- SENTINEL .env file modified (credential change detection) -->
+  <rule id="100112" level="10">
+    <if_sid>550</if_sid>
+    <match>/opt/bms-intelligence/backend/.env</match>
+    <description>SENTINEL .env file modified - credential or configuration change detected</description>
+    <group>sentinel,credential_change,</group>
+  </rule>
+
+  <!-- AimTheLaw .env file modified -->
+  <rule id="100113" level="10">
+    <if_sid>550</if_sid>
+    <match>/opt/aimthelaw/.env</match>
+    <description>AimTheLaw .env file modified - credential or configuration change detected</description>
+    <group>aimthelaw,credential_change,</group>
+  </rule>
+
+  <!-- docker-compose.yml modified outside git workflow -->
+  <rule id="100114" level="8">
+    <if_sid>550</if_sid>
+    <match>docker-compose.yml</match>
+    <description>Docker Compose configuration modified - verify infrastructure change</description>
+    <group>sentinel,infra_change,</group>
+  </rule>
+
+  <!-- Crontab modified -->
+  <rule id="100115" level="10">
+    <if_sid>550</if_sid>
+    <match>/etc/crontab|/var/spool/cron</match>
+    <description>Crontab modified - verify scheduled task change is authorized</description>
+    <group>sentinel,crontab_change,</group>
+  </rule>
+
+  <!-- ============================================================ -->
+  <!-- SENTINEL BMS Security Events                                 -->
+  <!-- Monitor SENTINEL-specific security events from app logs      -->
+  <!-- ============================================================ -->
+
+  <!-- BMS device control action from unknown IP -->
+  <rule id="100120" level="8">
+    <decoded_as>json</decoded_as>
+    <field name="event_type">BMS_CONTROL_ACTION</field>
+    <description>BMS device control action executed - audit trail event</description>
+    <group>sentinel,bms_control,</group>
+  </rule>
+
+  <!-- Safety override attempt -->
+  <rule id="100121" level="12">
+    <decoded_as>json</decoded_as>
+    <field name="event_type">SAFETY_OVERRIDE</field>
+    <description>CRITICAL: Safety system override attempted - immediate review required</description>
+    <group>sentinel,safety_override,</group>
+  </rule>
+
+  <!-- Multiple failed authentication attempts (SENTINEL API) -->
+  <rule id="100122" level="10" frequency="5" timeframe="300">
+    <decoded_as>json</decoded_as>
+    <field name="event_type">AUTH_FAILURE</field>
+    <description>Multiple authentication failures from same source - possible brute force</description>
+    <group>sentinel,brute_force,</group>
+  </rule>
+
+  <!-- Suspicious path access (SQL injection, path traversal) -->
+  <rule id="100123" level="12">
+    <decoded_as>json</decoded_as>
+    <field name="event_type">SUSPICIOUS_PATH</field>
+    <description>CRITICAL: Suspicious path pattern detected - possible injection attempt</description>
+    <group>sentinel,injection_attempt,</group>
+  </rule>
+
+  <!-- ============================================================ -->
+  <!-- SSH and System Access Monitoring                             -->
+  <!-- Enhanced rules for Contabo VPS access                        -->
+  <!-- ============================================================ -->
+
+  <!-- New user account created -->
+  <rule id="100130" level="10">
+    <if_sid>5901</if_sid>
+    <description>New user account created on system - verify authorization</description>
+    <group>sentinel,account_creation,</group>
+  </rule>
+
+  <!-- Sudo to root from non-standard user -->
+  <rule id="100131" level="8">
+    <if_sid>5402</if_sid>
+    <description>Sudo escalation to root - verify authorized administrator</description>
+    <group>sentinel,privilege_escalation,</group>
+  </rule>
+
+  <!-- SSH login from new IP address -->
+  <rule id="100132" level="6">
+    <if_sid>5715</if_sid>
+    <description>SSH login from IP not seen before - verify authorized access</description>
+    <group>sentinel,new_ssh_source,</group>
+  </rule>
+
+</group>

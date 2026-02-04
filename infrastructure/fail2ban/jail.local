@@ -1,0 +1,92 @@
+# SENTINEL BMS Intelligence - Fail2Ban Configuration
+# Brute force protection with escalation
+#
+# Ported from AimTheLaw production config, adapted for SENTINEL.
+# Shared Contabo VPS: protects both SENTINEL and AimTheLaw.
+#
+# FSR Domain 4.13: Incident Detection (HIGH gap)
+# Escalation: 3 attempts/10min -> 30min ban, 50 violations -> 24h ban
+
+[DEFAULT]
+# Ban settings
+bantime = 1800        # 30 minutes default ban
+findtime = 600        # 10 minute detection window
+maxretry = 3          # Max attempts before ban
+backend = auto        # Detection backend
+
+# Email notifications (configure SMTP in environment)
+destemail = admin@sentinel-bms.co.za
+sendername = SENTINEL-Security
+mta = sendmail
+
+# Ban action (use iptables for Docker compatibility)
+banaction = iptables-multiport
+banaction_allports = iptables-allports
+
+# ============================================================
+# SSH Protection
+# ============================================================
+[sshd]
+enabled = true
+port = ssh
+filter = sshd
+logpath = /var/log/auth.log
+maxretry = 3
+bantime = 3600        # 1 hour for SSH brute force
+findtime = 600        # 10 minute window
+
+# Escalation: Repeat offenders get 24h ban
+[sshd-aggressive]
+enabled = true
+port = ssh
+filter = sshd[mode=aggressive]
+logpath = /var/log/auth.log
+maxretry = 1          # Single attempt after first ban
+bantime = 86400       # 24 hours
+findtime = 86400      # Check over 24 hour window
+
+# ============================================================
+# Docker Container Monitoring
+# ============================================================
+[docker-auth]
+enabled = true
+port = all
+filter = docker-auth
+logpath = /var/log/daemon.log
+maxretry = 5
+bantime = 1800        # 30 minutes
+
+# ============================================================
+# SENTINEL API Protection
+# Rate limit enforcement via fail2ban (backup to application-level)
+# ============================================================
+[sentinel-api]
+enabled = true
+port = http,https
+filter = sentinel-api
+logpath = /var/log/sentinel/security.log
+maxretry = 10         # 10 rate limit violations
+findtime = 300        # within 5 minutes
+bantime = 900         # 15 minute ban
+
+# SENTINEL device control abuse
+[sentinel-control]
+enabled = true
+port = http,https
+filter = sentinel-control
+logpath = /var/log/sentinel/security.log
+maxretry = 5          # 5 suspicious control attempts
+findtime = 600        # within 10 minutes
+bantime = 3600        # 1 hour ban (safety-critical)
+
+# ============================================================
+# Escalation Rule
+# Repeat offenders across all jails get extended ban
+# ============================================================
+[recidive]
+enabled = true
+logpath = /var/log/fail2ban.log
+banaction = %(banaction_allports)s
+bantime = 86400       # 24 hours for repeat offenders
+findtime = 86400      # Look back 24 hours
+maxretry = 50         # After 50 total violations across all jails

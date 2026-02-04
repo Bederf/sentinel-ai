@@ -1,6 +1,6 @@
 # BMS Intelligence Docker Compose
 # Development and demo configuration
-# Includes: Backend, Frontend, InfluxDB, Loki, Promtail (Phase 63 Security)
+# Includes: Backend, Frontend, InfluxDB, Loki, Promtail, Wazuh (Phase 63 Security)
 
 version: "3.8"
 
@@ -141,10 +141,81 @@ services:
     networks:
       - bms-network
 
+  # ============================================================
+  # Host-Based Intrusion Detection (Phase 63-02 - FSR Domain 4.13)
+  # ============================================================
+
+  # Wazuh Agent - Host-Based IDS/IPS
+  # File integrity monitoring, log analysis, rootkit detection, active response
+  # Covers both SENTINEL and AimTheLaw on shared Contabo VPS
+  wazuh-agent:
+    image: wazuh/wazuh-agent:4.9.0
+    container_name: bms-wazuh-agent
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      - WAZUH_MANAGER=localhost
+      - WAZUH_AGENT_NAME=contabo-sentinel
+    volumes:
+      # Wazuh configuration
+      - ./infrastructure/wazuh/ossec.conf:/var/ossec/etc/ossec.conf:ro
+      - ./infrastructure/wazuh/local_rules.xml:/var/ossec/etc/rules/local_rules.xml:ro
+      # Persistent data
+      - wazuh-data:/var/ossec/data
+      # System log monitoring (read-only)
+      - /var/log:/var/log:ro
+      # Docker socket for container monitoring (read-only)
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Application directories for FIM (read-only)
+      - /opt/bms-intelligence/backend/.env:/opt/bms-intelligence/backend/.env:ro
+      - /opt/bms-intelligence/docker-compose.yml:/opt/bms-intelligence/docker-compose.yml:ro
+      - /etc/passwd:/host/etc/passwd:ro
+      - /etc/shadow:/host/etc/shadow:ro
+      - /etc/ssh:/host/etc/ssh:ro
+    cap_add:
+      - SYS_PTRACE     # Required for rootkit detection
+      - NET_ADMIN       # Required for active response (firewall-drop)
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+        labels: "service"
+    labels:
+      - "service=sentinel-wazuh-agent"
+
+  # Fail2Ban - Brute Force Protection
+  # SSH protection, API rate limit enforcement, escalation rules
+  # Ported from AimTheLaw, adapted for SENTINEL endpoints
+  fail2ban:
+    image: crazymax/fail2ban:latest
+    container_name: bms-fail2ban
+    restart: unless-stopped
+    network_mode: host
+    cap_add:
+      - NET_ADMIN       # Required for iptables manipulation
+      - NET_RAW         # Required for packet filtering
+    volumes:
+      - ./infrastructure/fail2ban/jail.local:/etc/fail2ban/jail.local:ro
+      - fail2ban-data:/var/lib/fail2ban
+      - /var/log:/var/log:ro
+    environment:
+      - TZ=Africa/Johannesburg
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+        labels: "service"
+    labels:
+      - "service=sentinel-fail2ban"
+
 volumes:
   influxdb-data:
   influxdb-config:
   loki-data:
+  wazuh-data:
+  fail2ban-data:
 
 networks:
   bms-network:
