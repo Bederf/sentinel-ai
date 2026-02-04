@@ -134,7 +134,7 @@ class EquipmentBaseline(EquipmentBaselineBase):
         json_schema_extra = {
             "example": {
                 "id": "123e4567-e89b-12d3-a456-426614174000",
-                "equipment_id": "chiller-001",
+                "equipment_id": "S002-CHILLER-B1-001",
                 "baseline_date": "2026-02-01T14:30:00Z",
                 "captured_by": "John Smith",
                 "baseline_type": "initial",
@@ -190,7 +190,7 @@ class EquipmentElement(EquipmentElementBase):
         json_schema_extra = {
             "example": {
                 "id": "123e4567-e89b-12d3-a456-426614174001",
-                "equipment_id": "chiller-001",
+                "equipment_id": "S002-CHILLER-B1-001",
                 "element_id": "compressor_bearing_1",
                 "element_type": "bearing",
                 "element_name": "Compressor Bearing #1",
@@ -295,7 +295,7 @@ class BaselineComparison(BaselineComparisonBase):
                 "id": "123e4567-e89b-12d3-a456-426614174003",
                 "comparison_type": "equipment_baseline",
                 "baseline_id": "123e4567-e89b-12d3-a456-426614174000",
-                "equipment_id": "chiller-001",
+                "equipment_id": "S002-CHILLER-B1-001",
                 "comparison_date": "2026-03-15T10:00:00Z",
                 "comparison_results": {
                     "chw_supply_temp": {

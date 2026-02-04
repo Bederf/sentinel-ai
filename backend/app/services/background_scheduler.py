@@ -96,7 +96,12 @@ class BackgroundSchedulerService:
                 equipment_list = equipment_repo.get_by_building_code("site-002")
                 if equipment_list:
                     # Sample controllable equipment types for realistic audit logs
-                    controllable_types = ['fcu', 'ahu', 'vav', 'chiller', 'lighting', 'pump', 'generator']
+                    controllable_types = [
+                        'fcu', 'ahu', 'vav', 'chiller', 'pump',
+                        'dali_controller', 'luminaire', 'luminaire_group',
+                        'generator', 'ups', 'ats', 'transformer',
+                        'lv_switchboard', 'power_meter',
+                    ]
                     demo_devices = [
                         eq.get('code') or eq.get('equipment_id') or eq.get('id')
                         for eq in equipment_list
@@ -105,16 +110,38 @@ class BackgroundSchedulerService:
             except Exception as e:
                 logger.warning(f"Could not fetch site-002 equipment: {e}")
 
-            # Fallback to sample device IDs if none found
+            # Fallback to real Sandton City equipment codes if Supabase unavailable
             if not demo_devices:
                 demo_devices = [
-                    "FCU-L10-01", "FCU-L11-02", "FCU-L12-03",
-                    "AHU-L10-01", "VAV-L11-01", "DALI-L12-A",
-                    "GEN-001", "UPS-001", "ATS-001"
+                    "S002-CHILLER-B1-001", "S002-CHILLER-B1-002", "S002-CHILLER-B1-003",
+                    "S002-AHU-L0-01", "S002-AHU-L1-01", "S002-AHU-L2-01",
+                    "S002-FCU-L0-A", "S002-FCU-L1-A", "S002-FCU-L1-C",
+                    "S002-FCU-L2-A", "S002-FCU-L2-C",
+                    "S002-VAV-L0-C", "S002-VAV-L1-A", "S002-VAV-L1-E",
+                    "S002-VAV-L2-A", "S002-VAV-L2-E",
+                    "S002-DALI-L0-01", "S002-DALI-L1-01", "S002-DALI-L2-05",
+                    "S002-LUM-L0-A", "S002-LUM-L1-A", "S002-LUM-L2-E",
+                    "S002-GEN-B1-001", "S002-GEN-B1-002",
+                    "S002-UPS-B1-001", "S002-ATS-B1-001",
+                    "S002-TX-B1-001", "S002-MTR-B1-MAIN",
+                    "S002-CO2-L1-E",
                 ]
 
             demo_users = ["operator-1", "operator-2", "system", "scheduler", "admin"]
-            demo_points = ["setpoint", "fan_speed", "brightness", "status", "mode"]
+            demo_points_by_type = {
+                "CHILLER": ["chw_supply_temp", "setpoint", "status", "mode", "runtime_hours"],
+                "AHU": ["supply_air_temp", "fan_speed", "setpoint", "status", "damper_position"],
+                "FCU": ["setpoint", "fan_speed", "status", "mode"],
+                "VAV": ["setpoint", "damper_position", "airflow", "status"],
+                "DALI": ["brightness", "scene", "status", "mode"],
+                "LUM": ["brightness", "status", "dimmer_level"],
+                "CO2": ["status", "calibration", "threshold"],
+                "GEN": ["status", "mode", "load_percent", "runtime_hours"],
+                "UPS": ["status", "mode", "load_percent", "battery_charge_pct"],
+                "ATS": ["status", "position", "mode"],
+                "TX": ["status", "load_percent", "oil_temp_c"],
+                "MTR": ["status", "active_power_kw", "power_factor"],
+            }
 
             audit_logger = AuditLogger()
             entries_created = 0
@@ -123,7 +150,9 @@ class BackgroundSchedulerService:
             for _ in range(random.randint(2, 5)):
                 device_id = random.choice(demo_devices)
                 user = random.choice(demo_users)
-                point_name = random.choice(demo_points)
+                # v2.0 IDs: S###-TYPE-FLOOR-ZONE — type is second segment
+                device_prefix = device_id.split("-")[1] if "-" in device_id else device_id
+                point_name = random.choice(demo_points_by_type.get(device_prefix, ["status", "setpoint"]))
 
                 old_value = random.randint(20, 25) if "setpoint" in point_name else random.randint(50, 100)
                 new_value = old_value + random.randint(-5, 5)

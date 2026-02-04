@@ -1528,7 +1528,7 @@ CHAT_TOOLS = [
             "properties": {
                 "device_id": {
                     "type": "string",
-                    "description": "The device ID to look up (e.g., '001-chiller-001')"
+                    "description": "The device ID to look up (e.g., 'S002-CHILLER-B1-001')"
                 }
             },
             "required": ["device_id"]
@@ -1542,7 +1542,7 @@ CHAT_TOOLS = [
             "properties": {
                 "device_id": {
                     "type": "string",
-                    "description": "The device ID to control (e.g., '001-chiller-001')"
+                    "description": "The device ID to control (e.g., 'S002-CHILLER-B1-001')"
                 },
                 "point": {
                     "type": "string",

@@ -98,8 +98,8 @@ class DiagnosticContext(BaseModel):
     original_reading: Optional[float] = None  # e.g., 25.0 (temp was 25°C)
     setpoint: Optional[float] = None  # e.g., 21.0
     deviation: Optional[float] = None  # e.g., 4.0
-    faulty_equipment: Optional[str] = None  # e.g., "FCU-L10-03"
-    zone_id: Optional[str] = None  # e.g., "Zone-L10-C"
+    faulty_equipment: Optional[str] = None  # e.g., "S002-FCU-L0-C"
+    zone_id: Optional[str] = None  # e.g., "Zone-L0-C"
     recommended_actions: List[str] = Field(default_factory=list)
     parts_required: List[str] = Field(default_factory=list)
     severity: Optional[str] = None  # critical, warning, info

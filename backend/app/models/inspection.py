@@ -524,7 +524,7 @@ class InspectionSubmission(BaseModel):
     class Config:
         json_schema_extra = {
             "example": {
-                "equipment_id": "chiller-001",
+                "equipment_id": "S002-CHILLER-B1-001",
                 "template_id": "chiller_weekly",
                 "checklist_responses": {
                     "compressor_condition": "ok",

@@ -22,10 +22,10 @@ class Desk(BaseModel):
     - DALI-2 lighting (Tridonic Scenecom)
     - Environmental context (window, orientation, heat sources)
     """
-    desk_id: str  # e.g., "L12-25" or "25"
-    floor: str  # e.g., "Level 12"
+    desk_id: str  # e.g., "L2-D025" or "25"
+    floor: str  # e.g., "Level 2"
     building: str = ""  # e.g., "Sandton" (can be inferred from folder)
-    zone_id: str  # e.g., "Zone-L12-N"
+    zone_id: str  # e.g., "Zone-L2-C"
 
     # Environmental context
     near_window: bool = False
@@ -42,10 +42,10 @@ class Desk(BaseModel):
     y_coord: Optional[float] = None
 
     # DALI-2 Scenecom integration (Tridonic)
-    dali_zone: Optional[str] = None  # DALI zone/group (e.g., "Zone-L12-N" - often matches HVAC zone)
-    sensor_id: Optional[str] = None  # PIR occupancy sensor (e.g., "PIR-L12-N-001")
-    luminaire_ids: Optional[List[str]] = None  # Luminaires serving this desk (e.g., ["LUM-L12-001", "LUM-L12-002"])
-    dali_controller: Optional[str] = None  # Scenecom controller (e.g., "DALI-L12-01")
+    dali_zone: Optional[str] = None  # DALI zone/group (e.g., "Zone-L2-C" - often matches HVAC zone)
+    sensor_id: Optional[str] = None  # PIR occupancy sensor (e.g., "S002-PIR-L2-C-001")
+    luminaire_ids: Optional[List[str]] = None  # Luminaires serving this desk (e.g., ["S002-LUM-L2-001", "S002-LUM-L2-002"])
+    dali_controller: Optional[str] = None  # Scenecom controller (e.g., "S002-DALI-L2-01")
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
@@ -110,13 +110,13 @@ class HVACZone(BaseModel):
 
     Links to FCUs, VAVs, AHUs, and sensors for complete BMS context.
     """
-    zone_id: str  # e.g., "Zone-L12-N"
-    zone_name: str  # e.g., "Level 12 North"
+    zone_id: str  # e.g., "Zone-L2-C"
+    zone_name: str  # e.g., "Level 2 Zone C"
     floor: str
-    fcu_id: str  # e.g., "FCU-L12-03"
+    fcu_id: str  # e.g., "S002-FCU-L2-C"
     vav_id: Optional[str] = None
     ahu_id: Optional[str] = None
-    temp_sensor: str  # e.g., "TS-L12-03"
+    temp_sensor: str  # e.g., "S002-TS-L2-C"
     co2_sensor: Optional[str] = None
     typical_occupancy: int
     area_sqm: Optional[float] = None

@@ -203,21 +203,57 @@ async def generate_demo_audit_data() -> dict:
 
         logger.info("Generating demo audit data...")
 
-        # Demo devices
+        # Clear existing demo data before regenerating
+        audit_logger.clear()
+
+        # Demo devices - real equipment codes from Sandton City (site-002)
+        # Covers all equipment types for comprehensive audit trail
         demo_devices = [
-            "chiller-gateway-001",
-            "ahu-level3-002",
-            "lighting-lobby-003",
-            "access-main-004",
-            "fire-pump-005",
-            "vav-office-006"
+            # HVAC - Chillers
+            "S002-CHILLER-B1-001", "S002-CHILLER-B1-002", "S002-CHILLER-B1-003",
+            # HVAC - AHUs (one per floor)
+            "S002-AHU-L0-01", "S002-AHU-L1-01", "S002-AHU-L2-01",
+            # HVAC - FCUs (sample across floors)
+            "S002-FCU-L0-A", "S002-FCU-L0-C", "S002-FCU-L1-A", "S002-FCU-L1-C", "S002-FCU-L1-E",
+            "S002-FCU-L2-A", "S002-FCU-L2-C", "S002-FCU-L2-E",
+            # HVAC - VAVs (sample across floors)
+            "S002-VAV-L0-C", "S002-VAV-L0-E",
+            "S002-VAV-L1-A", "S002-VAV-L1-C", "S002-VAV-L1-E",
+            "S002-VAV-L2-A", "S002-VAV-L2-C", "S002-VAV-L2-E",
+            # Lighting - DALI controllers (sample)
+            "S002-DALI-L0-01", "S002-DALI-L1-01", "S002-DALI-L1-05", "S002-DALI-L2-01", "S002-DALI-L2-05",
+            # Lighting - Luminaire groups (sample)
+            "S002-LUM-L0-A", "S002-LUM-L1-A", "S002-LUM-L1-E", "S002-LUM-L2-A", "S002-LUM-L2-E",
+            # Energy Centre - Generators
+            "S002-GEN-B1-001", "S002-GEN-B1-002", "S002-GEN-B1-003", "S002-GEN-B1-004",
+            # Energy Centre - UPS, ATS, Transformers
+            "S002-UPS-B1-001", "S002-UPS-B1-002", "S002-ATS-B1-001",
+            "S002-TX-B1-001", "S002-TX-B1-002",
+            # Energy Centre - Switchboard, meters
+            "S002-MSB-B1-001", "S002-MTR-B1-MAIN", "S002-MTR-B1-GEN",
+            # Sensors (at-risk)
+            "S002-CO2-L1-E",
         ]
 
         # Demo users
         demo_users = ["operator-1", "operator-2", "system", "scheduler", "admin"]
 
-        # Demo points
-        demo_points = ["setpoint", "fan_speed", "brightness", "status", "mode"]
+        # Demo points per device type (second segment of v2.0 ID: S###-TYPE-FLOOR-ZONE)
+        demo_points_by_type = {
+            "CHILLER": ["chw_supply_temp", "setpoint", "status", "mode", "runtime_hours"],
+            "AHU": ["supply_air_temp", "fan_speed", "setpoint", "status", "damper_position"],
+            "FCU": ["setpoint", "fan_speed", "status", "mode"],
+            "VAV": ["setpoint", "damper_position", "airflow", "status"],
+            "DALI": ["brightness", "scene", "status", "mode"],
+            "LUM": ["brightness", "status", "dimmer_level"],
+            "CO2": ["status", "calibration", "threshold"],
+            "GEN": ["status", "mode", "load_percent", "runtime_hours"],
+            "UPS": ["status", "mode", "load_percent", "battery_charge_pct"],
+            "ATS": ["status", "position", "mode"],
+            "TX": ["status", "load_percent", "oil_temp_c"],
+            "MSB": ["status", "total_power_kw"],
+            "MTR": ["status", "active_power_kw", "power_factor"],
+        }
 
         # Generate entries for last 7 days
         entries_created = 0
@@ -233,7 +269,9 @@ async def generate_demo_audit_data() -> dict:
                 # Random device and user
                 device_id = random.choice(demo_devices)
                 user = random.choice(demo_users)
-                point_name = random.choice(demo_points)
+                # v2.0 IDs: S###-TYPE-FLOOR-ZONE — type is second segment
+                device_prefix = device_id.split("-")[1] if "-" in device_id else device_id
+                point_name = random.choice(demo_points_by_type.get(device_prefix, ["status", "setpoint"]))
 
                 # Random old and new values
                 old_value = random.randint(20, 25) if "setpoint" in point_name else random.randint(50, 100)

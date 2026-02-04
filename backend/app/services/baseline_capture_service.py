@@ -249,7 +249,7 @@ class BaselineCaptureService:
         Capture baseline from specified source.
 
         Args:
-            equipment_id: Equipment identifier (e.g., "chiller-001")
+            equipment_id: Equipment identifier (e.g., "S002-CHILLER-B1-001")
             source: Data source (manual, device, sensor_analysis)
             data: Source-specific data:
                 - manual: Dict of baseline_values

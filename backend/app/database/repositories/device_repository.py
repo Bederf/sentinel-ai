@@ -51,7 +51,7 @@ class DeviceRepository:
 
         Args:
             building_id: Building UUID
-            device_id: Device identifier (e.g., '001-gwc-chiller-001')
+            device_id: Device identifier (e.g., 'S001-CHILLER-B1-001')
 
         Returns:
             Device data or None if not found

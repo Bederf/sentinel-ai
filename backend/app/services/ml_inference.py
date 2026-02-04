@@ -367,11 +367,11 @@ class AnomalyDetectionService:
         if equipment_list is None:
             # Demo equipment list
             equipment_list = [
-                {"equipment_id": "chiller-001", "equipment_type": "chiller"},
-                {"equipment_id": "chiller-002", "equipment_type": "chiller"},
-                {"equipment_id": "ahu-001", "equipment_type": "ahu"},
-                {"equipment_id": "ahu-002", "equipment_type": "ahu"},
-                {"equipment_id": "gen-001", "equipment_type": "generator"},
+                {"equipment_id": "S002-CHILLER-B1-001", "equipment_type": "chiller"},
+                {"equipment_id": "S002-CHILLER-B1-002", "equipment_type": "chiller"},
+                {"equipment_id": "S002-AHU-L0-01", "equipment_type": "ahu"},
+                {"equipment_id": "S002-AHU-L1-01", "equipment_type": "ahu"},
+                {"equipment_id": "S002-GEN-B1-001", "equipment_type": "generator"},
             ]
 
         results = []
