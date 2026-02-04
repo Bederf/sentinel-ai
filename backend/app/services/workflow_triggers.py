@@ -779,14 +779,22 @@ class WorkflowTriggerEngine:
         work_order_id: str,
         effectiveness: EffectivenessResult
     ) -> bool:
-        """Record repair outcome for ML training."""
-        # Log for demo - in production, this would call ML feedback service
-        logger.info(
-            f"ML Feedback recorded: {equipment_id}, WO {work_order_id}, "
-            f"score={effectiveness.effectiveness_score:.1f}%, "
-            f"successful={effectiveness.repair_successful}"
-        )
-        return True
+        """Record repair outcome for ML training via MLFeedbackService."""
+        try:
+            from app.services.ml_feedback_service import get_ml_feedback_service
+            ml_service = get_ml_feedback_service()
+            ml_service.record_repair_feedback(
+                equipment_id=equipment_id,
+                work_order_id=work_order_id,
+                effectiveness_score=effectiveness.effectiveness_score,
+                repair_successful=effectiveness.repair_successful,
+                failure_type=None,
+                prediction_id=None
+            )
+            return True
+        except Exception as e:
+            logger.warning(f"ML feedback recording failed (non-critical): {e}")
+            return False
 
     async def _send_alert(self, message: str):
         """Send alert notification."""

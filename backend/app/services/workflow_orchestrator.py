@@ -506,10 +506,22 @@ class AssetWorkflowOrchestrator:
         work_order_id: str,
         effectiveness: Dict[str, Any]
     ) -> bool:
-        """Record repair outcome for ML training"""
-        # Future: Call ML feedback service
-        logger.info(f"Recorded ML feedback for {equipment_id}, WO {work_order_id}")
-        return True
+        """Record repair outcome for ML training via MLFeedbackService."""
+        try:
+            from app.services.ml_feedback_service import get_ml_feedback_service
+            ml_service = get_ml_feedback_service()
+            ml_service.record_repair_feedback(
+                equipment_id=equipment_id,
+                work_order_id=work_order_id,
+                effectiveness_score=effectiveness.get("score", 0.0),
+                repair_successful=effectiveness.get("repair_successful", False),
+                failure_type=None,
+                prediction_id=None
+            )
+            return True
+        except Exception as e:
+            logger.warning(f"ML feedback recording failed (non-critical): {e}")
+            return False
 
     async def _get_baseline_status(self, equipment_id: str) -> Dict[str, Any]:
         """Get baseline status for equipment"""
