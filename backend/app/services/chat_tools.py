@@ -1839,6 +1839,99 @@ async def get_fire_system_status() -> dict[str, Any]:
         return {"error": str(e)}
 
 
+async def get_security_status() -> dict[str, Any]:
+    """
+    Get security system status including access control, cameras,
+    alarm zones, occupancy, and recent badge events.
+
+    Returns:
+        Structured security system status report
+    """
+    try:
+        from app.services.security_service import get_security_service
+        from app.services.security_occupancy_service import get_security_occupancy_service
+
+        svc = get_security_service()
+        occ_svc = get_security_occupancy_service()
+
+        status = svc.get_system_status()
+        zones = svc.get_access_zones()
+        cameras = svc.get_cameras()
+        alarm_zones = svc.get_alarm_zones()
+        denied = svc.get_denied_access_events()
+        after_hours = svc.get_after_hours_events()
+        building_occ = occ_svc.get_building_occupancy()
+
+        # Build structured response
+        sections = []
+
+        # System overview
+        sections.append(
+            f"## Security System Overview\n"
+            f"- Doors: {status.doors_secure}/{status.total_doors} secure\n"
+            f"- Cameras: {status.cameras_online}/{status.cameras_total} online\n"
+            f"- Alarm zones: {status.alarm_zones_armed}/{status.alarm_zones_total} armed\n"
+            f"- Active alerts: {status.active_alerts}\n"
+            f"- Building occupancy: {status.occupancy_total} people"
+        )
+
+        # Access zones
+        zone_lines = []
+        for z in zones:
+            zone_lines.append(f"  - {z.name} ({z.floor}) - {z.access_level.value}")
+        sections.append(f"## Access Zones ({len(zones)})\n" + "\n".join(zone_lines))
+
+        # Camera status
+        offline_cams = [c for c in cameras if c.status.value != "online"]
+        if offline_cams:
+            cam_lines = [f"  - {c.name}: {c.status.value}" for c in offline_cams]
+            sections.append(f"## Camera Alerts\n" + "\n".join(cam_lines))
+        else:
+            sections.append(f"## Cameras\nAll {len(cameras)} cameras online")
+
+        # Alarm zones
+        alarm_lines = [f"  - {az.name}: {az.status.value} ({az.arm_type.value})" for az in alarm_zones]
+        sections.append(f"## Alarm Zones\n" + "\n".join(alarm_lines))
+
+        # Denied access
+        if denied:
+            deny_lines = [f"  - {e.person_name} at {e.door_id}: {e.reason}" for e in denied[:5]]
+            sections.append(f"## Denied Access ({len(denied)})\n" + "\n".join(deny_lines))
+
+        # After-hours access
+        if after_hours:
+            ah_lines = [f"  - {e.person_name} at {e.door_id} ({e.timestamp})" for e in after_hours[:5]]
+            sections.append(f"## After-Hours Access ({len(after_hours)})\n" + "\n".join(ah_lines))
+
+        # Occupancy summary
+        occ_lines = []
+        for zone_occ in building_occ.get("zones", []):
+            if zone_occ.get("occupancy_count", 0) > 0:
+                occ_lines.append(f"  - {zone_occ['zone_name']}: {zone_occ['occupancy_count']} people")
+        if occ_lines:
+            sections.append(f"## Occupancy\nTotal: {building_occ.get('total_occupancy', 0)} people\n" + "\n".join(occ_lines))
+        else:
+            sections.append(f"## Occupancy\nTotal: {building_occ.get('total_occupancy', 0)} people")
+
+        return {
+            "success": True,
+            "report": "\n\n".join(sections),
+            "doors_secure": status.doors_secure,
+            "total_doors": status.total_doors,
+            "cameras_online": status.cameras_online,
+            "cameras_total": status.cameras_total,
+            "alarm_zones_armed": status.alarm_zones_armed,
+            "active_alerts": status.active_alerts,
+            "occupancy_total": status.occupancy_total,
+            "denied_events": len(denied),
+            "after_hours_events": len(after_hours),
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting security status: {e}")
+        return {"error": str(e)}
+
+
 # Tool definitions for Claude API
 CHAT_TOOLS = [
     {
@@ -2144,6 +2237,15 @@ CHAT_TOOLS = [
             "properties": {},
             "required": []
         }
+    },
+    {
+        "name": "get_security_status",
+        "description": "Get security system status including access control doors, CCTV cameras, alarm zones, building occupancy from badge events, denied access events, and after-hours access. Use this when someone asks about security, access control, cameras, CCTV, who is in the building, occupancy, or alarm zones.",
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+            "required": []
+        }
     }
 ]
 
@@ -2166,6 +2268,7 @@ TOOL_HANDLERS = {
     "approve_point_mapping": approve_point_mapping,
     "correct_point_classification": correct_point_classification,
     "get_fire_system_status": get_fire_system_status,
+    "get_security_status": get_security_status,
 }
 
 
