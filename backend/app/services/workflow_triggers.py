@@ -650,6 +650,30 @@ class WorkflowTriggerEngine:
                 effectiveness=effectiveness
             )
 
+            # 6b. Schedule follow-up and calculate cost-benefit
+            followup_scheduled = False
+            cost_benefit_calculated = False
+            try:
+                from app.services.followup_scheduler import get_followup_scheduler
+                scheduler = get_followup_scheduler()
+                scheduler.schedule_followup(
+                    equipment_id=equipment_id,
+                    work_order_id=work_order_id,
+                    effectiveness_score=avg_improvement,
+                    repair_successful=effectiveness.repair_successful
+                )
+                followup_scheduled = True
+
+                scheduler.calculate_cost_benefit(
+                    work_order_id=work_order_id,
+                    equipment_id=equipment_id,
+                    repair_cost=0.0,
+                    effectiveness_score=avg_improvement
+                )
+                cost_benefit_calculated = True
+            except Exception as e:
+                logger.warning(f"Follow-up scheduling failed (non-critical): {e}")
+
             # 7. Audit log
             await self._audit_log(
                 trigger_type=TriggerType.REPAIR_VALIDATION,
@@ -660,7 +684,9 @@ class WorkflowTriggerEngine:
                     "effectiveness_score": avg_improvement,
                     "repair_successful": effectiveness.repair_successful,
                     "follow_up_created": follow_up_created,
-                    "ml_feedback_recorded": ml_feedback_recorded
+                    "ml_feedback_recorded": ml_feedback_recorded,
+                    "followup_scheduled": followup_scheduled,
+                    "cost_benefit_calculated": cost_benefit_calculated
                 }
             )
 
@@ -675,9 +701,11 @@ class WorkflowTriggerEngine:
                     "back_to_baseline": effectiveness.back_to_baseline,
                     "improvements": improvements,
                     "follow_up_created": follow_up_created,
-                    "ml_feedback_recorded": ml_feedback_recorded
+                    "ml_feedback_recorded": ml_feedback_recorded,
+                    "followup_scheduled": followup_scheduled,
+                    "cost_benefit_calculated": cost_benefit_calculated
                 },
-                follow_up_scheduled=follow_up_created
+                follow_up_scheduled=follow_up_created or followup_scheduled
             )
             self._trigger_history.append(result)
             return result

@@ -2,10 +2,12 @@
 Repair Effectiveness API Endpoints
 
 REST API for post-repair validation, effectiveness scoring,
-equipment health recalculation, and repair history.
+equipment health recalculation, repair history, follow-up scheduling,
+cost-benefit analysis, and escalation tracking.
 
 Phase 57: Repair Effectiveness
-Plan 01: Core service and API endpoints
+Plan 01: Core service and API endpoints (5 endpoints)
+Plan 03: Follow-up scheduling and cost-benefit (3 endpoints)
 
 Endpoints:
 - POST /api/repair-effectiveness/validate - Validate repair effectiveness
@@ -13,10 +15,13 @@ Endpoints:
 - GET  /api/repair-effectiveness/health/{equipment_id} - Equipment health score
 - GET  /api/repair-effectiveness/history/{equipment_id} - Repair history
 - GET  /api/repair-effectiveness/summary - Fleet-wide summary
+- GET  /api/repair-effectiveness/followups - Pending follow-up tasks
+- GET  /api/repair-effectiveness/cost-benefit/{work_order_id} - Cost-benefit analysis
+- GET  /api/repair-effectiveness/escalations/{equipment_id} - Escalation status
 """
 
 import logging
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException
 
@@ -28,6 +33,12 @@ from app.models.repair_effectiveness import (
     RepairHistoryEntry,
 )
 from app.services.repair_effectiveness_service import get_repair_effectiveness_service
+from app.services.followup_scheduler import (
+    get_followup_scheduler,
+    FollowupTask,
+    CostBenefitAnalysis,
+    EscalationRecord,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -160,4 +171,82 @@ async def get_effectiveness_summary():
 
     except Exception as e:
         logger.error(f"Error getting effectiveness summary: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# Follow-up & Cost-Benefit Endpoints (Phase 57, Plan 03)
+# ============================================================================
+
+@router.get("/followups", response_model=List[FollowupTask])
+async def get_followups(
+    equipment_id: Optional[str] = None,
+    status: Optional[str] = None
+) -> List[FollowupTask]:
+    """
+    Get pending follow-up tasks.
+
+    Optionally filter by equipment_id and status (scheduled/completed/cancelled).
+    Returns tasks sorted by scheduled date.
+    """
+    try:
+        scheduler = get_followup_scheduler()
+        return scheduler.get_pending_followups(
+            equipment_id=equipment_id,
+            status=status
+        )
+    except Exception as e:
+        logger.error(f"Error getting followups: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/cost-benefit/{work_order_id}", response_model=CostBenefitAnalysis)
+async def get_cost_benefit(work_order_id: str) -> CostBenefitAnalysis:
+    """
+    Get cost-benefit analysis for a specific repair.
+
+    Returns ROI calculation with ZAR figures including estimated failure cost,
+    cost avoidance, and whether the repair was cost-effective.
+    """
+    try:
+        scheduler = get_followup_scheduler()
+        analyses = scheduler.get_cost_analyses()
+
+        for analysis in analyses:
+            if analysis.work_order_id == work_order_id:
+                return analysis
+
+        raise HTTPException(
+            status_code=404,
+            detail=f"No cost-benefit analysis found for work order {work_order_id}"
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting cost-benefit for {work_order_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/escalations/{equipment_id}")
+async def get_escalation_status(equipment_id: str):
+    """
+    Check escalation status for equipment.
+
+    Returns escalation record with level (1-3) and recommended action,
+    or a no-escalation message if equipment has no failed repairs.
+    """
+    try:
+        scheduler = get_followup_scheduler()
+        escalation = scheduler.check_escalation(equipment_id)
+
+        if escalation is None:
+            return {
+                "escalation_level": 0,
+                "message": "No escalation needed",
+                "equipment_id": equipment_id
+            }
+
+        return escalation
+    except Exception as e:
+        logger.error(f"Error checking escalation for {equipment_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
