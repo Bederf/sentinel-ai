@@ -3,11 +3,13 @@
 Provides fire alarm panel monitoring, zone-level alarm tracking,
 smoke damper status, stairwell pressurization, and system health.
 Uses FireSafetyRepository for all data operations (Supabase + JSON fallback).
+Integrates with FireHVACCoordinator for cause-effect execution on alarms.
 """
 
+import asyncio
 import logging
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 from app.database.repositories.fire_safety_repository import get_fire_safety_repository
@@ -244,10 +246,104 @@ class FireSystemService:
             overall_health=overall,
         )
 
+    async def trigger_alarm(self, zone_id: str, alarm_type: str) -> Dict[str, Any]:
+        """Trigger a fire alarm and execute cause-effect chain.
+
+        Creates a FireAlarm entry via repository, then calls
+        FireHVACCoordinator.execute_cause_effect() for the full
+        HVAC/damper/pressurization response.
+
+        Returns combined result (alarm + effects executed).
+        """
+        from app.services.fire_hvac_coordinator import get_fire_hvac_coordinator
+
+        # Validate zone exists
+        zone = self._repo.get_zone(zone_id)
+        if not zone:
+            return {"error": f"Zone {zone_id} not found"}
+
+        # Create alarm via repository (dual-write)
+        alarm_data = {
+            "alarm_id": f"ALM-{uuid4().hex[:8].upper()}",
+            "zone_id": zone_id,
+            "alarm_type": alarm_type,
+            "severity": "fire" if alarm_type in ("smoke", "heat", "manual") else "fault",
+            "description": f"{alarm_type.upper()} alarm in {zone.get('zone_name', zone_id)}",
+            "acknowledged": False,
+            "cleared": False,
+            "created_at": datetime.utcnow().isoformat(),
+        }
+        self._repo.create_alarm(alarm_data)
+
+        # Execute cause-effect chain via coordinator
+        coordinator = get_fire_hvac_coordinator()
+        cause_effect_result = await coordinator.execute_cause_effect(zone_id, alarm_type)
+
+        return {
+            "alarm_id": alarm_data["alarm_id"],
+            "alarm": alarm_data,
+            "zone": zone,
+            "cause_effect": cause_effect_result.to_dict(),
+            "coordinator_mode": coordinator._mode,
+        }
+
+    async def clear_alarm(self, alarm_id: str) -> Dict[str, Any]:
+        """Clear a fire alarm and trigger reset if no more active alarms.
+
+        Marks alarm as acknowledged/cleared via repository, then checks
+        if any alarms remain. If none, calls coordinator.reset_fire_mode().
+        """
+        from app.services.fire_hvac_coordinator import get_fire_hvac_coordinator
+
+        # Mark alarm as cleared via repository (dual-write)
+        self._repo.update_alarm(alarm_id, {
+            "acknowledged": True,
+            "acknowledged_by": "operator",
+            "acknowledged_at": datetime.utcnow().isoformat(),
+            "cleared": True,
+            "cleared_at": datetime.utcnow().isoformat(),
+        })
+
+        # Log the clear action
+        self._repo.log_action({
+            "action_type": "alarm_cleared",
+            "zone_id": "unknown",
+            "description": f"Alarm {alarm_id} cleared by operator",
+            "mode": "normal",
+        })
+
+        # Check remaining active alarms
+        remaining = self._repo.get_active_alarms()
+        remaining_active = [a for a in remaining if a.get("alarm_id") != alarm_id and not a.get("cleared", False)]
+
+        result: Dict[str, Any] = {
+            "alarm_id": alarm_id,
+            "cleared": True,
+            "remaining_active_alarms": len(remaining_active),
+        }
+
+        # If no more active alarms, reset fire mode
+        if len(remaining_active) == 0:
+            coordinator = get_fire_hvac_coordinator()
+            if coordinator._mode != "normal":
+                reset_result = await coordinator.reset_fire_mode()
+                result["reset"] = reset_result
+                result["coordinator_mode"] = "normal"
+            else:
+                result["coordinator_mode"] = "normal"
+                result["reset"] = None
+        else:
+            coordinator = get_fire_hvac_coordinator()
+            result["coordinator_mode"] = coordinator._mode
+            result["reset"] = None
+
+        return result
+
     def simulate_alarm(self, zone_id: str, alarm_type: str = "smoke") -> dict:
-        """Simulate a fire alarm for demo purposes.
+        """Simulate a fire alarm for demo purposes (legacy sync method).
 
         Returns the alarm details and the cause-effect actions that would activate.
+        For full coordination, use trigger_alarm() instead.
         """
         # Validate zone exists
         zone = self._repo.get_zone(zone_id)
