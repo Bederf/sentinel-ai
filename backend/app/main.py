@@ -39,6 +39,8 @@ from app.api import rag  # Phase 44 RAG (Retrieval-Augmented Generation)
 from app.api import workflow  # Phase 53 Workflow orchestration & triggers
 from app.api import baselines  # Phase 54-01 Equipment Baseline Assessment
 from app.api import condition  # Phase 56-01 Condition trending & degradation analysis
+from app.api import ml_feedback  # Phase 57-02 ML feedback loop
+from app.api import repair_effectiveness  # Phase 57-01 Repair effectiveness validation
 # from app.api import inspection  # Phase 45 Routine Inspection & Maintenance - TODO: Fix import errors
 from app.middleware.audit_middleware import AuditMiddleware
 from app.services.background_scheduler import scheduler_service
@@ -114,6 +116,8 @@ app.include_router(rag.router, tags=["rag"])  # Phase 44 RAG with pgvector
 app.include_router(workflow.router, tags=["workflow"])  # Phase 53 Workflow orchestration & triggers
 app.include_router(baselines.router, tags=["baselines"])  # Phase 54-01 Equipment Baseline Assessment
 app.include_router(condition.router, tags=["condition"])  # Phase 56-01 Condition trending & degradation
+app.include_router(ml_feedback.router, tags=["ml-feedback"])  # Phase 57-02 ML feedback loop
+app.include_router(repair_effectiveness.router, tags=["repair-effectiveness"])  # Phase 57-01 Repair effectiveness
 # app.include_router(inspection.router)  # Phase 45 Routine Inspection & Maintenance - TODO: Fix import errors
 
 
