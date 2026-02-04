@@ -1,0 +1,138 @@
+# =============================================================================
+# SENTINEL BMS Intelligence - Dependabot Configuration
+# =============================================================================
+#
+# Automated dependency security updates for all ecosystems.
+# Ported from AimTheLaw, adapted for SENTINEL repo structure.
+#
+# Monitors: Python (pip), Node.js (npm), GitHub Actions, Docker
+#
+# Addresses FSR domain 4.10 (Vulnerability Management) - automated
+# dependency vulnerability monitoring and remediation.
+#
+# Remediation SLAs: Critical 7d, High 14d, Medium 30d
+# =============================================================================
+
+version: 2
+updates:
+  # ---------------------------------------------------------------------------
+  # Backend Python Dependencies
+  # ---------------------------------------------------------------------------
+  - package-ecosystem: "pip"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Africa/Johannesburg"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "Bederf"
+    commit-message:
+      prefix: "security(deps)"
+      prefix-development: "deps"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "python"
+      - "security"
+    # Group related updates
+    groups:
+      security-updates:
+        patterns:
+          - "*security*"
+          - "*crypto*"
+          - "*auth*"
+          - "fastapi*"
+          - "uvicorn*"
+          - "supabase*"
+          - "httpx*"
+          - "pydantic*"
+      ai-ml-updates:
+        patterns:
+          - "*anthropic*"
+          - "*tensorflow*"
+          - "*torch*"
+          - "pandas*"
+          - "numpy*"
+
+  # ---------------------------------------------------------------------------
+  # Frontend Node.js Dependencies
+  # ---------------------------------------------------------------------------
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "07:00"
+      timezone: "Africa/Johannesburg"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "Bederf"
+    commit-message:
+      prefix: "security(deps)"
+      prefix-development: "deps"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "javascript"
+      - "security"
+    # Group frontend updates
+    groups:
+      security-updates:
+        patterns:
+          - "*security*"
+          - "*crypto*"
+          - "react*"
+          - "*auth*"
+      ui-updates:
+        patterns:
+          - "*ui*"
+          - "*tailwind*"
+          - "*tremor*"
+          - "*lucide*"
+
+  # ---------------------------------------------------------------------------
+  # GitHub Actions Dependencies
+  # ---------------------------------------------------------------------------
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    reviewers:
+      - "Bederf"
+    commit-message:
+      prefix: "ci(deps)"
+      include: "scope"
+    labels:
+      - "github-actions"
+      - "ci-cd"
+
+  # ---------------------------------------------------------------------------
+  # Docker Base Images
+  # ---------------------------------------------------------------------------
+  - package-ecosystem: "docker"
+    directory: "/backend"
+    schedule:
+      interval: "monthly"
+    reviewers:
+      - "Bederf"
+    commit-message:
+      prefix: "docker(deps)"
+      include: "scope"
+    labels:
+      - "docker"
+      - "infrastructure"
+
+  - package-ecosystem: "docker"
+    directory: "/frontend"
+    schedule:
+      interval: "monthly"
+    reviewers:
+      - "Bederf"
+    commit-message:
+      prefix: "docker(deps)"
+      include: "scope"
+    labels:
+      - "docker"
+      - "infrastructure"

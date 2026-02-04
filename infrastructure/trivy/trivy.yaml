@@ -1,0 +1,72 @@
+# =============================================================================
+# SENTINEL BMS Intelligence - Trivy Configuration
+# =============================================================================
+#
+# Trivy vulnerability scanner configuration for container and filesystem scans.
+# Used by both GitHub Actions CI/CD and local developer scanning.
+#
+# Addresses FSR domains:
+#   4.9  Application Security
+#   4.10 Vulnerability Management
+#
+# Usage:
+#   trivy fs --config infrastructure/trivy/trivy.yaml backend/
+#   trivy image --config infrastructure/trivy/trivy.yaml sentinel-backend:latest
+# =============================================================================
+
+# Severity levels to report
+severity:
+  - CRITICAL
+  - HIGH
+  - MEDIUM
+
+# Skip vulnerabilities without available fixes
+ignore-unfixed: true
+
+# Security checks to perform
+security-checks:
+  - vuln      # Known vulnerabilities (CVEs)
+  - secret    # Hardcoded secrets and credentials
+  - misconfig # Infrastructure misconfigurations
+
+# Output format (override with --format flag)
+format: table
+
+# Cache configuration
+cache:
+  dir: /tmp/trivy-cache
+
+# Skip scanning these paths
+skip-dirs:
+  - node_modules
+  - .git
+  - .planning
+  - docs
+  - simbiot_concept
+  - examples
+  - k6
+  - e2e
+
+# Skip scanning these file patterns
+skip-files:
+  - "**/*_test.py"
+  - "**/*_test.go"
+  - "**/test_*.py"
+  - "**/*.test.ts"
+  - "**/*.test.tsx"
+  - "**/*.spec.ts"
+  - "**/*.spec.tsx"
+  - "**/*.md"
+  - "**/*.json"
+
+# Vulnerability database
+db:
+  # Auto-download latest vulnerability database
+  skip-update: false
+
+# Misconfiguration scanning options
+misconfig:
+  # Check Dockerfile best practices
+  include:
+    - dockerfile
+    - kubernetes
