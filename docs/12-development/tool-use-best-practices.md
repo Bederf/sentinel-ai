@@ -452,7 +452,7 @@ def test_temperature_validation():
 def test_control_device_success(client):
     """Test device control endpoint."""
     response = client.post(
-        "/api/devices/001-gwc-chiller-001/control",
+        "/api/devices/S001-CHILLER-B1-001/control",
         json={"point": "chw_supply_temp_setpoint", "value": 7.0}
     )
 
@@ -468,7 +468,7 @@ def test_control_device_success(client):
 ```typescript
 describe('DeviceControl', () => {
   it('shows loading state while controlling', async () => {
-    const { getByText } = render(<DeviceControl deviceId="001-gwc-chiller-001" />);
+    const { getByText } = render(<DeviceControl deviceId="S001-CHILLER-B1-001" />);
     const button = getByText('Control');
 
     fireEvent.click(button);

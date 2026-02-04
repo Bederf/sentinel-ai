@@ -77,7 +77,7 @@ List assets/equipment for a building.
   "building_id": "001",
   "assets": [
     {
-      "equipment_id": "001-gwc-chiller-001",
+      "equipment_id": "S001-CHILLER-B1-001",
       "equipment_name": "Chiller 1",
       "type": "chiller",
       "criticality": "critical",
@@ -100,7 +100,7 @@ Comprehensive asset details including metrics, readings, and maintenance history
 ```json
 {
   "asset": {
-    "equipment_id": "001-gwc-chiller-001",
+    "equipment_id": "S001-CHILLER-B1-001",
     "equipment_name": "Chiller 1",
     "type": "chiller",
     "manufacturer": "York",
@@ -144,7 +144,7 @@ BMS device discovery and listing.
 {
   "devices": [
     {
-      "device_id": "001-gwc-chiller-001",
+      "device_id": "S001-CHILLER-B1-001",
       "device_name": "Chiller 1",
       "type": "chiller",
       "protocol": "bacnet",
@@ -168,7 +168,7 @@ Read current value from device point.
 **Returns:**
 ```json
 {
-  "device_id": "001-gwc-chiller-001",
+  "device_id": "S001-CHILLER-B1-001",
   "point_name": "chw_supply_temp",
   "value": 7.8,
   "unit": "°C",
@@ -195,7 +195,7 @@ Write value to device point **with safety validation**.
 ```json
 {
   "success": true,
-  "device_id": "001-gwc-chiller-001",
+  "device_id": "S001-CHILLER-B1-001",
   "point_name": "zone_cooling_setpoint",
   "previous_value": 22.0,
   "new_value": 21.0,
@@ -242,7 +242,7 @@ List active alarms with filtering.
   "alarms": [
     {
       "id": "alarm-001",
-      "equipment_id": "001-gwc-chiller-001",
+      "equipment_id": "S001-CHILLER-B1-001",
       "equipment_name": "Chiller 1",
       "title": "High Discharge Pressure",
       "message": "Discharge pressure exceeded threshold: 250 psi (limit: 240 psi)",
@@ -309,7 +309,7 @@ Automatically detects recurring alarm patterns:
 
 ```json
 {
-  "asset_tag": "001-gwc-chiller-001",
+  "asset_tag": "S001-CHILLER-B1-001",
   "asset_name": "Chiller 1",
   "alarm_count": 5,
   "dates": ["2026-01-15", "2026-01-22", "2026-01-29", "2026-02-01", "2026-02-02"],
@@ -352,7 +352,7 @@ Historical trend data for parameters.
 **Returns:**
 ```json
 {
-  "asset_id": "001-gwc-chiller-001",
+  "asset_id": "S001-CHILLER-B1-001",
   "parameter": "chw_supply_temp",
   "from_time": "2026-02-01T00:00:00Z",
   "to_time": "2026-02-02T00:00:00Z",
@@ -391,7 +391,7 @@ Average of all asset health scores in building.
 **Returns:**
 ```json
 {
-  "target_id": "001-gwc-chiller-001",
+  "target_id": "S001-CHILLER-B1-001",
   "target_type": "asset",
   "health_score": 72.0,
   "status": "warning",
@@ -424,7 +424,7 @@ List work orders with filtering.
     {
       "id": "WO-2026-00123",
       "building_id": "001",
-      "asset_id": "001-gwc-chiller-001",
+      "asset_id": "S001-CHILLER-B1-001",
       "title": "Replace Chiller Compressor Bearing",
       "description": "Vibration analysis indicates bearing failure...",
       "priority": "critical",
@@ -458,7 +458,7 @@ Create new work order.
   "work_order": {
     "id": "WO-2026-00124",
     "building_id": "001",
-    "asset_id": "001-gwc-chiller-001",
+    "asset_id": "S001-CHILLER-B1-001",
     "title": "Inspect Chiller Refrigerant Leak",
     "priority": "high",
     "status": "open",

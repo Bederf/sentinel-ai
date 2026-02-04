@@ -8,10 +8,10 @@ This document defines the standard naming conventions used throughout the SENTIN
 
 | Context | Field Name | Example | Notes |
 |---------|------------|---------|-------|
-| Equipment records | `equipment_id` | `"001-gwc-chiller-001"` | Primary identifier for assets |
+| Equipment records | `equipment_id` | `"S001-CHILLER-B1-001"` | Primary identifier for assets |
 | Equipment records | `equipment_name` | `"Chiller 1"` | Human-readable name |
-| Device control | `device_id` | `"001-gwc-chiller-001"` | Same value as equipment_id |
-| Optimization recommendations | `equipment_id` | `"001-gwc-chiller-001"` | Use equipment_id in recommendations |
+| Device control | `device_id` | `"S001-CHILLER-B1-001"` | Same value as equipment_id |
+| Optimization recommendations | `equipment_id` | `"S001-CHILLER-B1-001"` | Use equipment_id in recommendations |
 | Optimization recommendations | `equipment_name` | `"Chiller 1"` | Use equipment_name in recommendations |
 
 **Rule:** In domain models (equipment, assets, recommendations), use `equipment_id` and `equipment_name`. The `device_id` is used only at the device control layer when writing to actual hardware.
@@ -57,10 +57,10 @@ This document defines the standard naming conventions used throughout the SENTIN
 ### Examples
 
 ```
-001-gwc-chiller-001     # Gateway Centre, Chiller 1
-001-gwc-ahu-002         # Gateway Centre, AHU 2
-002-rbt-fcu-015         # Rosebank Towers, FCU 15
-003-cm-zone-ctrl-001    # Centurion Mall, Zone Controller 1
+S001-CHILLER-B1-001     # Gateway Centre, Chiller 1
+S001-AHU-L0-02         # Gateway Centre, AHU 2
+S004-FCU-L0-A           # Rosebank Towers, FCU Level 0 Zone A
+S003-BMS-B1-001         # Menlyn Maine, Zone Controller 1
 ```
 
 ### Device Types

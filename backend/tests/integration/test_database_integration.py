@@ -132,7 +132,7 @@ class TestDataValidation:
         """Test data types are enforced."""
         # Try to send wrong data types
         response = test_client.post(
-            "/api/devices/001-gwc-chiller-001/control",
+            "/api/devices/S001-CHILLER-B1-001/control",
             json={"point": "test", "value": "not_a_number"}
         )
         # Should reject wrong type for value field

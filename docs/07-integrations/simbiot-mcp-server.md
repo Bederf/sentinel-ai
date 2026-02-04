@@ -121,7 +121,7 @@ SIMBIOT MCP Server provides 23 tools for building management, exposing BMS data 
 User: "Show me all buildings in Gauteng"
 Claude: [Calls get_buildings with region="gauteng"]
 
-User: "What's the current status of chiller 001-gwc-chiller-001?"
+User: "What's the current status of chiller S001-CHILLER-B1-001?"
 Claude: [Calls read_device_point with device_id and points]
 
 User: "Create a work order for the faulty FCU on Level 10"
@@ -204,13 +204,13 @@ await server.call_tool("get_buildings", {"region": "gauteng"})
 ```python
 # Request
 await server.call_tool("read_device_point", {
-  "device_id": "001-gwc-chiller-001",
+  "device_id": "S001-CHILLER-B1-001",
   "point_name": "chw_supply_temp"
 })
 
 # Response
 {
-  "device_id": "001-gwc-chiller-001",
+  "device_id": "S001-CHILLER-B1-001",
   "point_name": "chw_supply_temp",
   "value": 7.2,
   "unit": "°C",
@@ -224,7 +224,7 @@ await server.call_tool("read_device_point", {
 ```python
 # Request
 await server.call_tool("write_device_point", {
-  "device_id": "001-gwc-fcu-001",
+  "device_id": "S001-FCU-L0-A",
   "point_name": "cooling_setpoint",
   "value": 22.0,
   "priority": 8
@@ -233,7 +233,7 @@ await server.call_tool("write_device_point", {
 # Response
 {
   "success": true,
-  "device_id": "001-gwc-fcu-001",
+  "device_id": "S001-FCU-L0-A",
   "point_name": "cooling_setpoint",
   "value": 22.0,
   "previous_value": 24.0,
@@ -310,7 +310,7 @@ Every write operation creates an audit record:
 {
   "audit_id": "audit-abc123",
   "action": "write_device_point",
-  "device_id": "001-gwc-fcu-001",
+  "device_id": "S001-FCU-L0-A",
   "point_name": "cooling_setpoint",
   "old_value": 24.0,
   "new_value": 22.0,

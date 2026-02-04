@@ -20,7 +20,7 @@
 ### Equipment Hierarchy
 
 ```
-CHILLER (011-stc-chiller-001)
+CHILLER (S002-CHILLER-B1-001)
     │
     ├── AHU-L12-01
     │   ├── VAV-L12-03A ──► FCU-L12-03 ──► Zone-L12-N (Desks 201-206)

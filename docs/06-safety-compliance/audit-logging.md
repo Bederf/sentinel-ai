@@ -119,7 +119,7 @@ audit_logger = AuditLogger()
 
 # Log a control action
 entry_id = audit_logger.log_control_action(
-    device_id="001-gwc-chiller-001",
+    device_id="S001-CHILLER-B1-001",
     point_name="chw_setpoint",
     user="operator@example.com",
     old_value=7.0,
@@ -166,7 +166,7 @@ correlation_id = str(uuid.uuid4())
 
 # Log the initial request
 audit_logger.log_control_action(
-    device_id="001-gwc-chiller-001",
+    device_id="S001-CHILLER-B1-001",
     point_name="chw_setpoint",
     user="operator",
     old_value=7.0,
@@ -177,7 +177,7 @@ audit_logger.log_control_action(
 
 # Log the safety validation
 audit_logger.log_safety_validation(
-    device_id="001-gwc-chiller-001",
+    device_id="S001-CHILLER-B1-001",
     user="system",
     validation_result={"allowed": True, ...},
     result=AuditResultType.SUCCESS,
@@ -186,7 +186,7 @@ audit_logger.log_safety_validation(
 
 # Log the final result
 audit_logger.log_control_action(
-    device_id="001-gwc-chiller-001",
+    device_id="S001-CHILLER-B1-001",
     point_name="chw_setpoint",
     user="operator",
     old_value=7.0,
@@ -213,7 +213,7 @@ audit_logger.log_control_action(
 curl "http://localhost:9095/api/audit/logs?limit=50"
 
 # Filter by device
-curl "http://localhost:9095/api/audit/logs?device_id=001-gwc-chiller-001"
+curl "http://localhost:9095/api/audit/logs?device_id=S001-CHILLER-B1-001"
 
 # Filter by action type
 curl "http://localhost:9095/api/audit/logs?action=device_control"
@@ -237,7 +237,7 @@ Response:
       "timestamp": "2026-01-30T10:30:00Z",
       "action": "device_control",
       "user": "operator@example.com",
-      "device_id": "001-gwc-chiller-001",
+      "device_id": "S001-CHILLER-B1-001",
       "point_name": "chw_setpoint",
       "old_value": 7.0,
       "new_value": 8.0,
@@ -399,7 +399,7 @@ Audit logs are stored in JSON format for easy querying and export:
       "timestamp": "2026-01-30T10:30:00Z",
       "action": "device_control",
       "user": "operator@example.com",
-      "device_id": "001-gwc-chiller-001",
+      "device_id": "S001-CHILLER-B1-001",
       "point_name": "chw_setpoint",
       "old_value": 7.0,
       "new_value": 8.0,
@@ -420,7 +420,7 @@ Audit logs are stored in JSON format for easy querying and export:
       "correlation_id": "req_abc123",
       "metadata": {
         "source": "api",
-        "endpoint": "/api/devices/001-gwc-chiller-001/control"
+        "endpoint": "/api/devices/S001-CHILLER-B1-001/control"
       }
     }
   ]

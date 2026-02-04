@@ -211,10 +211,10 @@ python /home/bederf/clawd/tools/bms_desk_diagnosis.py list Sandton
 python /home/bederf/clawd/tools/bms_control.py list
 
 # Set temperature
-python /home/bederf/clawd/tools/bms_control.py temp 001-gwc-fcu-001 22
+python /home/bederf/clawd/tools/bms_control.py temp S001-FCU-L0-A 22
 
 # Check safety
-python /home/bederf/clawd/tools/bms_control.py safety 001-gwc-chiller-001
+python /home/bederf/clawd/tools/bms_control.py safety S001-CHILLER-B1-001
 ```
 
 ### Test AI Bridge

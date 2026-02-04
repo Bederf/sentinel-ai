@@ -111,7 +111,7 @@ def test_call_read_device_point():
         json={
             "tool_name": "read_device_point",
             "arguments": {
-                "device_id": "001-gwc-chiller-001",
+                "device_id": "S001-CHILLER-B1-001",
                 "point_name": "chw_supply_temp"
             }
         }

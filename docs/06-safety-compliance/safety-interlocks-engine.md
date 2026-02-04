@@ -129,7 +129,7 @@ Enforces relationships between devices where one device's state affects another'
   "severity": "block",
   "description": "When fire alarm is active, disable HVAC",
   "device_type": "hvac",
-  "trigger_device_id": "001-gwc-fire-001",
+  "trigger_device_id": "S001-FIRE-B1-001",
   "trigger_point": "fire_alarm_status",
   "trigger_value": true,
   "action": "disable"
@@ -270,7 +270,7 @@ applicable_rules = await safety_engine.get_rules_for_device(
             "rule_name": "Maximum Brightness Limit"
         }
     ],
-    "device_id": "001-gwc-lighting-001",
+    "device_id": "S001-DALI-L0-01",
     "point_name": "brightness",
     "value": 95,
     "timestamp": "2026-01-30T10:30:00Z"
@@ -300,7 +300,7 @@ applicable_rules = await safety_engine.get_rules_for_device(
 curl -X POST http://localhost:9095/api/safety/validate \
   -H "Content-Type: application/json" \
   -d '{
-    "device_id": "001-gwc-chiller-001",
+    "device_id": "S001-CHILLER-B1-001",
     "point_name": "chw_setpoint",
     "value": 7.0
   }'
@@ -316,7 +316,7 @@ Response (allowed):
     "alarms": [],
     "message": "Safety validation complete"
   },
-  "device_id": "001-gwc-chiller-001",
+  "device_id": "S001-CHILLER-B1-001",
   "point_name": "chw_setpoint",
   "value": 7.0
 }
@@ -332,7 +332,7 @@ Response (blocked):
     "alarms": [],
     "message": "Safety validation complete"
   },
-  "device_id": "001-gwc-chiller-001",
+  "device_id": "S001-CHILLER-B1-001",
   "point_name": "chw_setpoint",
   "value": 3.0
 }
@@ -489,8 +489,8 @@ Rules can be targeted at different levels:
 |-------|-------------|-----------|------------|-------------|
 | All HVAC | "hvac" | null | null | Generic HVAC limits |
 | Specific device type + point | "hvac" | null | "chw_setpoint" | All chillers, specific point |
-| Specific device | "hvac" | "001-gwc-chiller-001" | null | One chiller, all points |
-| Specific device + point | "hvac" | "001-gwc-chiller-001" | "chw_setpoint" | One point on one device |
+| Specific device | "hvac" | "S001-CHILLER-B1-001" | null | One chiller, all points |
+| Specific device + point | "hvac" | "S001-CHILLER-B1-001" | "chw_setpoint" | One point on one device |
 
 ## Best practices
 

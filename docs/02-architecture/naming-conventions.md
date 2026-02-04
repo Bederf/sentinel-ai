@@ -1,12 +1,12 @@
 ---
-title: "Device and Location Naming Conventions"
+title: "Equipment & Device Naming Conventions"
 type: "reference"
 status: "approved"
-version: "1.0.0"
+version: "2.0.0"
 created: "2026-01-30"
-updated: "2026-01-30"
+updated: "2026-02-04"
 author: "Sentinel Development Team"
-tags: ["naming-conventions", "bms", "device-identification"]
+tags: ["naming-conventions", "bms", "device-identification", "equipment-id"]
 related: ["system-overview.md", "../07-integrations/cafm-schema.md"]
 domain: "bms"
 audience: "developers"
@@ -14,311 +14,320 @@ complexity: "intermediate"
 estimated_read_time: 15
 ---
 
-# SENTINEL Device Naming Conventions
+# SENTINEL Equipment & Device Naming Conventions
 
-**Purpose:** Standardize SENTINEL's internal device representation for consistent data management, technician navigation, and system integration.
+**Purpose:** Standardize SENTINEL's internal equipment/device identification so that any ID immediately tells you **which site**, **what device type**, **which floor**, and **which zone or unit**.
 
-**Scope:** This standard applies to SENTINEL's **internal** device model. External BMS/CAFM systems use their own conventions, which Phase 14 integration layer maps to this standard.
+**Scope:** This standard applies to SENTINEL's **internal** model — the single canonical ID used in Supabase (`equipment.code`), device control (`mock_devices.json`), audit logs, and all frontend/backend references. External BMS/CAFM systems use their own conventions mapped via the integration layer.
+
+**Key Principle:** One ID system. Equipment and devices are the same entity. The ID is used everywhere — no separate "equipment ID" vs "device ID".
 
 ---
 
-## 1. Device ID Format
+## 1. Equipment ID Format
 
-**Pattern:** `{site_code}-{building_code}-{device_type}-{sequence}`
+**Pattern:** `{site}-{type}-{floor}-{zone_or_seq}`
 
 **Components:**
-- `site_code` (3 digits): Site identifier from site inventory (001, 002, 011, etc.)
-- `building_code` (3 chars): Building abbreviation from approved list
-- `device_type` (lowercase): Device type from approved list
-- `sequence` (3 digits): Sequential number starting at 001
+
+| Component | Format | Description |
+|-----------|--------|-------------|
+| `site` | `S###` (3-digit, zero-padded) | Site identifier from site registry |
+| `type` | UPPERCASE abbreviation | Device/equipment type from approved list |
+| `floor` | `B#` / `G` / `L#` / `R` | Basement, Ground, Level, or Roof |
+| `zone_or_seq` | Letter (`A`-`Z`) or 3-digit (`001`) | Zone letter for zoned equipment, numeric sequence for plant room equipment |
+
+**Floor Codes:**
+
+| Code | Meaning | Examples |
+|------|---------|---------|
+| `B1`, `B2` | Basement levels (B1 = first basement) | `B1`, `B2` |
+| `G` | Ground floor | `G` |
+| `L0`, `L1`...`L99` | Above-ground levels | `L0`, `L1`, `L2` |
+| `R` | Roof level | `R` |
+
+**Zone vs Sequence:**
+- **Zone letter** (`A`-`Z`): Used when a device serves a specific zone on a floor (FCUs, VAVs, DALI controllers, luminaires, sensors). One device per zone per floor.
+- **Numeric sequence** (`001`-`999`): Used for plant room equipment where multiple units exist without zone assignment (chillers, generators, UPS, transformers). Also used when a floor has multiple units of the same type serving the same zone.
+
+---
+
+## 2. Site Code Registry
+
+**Pattern:** `S###` — three-digit zero-padded number.
+
+The site code is the sole location identifier. There is no separate "building code" — each site represents one building.
+
+| Site Code | Building Name | City |
+|-----------|---------------|------|
+| `S001` | Gateway Centre | Johannesburg |
+| `S002` | Sandton City Office Tower | Sandton |
+| `S003` | Menlyn Maine | Pretoria |
+| `S004` | Rosebank Towers | Rosebank |
+| `S005` | Century City | Cape Town |
+| `S006` | V&A Waterfront | Cape Town |
+| `S007` | Umhlanga Ridge | Durban |
+| `S008` | Sandton Views | Sandton |
+| `S009` | Bryanston Office Park | Bryanston |
+| `S010` | Midrand Business Park | Midrand |
+
+**Supabase mapping:** The `buildings` table `code` column stores `site-002` format. The equipment ID prefix `S002` maps to `site-002` by convention (`S` + zero-padded number = `site-` + number).
+
+---
+
+## 3. Device Type List
+
+| Type Code | Description | Category | Typical Location |
+|-----------|-------------|----------|-----------------|
+| **HVAC** | | | |
+| `CHILLER` | Chiller unit | HVAC | Plant room (B1) |
+| `AHU` | Air Handling Unit | HVAC | Plant room or per-floor |
+| `FCU` | Fan Coil Unit | HVAC | Per zone |
+| `VAV` | Variable Air Volume | HVAC | Per zone |
+| `SPLIT` | Split AC unit | HVAC | Per room |
+| `CT` | Cooling Tower | HVAC | Roof |
+| **Lighting** | | | |
+| `DALI` | DALI-2 Controller | Lighting | Per zone |
+| `LUM` | Luminaire Group | Lighting | Per zone |
+| **Energy Centre** | | | |
+| `GEN` | Generator | Energy | Plant room (B1) |
+| `TX` | Transformer | Energy | Plant room (B1) |
+| `UPS` | UPS system | Energy | Plant room (B1) |
+| `ATS` | Auto Transfer Switch | Energy | Plant room (B1) |
+| `MSB` | Main Switchboard | Energy | Plant room (B1) |
+| `MTR` | Power Meter | Energy | Per floor or plant room |
+| `PFC` | Power Factor Correction | Energy | Plant room (B1) |
+| `FDR` | Feeder/Distribution Board | Energy | Per floor |
+| `MV` | Medium Voltage Incomer | Energy | Plant room (B1) |
+| **Sensors** | | | |
+| `TS` | Temperature Sensor | Sensors | Per zone |
+| `CO2` | CO2 Sensor | Sensors | Per zone |
+| `OCC` | Occupancy Sensor | Sensors | Per zone |
+| `DLS` | Daylight Sensor | Sensors | Per zone |
+| **Other** | | | |
+| `ACC` | Access Control | Security | Per entry point |
+| `FIRE` | Fire System | Fire | Per zone/floor |
+| `LIFT` | Lift/Elevator | Transport | Per shaft |
+| `BMS` | BMS Controller | Controls | Plant room |
+| `PXC` | Desigo PXC Controller | Controls | Per floor or plant room |
+
+---
+
+## 4. Examples — Sandton City (S002)
+
+### HVAC Equipment
+```
+S002-CHILLER-B1-001     Chiller #1, Basement 1 plant room
+S002-CHILLER-B1-002     Chiller #2, Basement 1 plant room
+S002-CHILLER-B1-003     Standby Chiller #3, Basement 1
+S002-AHU-L0-01          AHU serving Level 0
+S002-AHU-L1-01          AHU serving Level 1
+S002-AHU-L2-01          AHU serving Level 2
+S002-FCU-L0-A           FCU, Level 0, Zone A
+S002-FCU-L1-C           FCU, Level 1, Zone C
+S002-VAV-L1-A           VAV, Level 1, Zone A
+S002-VAV-L2-E           VAV, Level 2, Zone E
+S002-CT-R-001           Cooling Tower #1, Roof
+```
+
+### Lighting
+```
+S002-DALI-L0-A          DALI Controller, Level 0, Zone A
+S002-DALI-L2-E          DALI Controller, Level 2, Zone E
+S002-LUM-L1-B           Luminaire Group, Level 1, Zone B
+S002-LUM-L2-E           Luminaire Group, Level 2, Zone E
+```
+
+### Energy Centre
+```
+S002-GEN-B1-001         Generator #1 (Primary A)
+S002-GEN-B1-002         Generator #2 (Primary B)
+S002-GEN-B1-003         Generator #3 (Standby A)
+S002-GEN-B1-004         Generator #4 (Standby B)
+S002-TX-B1-001          Transformer #1 (Essential)
+S002-TX-B1-002          Transformer #2 (Non-Essential)
+S002-UPS-B1-001         IT Critical UPS
+S002-UPS-B1-002         Building Services UPS
+S002-ATS-B1-001         Main ATS
+S002-MSB-B1-001         Main LV Switchboard
+S002-MTR-B1-MAIN        Main Incomer Meter (named sequence)
+S002-MTR-B1-GEN         Generator Output Meter
+S002-MTR-B1-TENANT      Tenant Sub-Metering Bus
+S002-MV-B1-001          Eskom 11kV Incomer
+S002-PFC-B1-001         Main PFC Bank
+S002-FDR-L1-001         Level 1 Distribution Board
+S002-FDR-B1-HVAC        HVAC Plant Room Feeder
+```
+
+### Sensors
+```
+S002-TS-L1-A            Temperature Sensor, Level 1, Zone A
+S002-CO2-L1-E           CO2 Sensor, Level 1, Zone E
+S002-OCC-L0-C           Occupancy Sensor, Level 0, Zone C
+S002-DLS-L2-A           Daylight Sensor, Level 2, Zone A
+```
+
+### Controllers
+```
+S002-BMS-B1-001         Siemens Desigo CC (main BMS/SCADA)
+S002-PXC-B1-CHP         PXC Chiller Plant Controller
+S002-PXC-L1-HVAC        PXC Level 1 HVAC Controller
+```
+
+---
+
+## 5. Point Naming Convention
+
+Points represent individual data values on a device. They are **not** globally unique — they are scoped to the device.
+
+**Pattern:** `{system}_{parameter}_{qualifier}`
+
+**System Codes:**
+
+| Code | System |
+|------|--------|
+| `chw` | Chilled Water |
+| `hw` | Hot Water |
+| `sa` | Supply Air |
+| `ra` | Return Air |
+| `da` | Discharge Air |
+| `zone` | Zone/Room |
+| `chiller` | Chiller-specific |
+| `boiler` | Boiler-specific |
+
+**Parameter Codes:**
+
+| Code | Parameter |
+|------|-----------|
+| `temp` | Temperature |
+| `pressure` | Pressure |
+| `flow` | Flow rate |
+| `status` | On/off status |
+| `setpoint` | Setpoint value |
+| `position` | Position (0-100%) |
+| `level` | Level (0-100%) |
+| `amps` | Current draw |
+| `volts` | Voltage |
+| `hz` | Frequency |
+| `runtime` | Runtime hours |
+| `load` | Load percentage |
+| `brightness` | Light level (0-100%) |
+| `scene` | Lighting scene number |
+
+**Qualifier Codes:**
+
+| Code | Qualifier |
+|------|-----------|
+| `supply` | Supply side |
+| `return` | Return side |
+| `discharge` | Discharge side |
+| `inlet` | Inlet |
+| `outlet` | Outlet |
 
 **Examples:**
 ```
-001-gwc-chiller-001  (Gateway Centre, Chiller #1)
-011-stc-ahu-001      (Sandton City, AHU #1)
-002-wcp-fcu-012      (Western Cape Park, FCU #12)
-006-flt-lighting-003 (Flagship, Lighting Panel #3)
+chw_supply_temp          Chilled Water Supply Temperature
+chw_return_temp          Chilled Water Return Temperature
+chw_setpoint             Chilled Water Setpoint
+sa_damper_position       Supply Air Damper Position
+ra_temp                  Return Air Temperature
+zone_temp_setpoint       Zone Temperature Setpoint
+chiller_status           Chiller On/Off Status
+compressor_amps          Compressor Current Draw
+brightness               Light brightness level
+scene                    Active lighting scene
+load_percent             Generator/UPS load percentage
+runtime_hours            Cumulative runtime
 ```
 
-**Building Code List:**
-| Code | Building Name |
-|------|---------------|
-| gwc  | Gateway Centre |
-| stc  | Sandton City |
-| wcp  | Western Cape Park |
-| flt  | Flagship |
-| cmp  | Centurion Mall |
-| prp  | Pretoria |
-
-**Device Type List:**
-| Type | Description |
-|------|-------------|
-| chiller | Chiller unit |
-| ahu | Air Handling Unit |
-| fcu | Fan Coil Unit |
-| vav | Variable Air Volume |
-| split | Split AC unit |
-| lighting | Lighting panel/controller |
-| access | Access control panel |
-| firepump | Fire pump controller |
-| ups | UPS system |
-| generator | Generator |
+**Fully qualified point reference:** `{equipment_id}.{point_name}`
+```
+S002-CHILLER-B1-001.chw_supply_temp
+S002-VAV-L1-A.sa_damper_position
+S002-DALI-L2-E.brightness
+```
 
 ---
 
-## 2. Location Metadata
+## 6. Location Metadata
 
-Every device MUST include a `location` object with technician-friendly information.
+Every device MUST include a `location` object for technician-friendly navigation. This is **supplementary** to the ID — the ID encodes site/floor/zone, the metadata provides human-readable detail.
 
 **Structure:**
 ```json
 {
   "location": {
-    "building": "Gateway Centre",
-    "floor": "FL2",
-    "zone": "Q3",
-    "room": "MR4",
-    "description": "Floor 2, Quadrant 3, Mechanical Room 4"
+    "building": "Sandton City Office Tower",
+    "floor": "L1",
+    "zone": "A",
+    "room": "MR1",
+    "description": "Level 1, Zone A, Mechanical Room 1"
   }
 }
 ```
 
-**Field Descriptions:**
-- `building` (required): Full building name
-- `floor` (required): Floor identifier
-  - Format: `FL{number}` (FL1, FL2, FL3) or `Basement` or `Roof` or `Ground`
-- `zone` (required): Zone/quadrant identifier
-  - Format: `Q{1-4}` or directional names (North, South, East, West)
-- `room` (required): Room identifier
-  - Format: `{type}{number}` where type is from approved list
-  - Examples: MR4 (Mechanical Room 4), ER1 (Electrical Room 1), OR12 (Office Room 12)
-- `description` (required): Human-readable location string
-
 **Room Type Codes:**
+
 | Code | Meaning |
 |------|---------|
-| MR | Mechanical Room |
-| ER | Electrical Room |
-| OR | Office Room |
-| SR | Server Room |
-| WR | Washroom |
-| KR | Kitchen |
-| LR | Lobby/Reception |
-| ST | Storage |
-
-**Display Formats:**
-- **Compact:** `FL2/Q3/MR4`
-- **Full:** `Gateway Centre, Floor 2, Quadrant 3, Mechanical Room 4`
-- **Short:** `FL2 - MR4 (Q3)`
+| `MR` | Mechanical Room |
+| `ER` | Electrical Room |
+| `OR` | Office |
+| `SR` | Server Room |
+| `LR` | Lobby/Reception |
+| `PR` | Plant Room |
+| `ST` | Storage |
 
 ---
 
-## 3. Equipment Metadata
+## 7. Equipment Metadata
 
 Every device MUST include an `equipment` object with make, model, and specifications.
 
-**Structure:**
 ```json
 {
   "equipment": {
-    "manufacturer": "Trane",
-    "model": "RTAC 200",
-    "serial_number": "TR-2024-001",
-    "installation_year": 2015,
-    "capacity_kw": 220,
+    "manufacturer": "York",
+    "model": "YCIV",
+    "serial_number": "YK-SAN-2020-001",
+    "installation_year": 2020,
+    "capacity_kw": 350,
     "specifications": {
       "refrigerant": "R134a",
-      "compressor_type": "Scroll",
+      "compressor_type": "Screw",
       "number_of_compressors": 2
     }
   }
 }
 ```
 
-**Required Fields:**
-- `manufacturer` (required): Manufacturer name
-- `model` (required): Model number/name
-- `serial_number` (optional): Asset serial number
-- `installation_year` (optional): Year installed
-- `capacity_kw` (optional): Capacity in kW (for HVAC equipment)
-
-**Common Manufacturers:**
-- HVAC: Trane, Carrier, York, Daikin, Samsung, Mitsubishi
-- Lighting: Tridonic, Philips, Osram, Schneider
-- Access Control: HID, Suprema, Dormakaba
-- Fire: Honeywell, Siemens, Notifier, Johnson Controls
-
 ---
 
-## 4. Point Naming Convention
-
-**Pattern:** `{system}_{parameter}_{qualifier}`
-
-**System Codes:**
-| Code | System |
-|------|--------|
-| chw | Chilled Water |
-| hw | Hot Water |
-| sa | Supply Air |
-| ra | Return Air |
-| da | Discharge Air |
-| zone | Zone/Room |
-| chiller | Chiller-specific |
-| boiler | Boiler-specific |
-
-**Parameter Codes:**
-| Code | Parameter |
-|------|-----------|
-| temp | Temperature |
-| pressure | Pressure |
-| flow | Flow rate |
-| status | On/off status |
-| setpoint | Setpoint value |
-| position | Position (0-100%) |
-| level | Level (0-100%) |
-| amps | Current draw |
-| volts | Voltage |
-| hz | Frequency |
-
-**Qualifier Codes:**
-| Code | Qualifier |
-|------|-----------|
-| supply | Supply side |
-| return | Return side |
-| discharge | Discharge side |
-| inlet | Inlet |
-| outlet | Outlet |
-| left | Left side |
-| right | Right side |
-
-**Examples:**
-```
-chw_supply_temp          (Chilled Water Supply Temperature)
-chw_return_temp          (Chilled Water Return Temperature)
-chw_setpoint             (Chilled Water Setpoint)
-sa_damper_position       (Supply Air Damper Position)
-ra_temp                  (Return Air Temperature)
-zone_temp_setpoint       (Zone Temperature Setpoint)
-chiller_status           (Chiller On/Off Status)
-compressor_amps          (Compressor Current Draw)
-```
-
----
-
-## 5. Site ID Format
-
-**Pattern:** `{region_code}-{site_number}`
-
-**Examples:**
-```
-gwc-001  (Gateway Centre, Site #001)
-stc-011  (Sandton City, Site #011)
-wcp-002  (Western Cape Park, Site #002)
-```
-
-**Region Codes:**
-| Code | Region |
-|------|--------|
-| gwc | Gateway Centre |
-| stc | Sandton City |
-| wcp | Western Cape Park |
-| flt | Flagship |
-| cmp | Centurion Mall |
-| prp | Pretoria |
-
----
-
-## 6. Data Model Changes
-
-### Device Model (backend/app/models/device.py)
-
-Add to Device dataclass:
-```python
-@dataclass
-class Device:
-    # ... existing fields ...
-
-    location: DeviceLocation
-    equipment: DeviceEquipment
-
-@dataclass
-class DeviceLocation:
-    building: str
-    floor: str
-    zone: str
-    room: str
-    description: str
-
-@dataclass
-class DeviceEquipment:
-    manufacturer: str
-    model: str
-    serial_number: Optional[str] = None
-    installation_year: Optional[int] = None
-    capacity_kw: Optional[float] = None
-    specifications: Dict[str, Any] = field(default_factory=dict)
-```
-
----
-
-## 7. Migration Checklist
-
-- [ ] Update Device model with location and equipment fields
-- [ ] Update all devices in mock_devices.json with new IDs
-- [ ] Add location metadata to all devices
-- [ ] Add equipment metadata to all devices
-- [ ] Standardize point names across all devices
-- [ ] Update safety_rules.json with new point names
-- [ ] Update any API responses or UI code referencing old fields
-- [ ] Update test data and fixtures
-
----
-
-## 8. External System Integration (Phase 14)
-
-**IMPORTANT:** This standard is for SENTINEL's **internal** representation only.
-
-External BMS/CAFM systems use their own naming conventions. Phase 14 integration layer handles the translation:
-
-```
-External BMS Point              →  SENTINEL Internal Point
------------------------------     →  ------------------------
-"NAE01/CHW-PLT-01.CTL"          →  "001-gwc-chiller-001.points.chw_setpoint"
-"Site11_Chiller_Main.Temp"      →  "011-stc-chiller-001.points.chw_supply_temp"
-"AHU-L12-001.SAT"               →  "001-gwc-ahu-001.points.sa_supply_temp"
-```
-
-The `point_asset_mappings` table (Migration 010) stores these mappings with confidence scores.
-
----
-
-## 9. Examples
-
-### Complete Device Example
+## 8. Complete Device Example
 
 ```json
 {
-  "id": "001-gwc-chiller-001",
-  "site_id": "gwc-001",
-  "name": "Gateway Centre Chiller 1",
-  "device_type": "hvac",
-  "protocol": "mock",
+  "id": "S002-CHILLER-B1-001",
+  "site_id": "site-002",
+  "name": "York YCIV Chiller 1",
+  "device_type": "chiller",
+  "protocol": "bacnet",
   "location": {
-    "building": "Gateway Centre",
-    "floor": "Basement",
-    "zone": "Q1",
-    "room": "MR1",
-    "description": "Basement, Quadrant 1, Main Mechanical Room"
+    "building": "Sandton City Office Tower",
+    "floor": "B1",
+    "zone": "PR",
+    "room": "PR1",
+    "description": "Basement 1, Plant Room 1"
   },
   "equipment": {
-    "manufacturer": "Trane",
-    "model": "RTAC 200",
-    "serial_number": "TR-GWC-2015-001",
-    "installation_year": 2015,
-    "capacity_kw": 220,
+    "manufacturer": "York",
+    "model": "YCIV",
+    "serial_number": "YK-SAN-2020-001",
+    "installation_year": 2020,
+    "capacity_kw": 350,
     "specifications": {
       "refrigerant": "R134a",
-      "compressor_type": "Scroll",
+      "compressor_type": "Screw",
       "number_of_compressors": 2
     }
   },
@@ -332,28 +341,90 @@ The `point_asset_mappings` table (Migration 010) stores these mappings with conf
       "max_value": 15.0,
       "default_value": 7.0
     },
-    "chw_return_temp": { ... },
-    "chw_setpoint": { ... },
-    "chiller_status": { ... },
-    "compressor_amps": { ... }
+    "chw_return_temp": {
+      "name": "chw_return_temp",
+      "point_type": "analog_input",
+      "description": "Chilled water return temperature",
+      "unit": "°C"
+    },
+    "chw_setpoint": {
+      "name": "chw_setpoint",
+      "point_type": "analog_output",
+      "description": "Chilled water setpoint",
+      "unit": "°C",
+      "min_value": 5.0,
+      "max_value": 12.0,
+      "default_value": 7.0,
+      "writable": true
+    },
+    "chiller_status": {
+      "name": "chiller_status",
+      "point_type": "binary_input",
+      "description": "Chiller running status"
+    }
   }
 }
 ```
 
 ---
 
-## 10. Validation Rules
+## 9. External System Integration
 
-1. **Device IDs must be unique** across all sites
-2. **Location fields are required** for all devices
-3. **Equipment manufacturer and model are required**
-4. **Point names must follow** {system}_{parameter}_{qualifier} pattern
-5. **Device type must be from approved list**
-6. **Floor format must be** FL{number}, Ground, Basement, or Roof
-7. **Zone format must be** Q{1-4} or directional name
+**IMPORTANT:** This standard is for SENTINEL's **internal** representation only.
+
+External BMS/CAFM systems use their own naming conventions. The integration layer handles translation:
+
+```
+External BMS Point              →  SENTINEL Internal
+-----------------------------     →  ----------------------------
+"NAE01/CHW-PLT-01.CTL"          →  S002-CHILLER-B1-001.chw_setpoint
+"Site11_Chiller_Main.Temp"      →  S002-CHILLER-B1-001.chw_supply_temp
+"AHU-L12-001.SAT"               →  S002-AHU-L1-01.sa_supply_temp
+```
+
+The `point_asset_mappings` table stores these mappings with confidence scores.
 
 ---
 
-**Document Version:** 1.0
-**Last Updated:** 2026-01-29
-**Status:** Ready for Implementation
+## 10. Validation Rules
+
+1. **Equipment IDs must be globally unique** across all sites
+2. **Site code must exist** in the site registry
+3. **Device type must be from approved list** (Section 3)
+4. **Floor code must follow format:** `B#`, `G`, `L#`, or `R`
+5. **Zone/sequence must be:** single uppercase letter (`A`-`Z`) or 3-digit number (`001`-`999`) or short named key (`MAIN`, `HVAC`, `CHP`)
+6. **Point names must follow** `{system}_{parameter}_{qualifier}` pattern
+7. **Location metadata is required** for all devices
+
+---
+
+## 11. Migration from Legacy IDs
+
+### ID Format Mapping
+
+| Legacy Format | New Format | Rule |
+|---------------|------------|------|
+| `001-gwc-chiller-001` | `S001-CHILLER-B1-001` | Drop building code, use site prefix |
+| `CHILLER-001` | `S002-CHILLER-B1-001` | Add site + floor |
+| `VAV-L1-05` | `S002-VAV-L1-E` | Add site, map zone number to letter |
+| `SAN-GEN-001` | `S002-GEN-B1-001` | Replace building abbrev with site code |
+| `011-stc-ahu-001` | `S002-AHU-L0-01` | Remap site code, add floor |
+| `FCU-L12-03` | `S002-FCU-L1-C` | Add site, correct floor |
+| `002-stc-vav-l12-01` | `S002-VAV-L1-A` | Simplify to standard format |
+| `S001-FCU-L1-A` | `S001-FCU-L1-A` | Already correct |
+
+### Zone Number to Letter Mapping (Sandton City)
+
+| Zone Number | Zone Letter | Zone Name |
+|-------------|-------------|-----------|
+| 01 | A | North |
+| 02 | B | East |
+| 03 | C | Central |
+| 04 | D | West |
+| 05 | E | South |
+
+---
+
+**Document Version:** 2.1
+**Last Updated:** 2026-02-04
+**Status:** Approved — Migration Complete (Phase 62)

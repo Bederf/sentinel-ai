@@ -9,7 +9,7 @@ Usage:
 
     server = SIMBIOTMCPServer()
     result = await server.call_tool("get_buildings")
-    result = await server.call_tool("read_device_point", device_id="001-gwc-chiller-001", point_name="chw_supply_temp")
+    result = await server.call_tool("read_device_point", device_id="S001-CHILLER-B1-001", point_name="chw_supply_temp")
 """
 
 from typing import Optional, Dict, List, Any
@@ -2814,7 +2814,7 @@ MCP_TOOLS = [
             "properties": {
                 "asset_id": {
                     "type": "string",
-                    "description": "Asset/device ID (e.g., 001-gwc-chiller-001)"
+                    "description": "Asset/device ID (e.g., S001-CHILLER-B1-001)"
                 },
                 "include": {
                     "type": "array",
@@ -2855,7 +2855,7 @@ MCP_TOOLS = [
             "properties": {
                 "device_id": {
                     "type": "string",
-                    "description": "Device ID (e.g., 001-gwc-chiller-001)"
+                    "description": "Device ID (e.g., S001-CHILLER-B1-001)"
                 },
                 "point_name": {
                     "type": "string",
@@ -2873,7 +2873,7 @@ MCP_TOOLS = [
             "properties": {
                 "device_id": {
                     "type": "string",
-                    "description": "Device ID (e.g., 001-gwc-chiller-001)"
+                    "description": "Device ID (e.g., S001-CHILLER-B1-001)"
                 },
                 "point_name": {
                     "type": "string",
@@ -2969,7 +2969,7 @@ MCP_TOOLS = [
             "properties": {
                 "asset_id": {
                     "type": "string",
-                    "description": "Asset/device ID (e.g., 001-gwc-chiller-001)"
+                    "description": "Asset/device ID (e.g., S001-CHILLER-B1-001)"
                 },
                 "parameter": {
                     "type": "string",
@@ -3416,7 +3416,7 @@ class SIMBIOTMCPServer:
         server = SIMBIOTMCPServer()
         tools = server.list_tools()  # Get available tools
         result = await server.call_tool("get_buildings")
-        result = await server.call_tool("read_device_point", device_id="001-gwc-chiller-001", point_name="chw_supply_temp")
+        result = await server.call_tool("read_device_point", device_id="S001-CHILLER-B1-001", point_name="chw_supply_temp")
     """
 
     def __init__(self):

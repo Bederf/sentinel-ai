@@ -287,7 +287,7 @@ Response:
     "rationale": "Load shedding scheduled 16:00-18:30. Pre-cooling recommended to maintain comfort.",
     "setpoint_changes": [
       {
-        "device_id": "001-gwc-ahu-001",
+        "device_id": "S001-AHU-L0-01",
         "device_name": "AHU-1",
         "point_name": "cooling_setpoint",
         "current_value": 22.4,
@@ -295,7 +295,7 @@ Response:
         "reason": "Pre-cool for load shedding"
       },
       {
-        "device_id": "001-gwc-chiller-001",
+        "device_id": "S001-CHILLER-B1-001",
         "device_name": "Chiller 1",
         "point_name": "chw_setpoint",
         "current_value": 7.0,
@@ -336,12 +336,12 @@ curl -X POST http://localhost:9095/api/optimization/approve \
     "site_id": "site-001",
     "setpoints_to_apply": [
       {
-        "device_id": "001-gwc-ahu-001",
+        "device_id": "S001-AHU-L0-01",
         "point_name": "cooling_setpoint",
         "value": 19.0
       },
       {
-        "device_id": "001-gwc-chiller-001",
+        "device_id": "S001-CHILLER-B1-001",
         "point_name": "chw_setpoint",
         "value": 6.0
       }
@@ -355,13 +355,13 @@ Response:
   "success": true,
   "results": [
     {
-      "device_id": "001-gwc-ahu-001",
+      "device_id": "S001-AHU-L0-01",
       "point_name": "cooling_setpoint",
       "success": true,
       "value": 19.0
     },
     {
-      "device_id": "001-gwc-chiller-001",
+      "device_id": "S001-CHILLER-B1-001",
       "point_name": "chw_setpoint",
       "success": true,
       "value": 6.0

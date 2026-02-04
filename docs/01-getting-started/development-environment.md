@@ -284,7 +284,7 @@ OLLAMA_BASE_URL=http://localhost:11434
 ```bash
 curl -X POST http://localhost:9095/api/hybrid-chat \
   -H "Content-Type: application/json" \
-  -d '{"message":"What is the temperature of chiller 001-gwc-chiller-001?"}'
+  -d '{"message":"What is the temperature of chiller S001-CHILLER-B1-001?"}'
 ```
 
 ## Troubleshooting

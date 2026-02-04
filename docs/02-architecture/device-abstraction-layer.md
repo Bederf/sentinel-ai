@@ -377,7 +377,7 @@ class DeviceManager:
 from app.services.device_abstraction import device_manager
 
 # Get device adapter (protocol-agnostic)
-adapter = await device_manager.get_adapter("001-gwc-chiller-001")
+adapter = await device_manager.get_adapter("S001-CHILLER-B1-001")
 
 # Read point (works for any protocol)
 value = await adapter.read_value("chw_supply_temp")
@@ -400,7 +400,7 @@ elif device.protocol == "modbus":
 
 ```python
 # Get adapter
-adapter = await device_manager.get_adapter("001-gwc-chiller-001")
+adapter = await device_manager.get_adapter("S001-CHILLER-B1-001")
 
 # Write point (automatically validates against safety rules)
 success = await adapter.write_value(
@@ -559,7 +559,7 @@ success = await adapter.write_value(point, value)
 async def test_bacnet_adapter_read():
     """Test BACnet adapter read operation."""
     device = Device(
-        id="001-gwc-chiller-001",
+        id="S001-CHILLER-B1-001",
         protocol="bacnet",
         address="192.168.1.100",
         points={
@@ -587,7 +587,7 @@ async def test_bacnet_adapter_read():
 async def test_device_control_with_mock():
     """Test device control using mock adapter."""
     device = Device(
-        id="001-gwc-chiller-001",
+        id="S001-CHILLER-B1-001",
         protocol="mock",
         points={"temp_setpoint": DevicePoint(name="temp_setpoint")}
     )

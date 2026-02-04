@@ -60,7 +60,7 @@ SIMBIOT MCP Server provides 23 tools for building management:
 **Usage:**
 In Claude Desktop, ask:
 - "Show me all buildings in Gauteng"
-- "What's the current status of chiller 001-gwc-chiller-001?"
+- "What's the current status of chiller S001-CHILLER-B1-001?"
 - "List all active alarms"
 
 ### Method 2: Remote SSE (Cloud Claude)

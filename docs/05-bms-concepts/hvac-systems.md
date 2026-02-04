@@ -45,7 +45,7 @@ SENTINEL manages **Central Chilled Water systems with VAV Reheat** - the most co
 │                                                                          │
 │    ┌────────────────────────┐      ┌─────────────────────┐             │
 │    │   CHILLER (220 kW)     │      │   COOLING TOWER     │             │
-│    │   011-stc-chiller-001  │◄────►│   (Heat Rejection)  │             │
+│    │   S002-CHILLER-B1-001  │◄────►│   (Heat Rejection)  │             │
 │    │                        │      └─────────────────────┘             │
 │    │   • chw_supply: 6°C    │                                          │
 │    │   • chw_return: 12°C   │                                          │

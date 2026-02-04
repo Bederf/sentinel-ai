@@ -149,7 +149,7 @@ Fast heartbeat update for device last_seen timestamp.
 
 **Usage:**
 ```sql
-SELECT update_device_last_seen('001-gwc-chiller-001', 'building-uuid');
+SELECT update_device_last_seen('S001-CHILLER-B1-001', 'building-uuid');
 ```
 
 #### get_device_by_id(p_building_id UUID, p_device_id TEXT)
@@ -157,7 +157,7 @@ Retrieve device by composite key.
 
 **Usage:**
 ```sql
-SELECT * FROM get_device_by_id('building-uuid', '001-gwc-chiller-001');
+SELECT * FROM get_device_by_id('building-uuid', 'S001-CHILLER-B1-001');
 ```
 
 ## Row Level Security (RLS)
@@ -245,9 +245,9 @@ from app.database.repositories import (
 # Device CRUD
 device_repo = DeviceRepository()
 devices = device_repo.get_by_building_code('sandton')
-device = device_repo.get_by_id(building_uuid, '001-gwc-chiller-001')
-device_repo.update_status(building_uuid, '001-gwc-chiller-001', 'fault')
-device_repo.update_last_seen(building_uuid, '001-gwc-chiller-001')
+device = device_repo.get_by_id(building_uuid, 'S001-CHILLER-B1-001')
+device_repo.update_status(building_uuid, 'S001-CHILLER-B1-001', 'fault')
+device_repo.update_last_seen(building_uuid, 'S001-CHILLER-B1-001')
 
 # DALI Controllers
 controller_repo = DALIControllerRepository()
@@ -274,7 +274,7 @@ group_repo.update_scene(building_uuid, 'GRP-L12-N-001', 'working', {
 ```json
 {
   "building_id": "uuid-for-sandton",
-  "device_id": "001-gwc-chiller-001",
+  "device_id": "S001-CHILLER-B1-001",
   "name": "Chiller Plant 001",
   "device_type": "hvac",
   "protocol": "bacnet",
