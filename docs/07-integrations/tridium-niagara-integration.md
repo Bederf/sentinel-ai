@@ -2,7 +2,7 @@
 title: "SENTINEL-Tridium Niagara Integration Guide"
 type: "guide"
 status: "approved"
-version: "1.0.0"
+version: "2.0.0"
 created: "2026-02-04"
 updated: "2026-02-04"
 author: "Sentinel Development Team"
@@ -94,15 +94,20 @@ SENTINEL uses three complementary protocols, each for its strengths:
 ```
 backend/
 ├── app/services/niagara/
-│   ├── __init__.py
-│   ├── bacnet_client.py          # BAC0 wrapper — device discovery, point R/W, COV
+│   ├── __init__.py               # Package exports
+│   ├── bacnet_client.py          # BAC0 wrapper — device discovery, point R/W, COV (~890 lines)
+│   ├── bacnet_adapter.py         # DeviceAdapter for BACnet protocol integration
 │   ├── obix_client.py            # oBIX API client — histories, alarms, schedules
-│   ├── fox_client.py             # Fox over WebSocket (Niagara 4.15+ only)
-│   ├── point_discovery.py        # BACnet auto-discovery service
-│   ├── point_classifier.py       # AI-assisted Haystack/Brick classification
-│   └── mapping_service.py        # Point-to-equipment mapping + dual-write
-├── app/models/niagara.py         # Pydantic models
-└── app/api/niagara.py            # REST API endpoints
+│   ├── point_discovery.py        # BACnet auto-discovery service (~310 lines)
+│   ├── point_classifier.py       # AI-assisted Haystack/Brick classification (~450 lines)
+│   └── mapping_service.py        # Point-to-equipment mapping + dual-write (~530 lines)
+├── app/models/niagara.py         # Pydantic models (BACnet + oBIX)
+├── app/data/niagara/
+│   └── haystack_tags.json        # Haystack/Brick ontology tags (16 point types, 12 equipment patterns)
+├── app/api/
+│   ├── niagara_bacnet.py         # BACnet REST API endpoints (7 endpoints)
+│   ├── niagara.py                # oBIX REST API endpoints (5 endpoints)
+│   └── niagara_discovery.py      # Discovery & mapping REST API (4 endpoints)
 ```
 
 ### Technology Stack
@@ -430,25 +435,27 @@ Review happens via SENTINEL chat (or Telegram/WhatsApp). The team confirms or co
 
 ## API Endpoints
 
-### BACnet Operations
+### BACnet Operations (`/api/niagara/bacnet/`)
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/niagara/discover` | Discover BACnet devices on network |
-| GET | `/api/niagara/devices/{id}/points` | Discover all points on device |
-| GET | `/api/niagara/devices/{id}/points/{name}` | Read point value |
-| POST | `/api/niagara/devices/{id}/points/{name}/write` | Write point value |
-| POST | `/api/niagara/subscribe` | Create COV subscription |
-| DELETE | `/api/niagara/subscribe/{id}` | Cancel subscription |
+| POST | `/api/niagara/bacnet/discover` | Discover BACnet devices on network |
+| GET | `/api/niagara/bacnet/devices/{id}/points` | Discover all points on device |
+| GET | `/api/niagara/bacnet/devices/{id}/points/{type}/{instance}` | Read point value |
+| POST | `/api/niagara/bacnet/devices/{id}/points/{type}/{instance}/write` | Write point value with priority |
+| POST | `/api/niagara/bacnet/subscribe` | Create COV subscription |
+| GET | `/api/niagara/bacnet/subscriptions` | List active COV subscriptions |
+| DELETE | `/api/niagara/bacnet/subscribe/{id}` | Cancel subscription |
+| GET | `/api/niagara/bacnet/status` | BACnet client status check |
 
-### oBIX Operations
+### oBIX Operations (`/api/niagara/obix/`)
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | POST | `/api/niagara/obix/config` | Configure oBIX connection |
-| GET | `/api/niagara/obix/points/{path}` | Read point via oBIX |
-| GET | `/api/niagara/obix/history` | Get historical data |
-| GET | `/api/niagara/obix/alarms` | Get alarm history |
+| GET | `/api/niagara/obix/points/{point_path:path}` | Read point via oBIX |
+| GET | `/api/niagara/obix/history` | Get historical data (query: point_path, start, end) |
+| GET | `/api/niagara/obix/alarms` | Get alarm history (query: start, end, severity, limit) |
 | GET | `/api/niagara/obix/status` | Check oBIX connection status |
 
 ### Discovery & Mapping
@@ -699,15 +706,17 @@ graph TB
 
 ## Implementation Status
 
-Phase 60 (Tridium Niagara Integration) is planned in v13.0 with 3 implementation plans:
+Phase 60 (Tridium Niagara Integration) is **COMPLETE** in v13.0:
 
-| Plan | Description | Wave | Status |
-|------|-------------|------|--------|
-| 60-01 | BACnet/IP client for Niagara | Wave 1 | Planned |
-| 60-02 | oBIX REST API for histories and alarms | Wave 1 | Planned |
-| 60-03 | AI-assisted point discovery and auto-mapping | Wave 2 | Planned |
+| Plan | Description | Wave | Status | Tests |
+|------|-------------|------|--------|-------|
+| 60-01 | BACnet/IP client (BAC0 wrapper, DeviceAdapter) | Wave 1 | ✅ Complete | 95 |
+| 60-02 | oBIX REST API (session auth, XML parsing) | Wave 1 | ✅ Complete | 26 |
+| 60-03 | AI-assisted point discovery and auto-mapping | Wave 2 | ✅ Complete | 58 |
 
-Research completed: 2026-02-03 (see `.planning/phases/60-niagara-integration/60-RESEARCH.md`)
+**Total: 179 tests, 16 new files, 3 API routers (16 endpoints)**
+
+Completed: 2026-02-04
 
 ## References
 
@@ -728,5 +737,5 @@ Research completed: 2026-02-03 (see `.planning/phases/60-niagara-integration/60-
 ---
 
 *Phase: 60-niagara-integration*
-*Document version: 1.0.0*
-*Created: 2026-02-04*
+*Document version: 2.0.0*
+*Completed: 2026-02-04*
