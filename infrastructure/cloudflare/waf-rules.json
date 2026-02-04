@@ -1,0 +1,194 @@
+{
+  "_description": "SENTINEL BMS Intelligence - Cloudflare WAF Rules",
+  "_version": "1.0.0",
+  "_fsr_domains": ["4.9 Application Security (HIGH gap)", "4.13 Incident Detection (HIGH gap)"],
+  "_note": "Apply via Cloudflare Dashboard or API. These rules are documentation of what to configure.",
+  "_last_updated": "2026-02-04",
+
+  "rules": [
+    {
+      "id": "sentinel-waf-001",
+      "name": "OWASP Core Rule Set",
+      "description": "Enable Cloudflare managed OWASP ModSecurity Core Rule Set for broad attack protection",
+      "action": "managed_challenge",
+      "sensitivity": "medium",
+      "enabled": true,
+      "rationale": "OWASP CRS covers top 10 web vulnerabilities including injection, XSS, and CSRF. Medium sensitivity balances security with false positive reduction for BMS API traffic.",
+      "cloudflare_config": {
+        "type": "managed_ruleset",
+        "ruleset": "cloudflare_owasp_core",
+        "paranoia_level": 2,
+        "anomaly_score_threshold": 60
+      }
+    },
+    {
+      "id": "sentinel-waf-002",
+      "name": "SQL Injection Protection",
+      "description": "Block requests containing SQL injection patterns in query parameters, headers, and request body",
+      "action": "block",
+      "enabled": true,
+      "rationale": "SENTINEL API accepts JSON payloads with equipment IDs, sensor values, and search queries. SQL injection in these fields could compromise Supabase PostgreSQL backend.",
+      "cloudflare_config": {
+        "type": "custom_rule",
+        "expression": "(http.request.uri.query contains \"' OR \" or http.request.uri.query contains \"1=1\" or http.request.uri.query contains \"UNION SELECT\" or http.request.uri.query contains \"DROP TABLE\" or http.request.uri.query contains \"; --\" or http.request.body.raw contains \"' OR \" or http.request.body.raw contains \"UNION SELECT\")",
+        "action": "block",
+        "logging": true
+      }
+    },
+    {
+      "id": "sentinel-waf-003",
+      "name": "XSS Protection",
+      "description": "Block requests containing cross-site scripting patterns",
+      "action": "block",
+      "enabled": true,
+      "rationale": "AI chat endpoints accept free-text input that could contain XSS payloads. Block script injection patterns before they reach the backend.",
+      "cloudflare_config": {
+        "type": "custom_rule",
+        "expression": "(http.request.uri contains \"<script\" or http.request.uri contains \"javascript:\" or http.request.uri contains \"onerror=\" or http.request.uri contains \"onload=\" or http.request.body.raw contains \"<script\" or http.request.body.raw contains \"javascript:\")",
+        "action": "block",
+        "logging": true
+      }
+    },
+    {
+      "id": "sentinel-waf-004",
+      "name": "Path Traversal Protection",
+      "description": "Block requests attempting directory traversal to access system files",
+      "action": "block",
+      "enabled": true,
+      "rationale": "Prevent access to .env files, system configs, and source code through path traversal. Critical for protecting API keys and database credentials.",
+      "cloudflare_config": {
+        "type": "custom_rule",
+        "expression": "(http.request.uri contains \"../\" or http.request.uri contains \"..\\\\\" or http.request.uri contains \"%2e%2e%2f\" or http.request.uri contains \"%2e%2e/\" or http.request.uri contains \"..%2f\" or http.request.uri contains \".env\" or http.request.uri contains \"/etc/passwd\")",
+        "action": "block",
+        "logging": true
+      }
+    },
+    {
+      "id": "sentinel-waf-005",
+      "name": "API Rate Limiting",
+      "description": "Endpoint-specific rate limits for SENTINEL API to prevent abuse and control costs",
+      "action": "rate_limit",
+      "enabled": true,
+      "rationale": "Different endpoints have different cost and safety profiles. AI chat is expensive (Claude API), device control is safety-critical, MCP tools need moderate limits.",
+      "cloudflare_config": {
+        "type": "rate_limiting_rules",
+        "rules": [
+          {
+            "name": "AI Chat Rate Limit",
+            "expression": "(http.request.uri.path eq \"/api/chat\" or http.request.uri.path eq \"/api/hybrid-chat\")",
+            "requests_per_period": 30,
+            "period_seconds": 60,
+            "action": "block",
+            "mitigation_timeout": 60,
+            "rationale": "AI chat calls Claude API at ~$0.01/query. 30 req/min/IP prevents cost abuse while allowing normal conversation."
+          },
+          {
+            "name": "MCP Tool Rate Limit",
+            "expression": "(http.request.uri.path eq \"/api/mcp/simbiot/call\")",
+            "requests_per_period": 60,
+            "period_seconds": 60,
+            "action": "block",
+            "mitigation_timeout": 60,
+            "rationale": "MCP tools interact with building systems. 60 req/min allows batch operations while preventing runaway automation."
+          },
+          {
+            "name": "Device Control Rate Limit",
+            "expression": "(http.request.uri.path contains \"/api/devices/\" and http.request.uri.path contains \"/control\")",
+            "requests_per_period": 20,
+            "period_seconds": 60,
+            "action": "block",
+            "mitigation_timeout": 120,
+            "rationale": "Safety-critical: device control changes BMS setpoints. 20 req/min prevents accidental rapid-fire commands. 2-min cooldown on violation."
+          },
+          {
+            "name": "General API Rate Limit",
+            "expression": "(http.request.uri.path starts_with \"/api/\")",
+            "requests_per_period": 120,
+            "period_seconds": 60,
+            "action": "managed_challenge",
+            "mitigation_timeout": 60,
+            "rationale": "General API limit allows normal dashboard usage. Challenge (not block) gives legitimate users a chance to continue."
+          }
+        ]
+      }
+    },
+    {
+      "id": "sentinel-waf-006",
+      "name": "Bot Protection",
+      "description": "Challenge requests from known bot user agents, excluding monitoring services",
+      "action": "managed_challenge",
+      "enabled": true,
+      "rationale": "Protect against automated scanners, scrapers, and vulnerability tools while allowing legitimate monitoring (UptimeRobot, health checks).",
+      "cloudflare_config": {
+        "type": "custom_rule",
+        "expression": "(cf.client.bot and not cf.bot_management.verified_bot and not http.request.uri.path eq \"/api/health\" and not http.user_agent contains \"UptimeRobot\" and not http.user_agent contains \"Cloudflare\")",
+        "action": "managed_challenge",
+        "logging": true
+      }
+    },
+    {
+      "id": "sentinel-waf-007",
+      "name": "Geographic Access Control",
+      "description": "Allow South Africa primarily, challenge requests from high-risk countries",
+      "action": "managed_challenge",
+      "enabled": true,
+      "rationale": "SENTINEL manages South African buildings. Primary users are in ZA. Challenge (not block) non-ZA traffic to reduce automated attacks while allowing legitimate remote access.",
+      "cloudflare_config": {
+        "type": "custom_rule",
+        "expression": "(not ip.geoip.country in {\"ZA\" \"GB\" \"US\" \"DE\" \"NL\"} and http.request.uri.path starts_with \"/api/\" and not http.request.uri.path eq \"/api/health\")",
+        "action": "managed_challenge",
+        "logging": true,
+        "note": "ZA=South Africa (primary), GB/US/DE/NL=allowed for remote access and Cloudflare infrastructure"
+      }
+    },
+    {
+      "id": "sentinel-waf-008",
+      "name": "Request Size Limits",
+      "description": "Block oversized requests to prevent DoS via large payloads",
+      "action": "block",
+      "enabled": true,
+      "rationale": "Normal SENTINEL API payloads are <1MB. OCR and vision endpoints accept images up to 5MB. Block >10MB to prevent resource exhaustion.",
+      "cloudflare_config": {
+        "type": "custom_rule",
+        "expression": "(http.request.body.size gt 10485760 and not http.request.uri.path eq \"/api/ocr/process\" and not http.request.uri.path eq \"/api/vision/analyze\")",
+        "action": "block",
+        "logging": true,
+        "note": "10MB = 10485760 bytes. OCR and vision endpoints are exempt for image uploads."
+      }
+    },
+    {
+      "id": "sentinel-waf-009",
+      "name": "Header Validation",
+      "description": "Require Content-Type header on POST/PUT/PATCH requests to prevent content-type confusion attacks",
+      "action": "block",
+      "enabled": true,
+      "rationale": "All SENTINEL API mutations expect JSON payloads. Missing Content-Type header suggests malformed or malicious requests. Exempt multipart endpoints for file uploads.",
+      "cloudflare_config": {
+        "type": "custom_rule",
+        "expression": "(http.request.method in {\"POST\" \"PUT\" \"PATCH\"} and http.request.uri.path starts_with \"/api/\" and not any(http.request.headers[\"content-type\"][*] contains \"application/json\") and not any(http.request.headers[\"content-type\"][*] contains \"multipart/form-data\") and not any(http.request.headers[\"content-type\"][*] contains \"text/event-stream\") and not http.request.uri.path eq \"/api/health\")",
+        "action": "block",
+        "logging": true
+      }
+    }
+  ],
+
+  "summary": {
+    "total_rules": 9,
+    "rule_categories": {
+      "attack_protection": ["sentinel-waf-001", "sentinel-waf-002", "sentinel-waf-003", "sentinel-waf-004"],
+      "rate_limiting": ["sentinel-waf-005"],
+      "bot_protection": ["sentinel-waf-006"],
+      "access_control": ["sentinel-waf-007"],
+      "input_validation": ["sentinel-waf-008", "sentinel-waf-009"]
+    },
+    "sentinel_endpoints_covered": {
+      "/api/chat": "30 req/min (AI cost control)",
+      "/api/hybrid-chat": "30 req/min (AI cost control)",
+      "/api/mcp/simbiot/call": "60 req/min (BMS tool safety)",
+      "/api/devices/*/control": "20 req/min (safety-critical)",
+      "/api/*": "120 req/min (general)",
+      "/api/ocr/process": "Exempt from size limit (image upload)",
+      "/api/vision/analyze": "Exempt from size limit (image upload)"
+    }
+  }
+}
