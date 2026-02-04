@@ -1,0 +1,229 @@
+{
+  "point_type_tags": {
+    "temperature": {
+      "keywords": ["temp", "temperature", "tmp", "degc", "degf"],
+      "brick_class": "Temperature_Sensor",
+      "unit": "degC",
+      "point_type": "sensor"
+    },
+    "humidity": {
+      "keywords": ["humidity", "rh", "hum", "relative_humidity", "moistur"],
+      "brick_class": "Humidity_Sensor",
+      "unit": "%",
+      "point_type": "sensor"
+    },
+    "pressure": {
+      "keywords": ["pressure", "press", "static", "discharge", "dp", "diff_press", "kpa", "pa"],
+      "brick_class": "Pressure_Sensor",
+      "unit": "kPa",
+      "point_type": "sensor"
+    },
+    "flow": {
+      "keywords": ["flow", "cfm", "lps", "gpm", "volume", "airflow"],
+      "brick_class": "Flow_Sensor",
+      "unit": "L/s",
+      "point_type": "sensor"
+    },
+    "co2": {
+      "keywords": ["co2", "carbon_dioxide", "carbondioxide", "iaq"],
+      "brick_class": "CO2_Sensor",
+      "unit": "ppm",
+      "point_type": "sensor"
+    },
+    "setpoint": {
+      "keywords": ["setpoint", "sp", "set_point", "stpt", "target"],
+      "brick_class": "Setpoint",
+      "unit": "",
+      "point_type": "setpoint"
+    },
+    "status": {
+      "keywords": ["status", "sts", "state", "run", "running", "on_off", "mode"],
+      "brick_class": "Status",
+      "unit": "",
+      "point_type": "status"
+    },
+    "command": {
+      "keywords": ["command", "cmd", "enable", "disable", "start", "stop", "output"],
+      "brick_class": "Command",
+      "unit": "",
+      "point_type": "command"
+    },
+    "alarm": {
+      "keywords": ["alarm", "alm", "fault", "warning", "trip", "fail", "error"],
+      "brick_class": "Alarm",
+      "unit": "",
+      "point_type": "alarm"
+    },
+    "speed": {
+      "keywords": ["speed", "vfd", "freq", "frequency", "hz", "rpm", "fan_speed"],
+      "brick_class": "Speed_Sensor",
+      "unit": "%",
+      "point_type": "sensor"
+    },
+    "valve_position": {
+      "keywords": ["valve", "vlv", "damper", "dmp", "position", "pos"],
+      "brick_class": "Valve_Position_Sensor",
+      "unit": "%",
+      "point_type": "sensor"
+    },
+    "power": {
+      "keywords": ["power", "kw", "watt", "energy", "kwh", "consumption"],
+      "brick_class": "Power_Sensor",
+      "unit": "kW",
+      "point_type": "sensor"
+    },
+    "current": {
+      "keywords": ["current", "amp", "amps"],
+      "brick_class": "Current_Sensor",
+      "unit": "A",
+      "point_type": "sensor"
+    },
+    "voltage": {
+      "keywords": ["voltage", "volt", "vac", "vdc"],
+      "brick_class": "Voltage_Sensor",
+      "unit": "V",
+      "point_type": "sensor"
+    },
+    "occupancy": {
+      "keywords": ["occupancy", "occ", "occupied", "pir", "motion"],
+      "brick_class": "Occupancy_Sensor",
+      "unit": "",
+      "point_type": "sensor"
+    },
+    "level": {
+      "keywords": ["level", "tank", "reservoir", "fuel"],
+      "brick_class": "Level_Sensor",
+      "unit": "%",
+      "point_type": "sensor"
+    }
+  },
+  "equipment_patterns": {
+    "chiller": {
+      "regex": "chiller|chil|ch[-_]?\\d",
+      "brick_class": "Chiller",
+      "typical_points": ["chw_supply_temp", "chw_return_temp", "condenser_water_temp", "compressor_status", "load_percent"]
+    },
+    "ahu": {
+      "regex": "ahu|air[._-]?handler|air[._-]?handling",
+      "brick_class": "Air_Handling_Unit",
+      "typical_points": ["supply_air_temp", "return_air_temp", "mixed_air_temp", "filter_dp", "fan_status", "fan_speed"]
+    },
+    "fcu": {
+      "regex": "fcu|fan[._-]?coil",
+      "brick_class": "Fan_Coil_Unit",
+      "typical_points": ["supply_air_temp", "room_temp", "fan_speed", "valve_position", "setpoint"]
+    },
+    "vav": {
+      "regex": "vav|variable[._-]?air[._-]?volume",
+      "brick_class": "Variable_Air_Volume_Box",
+      "typical_points": ["discharge_air_temp", "zone_temp", "damper_position", "airflow", "setpoint"]
+    },
+    "pump": {
+      "regex": "pump|pmp",
+      "brick_class": "Pump",
+      "typical_points": ["discharge_pressure", "suction_pressure", "flow", "speed", "status"]
+    },
+    "boiler": {
+      "regex": "boiler|blr",
+      "brick_class": "Boiler",
+      "typical_points": ["supply_temp", "return_temp", "firing_rate", "status", "flame_status"]
+    },
+    "cooling_tower": {
+      "regex": "cooling[._-]?tower|ct[-_]?\\d|tower",
+      "brick_class": "Cooling_Tower",
+      "typical_points": ["water_temp", "fan_speed", "basin_level", "status"]
+    },
+    "generator": {
+      "regex": "generator|gen[-_]?\\d|genset",
+      "brick_class": "Generator",
+      "typical_points": ["output_kw", "fuel_level", "engine_temp", "frequency", "voltage", "status"]
+    },
+    "ups": {
+      "regex": "ups|uninterruptible",
+      "brick_class": "UPS",
+      "typical_points": ["battery_level", "load_percent", "input_voltage", "output_voltage", "status"]
+    },
+    "transformer": {
+      "regex": "transformer|xfmr|trafo",
+      "brick_class": "Transformer",
+      "typical_points": ["primary_voltage", "secondary_voltage", "oil_temp", "load_percent"]
+    },
+    "dali_controller": {
+      "regex": "dali|light[._-]?controller|luminaire|lighting",
+      "brick_class": "Lighting_Equipment",
+      "typical_points": ["brightness", "power_state", "lux_level", "occupancy"]
+    },
+    "meter": {
+      "regex": "meter|mtr|metering|power[._-]?meter",
+      "brick_class": "Meter",
+      "typical_points": ["kw", "kwh", "kva", "power_factor", "voltage", "current"]
+    }
+  },
+  "unit_mappings": {
+    "degC": ["degc", "celsius", "c", "degrees_c"],
+    "degF": ["degf", "fahrenheit", "f", "degrees_f"],
+    "kPa": ["kpa", "kilopascals"],
+    "Pa": ["pa", "pascals"],
+    "psi": ["psi", "pounds_per_square_inch"],
+    "%": ["percent", "pct", "%"],
+    "L/s": ["l/s", "lps", "liters_per_second"],
+    "CFM": ["cfm", "cubic_feet_per_minute"],
+    "ppm": ["ppm", "parts_per_million"],
+    "kW": ["kw", "kilowatt", "kilowatts"],
+    "kWh": ["kwh", "kilowatt_hours"],
+    "A": ["amp", "amps", "ampere", "amperes"],
+    "V": ["volt", "volts", "vac", "vdc"],
+    "Hz": ["hz", "hertz"],
+    "RPM": ["rpm", "revolutions_per_minute"]
+  },
+  "demo_points": [
+    {"name": "CH-1_CHW_Supply_Temp", "description": "Chiller 1 Chilled Water Supply Temperature", "object_type": "analogInput", "units": "degC", "value": 6.5},
+    {"name": "CH-1_CHW_Return_Temp", "description": "Chiller 1 Chilled Water Return Temperature", "object_type": "analogInput", "units": "degC", "value": 12.3},
+    {"name": "CH-1_Condenser_Water_Temp", "description": "Chiller 1 Condenser Water Temperature", "object_type": "analogInput", "units": "degC", "value": 32.1},
+    {"name": "CH-1_Compressor_Status", "description": "Chiller 1 Compressor Run Status", "object_type": "binaryInput", "units": "", "value": 1},
+    {"name": "CH-1_Load_Percent", "description": "Chiller 1 Current Load", "object_type": "analogInput", "units": "%", "value": 72},
+    {"name": "CH-1_CHW_SP", "description": "Chiller 1 CHW Supply Setpoint", "object_type": "analogValue", "units": "degC", "value": 6.0},
+    {"name": "CH-1_Alarm", "description": "Chiller 1 General Alarm", "object_type": "binaryInput", "units": "", "value": 0},
+    {"name": "CH-2_CHW_Supply_Temp", "description": "Chiller 2 Chilled Water Supply Temperature", "object_type": "analogInput", "units": "degC", "value": 6.8},
+    {"name": "CH-2_Compressor_Status", "description": "Chiller 2 Compressor Status", "object_type": "binaryInput", "units": "", "value": 1},
+    {"name": "CH-2_Load_Percent", "description": "Chiller 2 Load Percentage", "object_type": "analogInput", "units": "%", "value": 65},
+    {"name": "AHU-1_Supply_Air_Temp", "description": "AHU-1 Supply Air Temperature", "object_type": "analogInput", "units": "degC", "value": 14.2},
+    {"name": "AHU-1_Return_Air_Temp", "description": "AHU-1 Return Air Temperature", "object_type": "analogInput", "units": "degC", "value": 24.5},
+    {"name": "AHU-1_Mixed_Air_Temp", "description": "AHU-1 Mixed Air Temperature", "object_type": "analogInput", "units": "degC", "value": 19.3},
+    {"name": "AHU-1_Filter_DP", "description": "AHU-1 Filter Differential Pressure", "object_type": "analogInput", "units": "Pa", "value": 180},
+    {"name": "AHU-1_Fan_Status", "description": "AHU-1 Supply Fan Run Status", "object_type": "binaryInput", "units": "", "value": 1},
+    {"name": "AHU-1_Fan_Speed", "description": "AHU-1 Supply Fan Speed", "object_type": "analogOutput", "units": "%", "value": 78},
+    {"name": "AHU-1_SA_SP", "description": "AHU-1 Supply Air Setpoint", "object_type": "analogValue", "units": "degC", "value": 14.0},
+    {"name": "AHU-2_Supply_Air_Temp", "description": "AHU-2 Supply Air Temperature", "object_type": "analogInput", "units": "degC", "value": 15.1},
+    {"name": "AHU-2_Fan_Status", "description": "AHU-2 Supply Fan Status", "object_type": "binaryInput", "units": "", "value": 1},
+    {"name": "AHU-2_Fan_Speed", "description": "AHU-2 Fan Speed", "object_type": "analogOutput", "units": "%", "value": 65},
+    {"name": "VAV-L1-A_Zone_Temp", "description": "VAV Level 1 Zone A Temperature", "object_type": "analogInput", "units": "degC", "value": 22.5},
+    {"name": "VAV-L1-A_Damper_Pos", "description": "VAV Level 1 Zone A Damper Position", "object_type": "analogOutput", "units": "%", "value": 55},
+    {"name": "VAV-L1-A_Airflow", "description": "VAV Level 1 Zone A Airflow", "object_type": "analogInput", "units": "L/s", "value": 120},
+    {"name": "VAV-L1-A_Zone_SP", "description": "VAV Level 1 Zone A Temperature Setpoint", "object_type": "analogValue", "units": "degC", "value": 22.0},
+    {"name": "VAV-L1-B_Zone_Temp", "description": "VAV Level 1 Zone B Temperature", "object_type": "analogInput", "units": "degC", "value": 23.1},
+    {"name": "VAV-L1-B_Damper_Pos", "description": "VAV Level 1 Zone B Damper Position", "object_type": "analogOutput", "units": "%", "value": 40},
+    {"name": "VAV-L2-A_Zone_Temp", "description": "VAV Level 2 Zone A Temperature", "object_type": "analogInput", "units": "degC", "value": 21.8},
+    {"name": "VAV-L2-A_Zone_SP", "description": "VAV Level 2 Zone A Setpoint", "object_type": "analogValue", "units": "degC", "value": 22.0},
+    {"name": "FCU-L1-A_Room_Temp", "description": "FCU Level 1 Zone A Room Temperature", "object_type": "analogInput", "units": "degC", "value": 22.8},
+    {"name": "FCU-L1-A_Fan_Speed", "description": "FCU Level 1 Zone A Fan Speed", "object_type": "analogOutput", "units": "%", "value": 60},
+    {"name": "FCU-L1-A_Valve_Pos", "description": "FCU Level 1 Zone A Cooling Valve", "object_type": "analogOutput", "units": "%", "value": 45},
+    {"name": "PUMP-CW-1_Status", "description": "Condenser Water Pump 1 Status", "object_type": "binaryInput", "units": "", "value": 1},
+    {"name": "PUMP-CW-1_Speed", "description": "Condenser Water Pump 1 Speed", "object_type": "analogOutput", "units": "%", "value": 80},
+    {"name": "PUMP-CHW-1_Status", "description": "Chilled Water Pump 1 Status", "object_type": "binaryInput", "units": "", "value": 1},
+    {"name": "PUMP-CHW-1_DP", "description": "Chilled Water Pump 1 Discharge Pressure", "object_type": "analogInput", "units": "kPa", "value": 250},
+    {"name": "CT-1_Fan_Speed", "description": "Cooling Tower 1 Fan Speed", "object_type": "analogOutput", "units": "%", "value": 70},
+    {"name": "CT-1_Basin_Temp", "description": "Cooling Tower 1 Basin Water Temperature", "object_type": "analogInput", "units": "degC", "value": 28.5},
+    {"name": "MTR-MAIN_kW", "description": "Main Power Meter Active Power", "object_type": "analogInput", "units": "kW", "value": 450},
+    {"name": "MTR-MAIN_kWh", "description": "Main Power Meter Energy", "object_type": "analogInput", "units": "kWh", "value": 12500},
+    {"name": "MTR-MAIN_PF", "description": "Main Power Meter Power Factor", "object_type": "analogInput", "units": "", "value": 0.92},
+    {"name": "GEN-1_Status", "description": "Generator 1 Run Status", "object_type": "binaryInput", "units": "", "value": 0},
+    {"name": "GEN-1_Fuel_Level", "description": "Generator 1 Fuel Level", "object_type": "analogInput", "units": "%", "value": 85},
+    {"name": "GEN-1_Output_kW", "description": "Generator 1 Output Power", "object_type": "analogInput", "units": "kW", "value": 0},
+    {"name": "ZONE-L1_CO2", "description": "Level 1 CO2 Sensor", "object_type": "analogInput", "units": "ppm", "value": 650},
+    {"name": "ZONE-L1_Humidity", "description": "Level 1 Humidity Sensor", "object_type": "analogInput", "units": "%", "value": 55},
+    {"name": "ZONE-L2_CO2", "description": "Level 2 CO2 Sensor", "object_type": "analogInput", "units": "ppm", "value": 720},
+    {"name": "UPS-1_Battery_Level", "description": "UPS 1 Battery Level", "object_type": "analogInput", "units": "%", "value": 98},
+    {"name": "UPS-1_Load_Percent", "description": "UPS 1 Load Percentage", "object_type": "analogInput", "units": "%", "value": 45}
+  ]
+}
