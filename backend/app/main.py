@@ -43,6 +43,7 @@ from app.api import ml_feedback  # Phase 57-02 ML feedback loop
 from app.api import repair_effectiveness  # Phase 57-01 Repair effectiveness validation
 from app.api import remote_ops  # Phase 59-01 Remote operations monitoring
 from app.api import remote_commands  # Phase 59-02 Remote command execution
+from app.api import dispatch  # Phase 59-03 Smart dispatch & task bundling
 # from app.api import inspection  # Phase 45 Routine Inspection & Maintenance - TODO: Fix import errors
 from app.middleware.audit_middleware import AuditMiddleware
 from app.services.background_scheduler import scheduler_service
@@ -122,6 +123,7 @@ app.include_router(ml_feedback.router, tags=["ml-feedback"])  # Phase 57-02 ML f
 app.include_router(repair_effectiveness.router, tags=["repair-effectiveness"])  # Phase 57-01 Repair effectiveness
 app.include_router(remote_ops.router, tags=["remote-ops"])  # Phase 59-01 Remote operations monitoring
 app.include_router(remote_commands.router, prefix="/api/remote", tags=["remote-ops"])  # Phase 59-02 Remote command execution
+app.include_router(dispatch.router, prefix="/api/dispatch", tags=["dispatch"])  # Phase 59-03 Smart dispatch
 # app.include_router(inspection.router)  # Phase 45 Routine Inspection & Maintenance - TODO: Fix import errors
 
 
