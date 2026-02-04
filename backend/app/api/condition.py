@@ -1,8 +1,8 @@
 """
-Condition Analysis API (Phase 56-01, 56-02)
+Condition Analysis API (Phase 56-01, 56-02, 56-03)
 
 REST endpoints for element-level condition trending, degradation analysis,
-and remaining useful life (RUL) predictions.
+remaining useful life (RUL) predictions, and service optimization.
 
 Endpoints:
 - GET  /api/condition/trends/{equipment_id}                - Equipment trend summary
@@ -12,6 +12,9 @@ Endpoints:
 - GET  /api/condition/rul/{equipment_id}                   - RUL prediction
 - GET  /api/condition/recommendations/{equipment_id}       - Service recommendations
 - GET  /api/condition/fleet-risk                           - Fleet-wide risk overview
+- POST /api/condition/optimize-service-schedule             - Fleet schedule optimization (ROADMAP spec)
+- GET  /api/condition/utilization/{equipment_id}            - Asset utilization tracking
+- GET  /api/condition/cost-comparison/{equipment_id}        - Fixed vs conditional cost comparison
 """
 
 import json
@@ -30,9 +33,15 @@ from app.models.condition import (
     EquipmentRUL,
     ServiceRecommendation,
     RiskLevel,
+    AssetUtilization,
+    ServiceWindow,
+    MaintenanceCostComparison,
+    OptimizedSchedule,
+    OptimizeScheduleRequest,
 )
 from app.services.element_trend_service import get_element_trend_service
 from app.services.rul_calculator import get_rul_calculator
+from app.services.service_optimizer import get_service_optimizer
 
 logger = logging.getLogger(__name__)
 
@@ -358,6 +367,102 @@ async def get_fleet_risk(
         raise HTTPException(
             status_code=500,
             detail=f"Error calculating fleet risk: {str(e)}"
+        )
+
+
+# ============================================================================
+# Service Optimization Endpoints (Phase 56-03)
+# ============================================================================
+
+@router.post(
+    "/optimize-service-schedule",
+    response_model=OptimizedSchedule,
+    summary="Optimize fleet service schedule",
+    description=(
+        "Returns optimized maintenance schedule for specified equipment or full fleet. "
+        "Compares condition-based timing against fixed-schedule approach. "
+        "Matches ROADMAP spec endpoint."
+    )
+)
+async def optimize_service_schedule(request: OptimizeScheduleRequest):
+    """Optimize service schedule for fleet or specific equipment."""
+    try:
+        optimizer = get_service_optimizer()
+        schedule = await optimizer.optimize_fleet_schedule(
+            equipment_ids=request.equipment_ids,
+            fixed_interval_days=request.fixed_interval_days,
+        )
+        return schedule
+    except Exception as e:
+        logger.error(f"Error optimizing service schedule: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error optimizing service schedule: {str(e)}"
+        )
+
+
+@router.get(
+    "/utilization/{equipment_id}",
+    response_model=List[AssetUtilization],
+    summary="Get asset utilization",
+    description=(
+        "Returns utilization percentages for all monitored elements of an equipment item. "
+        "Shows how much of each component's usable life has been consumed."
+    )
+)
+async def get_utilization(equipment_id: str):
+    """Get asset utilization for all elements of equipment."""
+    try:
+        optimizer = get_service_optimizer()
+        utilizations = await optimizer.calculate_utilization(equipment_id)
+
+        if not utilizations:
+            # Return empty list with informative log
+            logger.info(
+                f"No utilization data for {equipment_id} - "
+                f"no inspection data or thresholds available"
+            )
+
+        return utilizations
+    except Exception as e:
+        logger.error(f"Error calculating utilization for {equipment_id}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error calculating utilization: {str(e)}"
+        )
+
+
+@router.get(
+    "/cost-comparison/{equipment_id}",
+    response_model=MaintenanceCostComparison,
+    summary="Get maintenance cost comparison",
+    description=(
+        "Compares fixed-schedule vs condition-based maintenance costs for equipment. "
+        "Shows potential savings from adopting condition-based approach."
+    )
+)
+async def get_cost_comparison(
+    equipment_id: str,
+    fixed_interval_days: int = Query(
+        default=90,
+        ge=7,
+        le=365,
+        description="Fixed-schedule interval in days for comparison (default 90 = quarterly)"
+    )
+):
+    """Compare fixed vs condition-based maintenance costs."""
+    try:
+        optimizer = get_service_optimizer()
+        comparison = await optimizer.compare_maintenance_costs(
+            equipment_id=equipment_id,
+            fixed_interval_days=fixed_interval_days,
+        )
+        return comparison
+    except Exception as e:
+        logger.error(f"Error comparing costs for {equipment_id}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error comparing maintenance costs: {str(e)}"
         )
 
 
