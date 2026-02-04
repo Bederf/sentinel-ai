@@ -8,15 +8,30 @@
     "condition_at_capture": "good",
     "notes": "Baseline captured after quarterly service. Cummins C500D5 running at 1500 RPM. All parameters normal.",
     "vibration_rms_ms2": 2.8,
-    "vibration_peak_frequencies_hz": [25.0, 50.0, 75.0, 100.0],
+    "vibration_peak_frequencies_hz": [
+      25.0,
+      50.0,
+      75.0,
+      100.0
+    ],
     "dominant_frequency_hz": 25.0,
     "audio_noise_floor_db": 82.5,
     "spectrum_shape": "harmonic",
     "is_active": true,
     "full_data": {
       "rms_total_ms2": 2.8,
-      "peak_frequencies_hz": [25.0, 50.0, 75.0, 100.0],
-      "peak_amplitudes": [0.85, 0.42, 0.18, 0.08],
+      "peak_frequencies_hz": [
+        25.0,
+        50.0,
+        75.0,
+        100.0
+      ],
+      "peak_amplitudes": [
+        0.85,
+        0.42,
+        0.18,
+        0.08
+      ],
       "dominant_frequency_hz": 25.0,
       "spectrum_shape": "harmonic",
       "measurement_type": "vibration",
@@ -32,15 +47,27 @@
     "condition_at_capture": "good",
     "notes": "York YLAA0220HE screw chiller baseline. Compressor running at full load during capture.",
     "vibration_rms_ms2": 1.9,
-    "vibration_peak_frequencies_hz": [48.5, 97.0, 145.5],
+    "vibration_peak_frequencies_hz": [
+      48.5,
+      97.0,
+      145.5
+    ],
     "dominant_frequency_hz": 48.5,
     "audio_noise_floor_db": 78.0,
     "spectrum_shape": "harmonic",
     "is_active": true,
     "full_data": {
       "rms_total_ms2": 1.9,
-      "peak_frequencies_hz": [48.5, 97.0, 145.5],
-      "peak_amplitudes": [0.72, 0.35, 0.15],
+      "peak_frequencies_hz": [
+        48.5,
+        97.0,
+        145.5
+      ],
+      "peak_amplitudes": [
+        0.72,
+        0.35,
+        0.15
+      ],
       "dominant_frequency_hz": 48.5,
       "spectrum_shape": "harmonic",
       "measurement_type": "vibration",
@@ -56,15 +83,27 @@
     "condition_at_capture": "good",
     "notes": "Baltimore Aircoil FXV-421 fan baseline. Fan motor at 100% speed.",
     "vibration_rms_ms2": 1.5,
-    "vibration_peak_frequencies_hz": [14.5, 29.0, 43.5],
+    "vibration_peak_frequencies_hz": [
+      14.5,
+      29.0,
+      43.5
+    ],
     "dominant_frequency_hz": 14.5,
     "audio_noise_floor_db": 85.0,
     "spectrum_shape": "harmonic",
     "is_active": true,
     "full_data": {
       "rms_total_ms2": 1.5,
-      "peak_frequencies_hz": [14.5, 29.0, 43.5],
-      "peak_amplitudes": [0.65, 0.28, 0.12],
+      "peak_frequencies_hz": [
+        14.5,
+        29.0,
+        43.5
+      ],
+      "peak_amplitudes": [
+        0.65,
+        0.28,
+        0.12
+      ],
       "dominant_frequency_hz": 14.5,
       "spectrum_shape": "harmonic",
       "measurement_type": "vibration",
@@ -80,15 +119,27 @@
     "condition_at_capture": "good",
     "notes": "Carrier 39M-80 supply fan baseline. VSD at 75% speed.",
     "vibration_rms_ms2": 1.2,
-    "vibration_peak_frequencies_hz": [12.0, 24.0, 36.0],
+    "vibration_peak_frequencies_hz": [
+      12.0,
+      24.0,
+      36.0
+    ],
     "dominant_frequency_hz": 12.0,
     "audio_noise_floor_db": 72.0,
     "spectrum_shape": "harmonic",
     "is_active": true,
     "full_data": {
       "rms_total_ms2": 1.2,
-      "peak_frequencies_hz": [12.0, 24.0, 36.0],
-      "peak_amplitudes": [0.55, 0.22, 0.09],
+      "peak_frequencies_hz": [
+        12.0,
+        24.0,
+        36.0
+      ],
+      "peak_amplitudes": [
+        0.55,
+        0.22,
+        0.09
+      ],
       "dominant_frequency_hz": 12.0,
       "spectrum_shape": "harmonic",
       "measurement_type": "vibration",
@@ -104,15 +155,30 @@
     "condition_at_capture": "fair",
     "notes": "Carrier 39M-50 basement unit. Noted slight bearing noise at capture - monitoring.",
     "vibration_rms_ms2": 2.1,
-    "vibration_peak_frequencies_hz": [16.0, 32.0, 48.0, 128.5],
+    "vibration_peak_frequencies_hz": [
+      16.0,
+      32.0,
+      48.0,
+      128.5
+    ],
     "dominant_frequency_hz": 16.0,
     "audio_noise_floor_db": 76.0,
     "spectrum_shape": "noisy",
     "is_active": true,
     "full_data": {
       "rms_total_ms2": 2.1,
-      "peak_frequencies_hz": [16.0, 32.0, 48.0, 128.5],
-      "peak_amplitudes": [0.68, 0.32, 0.14, 0.25],
+      "peak_frequencies_hz": [
+        16.0,
+        32.0,
+        48.0,
+        128.5
+      ],
+      "peak_amplitudes": [
+        0.68,
+        0.32,
+        0.14,
+        0.25
+      ],
       "dominant_frequency_hz": 16.0,
       "spectrum_shape": "noisy",
       "measurement_type": "vibration",

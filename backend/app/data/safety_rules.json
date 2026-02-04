@@ -4,7 +4,7 @@
     "name": "Zone Temperature Safe Range",
     "rule_type": "temperature_range",
     "severity": "block",
-    "description": "Zone temperature setpoints must be within 16-28\u00b0C for occupant comfort",
+    "description": "Zone temperature setpoints must be within 16-28°C for occupant comfort",
     "device_type": "hvac",
     "device_id": null,
     "point_name": "cooling_setpoint",
@@ -14,14 +14,14 @@
     "updated_at": "2026-01-28T11:49:47.687597+00:00",
     "min_temp": 16.0,
     "max_temp": 28.0,
-    "unit": "\u00b0C"
+    "unit": "°C"
   },
   {
     "id": "temp_chw_supply_range",
     "name": "CHW Supply Temperature Range",
     "rule_type": "temperature_range",
     "severity": "block",
-    "description": "Chilled water supply temperature must be within 5-12\u00b0C",
+    "description": "Chilled water supply temperature must be within 5-12°C",
     "device_type": "hvac",
     "device_id": null,
     "point_name": "chw_supply_temp_setpoint",
@@ -31,14 +31,14 @@
     "updated_at": "2026-01-29T12:00:00.000000+00:00",
     "min_temp": 5.0,
     "max_temp": 12.0,
-    "unit": "\u00b0C"
+    "unit": "°C"
   },
   {
     "id": "temp_chw_setpoint_range",
     "name": "CHW Setpoint Temperature Range",
     "rule_type": "temperature_range",
     "severity": "block",
-    "description": "Chilled water setpoint must be within 5-12\u00b0C for proper cooling",
+    "description": "Chilled water setpoint must be within 5-12°C for proper cooling",
     "device_type": "hvac",
     "device_id": null,
     "point_name": "chw_setpoint",
@@ -48,14 +48,14 @@
     "updated_at": "2026-01-29T11:15:00.000000+00:00",
     "min_temp": 5.0,
     "max_temp": 12.0,
-    "unit": "\u00b0C"
+    "unit": "°C"
   },
   {
     "id": "temp_chiller_min",
     "name": "Chiller Minimum Temperature",
     "rule_type": "temperature_range",
     "severity": "block",
-    "description": "Chiller supply temperature must be above 5\u00b0C to prevent freeze damage",
+    "description": "Chiller supply temperature must be above 5°C to prevent freeze damage",
     "device_type": "hvac",
     "device_id": null,
     "point_name": "chw_supply_temp",
@@ -65,7 +65,7 @@
     "updated_at": "2026-01-29T12:00:00.000000+00:00",
     "min_temp": 5.0,
     "max_temp": 15.0,
-    "unit": "\u00b0C"
+    "unit": "°C"
   },
   {
     "id": "chiller_runtime_limit",
@@ -121,7 +121,7 @@
     "name": "HVAC Temperature Safe Range",
     "rule_type": "temperature_range",
     "severity": "block",
-    "description": "HVAC temperature must be within 16-28\u00b0C for occupant comfort and equipment safety. DISABLED: Too broad - conflicts with chiller setpoints (5-12°C). Use point-specific rules instead.",
+    "description": "HVAC temperature must be within 16-28°C for occupant comfort and equipment safety. DISABLED: Too broad - conflicts with chiller setpoints (5-12°C). Use point-specific rules instead.",
     "device_type": "hvac",
     "device_id": null,
     "point_name": null,
@@ -131,7 +131,7 @@
     "updated_at": "2026-01-27T13:49:12.016478",
     "min_temp": 16.0,
     "max_temp": 28.0,
-    "unit": "\u00b0C"
+    "unit": "°C"
   },
   {
     "id": "fire_alarm_hvac_interlock",
@@ -146,7 +146,7 @@
     "metadata": {},
     "created_at": "2026-01-27T13:49:12.016579",
     "updated_at": "2026-01-29T12:00:00.000000+00:00",
-    "trigger_device_id": "001-gwc-fire-001",
+    "trigger_device_id": "S001-FIRE-B1-001",
     "trigger_point": "fire_alarm_status",
     "trigger_value": true,
     "action": "disable",

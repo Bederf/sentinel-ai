@@ -3,7 +3,7 @@
   "site_name": "Demo Office Building",
   "controllers": [
     {
-      "controller_id": "DALI-G-01",
+      "controller_id": "S002-DALI-G-01",
       "name": "Ground Floor Zone 1",
       "location": "DB Room Ground Floor",
       "ip_address": "192.168.10.11",
@@ -14,7 +14,7 @@
       "firmware_version": "3.2.1"
     },
     {
-      "controller_id": "DALI-G-02",
+      "controller_id": "S002-DALI-G-02",
       "name": "Ground Floor Zone 2",
       "location": "DB Room Ground Floor",
       "ip_address": "192.168.10.12",
@@ -25,7 +25,7 @@
       "firmware_version": "3.2.1"
     },
     {
-      "controller_id": "DALI-G-03",
+      "controller_id": "S002-DALI-G-03",
       "name": "Ground Floor Zone 3",
       "location": "DB Room Ground Floor",
       "ip_address": "192.168.10.13",
@@ -36,7 +36,7 @@
       "firmware_version": "3.2.1"
     },
     {
-      "controller_id": "DALI-G-04",
+      "controller_id": "S002-DALI-G-04",
       "name": "Ground Floor Zone 4",
       "location": "DB Room Ground Floor",
       "ip_address": "192.168.10.14",
@@ -47,7 +47,7 @@
       "firmware_version": "3.2.1"
     },
     {
-      "controller_id": "DALI-G-05",
+      "controller_id": "S002-DALI-G-05",
       "name": "Ground Floor Zone 5",
       "location": "DB Room Ground Floor",
       "ip_address": "192.168.10.15",
@@ -58,7 +58,7 @@
       "firmware_version": "3.2.1"
     },
     {
-      "controller_id": "DALI-L1-01",
+      "controller_id": "S002-DALI-L1-01",
       "name": "First Floor Zone 1",
       "location": "DB Room Level 1",
       "ip_address": "192.168.10.21",
@@ -69,7 +69,7 @@
       "firmware_version": "3.2.1"
     },
     {
-      "controller_id": "DALI-L1-02",
+      "controller_id": "S002-DALI-L1-02",
       "name": "First Floor Zone 2",
       "location": "DB Room Level 1",
       "ip_address": "192.168.10.22",
@@ -80,7 +80,7 @@
       "firmware_version": "3.2.1"
     },
     {
-      "controller_id": "DALI-L1-03",
+      "controller_id": "S002-DALI-L1-03",
       "name": "First Floor Zone 3",
       "location": "DB Room Level 1",
       "ip_address": "192.168.10.23",
@@ -91,7 +91,7 @@
       "firmware_version": "3.2.1"
     },
     {
-      "controller_id": "DALI-L1-04",
+      "controller_id": "S002-DALI-L1-04",
       "name": "First Floor Zone 4",
       "location": "DB Room Level 1",
       "ip_address": "192.168.10.24",
@@ -102,7 +102,7 @@
       "firmware_version": "3.2.1"
     },
     {
-      "controller_id": "DALI-L1-05",
+      "controller_id": "S002-DALI-L1-05",
       "name": "First Floor Zone 5",
       "location": "DB Room Level 1",
       "ip_address": "192.168.10.25",

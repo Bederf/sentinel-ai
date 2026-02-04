@@ -2379,16 +2379,16 @@
       "building": "Sandton City Office Tower",
       "floor": "L2",
       "zone": "Level 2 North",
-      "zone_id": "Zone-L12-N",
+      "zone_id": "Zone-L2-N",
       "room": "Level 12 North Open Plan",
       "description": "L2, Level 2 North, Sandton Level 2 North FCU"
     },
     "metadata": {
       "building": "Sandton City Office Tower",
       "building_id": "site-002",
-      "floor": "L12",
+      "floor": "L2",
       "zone": "Level 12 North",
-      "zone_id": "Zone-L12-N",
+      "zone_id": "Zone-L2-N",
       "serves": "Serves Level 12 North open plan area"
     }
   },
@@ -2468,16 +2468,16 @@
       "building": "Sandton City Office Tower",
       "floor": "L2",
       "zone": "Level 2 South",
-      "zone_id": "Zone-L12-S",
+      "zone_id": "Zone-L2-S",
       "room": "Level 12 South Open Plan",
       "description": "L2, Level 2 South, Sandton Level 2 South FCU"
     },
     "metadata": {
       "building": "Sandton City Office Tower",
       "building_id": "site-002",
-      "floor": "L12",
+      "floor": "L2",
       "zone": "Level 12 South",
-      "zone_id": "Zone-L12-S",
+      "zone_id": "Zone-L2-S",
       "serves": "Serves Level 12 South open plan area"
     }
   },
@@ -2557,16 +2557,16 @@
       "building": "Sandton City Office Tower",
       "floor": "L1",
       "zone": "Level 1 North",
-      "zone_id": "Zone-L11-N",
+      "zone_id": "Zone-L1-N",
       "room": "Level 11 North Open Plan",
       "description": "L1, Level 1 North, Sandton Level 1 North FCU"
     },
     "metadata": {
       "building": "Sandton City Office Tower",
       "building_id": "site-002",
-      "floor": "L11",
+      "floor": "L1",
       "zone": "Level 11 North",
-      "zone_id": "Zone-L11-N",
+      "zone_id": "Zone-L1-N",
       "serves": "Serves Level 11 North open plan area"
     }
   },
@@ -2646,16 +2646,16 @@
       "building": "Sandton City Office Tower",
       "floor": "L1",
       "zone": "Level 1 South",
-      "zone_id": "Zone-L11-S",
+      "zone_id": "Zone-L1-S",
       "room": "Level 11 South Open Plan",
       "description": "L1, Level 1 South, Sandton Level 1 South FCU"
     },
     "metadata": {
       "building": "Sandton City Office Tower",
       "building_id": "site-002",
-      "floor": "L11",
+      "floor": "L1",
       "zone": "Level 11 South",
-      "zone_id": "Zone-L11-S",
+      "zone_id": "Zone-L1-S",
       "serves": "Serves Level 11 South open plan area"
     }
   },
@@ -2735,22 +2735,22 @@
       "building": "Sandton City Office Tower",
       "floor": "L0",
       "zone": "Level 0 North",
-      "zone_id": "Zone-L10-N",
+      "zone_id": "Zone-L0-N",
       "room": "Level 10 North Open Plan",
       "description": "L0, Level 0 North, Sandton Level 0 North FCU"
     },
     "metadata": {
       "building": "Sandton City Office Tower",
       "building_id": "site-002",
-      "floor": "L10",
+      "floor": "L0",
       "zone": "Level 10 North",
-      "zone_id": "Zone-L10-N",
+      "zone_id": "Zone-L0-N",
       "serves": "Serves Level 10 North open plan area"
     }
   },
   {
     "id": "S002-AHU-L2-01",
-    "name": "Sandton L12 AHU",
+    "name": "Sandton L2 AHU",
     "device_type": "hvac",
     "protocol": "mock",
     "site_id": "site-002",
@@ -2837,20 +2837,20 @@
       "building": "Sandton City Office Tower",
       "floor": "L2",
       "zone": "Plant Room",
-      "room": "AHU Room L12",
+      "room": "AHU Room L2",
       "description": "L2, Plant Room, Sandton L2 AHU"
     },
     "metadata": {
       "building": "Sandton City Office Tower",
       "building_id": "site-002",
-      "floor": "L12",
-      "serves": "All zones on L12",
+      "floor": "L2",
+      "serves": "All zones on L2",
       "critical": true
     }
   },
   {
     "id": "S002-AHU-L1-01",
-    "name": "Sandton L11 AHU",
+    "name": "Sandton L1 AHU",
     "device_type": "hvac",
     "protocol": "mock",
     "site_id": "site-002",
@@ -2937,20 +2937,20 @@
       "building": "Sandton City Office Tower",
       "floor": "L1",
       "zone": "Plant Room",
-      "room": "AHU Room L11",
+      "room": "AHU Room L1",
       "description": "L1, Plant Room, Sandton L1 AHU"
     },
     "metadata": {
       "building": "Sandton City Office Tower",
       "building_id": "site-002",
-      "floor": "L11",
-      "serves": "All zones on L11",
+      "floor": "L1",
+      "serves": "All zones on L1",
       "critical": true
     }
   },
   {
     "id": "S002-AHU-L0-01",
-    "name": "Sandton L10 AHU",
+    "name": "Sandton L0 AHU",
     "device_type": "hvac",
     "protocol": "mock",
     "site_id": "site-002",
@@ -3037,20 +3037,20 @@
       "building": "Sandton City Office Tower",
       "floor": "L0",
       "zone": "Plant Room",
-      "room": "AHU Room L10",
+      "room": "AHU Room L0",
       "description": "L0, Plant Room, Sandton L0 AHU"
     },
     "metadata": {
       "building": "Sandton City Office Tower",
       "building_id": "site-002",
-      "floor": "L10",
-      "serves": "All zones on L10",
+      "floor": "L0",
+      "serves": "All zones on L0",
       "critical": true
     }
   },
   {
     "id": "S002-VAV-L2-A",
-    "name": "Sandton VAV-L12-01",
+    "name": "Sandton VAV-L2-01",
     "device_type": "hvac",
     "protocol": "mock",
     "site_id": "site-002",
@@ -3112,7 +3112,7 @@
       "building": "Sandton City Office Tower",
       "floor": "L2",
       "zone": "Zone-L2-A",
-      "room": "Ceiling L12",
+      "room": "Ceiling L2",
       "description": "Level 2, Zone A",
       "zone_type": "open_office",
       "exposure": "interior",
@@ -3121,7 +3121,7 @@
     "equipment": {
       "manufacturer": "Trane",
       "model": "DERA-500",
-      "serial_number": "STC-VAV-L12-01",
+      "serial_number": "STC-VAV-L2-01",
       "installation_year": 2018,
       "capacity_kw": 500
     },
@@ -3129,16 +3129,16 @@
       "building": "Sandton City Office Tower",
       "building_id": "site-002",
       "floor": 12,
-      "zone": "Zone-L12-A",
+      "zone": "Zone-L2-A",
       "location": "Level 12 Zone A ceiling",
-      "serves": "Zone-L12-A",
+      "serves": "Zone-L2-A",
       "safety_status": "safe",
       "safety_note": "Operating normally"
     }
   },
   {
     "id": "S002-VAV-L2-B",
-    "name": "Sandton VAV-L12-02",
+    "name": "Sandton VAV-L2-02",
     "device_type": "hvac",
     "protocol": "mock",
     "site_id": "site-002",
@@ -3200,7 +3200,7 @@
       "building": "Sandton City Office Tower",
       "floor": "L2",
       "zone": "Zone-L2-B",
-      "room": "Ceiling L12",
+      "room": "Ceiling L2",
       "description": "Level 2, Zone B",
       "zone_type": "open_office",
       "exposure": "interior",
@@ -3209,7 +3209,7 @@
     "equipment": {
       "manufacturer": "Trane",
       "model": "DERA-500",
-      "serial_number": "STC-VAV-L12-02",
+      "serial_number": "STC-VAV-L2-02",
       "installation_year": 2018,
       "capacity_kw": 500
     },
@@ -3217,16 +3217,16 @@
       "building": "Sandton City Office Tower",
       "building_id": "site-002",
       "floor": 12,
-      "zone": "Zone-L12-B",
+      "zone": "Zone-L2-B",
       "location": "Level 12 Zone B ceiling",
-      "serves": "Zone-L12-B",
+      "serves": "Zone-L2-B",
       "safety_status": "safe",
       "safety_note": "Operating normally"
     }
   },
   {
     "id": "S002-VAV-L2-C",
-    "name": "Sandton VAV-L12-03",
+    "name": "Sandton VAV-L2-03",
     "device_type": "hvac",
     "protocol": "mock",
     "site_id": "site-002",
@@ -3288,7 +3288,7 @@
       "building": "Sandton City Office Tower",
       "floor": "L2",
       "zone": "Zone-L2-C",
-      "room": "Ceiling L12",
+      "room": "Ceiling L2",
       "description": "Level 2, Zone C",
       "zone_type": "open_office",
       "exposure": "interior",
@@ -3297,7 +3297,7 @@
     "equipment": {
       "manufacturer": "Trane",
       "model": "DERA-500",
-      "serial_number": "STC-VAV-L12-03",
+      "serial_number": "STC-VAV-L2-03",
       "installation_year": 2018,
       "capacity_kw": 500
     },
@@ -3305,16 +3305,16 @@
       "building": "Sandton City Office Tower",
       "building_id": "site-002",
       "floor": 12,
-      "zone": "Zone-L12-C",
+      "zone": "Zone-L2-C",
       "location": "Level 12 Zone C ceiling",
-      "serves": "Zone-L12-C",
+      "serves": "Zone-L2-C",
       "safety_status": "safe",
       "safety_note": "Operating normally"
     }
   },
   {
     "id": "S002-VAV-L2-D",
-    "name": "Sandton VAV-L12-04",
+    "name": "Sandton VAV-L2-04",
     "device_type": "hvac",
     "protocol": "mock",
     "site_id": "site-002",
@@ -3376,7 +3376,7 @@
       "building": "Sandton City Office Tower",
       "floor": "L2",
       "zone": "Zone-L2-D",
-      "room": "Ceiling L12",
+      "room": "Ceiling L2",
       "description": "Level 2, Zone D",
       "zone_type": "open_office",
       "exposure": "interior",
@@ -3385,7 +3385,7 @@
     "equipment": {
       "manufacturer": "Trane",
       "model": "DERA-500",
-      "serial_number": "STC-VAV-L12-04",
+      "serial_number": "STC-VAV-L2-04",
       "installation_year": 2018,
       "capacity_kw": 500
     },
@@ -3393,16 +3393,16 @@
       "building": "Sandton City Office Tower",
       "building_id": "site-002",
       "floor": 12,
-      "zone": "Zone-L12-D",
+      "zone": "Zone-L2-D",
       "location": "Level 12 Zone D ceiling",
-      "serves": "Zone-L12-D",
+      "serves": "Zone-L2-D",
       "safety_status": "safe",
       "safety_note": "Operating normally"
     }
   },
   {
     "id": "S002-VAV-L2-E",
-    "name": "Sandton VAV-L12-05",
+    "name": "Sandton VAV-L2-05",
     "device_type": "hvac",
     "protocol": "mock",
     "site_id": "site-002",
@@ -3464,7 +3464,7 @@
       "building": "Sandton City Office Tower",
       "floor": "L2",
       "zone": "Zone-L2-E",
-      "room": "Ceiling L12",
+      "room": "Ceiling L2",
       "description": "Level 2, Zone E",
       "zone_type": "open_office",
       "exposure": "interior",
@@ -3473,7 +3473,7 @@
     "equipment": {
       "manufacturer": "Trane",
       "model": "DERA-500",
-      "serial_number": "STC-VAV-L12-05",
+      "serial_number": "STC-VAV-L2-05",
       "installation_year": 2018,
       "capacity_kw": 500
     },
@@ -3481,16 +3481,16 @@
       "building": "Sandton City Office Tower",
       "building_id": "site-002",
       "floor": 12,
-      "zone": "Zone-L12-E",
+      "zone": "Zone-L2-E",
       "location": "Level 12 Zone E ceiling",
-      "serves": "Zone-L12-E",
+      "serves": "Zone-L2-E",
       "safety_status": "safe",
       "safety_note": "Operating normally"
     }
   },
   {
     "id": "S002-VAV-L1-A",
-    "name": "Sandton VAV-L11-01",
+    "name": "Sandton VAV-L1-01",
     "device_type": "hvac",
     "protocol": "mock",
     "site_id": "site-002",
@@ -3552,7 +3552,7 @@
       "building": "Sandton City Office Tower",
       "floor": "L1",
       "zone": "Zone-L1-A",
-      "room": "Ceiling L11",
+      "room": "Ceiling L1",
       "description": "Level 1, Zone A",
       "zone_type": "open_office",
       "exposure": "interior",
@@ -3561,7 +3561,7 @@
     "equipment": {
       "manufacturer": "Trane",
       "model": "DERA-500",
-      "serial_number": "STC-VAV-L11-01",
+      "serial_number": "STC-VAV-L1-01",
       "installation_year": 2018,
       "capacity_kw": 500
     },
@@ -3569,16 +3569,16 @@
       "building": "Sandton City Office Tower",
       "building_id": "site-002",
       "floor": 11,
-      "zone": "Zone-L11-A",
+      "zone": "Zone-L1-A",
       "location": "Level 11 Zone A ceiling",
-      "serves": "Zone-L11-A",
+      "serves": "Zone-L1-A",
       "safety_status": "safe",
       "safety_note": "Operating normally"
     }
   },
   {
     "id": "S002-VAV-L1-B",
-    "name": "Sandton VAV-L11-02",
+    "name": "Sandton VAV-L1-02",
     "device_type": "hvac",
     "protocol": "mock",
     "site_id": "site-002",
@@ -3640,7 +3640,7 @@
       "building": "Sandton City Office Tower",
       "floor": "L1",
       "zone": "Zone-L1-B",
-      "room": "Ceiling L11",
+      "room": "Ceiling L1",
       "description": "Level 1, Zone B",
       "zone_type": "open_office",
       "exposure": "interior",
@@ -3649,7 +3649,7 @@
     "equipment": {
       "manufacturer": "Trane",
       "model": "DERA-500",
-      "serial_number": "STC-VAV-L11-02",
+      "serial_number": "STC-VAV-L1-02",
       "installation_year": 2018,
       "capacity_kw": 500
     },
@@ -3657,16 +3657,16 @@
       "building": "Sandton City Office Tower",
       "building_id": "site-002",
       "floor": 11,
-      "zone": "Zone-L11-B",
+      "zone": "Zone-L1-B",
       "location": "Level 11 Zone B ceiling",
-      "serves": "Zone-L11-B",
+      "serves": "Zone-L1-B",
       "safety_status": "safe",
       "safety_note": "Operating normally"
     }
   },
   {
     "id": "S002-VAV-L1-C",
-    "name": "Sandton VAV-L11-03",
+    "name": "Sandton VAV-L1-03",
     "device_type": "hvac",
     "protocol": "mock",
     "site_id": "site-002",
@@ -3728,7 +3728,7 @@
       "building": "Sandton City Office Tower",
       "floor": "L1",
       "zone": "Zone-L1-C",
-      "room": "Ceiling L11",
+      "room": "Ceiling L1",
       "description": "Level 1, Zone C",
       "zone_type": "open_office",
       "exposure": "interior",
@@ -3737,7 +3737,7 @@
     "equipment": {
       "manufacturer": "Trane",
       "model": "DERA-500",
-      "serial_number": "STC-VAV-L11-03",
+      "serial_number": "STC-VAV-L1-03",
       "installation_year": 2018,
       "capacity_kw": 500
     },
@@ -3745,16 +3745,16 @@
       "building": "Sandton City Office Tower",
       "building_id": "site-002",
       "floor": 11,
-      "zone": "Zone-L11-C",
+      "zone": "Zone-L1-C",
       "location": "Level 11 Zone C ceiling",
-      "serves": "Zone-L11-C",
+      "serves": "Zone-L1-C",
       "safety_status": "safe",
       "safety_note": "Operating normally"
     }
   },
   {
     "id": "S002-VAV-L1-D",
-    "name": "Sandton VAV-L11-04",
+    "name": "Sandton VAV-L1-04",
     "device_type": "hvac",
     "protocol": "mock",
     "site_id": "site-002",
@@ -3816,7 +3816,7 @@
       "building": "Sandton City Office Tower",
       "floor": "L1",
       "zone": "Zone-L1-D",
-      "room": "Ceiling L11",
+      "room": "Ceiling L1",
       "description": "Level 1, Zone D",
       "zone_type": "open_office",
       "exposure": "interior",
@@ -3825,7 +3825,7 @@
     "equipment": {
       "manufacturer": "Trane",
       "model": "DERA-500",
-      "serial_number": "STC-VAV-L11-04",
+      "serial_number": "STC-VAV-L1-04",
       "installation_year": 2018,
       "capacity_kw": 500
     },
@@ -3833,16 +3833,16 @@
       "building": "Sandton City Office Tower",
       "building_id": "site-002",
       "floor": 11,
-      "zone": "Zone-L11-D",
+      "zone": "Zone-L1-D",
       "location": "Level 11 Zone D ceiling",
-      "serves": "Zone-L11-D",
+      "serves": "Zone-L1-D",
       "safety_status": "safe",
       "safety_note": "Operating normally"
     }
   },
   {
     "id": "S002-VAV-L1-E",
-    "name": "Sandton VAV-L11-05",
+    "name": "Sandton VAV-L1-05",
     "device_type": "hvac",
     "protocol": "mock",
     "site_id": "site-002",
@@ -3904,7 +3904,7 @@
       "building": "Sandton City Office Tower",
       "floor": "L1",
       "zone": "Zone-L1-E",
-      "room": "Ceiling L11",
+      "room": "Ceiling L1",
       "description": "Level 1, Zone E",
       "zone_type": "open_office",
       "exposure": "interior",
@@ -3913,7 +3913,7 @@
     "equipment": {
       "manufacturer": "Trane",
       "model": "DERA-500",
-      "serial_number": "STC-VAV-L11-05",
+      "serial_number": "STC-VAV-L1-05",
       "installation_year": 2018,
       "capacity_kw": 500
     },
@@ -3921,16 +3921,16 @@
       "building": "Sandton City Office Tower",
       "building_id": "site-002",
       "floor": 11,
-      "zone": "Zone-L11-E",
+      "zone": "Zone-L1-E",
       "location": "Level 11 Zone E ceiling",
-      "serves": "Zone-L11-E",
+      "serves": "Zone-L1-E",
       "safety_status": "safe",
       "safety_note": "Operating normally"
     }
   },
   {
     "id": "S002-VAV-L0-A",
-    "name": "Sandton VAV-L10-01",
+    "name": "Sandton VAV-L0-01",
     "device_type": "hvac",
     "protocol": "mock",
     "site_id": "site-002",
@@ -3992,7 +3992,7 @@
       "building": "Sandton City Office Tower",
       "floor": "L0",
       "zone": "Zone-L0-A",
-      "room": "Ceiling L10",
+      "room": "Ceiling L0",
       "description": "Level 0, Zone A",
       "zone_type": "open_office",
       "exposure": "interior",
@@ -4001,7 +4001,7 @@
     "equipment": {
       "manufacturer": "Trane",
       "model": "DERA-500",
-      "serial_number": "STC-VAV-L10-01",
+      "serial_number": "STC-VAV-L0-01",
       "installation_year": 2018,
       "capacity_kw": 500
     },
@@ -4009,16 +4009,16 @@
       "building": "Sandton City Office Tower",
       "building_id": "site-002",
       "floor": 10,
-      "zone": "Zone-L10-A",
+      "zone": "Zone-L0-A",
       "location": "Level 10 Zone A ceiling",
-      "serves": "Zone-L10-A",
+      "serves": "Zone-L0-A",
       "safety_status": "safe",
       "safety_note": "Operating normally"
     }
   },
   {
     "id": "S002-VAV-L0-B",
-    "name": "Sandton VAV-L10-02",
+    "name": "Sandton VAV-L0-02",
     "device_type": "hvac",
     "protocol": "mock",
     "site_id": "site-002",
@@ -4080,7 +4080,7 @@
       "building": "Sandton City Office Tower",
       "floor": "L0",
       "zone": "Zone-L0-B",
-      "room": "Ceiling L10",
+      "room": "Ceiling L0",
       "description": "Level 0, Zone B",
       "zone_type": "open_office",
       "exposure": "interior",
@@ -4089,7 +4089,7 @@
     "equipment": {
       "manufacturer": "Trane",
       "model": "DERA-500",
-      "serial_number": "STC-VAV-L10-02",
+      "serial_number": "STC-VAV-L0-02",
       "installation_year": 2018,
       "capacity_kw": 500
     },
@@ -4097,16 +4097,16 @@
       "building": "Sandton City Office Tower",
       "building_id": "site-002",
       "floor": 10,
-      "zone": "Zone-L10-B",
+      "zone": "Zone-L0-B",
       "location": "Level 10 Zone B ceiling",
-      "serves": "Zone-L10-B",
+      "serves": "Zone-L0-B",
       "safety_status": "safe",
       "safety_note": "Operating normally"
     }
   },
   {
     "id": "S002-VAV-L0-C",
-    "name": "Sandton VAV-L10-03",
+    "name": "Sandton VAV-L0-03",
     "device_type": "hvac",
     "protocol": "mock",
     "site_id": "site-002",
@@ -4168,7 +4168,7 @@
       "building": "Sandton City Office Tower",
       "floor": "L0",
       "zone": "Zone-L0-C",
-      "room": "Ceiling L10",
+      "room": "Ceiling L0",
       "description": "Level 0, Zone C",
       "zone_type": "open_office",
       "exposure": "interior",
@@ -4177,7 +4177,7 @@
     "equipment": {
       "manufacturer": "Trane",
       "model": "DERA-500",
-      "serial_number": "STC-VAV-L10-03",
+      "serial_number": "STC-VAV-L0-03",
       "installation_year": 2018,
       "capacity_kw": 500
     },
@@ -4185,16 +4185,16 @@
       "building": "Sandton City Office Tower",
       "building_id": "site-002",
       "floor": 10,
-      "zone": "Zone-L10-C",
+      "zone": "Zone-L0-C",
       "location": "Level 10 Zone C ceiling",
-      "serves": "Zone-L10-C",
+      "serves": "Zone-L0-C",
       "safety_status": "safe",
       "safety_note": "Operating normally"
     }
   },
   {
     "id": "S002-VAV-L0-D",
-    "name": "Sandton VAV-L10-04",
+    "name": "Sandton VAV-L0-04",
     "device_type": "hvac",
     "protocol": "mock",
     "site_id": "site-002",
@@ -4256,7 +4256,7 @@
       "building": "Sandton City Office Tower",
       "floor": "L0",
       "zone": "Zone-L0-D",
-      "room": "Ceiling L10",
+      "room": "Ceiling L0",
       "description": "Level 0, Zone D",
       "zone_type": "open_office",
       "exposure": "interior",
@@ -4265,7 +4265,7 @@
     "equipment": {
       "manufacturer": "Trane",
       "model": "DERA-500",
-      "serial_number": "STC-VAV-L10-04",
+      "serial_number": "STC-VAV-L0-04",
       "installation_year": 2018,
       "capacity_kw": 500
     },
@@ -4273,16 +4273,16 @@
       "building": "Sandton City Office Tower",
       "building_id": "site-002",
       "floor": 10,
-      "zone": "Zone-L10-D",
+      "zone": "Zone-L0-D",
       "location": "Level 10 Zone D ceiling",
-      "serves": "Zone-L10-D",
+      "serves": "Zone-L0-D",
       "safety_status": "safe",
       "safety_note": "Operating normally"
     }
   },
   {
     "id": "S002-VAV-L0-E",
-    "name": "Sandton VAV-L10-05",
+    "name": "Sandton VAV-L0-05",
     "device_type": "hvac",
     "protocol": "mock",
     "site_id": "site-002",
@@ -4344,7 +4344,7 @@
       "building": "Sandton City Office Tower",
       "floor": "L0",
       "zone": "Zone-L0-E",
-      "room": "Ceiling L10",
+      "room": "Ceiling L0",
       "description": "Level 0, Zone E",
       "zone_type": "open_office",
       "exposure": "interior",
@@ -4353,7 +4353,7 @@
     "equipment": {
       "manufacturer": "Trane",
       "model": "DERA-500",
-      "serial_number": "STC-VAV-L10-05",
+      "serial_number": "STC-VAV-L0-05",
       "installation_year": 2018,
       "capacity_kw": 500
     },
@@ -4361,9 +4361,9 @@
       "building": "Sandton City Office Tower",
       "building_id": "site-002",
       "floor": 10,
-      "zone": "Zone-L10-E",
+      "zone": "Zone-L0-E",
       "location": "Level 10 Zone E ceiling",
-      "serves": "Zone-L10-E",
+      "serves": "Zone-L0-E",
       "safety_status": "safe",
       "safety_note": "Operating normally"
     }
