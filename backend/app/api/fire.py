@@ -1,18 +1,47 @@
 """Fire & Life Safety API endpoints.
 
 Provides read-only monitoring of fire alarm panels, smoke dampers,
-stairwell pressurization, and cause-effect matrix. Plus demo simulation.
+stairwell pressurization, and cause-effect matrix. Plus coordination
+endpoints for HVAC shutdown, smoke management, and alarm lifecycle.
 """
 
 from fastapi import APIRouter, HTTPException, Query
-from typing import Optional
+from pydantic import BaseModel, Field
+from typing import List, Optional
 import logging
 
 from app.services.fire_system_service import get_fire_system_service
+from app.services.fire_hvac_coordinator import get_fire_hvac_coordinator
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/fire", tags=["fire"])
+
+
+# --- Request/Response models ---
+
+class TriggerAlarmRequest(BaseModel):
+    """Request to trigger a fire alarm."""
+    zone_id: str = Field(..., description="Fire zone ID (e.g., FZ-L1-C)")
+    alarm_type: str = Field("smoke", description="Alarm type: smoke, heat, manual, flow, fault")
+
+
+class ClearAlarmRequest(BaseModel):
+    """Request to clear a fire alarm."""
+    alarm_id: str = Field(..., description="Alarm ID to clear")
+
+
+class SmokeManagementRequest(BaseModel):
+    """Request to enter smoke management mode."""
+    zone_id: str = Field(..., description="Fire zone ID for smoke management")
+
+
+class ForceResetRequest(BaseModel):
+    """Request to force reset fire mode."""
+    authorization: str = Field(..., description="ENGINEER authorization code")
+
+
+# --- Existing monitoring endpoints (from 61-01) ---
 
 
 @router.get("/status")
@@ -171,3 +200,121 @@ async def simulate_alarm(
     if "error" in result:
         raise HTTPException(status_code=404, detail=result["error"])
     return result
+
+
+# --- New coordination endpoints (61-02) ---
+
+
+@router.get("/coordination-status")
+async def get_coordination_status():
+    """Get current fire-HVAC coordination status.
+
+    Returns the current coordination mode (normal/fire_mode/smoke_management/resetting),
+    affected zones, shutdown devices, and recent action log.
+    """
+    coordinator = get_fire_hvac_coordinator()
+    status = coordinator.get_coordination_status()
+    return status
+
+
+@router.post("/trigger-alarm")
+async def trigger_alarm(request: TriggerAlarmRequest):
+    """Trigger a fire alarm and execute full cause-effect chain.
+
+    Creates alarm, executes HVAC shutdown, damper closure, pressurization
+    activation based on cause-effect matrix. Returns alarm details and
+    all effects executed.
+    """
+    if request.alarm_type not in ("smoke", "heat", "manual", "flow", "fault"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid alarm type: {request.alarm_type}. Must be smoke, heat, manual, flow, or fault",
+        )
+
+    svc = get_fire_system_service()
+    result = await svc.trigger_alarm(request.zone_id, request.alarm_type)
+
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+
+    return result
+
+
+@router.post("/clear-alarm")
+async def clear_alarm(request: ClearAlarmRequest):
+    """Clear a fire alarm by alarm_id.
+
+    Marks alarm as acknowledged/cleared. If no more active alarms remain,
+    triggers the coordinator reset sequence (staged damper re-opening,
+    HVAC restart, pressurization wind-down).
+    """
+    svc = get_fire_system_service()
+    result = await svc.clear_alarm(request.alarm_id)
+    return result
+
+
+@router.post("/smoke-management")
+async def enter_smoke_management(request: SmokeManagementRequest):
+    """Enter smoke management mode for a zone.
+
+    Coordinates:
+    - Close supply dampers to fire zone
+    - Keep return/exhaust running at 60% for smoke extraction
+    - Pressurize adjacent zones to prevent smoke spread
+    """
+    # Validate zone exists
+    svc = get_fire_system_service()
+    zone = svc.get_zone_status(request.zone_id)
+    if not zone:
+        raise HTTPException(status_code=404, detail=f"Zone {request.zone_id} not found")
+
+    coordinator = get_fire_hvac_coordinator()
+    result = await coordinator.enter_smoke_management_mode(request.zone_id)
+    return result
+
+
+@router.post("/reset")
+async def force_reset(request: ForceResetRequest):
+    """Force reset to normal mode (ENGINEER authorization required).
+
+    Performs staged reset:
+    - Re-open dampers (25% -> 50% -> 100%)
+    - Restart HVAC (AHUs first, then FCU/VAV)
+    - Wind down pressurization fans
+    """
+    # Validate authorization (demo: accept 'ENGINEER' or any non-empty string)
+    if not request.authorization or len(request.authorization) < 3:
+        raise HTTPException(
+            status_code=403,
+            detail="Valid ENGINEER authorization required for force reset",
+        )
+
+    coordinator = get_fire_hvac_coordinator()
+    if coordinator._mode == "normal":
+        return {
+            "mode": "normal",
+            "message": "System already in normal mode, no reset needed",
+        }
+
+    result = await coordinator.reset_fire_mode()
+    result["authorized_by"] = request.authorization
+    return result
+
+
+@router.get("/action-log")
+async def get_action_log(
+    limit: int = Query(50, ge=1, le=200, description="Number of log entries to return"),
+):
+    """Get timestamped log of all fire coordination actions.
+
+    Returns audit trail of all fire-HVAC coordination events including
+    alarm triggers, cause-effect executions, mode changes, damper
+    operations, pressurization activations, and resets.
+    """
+    from app.database.repositories.fire_safety_repository import get_fire_safety_repository
+    repo = get_fire_safety_repository()
+    log = repo.get_action_log(limit=limit)
+    return {
+        "entries": log,
+        "count": len(log),
+    }
