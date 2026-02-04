@@ -1175,6 +1175,39 @@ export const api = {
   },
 
   /**
+   * Start pre-cooling sequence for a site
+   * @param siteId - Site ID
+   * @param scenarioId - Optional scenario ID
+   */
+  async startPrecooling(
+    siteId: string,
+    scenarioId?: string
+  ): Promise<{ success: boolean; status: string; started_at: string; actions: any[]; message: string }> {
+    return fetchApi(`/api/optimization/precooling/${siteId}/start`, {
+      method: "POST",
+      body: JSON.stringify({ scenario_id: scenarioId }),
+    });
+  },
+
+  /**
+   * Stop pre-cooling for a site
+   * @param siteId - Site ID
+   */
+  async stopPrecooling(siteId: string): Promise<{ success: boolean; status: string; message: string }> {
+    return fetchApi(`/api/optimization/precooling/${siteId}/stop`, {
+      method: "POST",
+    });
+  },
+
+  /**
+   * Get pre-cooling status for a site
+   * @param siteId - Site ID
+   */
+  async getPrecoolingStatus(siteId: string): Promise<{ status: string; started_at?: string; actions?: any[] }> {
+    return fetchApi(`/api/optimization/precooling/${siteId}/status`);
+  },
+
+  /**
    * Get latest pending recommendation for a site
    * @param siteId - Site ID
    */
@@ -2014,12 +2047,11 @@ export const monitoringApi = {
     total: number;
   }> => {
     const params = new URLSearchParams({
-      confidence: 'unmatched',
       limit: limit.toString(),
       offset: offset.toString(),
     });
     if (buildingId) params.set('building_id', buildingId);
-    const res = await fetch(`${API_BASE_URL}/api/integration/point-mappings?${params}`);
+    const res = await fetch(`${API_BASE_URL}/api/integration/unmatched-points?${params}`);
     if (!res.ok) throw new Error('Failed to fetch unmatched points');
     return res.json();
   },
@@ -2989,5 +3021,273 @@ export async function createWorkOrder(params: CreateWorkOrderParams): Promise<Wo
 
   return response.json();
 }
+
+// ============= Niagara Connection Interfaces (Phase 65) =============
+
+export interface NiagaraOBIXConfig {
+  host: string;
+  port: number;
+  username: string;
+  password: string;
+  use_https: boolean;
+  timeout: number;
+}
+
+export interface NiagaraConfigResponse {
+  success: boolean;
+  message: string;
+  connected: boolean;
+}
+
+export interface NiagaraConnectionStatus {
+  connected: boolean;
+  last_auth: string | null;
+  server_version: string | null;
+  base_url: string;
+  message: string;
+}
+
+export interface BACnetDevice {
+  device_id: number;
+  ip_address: string;
+  vendor_name: string;
+  model_name: string;
+  firmware_version: string;
+  object_name: string;
+}
+
+export interface DiscoverClassifyRequest {
+  device_ip: string;
+  site_id: string;
+  device_bacnet_id?: number;
+  use_demo: boolean;
+}
+
+export interface DiscoverClassifyResponse {
+  discovery_id: string;
+  points_count: number;
+  equipment_count: number;
+  status: string;
+  summary: Record<string, string | number | boolean>;
+}
+
+export interface NiagaraMappingSummary {
+  discovery_id: string;
+  status: string;
+  equipment: Array<{
+    equipment_id: string;
+    equipment_type: string;
+    equipment_name: string;
+    points: Array<{
+      name: string;
+      point_type: string;
+      confidence: string;
+      brick_class?: string;
+      unit?: string;
+    }>;
+    confidence: string;
+  }>;
+  validation: Record<string, string | number | boolean>;
+  total_points: number;
+  equipment_count: number;
+  confidence_breakdown: Record<string, number>;
+  needs_review: number;
+}
+
+export interface NiagaraApproveResponse {
+  success: boolean;
+  equipment_created: number;
+  message: string;
+}
+
+export interface NiagaraCorrectRequest {
+  point_id: string;
+  equipment_id?: string;
+  point_type?: string;
+  equipment_type?: string;
+}
+
+export const niagaraApi = {
+  configureOBIX: (config: NiagaraOBIXConfig) =>
+    fetchApi<NiagaraConfigResponse>('/api/niagara/obix/config', {
+      method: 'POST',
+      body: JSON.stringify(config),
+    }),
+
+  getOBIXStatus: () =>
+    fetchApi<NiagaraConnectionStatus>('/api/niagara/obix/status'),
+
+  discoverAndClassify: (req: DiscoverClassifyRequest) =>
+    fetchApi<DiscoverClassifyResponse>('/api/niagara/discover-and-classify', {
+      method: 'POST',
+      body: JSON.stringify(req),
+    }),
+
+  getMappings: (discoveryId: string) =>
+    fetchApi<NiagaraMappingSummary>(`/api/niagara/mappings/${discoveryId}`),
+
+  approveMappings: (discoveryId: string, approvedBy: string) =>
+    fetchApi<NiagaraApproveResponse>(
+      `/api/niagara/mappings/${discoveryId}/approve?approved_by=${encodeURIComponent(approvedBy)}`,
+      { method: 'POST' },
+    ),
+
+  correctPoint: (discoveryId: string, correction: NiagaraCorrectRequest) =>
+    fetchApi<{ success: boolean; corrections: string[]; message: string }>(
+      `/api/niagara/mappings/${discoveryId}/correct`,
+      { method: 'POST', body: JSON.stringify(correction) },
+    ),
+};
+
+// ============= Security Module Interfaces (Phase 58) =============
+
+export interface SecuritySystemStatus {
+  total_doors: number;
+  doors_secure: number;
+  cameras_online: number;
+  cameras_total: number;
+  alarm_zones_armed: number;
+  alarm_zones_total: number;
+  active_alerts: number;
+  occupancy_total: number;
+}
+
+export interface AccessZone {
+  zone_id: string;
+  name: string;
+  floor: string;
+  access_level: "public" | "restricted" | "secure" | "critical";
+  doors: string[];
+}
+
+export interface Door {
+  door_id: string;
+  name: string;
+  zone_id: string;
+  status: "open" | "closed" | "locked" | "fault";
+  reader_type: "card" | "biometric" | "pin";
+  last_event_time: string | null;
+}
+
+export interface BadgeEvent {
+  event_id: string;
+  door_id: string;
+  zone_id: string;
+  badge_id: string;
+  person_name: string;
+  direction: "entry" | "exit";
+  timestamp: string;
+  granted: boolean;
+  reason: string;
+}
+
+export interface SecurityCamera {
+  camera_id: string;
+  name: string;
+  zone_id: string;
+  floor: string;
+  status: "online" | "offline" | "fault";
+  type: "fixed" | "ptz" | "dome";
+  resolution: string;
+  has_analytics: boolean;
+  motion_detected: boolean;
+}
+
+export interface SecurityAlarmZone {
+  zone_id: string;
+  name: string;
+  status: "armed" | "disarmed" | "triggered" | "fault";
+  arm_type: "full" | "perimeter" | "night";
+}
+
+export interface SecurityOccupancy {
+  zone_id: string;
+  zone_name: string;
+  occupancy_count: number;
+  badge_entries: number;
+  badge_exits: number;
+  last_updated: string | null;
+  source: "badge" | "camera" | "combined";
+}
+
+export interface OccupancyRecommendation {
+  zone_id: string;
+  zone_name: string;
+  current_occupancy: number;
+  recommendation_type: "hvac" | "lighting";
+  action: string;
+  detail: string;
+}
+
+// ============= Security API Client =============
+
+export const securityApi = {
+  /** Get overall security system status */
+  getStatus: () =>
+    fetchApi<SecuritySystemStatus>("/api/security/status"),
+
+  /** Get all access zones with doors */
+  getZones: () =>
+    fetchApi<{ zones: AccessZone[]; count: number }>("/api/security/zones"),
+
+  /** Get all door status */
+  getDoors: () =>
+    fetchApi<{ doors: Door[]; count: number; secure: number }>("/api/security/doors"),
+
+  /** Get badge events with optional filtering */
+  getEvents: (params?: { zone_id?: string; limit?: number }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.zone_id) searchParams.set("zone_id", params.zone_id);
+    if (params?.limit) searchParams.set("limit", params.limit.toString());
+    const qs = searchParams.toString();
+    return fetchApi<{ events: BadgeEvent[]; count: number }>(
+      `/api/security/events${qs ? `?${qs}` : ""}`
+    );
+  },
+
+  /** Get denied access events */
+  getDeniedEvents: () =>
+    fetchApi<{ events: BadgeEvent[]; count: number }>("/api/security/events/denied"),
+
+  /** Get after-hours access events */
+  getAfterHoursEvents: () =>
+    fetchApi<{ events: BadgeEvent[]; count: number }>("/api/security/events/after-hours"),
+
+  /** Get all cameras with status */
+  getCameras: () =>
+    fetchApi<{ cameras: SecurityCamera[]; count: number; online: number }>("/api/security/cameras"),
+
+  /** Get all alarm zones */
+  getAlarmZones: () =>
+    fetchApi<{ alarm_zones: SecurityAlarmZone[]; count: number; armed: number }>("/api/security/alarm-zones"),
+
+  /** Arm an alarm zone */
+  armAlarmZone: (zoneId: string, armType: "full" | "perimeter" | "night" = "full") =>
+    fetchApi<{ success: boolean; zone_id: string; status: string; arm_type: string }>(
+      `/api/security/alarm-zones/${zoneId}/arm`,
+      { method: "POST", body: JSON.stringify({ arm_type: armType }) }
+    ),
+
+  /** Disarm an alarm zone */
+  disarmAlarmZone: (zoneId: string) =>
+    fetchApi<{ success: boolean; zone_id: string; status: string }>(
+      `/api/security/alarm-zones/${zoneId}/disarm`,
+      { method: "POST" }
+    ),
+
+  /** Get building-wide occupancy */
+  getOccupancy: () =>
+    fetchApi<{ total_occupancy: number; zones: SecurityOccupancy[] }>("/api/security/occupancy"),
+
+  /** Get zone-specific occupancy */
+  getZoneOccupancy: (zoneId: string) =>
+    fetchApi<SecurityOccupancy>(`/api/security/occupancy/${zoneId}`),
+
+  /** Get cross-module occupancy recommendations */
+  getOccupancyRecommendations: () =>
+    fetchApi<{ recommendations: OccupancyRecommendation[]; count: number }>(
+      "/api/security/occupancy/recommendations"
+    ),
+};
 
 export default api;
