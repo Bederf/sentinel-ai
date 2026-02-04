@@ -1,0 +1,70 @@
+# Grafana Loki Configuration for SENTINEL BMS Intelligence
+# Ported from AimTheLaw production config, adapted for FSR compliance
+# Retention: 90 days (2160h) per FSR domain 4.13 requirements
+
+auth_enabled: false
+
+server:
+  http_listen_port: 3100
+
+limits_config:
+  enforce_metric_name: false
+  reject_old_samples: true
+  reject_old_samples_max_age: 2160h  # 90 days for FSR compliance
+  split_queries_by_interval: 15m
+  max_query_series: 500
+  max_entries_limit_per_query: 5000
+
+common:
+  path_prefix: /loki
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks
+      rules_directory: /loki/rules
+  replication_factor: 1
+  ring:
+    instance_addr: 127.0.0.1
+    kvstore:
+      store: inmemory
+
+schema_config:
+  configs:
+    - from: "2026-01-01"
+      store: boltdb-shipper
+      object_store: filesystem
+      schema: v11
+      index:
+        prefix: sentinel_loki_index_
+        period: 24h
+
+ingester:
+  lifecycler:
+    address: 127.0.0.1
+    ring:
+      kvstore:
+        store: inmemory
+      replication_factor: 1
+    final_sleep: 0s
+  chunk_idle_period: 1h
+  max_chunk_age: 1h
+  chunk_target_size: 1048576
+  chunk_retain_period: 30s
+
+storage_config:
+  filesystem:
+    directory: /loki
+
+compactor:
+  working_directory: /loki/compactor
+  shared_store: filesystem
+  compaction_interval: 10m
+  retention_enabled: true
+  retention_delete_delay: 2h
+  retention_delete_worker_count: 150
+  delete_request_cancel_period: 24h
+
+ruler:
+  storage:
+    type: local
+    local:
+      directory: /loki/rules
