@@ -335,5 +335,51 @@
     "airflow_setpoint": 250,
     "discharge_air_temp": 14.5,
     "heating_valve": 0
+  },
+  "S002-ACC-G-001": {
+    "door_status": false,
+    "lock_status": true,
+    "access_granted": true,
+    "tamper_alarm": false,
+    "reader_battery": 95
+  },
+  "S002-ACC-L1-A": {
+    "door_status": false,
+    "lock_status": true,
+    "access_granted": true,
+    "tamper_alarm": false,
+    "reader_battery": 88
+  },
+  "S002-ACC-L2-A": {
+    "door_status": false,
+    "lock_status": true,
+    "access_granted": true,
+    "tamper_alarm": false,
+    "reader_battery": 91
+  },
+  "S002-ACC-L1-SRV": {
+    "door_status": false,
+    "lock_status": true,
+    "access_granted": true,
+    "tamper_alarm": false,
+    "reader_battery": 96
+  },
+  "S002-CAM-G-001": {
+    "camera_status": 1,
+    "motion_detected": true,
+    "recording": true,
+    "disk_usage": 62
+  },
+  "S002-CAM-L1-A": {
+    "camera_status": 1,
+    "motion_detected": false,
+    "recording": true,
+    "disk_usage": 62
+  },
+  "S002-CAM-L1-SRV": {
+    "camera_status": 1,
+    "motion_detected": false,
+    "recording": true,
+    "disk_usage": 62
   }
 }

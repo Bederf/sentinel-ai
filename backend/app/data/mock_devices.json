@@ -13,7 +13,7 @@
         "name": "chw_supply_temp",
         "point_type": "analog_input",
         "description": "Chilled water supply temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 5.0,
         "max_value": 15.0,
         "default_value": 7.2,
@@ -23,7 +23,7 @@
         "name": "chw_return_temp",
         "point_type": "analog_input",
         "description": "Chilled water return temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 10.0,
         "max_value": 20.0,
         "default_value": 12.5,
@@ -49,7 +49,7 @@
         "name": "chw_supply_temp_setpoint",
         "point_type": "analog_value",
         "description": "Chilled water supply temperature setpoint",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 5.0,
         "max_value": 12.0,
         "default_value": 7.0,
@@ -113,7 +113,7 @@
         "name": "supply_air_temp",
         "point_type": "analog_input",
         "description": "Supply air temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 15.0,
         "max_value": 25.0,
         "default_value": 18.5,
@@ -123,7 +123,7 @@
         "name": "return_air_temp",
         "point_type": "analog_input",
         "description": "Return air temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 20.0,
         "max_value": 30.0,
         "default_value": 24.5,
@@ -204,7 +204,7 @@
         "name": "room_temp",
         "point_type": "analog_input",
         "description": "Room temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 16.0,
         "max_value": 32.0,
         "default_value": 26.0,
@@ -214,7 +214,7 @@
         "name": "room_temp_setpoint",
         "point_type": "analog_value",
         "description": "Room temperature setpoint",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 18.0,
         "max_value": 26.0,
         "default_value": 24.0,
@@ -273,7 +273,7 @@
       "serves": "CTO Office",
       "occupant": "CTO",
       "safety_status": "warning",
-      "safety_note": "Room temperature 26°C above comfort range (22-24°C) - adjust setpoint to restore comfort"
+      "safety_note": "Room temperature 26\u00b0C above comfort range (22-24\u00b0C) - adjust setpoint to restore comfort"
     }
   },
   {
@@ -546,7 +546,7 @@
         "name": "zone_temp",
         "point_type": "analog_input",
         "description": "Average zone temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 16.0,
         "max_value": 30.0,
         "default_value": 23.2,
@@ -556,7 +556,7 @@
         "name": "zone_cooling_setpoint",
         "point_type": "analog_value",
         "description": "Zone cooling temperature setpoint",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 20.0,
         "max_value": 26.0,
         "default_value": 23.0,
@@ -566,7 +566,7 @@
         "name": "zone_heating_setpoint",
         "point_type": "analog_value",
         "description": "Zone heating temperature setpoint",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 18.0,
         "max_value": 24.0,
         "default_value": 20.0,
@@ -664,7 +664,7 @@
         "name": "chw_supply_temp",
         "point_type": "analog_input",
         "description": "Chilled water supply temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 4.0,
         "max_value": 15.0,
         "default_value": 7.0,
@@ -674,7 +674,7 @@
         "name": "chw_return_temp",
         "point_type": "analog_input",
         "description": "Chilled water return temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 8.0,
         "max_value": 20.0,
         "default_value": 12.0,
@@ -684,7 +684,7 @@
         "name": "chw_supply_temp_setpoint",
         "point_type": "analog_value",
         "description": "CHW supply temperature setpoint",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 5.0,
         "max_value": 12.0,
         "default_value": 7.0,
@@ -764,7 +764,7 @@
         "name": "room_temp",
         "point_type": "analog_input",
         "description": "Room temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 16.0,
         "max_value": 32.0,
         "default_value": 18.6,
@@ -774,7 +774,7 @@
         "name": "room_temp_setpoint",
         "point_type": "analog_value",
         "description": "Room temperature setpoint",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 18.0,
         "max_value": 26.0,
         "default_value": 22.0,
@@ -833,7 +833,7 @@
       "location": "Floor 1 Open Plan",
       "serves": "Ground floor office area",
       "safety_status": "safe",
-      "safety_note": "Room at 18.6°C - running cool"
+      "safety_note": "Room at 18.6\u00b0C - running cool"
     }
   },
   {
@@ -849,7 +849,7 @@
         "name": "room_temp",
         "point_type": "analog_input",
         "description": "Room temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 16.0,
         "max_value": 32.0,
         "default_value": 18.5,
@@ -859,7 +859,7 @@
         "name": "room_temp_setpoint",
         "point_type": "analog_value",
         "description": "Room temperature setpoint",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 18.0,
         "max_value": 26.0,
         "default_value": 22.0,
@@ -918,7 +918,7 @@
       "location": "Floor 2 Open Plan",
       "serves": "Upper floor office area",
       "safety_status": "safe",
-      "safety_note": "Room at 18.5°C - running cool"
+      "safety_note": "Room at 18.5\u00b0C - running cool"
     }
   },
   {
@@ -935,7 +935,7 @@
         "name": "supply_air_temp",
         "point_type": "analog_input",
         "description": "Supply air temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 12.0,
         "max_value": 25.0,
         "default_value": 14.5,
@@ -945,7 +945,7 @@
         "name": "return_air_temp",
         "point_type": "analog_input",
         "description": "Return air temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 18.0,
         "max_value": 30.0,
         "default_value": 21.0,
@@ -1015,7 +1015,7 @@
       "location": "Roof Plant Room",
       "serves": "Both floors",
       "safety_status": "safe",
-      "safety_note": "Return air at 21°C indicates space warmer than FCU readings"
+      "safety_note": "Return air at 21\u00b0C indicates space warmer than FCU readings"
     }
   },
   {
@@ -1032,7 +1032,7 @@
         "name": "chw_supply_temp",
         "point_type": "analog_input",
         "description": "Chilled water supply temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 4.0,
         "max_value": 15.0,
         "default_value": 6.8,
@@ -1042,7 +1042,7 @@
         "name": "chw_return_temp",
         "point_type": "analog_input",
         "description": "Chilled water return temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 8.0,
         "max_value": 20.0,
         "default_value": 11.5,
@@ -1052,7 +1052,7 @@
         "name": "chw_supply_temp_setpoint",
         "point_type": "analog_value",
         "description": "Chilled water supply temperature setpoint",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 5.0,
         "max_value": 12.0,
         "default_value": 7.0,
@@ -1121,7 +1121,7 @@
       "serves": "Entire building chilled water",
       "critical": true,
       "safety_status": "safe",
-      "safety_note": "CHW setpoint at 7°C - consider raising to 8°C for efficiency"
+      "safety_note": "CHW setpoint at 7\u00b0C - consider raising to 8\u00b0C for efficiency"
     }
   },
   {
@@ -1138,7 +1138,7 @@
         "name": "supply_air_temp",
         "point_type": "analog_input",
         "description": "Supply air temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 12.0,
         "max_value": 25.0,
         "default_value": 15.2,
@@ -1148,7 +1148,7 @@
         "name": "return_air_temp",
         "point_type": "analog_input",
         "description": "Return air temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 18.0,
         "max_value": 30.0,
         "default_value": 23.5,
@@ -1235,7 +1235,7 @@
         "name": "chw_supply_temp",
         "point_type": "analog_input",
         "description": "Chilled water supply temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 4.0,
         "max_value": 15.0,
         "default_value": 7.0,
@@ -1245,7 +1245,7 @@
         "name": "chw_return_temp",
         "point_type": "analog_input",
         "description": "Chilled water return temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 8.0,
         "max_value": 20.0,
         "default_value": 12.0,
@@ -1255,7 +1255,7 @@
         "name": "chw_supply_temp_setpoint",
         "point_type": "analog_value",
         "description": "Chilled water supply temperature setpoint",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 5.0,
         "max_value": 12.0,
         "default_value": 7.0,
@@ -1330,7 +1330,7 @@
         "name": "room_temp",
         "point_type": "analog_input",
         "description": "Room temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 16.0,
         "max_value": 32.0,
         "default_value": 22.8,
@@ -1340,7 +1340,7 @@
         "name": "room_temp_setpoint",
         "point_type": "analog_value",
         "description": "Room temperature setpoint",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 18.0,
         "max_value": 26.0,
         "default_value": 22.0,
@@ -1414,7 +1414,7 @@
         "name": "zone_temp",
         "point_type": "analog_input",
         "description": "Average zone temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 16.0,
         "max_value": 30.0,
         "default_value": 22.5,
@@ -1424,7 +1424,7 @@
         "name": "zone_cooling_setpoint",
         "point_type": "analog_value",
         "description": "Zone cooling temperature setpoint",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 20.0,
         "max_value": 26.0,
         "default_value": 22.0,
@@ -1434,7 +1434,7 @@
         "name": "zone_heating_setpoint",
         "point_type": "analog_value",
         "description": "Zone heating temperature setpoint",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 18.0,
         "max_value": 24.0,
         "default_value": 20.0,
@@ -1498,7 +1498,7 @@
         "name": "supply_air_temp",
         "point_type": "analog_input",
         "description": "Supply air temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 12.0,
         "max_value": 25.0,
         "default_value": 16.0,
@@ -1508,7 +1508,7 @@
         "name": "return_air_temp",
         "point_type": "analog_input",
         "description": "Return air temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 18.0,
         "max_value": 30.0,
         "default_value": 24.0,
@@ -1584,7 +1584,7 @@
         "name": "room_temp",
         "point_type": "analog_input",
         "description": "Room temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 16.0,
         "max_value": 32.0,
         "default_value": 23.0,
@@ -1594,7 +1594,7 @@
         "name": "room_temp_setpoint",
         "point_type": "analog_value",
         "description": "Room temperature setpoint",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 18.0,
         "max_value": 28.0,
         "default_value": 22.0,
@@ -1676,7 +1676,7 @@
         "name": "supply_air_temp",
         "point_type": "analog_input",
         "description": "Supply air temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 12.0,
         "max_value": 25.0,
         "default_value": 15.5,
@@ -1686,7 +1686,7 @@
         "name": "return_air_temp",
         "point_type": "analog_input",
         "description": "Return air temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 18.0,
         "max_value": 30.0,
         "default_value": 22.0,
@@ -1773,7 +1773,7 @@
         "name": "chw_supply_temp",
         "point_type": "analog_input",
         "description": "Chilled water supply temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 4.0,
         "max_value": 15.0,
         "default_value": 7.2,
@@ -1783,7 +1783,7 @@
         "name": "chw_return_temp",
         "point_type": "analog_input",
         "description": "Chilled water return temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 8.0,
         "max_value": 20.0,
         "default_value": 12.5,
@@ -1793,7 +1793,7 @@
         "name": "chw_supply_temp_setpoint",
         "point_type": "analog_value",
         "description": "Chilled water supply temperature setpoint",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 5.0,
         "max_value": 12.0,
         "default_value": 7.0,
@@ -1868,7 +1868,7 @@
         "name": "room_temp",
         "point_type": "analog_input",
         "description": "Room temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 16.0,
         "max_value": 32.0,
         "default_value": 21.5,
@@ -1878,7 +1878,7 @@
         "name": "room_temp_setpoint",
         "point_type": "analog_value",
         "description": "Room temperature setpoint",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 18.0,
         "max_value": 26.0,
         "default_value": 22.0,
@@ -1954,7 +1954,7 @@
         "name": "supply_air_temp",
         "point_type": "analog_input",
         "description": "Supply air temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 12.0,
         "max_value": 25.0,
         "default_value": 16.5,
@@ -1964,7 +1964,7 @@
         "name": "return_air_temp",
         "point_type": "analog_input",
         "description": "Return air temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 18.0,
         "max_value": 30.0,
         "default_value": 24.5,
@@ -2051,7 +2051,7 @@
         "name": "chw_supply_temp",
         "point_type": "analog_input",
         "description": "Chilled water supply temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 4.0,
         "max_value": 15.0,
         "default_value": 6.5,
@@ -2061,7 +2061,7 @@
         "name": "chw_return_temp",
         "point_type": "analog_input",
         "description": "Chilled water return temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 8.0,
         "max_value": 20.0,
         "default_value": 11.8,
@@ -2071,7 +2071,7 @@
         "name": "chw_supply_temp_setpoint",
         "point_type": "analog_value",
         "description": "Chilled water supply temperature setpoint",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 5.0,
         "max_value": 12.0,
         "default_value": 6.5,
@@ -2146,7 +2146,7 @@
         "name": "room_temp",
         "point_type": "analog_input",
         "description": "Room temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 16.0,
         "max_value": 32.0,
         "default_value": 23.5,
@@ -2156,7 +2156,7 @@
         "name": "room_temp_setpoint",
         "point_type": "analog_value",
         "description": "Room temperature setpoint",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 18.0,
         "max_value": 26.0,
         "default_value": 23.0,
@@ -2231,7 +2231,7 @@
         "name": "room_temp",
         "point_type": "analog_input",
         "description": "Room temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 16.0,
         "max_value": 32.0,
         "default_value": 24.0,
@@ -2241,7 +2241,7 @@
         "name": "room_temp_setpoint",
         "point_type": "analog_value",
         "description": "Room temperature setpoint",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 18.0,
         "max_value": 26.0,
         "default_value": 23.0,
@@ -2316,7 +2316,7 @@
         "name": "room_temp",
         "point_type": "analog_input",
         "description": "Room temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 16.0,
         "max_value": 32.0,
         "default_value": 22.5,
@@ -2326,7 +2326,7 @@
         "name": "room_temp_setpoint",
         "point_type": "analog_value",
         "description": "Room temperature setpoint",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 18.0,
         "max_value": 26.0,
         "default_value": 22.0,
@@ -2405,7 +2405,7 @@
         "name": "room_temp",
         "point_type": "analog_input",
         "description": "Room temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 16.0,
         "max_value": 32.0,
         "default_value": 23.0,
@@ -2415,7 +2415,7 @@
         "name": "room_temp_setpoint",
         "point_type": "analog_value",
         "description": "Room temperature setpoint",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 18.0,
         "max_value": 26.0,
         "default_value": 22.0,
@@ -2494,7 +2494,7 @@
         "name": "room_temp",
         "point_type": "analog_input",
         "description": "Room temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 16.0,
         "max_value": 32.0,
         "default_value": 21.5,
@@ -2504,7 +2504,7 @@
         "name": "room_temp_setpoint",
         "point_type": "analog_value",
         "description": "Room temperature setpoint",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 18.0,
         "max_value": 26.0,
         "default_value": 22.0,
@@ -2583,7 +2583,7 @@
         "name": "room_temp",
         "point_type": "analog_input",
         "description": "Room temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 16.0,
         "max_value": 32.0,
         "default_value": 24.0,
@@ -2593,7 +2593,7 @@
         "name": "room_temp_setpoint",
         "point_type": "analog_value",
         "description": "Room temperature setpoint",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 18.0,
         "max_value": 26.0,
         "default_value": 22.0,
@@ -2672,7 +2672,7 @@
         "name": "room_temp",
         "point_type": "analog_input",
         "description": "Room temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 16.0,
         "max_value": 32.0,
         "default_value": 22.0,
@@ -2682,7 +2682,7 @@
         "name": "room_temp_setpoint",
         "point_type": "analog_value",
         "description": "Room temperature setpoint",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 18.0,
         "max_value": 26.0,
         "default_value": 22.0,
@@ -2761,7 +2761,7 @@
         "name": "supply_air_temp",
         "point_type": "analog_input",
         "description": "Supply air temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 10.0,
         "max_value": 25.0,
         "default_value": 14.0,
@@ -2771,7 +2771,7 @@
         "name": "supply_air_temp_setpoint",
         "point_type": "analog_value",
         "description": "Supply air temperature setpoint",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 12.0,
         "max_value": 18.0,
         "default_value": 14.0,
@@ -2781,7 +2781,7 @@
         "name": "return_air_temp",
         "point_type": "analog_input",
         "description": "Return air temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 18.0,
         "max_value": 28.0,
         "default_value": 23.0,
@@ -2861,7 +2861,7 @@
         "name": "supply_air_temp",
         "point_type": "analog_input",
         "description": "Supply air temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 10.0,
         "max_value": 25.0,
         "default_value": 14.0,
@@ -2871,7 +2871,7 @@
         "name": "supply_air_temp_setpoint",
         "point_type": "analog_value",
         "description": "Supply air temperature setpoint",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 12.0,
         "max_value": 18.0,
         "default_value": 14.0,
@@ -2881,7 +2881,7 @@
         "name": "return_air_temp",
         "point_type": "analog_input",
         "description": "Return air temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 18.0,
         "max_value": 28.0,
         "default_value": 23.0,
@@ -2961,7 +2961,7 @@
         "name": "supply_air_temp",
         "point_type": "analog_input",
         "description": "Supply air temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 10.0,
         "max_value": 25.0,
         "default_value": 14.0,
@@ -2971,7 +2971,7 @@
         "name": "supply_air_temp_setpoint",
         "point_type": "analog_value",
         "description": "Supply air temperature setpoint",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 12.0,
         "max_value": 18.0,
         "default_value": 14.0,
@@ -2981,7 +2981,7 @@
         "name": "return_air_temp",
         "point_type": "analog_input",
         "description": "Return air temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 18.0,
         "max_value": 28.0,
         "default_value": 23.0,
@@ -3091,7 +3091,7 @@
         "name": "discharge_air_temp",
         "point_type": "analog_input",
         "description": "Discharge air temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 10,
         "max_value": 30,
         "default_value": 14.5,
@@ -3179,7 +3179,7 @@
         "name": "discharge_air_temp",
         "point_type": "analog_input",
         "description": "Discharge air temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 10,
         "max_value": 30,
         "default_value": 14.5,
@@ -3267,7 +3267,7 @@
         "name": "discharge_air_temp",
         "point_type": "analog_input",
         "description": "Discharge air temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 10,
         "max_value": 30,
         "default_value": 14.5,
@@ -3355,7 +3355,7 @@
         "name": "discharge_air_temp",
         "point_type": "analog_input",
         "description": "Discharge air temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 10,
         "max_value": 30,
         "default_value": 14.5,
@@ -3443,7 +3443,7 @@
         "name": "discharge_air_temp",
         "point_type": "analog_input",
         "description": "Discharge air temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 10,
         "max_value": 30,
         "default_value": 14.5,
@@ -3531,7 +3531,7 @@
         "name": "discharge_air_temp",
         "point_type": "analog_input",
         "description": "Discharge air temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 10,
         "max_value": 30,
         "default_value": 14.5,
@@ -3619,7 +3619,7 @@
         "name": "discharge_air_temp",
         "point_type": "analog_input",
         "description": "Discharge air temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 10,
         "max_value": 30,
         "default_value": 14.5,
@@ -3707,7 +3707,7 @@
         "name": "discharge_air_temp",
         "point_type": "analog_input",
         "description": "Discharge air temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 10,
         "max_value": 30,
         "default_value": 14.5,
@@ -3795,7 +3795,7 @@
         "name": "discharge_air_temp",
         "point_type": "analog_input",
         "description": "Discharge air temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 10,
         "max_value": 30,
         "default_value": 14.5,
@@ -3883,7 +3883,7 @@
         "name": "discharge_air_temp",
         "point_type": "analog_input",
         "description": "Discharge air temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 10,
         "max_value": 30,
         "default_value": 14.5,
@@ -3971,7 +3971,7 @@
         "name": "discharge_air_temp",
         "point_type": "analog_input",
         "description": "Discharge air temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 10,
         "max_value": 30,
         "default_value": 14.5,
@@ -4059,7 +4059,7 @@
         "name": "discharge_air_temp",
         "point_type": "analog_input",
         "description": "Discharge air temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 10,
         "max_value": 30,
         "default_value": 14.5,
@@ -4147,7 +4147,7 @@
         "name": "discharge_air_temp",
         "point_type": "analog_input",
         "description": "Discharge air temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 10,
         "max_value": 30,
         "default_value": 14.5,
@@ -4235,7 +4235,7 @@
         "name": "discharge_air_temp",
         "point_type": "analog_input",
         "description": "Discharge air temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 10,
         "max_value": 30,
         "default_value": 14.5,
@@ -4323,7 +4323,7 @@
         "name": "discharge_air_temp",
         "point_type": "analog_input",
         "description": "Discharge air temperature",
-        "unit": "°C",
+        "unit": "\u00b0C",
         "min_value": 10,
         "max_value": 30,
         "default_value": 14.5,
@@ -4384,7 +4384,12 @@
         "default_value": 2,
         "writable": false,
         "metadata": {
-          "states": {"0": "normal", "1": "alarm", "2": "fault", "3": "disabled"}
+          "states": {
+            "0": "normal",
+            "1": "alarm",
+            "2": "fault",
+            "3": "disabled"
+          }
         }
       },
       "zone_alarm_active": {
@@ -4480,7 +4485,12 @@
         "default_value": 0,
         "writable": false,
         "metadata": {
-          "states": {"0": "open", "1": "closed", "2": "transit", "3": "fault"}
+          "states": {
+            "0": "open",
+            "1": "closed",
+            "2": "transit",
+            "3": "fault"
+          }
         }
       },
       "command": {
@@ -4531,13 +4541,71 @@
     "site_id": "site-002",
     "life_safety": true,
     "points": {
-      "position": {"name": "position", "point_type": "analog_input", "description": "Damper position percentage", "unit": "%", "min_value": 0, "max_value": 100, "default_value": 100, "writable": false},
-      "status": {"name": "status", "point_type": "multistate_value", "description": "Damper operational status", "unit": "", "default_value": 0, "writable": false, "metadata": {"states": {"0": "open", "1": "closed", "2": "transit", "3": "fault"}}},
-      "command": {"name": "command", "point_type": "binary_value", "description": "Damper open/close command", "unit": "", "default_value": true, "writable": true, "priority": 1}
+      "position": {
+        "name": "position",
+        "point_type": "analog_input",
+        "description": "Damper position percentage",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 100,
+        "writable": false
+      },
+      "status": {
+        "name": "status",
+        "point_type": "multistate_value",
+        "description": "Damper operational status",
+        "unit": "",
+        "default_value": 0,
+        "writable": false,
+        "metadata": {
+          "states": {
+            "0": "open",
+            "1": "closed",
+            "2": "transit",
+            "3": "fault"
+          }
+        }
+      },
+      "command": {
+        "name": "command",
+        "point_type": "binary_value",
+        "description": "Damper open/close command",
+        "unit": "",
+        "default_value": true,
+        "writable": true,
+        "priority": 1
+      }
     },
-    "device_location": {"building": "Sandton City Office Tower", "floor": "L0", "zone": "Zone-L0-D", "room": "AHU-L0", "description": "Level 0 AHU return duct damper", "zone_type": "plant_room", "exposure": "interior", "zone_priority": 1},
-    "equipment": {"manufacturer": "Belimo", "model": "BF24-SR-T", "serial_number": "STC-DMR-L0-002", "installation_year": 2020, "capacity_kw": 0.02},
-    "metadata": {"building": "Sandton City Office Tower", "building_id": "site-002", "floor": 10, "zone": "Zone-L0-D", "location": "Level 0 AHU return duct", "serves": "Zone-L0-D smoke containment", "critical": true, "safety_device": true, "safety_status": "safe", "safety_note": "Normal - fully open"}
+    "device_location": {
+      "building": "Sandton City Office Tower",
+      "floor": "L0",
+      "zone": "Zone-L0-D",
+      "room": "AHU-L0",
+      "description": "Level 0 AHU return duct damper",
+      "zone_type": "plant_room",
+      "exposure": "interior",
+      "zone_priority": 1
+    },
+    "equipment": {
+      "manufacturer": "Belimo",
+      "model": "BF24-SR-T",
+      "serial_number": "STC-DMR-L0-002",
+      "installation_year": 2020,
+      "capacity_kw": 0.02
+    },
+    "metadata": {
+      "building": "Sandton City Office Tower",
+      "building_id": "site-002",
+      "floor": 10,
+      "zone": "Zone-L0-D",
+      "location": "Level 0 AHU return duct",
+      "serves": "Zone-L0-D smoke containment",
+      "critical": true,
+      "safety_device": true,
+      "safety_status": "safe",
+      "safety_note": "Normal - fully open"
+    }
   },
   {
     "id": "S002-DAMPER-L1-001",
@@ -4547,13 +4615,71 @@
     "site_id": "site-002",
     "life_safety": true,
     "points": {
-      "position": {"name": "position", "point_type": "analog_input", "description": "Damper position percentage", "unit": "%", "min_value": 0, "max_value": 100, "default_value": 35, "writable": false},
-      "status": {"name": "status", "point_type": "multistate_value", "description": "Damper operational status", "unit": "", "default_value": 3, "writable": false, "metadata": {"states": {"0": "open", "1": "closed", "2": "transit", "3": "fault"}}},
-      "command": {"name": "command", "point_type": "binary_value", "description": "Damper open/close command", "unit": "", "default_value": true, "writable": true, "priority": 1}
+      "position": {
+        "name": "position",
+        "point_type": "analog_input",
+        "description": "Damper position percentage",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 35,
+        "writable": false
+      },
+      "status": {
+        "name": "status",
+        "point_type": "multistate_value",
+        "description": "Damper operational status",
+        "unit": "",
+        "default_value": 3,
+        "writable": false,
+        "metadata": {
+          "states": {
+            "0": "open",
+            "1": "closed",
+            "2": "transit",
+            "3": "fault"
+          }
+        }
+      },
+      "command": {
+        "name": "command",
+        "point_type": "binary_value",
+        "description": "Damper open/close command",
+        "unit": "",
+        "default_value": true,
+        "writable": true,
+        "priority": 1
+      }
     },
-    "device_location": {"building": "Sandton City Office Tower", "floor": "L1", "zone": "Zone-L1-A", "room": "AHU-L1", "description": "Level 1 AHU supply duct damper - STUCK AT 35%", "zone_type": "plant_room", "exposure": "interior", "zone_priority": 1},
-    "equipment": {"manufacturer": "Belimo", "model": "BF24-SR-T", "serial_number": "STC-DMR-L1-001", "installation_year": 2020, "capacity_kw": 0.02},
-    "metadata": {"building": "Sandton City Office Tower", "building_id": "site-002", "floor": 11, "zone": "Zone-L1-A", "location": "Level 1 AHU supply duct", "serves": "Zone-L1-A smoke containment", "critical": true, "safety_device": true, "safety_status": "alarm", "safety_note": "FAULT - Damper stuck at 35%, target 100%"}
+    "device_location": {
+      "building": "Sandton City Office Tower",
+      "floor": "L1",
+      "zone": "Zone-L1-A",
+      "room": "AHU-L1",
+      "description": "Level 1 AHU supply duct damper - STUCK AT 35%",
+      "zone_type": "plant_room",
+      "exposure": "interior",
+      "zone_priority": 1
+    },
+    "equipment": {
+      "manufacturer": "Belimo",
+      "model": "BF24-SR-T",
+      "serial_number": "STC-DMR-L1-001",
+      "installation_year": 2020,
+      "capacity_kw": 0.02
+    },
+    "metadata": {
+      "building": "Sandton City Office Tower",
+      "building_id": "site-002",
+      "floor": 11,
+      "zone": "Zone-L1-A",
+      "location": "Level 1 AHU supply duct",
+      "serves": "Zone-L1-A smoke containment",
+      "critical": true,
+      "safety_device": true,
+      "safety_status": "alarm",
+      "safety_note": "FAULT - Damper stuck at 35%, target 100%"
+    }
   },
   {
     "id": "S002-DAMPER-L1-002",
@@ -4563,13 +4689,71 @@
     "site_id": "site-002",
     "life_safety": true,
     "points": {
-      "position": {"name": "position", "point_type": "analog_input", "description": "Damper position percentage", "unit": "%", "min_value": 0, "max_value": 100, "default_value": 100, "writable": false},
-      "status": {"name": "status", "point_type": "multistate_value", "description": "Damper operational status", "unit": "", "default_value": 0, "writable": false, "metadata": {"states": {"0": "open", "1": "closed", "2": "transit", "3": "fault"}}},
-      "command": {"name": "command", "point_type": "binary_value", "description": "Damper open/close command", "unit": "", "default_value": true, "writable": true, "priority": 1}
+      "position": {
+        "name": "position",
+        "point_type": "analog_input",
+        "description": "Damper position percentage",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 100,
+        "writable": false
+      },
+      "status": {
+        "name": "status",
+        "point_type": "multistate_value",
+        "description": "Damper operational status",
+        "unit": "",
+        "default_value": 0,
+        "writable": false,
+        "metadata": {
+          "states": {
+            "0": "open",
+            "1": "closed",
+            "2": "transit",
+            "3": "fault"
+          }
+        }
+      },
+      "command": {
+        "name": "command",
+        "point_type": "binary_value",
+        "description": "Damper open/close command",
+        "unit": "",
+        "default_value": true,
+        "writable": true,
+        "priority": 1
+      }
     },
-    "device_location": {"building": "Sandton City Office Tower", "floor": "L1", "zone": "Zone-L1-C", "room": "AHU-L1", "description": "Level 1 AHU return duct damper", "zone_type": "plant_room", "exposure": "interior", "zone_priority": 1},
-    "equipment": {"manufacturer": "Belimo", "model": "BF24-SR-T", "serial_number": "STC-DMR-L1-002", "installation_year": 2020, "capacity_kw": 0.02},
-    "metadata": {"building": "Sandton City Office Tower", "building_id": "site-002", "floor": 11, "zone": "Zone-L1-C", "location": "Level 1 AHU return duct", "serves": "Zone-L1-C smoke containment", "critical": true, "safety_device": true, "safety_status": "safe", "safety_note": "Normal - fully open"}
+    "device_location": {
+      "building": "Sandton City Office Tower",
+      "floor": "L1",
+      "zone": "Zone-L1-C",
+      "room": "AHU-L1",
+      "description": "Level 1 AHU return duct damper",
+      "zone_type": "plant_room",
+      "exposure": "interior",
+      "zone_priority": 1
+    },
+    "equipment": {
+      "manufacturer": "Belimo",
+      "model": "BF24-SR-T",
+      "serial_number": "STC-DMR-L1-002",
+      "installation_year": 2020,
+      "capacity_kw": 0.02
+    },
+    "metadata": {
+      "building": "Sandton City Office Tower",
+      "building_id": "site-002",
+      "floor": 11,
+      "zone": "Zone-L1-C",
+      "location": "Level 1 AHU return duct",
+      "serves": "Zone-L1-C smoke containment",
+      "critical": true,
+      "safety_device": true,
+      "safety_status": "safe",
+      "safety_note": "Normal - fully open"
+    }
   },
   {
     "id": "S002-DAMPER-L2-001",
@@ -4579,13 +4763,71 @@
     "site_id": "site-002",
     "life_safety": true,
     "points": {
-      "position": {"name": "position", "point_type": "analog_input", "description": "Damper position percentage", "unit": "%", "min_value": 0, "max_value": 100, "default_value": 100, "writable": false},
-      "status": {"name": "status", "point_type": "multistate_value", "description": "Damper operational status", "unit": "", "default_value": 0, "writable": false, "metadata": {"states": {"0": "open", "1": "closed", "2": "transit", "3": "fault"}}},
-      "command": {"name": "command", "point_type": "binary_value", "description": "Damper open/close command", "unit": "", "default_value": true, "writable": true, "priority": 1}
+      "position": {
+        "name": "position",
+        "point_type": "analog_input",
+        "description": "Damper position percentage",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 100,
+        "writable": false
+      },
+      "status": {
+        "name": "status",
+        "point_type": "multistate_value",
+        "description": "Damper operational status",
+        "unit": "",
+        "default_value": 0,
+        "writable": false,
+        "metadata": {
+          "states": {
+            "0": "open",
+            "1": "closed",
+            "2": "transit",
+            "3": "fault"
+          }
+        }
+      },
+      "command": {
+        "name": "command",
+        "point_type": "binary_value",
+        "description": "Damper open/close command",
+        "unit": "",
+        "default_value": true,
+        "writable": true,
+        "priority": 1
+      }
     },
-    "device_location": {"building": "Sandton City Office Tower", "floor": "L2", "zone": "Zone-L2-A", "room": "AHU-L2", "description": "Level 2 AHU supply duct damper", "zone_type": "plant_room", "exposure": "interior", "zone_priority": 1},
-    "equipment": {"manufacturer": "Belimo", "model": "BF24-SR-T", "serial_number": "STC-DMR-L2-001", "installation_year": 2020, "capacity_kw": 0.02},
-    "metadata": {"building": "Sandton City Office Tower", "building_id": "site-002", "floor": 12, "zone": "Zone-L2-A", "location": "Level 2 AHU supply duct", "serves": "Zone-L2-A smoke containment", "critical": true, "safety_device": true, "safety_status": "safe", "safety_note": "Normal - fully open"}
+    "device_location": {
+      "building": "Sandton City Office Tower",
+      "floor": "L2",
+      "zone": "Zone-L2-A",
+      "room": "AHU-L2",
+      "description": "Level 2 AHU supply duct damper",
+      "zone_type": "plant_room",
+      "exposure": "interior",
+      "zone_priority": 1
+    },
+    "equipment": {
+      "manufacturer": "Belimo",
+      "model": "BF24-SR-T",
+      "serial_number": "STC-DMR-L2-001",
+      "installation_year": 2020,
+      "capacity_kw": 0.02
+    },
+    "metadata": {
+      "building": "Sandton City Office Tower",
+      "building_id": "site-002",
+      "floor": 12,
+      "zone": "Zone-L2-A",
+      "location": "Level 2 AHU supply duct",
+      "serves": "Zone-L2-A smoke containment",
+      "critical": true,
+      "safety_device": true,
+      "safety_status": "safe",
+      "safety_note": "Normal - fully open"
+    }
   },
   {
     "id": "S002-DAMPER-L2-002",
@@ -4595,13 +4837,71 @@
     "site_id": "site-002",
     "life_safety": true,
     "points": {
-      "position": {"name": "position", "point_type": "analog_input", "description": "Damper position percentage", "unit": "%", "min_value": 0, "max_value": 100, "default_value": 100, "writable": false},
-      "status": {"name": "status", "point_type": "multistate_value", "description": "Damper operational status", "unit": "", "default_value": 0, "writable": false, "metadata": {"states": {"0": "open", "1": "closed", "2": "transit", "3": "fault"}}},
-      "command": {"name": "command", "point_type": "binary_value", "description": "Damper open/close command", "unit": "", "default_value": true, "writable": true, "priority": 1}
+      "position": {
+        "name": "position",
+        "point_type": "analog_input",
+        "description": "Damper position percentage",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 100,
+        "writable": false
+      },
+      "status": {
+        "name": "status",
+        "point_type": "multistate_value",
+        "description": "Damper operational status",
+        "unit": "",
+        "default_value": 0,
+        "writable": false,
+        "metadata": {
+          "states": {
+            "0": "open",
+            "1": "closed",
+            "2": "transit",
+            "3": "fault"
+          }
+        }
+      },
+      "command": {
+        "name": "command",
+        "point_type": "binary_value",
+        "description": "Damper open/close command",
+        "unit": "",
+        "default_value": true,
+        "writable": true,
+        "priority": 1
+      }
     },
-    "device_location": {"building": "Sandton City Office Tower", "floor": "L2", "zone": "Zone-L2-D", "room": "AHU-L2", "description": "Level 2 AHU return duct damper", "zone_type": "plant_room", "exposure": "interior", "zone_priority": 1},
-    "equipment": {"manufacturer": "Belimo", "model": "BF24-SR-T", "serial_number": "STC-DMR-L2-002", "installation_year": 2020, "capacity_kw": 0.02},
-    "metadata": {"building": "Sandton City Office Tower", "building_id": "site-002", "floor": 12, "zone": "Zone-L2-D", "location": "Level 2 AHU return duct", "serves": "Zone-L2-D smoke containment", "critical": true, "safety_device": true, "safety_status": "safe", "safety_note": "Normal - fully open"}
+    "device_location": {
+      "building": "Sandton City Office Tower",
+      "floor": "L2",
+      "zone": "Zone-L2-D",
+      "room": "AHU-L2",
+      "description": "Level 2 AHU return duct damper",
+      "zone_type": "plant_room",
+      "exposure": "interior",
+      "zone_priority": 1
+    },
+    "equipment": {
+      "manufacturer": "Belimo",
+      "model": "BF24-SR-T",
+      "serial_number": "STC-DMR-L2-002",
+      "installation_year": 2020,
+      "capacity_kw": 0.02
+    },
+    "metadata": {
+      "building": "Sandton City Office Tower",
+      "building_id": "site-002",
+      "floor": 12,
+      "zone": "Zone-L2-D",
+      "location": "Level 2 AHU return duct",
+      "serves": "Zone-L2-D smoke containment",
+      "critical": true,
+      "safety_device": true,
+      "safety_status": "safe",
+      "safety_note": "Normal - fully open"
+    }
   },
   {
     "id": "S002-PRESS-G-001",
@@ -4619,7 +4919,11 @@
         "default_value": 0,
         "writable": false,
         "metadata": {
-          "states": {"0": "off", "1": "running", "2": "fault"}
+          "states": {
+            "0": "off",
+            "1": "running",
+            "2": "fault"
+          }
         }
       },
       "speed_pct": {
@@ -4654,7 +4958,7 @@
       "zone_priority": 1
     },
     "equipment": {
-      "manufacturer": "Fläkt Group",
+      "manufacturer": "Fl\u00e4kt Group",
       "model": "STPF-1000",
       "serial_number": "STC-PRESS-001",
       "installation_year": 2020,
@@ -4681,12 +4985,634 @@
     "site_id": "site-002",
     "life_safety": true,
     "points": {
-      "fan_status": {"name": "fan_status", "point_type": "multistate_value", "description": "Pressurization fan operational status", "unit": "", "default_value": 0, "writable": false, "metadata": {"states": {"0": "off", "1": "running", "2": "fault"}}},
-      "speed_pct": {"name": "speed_pct", "point_type": "analog_input", "description": "Fan speed percentage", "unit": "%", "min_value": 0, "max_value": 100, "default_value": 0, "writable": false},
-      "differential_pressure_pa": {"name": "differential_pressure_pa", "point_type": "analog_input", "description": "Stairwell differential pressure", "unit": "Pa", "min_value": 0, "max_value": 100, "default_value": 0, "writable": false}
+      "fan_status": {
+        "name": "fan_status",
+        "point_type": "multistate_value",
+        "description": "Pressurization fan operational status",
+        "unit": "",
+        "default_value": 0,
+        "writable": false,
+        "metadata": {
+          "states": {
+            "0": "off",
+            "1": "running",
+            "2": "fault"
+          }
+        }
+      },
+      "speed_pct": {
+        "name": "speed_pct",
+        "point_type": "analog_input",
+        "description": "Fan speed percentage",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 0,
+        "writable": false
+      },
+      "differential_pressure_pa": {
+        "name": "differential_pressure_pa",
+        "point_type": "analog_input",
+        "description": "Stairwell differential pressure",
+        "unit": "Pa",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 0,
+        "writable": false
+      }
     },
-    "device_location": {"building": "Sandton City Office Tower", "floor": "G", "zone": "Stairwell-B", "room": "SW-B-FAN", "description": "Ground Floor Stairwell B pressurization fan room", "zone_type": "stairwell", "exposure": "interior", "zone_priority": 1},
-    "equipment": {"manufacturer": "Fläkt Group", "model": "STPF-1000", "serial_number": "STC-PRESS-002", "installation_year": 2020, "capacity_kw": 7.5},
-    "metadata": {"building": "Sandton City Office Tower", "building_id": "site-002", "floor": 0, "zone": "Stairwell-B", "location": "Ground Floor Stairwell B fan room", "serves": "Stairwell B pressurization (all floors)", "critical": true, "safety_device": true, "safety_status": "safe", "safety_note": "Standby - activates on fire alarm"}
+    "device_location": {
+      "building": "Sandton City Office Tower",
+      "floor": "G",
+      "zone": "Stairwell-B",
+      "room": "SW-B-FAN",
+      "description": "Ground Floor Stairwell B pressurization fan room",
+      "zone_type": "stairwell",
+      "exposure": "interior",
+      "zone_priority": 1
+    },
+    "equipment": {
+      "manufacturer": "Fl\u00e4kt Group",
+      "model": "STPF-1000",
+      "serial_number": "STC-PRESS-002",
+      "installation_year": 2020,
+      "capacity_kw": 7.5
+    },
+    "metadata": {
+      "building": "Sandton City Office Tower",
+      "building_id": "site-002",
+      "floor": 0,
+      "zone": "Stairwell-B",
+      "location": "Ground Floor Stairwell B fan room",
+      "serves": "Stairwell B pressurization (all floors)",
+      "critical": true,
+      "safety_device": true,
+      "safety_status": "safe",
+      "safety_note": "Standby - activates on fire alarm"
+    }
+  },
+  {
+    "id": "S002-ACC-G-001",
+    "name": "Main Entrance Reader",
+    "device_type": "security",
+    "protocol": "mock",
+    "site_id": "site-002",
+    "security_type": "reader",
+    "points": {
+      "door_status": {
+        "name": "door_status",
+        "point_type": "binary_input",
+        "description": "Door open/closed status",
+        "unit": "",
+        "default_value": false,
+        "writable": false
+      },
+      "lock_status": {
+        "name": "lock_status",
+        "point_type": "binary_value",
+        "description": "Electric lock engaged/disengaged",
+        "unit": "",
+        "default_value": true,
+        "writable": true
+      },
+      "access_granted": {
+        "name": "access_granted",
+        "point_type": "binary_input",
+        "description": "Last access granted status",
+        "unit": "",
+        "default_value": true,
+        "writable": false
+      },
+      "tamper_alarm": {
+        "name": "tamper_alarm",
+        "point_type": "binary_input",
+        "description": "Tamper alarm status",
+        "unit": "",
+        "default_value": false,
+        "writable": false
+      },
+      "reader_battery": {
+        "name": "reader_battery",
+        "point_type": "analog_input",
+        "description": "Reader battery level",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 95,
+        "writable": false
+      }
+    },
+    "device_location": {
+      "building": "Sandton City Office Tower",
+      "floor": "G",
+      "zone": "A",
+      "room": "Lobby",
+      "description": "Ground Floor, Main Entrance",
+      "zone_type": "lobby",
+      "exposure": "north",
+      "zone_priority": 4
+    },
+    "equipment": {
+      "manufacturer": "HID",
+      "model": "iCLASS SE R90",
+      "serial_number": "STC-ACC-001",
+      "installation_year": 2024,
+      "capacity_kw": 0.05
+    },
+    "metadata": {
+      "building": "Sandton City Office Tower",
+      "building_id": "site-002",
+      "floor": 0,
+      "zone": "A",
+      "location": "Ground Floor Main Entrance",
+      "serves": "Primary building access",
+      "critical_access": true,
+      "monitored_24_7": true,
+      "safety_status": "safe",
+      "safety_note": "All access points operational"
+    }
+  },
+  {
+    "id": "S002-ACC-L1-A",
+    "name": "Level 1 Office Reader",
+    "device_type": "security",
+    "protocol": "mock",
+    "site_id": "site-002",
+    "security_type": "reader",
+    "points": {
+      "door_status": {
+        "name": "door_status",
+        "point_type": "binary_input",
+        "description": "Door open/closed status",
+        "unit": "",
+        "default_value": false,
+        "writable": false
+      },
+      "lock_status": {
+        "name": "lock_status",
+        "point_type": "binary_value",
+        "description": "Electric lock engaged/disengaged",
+        "unit": "",
+        "default_value": true,
+        "writable": true
+      },
+      "access_granted": {
+        "name": "access_granted",
+        "point_type": "binary_input",
+        "description": "Last access granted status",
+        "unit": "",
+        "default_value": true,
+        "writable": false
+      },
+      "tamper_alarm": {
+        "name": "tamper_alarm",
+        "point_type": "binary_input",
+        "description": "Tamper alarm status",
+        "unit": "",
+        "default_value": false,
+        "writable": false
+      },
+      "reader_battery": {
+        "name": "reader_battery",
+        "point_type": "analog_input",
+        "description": "Reader battery level",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 88,
+        "writable": false
+      }
+    },
+    "device_location": {
+      "building": "Sandton City Office Tower",
+      "floor": "L1",
+      "zone": "A",
+      "room": "Office Entry",
+      "description": "Level 1, Office Entry",
+      "zone_type": "open_office",
+      "exposure": "interior",
+      "zone_priority": 3
+    },
+    "equipment": {
+      "manufacturer": "HID",
+      "model": "iCLASS SE R40",
+      "serial_number": "STC-ACC-002",
+      "installation_year": 2024,
+      "capacity_kw": 0.05
+    },
+    "metadata": {
+      "building": "Sandton City Office Tower",
+      "building_id": "site-002",
+      "floor": 1,
+      "zone": "A",
+      "location": "Level 1 Office Entry",
+      "serves": "Level 1 office access",
+      "critical_access": false,
+      "monitored_24_7": true,
+      "safety_status": "safe",
+      "safety_note": "Reader operational"
+    }
+  },
+  {
+    "id": "S002-ACC-L2-A",
+    "name": "Level 2 Office Reader",
+    "device_type": "security",
+    "protocol": "mock",
+    "site_id": "site-002",
+    "security_type": "reader",
+    "points": {
+      "door_status": {
+        "name": "door_status",
+        "point_type": "binary_input",
+        "description": "Door open/closed status",
+        "unit": "",
+        "default_value": false,
+        "writable": false
+      },
+      "lock_status": {
+        "name": "lock_status",
+        "point_type": "binary_value",
+        "description": "Electric lock engaged/disengaged",
+        "unit": "",
+        "default_value": true,
+        "writable": true
+      },
+      "access_granted": {
+        "name": "access_granted",
+        "point_type": "binary_input",
+        "description": "Last access granted status",
+        "unit": "",
+        "default_value": true,
+        "writable": false
+      },
+      "tamper_alarm": {
+        "name": "tamper_alarm",
+        "point_type": "binary_input",
+        "description": "Tamper alarm status",
+        "unit": "",
+        "default_value": false,
+        "writable": false
+      },
+      "reader_battery": {
+        "name": "reader_battery",
+        "point_type": "analog_input",
+        "description": "Reader battery level",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 91,
+        "writable": false
+      }
+    },
+    "device_location": {
+      "building": "Sandton City Office Tower",
+      "floor": "L2",
+      "zone": "A",
+      "room": "Office Entry",
+      "description": "Level 2, Office Entry",
+      "zone_type": "open_office",
+      "exposure": "interior",
+      "zone_priority": 3
+    },
+    "equipment": {
+      "manufacturer": "HID",
+      "model": "iCLASS SE R40",
+      "serial_number": "STC-ACC-003",
+      "installation_year": 2024,
+      "capacity_kw": 0.05
+    },
+    "metadata": {
+      "building": "Sandton City Office Tower",
+      "building_id": "site-002",
+      "floor": 2,
+      "zone": "A",
+      "location": "Level 2 Office Entry",
+      "serves": "Level 2 office access",
+      "critical_access": false,
+      "monitored_24_7": true,
+      "safety_status": "safe",
+      "safety_note": "Reader operational"
+    }
+  },
+  {
+    "id": "S002-ACC-L1-SRV",
+    "name": "Server Room Reader",
+    "device_type": "security",
+    "protocol": "mock",
+    "site_id": "site-002",
+    "security_type": "reader",
+    "points": {
+      "door_status": {
+        "name": "door_status",
+        "point_type": "binary_input",
+        "description": "Door open/closed status",
+        "unit": "",
+        "default_value": false,
+        "writable": false
+      },
+      "lock_status": {
+        "name": "lock_status",
+        "point_type": "binary_value",
+        "description": "Electric lock engaged/disengaged",
+        "unit": "",
+        "default_value": true,
+        "writable": true
+      },
+      "access_granted": {
+        "name": "access_granted",
+        "point_type": "binary_input",
+        "description": "Last access granted status",
+        "unit": "",
+        "default_value": true,
+        "writable": false
+      },
+      "tamper_alarm": {
+        "name": "tamper_alarm",
+        "point_type": "binary_input",
+        "description": "Tamper alarm status",
+        "unit": "",
+        "default_value": false,
+        "writable": false
+      },
+      "reader_battery": {
+        "name": "reader_battery",
+        "point_type": "analog_input",
+        "description": "Reader battery level",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 96,
+        "writable": false
+      }
+    },
+    "device_location": {
+      "building": "Sandton City Office Tower",
+      "floor": "L1",
+      "zone": "C",
+      "room": "Server Room",
+      "description": "Level 1, Server Room Entry",
+      "zone_type": "server_room",
+      "exposure": "interior",
+      "zone_priority": 1
+    },
+    "equipment": {
+      "manufacturer": "HID",
+      "model": "iCLASS SE RB25F",
+      "serial_number": "STC-ACC-004",
+      "installation_year": 2024,
+      "capacity_kw": 0.05
+    },
+    "metadata": {
+      "building": "Sandton City Office Tower",
+      "building_id": "site-002",
+      "floor": 1,
+      "zone": "C",
+      "location": "Level 1 Server Room",
+      "serves": "Server room biometric access",
+      "critical_access": true,
+      "monitored_24_7": true,
+      "safety_status": "safe",
+      "safety_note": "Biometric reader - critical zone"
+    }
+  },
+  {
+    "id": "S002-CAM-G-001",
+    "name": "Lobby Camera",
+    "device_type": "security",
+    "protocol": "mock",
+    "site_id": "site-002",
+    "security_type": "camera",
+    "points": {
+      "camera_status": {
+        "name": "camera_status",
+        "point_type": "multistate_value",
+        "description": "Camera operational status",
+        "unit": "",
+        "default_value": 1,
+        "writable": false,
+        "metadata": {
+          "states": {
+            "0": "offline",
+            "1": "online",
+            "2": "fault"
+          }
+        }
+      },
+      "motion_detected": {
+        "name": "motion_detected",
+        "point_type": "binary_input",
+        "description": "Motion detection status",
+        "unit": "",
+        "default_value": true,
+        "writable": false
+      },
+      "recording": {
+        "name": "recording",
+        "point_type": "binary_input",
+        "description": "Recording status",
+        "unit": "",
+        "default_value": true,
+        "writable": false
+      },
+      "disk_usage": {
+        "name": "disk_usage",
+        "point_type": "analog_input",
+        "description": "NVR disk usage",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 62,
+        "writable": false
+      }
+    },
+    "device_location": {
+      "building": "Sandton City Office Tower",
+      "floor": "G",
+      "zone": "A",
+      "room": "Lobby",
+      "description": "Ground Floor, Lobby Overview",
+      "zone_type": "lobby",
+      "exposure": "interior",
+      "zone_priority": 4
+    },
+    "equipment": {
+      "manufacturer": "Axis",
+      "model": "P3245-V",
+      "serial_number": "STC-CAM-001",
+      "installation_year": 2024,
+      "capacity_kw": 0.02
+    },
+    "metadata": {
+      "building": "Sandton City Office Tower",
+      "building_id": "site-002",
+      "floor": 0,
+      "zone": "A",
+      "location": "Ground Floor Lobby",
+      "serves": "Lobby surveillance",
+      "resolution": "4K",
+      "has_analytics": true,
+      "safety_status": "safe",
+      "safety_note": "Camera online, recording"
+    }
+  },
+  {
+    "id": "S002-CAM-L1-A",
+    "name": "Level 1 Corridor Camera",
+    "device_type": "security",
+    "protocol": "mock",
+    "site_id": "site-002",
+    "security_type": "camera",
+    "points": {
+      "camera_status": {
+        "name": "camera_status",
+        "point_type": "multistate_value",
+        "description": "Camera operational status",
+        "unit": "",
+        "default_value": 1,
+        "writable": false,
+        "metadata": {
+          "states": {
+            "0": "offline",
+            "1": "online",
+            "2": "fault"
+          }
+        }
+      },
+      "motion_detected": {
+        "name": "motion_detected",
+        "point_type": "binary_input",
+        "description": "Motion detection status",
+        "unit": "",
+        "default_value": false,
+        "writable": false
+      },
+      "recording": {
+        "name": "recording",
+        "point_type": "binary_input",
+        "description": "Recording status",
+        "unit": "",
+        "default_value": true,
+        "writable": false
+      },
+      "disk_usage": {
+        "name": "disk_usage",
+        "point_type": "analog_input",
+        "description": "NVR disk usage",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 62,
+        "writable": false
+      }
+    },
+    "device_location": {
+      "building": "Sandton City Office Tower",
+      "floor": "L1",
+      "zone": "A",
+      "room": "Corridor",
+      "description": "Level 1, Main Corridor",
+      "zone_type": "open_office",
+      "exposure": "interior",
+      "zone_priority": 3
+    },
+    "equipment": {
+      "manufacturer": "Axis",
+      "model": "M3106-L Mk II",
+      "serial_number": "STC-CAM-002",
+      "installation_year": 2024,
+      "capacity_kw": 0.015
+    },
+    "metadata": {
+      "building": "Sandton City Office Tower",
+      "building_id": "site-002",
+      "floor": 1,
+      "zone": "A",
+      "location": "Level 1 Corridor",
+      "serves": "L1 corridor surveillance",
+      "resolution": "1080p",
+      "has_analytics": false,
+      "safety_status": "safe",
+      "safety_note": "Camera online, recording"
+    }
+  },
+  {
+    "id": "S002-CAM-L1-SRV",
+    "name": "Server Room Camera",
+    "device_type": "security",
+    "protocol": "mock",
+    "site_id": "site-002",
+    "security_type": "camera",
+    "points": {
+      "camera_status": {
+        "name": "camera_status",
+        "point_type": "multistate_value",
+        "description": "Camera operational status",
+        "unit": "",
+        "default_value": 1,
+        "writable": false,
+        "metadata": {
+          "states": {
+            "0": "offline",
+            "1": "online",
+            "2": "fault"
+          }
+        }
+      },
+      "motion_detected": {
+        "name": "motion_detected",
+        "point_type": "binary_input",
+        "description": "Motion detection status",
+        "unit": "",
+        "default_value": false,
+        "writable": false
+      },
+      "recording": {
+        "name": "recording",
+        "point_type": "binary_input",
+        "description": "Recording status",
+        "unit": "",
+        "default_value": true,
+        "writable": false
+      },
+      "disk_usage": {
+        "name": "disk_usage",
+        "point_type": "analog_input",
+        "description": "NVR disk usage",
+        "unit": "%",
+        "min_value": 0,
+        "max_value": 100,
+        "default_value": 62,
+        "writable": false
+      }
+    },
+    "device_location": {
+      "building": "Sandton City Office Tower",
+      "floor": "L1",
+      "zone": "C",
+      "room": "Server Room",
+      "description": "Level 1, Server Room",
+      "zone_type": "server_room",
+      "exposure": "interior",
+      "zone_priority": 1
+    },
+    "equipment": {
+      "manufacturer": "Axis",
+      "model": "Q6128-E",
+      "serial_number": "STC-CAM-003",
+      "installation_year": 2024,
+      "capacity_kw": 0.03
+    },
+    "metadata": {
+      "building": "Sandton City Office Tower",
+      "building_id": "site-002",
+      "floor": 1,
+      "zone": "C",
+      "location": "Level 1 Server Room",
+      "serves": "Server room surveillance - 24/7",
+      "resolution": "4K",
+      "has_analytics": true,
+      "safety_status": "safe",
+      "safety_note": "PTZ camera online, recording 24/7"
+    }
   }
 ]
