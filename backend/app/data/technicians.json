@@ -1,0 +1,52 @@
+[
+  {
+    "id": "tech-001",
+    "name": "Sipho Ndlovu",
+    "role": "technician",
+    "specializations": ["hvac", "general"],
+    "current_site": "site-002",
+    "status": "onsite",
+    "phone": "+27 82 555 0101",
+    "assigned_work_orders": ["WO-20260204-A1B2C3D4"]
+  },
+  {
+    "id": "tech-002",
+    "name": "Johan van der Merwe",
+    "role": "engineer",
+    "specializations": ["hvac", "electrical", "plumbing"],
+    "current_site": null,
+    "status": "available",
+    "phone": "+27 83 555 0202",
+    "assigned_work_orders": []
+  },
+  {
+    "id": "tech-003",
+    "name": "Thabo Molefe",
+    "role": "technician",
+    "specializations": ["electrical", "fire_safety"],
+    "current_site": null,
+    "status": "available",
+    "phone": "+27 84 555 0303",
+    "assigned_work_orders": []
+  },
+  {
+    "id": "tech-004",
+    "name": "Pieter Botha",
+    "role": "technician",
+    "specializations": ["hvac", "plumbing", "general"],
+    "current_site": "site-003",
+    "status": "onsite",
+    "phone": "+27 72 555 0404",
+    "assigned_work_orders": ["WO-20260204-E5F6G7H8"]
+  },
+  {
+    "id": "tech-005",
+    "name": "Lerato Mahlangu",
+    "role": "engineer",
+    "specializations": ["electrical", "hvac", "fire_safety", "general"],
+    "current_site": null,
+    "status": "off_duty",
+    "phone": "+27 76 555 0505",
+    "assigned_work_orders": []
+  }
+]
