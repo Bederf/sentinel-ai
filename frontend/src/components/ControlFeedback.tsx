@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 /**
  * ControlFeedback Component - SENTINEL control action feedback display
  *

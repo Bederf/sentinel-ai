@@ -122,19 +122,16 @@ async def notify_technician_of_work_order(
         if field not in data:
             raise HTTPException(status_code=400, detail=f"Missing required field: {field}")
 
-    # Send notification
-    success = await work_order_notifier.notify_technician(data)
+    # Send notification (returns service_record_code on success)
+    result = await work_order_notifier.notify_technician_with_code(data)
 
-    if not success:
-        raise HTTPException(status_code=500, detail="Failed to send notification")
-
-    # Get service record code
-    filters = {"work_order_id": data["work_order_id"]}
-    # Note: Need to call list with filters through repository
+    if not result.get("success"):
+        raise HTTPException(status_code=500, detail=result.get("error", "Failed to send notification"))
 
     return {
         "success": True,
-        "message": "Work order notification sent successfully"
+        "message": "Work order notification sent successfully",
+        "service_record_code": result.get("service_record_code")
     }
 
 

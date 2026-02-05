@@ -123,7 +123,7 @@ export function OptimizationPanel({ siteId: initialSiteId = "site-001", scenario
 
   // Precooling state
   const [precoolingStatus, setPrecoolingStatus] = useState<"idle" | "starting" | "running" | "stopped">("idle");
-  const [precoolingActions, setPrecoolingActions] = useState<any[]>([]);
+  const [_precoolingActions, setPrecoolingActions] = useState<any[]>([]);
 
   // Fetch sites on mount
   useEffect(() => {
@@ -204,7 +204,7 @@ export function OptimizationPanel({ siteId: initialSiteId = "site-001", scenario
         setThermalRunway(thermalData);
 
         // Find matching scenario: by scenarioId prop, or by site_id
-        let matched = scenarioId
+        const matched = scenarioId
           ? scenarios.find((s) => s.scenario_id === scenarioId) ?? null
           : scenarios.find((s) => s.site_id === selectedSiteId) ?? scenarios[0] ?? null;
         setScenario(matched);

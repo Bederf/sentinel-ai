@@ -1,0 +1,70 @@
+{
+  "site_id": "site-004",
+  "config": {
+    "site_id": "site-004",
+    "vendor": "niagara",
+    "seed": 42,
+    "start_date": "2026-01-06",
+    "days": 30,
+    "interval_minutes": 15,
+    "include_degradation": true,
+    "degradation_equipment": [
+      "S002-CHILLER-B1-001"
+    ],
+    "include_diffusers": true
+  },
+  "timestamp": "2026-02-05T10:04:46.352102",
+  "files": {
+    "point_list": "/opt/bms-intelligence/backend/app/data/bms_simulator/exports/point_list_site-004_niagara_20260205_100446.csv"
+  },
+  "summary": {
+    "points": {
+      "site_id": "site-004",
+      "total_devices": 79,
+      "total_points": 476,
+      "devices_by_type": {
+        "chiller": 3,
+        "split": 6,
+        "mcu2_gateway": 3,
+        "fire_panel": 1,
+        "jace": 2,
+        "cold_room": 3,
+        "boiler": 2,
+        "db": 2,
+        "generator": 3,
+        "msb": 1,
+        "cooling_tower": 2,
+        "ahu": 8,
+        "theatre_ahu": 4,
+        "medical_gas": 1,
+        "ups": 1,
+        "lift": 4,
+        "extract_fan": 1,
+        "pump": 2,
+        "diffuser": 30
+      },
+      "points_by_type": {
+        "chiller": 27,
+        "split": 19,
+        "mcu2_gateway": 12,
+        "fire_panel": 6,
+        "jace": 12,
+        "cold_room": 20,
+        "boiler": 16,
+        "db": 8,
+        "generator": 24,
+        "msb": 9,
+        "cooling_tower": 16,
+        "ahu": 55,
+        "theatre_ahu": 51,
+        "medical_gas": 7,
+        "ups": 8,
+        "lift": 21,
+        "extract_fan": 4,
+        "pump": 11,
+        "diffuser": 150
+      }
+    }
+  },
+  "elapsed_seconds": 0.04814
+}

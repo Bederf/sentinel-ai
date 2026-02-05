@@ -1,7 +1,15 @@
-"""AI Optimizer Service for building HVAC optimization.
+"""AI Optimizer Service for building-wide optimization.
 
 Uses Claude AI to analyze building telemetry, weather forecasts, and energy
-pricing to generate optimal HVAC setpoint recommendations.
+pricing to generate optimal setpoint recommendations for ALL equipment types:
+- HVAC (chillers, AHUs, FCUs, VAVs)
+- Lighting (DALI-2 luminaires, zone control)
+- Power (generators, UPS, ATS, meters)
+- Security (access control integration)
+- Fire Safety (monitoring only)
+
+Equipment inventory is site-specific - different buildings have different
+equipment combinations.
 """
 
 import logging
@@ -157,32 +165,41 @@ class AIOptimizerService:
         if not energy_prices:
             energy_prices = self._generate_mock_energy_prices()
 
-        # Get site devices for context
-        devices = await device_manager.list_devices_by_site(site_id)
-        hvac_devices = [d for d in devices if d.device_type == DeviceType.HVAC]
-        lighting_devices = [d for d in devices if d.device_type == DeviceType.LIGHTING]
+        # Get ALL site devices - equipment inventory varies by building
+        all_devices = await device_manager.list_devices_by_site(site_id)
+
+        # Categorize equipment by type - this is site-specific
+        equipment_inventory = self._categorize_equipment(all_devices)
+
+        # For backwards compatibility, extract commonly used categories
+        hvac_devices = equipment_inventory.get("hvac", [])
+        lighting_devices = equipment_inventory.get("lighting", [])
+        power_devices = equipment_inventory.get("power", [])
+        security_devices = equipment_inventory.get("security", [])
+
+        logger.info(f"Site {site_id} equipment inventory: {self._summarize_inventory(equipment_inventory)}")
 
         # Fetch DALI lighting zone data
         dali_service = get_dali_service()
         dali_zones = self._gather_dali_zone_data(dali_service, site_id)
 
-        # Build optimization prompt for Claude
+        # Build optimization prompt for Claude with ALL available equipment
         prompt = self._build_optimization_prompt(
-            site, current_conditions, weather_forecast, energy_prices, hvac_devices,
-            lighting_devices, dali_zones
+            site, current_conditions, weather_forecast, energy_prices,
+            equipment_inventory, dali_zones
         )
 
         try:
             # Try to use Claude for analysis
             if self._claude_service.is_configured():
                 recommendation = await self._analyze_with_claude(
-                    site_id, prompt, current_conditions, hvac_devices, dali_zones
+                    site_id, prompt, current_conditions, equipment_inventory, dali_zones
                 )
             else:
                 # Fall back to rule-based optimization
                 recommendation = self._analyze_with_rules(
                     site_id, current_conditions, weather_forecast, energy_prices,
-                    hvac_devices, dali_zones
+                    equipment_inventory, dali_zones
                 )
 
             return recommendation
@@ -192,7 +209,7 @@ class AIOptimizerService:
             # Fall back to rule-based optimization
             return self._analyze_with_rules(
                 site_id, current_conditions, weather_forecast, energy_prices,
-                hvac_devices, dali_zones
+                equipment_inventory, dali_zones
             )
 
     async def _gather_current_conditions(self, site_id: str) -> Dict[str, Any]:
@@ -309,71 +326,106 @@ class AIOptimizerService:
         current_conditions: Dict[str, Any],
         weather_forecast: Dict[str, Any],
         energy_prices: Dict[str, Any],
-        hvac_devices: List[Device],
-        lighting_devices: Optional[List[Device]] = None,
+        equipment_inventory: Dict[str, List[Device]],
         dali_zones: Optional[Dict[str, Any]] = None,
     ) -> str:
-        """Build optimization prompt for Claude."""
-        lighting_devices = lighting_devices or []
+        """Build optimization prompt for Claude with ALL available equipment.
+
+        Equipment inventory varies by building - some have generators, others don't.
+        The AI should only recommend changes for equipment that exists at this site.
+        """
         dali_zones = dali_zones or {}
 
-        prompt = f"""You are an expert building optimization engineer specializing in HVAC and DALI lighting systems. Analyze the following building data and recommend optimal setpoints for energy efficiency and occupant comfort.
+        # Extract equipment by type for specific sections
+        hvac_devices = equipment_inventory.get("hvac", [])
+        lighting_devices = equipment_inventory.get("lighting", [])
+        power_devices = equipment_inventory.get("power", [])
+        meter_devices = equipment_inventory.get("meter", [])
+
+        # Get controllable equipment only
+        controllable = self._get_controllable_equipment(equipment_inventory)
+
+        # Build equipment inventory summary
+        inventory_summary = []
+        for device_type, devices in equipment_inventory.items():
+            if devices:
+                inventory_summary.append(f"- {device_type.upper()}: {len(devices)} devices")
+
+        prompt = f"""You are an expert building optimization engineer. Analyze this building's equipment and recommend optimal setpoints for energy efficiency and occupant comfort.
+
+**IMPORTANT:** This building has a SPECIFIC equipment inventory. Only recommend changes for equipment that EXISTS at this site. Different buildings have different equipment combinations.
 
 **Building:** {site['name']} ({site['id']})
-- Type: {site['type']}
-- Size: {site['sqm']} sqm
-- Operating hours: {site['operating_hours']}
+- Type: {site.get('type', 'commercial')}
+- Size: {site.get('sqm', 5000)} sqm
+- Floors: {site.get('floors', 1)}
+- Operating hours: {site.get('operating_hours', {}).get('start', '08:00')} - {site.get('operating_hours', {}).get('end', '18:00')}
+- Region: {site.get('region', 'Gauteng')}
+
+**Equipment Inventory at This Site:**
+{chr(10).join(inventory_summary) if inventory_summary else "No equipment registered"}
 
 **Current Conditions:**
 - Indoor temperature: {current_conditions.get('indoor_temp', 22)}°C
 - Outdoor temperature: {current_conditions.get('outdoor_temp', 28)}°C
 - Humidity: {current_conditions.get('humidity', 55)}%
 - Occupancy: {current_conditions.get('occupancy', 'unknown')}
-- Equipment status: {current_conditions.get('equipment_status', 'unknown')}
+- Equipment status: {current_conditions.get('equipment_status', 'normal')}
 
 **Weather Forecast (next 4 hours):**
 {json.dumps(weather_forecast, indent=2)}
 
-**Energy Pricing:**
+**Energy Pricing (South African):**
 {json.dumps(energy_prices, indent=2)}
 
-**HVAC Equipment on Site ({len(hvac_devices)} devices):**
-{self._format_device_list(hvac_devices)}
+{self._format_all_equipment_sections(equipment_inventory)}
 
-**Available Control Points:**
-{self._format_available_points(hvac_devices)}
+**All Available Control Points (by system):**
+{self._format_all_control_points(controllable)}
 
 {self._format_zone_context(hvac_devices)}
 
-**Zone-Aware Optimization Rules (IMPORTANT - Southern Hemisphere context):**
+**Zone-Aware Optimization Rules (Southern Hemisphere - South Africa):**
 - Executive/Server zones (P1): Maintain tighter comfort bands, never sacrifice cooling
-- South/West-facing zones: Account for afternoon solar heat gain (+1-2°C adjustment needed)
-- Top floor zones: Roof heat gain requires 0.5-1°C lower setpoints than interior zones
+- South/West-facing zones: Account for afternoon solar heat gain (+1-2°C adjustment)
+- Top floor zones: Roof heat gain requires 0.5-1°C lower setpoints
 - Meeting rooms (P2): Pre-condition 15 min before scheduled meetings
-- Load shedding: Prioritize by zone_priority (P1 = critical, P5 = lowest priority)
+- Load shedding: Prioritize by zone_priority (P1 = critical, P5 = shed first)
 - Plant rooms (P5): Can accept wider temperature ranges for energy savings
 
-**Building Constraints (SAFETY LIMITS - MUST NOT EXCEED):**
+**Equipment-Specific Constraints (SAFETY LIMITS):**
+
+HVAC:
 - CHW temperature: 5-15°C (minimum 5°C to prevent freeze damage)
-- Zone temperature setpoints: 20-26°C (standard comfort range)
-- Executive zones: 21-23°C (tighter comfort band)
-- Server rooms: 18-22°C (critical cooling)
+- Zone setpoints: 20-26°C (standard), 21-23°C (executive), 18-22°C (server)
 - Humidity: 30-65% RH
-- Lighting minimum: 10% (DALI level 25) in occupied zones for safety
-- Lighting minimum: 70% (DALI level 178) in emergency zones
+
+Lighting (DALI):
+- Minimum 10% (level 25) in occupied zones for safety
+- Minimum 70% (level 178) in emergency zones
+- Unoccupied zones: dim to 20% (level 51) not off
+
+Power/Generators:
+- Generator: start only during load shedding or mains failure
+- UPS: maintain battery charge >50%
+- ATS: automatic transfer, no manual override unless emergency
 
 {self._format_lighting_section(lighting_devices, dali_zones)}
 
 **Your Task:**
-1. Analyze the current conditions vs outdoor weather
-2. Consider energy pricing (higher rates = more aggressive optimization)
-3. Apply zone-aware rules based on zone_type and exposure
-4. Recommend specific HVAC setpoint changes
-5. Recommend DALI lighting adjustments (dim level 0-254, use dim_level point)
-6. IMPORTANT: Use the EXACT point_name from the "Available Control Points" list above
-7. Project energy savings in ZAR per hour (include lighting savings)
-8. Ensure all recommendations are within safety limits for each zone type
-9. Prioritize cross-system coordination (e.g., unoccupied zones: raise HVAC AND dim lights)
+1. Review the equipment inventory - ONLY recommend changes for equipment that EXISTS at this site
+2. Analyze current conditions vs outdoor weather and occupancy
+3. Consider energy pricing (higher rates = more aggressive optimization)
+4. Apply zone-aware rules based on zone_type and exposure
+5. Recommend setpoint changes for ALL relevant equipment types:
+   - HVAC: temperature setpoints, fan speeds, damper positions
+   - Lighting: DALI dim levels (0-254), scene selection
+   - Power: generator start/stop (only if load shedding), UPS mode
+   - Meters: no direct control, but use readings for context
+6. CRITICAL: Use EXACT point_name from "All Available Control Points" above
+7. Project energy savings in ZAR per hour (breakdown by system)
+8. Ensure all recommendations are within safety limits
+9. Prioritize cross-system coordination (unoccupied zones: raise HVAC AND dim lights)
 
 **Response Format (JSON):**
 ```json
@@ -382,22 +434,32 @@ class AIOptimizerService:
     {{
       "equipment_id": "device-id",
       "equipment_name": "Device Name",
-      "point_name": "setpoint",
+      "point_name": "zone_cooling_setpoint",
       "current_value": 22.0,
       "recommended_value": 23.0,
       "unit": "°C",
-      "reason": "Brief explanation",
+      "reason": "Raise setpoint during low occupancy",
       "system": "hvac"
     }},
     {{
-      "equipment_id": "zone-id",
-      "equipment_name": "Zone Name",
+      "equipment_id": "zone-L11-S",
+      "equipment_name": "Level 11 South",
       "point_name": "dim_level",
       "current_value": 254,
       "recommended_value": 51,
       "unit": "level",
       "reason": "Zone unoccupied - dim to 20%",
       "system": "lighting"
+    }},
+    {{
+      "equipment_id": "S002-GEN-1",
+      "equipment_name": "Main Generator",
+      "point_name": "mode",
+      "current_value": "standby",
+      "recommended_value": "standby",
+      "unit": "mode",
+      "reason": "No load shedding - maintain standby",
+      "system": "power"
     }}
   ],
   "cross_system_recommendations": [
@@ -406,6 +468,7 @@ class AIOptimizerService:
       "zone_name": "Level 11 South",
       "hvac_action": "Raise setpoint +2°C",
       "lighting_action": "Dim to 20%",
+      "power_action": null,
       "reason": "Zone unoccupied - coordinated energy savings",
       "combined_savings_kw": 1.2
     }}
@@ -413,12 +476,15 @@ class AIOptimizerService:
   "projected_savings": {{
     "hvac_kwh": 12.5,
     "lighting_kwh": 3.2,
-    "energy_kwh": 15.7,
+    "power_kwh": 0.0,
+    "total_kwh": 15.7,
     "cost_zar_per_hour": 39.25,
     "percentage_improvement": 12.5
   }},
+  "equipment_not_optimized": ["S002-GEN-1", "S002-UPS-1"],
+  "equipment_not_optimized_reason": "Generator and UPS in standby - no optimization needed",
   "confidence": 0.85,
-  "reasoning": "Summary of why these changes are recommended"
+  "reasoning": "Summary of optimization strategy for this building's specific equipment"
 }}
 ```
 
@@ -431,10 +497,10 @@ Provide ONLY the JSON response, no additional text."""
         site_id: str,
         prompt: str,
         current_conditions: Dict[str, Any],
-        hvac_devices: List[Device],
+        equipment_inventory: Dict[str, List[Device]],
         dali_zones: Optional[Dict[str, Any]] = None,
     ) -> OptimizationRecommendation:
-        """Analyze using Claude AI."""
+        """Analyze using Claude AI with full equipment inventory."""
         try:
             logger.info(f"Using Claude AI for optimization of site {site_id}")
 
@@ -537,6 +603,135 @@ Provide ONLY the JSON response, no additional text."""
             if point_name in device.points:
                 return device
         return None
+
+    # Equipment Inventory Methods (Site-Specific)
+
+    def _categorize_equipment(self, devices: List[Device]) -> Dict[str, List[Device]]:
+        """Categorize all equipment by type for site-specific optimization.
+
+        Different buildings have different equipment combinations:
+        - Building A: HVAC + DALI + Generators + Meters
+        - Building B: HVAC + Standard Lighting + UPS
+        - Building C: HVAC + DALI + Security + Fire
+
+        Returns:
+            Dict mapping device type to list of devices
+        """
+        inventory: Dict[str, List[Device]] = {}
+
+        for device in devices:
+            # Get device type key (e.g., "hvac", "lighting", "power")
+            type_key = device.device_type.value if device.device_type else "other"
+
+            if type_key not in inventory:
+                inventory[type_key] = []
+            inventory[type_key].append(device)
+
+        return inventory
+
+    def _summarize_inventory(self, inventory: Dict[str, List[Device]]) -> str:
+        """Create a summary string of equipment inventory for logging."""
+        parts = []
+        for device_type, devices in inventory.items():
+            if devices:
+                parts.append(f"{device_type}={len(devices)}")
+        return ", ".join(parts) if parts else "empty"
+
+    def _get_controllable_equipment(self, inventory: Dict[str, List[Device]]) -> Dict[str, List[Device]]:
+        """Filter inventory to only include equipment with writable points.
+
+        This is used for recommendations - we can only recommend changes
+        to equipment that has controllable parameters.
+        """
+        controllable: Dict[str, List[Device]] = {}
+
+        for device_type, devices in inventory.items():
+            controllable_devices = []
+            for device in devices:
+                writable_points = [
+                    name for name, point in device.points.items()
+                    if point.writable
+                ]
+                if writable_points:
+                    controllable_devices.append(device)
+
+            if controllable_devices:
+                controllable[device_type] = controllable_devices
+
+        return controllable
+
+    def _format_equipment_by_type(self, devices: List[Device], equipment_type: str) -> str:
+        """Format equipment list for a specific type in the AI prompt."""
+        if not devices:
+            return f"No {equipment_type} equipment available"
+
+        lines = []
+        for d in devices:
+            # Get type-specific attributes
+            extra_info = ""
+            if equipment_type == "hvac":
+                hvac_type = getattr(d, 'hvac_type', 'unknown')
+                extra_info = f" ({hvac_type})"
+            elif equipment_type == "power":
+                # For generators, UPS, ATS, meters
+                power_type = getattr(d, 'equipment', {})
+                if hasattr(power_type, 'get'):
+                    extra_info = f" ({power_type.get('type', 'unknown')})"
+            elif equipment_type == "meter":
+                extra_info = " (energy meter)"
+
+            location = getattr(d, 'location', 'unknown location')
+            if hasattr(d, 'device_location') and d.device_location:
+                loc = d.device_location
+                location = f"{getattr(loc, 'building', '')}/{getattr(loc, 'floor', '')}/{getattr(loc, 'zone', '')}"
+
+            lines.append(f"- {d.id}: {d.name}{extra_info} at {location}")
+
+        return "\n".join(lines)
+
+    def _format_all_equipment_sections(self, inventory: Dict[str, List[Device]]) -> str:
+        """Format all equipment types into prompt sections."""
+        sections = []
+
+        # Order equipment types by optimization priority
+        type_order = ["hvac", "lighting", "power", "meter", "security", "fire_safety", "other"]
+
+        for device_type in type_order:
+            devices = inventory.get(device_type, [])
+            if devices:
+                type_label = device_type.upper().replace("_", " ")
+                section = f"""**{type_label} Equipment ({len(devices)} devices):**
+{self._format_equipment_by_type(devices, device_type)}"""
+                sections.append(section)
+
+        # Add any remaining types not in the order
+        for device_type, devices in inventory.items():
+            if device_type not in type_order and devices:
+                type_label = device_type.upper().replace("_", " ")
+                section = f"""**{type_label} Equipment ({len(devices)} devices):**
+{self._format_equipment_by_type(devices, device_type)}"""
+                sections.append(section)
+
+        return "\n\n".join(sections) if sections else "No equipment available"
+
+    def _format_all_control_points(self, inventory: Dict[str, List[Device]]) -> str:
+        """Format all writable control points across all equipment types."""
+        lines = []
+
+        for device_type, devices in inventory.items():
+            type_label = device_type.upper()
+            type_lines = []
+
+            for d in devices:
+                writable_points = [name for name, point in d.points.items() if point.writable]
+                if writable_points:
+                    type_lines.append(f"  - {d.id} ({d.name}): {', '.join(writable_points)}")
+
+            if type_lines:
+                lines.append(f"\n[{type_label}]")
+                lines.extend(type_lines)
+
+        return "\n".join(lines) if lines else "No writable control points found"
 
     # Zone-Aware Optimization Helper Methods
 
@@ -893,12 +1088,23 @@ Provide ONLY the JSON response, no additional text."""
         current_conditions: Dict[str, Any],
         weather_forecast: Dict[str, Any],
         energy_prices: Dict[str, Any],
-        hvac_devices: List[Device],
+        equipment_inventory: Dict[str, List[Device]],
         dali_zones: Optional[Dict[str, Any]] = None,
     ) -> OptimizationRecommendation:
-        """Fallback rule-based optimization for HVAC and lighting."""
+        """Fallback rule-based optimization for ALL equipment types.
+
+        Uses equipment inventory to generate recommendations for whatever
+        equipment exists at this site. Different buildings have different
+        equipment combinations.
+        """
         logger.info(f"Using rule-based optimization for site {site_id}")
         dali_zones = dali_zones or {}
+
+        # Extract equipment by type from inventory
+        hvac_devices = equipment_inventory.get("hvac", [])
+        power_devices = equipment_inventory.get("power", [])
+        lighting_devices = equipment_inventory.get("lighting", [])
+        meter_devices = equipment_inventory.get("meter", [])
 
         indoor_temp = current_conditions.get("indoor_temp", 22.0)
         outdoor_temp = current_conditions.get("outdoor_temp", 28.0)
@@ -1154,21 +1360,87 @@ Provide ONLY the JSON response, no additional text."""
                             "system": "lighting",
                         })
 
+        # ============================================================
+        # Power Equipment Rules (Generators, UPS, ATS)
+        # ============================================================
+        power_recommendations = []
+
+        # Only optimize power equipment if it exists at this site
+        if power_devices:
+            logger.info(f"Processing {len(power_devices)} power devices for optimization")
+
+            for device in power_devices:
+                device_type = device.name.lower()
+
+                # Generator optimization
+                if "gen" in device_type or "generator" in device_type:
+                    # Generator should stay in standby unless load shedding
+                    # This is informational - we don't change generator state automatically
+                    if "mode" in device.points or "run_mode" in device.points:
+                        point_name = "mode" if "mode" in device.points else "run_mode"
+                        current_mode = device.points[point_name].default_value if device.points[point_name].default_value else "standby"
+
+                        # Don't recommend starting generator unless load shedding
+                        # Just confirm standby mode is appropriate
+                        power_recommendations.append({
+                            "equipment_id": device.id,
+                            "equipment_name": device.name,
+                            "point_name": point_name,
+                            "current_value": current_mode,
+                            "recommended_value": "standby",
+                            "unit": "mode",
+                            "reason": "No load shedding - maintain standby mode for efficiency",
+                            "system": "power",
+                        })
+
+                # UPS optimization
+                elif "ups" in device_type:
+                    # UPS should maintain charge level, recommend eco mode if available
+                    if "eco_mode" in device.points:
+                        eco_mode = device.points["eco_mode"]
+                        current_value = eco_mode.default_value if eco_mode.default_value is not None else False
+
+                        # Enable eco mode during off-peak hours for efficiency
+                        energy_period = energy_prices.get("period", "standard")
+                        if energy_period == "off_peak" and not current_value:
+                            power_recommendations.append({
+                                "equipment_id": device.id,
+                                "equipment_name": device.name,
+                                "point_name": "eco_mode",
+                                "current_value": current_value,
+                                "recommended_value": True,
+                                "unit": "bool",
+                                "reason": "Enable UPS eco mode during off-peak hours for efficiency",
+                                "system": "power",
+                            })
+
+                # ATS (Automatic Transfer Switch) - monitoring only
+                elif "ats" in device_type:
+                    # ATS operates automatically, no optimization needed
+                    # Just log that it exists for the AI context
+                    pass
+
         # Merge lighting recommendations with HVAC recommendations
         for rec in lighting_recommendations:
+            recommendations.append(rec)
+
+        # Merge power recommendations
+        for rec in power_recommendations:
             recommendations.append(rec)
 
         # Sort recommendations by zone priority (critical zones first)
         recommendations = self._sort_recommendations_by_priority(recommendations, hvac_devices)
 
         # Calculate projected savings based on number and type of recommendations
-        hvac_recs = [r for r in recommendations if r.get("system") != "lighting"]
+        hvac_recs = [r for r in recommendations if r.get("system") == "hvac" or r.get("system") is None]
         lighting_recs = [r for r in recommendations if r.get("system") == "lighting"]
+        power_recs = [r for r in recommendations if r.get("system") == "power"]
 
         hvac_savings = 5.0 + (len(hvac_recs) * 4.5)  # kWh base for HVAC
         lighting_savings = lighting_savings_kw  # Calculated above for lighting
+        power_savings = len(power_recs) * 2.0  # Modest savings from power optimization
 
-        energy_savings = hvac_savings + lighting_savings
+        energy_savings = hvac_savings + lighting_savings + power_savings
         energy_rate = energy_prices.get("current_rate", 2.50)
         cost_savings = energy_savings * energy_rate
         percentage = min(8.0 + (len(recommendations) * 1.5), 20.0)  # Higher cap with lighting
@@ -1188,6 +1460,8 @@ Provide ONLY the JSON response, no additional text."""
             reasoning_parts.append("fan speed optimization")
         if lighting_recs:
             reasoning_parts.append("DALI lighting optimization")
+        if power_recs:
+            reasoning_parts.append("power equipment optimization")
 
         # Add zone-aware context to reasoning
         zone_context = []
@@ -1229,7 +1503,8 @@ Provide ONLY the JSON response, no additional text."""
             projected_savings={
                 "hvac_kwh": round(hvac_savings, 1),
                 "lighting_kwh": round(lighting_savings, 1),
-                "energy_kwh": round(energy_savings, 1),
+                "power_kwh": round(power_savings, 1),
+                "total_kwh": round(energy_savings, 1),
                 "cost_zar_per_hour": round(cost_savings, 2),
                 "percentage_improvement": round(percentage, 1),
             },

@@ -1,0 +1,5671 @@
+{
+  "discovery_id": "b93ac87f",
+  "site_id": "site-005",
+  "created_at": "2026-02-05T09:42:32.707728",
+  "equipment_count": 91,
+  "total_points": 326,
+  "equipment": {
+    "UMH-AHU-B1-LAUN.fan": {
+      "equipment_id": "UMH-AHU-B1-LAUN.fan",
+      "equipment_type": "ahu",
+      "equipment_name": "Air Handling Unit (UMH-AHU-B1-LAUN.fan)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-AHU-B1-LAUN.fan_status",
+          "standardized_name": "UMH-AHU-B1-LAUN.fan/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "binaryValue",
+          "instance": 1002,
+          "present_value": true,
+          "writable": true
+        },
+        {
+          "original_name": "UMH-AHU-B1-LAUN.fan_speed",
+          "standardized_name": "UMH-AHU-B1-LAUN.fan/speed_sensor",
+          "point_type": "sensor",
+          "point_category": "speed",
+          "unit": "%",
+          "confidence": "medium",
+          "object_type": "analogValue",
+          "instance": 1003,
+          "present_value": 70,
+          "writable": true
+        }
+      ],
+      "point_count": 2,
+      "confidence": "medium",
+      "metadata": {
+        "type_vote_counts": {
+          "ahu": 2
+        },
+        "avg_confidence_score": 2.0
+      },
+      "created_at": "2026-02-05T09:42:32.700982",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-AHU-L2-001.fan": {
+      "equipment_id": "UMH-AHU-L2-001.fan",
+      "equipment_type": "ahu",
+      "equipment_name": "Air Handling Unit (UMH-AHU-L2-001.fan)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-AHU-L2-001.fan_speed",
+          "standardized_name": "UMH-AHU-L2-001.fan/speed_sensor",
+          "point_type": "sensor",
+          "point_category": "speed",
+          "unit": "%",
+          "confidence": "medium",
+          "object_type": "analogValue",
+          "instance": 1008,
+          "present_value": 60,
+          "writable": true
+        },
+        {
+          "original_name": "UMH-AHU-L2-001.fan_status",
+          "standardized_name": "UMH-AHU-L2-001.fan/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "binaryValue",
+          "instance": 1010,
+          "present_value": true,
+          "writable": false
+        }
+      ],
+      "point_count": 2,
+      "confidence": "medium",
+      "metadata": {
+        "type_vote_counts": {
+          "ahu": 2
+        },
+        "avg_confidence_score": 2.0
+      },
+      "created_at": "2026-02-05T09:42:32.701060",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-AHU-L3-ICU.hepa": {
+      "equipment_id": "UMH-AHU-L3-ICU.hepa",
+      "equipment_type": "ahu",
+      "equipment_name": "Air Handling Unit (UMH-AHU-L3-ICU.hepa)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-AHU-L3-ICU.hepa_dp",
+          "standardized_name": "UMH-AHU-L3-ICU.hepa/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "Pa",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1016,
+          "present_value": 260,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "medium",
+      "metadata": {
+        "type_vote_counts": {
+          "ahu": 1
+        },
+        "avg_confidence_score": 2.0
+      },
+      "created_at": "2026-02-05T09:42:32.701092",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-AHU-L3-ICU.fan": {
+      "equipment_id": "UMH-AHU-L3-ICU.fan",
+      "equipment_type": "ahu",
+      "equipment_name": "Air Handling Unit (UMH-AHU-L3-ICU.fan)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-AHU-L3-ICU.fan_speed",
+          "standardized_name": "UMH-AHU-L3-ICU.fan/speed_sensor",
+          "point_type": "sensor",
+          "point_category": "speed",
+          "unit": "%",
+          "confidence": "medium",
+          "object_type": "analogValue",
+          "instance": 1018,
+          "present_value": 90,
+          "writable": true
+        },
+        {
+          "original_name": "UMH-AHU-L3-ICU.fan_status",
+          "standardized_name": "UMH-AHU-L3-ICU.fan/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "binaryValue",
+          "instance": 1021,
+          "present_value": true,
+          "writable": false
+        }
+      ],
+      "point_count": 2,
+      "confidence": "medium",
+      "metadata": {
+        "type_vote_counts": {
+          "ahu": 2
+        },
+        "avg_confidence_score": 2.0
+      },
+      "created_at": "2026-02-05T09:42:32.701120",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-AHU-L3-ICU.room": {
+      "equipment_id": "UMH-AHU-L3-ICU.room",
+      "equipment_type": "ahu",
+      "equipment_name": "Air Handling Unit (UMH-AHU-L3-ICU.room)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-AHU-L3-ICU.room_pressure",
+          "standardized_name": "UMH-AHU-L3-ICU.room/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "Pa",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1019,
+          "present_value": 10,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "medium",
+      "metadata": {
+        "type_vote_counts": {
+          "ahu": 1
+        },
+        "avg_confidence_score": 2.0
+      },
+      "created_at": "2026-02-05T09:42:32.701140",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-AHU-L3-ICU.air": {
+      "equipment_id": "UMH-AHU-L3-ICU.air",
+      "equipment_type": "ahu",
+      "equipment_name": "Air Handling Unit (UMH-AHU-L3-ICU.air)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-AHU-L3-ICU.air_changes_per_hour",
+          "standardized_name": "UMH-AHU-L3-ICU.air/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "ACH",
+          "confidence": "low",
+          "object_type": "analogInput",
+          "instance": 1020,
+          "present_value": 15,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "low",
+      "metadata": {
+        "type_vote_counts": {
+          "ahu": 1
+        },
+        "avg_confidence_score": 1.0
+      },
+      "created_at": "2026-02-05T09:42:32.701164",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-AHU-L3-TH1.hepa": {
+      "equipment_id": "UMH-AHU-L3-TH1.hepa",
+      "equipment_type": "ahu",
+      "equipment_name": "Air Handling Unit (UMH-AHU-L3-TH1.hepa)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-AHU-L3-TH1.hepa_dp",
+          "standardized_name": "UMH-AHU-L3-TH1.hepa/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "Pa",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1027,
+          "present_value": 250,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "medium",
+      "metadata": {
+        "type_vote_counts": {
+          "ahu": 1
+        },
+        "avg_confidence_score": 2.0
+      },
+      "created_at": "2026-02-05T09:42:32.701183",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-AHU-L3-TH1.fan": {
+      "equipment_id": "UMH-AHU-L3-TH1.fan",
+      "equipment_type": "ahu",
+      "equipment_name": "Air Handling Unit (UMH-AHU-L3-TH1.fan)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-AHU-L3-TH1.fan_speed",
+          "standardized_name": "UMH-AHU-L3-TH1.fan/speed_sensor",
+          "point_type": "sensor",
+          "point_category": "speed",
+          "unit": "%",
+          "confidence": "medium",
+          "object_type": "analogValue",
+          "instance": 1029,
+          "present_value": 85,
+          "writable": true
+        },
+        {
+          "original_name": "UMH-AHU-L3-TH1.fan_status",
+          "standardized_name": "UMH-AHU-L3-TH1.fan/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "binaryValue",
+          "instance": 1035,
+          "present_value": true,
+          "writable": false
+        }
+      ],
+      "point_count": 2,
+      "confidence": "medium",
+      "metadata": {
+        "type_vote_counts": {
+          "ahu": 2
+        },
+        "avg_confidence_score": 2.0
+      },
+      "created_at": "2026-02-05T09:42:32.701211",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-AHU-L3-TH1.room": {
+      "equipment_id": "UMH-AHU-L3-TH1.room",
+      "equipment_type": "ahu",
+      "equipment_name": "Air Handling Unit (UMH-AHU-L3-TH1.room)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-AHU-L3-TH1.room_pressure",
+          "standardized_name": "UMH-AHU-L3-TH1.room/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "Pa",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1031,
+          "present_value": 15,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "medium",
+      "metadata": {
+        "type_vote_counts": {
+          "ahu": 1
+        },
+        "avg_confidence_score": 2.0
+      },
+      "created_at": "2026-02-05T09:42:32.701230",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-AHU-L3-TH1.air": {
+      "equipment_id": "UMH-AHU-L3-TH1.air",
+      "equipment_type": "ahu",
+      "equipment_name": "Air Handling Unit (UMH-AHU-L3-TH1.air)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-AHU-L3-TH1.air_changes_per_hour",
+          "standardized_name": "UMH-AHU-L3-TH1.air/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "ACH",
+          "confidence": "low",
+          "object_type": "analogInput",
+          "instance": 1032,
+          "present_value": 20,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "low",
+      "metadata": {
+        "type_vote_counts": {
+          "ahu": 1
+        },
+        "avg_confidence_score": 1.0
+      },
+      "created_at": "2026-02-05T09:42:32.701246",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-AHU-L3-TH2.hepa": {
+      "equipment_id": "UMH-AHU-L3-TH2.hepa",
+      "equipment_type": "ahu",
+      "equipment_name": "Air Handling Unit (UMH-AHU-L3-TH2.hepa)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-AHU-L3-TH2.hepa_dp",
+          "standardized_name": "UMH-AHU-L3-TH2.hepa/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "Pa",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1041,
+          "present_value": 280,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "medium",
+      "metadata": {
+        "type_vote_counts": {
+          "ahu": 1
+        },
+        "avg_confidence_score": 2.0
+      },
+      "created_at": "2026-02-05T09:42:32.701264",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-AHU-L3-TH2.fan": {
+      "equipment_id": "UMH-AHU-L3-TH2.fan",
+      "equipment_type": "ahu",
+      "equipment_name": "Air Handling Unit (UMH-AHU-L3-TH2.fan)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-AHU-L3-TH2.fan_speed",
+          "standardized_name": "UMH-AHU-L3-TH2.fan/speed_sensor",
+          "point_type": "sensor",
+          "point_category": "speed",
+          "unit": "%",
+          "confidence": "medium",
+          "object_type": "analogValue",
+          "instance": 1043,
+          "present_value": 88,
+          "writable": true
+        },
+        {
+          "original_name": "UMH-AHU-L3-TH2.fan_status",
+          "standardized_name": "UMH-AHU-L3-TH2.fan/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "binaryValue",
+          "instance": 1049,
+          "present_value": true,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-L3-TH2.fan_vibration",
+          "standardized_name": "UMH-AHU-L3-TH2.fan/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "mm/s",
+          "confidence": "low",
+          "object_type": "analogInput",
+          "instance": 1050,
+          "present_value": 1.2,
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "medium",
+      "metadata": {
+        "type_vote_counts": {
+          "ahu": 3
+        },
+        "avg_confidence_score": 1.67
+      },
+      "created_at": "2026-02-05T09:42:32.701286",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-AHU-L3-TH2.room": {
+      "equipment_id": "UMH-AHU-L3-TH2.room",
+      "equipment_type": "ahu",
+      "equipment_name": "Air Handling Unit (UMH-AHU-L3-TH2.room)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-AHU-L3-TH2.room_pressure",
+          "standardized_name": "UMH-AHU-L3-TH2.room/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "Pa",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1045,
+          "present_value": 15,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "medium",
+      "metadata": {
+        "type_vote_counts": {
+          "ahu": 1
+        },
+        "avg_confidence_score": 2.0
+      },
+      "created_at": "2026-02-05T09:42:32.701302",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-AHU-L3-TH2.air": {
+      "equipment_id": "UMH-AHU-L3-TH2.air",
+      "equipment_type": "ahu",
+      "equipment_name": "Air Handling Unit (UMH-AHU-L3-TH2.air)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-AHU-L3-TH2.air_changes_per_hour",
+          "standardized_name": "UMH-AHU-L3-TH2.air/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "ACH",
+          "confidence": "low",
+          "object_type": "analogInput",
+          "instance": 1046,
+          "present_value": 20,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "low",
+      "metadata": {
+        "type_vote_counts": {
+          "ahu": 1
+        },
+        "avg_confidence_score": 1.0
+      },
+      "created_at": "2026-02-05T09:42:32.701330",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-AHU-L3-TH3.hepa": {
+      "equipment_id": "UMH-AHU-L3-TH3.hepa",
+      "equipment_type": "ahu",
+      "equipment_name": "Air Handling Unit (UMH-AHU-L3-TH3.hepa)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-AHU-L3-TH3.hepa_dp",
+          "standardized_name": "UMH-AHU-L3-TH3.hepa/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "Pa",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1056,
+          "present_value": 240,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "medium",
+      "metadata": {
+        "type_vote_counts": {
+          "ahu": 1
+        },
+        "avg_confidence_score": 2.0
+      },
+      "created_at": "2026-02-05T09:42:32.701347",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-AHU-L3-TH3.fan": {
+      "equipment_id": "UMH-AHU-L3-TH3.fan",
+      "equipment_type": "ahu",
+      "equipment_name": "Air Handling Unit (UMH-AHU-L3-TH3.fan)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-AHU-L3-TH3.fan_speed",
+          "standardized_name": "UMH-AHU-L3-TH3.fan/speed_sensor",
+          "point_type": "sensor",
+          "point_category": "speed",
+          "unit": "%",
+          "confidence": "medium",
+          "object_type": "analogValue",
+          "instance": 1058,
+          "present_value": 82,
+          "writable": true
+        },
+        {
+          "original_name": "UMH-AHU-L3-TH3.fan_status",
+          "standardized_name": "UMH-AHU-L3-TH3.fan/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "binaryValue",
+          "instance": 1061,
+          "present_value": true,
+          "writable": false
+        }
+      ],
+      "point_count": 2,
+      "confidence": "medium",
+      "metadata": {
+        "type_vote_counts": {
+          "ahu": 2
+        },
+        "avg_confidence_score": 2.0
+      },
+      "created_at": "2026-02-05T09:42:32.701365",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-AHU-L3-TH3.room": {
+      "equipment_id": "UMH-AHU-L3-TH3.room",
+      "equipment_type": "ahu",
+      "equipment_name": "Air Handling Unit (UMH-AHU-L3-TH3.room)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-AHU-L3-TH3.room_pressure",
+          "standardized_name": "UMH-AHU-L3-TH3.room/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "Pa",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1059,
+          "present_value": 15,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "medium",
+      "metadata": {
+        "type_vote_counts": {
+          "ahu": 1
+        },
+        "avg_confidence_score": 2.0
+      },
+      "created_at": "2026-02-05T09:42:32.701392",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-AHU-L3-TH3.air": {
+      "equipment_id": "UMH-AHU-L3-TH3.air",
+      "equipment_type": "ahu",
+      "equipment_name": "Air Handling Unit (UMH-AHU-L3-TH3.air)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-AHU-L3-TH3.air_changes_per_hour",
+          "standardized_name": "UMH-AHU-L3-TH3.air/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "ACH",
+          "confidence": "low",
+          "object_type": "analogInput",
+          "instance": 1060,
+          "present_value": 20,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "low",
+      "metadata": {
+        "type_vote_counts": {
+          "ahu": 1
+        },
+        "avg_confidence_score": 1.0
+      },
+      "created_at": "2026-02-05T09:42:32.701415",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-AHU-L4-001.fan": {
+      "equipment_id": "UMH-AHU-L4-001.fan",
+      "equipment_type": "ahu",
+      "equipment_name": "Air Handling Unit (UMH-AHU-L4-001.fan)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-AHU-L4-001.fan_speed",
+          "standardized_name": "UMH-AHU-L4-001.fan/speed_sensor",
+          "point_type": "sensor",
+          "point_category": "speed",
+          "unit": "%",
+          "confidence": "medium",
+          "object_type": "analogValue",
+          "instance": 1066,
+          "present_value": 70,
+          "writable": true
+        },
+        {
+          "original_name": "UMH-AHU-L4-001.fan_status",
+          "standardized_name": "UMH-AHU-L4-001.fan/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "binaryValue",
+          "instance": 1068,
+          "present_value": true,
+          "writable": false
+        }
+      ],
+      "point_count": 2,
+      "confidence": "medium",
+      "metadata": {
+        "type_vote_counts": {
+          "ahu": 2
+        },
+        "avg_confidence_score": 2.0
+      },
+      "created_at": "2026-02-05T09:42:32.701449",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-AHU-L5-001.fan": {
+      "equipment_id": "UMH-AHU-L5-001.fan",
+      "equipment_type": "ahu",
+      "equipment_name": "Air Handling Unit (UMH-AHU-L5-001.fan)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-AHU-L5-001.fan_speed",
+          "standardized_name": "UMH-AHU-L5-001.fan/speed_sensor",
+          "point_type": "sensor",
+          "point_category": "speed",
+          "unit": "%",
+          "confidence": "medium",
+          "object_type": "analogValue",
+          "instance": 1073,
+          "present_value": 72,
+          "writable": true
+        },
+        {
+          "original_name": "UMH-AHU-L5-001.fan_status",
+          "standardized_name": "UMH-AHU-L5-001.fan/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "binaryValue",
+          "instance": 1075,
+          "present_value": true,
+          "writable": false
+        }
+      ],
+      "point_count": 2,
+      "confidence": "medium",
+      "metadata": {
+        "type_vote_counts": {
+          "ahu": 2
+        },
+        "avg_confidence_score": 2.0
+      },
+      "created_at": "2026-02-05T09:42:32.701466",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-AHU-L6-001.fan": {
+      "equipment_id": "UMH-AHU-L6-001.fan",
+      "equipment_type": "ahu",
+      "equipment_name": "Air Handling Unit (UMH-AHU-L6-001.fan)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-AHU-L6-001.fan_speed",
+          "standardized_name": "UMH-AHU-L6-001.fan/speed_sensor",
+          "point_type": "sensor",
+          "point_category": "speed",
+          "unit": "%",
+          "confidence": "medium",
+          "object_type": "analogValue",
+          "instance": 1080,
+          "present_value": 75,
+          "writable": true
+        },
+        {
+          "original_name": "UMH-AHU-L6-001.fan_status",
+          "standardized_name": "UMH-AHU-L6-001.fan/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "binaryValue",
+          "instance": 1083,
+          "present_value": true,
+          "writable": false
+        }
+      ],
+      "point_count": 2,
+      "confidence": "medium",
+      "metadata": {
+        "type_vote_counts": {
+          "ahu": 2
+        },
+        "avg_confidence_score": 2.0
+      },
+      "created_at": "2026-02-05T09:42:32.701482",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-AHU-L6-001.co2": {
+      "equipment_id": "UMH-AHU-L6-001.co2",
+      "equipment_type": "ahu",
+      "equipment_name": "Air Handling Unit (UMH-AHU-L6-001.co2)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-AHU-L6-001.co2_level",
+          "standardized_name": "UMH-AHU-L6-001.co2/co2_sensor",
+          "point_type": "sensor",
+          "point_category": "co2",
+          "unit": "ppm",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1082,
+          "present_value": 650,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "medium",
+      "metadata": {
+        "type_vote_counts": {
+          "ahu": 1
+        },
+        "avg_confidence_score": 2.0
+      },
+      "created_at": "2026-02-05T09:42:32.701495",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-AHU-L7-001.fan": {
+      "equipment_id": "UMH-AHU-L7-001.fan",
+      "equipment_type": "ahu",
+      "equipment_name": "Air Handling Unit (UMH-AHU-L7-001.fan)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-AHU-L7-001.fan_speed",
+          "standardized_name": "UMH-AHU-L7-001.fan/speed_sensor",
+          "point_type": "sensor",
+          "point_category": "speed",
+          "unit": "%",
+          "confidence": "medium",
+          "object_type": "analogValue",
+          "instance": 1088,
+          "present_value": 68,
+          "writable": true
+        },
+        {
+          "original_name": "UMH-AHU-L7-001.fan_status",
+          "standardized_name": "UMH-AHU-L7-001.fan/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "binaryValue",
+          "instance": 1090,
+          "present_value": true,
+          "writable": false
+        }
+      ],
+      "point_count": 2,
+      "confidence": "medium",
+      "metadata": {
+        "type_vote_counts": {
+          "ahu": 2
+        },
+        "avg_confidence_score": 2.0
+      },
+      "created_at": "2026-02-05T09:42:32.701541",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-AHU-L8-001.fan": {
+      "equipment_id": "UMH-AHU-L8-001.fan",
+      "equipment_type": "ahu",
+      "equipment_name": "Air Handling Unit (UMH-AHU-L8-001.fan)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-AHU-L8-001.fan_speed",
+          "standardized_name": "UMH-AHU-L8-001.fan/speed_sensor",
+          "point_type": "sensor",
+          "point_category": "speed",
+          "unit": "%",
+          "confidence": "medium",
+          "object_type": "analogValue",
+          "instance": 1095,
+          "present_value": 65,
+          "writable": true
+        },
+        {
+          "original_name": "UMH-AHU-L8-001.fan_status",
+          "standardized_name": "UMH-AHU-L8-001.fan/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "binaryValue",
+          "instance": 1097,
+          "present_value": true,
+          "writable": false
+        }
+      ],
+      "point_count": 2,
+      "confidence": "medium",
+      "metadata": {
+        "type_vote_counts": {
+          "ahu": 2
+        },
+        "avg_confidence_score": 2.0
+      },
+      "created_at": "2026-02-05T09:42:32.701568",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-AHU-L9-001.fan": {
+      "equipment_id": "UMH-AHU-L9-001.fan",
+      "equipment_type": "ahu",
+      "equipment_name": "Air Handling Unit (UMH-AHU-L9-001.fan)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-AHU-L9-001.fan_speed",
+          "standardized_name": "UMH-AHU-L9-001.fan/speed_sensor",
+          "point_type": "sensor",
+          "point_category": "speed",
+          "unit": "%",
+          "confidence": "medium",
+          "object_type": "analogValue",
+          "instance": 1102,
+          "present_value": 72,
+          "writable": true
+        },
+        {
+          "original_name": "UMH-AHU-L9-001.fan_status",
+          "standardized_name": "UMH-AHU-L9-001.fan/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "binaryValue",
+          "instance": 1104,
+          "present_value": true,
+          "writable": false
+        }
+      ],
+      "point_count": 2,
+      "confidence": "medium",
+      "metadata": {
+        "type_vote_counts": {
+          "ahu": 2
+        },
+        "avg_confidence_score": 2.0
+      },
+      "created_at": "2026-02-05T09:42:32.701602",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-BOILER-B1-001.hw": {
+      "equipment_id": "UMH-BOILER-B1-001.hw",
+      "equipment_type": "boiler",
+      "equipment_name": "Boiler (UMH-BOILER-B1-001.hw)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-BOILER-B1-001.hw_supply_temp",
+          "standardized_name": "UMH-BOILER-B1-001.hw/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1106,
+          "present_value": 70.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-BOILER-B1-001.hw_return_temp",
+          "standardized_name": "UMH-BOILER-B1-001.hw/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1107,
+          "present_value": 55.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-BOILER-B1-001.hw_supply_temp_setpoint",
+          "standardized_name": "UMH-BOILER-B1-001.hw/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogValue",
+          "instance": 1110,
+          "present_value": 70.0,
+          "writable": true
+        }
+      ],
+      "point_count": 3,
+      "confidence": "medium",
+      "metadata": {
+        "type_vote_counts": {
+          "boiler": 3
+        },
+        "avg_confidence_score": 2.0
+      },
+      "created_at": "2026-02-05T09:42:32.701625",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-BOILER-B1-002.hw": {
+      "equipment_id": "UMH-BOILER-B1-002.hw",
+      "equipment_type": "boiler",
+      "equipment_name": "Boiler (UMH-BOILER-B1-002.hw)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-BOILER-B1-002.hw_supply_temp",
+          "standardized_name": "UMH-BOILER-B1-002.hw/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1114,
+          "present_value": 68.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-BOILER-B1-002.hw_return_temp",
+          "standardized_name": "UMH-BOILER-B1-002.hw/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1115,
+          "present_value": 52.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-BOILER-B1-002.hw_supply_temp_setpoint",
+          "standardized_name": "UMH-BOILER-B1-002.hw/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogValue",
+          "instance": 1118,
+          "present_value": 70.0,
+          "writable": true
+        }
+      ],
+      "point_count": 3,
+      "confidence": "medium",
+      "metadata": {
+        "type_vote_counts": {
+          "boiler": 3
+        },
+        "avg_confidence_score": 2.0
+      },
+      "created_at": "2026-02-05T09:42:32.701662",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-COLD-B1-001.door": {
+      "equipment_id": "UMH-COLD-B1-001.door",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (UMH-COLD-B1-001.door)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-COLD-B1-001.door_status",
+          "standardized_name": "UMH-COLD-B1-001.door/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "low",
+          "object_type": "binaryInput",
+          "instance": 1151,
+          "present_value": false,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "low",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 1.0
+      },
+      "created_at": "2026-02-05T09:42:32.701683",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-COLD-L1-001.door": {
+      "equipment_id": "UMH-COLD-L1-001.door",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (UMH-COLD-L1-001.door)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-COLD-L1-001.door_status",
+          "standardized_name": "UMH-COLD-L1-001.door/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "low",
+          "object_type": "binaryInput",
+          "instance": 1156,
+          "present_value": false,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "low",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 1.0
+      },
+      "created_at": "2026-02-05T09:42:32.701695",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-COLD-L1-002.door": {
+      "equipment_id": "UMH-COLD-L1-002.door",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (UMH-COLD-L1-002.door)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-COLD-L1-002.door_status",
+          "standardized_name": "UMH-COLD-L1-002.door/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "low",
+          "object_type": "binaryInput",
+          "instance": 1164,
+          "present_value": false,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "low",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 1.0
+      },
+      "created_at": "2026-02-05T09:42:32.701707",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-CT-R-001.cw": {
+      "equipment_id": "UMH-CT-R-001.cw",
+      "equipment_type": "cooling_tower",
+      "equipment_name": "Cooling Tower (UMH-CT-R-001.cw)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-CT-R-001.cw_supply_temp",
+          "standardized_name": "UMH-CT-R-001.cw/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1169,
+          "present_value": 28.5,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-CT-R-001.cw_return_temp",
+          "standardized_name": "UMH-CT-R-001.cw/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1170,
+          "present_value": 34.0,
+          "writable": false
+        }
+      ],
+      "point_count": 2,
+      "confidence": "medium",
+      "metadata": {
+        "type_vote_counts": {
+          "cooling_tower": 2
+        },
+        "avg_confidence_score": 2.0
+      },
+      "created_at": "2026-02-05T09:42:32.701724",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-CT-R-001.fan": {
+      "equipment_id": "UMH-CT-R-001.fan",
+      "equipment_type": "cooling_tower",
+      "equipment_name": "Cooling Tower (UMH-CT-R-001.fan)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-CT-R-001.fan_speed",
+          "standardized_name": "UMH-CT-R-001.fan/speed_sensor",
+          "point_type": "sensor",
+          "point_category": "speed",
+          "unit": "%",
+          "confidence": "medium",
+          "object_type": "analogValue",
+          "instance": 1172,
+          "present_value": 75,
+          "writable": true
+        },
+        {
+          "original_name": "UMH-CT-R-001.fan_status",
+          "standardized_name": "UMH-CT-R-001.fan/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "binaryValue",
+          "instance": 1173,
+          "present_value": true,
+          "writable": false
+        }
+      ],
+      "point_count": 2,
+      "confidence": "medium",
+      "metadata": {
+        "type_vote_counts": {
+          "cooling_tower": 2
+        },
+        "avg_confidence_score": 2.0
+      },
+      "created_at": "2026-02-05T09:42:32.701738",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-CT-R-001.basin": {
+      "equipment_id": "UMH-CT-R-001.basin",
+      "equipment_type": "cooling_tower",
+      "equipment_name": "Cooling Tower (UMH-CT-R-001.basin)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-CT-R-001.basin_level",
+          "standardized_name": "UMH-CT-R-001.basin/level_sensor",
+          "point_type": "sensor",
+          "point_category": "level",
+          "unit": "%",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1174,
+          "present_value": 85,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "medium",
+      "metadata": {
+        "type_vote_counts": {
+          "cooling_tower": 1
+        },
+        "avg_confidence_score": 2.0
+      },
+      "created_at": "2026-02-05T09:42:32.701748",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-CT-R-001.wet": {
+      "equipment_id": "UMH-CT-R-001.wet",
+      "equipment_type": "cooling_tower",
+      "equipment_name": "Cooling Tower (UMH-CT-R-001.wet)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-CT-R-001.wet_bulb_temp",
+          "standardized_name": "UMH-CT-R-001.wet/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1175,
+          "present_value": 24.0,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "medium",
+      "metadata": {
+        "type_vote_counts": {
+          "cooling_tower": 1
+        },
+        "avg_confidence_score": 2.0
+      },
+      "created_at": "2026-02-05T09:42:32.701757",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-CT-R-002.cw": {
+      "equipment_id": "UMH-CT-R-002.cw",
+      "equipment_type": "cooling_tower",
+      "equipment_name": "Cooling Tower (UMH-CT-R-002.cw)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-CT-R-002.cw_supply_temp",
+          "standardized_name": "UMH-CT-R-002.cw/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1177,
+          "present_value": 28.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-CT-R-002.cw_return_temp",
+          "standardized_name": "UMH-CT-R-002.cw/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1178,
+          "present_value": 33.5,
+          "writable": false
+        }
+      ],
+      "point_count": 2,
+      "confidence": "medium",
+      "metadata": {
+        "type_vote_counts": {
+          "cooling_tower": 2
+        },
+        "avg_confidence_score": 2.0
+      },
+      "created_at": "2026-02-05T09:42:32.701768",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-CT-R-002.fan": {
+      "equipment_id": "UMH-CT-R-002.fan",
+      "equipment_type": "cooling_tower",
+      "equipment_name": "Cooling Tower (UMH-CT-R-002.fan)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-CT-R-002.fan_speed",
+          "standardized_name": "UMH-CT-R-002.fan/speed_sensor",
+          "point_type": "sensor",
+          "point_category": "speed",
+          "unit": "%",
+          "confidence": "medium",
+          "object_type": "analogValue",
+          "instance": 1180,
+          "present_value": 70,
+          "writable": true
+        },
+        {
+          "original_name": "UMH-CT-R-002.fan_status",
+          "standardized_name": "UMH-CT-R-002.fan/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "binaryValue",
+          "instance": 1181,
+          "present_value": true,
+          "writable": false
+        }
+      ],
+      "point_count": 2,
+      "confidence": "medium",
+      "metadata": {
+        "type_vote_counts": {
+          "cooling_tower": 2
+        },
+        "avg_confidence_score": 2.0
+      },
+      "created_at": "2026-02-05T09:42:32.701782",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-CT-R-002.basin": {
+      "equipment_id": "UMH-CT-R-002.basin",
+      "equipment_type": "cooling_tower",
+      "equipment_name": "Cooling Tower (UMH-CT-R-002.basin)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-CT-R-002.basin_level",
+          "standardized_name": "UMH-CT-R-002.basin/level_sensor",
+          "point_type": "sensor",
+          "point_category": "level",
+          "unit": "%",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1182,
+          "present_value": 88,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "medium",
+      "metadata": {
+        "type_vote_counts": {
+          "cooling_tower": 1
+        },
+        "avg_confidence_score": 2.0
+      },
+      "created_at": "2026-02-05T09:42:32.701793",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-CT-R-002.wet": {
+      "equipment_id": "UMH-CT-R-002.wet",
+      "equipment_type": "cooling_tower",
+      "equipment_name": "Cooling Tower (UMH-CT-R-002.wet)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-CT-R-002.wet_bulb_temp",
+          "standardized_name": "UMH-CT-R-002.wet/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1183,
+          "present_value": 24.0,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "medium",
+      "metadata": {
+        "type_vote_counts": {
+          "cooling_tower": 1
+        },
+        "avg_confidence_score": 2.0
+      },
+      "created_at": "2026-02-05T09:42:32.701802",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-DB-L3-001.total": {
+      "equipment_id": "UMH-DB-L3-001.total",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (UMH-DB-L3-001.total)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-DB-L3-001.total_kw",
+          "standardized_name": "UMH-DB-L3-001.total/power_sensor",
+          "point_type": "sensor",
+          "point_category": "power",
+          "unit": "kW",
+          "confidence": "low",
+          "object_type": "analogInput",
+          "instance": 1185,
+          "present_value": 85,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "low",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 1.0
+      },
+      "created_at": "2026-02-05T09:42:32.701810",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-DB-L3-002.total": {
+      "equipment_id": "UMH-DB-L3-002.total",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (UMH-DB-L3-002.total)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-DB-L3-002.total_kw",
+          "standardized_name": "UMH-DB-L3-002.total/power_sensor",
+          "point_type": "sensor",
+          "point_category": "power",
+          "unit": "kW",
+          "confidence": "low",
+          "object_type": "analogInput",
+          "instance": 1189,
+          "present_value": 65,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "low",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 1.0
+      },
+      "created_at": "2026-02-05T09:42:32.701821",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-FIRE-001.system": {
+      "equipment_id": "UMH-FIRE-001.system",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (UMH-FIRE-001.system)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-FIRE-001.system_status",
+          "standardized_name": "UMH-FIRE-001.system/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "kPa",
+          "confidence": "low",
+          "object_type": "multistateValue",
+          "instance": 1193,
+          "present_value": 1,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "low",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 1.0
+      },
+      "created_at": "2026-02-05T09:42:32.701831",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-FIRE-001.zones": {
+      "equipment_id": "UMH-FIRE-001.zones",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (UMH-FIRE-001.zones)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-FIRE-001.zones_in_alarm",
+          "standardized_name": "UMH-FIRE-001.zones/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "kPa",
+          "confidence": "low",
+          "object_type": "analogInput",
+          "instance": 1194,
+          "present_value": 0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-FIRE-001.zones_in_fault",
+          "standardized_name": "UMH-FIRE-001.zones/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "kPa",
+          "confidence": "low",
+          "object_type": "analogInput",
+          "instance": 1195,
+          "present_value": 0,
+          "writable": false
+        }
+      ],
+      "point_count": 2,
+      "confidence": "low",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 1.0
+      },
+      "created_at": "2026-02-05T09:42:32.701842",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-FIRE-001.battery": {
+      "equipment_id": "UMH-FIRE-001.battery",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (UMH-FIRE-001.battery)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-FIRE-001.battery_status",
+          "standardized_name": "UMH-FIRE-001.battery/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "kPa",
+          "confidence": "low",
+          "object_type": "binaryInput",
+          "instance": 1196,
+          "present_value": true,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "low",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 1.0
+      },
+      "created_at": "2026-02-05T09:42:32.701850",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-FIRE-001.mains": {
+      "equipment_id": "UMH-FIRE-001.mains",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (UMH-FIRE-001.mains)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-FIRE-001.mains_status",
+          "standardized_name": "UMH-FIRE-001.mains/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "kPa",
+          "confidence": "low",
+          "object_type": "binaryInput",
+          "instance": 1197,
+          "present_value": true,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "low",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 1.0
+      },
+      "created_at": "2026-02-05T09:42:32.701859",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-GEN-B1-001.fuel": {
+      "equipment_id": "UMH-GEN-B1-001.fuel",
+      "equipment_type": "generator",
+      "equipment_name": "Generator (UMH-GEN-B1-001.fuel)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-GEN-B1-001.fuel_level",
+          "standardized_name": "UMH-GEN-B1-001.fuel/level_sensor",
+          "point_type": "sensor",
+          "point_category": "level",
+          "unit": "%",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1199,
+          "present_value": 85,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "medium",
+      "metadata": {
+        "type_vote_counts": {
+          "generator": 1
+        },
+        "avg_confidence_score": 2.0
+      },
+      "created_at": "2026-02-05T09:42:32.701869",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-GEN-B1-001.run": {
+      "equipment_id": "UMH-GEN-B1-001.run",
+      "equipment_type": "generator",
+      "equipment_name": "Generator (UMH-GEN-B1-001.run)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-GEN-B1-001.run_hours",
+          "standardized_name": "UMH-GEN-B1-001.run/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "hours",
+          "confidence": "medium",
+          "object_type": "analogValue",
+          "instance": 1201,
+          "present_value": 4500,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "medium",
+      "metadata": {
+        "type_vote_counts": {
+          "generator": 1
+        },
+        "avg_confidence_score": 2.0
+      },
+      "created_at": "2026-02-05T09:42:32.701878",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-GEN-B1-001.oil": {
+      "equipment_id": "UMH-GEN-B1-001.oil",
+      "equipment_type": "generator",
+      "equipment_name": "Generator (UMH-GEN-B1-001.oil)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-GEN-B1-001.oil_pressure",
+          "standardized_name": "UMH-GEN-B1-001.oil/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "bar",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1203,
+          "present_value": 4.5,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "medium",
+      "metadata": {
+        "type_vote_counts": {
+          "generator": 1
+        },
+        "avg_confidence_score": 2.0
+      },
+      "created_at": "2026-02-05T09:42:32.701887",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-GEN-B1-001.load": {
+      "equipment_id": "UMH-GEN-B1-001.load",
+      "equipment_type": "generator",
+      "equipment_name": "Generator (UMH-GEN-B1-001.load)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-GEN-B1-001.load_percent",
+          "standardized_name": "UMH-GEN-B1-001.load/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "%",
+          "confidence": "low",
+          "object_type": "analogInput",
+          "instance": 1204,
+          "present_value": 0,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "low",
+      "metadata": {
+        "type_vote_counts": {
+          "generator": 1
+        },
+        "avg_confidence_score": 1.0
+      },
+      "created_at": "2026-02-05T09:42:32.701896",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-GEN-B1-002.fuel": {
+      "equipment_id": "UMH-GEN-B1-002.fuel",
+      "equipment_type": "generator",
+      "equipment_name": "Generator (UMH-GEN-B1-002.fuel)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-GEN-B1-002.fuel_level",
+          "standardized_name": "UMH-GEN-B1-002.fuel/level_sensor",
+          "point_type": "sensor",
+          "point_category": "level",
+          "unit": "%",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1207,
+          "present_value": 90,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "medium",
+      "metadata": {
+        "type_vote_counts": {
+          "generator": 1
+        },
+        "avg_confidence_score": 2.0
+      },
+      "created_at": "2026-02-05T09:42:32.701907",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-GEN-B1-002.run": {
+      "equipment_id": "UMH-GEN-B1-002.run",
+      "equipment_type": "generator",
+      "equipment_name": "Generator (UMH-GEN-B1-002.run)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-GEN-B1-002.run_hours",
+          "standardized_name": "UMH-GEN-B1-002.run/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "hours",
+          "confidence": "medium",
+          "object_type": "analogValue",
+          "instance": 1209,
+          "present_value": 3800,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "medium",
+      "metadata": {
+        "type_vote_counts": {
+          "generator": 1
+        },
+        "avg_confidence_score": 2.0
+      },
+      "created_at": "2026-02-05T09:42:32.701915",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-GEN-B1-002.oil": {
+      "equipment_id": "UMH-GEN-B1-002.oil",
+      "equipment_type": "generator",
+      "equipment_name": "Generator (UMH-GEN-B1-002.oil)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-GEN-B1-002.oil_pressure",
+          "standardized_name": "UMH-GEN-B1-002.oil/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "bar",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1211,
+          "present_value": 4.8,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "medium",
+      "metadata": {
+        "type_vote_counts": {
+          "generator": 1
+        },
+        "avg_confidence_score": 2.0
+      },
+      "created_at": "2026-02-05T09:42:32.701924",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-GEN-B1-002.load": {
+      "equipment_id": "UMH-GEN-B1-002.load",
+      "equipment_type": "generator",
+      "equipment_name": "Generator (UMH-GEN-B1-002.load)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-GEN-B1-002.load_percent",
+          "standardized_name": "UMH-GEN-B1-002.load/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "%",
+          "confidence": "low",
+          "object_type": "analogInput",
+          "instance": 1212,
+          "present_value": 0,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "low",
+      "metadata": {
+        "type_vote_counts": {
+          "generator": 1
+        },
+        "avg_confidence_score": 1.0
+      },
+      "created_at": "2026-02-05T09:42:32.701933",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-GEN-B1-003.fuel": {
+      "equipment_id": "UMH-GEN-B1-003.fuel",
+      "equipment_type": "generator",
+      "equipment_name": "Generator (UMH-GEN-B1-003.fuel)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-GEN-B1-003.fuel_level",
+          "standardized_name": "UMH-GEN-B1-003.fuel/level_sensor",
+          "point_type": "sensor",
+          "point_category": "level",
+          "unit": "%",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1215,
+          "present_value": 92,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "medium",
+      "metadata": {
+        "type_vote_counts": {
+          "generator": 1
+        },
+        "avg_confidence_score": 2.0
+      },
+      "created_at": "2026-02-05T09:42:32.701944",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-GEN-B1-003.run": {
+      "equipment_id": "UMH-GEN-B1-003.run",
+      "equipment_type": "generator",
+      "equipment_name": "Generator (UMH-GEN-B1-003.run)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-GEN-B1-003.run_hours",
+          "standardized_name": "UMH-GEN-B1-003.run/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "hours",
+          "confidence": "medium",
+          "object_type": "analogValue",
+          "instance": 1217,
+          "present_value": 2200,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "medium",
+      "metadata": {
+        "type_vote_counts": {
+          "generator": 1
+        },
+        "avg_confidence_score": 2.0
+      },
+      "created_at": "2026-02-05T09:42:32.701953",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-GEN-B1-003.oil": {
+      "equipment_id": "UMH-GEN-B1-003.oil",
+      "equipment_type": "generator",
+      "equipment_name": "Generator (UMH-GEN-B1-003.oil)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-GEN-B1-003.oil_pressure",
+          "standardized_name": "UMH-GEN-B1-003.oil/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "bar",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1219,
+          "present_value": 5.0,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "medium",
+      "metadata": {
+        "type_vote_counts": {
+          "generator": 1
+        },
+        "avg_confidence_score": 2.0
+      },
+      "created_at": "2026-02-05T09:42:32.701961",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-GEN-B1-003.load": {
+      "equipment_id": "UMH-GEN-B1-003.load",
+      "equipment_type": "generator",
+      "equipment_name": "Generator (UMH-GEN-B1-003.load)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-GEN-B1-003.load_percent",
+          "standardized_name": "UMH-GEN-B1-003.load/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "%",
+          "confidence": "low",
+          "object_type": "analogInput",
+          "instance": 1220,
+          "present_value": 0,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "low",
+      "metadata": {
+        "type_vote_counts": {
+          "generator": 1
+        },
+        "avg_confidence_score": 1.0
+      },
+      "created_at": "2026-02-05T09:42:32.706781",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-JACE-001.cpu": {
+      "equipment_id": "UMH-JACE-001.cpu",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (UMH-JACE-001.cpu)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-JACE-001.cpu_usage",
+          "standardized_name": "UMH-JACE-001.cpu/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "%",
+          "confidence": "unknown",
+          "object_type": "analogInput",
+          "instance": 1223,
+          "present_value": 35,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "low",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 0.0
+      },
+      "created_at": "2026-02-05T09:42:32.706812",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-JACE-001.memory": {
+      "equipment_id": "UMH-JACE-001.memory",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (UMH-JACE-001.memory)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-JACE-001.memory_usage",
+          "standardized_name": "UMH-JACE-001.memory/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "%",
+          "confidence": "unknown",
+          "object_type": "analogInput",
+          "instance": 1224,
+          "present_value": 62,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "low",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 0.0
+      },
+      "created_at": "2026-02-05T09:42:32.706823",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-JACE-001.uptime": {
+      "equipment_id": "UMH-JACE-001.uptime",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (UMH-JACE-001.uptime)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-JACE-001.uptime_hours",
+          "standardized_name": "UMH-JACE-001.uptime/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "hours",
+          "confidence": "unknown",
+          "object_type": "analogValue",
+          "instance": 1225,
+          "present_value": 8760,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "low",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 0.0
+      },
+      "created_at": "2026-02-05T09:42:32.706834",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-JACE-001.bacnet": {
+      "equipment_id": "UMH-JACE-001.bacnet",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (UMH-JACE-001.bacnet)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-JACE-001.bacnet_device_count",
+          "standardized_name": "UMH-JACE-001.bacnet/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "unknown",
+          "object_type": "analogInput",
+          "instance": 1226,
+          "present_value": 28,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "low",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 0.0
+      },
+      "created_at": "2026-02-05T09:42:32.706845",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-JACE-001.comms": {
+      "equipment_id": "UMH-JACE-001.comms",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (UMH-JACE-001.comms)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-JACE-001.comms_status",
+          "standardized_name": "UMH-JACE-001.comms/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "low",
+          "object_type": "binaryInput",
+          "instance": 1227,
+          "present_value": true,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "low",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 1.0
+      },
+      "created_at": "2026-02-05T09:42:32.706856",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-JACE-002.cpu": {
+      "equipment_id": "UMH-JACE-002.cpu",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (UMH-JACE-002.cpu)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-JACE-002.cpu_usage",
+          "standardized_name": "UMH-JACE-002.cpu/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "%",
+          "confidence": "unknown",
+          "object_type": "analogInput",
+          "instance": 1229,
+          "present_value": 28,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "low",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 0.0
+      },
+      "created_at": "2026-02-05T09:42:32.706878",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-JACE-002.memory": {
+      "equipment_id": "UMH-JACE-002.memory",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (UMH-JACE-002.memory)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-JACE-002.memory_usage",
+          "standardized_name": "UMH-JACE-002.memory/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "%",
+          "confidence": "unknown",
+          "object_type": "analogInput",
+          "instance": 1230,
+          "present_value": 55,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "low",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 0.0
+      },
+      "created_at": "2026-02-05T09:42:32.706890",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-JACE-002.uptime": {
+      "equipment_id": "UMH-JACE-002.uptime",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (UMH-JACE-002.uptime)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-JACE-002.uptime_hours",
+          "standardized_name": "UMH-JACE-002.uptime/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "hours",
+          "confidence": "unknown",
+          "object_type": "analogValue",
+          "instance": 1231,
+          "present_value": 6500,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "low",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 0.0
+      },
+      "created_at": "2026-02-05T09:42:32.706902",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-JACE-002.bacnet": {
+      "equipment_id": "UMH-JACE-002.bacnet",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (UMH-JACE-002.bacnet)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-JACE-002.bacnet_device_count",
+          "standardized_name": "UMH-JACE-002.bacnet/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "unknown",
+          "object_type": "analogInput",
+          "instance": 1232,
+          "present_value": 21,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "low",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 0.0
+      },
+      "created_at": "2026-02-05T09:42:32.706913",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-JACE-002.comms": {
+      "equipment_id": "UMH-JACE-002.comms",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (UMH-JACE-002.comms)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-JACE-002.comms_status",
+          "standardized_name": "UMH-JACE-002.comms/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "low",
+          "object_type": "binaryInput",
+          "instance": 1233,
+          "present_value": true,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "low",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 1.0
+      },
+      "created_at": "2026-02-05T09:42:32.706923",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-KEF-B1-001.fan": {
+      "equipment_id": "UMH-KEF-B1-001.fan",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (UMH-KEF-B1-001.fan)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-KEF-B1-001.fan_status",
+          "standardized_name": "UMH-KEF-B1-001.fan/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "low",
+          "object_type": "binaryValue",
+          "instance": 1235,
+          "present_value": true,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-KEF-B1-001.fan_speed",
+          "standardized_name": "UMH-KEF-B1-001.fan/speed_sensor",
+          "point_type": "sensor",
+          "point_category": "speed",
+          "unit": "%",
+          "confidence": "low",
+          "object_type": "analogValue",
+          "instance": 1236,
+          "present_value": 65,
+          "writable": false
+        }
+      ],
+      "point_count": 2,
+      "confidence": "low",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 1.0
+      },
+      "created_at": "2026-02-05T09:42:32.706934",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-KEF-B1-001.duct": {
+      "equipment_id": "UMH-KEF-B1-001.duct",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (UMH-KEF-B1-001.duct)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-KEF-B1-001.duct_temp",
+          "standardized_name": "UMH-KEF-B1-001.duct/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "low",
+          "object_type": "analogInput",
+          "instance": 1237,
+          "present_value": 35.0,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "low",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 1.0
+      },
+      "created_at": "2026-02-05T09:42:32.706945",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-LIFT-001.current": {
+      "equipment_id": "UMH-LIFT-001.current",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (UMH-LIFT-001.current)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-LIFT-001.current_floor",
+          "standardized_name": "UMH-LIFT-001.current/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "kPa",
+          "confidence": "low",
+          "object_type": "analogInput",
+          "instance": 1239,
+          "present_value": 1,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "low",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 1.0
+      },
+      "created_at": "2026-02-05T09:42:32.706955",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-LIFT-001.door": {
+      "equipment_id": "UMH-LIFT-001.door",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (UMH-LIFT-001.door)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-LIFT-001.door_status",
+          "standardized_name": "UMH-LIFT-001.door/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "kPa",
+          "confidence": "low",
+          "object_type": "binaryInput",
+          "instance": 1241,
+          "present_value": false,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "low",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 1.0
+      },
+      "created_at": "2026-02-05T09:42:32.706966",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-LIFT-001.in": {
+      "equipment_id": "UMH-LIFT-001.in",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (UMH-LIFT-001.in)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-LIFT-001.in_service",
+          "standardized_name": "UMH-LIFT-001.in/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "kPa",
+          "confidence": "low",
+          "object_type": "binaryValue",
+          "instance": 1242,
+          "present_value": true,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "low",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 1.0
+      },
+      "created_at": "2026-02-05T09:42:32.706976",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-LIFT-002.current": {
+      "equipment_id": "UMH-LIFT-002.current",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (UMH-LIFT-002.current)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-LIFT-002.current_floor",
+          "standardized_name": "UMH-LIFT-002.current/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "kPa",
+          "confidence": "low",
+          "object_type": "analogInput",
+          "instance": 1244,
+          "present_value": 3,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "low",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 1.0
+      },
+      "created_at": "2026-02-05T09:42:32.706985",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-LIFT-002.door": {
+      "equipment_id": "UMH-LIFT-002.door",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (UMH-LIFT-002.door)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-LIFT-002.door_status",
+          "standardized_name": "UMH-LIFT-002.door/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "kPa",
+          "confidence": "low",
+          "object_type": "binaryInput",
+          "instance": 1246,
+          "present_value": false,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "low",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 1.0
+      },
+      "created_at": "2026-02-05T09:42:32.706994",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-LIFT-002.in": {
+      "equipment_id": "UMH-LIFT-002.in",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (UMH-LIFT-002.in)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-LIFT-002.in_service",
+          "standardized_name": "UMH-LIFT-002.in/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "kPa",
+          "confidence": "low",
+          "object_type": "binaryValue",
+          "instance": 1247,
+          "present_value": true,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "low",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 1.0
+      },
+      "created_at": "2026-02-05T09:42:32.707004",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-LIFT-003.current": {
+      "equipment_id": "UMH-LIFT-003.current",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (UMH-LIFT-003.current)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-LIFT-003.current_floor",
+          "standardized_name": "UMH-LIFT-003.current/current_sensor",
+          "point_type": "sensor",
+          "point_category": "current",
+          "unit": "A",
+          "confidence": "low",
+          "object_type": "analogInput",
+          "instance": 1249,
+          "present_value": 0,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "low",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 1.0
+      },
+      "created_at": "2026-02-05T09:42:32.707012",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-LIFT-003.door": {
+      "equipment_id": "UMH-LIFT-003.door",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (UMH-LIFT-003.door)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-LIFT-003.door_status",
+          "standardized_name": "UMH-LIFT-003.door/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "low",
+          "object_type": "binaryInput",
+          "instance": 1251,
+          "present_value": false,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "low",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 1.0
+      },
+      "created_at": "2026-02-05T09:42:32.707028",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-LIFT-003.in": {
+      "equipment_id": "UMH-LIFT-003.in",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (UMH-LIFT-003.in)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-LIFT-003.in_service",
+          "standardized_name": "UMH-LIFT-003.in/status",
+          "point_type": "status",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "unknown",
+          "object_type": "binaryValue",
+          "instance": 1252,
+          "present_value": true,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "low",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 0.0
+      },
+      "created_at": "2026-02-05T09:42:32.707038",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-LIFT-004.current": {
+      "equipment_id": "UMH-LIFT-004.current",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (UMH-LIFT-004.current)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-LIFT-004.current_floor",
+          "standardized_name": "UMH-LIFT-004.current/current_sensor",
+          "point_type": "sensor",
+          "point_category": "current",
+          "unit": "A",
+          "confidence": "low",
+          "object_type": "analogInput",
+          "instance": 1254,
+          "present_value": 3,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "low",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 1.0
+      },
+      "created_at": "2026-02-05T09:42:32.707047",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-LIFT-004.door": {
+      "equipment_id": "UMH-LIFT-004.door",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (UMH-LIFT-004.door)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-LIFT-004.door_status",
+          "standardized_name": "UMH-LIFT-004.door/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "low",
+          "object_type": "binaryInput",
+          "instance": 1256,
+          "present_value": false,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "low",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 1.0
+      },
+      "created_at": "2026-02-05T09:42:32.707057",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-LIFT-004.in": {
+      "equipment_id": "UMH-LIFT-004.in",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (UMH-LIFT-004.in)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-LIFT-004.in_service",
+          "standardized_name": "UMH-LIFT-004.in/status",
+          "point_type": "status",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "unknown",
+          "object_type": "binaryValue",
+          "instance": 1257,
+          "present_value": true,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "low",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 0.0
+      },
+      "created_at": "2026-02-05T09:42:32.707074",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-MEDGAS-B1-001.o2": {
+      "equipment_id": "UMH-MEDGAS-B1-001.o2",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (UMH-MEDGAS-B1-001.o2)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-MEDGAS-B1-001.o2_pressure",
+          "standardized_name": "UMH-MEDGAS-B1-001.o2/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "bar",
+          "confidence": "low",
+          "object_type": "analogInput",
+          "instance": 1272,
+          "present_value": 10.5,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-MEDGAS-B1-001.o2_manifold_status",
+          "standardized_name": "UMH-MEDGAS-B1-001.o2/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "low",
+          "object_type": "multistateValue",
+          "instance": 1276,
+          "present_value": 1,
+          "writable": false
+        }
+      ],
+      "point_count": 2,
+      "confidence": "low",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 1.0
+      },
+      "created_at": "2026-02-05T09:42:32.707090",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-MSB-B1-001.total": {
+      "equipment_id": "UMH-MSB-B1-001.total",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (UMH-MSB-B1-001.total)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-MSB-B1-001.total_kw",
+          "standardized_name": "UMH-MSB-B1-001.total/power_sensor",
+          "point_type": "sensor",
+          "point_category": "power",
+          "unit": "kW",
+          "confidence": "low",
+          "object_type": "analogInput",
+          "instance": 1279,
+          "present_value": 1200,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-MSB-B1-001.total_kva",
+          "standardized_name": "UMH-MSB-B1-001.total/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "kVA",
+          "confidence": "unknown",
+          "object_type": "analogInput",
+          "instance": 1280,
+          "present_value": 1350,
+          "writable": false
+        }
+      ],
+      "point_count": 2,
+      "confidence": "low",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 0.5
+      },
+      "created_at": "2026-02-05T09:42:32.707102",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-MSB-B1-001.power": {
+      "equipment_id": "UMH-MSB-B1-001.power",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (UMH-MSB-B1-001.power)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-MSB-B1-001.power_factor",
+          "standardized_name": "UMH-MSB-B1-001.power/power_sensor",
+          "point_type": "sensor",
+          "point_category": "power",
+          "unit": "kW",
+          "confidence": "low",
+          "object_type": "analogInput",
+          "instance": 1281,
+          "present_value": 0.89,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "low",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 1.0
+      },
+      "created_at": "2026-02-05T09:42:32.707112",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-MSB-B1-001.mains": {
+      "equipment_id": "UMH-MSB-B1-001.mains",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (UMH-MSB-B1-001.mains)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-MSB-B1-001.mains_status",
+          "standardized_name": "UMH-MSB-B1-001.mains/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "low",
+          "object_type": "binaryInput",
+          "instance": 1286,
+          "present_value": true,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "low",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 1.0
+      },
+      "created_at": "2026-02-05T09:42:32.707122",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-PUMP-B1-CHW1.dp": {
+      "equipment_id": "UMH-PUMP-B1-CHW1.dp",
+      "equipment_type": "pump",
+      "equipment_name": "Pump (UMH-PUMP-B1-CHW1.dp)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-PUMP-B1-CHW1.dp_bar",
+          "standardized_name": "UMH-PUMP-B1-CHW1.dp/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "bar",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1291,
+          "present_value": 2.8,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "medium",
+      "metadata": {
+        "type_vote_counts": {
+          "pump": 1
+        },
+        "avg_confidence_score": 2.0
+      },
+      "created_at": "2026-02-05T09:42:32.707138",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-PUMP-B1-CHW1.vfd": {
+      "equipment_id": "UMH-PUMP-B1-CHW1.vfd",
+      "equipment_type": "pump",
+      "equipment_name": "Pump (UMH-PUMP-B1-CHW1.vfd)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-PUMP-B1-CHW1.vfd_fault",
+          "standardized_name": "UMH-PUMP-B1-CHW1.vfd/alarm_alarm",
+          "point_type": "alarm",
+          "point_category": "alarm",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "binaryInput",
+          "instance": 1292,
+          "present_value": false,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "medium",
+      "metadata": {
+        "type_vote_counts": {
+          "pump": 1
+        },
+        "avg_confidence_score": 2.0
+      },
+      "created_at": "2026-02-05T09:42:32.707152",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-PUMP-B1-CW1.dp": {
+      "equipment_id": "UMH-PUMP-B1-CW1.dp",
+      "equipment_type": "pump",
+      "equipment_name": "Pump (UMH-PUMP-B1-CW1.dp)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-PUMP-B1-CW1.dp_bar",
+          "standardized_name": "UMH-PUMP-B1-CW1.dp/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "bar",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1297,
+          "present_value": 3.2,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "medium",
+      "metadata": {
+        "type_vote_counts": {
+          "pump": 1
+        },
+        "avg_confidence_score": 2.0
+      },
+      "created_at": "2026-02-05T09:42:32.707169",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-SPLIT-L1-001.fan": {
+      "equipment_id": "UMH-SPLIT-L1-001.fan",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (UMH-SPLIT-L1-001.fan)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-SPLIT-L1-001.fan_speed",
+          "standardized_name": "UMH-SPLIT-L1-001.fan/speed_sensor",
+          "point_type": "sensor",
+          "point_category": "speed",
+          "unit": "%",
+          "confidence": "low",
+          "object_type": "multistateValue",
+          "instance": 1302,
+          "present_value": 2,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "low",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 1.0
+      },
+      "created_at": "2026-02-05T09:42:32.707184",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-UPS-L3-001.load": {
+      "equipment_id": "UMH-UPS-L3-001.load",
+      "equipment_type": "ups",
+      "equipment_name": "UPS (UMH-UPS-L3-001.load)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-UPS-L3-001.load_percent",
+          "standardized_name": "UMH-UPS-L3-001.load/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "%",
+          "confidence": "low",
+          "object_type": "analogInput",
+          "instance": 1318,
+          "present_value": 55,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "low",
+      "metadata": {
+        "type_vote_counts": {
+          "ups": 1
+        },
+        "avg_confidence_score": 1.0
+      },
+      "created_at": "2026-02-05T09:42:32.707197",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UMH-UPS-L3-001.input": {
+      "equipment_id": "UMH-UPS-L3-001.input",
+      "equipment_type": "ups",
+      "equipment_name": "UPS (UMH-UPS-L3-001.input)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-UPS-L3-001.input_voltage",
+          "standardized_name": "UMH-UPS-L3-001.input/voltage_sensor",
+          "point_type": "sensor",
+          "point_category": "voltage",
+          "unit": "V",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1321,
+          "present_value": 400,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "medium",
+      "metadata": {
+        "type_vote_counts": {
+          "ups": 1
+        },
+        "avg_confidence_score": 2.0
+      },
+      "created_at": "2026-02-05T09:42:32.707214",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UNASSIGNED": {
+      "equipment_id": "UNASSIGNED",
+      "equipment_type": "ahu",
+      "equipment_name": "Air Handling Unit (UNASSIGNED)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "UMH-AHU-B1-LAUN.supply_air_temp",
+          "standardized_name": "ahu/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1000,
+          "present_value": 22.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-B1-LAUN.exhaust_air_temp",
+          "standardized_name": "ahu/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1001,
+          "present_value": 28.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-B1-LAUN.alarm",
+          "standardized_name": "ahu/alarm_alarm",
+          "point_type": "alarm",
+          "point_category": "alarm",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "binaryInput",
+          "instance": 1004,
+          "present_value": false,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-L2-001.supply_air_temp",
+          "standardized_name": "ahu/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1005,
+          "present_value": 18.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-L2-001.return_air_temp",
+          "standardized_name": "ahu/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1006,
+          "present_value": 23.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-L2-001.filter_dp",
+          "standardized_name": "ahu/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "Pa",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1007,
+          "present_value": 110,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-L2-001.damper_position",
+          "standardized_name": "ahu/valve_position_sensor",
+          "point_type": "sensor",
+          "point_category": "valve_position",
+          "unit": "%",
+          "confidence": "medium",
+          "object_type": "analogValue",
+          "instance": 1009,
+          "present_value": 35,
+          "writable": true
+        },
+        {
+          "original_name": "UMH-AHU-L2-001.alarm",
+          "standardized_name": "ahu/alarm_alarm",
+          "point_type": "alarm",
+          "point_category": "alarm",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "binaryInput",
+          "instance": 1011,
+          "present_value": false,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-L3-ICU.supply_air_temp",
+          "standardized_name": "ahu/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1012,
+          "present_value": 19.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-L3-ICU.return_air_temp",
+          "standardized_name": "ahu/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1013,
+          "present_value": 23.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-L3-ICU.supply_humidity",
+          "standardized_name": "ahu/humidity_sensor",
+          "point_type": "sensor",
+          "point_category": "humidity",
+          "unit": "%RH",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1014,
+          "present_value": 55.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-L3-ICU.return_humidity",
+          "standardized_name": "ahu/humidity_sensor",
+          "point_type": "sensor",
+          "point_category": "humidity",
+          "unit": "%RH",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1015,
+          "present_value": 60.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-L3-ICU.prefilter_dp",
+          "standardized_name": "ahu/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "Pa",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1017,
+          "present_value": 85,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-L3-ICU.alarm",
+          "standardized_name": "ahu/alarm_alarm",
+          "point_type": "alarm",
+          "point_category": "alarm",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "binaryInput",
+          "instance": 1022,
+          "present_value": false,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-L3-TH1.supply_air_temp",
+          "standardized_name": "ahu/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1023,
+          "present_value": 18.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-L3-TH1.return_air_temp",
+          "standardized_name": "ahu/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1024,
+          "present_value": 22.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-L3-TH1.supply_humidity",
+          "standardized_name": "ahu/humidity_sensor",
+          "point_type": "sensor",
+          "point_category": "humidity",
+          "unit": "%RH",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1025,
+          "present_value": 50.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-L3-TH1.return_humidity",
+          "standardized_name": "ahu/humidity_sensor",
+          "point_type": "sensor",
+          "point_category": "humidity",
+          "unit": "%RH",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1026,
+          "present_value": 55.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-L3-TH1.prefilter_dp",
+          "standardized_name": "ahu/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "Pa",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1028,
+          "present_value": 80,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-L3-TH1.damper_position",
+          "standardized_name": "ahu/valve_position_sensor",
+          "point_type": "sensor",
+          "point_category": "valve_position",
+          "unit": "%",
+          "confidence": "medium",
+          "object_type": "analogValue",
+          "instance": 1030,
+          "present_value": 30,
+          "writable": true
+        },
+        {
+          "original_name": "UMH-AHU-L3-TH1.supply_air_temp_setpoint",
+          "standardized_name": "ahu/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogValue",
+          "instance": 1033,
+          "present_value": 18.0,
+          "writable": true
+        },
+        {
+          "original_name": "UMH-AHU-L3-TH1.humidity_setpoint",
+          "standardized_name": "ahu/humidity_sensor",
+          "point_type": "sensor",
+          "point_category": "humidity",
+          "unit": "%RH",
+          "confidence": "medium",
+          "object_type": "analogValue",
+          "instance": 1034,
+          "present_value": 50.0,
+          "writable": true
+        },
+        {
+          "original_name": "UMH-AHU-L3-TH1.alarm",
+          "standardized_name": "ahu/alarm_alarm",
+          "point_type": "alarm",
+          "point_category": "alarm",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "binaryInput",
+          "instance": 1036,
+          "present_value": false,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-L3-TH2.supply_air_temp",
+          "standardized_name": "ahu/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1037,
+          "present_value": 18.5,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-L3-TH2.return_air_temp",
+          "standardized_name": "ahu/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1038,
+          "present_value": 22.5,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-L3-TH2.supply_humidity",
+          "standardized_name": "ahu/humidity_sensor",
+          "point_type": "sensor",
+          "point_category": "humidity",
+          "unit": "%RH",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1039,
+          "present_value": 52.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-L3-TH2.return_humidity",
+          "standardized_name": "ahu/humidity_sensor",
+          "point_type": "sensor",
+          "point_category": "humidity",
+          "unit": "%RH",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1040,
+          "present_value": 57.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-L3-TH2.prefilter_dp",
+          "standardized_name": "ahu/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "Pa",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1042,
+          "present_value": 95,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-L3-TH2.damper_position",
+          "standardized_name": "ahu/valve_position_sensor",
+          "point_type": "sensor",
+          "point_category": "valve_position",
+          "unit": "%",
+          "confidence": "medium",
+          "object_type": "analogValue",
+          "instance": 1044,
+          "present_value": 35,
+          "writable": true
+        },
+        {
+          "original_name": "UMH-AHU-L3-TH2.supply_air_temp_setpoint",
+          "standardized_name": "ahu/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogValue",
+          "instance": 1047,
+          "present_value": 18.0,
+          "writable": true
+        },
+        {
+          "original_name": "UMH-AHU-L3-TH2.humidity_setpoint",
+          "standardized_name": "ahu/humidity_sensor",
+          "point_type": "sensor",
+          "point_category": "humidity",
+          "unit": "%RH",
+          "confidence": "medium",
+          "object_type": "analogValue",
+          "instance": 1048,
+          "present_value": 50.0,
+          "writable": true
+        },
+        {
+          "original_name": "UMH-AHU-L3-TH2.alarm",
+          "standardized_name": "ahu/alarm_alarm",
+          "point_type": "alarm",
+          "point_category": "alarm",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "binaryInput",
+          "instance": 1051,
+          "present_value": false,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-L3-TH3.supply_air_temp",
+          "standardized_name": "ahu/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1052,
+          "present_value": 18.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-L3-TH3.return_air_temp",
+          "standardized_name": "ahu/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1053,
+          "present_value": 22.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-L3-TH3.supply_humidity",
+          "standardized_name": "ahu/humidity_sensor",
+          "point_type": "sensor",
+          "point_category": "humidity",
+          "unit": "%RH",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1054,
+          "present_value": 50.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-L3-TH3.return_humidity",
+          "standardized_name": "ahu/humidity_sensor",
+          "point_type": "sensor",
+          "point_category": "humidity",
+          "unit": "%RH",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1055,
+          "present_value": 55.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-L3-TH3.prefilter_dp",
+          "standardized_name": "ahu/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "Pa",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1057,
+          "present_value": 75,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-L3-TH3.alarm",
+          "standardized_name": "ahu/alarm_alarm",
+          "point_type": "alarm",
+          "point_category": "alarm",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "binaryInput",
+          "instance": 1062,
+          "present_value": false,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-L4-001.supply_air_temp",
+          "standardized_name": "ahu/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1063,
+          "present_value": 18.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-L4-001.return_air_temp",
+          "standardized_name": "ahu/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1064,
+          "present_value": 23.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-L4-001.filter_dp",
+          "standardized_name": "ahu/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "Pa",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1065,
+          "present_value": 120,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-L4-001.damper_position",
+          "standardized_name": "ahu/valve_position_sensor",
+          "point_type": "sensor",
+          "point_category": "valve_position",
+          "unit": "%",
+          "confidence": "medium",
+          "object_type": "analogValue",
+          "instance": 1067,
+          "present_value": 40,
+          "writable": true
+        },
+        {
+          "original_name": "UMH-AHU-L4-001.alarm",
+          "standardized_name": "ahu/alarm_alarm",
+          "point_type": "alarm",
+          "point_category": "alarm",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "binaryInput",
+          "instance": 1069,
+          "present_value": false,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-L5-001.supply_air_temp",
+          "standardized_name": "ahu/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1070,
+          "present_value": 19.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-L5-001.return_air_temp",
+          "standardized_name": "ahu/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1071,
+          "present_value": 24.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-L5-001.filter_dp",
+          "standardized_name": "ahu/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "Pa",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1072,
+          "present_value": 115,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-L5-001.damper_position",
+          "standardized_name": "ahu/valve_position_sensor",
+          "point_type": "sensor",
+          "point_category": "valve_position",
+          "unit": "%",
+          "confidence": "medium",
+          "object_type": "analogValue",
+          "instance": 1074,
+          "present_value": 45,
+          "writable": true
+        },
+        {
+          "original_name": "UMH-AHU-L5-001.alarm",
+          "standardized_name": "ahu/alarm_alarm",
+          "point_type": "alarm",
+          "point_category": "alarm",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "binaryInput",
+          "instance": 1076,
+          "present_value": false,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-L6-001.supply_air_temp",
+          "standardized_name": "ahu/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1077,
+          "present_value": 18.5,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-L6-001.return_air_temp",
+          "standardized_name": "ahu/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1078,
+          "present_value": 23.5,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-L6-001.filter_dp",
+          "standardized_name": "ahu/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "Pa",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1079,
+          "present_value": 130,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-L6-001.damper_position",
+          "standardized_name": "ahu/valve_position_sensor",
+          "point_type": "sensor",
+          "point_category": "valve_position",
+          "unit": "%",
+          "confidence": "medium",
+          "object_type": "analogValue",
+          "instance": 1081,
+          "present_value": 50,
+          "writable": true
+        },
+        {
+          "original_name": "UMH-AHU-L6-001.alarm",
+          "standardized_name": "ahu/alarm_alarm",
+          "point_type": "alarm",
+          "point_category": "alarm",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "binaryInput",
+          "instance": 1084,
+          "present_value": false,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-L7-001.supply_air_temp",
+          "standardized_name": "ahu/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1085,
+          "present_value": 18.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-L7-001.return_air_temp",
+          "standardized_name": "ahu/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1086,
+          "present_value": 23.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-L7-001.filter_dp",
+          "standardized_name": "ahu/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "Pa",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1087,
+          "present_value": 100,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-L7-001.damper_position",
+          "standardized_name": "ahu/valve_position_sensor",
+          "point_type": "sensor",
+          "point_category": "valve_position",
+          "unit": "%",
+          "confidence": "medium",
+          "object_type": "analogValue",
+          "instance": 1089,
+          "present_value": 35,
+          "writable": true
+        },
+        {
+          "original_name": "UMH-AHU-L7-001.alarm",
+          "standardized_name": "ahu/alarm_alarm",
+          "point_type": "alarm",
+          "point_category": "alarm",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "binaryInput",
+          "instance": 1091,
+          "present_value": false,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-L8-001.supply_air_temp",
+          "standardized_name": "ahu/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1092,
+          "present_value": 17.5,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-L8-001.return_air_temp",
+          "standardized_name": "ahu/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1093,
+          "present_value": 22.5,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-L8-001.filter_dp",
+          "standardized_name": "ahu/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "Pa",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1094,
+          "present_value": 90,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-L8-001.damper_position",
+          "standardized_name": "ahu/valve_position_sensor",
+          "point_type": "sensor",
+          "point_category": "valve_position",
+          "unit": "%",
+          "confidence": "medium",
+          "object_type": "analogValue",
+          "instance": 1096,
+          "present_value": 30,
+          "writable": true
+        },
+        {
+          "original_name": "UMH-AHU-L8-001.alarm",
+          "standardized_name": "ahu/alarm_alarm",
+          "point_type": "alarm",
+          "point_category": "alarm",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "binaryInput",
+          "instance": 1098,
+          "present_value": false,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-L9-001.supply_air_temp",
+          "standardized_name": "ahu/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1099,
+          "present_value": 18.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-L9-001.return_air_temp",
+          "standardized_name": "ahu/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1100,
+          "present_value": 23.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-L9-001.filter_dp",
+          "standardized_name": "ahu/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "Pa",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1101,
+          "present_value": 95,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-AHU-L9-001.damper_position",
+          "standardized_name": "ahu/valve_position_sensor",
+          "point_type": "sensor",
+          "point_category": "valve_position",
+          "unit": "%",
+          "confidence": "medium",
+          "object_type": "analogValue",
+          "instance": 1103,
+          "present_value": 40,
+          "writable": true
+        },
+        {
+          "original_name": "UMH-AHU-L9-001.alarm",
+          "standardized_name": "ahu/alarm_alarm",
+          "point_type": "alarm",
+          "point_category": "alarm",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "binaryInput",
+          "instance": 1105,
+          "present_value": false,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-BOILER-B1-001.flue_temp",
+          "standardized_name": "boiler/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1108,
+          "present_value": 120.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-BOILER-B1-001.burner_status",
+          "standardized_name": "boiler/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "multistateValue",
+          "instance": 1109,
+          "present_value": 1,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-BOILER-B1-001.gas_pressure",
+          "standardized_name": "boiler/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "mbar",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1111,
+          "present_value": 21.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-BOILER-B1-001.runtime_hours",
+          "standardized_name": "boiler/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "hours",
+          "confidence": "medium",
+          "object_type": "analogValue",
+          "instance": 1112,
+          "present_value": 18000,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-BOILER-B1-001.alarm",
+          "standardized_name": "boiler/alarm_alarm",
+          "point_type": "alarm",
+          "point_category": "alarm",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "binaryInput",
+          "instance": 1113,
+          "present_value": false,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-BOILER-B1-002.flue_temp",
+          "standardized_name": "boiler/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1116,
+          "present_value": 115.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-BOILER-B1-002.burner_status",
+          "standardized_name": "boiler/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "multistateValue",
+          "instance": 1117,
+          "present_value": 0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-BOILER-B1-002.gas_pressure",
+          "standardized_name": "boiler/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "mbar",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1119,
+          "present_value": 21.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-BOILER-B1-002.runtime_hours",
+          "standardized_name": "boiler/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "hours",
+          "confidence": "medium",
+          "object_type": "analogValue",
+          "instance": 1120,
+          "present_value": 8000,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-BOILER-B1-002.alarm",
+          "standardized_name": "boiler/alarm_alarm",
+          "point_type": "alarm",
+          "point_category": "alarm",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "binaryInput",
+          "instance": 1121,
+          "present_value": false,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-CHILLER-B1-001.chw_supply_temp",
+          "standardized_name": "chiller/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1122,
+          "present_value": 6.5,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-CHILLER-B1-001.chw_return_temp",
+          "standardized_name": "chiller/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1123,
+          "present_value": 12.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-CHILLER-B1-001.condenser_pressure",
+          "standardized_name": "chiller/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "bar",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1124,
+          "present_value": 14.5,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-CHILLER-B1-001.compressor_amps",
+          "standardized_name": "chiller/current_sensor",
+          "point_type": "sensor",
+          "point_category": "current",
+          "unit": "A",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1125,
+          "present_value": 180,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-CHILLER-B1-001.chiller_status",
+          "standardized_name": "chiller/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "multistateValue",
+          "instance": 1126,
+          "present_value": 1,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-CHILLER-B1-001.chw_supply_temp_setpoint",
+          "standardized_name": "chiller/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogValue",
+          "instance": 1127,
+          "present_value": 6.0,
+          "writable": true
+        },
+        {
+          "original_name": "UMH-CHILLER-B1-001.cop",
+          "standardized_name": "chiller/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "low",
+          "object_type": "analogInput",
+          "instance": 1128,
+          "present_value": 4.8,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-CHILLER-B1-001.runtime_hours",
+          "standardized_name": "chiller/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "hours",
+          "confidence": "medium",
+          "object_type": "analogValue",
+          "instance": 1129,
+          "present_value": 45000,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-CHILLER-B1-001.alarm",
+          "standardized_name": "chiller/alarm_alarm",
+          "point_type": "alarm",
+          "point_category": "alarm",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "binaryInput",
+          "instance": 1130,
+          "present_value": false,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-CHILLER-B1-002.chw_supply_temp",
+          "standardized_name": "chiller/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1131,
+          "present_value": 6.5,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-CHILLER-B1-002.chw_return_temp",
+          "standardized_name": "chiller/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1132,
+          "present_value": 12.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-CHILLER-B1-002.condenser_pressure",
+          "standardized_name": "chiller/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "bar",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1133,
+          "present_value": 14.5,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-CHILLER-B1-002.compressor_amps",
+          "standardized_name": "chiller/current_sensor",
+          "point_type": "sensor",
+          "point_category": "current",
+          "unit": "A",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1134,
+          "present_value": 180,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-CHILLER-B1-002.chiller_status",
+          "standardized_name": "chiller/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "multistateValue",
+          "instance": 1135,
+          "present_value": 1,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-CHILLER-B1-002.chw_supply_temp_setpoint",
+          "standardized_name": "chiller/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogValue",
+          "instance": 1136,
+          "present_value": 6.0,
+          "writable": true
+        },
+        {
+          "original_name": "UMH-CHILLER-B1-002.cop",
+          "standardized_name": "chiller/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "low",
+          "object_type": "analogInput",
+          "instance": 1137,
+          "present_value": 5.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-CHILLER-B1-002.runtime_hours",
+          "standardized_name": "chiller/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "hours",
+          "confidence": "medium",
+          "object_type": "analogValue",
+          "instance": 1138,
+          "present_value": 42000,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-CHILLER-B1-002.alarm",
+          "standardized_name": "chiller/alarm_alarm",
+          "point_type": "alarm",
+          "point_category": "alarm",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "binaryInput",
+          "instance": 1139,
+          "present_value": false,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-CHILLER-B1-003.chw_supply_temp",
+          "standardized_name": "chiller/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1140,
+          "present_value": 6.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-CHILLER-B1-003.chw_return_temp",
+          "standardized_name": "chiller/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1141,
+          "present_value": 11.5,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-CHILLER-B1-003.condenser_pressure",
+          "standardized_name": "chiller/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "bar",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1142,
+          "present_value": 13.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-CHILLER-B1-003.compressor_amps",
+          "standardized_name": "chiller/current_sensor",
+          "point_type": "sensor",
+          "point_category": "current",
+          "unit": "A",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1143,
+          "present_value": 95,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-CHILLER-B1-003.chiller_status",
+          "standardized_name": "chiller/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "multistateValue",
+          "instance": 1144,
+          "present_value": 1,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-CHILLER-B1-003.chw_supply_temp_setpoint",
+          "standardized_name": "chiller/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogValue",
+          "instance": 1145,
+          "present_value": 5.5,
+          "writable": true
+        },
+        {
+          "original_name": "UMH-CHILLER-B1-003.cop",
+          "standardized_name": "chiller/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "low",
+          "object_type": "analogInput",
+          "instance": 1146,
+          "present_value": 5.2,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-CHILLER-B1-003.runtime_hours",
+          "standardized_name": "chiller/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "hours",
+          "confidence": "medium",
+          "object_type": "analogValue",
+          "instance": 1147,
+          "present_value": 28000,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-CHILLER-B1-003.alarm",
+          "standardized_name": "chiller/alarm_alarm",
+          "point_type": "alarm",
+          "point_category": "alarm",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "binaryInput",
+          "instance": 1148,
+          "present_value": false,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-COLD-B1-001.cabinet_temp",
+          "standardized_name": "unknown/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "low",
+          "object_type": "analogInput",
+          "instance": 1149,
+          "present_value": 3.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-COLD-B1-001.compressor_status",
+          "standardized_name": "unknown/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "kPa",
+          "confidence": "low",
+          "object_type": "binaryValue",
+          "instance": 1150,
+          "present_value": true,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-COLD-B1-001.alarm",
+          "standardized_name": "unknown/alarm_alarm",
+          "point_type": "alarm",
+          "point_category": "alarm",
+          "unit": "",
+          "confidence": "low",
+          "object_type": "binaryInput",
+          "instance": 1152,
+          "present_value": false,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-COLD-L1-001.cabinet_temp",
+          "standardized_name": "unknown/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "low",
+          "object_type": "analogInput",
+          "instance": 1153,
+          "present_value": 4.5,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-COLD-L1-001.cabinet_temp_setpoint",
+          "standardized_name": "unknown/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "low",
+          "object_type": "analogValue",
+          "instance": 1154,
+          "present_value": 4.0,
+          "writable": true
+        },
+        {
+          "original_name": "UMH-COLD-L1-001.compressor_status",
+          "standardized_name": "unknown/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "kPa",
+          "confidence": "low",
+          "object_type": "binaryValue",
+          "instance": 1155,
+          "present_value": true,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-COLD-L1-001.defrost_status",
+          "standardized_name": "unknown/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "low",
+          "object_type": "binaryValue",
+          "instance": 1157,
+          "present_value": false,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-COLD-L1-001.compressor_run_hours",
+          "standardized_name": "unknown/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "hours",
+          "confidence": "low",
+          "object_type": "analogValue",
+          "instance": 1158,
+          "present_value": 35000,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-COLD-L1-001.evaporator_temp",
+          "standardized_name": "unknown/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "low",
+          "object_type": "analogInput",
+          "instance": 1159,
+          "present_value": 0.5,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-COLD-L1-001.alarm",
+          "standardized_name": "unknown/alarm_alarm",
+          "point_type": "alarm",
+          "point_category": "alarm",
+          "unit": "",
+          "confidence": "low",
+          "object_type": "binaryInput",
+          "instance": 1160,
+          "present_value": false,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-COLD-L1-002.cabinet_temp",
+          "standardized_name": "unknown/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "low",
+          "object_type": "analogInput",
+          "instance": 1161,
+          "present_value": 4.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-COLD-L1-002.cabinet_temp_setpoint",
+          "standardized_name": "unknown/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "low",
+          "object_type": "analogValue",
+          "instance": 1162,
+          "present_value": 3.5,
+          "writable": true
+        },
+        {
+          "original_name": "UMH-COLD-L1-002.compressor_status",
+          "standardized_name": "unknown/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "kPa",
+          "confidence": "low",
+          "object_type": "binaryValue",
+          "instance": 1163,
+          "present_value": true,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-COLD-L1-002.defrost_status",
+          "standardized_name": "unknown/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "low",
+          "object_type": "binaryValue",
+          "instance": 1165,
+          "present_value": false,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-COLD-L1-002.compressor_run_hours",
+          "standardized_name": "unknown/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "hours",
+          "confidence": "low",
+          "object_type": "analogValue",
+          "instance": 1166,
+          "present_value": 24000,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-COLD-L1-002.evaporator_temp",
+          "standardized_name": "unknown/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "low",
+          "object_type": "analogInput",
+          "instance": 1167,
+          "present_value": 0.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-COLD-L1-002.alarm",
+          "standardized_name": "unknown/alarm_alarm",
+          "point_type": "alarm",
+          "point_category": "alarm",
+          "unit": "",
+          "confidence": "low",
+          "object_type": "binaryInput",
+          "instance": 1168,
+          "present_value": false,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-CT-R-001.approach_temp",
+          "standardized_name": "cooling_tower/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1171,
+          "present_value": 4.5,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-CT-R-001.alarm",
+          "standardized_name": "cooling_tower/alarm_alarm",
+          "point_type": "alarm",
+          "point_category": "alarm",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "binaryInput",
+          "instance": 1176,
+          "present_value": false,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-CT-R-002.approach_temp",
+          "standardized_name": "cooling_tower/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1179,
+          "present_value": 4.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-CT-R-002.alarm",
+          "standardized_name": "cooling_tower/alarm_alarm",
+          "point_type": "alarm",
+          "point_category": "alarm",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "binaryInput",
+          "instance": 1184,
+          "present_value": false,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-DB-L3-001.voltage",
+          "standardized_name": "unknown/voltage_sensor",
+          "point_type": "sensor",
+          "point_category": "voltage",
+          "unit": "V",
+          "confidence": "low",
+          "object_type": "analogInput",
+          "instance": 1186,
+          "present_value": 400,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-DB-L3-001.essential_status",
+          "standardized_name": "unknown/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "low",
+          "object_type": "binaryInput",
+          "instance": 1187,
+          "present_value": true,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-DB-L3-001.alarm",
+          "standardized_name": "unknown/alarm_alarm",
+          "point_type": "alarm",
+          "point_category": "alarm",
+          "unit": "",
+          "confidence": "low",
+          "object_type": "binaryInput",
+          "instance": 1188,
+          "present_value": false,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-DB-L3-002.voltage",
+          "standardized_name": "unknown/voltage_sensor",
+          "point_type": "sensor",
+          "point_category": "voltage",
+          "unit": "V",
+          "confidence": "low",
+          "object_type": "analogInput",
+          "instance": 1190,
+          "present_value": 400,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-DB-L3-002.essential_status",
+          "standardized_name": "unknown/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "low",
+          "object_type": "binaryInput",
+          "instance": 1191,
+          "present_value": true,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-DB-L3-002.alarm",
+          "standardized_name": "unknown/alarm_alarm",
+          "point_type": "alarm",
+          "point_category": "alarm",
+          "unit": "",
+          "confidence": "low",
+          "object_type": "binaryInput",
+          "instance": 1192,
+          "present_value": false,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-FIRE-001.alarm",
+          "standardized_name": "unknown/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "kPa",
+          "confidence": "low",
+          "object_type": "binaryInput",
+          "instance": 1198,
+          "present_value": false,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-GEN-B1-001.battery_voltage",
+          "standardized_name": "generator/voltage_sensor",
+          "point_type": "sensor",
+          "point_category": "voltage",
+          "unit": "V",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1200,
+          "present_value": 26.5,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-GEN-B1-001.coolant_temp",
+          "standardized_name": "generator/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1202,
+          "present_value": 45.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-GEN-B1-001.status",
+          "standardized_name": "generator/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "multistateValue",
+          "instance": 1205,
+          "present_value": 0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-GEN-B1-001.alarm",
+          "standardized_name": "generator/alarm_alarm",
+          "point_type": "alarm",
+          "point_category": "alarm",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "binaryInput",
+          "instance": 1206,
+          "present_value": false,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-GEN-B1-002.battery_voltage",
+          "standardized_name": "generator/voltage_sensor",
+          "point_type": "sensor",
+          "point_category": "voltage",
+          "unit": "V",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1208,
+          "present_value": 26.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-GEN-B1-002.coolant_temp",
+          "standardized_name": "generator/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1210,
+          "present_value": 42.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-GEN-B1-002.status",
+          "standardized_name": "generator/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "multistateValue",
+          "instance": 1213,
+          "present_value": 0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-GEN-B1-002.alarm",
+          "standardized_name": "generator/alarm_alarm",
+          "point_type": "alarm",
+          "point_category": "alarm",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "binaryInput",
+          "instance": 1214,
+          "present_value": false,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-GEN-B1-003.battery_voltage",
+          "standardized_name": "generator/voltage_sensor",
+          "point_type": "sensor",
+          "point_category": "voltage",
+          "unit": "V",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1216,
+          "present_value": 27.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-GEN-B1-003.coolant_temp",
+          "standardized_name": "generator/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1218,
+          "present_value": 40.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-GEN-B1-003.status",
+          "standardized_name": "generator/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "multistateValue",
+          "instance": 1221,
+          "present_value": 0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-GEN-B1-003.alarm",
+          "standardized_name": "generator/alarm_alarm",
+          "point_type": "alarm",
+          "point_category": "alarm",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "binaryInput",
+          "instance": 1222,
+          "present_value": false,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-JACE-001.alarm",
+          "standardized_name": "unknown/alarm_alarm",
+          "point_type": "alarm",
+          "point_category": "alarm",
+          "unit": "",
+          "confidence": "low",
+          "object_type": "binaryInput",
+          "instance": 1228,
+          "present_value": false,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-JACE-002.alarm",
+          "standardized_name": "unknown/alarm_alarm",
+          "point_type": "alarm",
+          "point_category": "alarm",
+          "unit": "",
+          "confidence": "low",
+          "object_type": "binaryInput",
+          "instance": 1234,
+          "present_value": false,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-KEF-B1-001.alarm",
+          "standardized_name": "unknown/alarm_alarm",
+          "point_type": "alarm",
+          "point_category": "alarm",
+          "unit": "",
+          "confidence": "low",
+          "object_type": "binaryInput",
+          "instance": 1238,
+          "present_value": false,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-LIFT-001.direction",
+          "standardized_name": "unknown/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "kPa",
+          "confidence": "low",
+          "object_type": "multistateValue",
+          "instance": 1240,
+          "present_value": 0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-LIFT-001.alarm",
+          "standardized_name": "unknown/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "kPa",
+          "confidence": "low",
+          "object_type": "binaryInput",
+          "instance": 1243,
+          "present_value": false,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-LIFT-002.direction",
+          "standardized_name": "unknown/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "kPa",
+          "confidence": "low",
+          "object_type": "multistateValue",
+          "instance": 1245,
+          "present_value": 0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-LIFT-002.alarm",
+          "standardized_name": "unknown/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "kPa",
+          "confidence": "low",
+          "object_type": "binaryInput",
+          "instance": 1248,
+          "present_value": false,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-LIFT-003.direction",
+          "standardized_name": "unknown/unclassified",
+          "point_type": "unknown",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "unknown",
+          "object_type": "multistateValue",
+          "instance": 1250,
+          "present_value": 0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-LIFT-003.alarm",
+          "standardized_name": "unknown/alarm_alarm",
+          "point_type": "alarm",
+          "point_category": "alarm",
+          "unit": "",
+          "confidence": "low",
+          "object_type": "binaryInput",
+          "instance": 1253,
+          "present_value": false,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-LIFT-004.direction",
+          "standardized_name": "unknown/unclassified",
+          "point_type": "unknown",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "unknown",
+          "object_type": "multistateValue",
+          "instance": 1255,
+          "present_value": 0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-LIFT-004.priority_mode",
+          "standardized_name": "unknown/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "low",
+          "object_type": "binaryValue",
+          "instance": 1258,
+          "present_value": false,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-LIFT-004.alarm",
+          "standardized_name": "unknown/alarm_alarm",
+          "point_type": "alarm",
+          "point_category": "alarm",
+          "unit": "",
+          "confidence": "low",
+          "object_type": "binaryInput",
+          "instance": 1259,
+          "present_value": false,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-MCU2-L2-001.connected_diffusers",
+          "standardized_name": "unknown/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "unknown",
+          "object_type": "analogInput",
+          "instance": 1260,
+          "present_value": 10,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-MCU2-L2-001.comms_status",
+          "standardized_name": "unknown/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "low",
+          "object_type": "binaryInput",
+          "instance": 1261,
+          "present_value": true,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-MCU2-L2-001.network_health",
+          "standardized_name": "unknown/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "%",
+          "confidence": "unknown",
+          "object_type": "analogInput",
+          "instance": 1262,
+          "present_value": 98,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-MCU2-L2-001.alarm",
+          "standardized_name": "unknown/alarm_alarm",
+          "point_type": "alarm",
+          "point_category": "alarm",
+          "unit": "",
+          "confidence": "low",
+          "object_type": "binaryInput",
+          "instance": 1263,
+          "present_value": false,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-MCU2-L5-001.connected_diffusers",
+          "standardized_name": "unknown/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "unknown",
+          "object_type": "analogInput",
+          "instance": 1264,
+          "present_value": 10,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-MCU2-L5-001.comms_status",
+          "standardized_name": "unknown/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "low",
+          "object_type": "binaryInput",
+          "instance": 1265,
+          "present_value": true,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-MCU2-L5-001.network_health",
+          "standardized_name": "unknown/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "%",
+          "confidence": "unknown",
+          "object_type": "analogInput",
+          "instance": 1266,
+          "present_value": 99,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-MCU2-L5-001.alarm",
+          "standardized_name": "unknown/alarm_alarm",
+          "point_type": "alarm",
+          "point_category": "alarm",
+          "unit": "",
+          "confidence": "low",
+          "object_type": "binaryInput",
+          "instance": 1267,
+          "present_value": false,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-MCU2-L8-001.connected_diffusers",
+          "standardized_name": "unknown/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "",
+          "confidence": "unknown",
+          "object_type": "analogInput",
+          "instance": 1268,
+          "present_value": 10,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-MCU2-L8-001.comms_status",
+          "standardized_name": "unknown/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "low",
+          "object_type": "binaryInput",
+          "instance": 1269,
+          "present_value": true,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-MCU2-L8-001.network_health",
+          "standardized_name": "unknown/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "%",
+          "confidence": "unknown",
+          "object_type": "analogInput",
+          "instance": 1270,
+          "present_value": 97,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-MCU2-L8-001.alarm",
+          "standardized_name": "unknown/alarm_alarm",
+          "point_type": "alarm",
+          "point_category": "alarm",
+          "unit": "",
+          "confidence": "low",
+          "object_type": "binaryInput",
+          "instance": 1271,
+          "present_value": false,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-MEDGAS-B1-001.n2o_pressure",
+          "standardized_name": "unknown/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "bar",
+          "confidence": "low",
+          "object_type": "analogInput",
+          "instance": 1273,
+          "present_value": 8.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-MEDGAS-B1-001.medical_air_pressure",
+          "standardized_name": "unknown/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "bar",
+          "confidence": "low",
+          "object_type": "analogInput",
+          "instance": 1274,
+          "present_value": 6.5,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-MEDGAS-B1-001.vacuum_pressure",
+          "standardized_name": "unknown/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "mbar",
+          "confidence": "low",
+          "object_type": "analogInput",
+          "instance": 1275,
+          "present_value": -550,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-MEDGAS-B1-001.n2o_manifold_status",
+          "standardized_name": "unknown/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "low",
+          "object_type": "multistateValue",
+          "instance": 1277,
+          "present_value": 1,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-MEDGAS-B1-001.alarm",
+          "standardized_name": "unknown/alarm_alarm",
+          "point_type": "alarm",
+          "point_category": "alarm",
+          "unit": "",
+          "confidence": "low",
+          "object_type": "binaryInput",
+          "instance": 1278,
+          "present_value": false,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-MSB-B1-001.voltage_l1",
+          "standardized_name": "unknown/voltage_sensor",
+          "point_type": "sensor",
+          "point_category": "voltage",
+          "unit": "V",
+          "confidence": "low",
+          "object_type": "analogInput",
+          "instance": 1282,
+          "present_value": 400,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-MSB-B1-001.voltage_l2",
+          "standardized_name": "unknown/voltage_sensor",
+          "point_type": "sensor",
+          "point_category": "voltage",
+          "unit": "V",
+          "confidence": "low",
+          "object_type": "analogInput",
+          "instance": 1283,
+          "present_value": 400,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-MSB-B1-001.voltage_l3",
+          "standardized_name": "unknown/voltage_sensor",
+          "point_type": "sensor",
+          "point_category": "voltage",
+          "unit": "V",
+          "confidence": "low",
+          "object_type": "analogInput",
+          "instance": 1284,
+          "present_value": 400,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-MSB-B1-001.frequency",
+          "standardized_name": "unknown/speed_sensor",
+          "point_type": "sensor",
+          "point_category": "speed",
+          "unit": "Hz",
+          "confidence": "low",
+          "object_type": "analogInput",
+          "instance": 1285,
+          "present_value": 50.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-MSB-B1-001.alarm",
+          "standardized_name": "unknown/alarm_alarm",
+          "point_type": "alarm",
+          "point_category": "alarm",
+          "unit": "",
+          "confidence": "low",
+          "object_type": "binaryInput",
+          "instance": 1287,
+          "present_value": false,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-PUMP-B1-CHW1.status",
+          "standardized_name": "pump/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "binaryValue",
+          "instance": 1288,
+          "present_value": true,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-PUMP-B1-CHW1.speed",
+          "standardized_name": "pump/setpoint_setpoint",
+          "point_type": "setpoint",
+          "point_category": "setpoint",
+          "unit": "%",
+          "confidence": "medium",
+          "object_type": "analogValue",
+          "instance": 1289,
+          "present_value": 75,
+          "writable": true
+        },
+        {
+          "original_name": "UMH-PUMP-B1-CHW1.motor_amps",
+          "standardized_name": "pump/current_sensor",
+          "point_type": "sensor",
+          "point_category": "current",
+          "unit": "A",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1290,
+          "present_value": 22,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-PUMP-B1-CHW1.alarm",
+          "standardized_name": "pump/alarm_alarm",
+          "point_type": "alarm",
+          "point_category": "alarm",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "binaryInput",
+          "instance": 1293,
+          "present_value": false,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-PUMP-B1-CW1.status",
+          "standardized_name": "pump/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "binaryValue",
+          "instance": 1294,
+          "present_value": true,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-PUMP-B1-CW1.speed",
+          "standardized_name": "pump/setpoint_setpoint",
+          "point_type": "setpoint",
+          "point_category": "setpoint",
+          "unit": "%",
+          "confidence": "medium",
+          "object_type": "analogValue",
+          "instance": 1295,
+          "present_value": 80,
+          "writable": true
+        },
+        {
+          "original_name": "UMH-PUMP-B1-CW1.motor_amps",
+          "standardized_name": "pump/current_sensor",
+          "point_type": "sensor",
+          "point_category": "current",
+          "unit": "A",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1296,
+          "present_value": 25,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-PUMP-B1-CW1.alarm",
+          "standardized_name": "pump/alarm_alarm",
+          "point_type": "alarm",
+          "point_category": "alarm",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "binaryInput",
+          "instance": 1298,
+          "present_value": false,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-SPLIT-L1-001.room_temp",
+          "standardized_name": "unknown/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "low",
+          "object_type": "analogInput",
+          "instance": 1299,
+          "present_value": 22.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-SPLIT-L1-001.setpoint",
+          "standardized_name": "unknown/setpoint_setpoint",
+          "point_type": "setpoint",
+          "point_category": "setpoint",
+          "unit": "degC",
+          "confidence": "low",
+          "object_type": "analogValue",
+          "instance": 1300,
+          "present_value": 22.0,
+          "writable": true
+        },
+        {
+          "original_name": "UMH-SPLIT-L1-001.mode",
+          "standardized_name": "unknown/setpoint_setpoint",
+          "point_type": "setpoint",
+          "point_category": "setpoint",
+          "unit": "",
+          "confidence": "low",
+          "object_type": "multistateValue",
+          "instance": 1301,
+          "present_value": 1,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-SPLIT-L1-002.room_temp",
+          "standardized_name": "unknown/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "low",
+          "object_type": "analogInput",
+          "instance": 1303,
+          "present_value": 21.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-SPLIT-L1-002.setpoint",
+          "standardized_name": "unknown/setpoint_setpoint",
+          "point_type": "setpoint",
+          "point_category": "setpoint",
+          "unit": "degC",
+          "confidence": "low",
+          "object_type": "analogValue",
+          "instance": 1304,
+          "present_value": 21.0,
+          "writable": true
+        },
+        {
+          "original_name": "UMH-SPLIT-L1-002.mode",
+          "standardized_name": "unknown/setpoint_setpoint",
+          "point_type": "setpoint",
+          "point_category": "setpoint",
+          "unit": "",
+          "confidence": "low",
+          "object_type": "multistateValue",
+          "instance": 1305,
+          "present_value": 1,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-SPLIT-L2-001.room_temp",
+          "standardized_name": "unknown/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "low",
+          "object_type": "analogInput",
+          "instance": 1306,
+          "present_value": 20.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-SPLIT-L2-001.setpoint",
+          "standardized_name": "unknown/setpoint_setpoint",
+          "point_type": "setpoint",
+          "point_category": "setpoint",
+          "unit": "degC",
+          "confidence": "low",
+          "object_type": "analogValue",
+          "instance": 1307,
+          "present_value": 20.0,
+          "writable": true
+        },
+        {
+          "original_name": "UMH-SPLIT-L2-001.mode",
+          "standardized_name": "unknown/setpoint_setpoint",
+          "point_type": "setpoint",
+          "point_category": "setpoint",
+          "unit": "",
+          "confidence": "low",
+          "object_type": "multistateValue",
+          "instance": 1308,
+          "present_value": 1,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-SPLIT-L3-001.room_temp",
+          "standardized_name": "unknown/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "low",
+          "object_type": "analogInput",
+          "instance": 1309,
+          "present_value": 22.5,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-SPLIT-L3-001.setpoint",
+          "standardized_name": "unknown/setpoint_setpoint",
+          "point_type": "setpoint",
+          "point_category": "setpoint",
+          "unit": "degC",
+          "confidence": "low",
+          "object_type": "analogValue",
+          "instance": 1310,
+          "present_value": 22.0,
+          "writable": true
+        },
+        {
+          "original_name": "UMH-SPLIT-L3-001.mode",
+          "standardized_name": "unknown/setpoint_setpoint",
+          "point_type": "setpoint",
+          "point_category": "setpoint",
+          "unit": "",
+          "confidence": "low",
+          "object_type": "multistateValue",
+          "instance": 1311,
+          "present_value": 1,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-SPLIT-L3-002.room_temp",
+          "standardized_name": "unknown/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "low",
+          "object_type": "analogInput",
+          "instance": 1312,
+          "present_value": 22.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-SPLIT-L3-002.setpoint",
+          "standardized_name": "unknown/setpoint_setpoint",
+          "point_type": "setpoint",
+          "point_category": "setpoint",
+          "unit": "degC",
+          "confidence": "low",
+          "object_type": "analogValue",
+          "instance": 1313,
+          "present_value": 22.0,
+          "writable": true
+        },
+        {
+          "original_name": "UMH-SPLIT-L3-002.mode",
+          "standardized_name": "unknown/setpoint_setpoint",
+          "point_type": "setpoint",
+          "point_category": "setpoint",
+          "unit": "",
+          "confidence": "low",
+          "object_type": "multistateValue",
+          "instance": 1314,
+          "present_value": 1,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-SPLIT-L9-001.room_temp",
+          "standardized_name": "unknown/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "low",
+          "object_type": "analogInput",
+          "instance": 1315,
+          "present_value": 21.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-SPLIT-L9-001.setpoint",
+          "standardized_name": "unknown/setpoint_setpoint",
+          "point_type": "setpoint",
+          "point_category": "setpoint",
+          "unit": "degC",
+          "confidence": "low",
+          "object_type": "analogValue",
+          "instance": 1316,
+          "present_value": 21.0,
+          "writable": true
+        },
+        {
+          "original_name": "UMH-SPLIT-L9-001.mode",
+          "standardized_name": "unknown/setpoint_setpoint",
+          "point_type": "setpoint",
+          "point_category": "setpoint",
+          "unit": "",
+          "confidence": "low",
+          "object_type": "multistateValue",
+          "instance": 1317,
+          "present_value": 1,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-UPS-L3-001.battery_charge",
+          "standardized_name": "ups/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "%",
+          "confidence": "low",
+          "object_type": "analogInput",
+          "instance": 1319,
+          "present_value": 100,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-UPS-L3-001.battery_runtime",
+          "standardized_name": "ups/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "min",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1320,
+          "present_value": 25,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-UPS-L3-001.output_voltage",
+          "standardized_name": "ups/voltage_sensor",
+          "point_type": "sensor",
+          "point_category": "voltage",
+          "unit": "V",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1322,
+          "present_value": 400,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-UPS-L3-001.status",
+          "standardized_name": "ups/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "multistateValue",
+          "instance": 1323,
+          "present_value": 1,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-UPS-L3-001.battery_temp",
+          "standardized_name": "ups/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 1324,
+          "present_value": 25.0,
+          "writable": false
+        },
+        {
+          "original_name": "UMH-UPS-L3-001.alarm",
+          "standardized_name": "ups/alarm_alarm",
+          "point_type": "alarm",
+          "point_category": "alarm",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "binaryInput",
+          "instance": 1325,
+          "present_value": false,
+          "writable": false
+        }
+      ],
+      "point_count": 211,
+      "confidence": "low",
+      "metadata": {
+        "type_vote_counts": {
+          "ahu": 68,
+          "boiler": 10,
+          "chiller": 27,
+          "cooling_tower": 4,
+          "generator": 12,
+          "pump": 8,
+          "ups": 6
+        },
+        "avg_confidence_score": 1.58
+      },
+      "created_at": "2026-02-05T09:42:32.707563",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    }
+  }
+}

@@ -29,7 +29,10 @@ class PredictionRepository:
         Returns:
             List of predictions
         """
-        query = self.client.table('predictions').select("*")
+        # Join with equipment and buildings to get related data
+        query = self.client.table('predictions').select(
+            "*, equipment:equipment_id(id, code, name, type), building:building_id(id, code, name)"
+        )
 
         if building_id:
             query = query.eq('building_id', building_id)

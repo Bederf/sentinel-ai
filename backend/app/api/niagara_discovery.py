@@ -44,6 +44,10 @@ class DiscoverRequest(BaseModel):
     use_demo: bool = Field(
         True, description="Use demo data when BACnet device unavailable"
     )
+    demo_building_id: Optional[str] = Field(
+        None,
+        description="Demo building ID to load data from (e.g., 'site-004'). Only used when use_demo=True.",
+    )
     bms_vendor: Optional[str] = Field(
         None,
         description="BMS vendor identifier (niagara, desigo, metasys, honeywell, schneider, trend, generic)",
@@ -143,6 +147,7 @@ async def discover_and_classify(request: DiscoverRequest):
             site_id=request.site_id,
             device_bacnet_id=request.device_bacnet_id,
             use_demo=request.use_demo,
+            demo_building_id=request.demo_building_id,
             bms_vendor=request.bms_vendor,
         )
 
@@ -283,6 +288,14 @@ async def approve_mapping(
             site_id = workflow_info.get("site_id", "")
             _register_dali_if_discovered(discovery_id, site_id, mappings)
 
+            # Bridge to Integration Monitoring
+            _bridge_to_integration_monitoring(
+                discovery_id,
+                site_id,
+                workflow_info.get("bms_vendor", "siemens"),
+                result.get("equipment_created", 0),
+            )
+
             return ApproveResponse(
                 success=True,
                 equipment_created=result.get("equipment_created", 0),
@@ -349,6 +362,41 @@ def _register_dali_if_discovered(
         )
     except Exception as e:
         logger.error("Failed to auto-register DALI site %s: %s", site_id, e)
+
+
+def _bridge_to_integration_monitoring(
+    discovery_id: str,
+    site_id: str,
+    bms_vendor: str,
+    equipment_created: int,
+) -> None:
+    """Bridge discovery results to Integration Monitoring tables.
+
+    Creates log_source, sync_jobs, and point_asset_mappings so the
+    Integration Monitoring dashboard shows the connected BMS data.
+    """
+    if not site_id:
+        return
+
+    try:
+        from app.services.integration_bridge import bridge_discovery_to_integration
+
+        result = bridge_discovery_to_integration(
+            discovery_id=discovery_id,
+            site_id=site_id,
+            bms_vendor=bms_vendor,
+            equipment_created=equipment_created,
+        )
+        if result.get("success"):
+            logger.info(
+                "Bridged discovery %s to Integration Monitoring: %d points mapped",
+                discovery_id,
+                result.get("points_mapped", 0),
+            )
+        else:
+            logger.warning("Bridge failed: %s", result.get("error"))
+    except Exception as e:
+        logger.error("Failed to bridge to Integration Monitoring: %s", e)
 
 
 # ---------------------------------------------------------------------------

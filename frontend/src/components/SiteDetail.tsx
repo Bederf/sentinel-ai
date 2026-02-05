@@ -26,9 +26,25 @@ import {
   CheckCircle,
   XCircle,
   AlertCircle,
+  Activity,
+  FileText,
+  RefreshCw,
+  Save,
+  Edit3,
+  Info,
+  Wifi,
+  Server,
 } from "lucide-react";
 import api from "../lib/api";
-import type { Alert, Prediction, EnergyDataPoint, Device, BuildingEquipmentItem, CategoryStatus } from "../lib/api";
+import type {
+  Alert,
+  Prediction,
+  EnergyDataPoint,
+  Device,
+  BuildingEquipmentItem,
+  CategoryStatus,
+  EquipmentMetadata,
+} from "../lib/api";
 import { formatDateTime, getTimezoneAbbreviation, isDifferentTimezone } from "../lib/timeFormat";
 import { KPICard } from "./KPICard";
 import { EnergyChart } from "./EnergyChart";
@@ -90,6 +106,15 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [showEquipmentControl, setShowEquipmentControl] = useState(false);
   const [loadingDevice, setLoadingDevice] = useState(false);
+
+  // Equipment metadata
+  const [equipmentMetadata, setEquipmentMetadata] = useState<EquipmentMetadata | null>(null);
+  const [loadingMetadata, setLoadingMetadata] = useState(false);
+  const [editingNotes, setEditingNotes] = useState(false);
+  const [notesValue, setNotesValue] = useState("");
+  const [savingNotes, setSavingNotes] = useState(false);
+  const [discovering, setDiscovering] = useState(false);
+  const [metadataTab, setMetadataTab] = useState<"info" | "network" | "device" | "operating" | "notes">("info");
 
   // Prediction detail modal
   const [selectedPrediction, setSelectedPrediction] = useState<Prediction | null>(null);
@@ -256,20 +281,70 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
       setSelectedEquipment(equip);
       setShowEquipmentControl(true);
       setLoadingDevice(true);
+      setLoadingMetadata(true);
+      setEquipmentMetadata(null);
+      setMetadataTab("info");
+      setEditingNotes(false);
 
-      // Try to fetch equipment controls from Supabase
-      try {
-        const deviceData = await api.getEquipmentControls(equip.id);
-        setSelectedDevice(deviceData);
-      } catch (deviceErr) {
-        console.warn("Could not load equipment controls:", deviceErr);
-        // Still show the modal with basic info, just no controls
+      // Fetch equipment controls and metadata in parallel
+      const [deviceResult, metadataResult] = await Promise.allSettled([
+        api.getEquipmentControls(equip.id),
+        api.getEquipmentMetadata(equip.id),
+      ]);
+
+      if (deviceResult.status === "fulfilled") {
+        setSelectedDevice(deviceResult.value);
+      } else {
+        console.warn("Could not load equipment controls:", deviceResult.reason);
         setSelectedDevice(null);
+      }
+
+      if (metadataResult.status === "fulfilled") {
+        setEquipmentMetadata(metadataResult.value.equipment);
+        setNotesValue(metadataResult.value.equipment.notes || "");
+      } else {
+        console.warn("Could not load equipment metadata:", metadataResult.reason);
       }
     } catch (error) {
       console.error("Failed to load equipment details:", error);
     } finally {
       setLoadingDevice(false);
+      setLoadingMetadata(false);
+    }
+  };
+
+  const handleSaveNotes = async () => {
+    if (!selectedEquipment) return;
+
+    setSavingNotes(true);
+    try {
+      const userEmail = localStorage.getItem("sentinel_user_email") || "unknown";
+      await api.updateEquipmentNotes(selectedEquipment.id, notesValue, userEmail);
+      setEquipmentMetadata((prev) => prev ? { ...prev, notes: notesValue } : null);
+      setEditingNotes(false);
+    } catch (error) {
+      console.error("Failed to save notes:", error);
+    } finally {
+      setSavingNotes(false);
+    }
+  };
+
+  const handleDiscoverEquipment = async () => {
+    if (!selectedEquipment) return;
+
+    setDiscovering(true);
+    try {
+      const result = await api.discoverEquipment(selectedEquipment.id, true);
+      if (result.saved) {
+        // Refresh metadata
+        const metadataResult = await api.getEquipmentMetadata(selectedEquipment.id);
+        setEquipmentMetadata(metadataResult.equipment);
+        setNotesValue(metadataResult.equipment.notes || "");
+      }
+    } catch (error) {
+      console.error("Discovery failed:", error);
+    } finally {
+      setDiscovering(false);
     }
   };
 
@@ -732,6 +807,20 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
                   >
                     {healthyEquipment} OK
                   </div>
+                  <div
+                    className="px-2 py-1 rounded text-xs font-medium flex items-center gap-1"
+                    style={{
+                      background: "rgba(59, 130, 246, 0.15)",
+                      color: "var(--color-sentinel-blue)",
+                    }}
+                    title="Equipment with BMS controls"
+                  >
+                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    {equipment.filter(e => e.controllable).length} Controllable
+                  </div>
                   <button
                     onClick={() => {
                       // Filter to warning equipment and show first prediction if available
@@ -905,15 +994,33 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
                             style={{
                               borderBottom: "1px solid var(--color-sentinel-border)",
                             }}
-                            onClick={() => item.controllable ? handleEquipmentClick(item) : null}
+                            onClick={() => handleEquipmentClick(item)}
                           >
                             <td className="py-3 px-4">
                               <div className="flex items-center gap-3">
                                 {getStatusIcon(item.status)}
                                 <div>
-                                  <p className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
-                                    {item.name}
-                                  </p>
+                                  <div className="flex items-center gap-2">
+                                    <p className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                                      {item.name}
+                                    </p>
+                                    {item.controllable && (
+                                      <span
+                                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium"
+                                        style={{
+                                          background: "rgba(16, 185, 129, 0.15)",
+                                          color: "var(--color-sentinel-green)",
+                                        }}
+                                        title="BMS Controllable - Click to open control panel"
+                                      >
+                                        <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        </svg>
+                                        BMS
+                                      </span>
+                                    )}
+                                  </div>
                                   <p className="text-xs font-mono" style={{ color: "var(--color-sentinel-text-disabled)" }}>
                                     {item.id}
                                   </p>
@@ -1216,20 +1323,386 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
                   }}
                 />
               ) : (
-                <div
-                  className="text-center py-12"
-                  style={{ color: "var(--color-sentinel-text-secondary)" }}
-                >
-                  <Cpu className="h-12 w-12 mx-auto mb-4" style={{ color: "var(--color-sentinel-text-disabled)" }} />
-                  <p className="text-lg font-medium mb-2" style={{ color: "var(--color-sentinel-text-primary)" }}>
-                    {selectedEquipment.name}
-                  </p>
-                  <p className="text-sm mb-4">
-                    Health: {selectedEquipment.health_score}% • Status: {selectedEquipment.status}
-                  </p>
-                  <p className="text-xs">
-                    No control points available for this equipment.
-                  </p>
+                <div style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                  {/* Equipment Info Header with Discovery Button */}
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-4">
+                      <div
+                        className="p-3 rounded-lg"
+                        style={{
+                          background: selectedEquipment.category === "HVAC"
+                            ? "rgba(59, 130, 246, 0.15)"
+                            : selectedEquipment.category === "Lighting"
+                            ? "rgba(251, 191, 36, 0.15)"
+                            : selectedEquipment.category === "Energy Centre"
+                            ? "rgba(168, 85, 247, 0.15)"
+                            : "var(--color-sentinel-bg-secondary)",
+                        }}
+                      >
+                        <Cpu className="h-8 w-8" style={{ color: "var(--color-sentinel-text-disabled)" }} />
+                      </div>
+                      <div>
+                        <p className="text-lg font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                          {selectedEquipment.name}
+                        </p>
+                        <p className="text-sm font-mono" style={{ color: "var(--color-sentinel-text-disabled)" }}>
+                          {selectedEquipment.id}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleDiscoverEquipment}
+                      disabled={discovering}
+                      className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors hover:brightness-110"
+                      style={{
+                        background: "var(--color-sentinel-blue)",
+                        color: "white",
+                        opacity: discovering ? 0.7 : 1,
+                      }}
+                    >
+                      <RefreshCw className={`h-4 w-4 ${discovering ? "animate-spin" : ""}`} />
+                      {discovering ? "Discovering..." : "Discover"}
+                    </button>
+                  </div>
+
+                  {/* Metadata Tabs */}
+                  <div
+                    className="flex gap-1 mb-4 p-1 rounded-lg"
+                    style={{ background: "var(--color-sentinel-bg-secondary)" }}
+                  >
+                    {[
+                      { id: "info" as const, label: "Info", icon: Info },
+                      { id: "network" as const, label: "Network", icon: Wifi },
+                      { id: "device" as const, label: "Device", icon: Server },
+                      { id: "operating" as const, label: "Operating", icon: Activity },
+                      { id: "notes" as const, label: "Notes", icon: FileText },
+                    ].map((tab) => {
+                      const Icon = tab.icon;
+                      const isActive = metadataTab === tab.id;
+                      return (
+                        <button
+                          key={tab.id}
+                          onClick={() => setMetadataTab(tab.id)}
+                          className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-md text-xs font-medium transition-colors"
+                          style={{
+                            background: isActive ? "var(--color-sentinel-bg-panel)" : "transparent",
+                            color: isActive ? "var(--color-sentinel-text-primary)" : "var(--color-sentinel-text-secondary)",
+                          }}
+                        >
+                          <Icon className="h-3.5 w-3.5" />
+                          {tab.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Tab Content */}
+                  {loadingMetadata ? (
+                    <div className="flex items-center justify-center py-8">
+                      <div
+                        className="animate-spin h-6 w-6 border-2 rounded-full"
+                        style={{ borderColor: "var(--color-sentinel-blue)", borderTopColor: "transparent" }}
+                      />
+                    </div>
+                  ) : (
+                    <>
+                      {/* Info Tab */}
+                      {metadataTab === "info" && (
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="p-3 rounded-lg" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                            <p className="text-xs uppercase tracking-wider mb-1" style={{ color: "var(--color-sentinel-text-disabled)" }}>Category</p>
+                            <p className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>{selectedEquipment.category}</p>
+                          </div>
+                          <div className="p-3 rounded-lg" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                            <p className="text-xs uppercase tracking-wider mb-1" style={{ color: "var(--color-sentinel-text-disabled)" }}>Type</p>
+                            <p className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>{selectedEquipment.type.replace(/_/g, " ")}</p>
+                          </div>
+                          <div className="p-3 rounded-lg" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                            <p className="text-xs uppercase tracking-wider mb-1" style={{ color: "var(--color-sentinel-text-disabled)" }}>Status</p>
+                            <div className="flex items-center gap-2">
+                              {getStatusIcon(selectedEquipment.status)}
+                              <p className="font-medium text-sm" style={{ color: getStatusColor(selectedEquipment.status) }}>{selectedEquipment.status}</p>
+                            </div>
+                          </div>
+                          <div className="p-3 rounded-lg" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                            <p className="text-xs uppercase tracking-wider mb-1" style={{ color: "var(--color-sentinel-text-disabled)" }}>Health</p>
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: "var(--color-sentinel-bg-canvas)" }}>
+                                <div className="h-full rounded-full" style={{ width: `${selectedEquipment.health_score}%`, background: getStatusColor(selectedEquipment.status) }} />
+                              </div>
+                              <span className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>{selectedEquipment.health_score}%</span>
+                            </div>
+                          </div>
+                          {selectedEquipment.location && (
+                            <div className="p-3 rounded-lg col-span-2" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                              <p className="text-xs uppercase tracking-wider mb-1" style={{ color: "var(--color-sentinel-text-disabled)" }}>Location</p>
+                              <p className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>{selectedEquipment.location}</p>
+                            </div>
+                          )}
+                          {equipmentMetadata?.commissioning_date && (
+                            <div className="p-3 rounded-lg" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                              <p className="text-xs uppercase tracking-wider mb-1" style={{ color: "var(--color-sentinel-text-disabled)" }}>Commissioned</p>
+                              <p className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>{equipmentMetadata.commissioning_date}</p>
+                            </div>
+                          )}
+                          {equipmentMetadata?.warranty_expiry && (
+                            <div className="p-3 rounded-lg" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                              <p className="text-xs uppercase tracking-wider mb-1" style={{ color: "var(--color-sentinel-text-disabled)" }}>Warranty Expiry</p>
+                              <p className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>{equipmentMetadata.warranty_expiry}</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Network Tab */}
+                      {metadataTab === "network" && (
+                        <div className="space-y-3">
+                          {equipmentMetadata?.network_info && Object.keys(equipmentMetadata.network_info).length > 0 ? (
+                            <div className="grid grid-cols-2 gap-3">
+                              {equipmentMetadata.network_info.ip_address && (
+                                <div className="p-3 rounded-lg" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                                  <p className="text-xs uppercase tracking-wider mb-1" style={{ color: "var(--color-sentinel-text-disabled)" }}>IP Address</p>
+                                  <p className="font-mono text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>{equipmentMetadata.network_info.ip_address}</p>
+                                </div>
+                              )}
+                              {equipmentMetadata.network_info.mac_address && (
+                                <div className="p-3 rounded-lg" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                                  <p className="text-xs uppercase tracking-wider mb-1" style={{ color: "var(--color-sentinel-text-disabled)" }}>MAC Address</p>
+                                  <p className="font-mono text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>{equipmentMetadata.network_info.mac_address}</p>
+                                </div>
+                              )}
+                              {equipmentMetadata.network_info.protocol && (
+                                <div className="p-3 rounded-lg" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                                  <p className="text-xs uppercase tracking-wider mb-1" style={{ color: "var(--color-sentinel-text-disabled)" }}>Protocol</p>
+                                  <p className="font-medium text-sm uppercase" style={{ color: "var(--color-sentinel-text-primary)" }}>{equipmentMetadata.network_info.protocol}</p>
+                                </div>
+                              )}
+                              {equipmentMetadata.network_info.dali_address !== undefined && (
+                                <div className="p-3 rounded-lg" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                                  <p className="text-xs uppercase tracking-wider mb-1" style={{ color: "var(--color-sentinel-text-disabled)" }}>DALI Address</p>
+                                  <p className="font-mono text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>Line {equipmentMetadata.network_info.dali_line || 1}, Address {equipmentMetadata.network_info.dali_address}</p>
+                                </div>
+                              )}
+                              {equipmentMetadata.network_info.bacnet_device_id !== undefined && (
+                                <div className="p-3 rounded-lg" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                                  <p className="text-xs uppercase tracking-wider mb-1" style={{ color: "var(--color-sentinel-text-disabled)" }}>BACnet Device ID</p>
+                                  <p className="font-mono text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>{equipmentMetadata.network_info.bacnet_device_id}</p>
+                                </div>
+                              )}
+                              {equipmentMetadata.network_info.modbus_address !== undefined && (
+                                <div className="p-3 rounded-lg" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                                  <p className="text-xs uppercase tracking-wider mb-1" style={{ color: "var(--color-sentinel-text-disabled)" }}>Modbus Address</p>
+                                  <p className="font-mono text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>{equipmentMetadata.network_info.modbus_address}</p>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="text-center py-8" style={{ color: "var(--color-sentinel-text-disabled)" }}>
+                              <Wifi className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                              <p className="text-sm">No network information available</p>
+                              <p className="text-xs mt-1">Click "Discover" to fetch network details</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Device Tab */}
+                      {metadataTab === "device" && (
+                        <div className="space-y-3">
+                          {equipmentMetadata?.device_info && Object.keys(equipmentMetadata.device_info).length > 0 ? (
+                            <div className="grid grid-cols-2 gap-3">
+                              {equipmentMetadata.device_info.manufacturer && (
+                                <div className="p-3 rounded-lg" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                                  <p className="text-xs uppercase tracking-wider mb-1" style={{ color: "var(--color-sentinel-text-disabled)" }}>Manufacturer</p>
+                                  <p className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>{equipmentMetadata.device_info.manufacturer}</p>
+                                </div>
+                              )}
+                              {equipmentMetadata.device_info.model && (
+                                <div className="p-3 rounded-lg" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                                  <p className="text-xs uppercase tracking-wider mb-1" style={{ color: "var(--color-sentinel-text-disabled)" }}>Model</p>
+                                  <p className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>{equipmentMetadata.device_info.model}</p>
+                                </div>
+                              )}
+                              {equipmentMetadata.device_info.serial_number && (
+                                <div className="p-3 rounded-lg" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                                  <p className="text-xs uppercase tracking-wider mb-1" style={{ color: "var(--color-sentinel-text-disabled)" }}>Serial Number</p>
+                                  <p className="font-mono text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>{equipmentMetadata.device_info.serial_number}</p>
+                                </div>
+                              )}
+                              {equipmentMetadata.device_info.gtin && (
+                                <div className="p-3 rounded-lg" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                                  <p className="text-xs uppercase tracking-wider mb-1" style={{ color: "var(--color-sentinel-text-disabled)" }}>GTIN</p>
+                                  <p className="font-mono text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>{equipmentMetadata.device_info.gtin}</p>
+                                </div>
+                              )}
+                              {equipmentMetadata.device_info.firmware_version && (
+                                <div className="p-3 rounded-lg" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                                  <p className="text-xs uppercase tracking-wider mb-1" style={{ color: "var(--color-sentinel-text-disabled)" }}>Firmware</p>
+                                  <p className="font-mono text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>v{equipmentMetadata.device_info.firmware_version}</p>
+                                </div>
+                              )}
+                              {equipmentMetadata.device_info.hardware_version && (
+                                <div className="p-3 rounded-lg" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                                  <p className="text-xs uppercase tracking-wider mb-1" style={{ color: "var(--color-sentinel-text-disabled)" }}>Hardware</p>
+                                  <p className="font-mono text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>v{equipmentMetadata.device_info.hardware_version}</p>
+                                </div>
+                              )}
+                              {equipmentMetadata.device_info.device_type && (
+                                <div className="p-3 rounded-lg col-span-2" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                                  <p className="text-xs uppercase tracking-wider mb-1" style={{ color: "var(--color-sentinel-text-disabled)" }}>Device Type</p>
+                                  <p className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>{equipmentMetadata.device_info.device_type}</p>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="text-center py-8" style={{ color: "var(--color-sentinel-text-disabled)" }}>
+                              <Server className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                              <p className="text-sm">No device information available</p>
+                              <p className="text-xs mt-1">Click "Discover" to fetch device details</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Operating Tab */}
+                      {metadataTab === "operating" && (
+                        <div className="space-y-3">
+                          {equipmentMetadata?.operating_data && Object.keys(equipmentMetadata.operating_data).length > 0 ? (
+                            <div className="grid grid-cols-2 gap-3">
+                              {equipmentMetadata.operating_data.runtime_hours !== undefined && (
+                                <div className="p-3 rounded-lg" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                                  <p className="text-xs uppercase tracking-wider mb-1" style={{ color: "var(--color-sentinel-text-disabled)" }}>Runtime Hours</p>
+                                  <p className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>{equipmentMetadata.operating_data.runtime_hours.toLocaleString()} hrs</p>
+                                </div>
+                              )}
+                              {equipmentMetadata.operating_data.lamp_hours !== undefined && (
+                                <div className="p-3 rounded-lg" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                                  <p className="text-xs uppercase tracking-wider mb-1" style={{ color: "var(--color-sentinel-text-disabled)" }}>Lamp Hours</p>
+                                  <p className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>{equipmentMetadata.operating_data.lamp_hours.toLocaleString()} hrs</p>
+                                </div>
+                              )}
+                              {equipmentMetadata.operating_data.power_cycles !== undefined && (
+                                <div className="p-3 rounded-lg" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                                  <p className="text-xs uppercase tracking-wider mb-1" style={{ color: "var(--color-sentinel-text-disabled)" }}>Power Cycles</p>
+                                  <p className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>{equipmentMetadata.operating_data.power_cycles.toLocaleString()}</p>
+                                </div>
+                              )}
+                              {equipmentMetadata.operating_data.rated_capacity && (
+                                <div className="p-3 rounded-lg" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                                  <p className="text-xs uppercase tracking-wider mb-1" style={{ color: "var(--color-sentinel-text-disabled)" }}>Rated Capacity</p>
+                                  <p className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>{equipmentMetadata.operating_data.rated_capacity}</p>
+                                </div>
+                              )}
+                              {equipmentMetadata.operating_data.system_status && (
+                                <div className="p-3 rounded-lg" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                                  <p className="text-xs uppercase tracking-wider mb-1" style={{ color: "var(--color-sentinel-text-disabled)" }}>System Status</p>
+                                  <p className="font-medium text-sm capitalize" style={{ color: "var(--color-sentinel-green)" }}>{equipmentMetadata.operating_data.system_status}</p>
+                                </div>
+                              )}
+                              {equipmentMetadata.operating_data.energy_kwh !== undefined && (
+                                <div className="p-3 rounded-lg" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                                  <p className="text-xs uppercase tracking-wider mb-1" style={{ color: "var(--color-sentinel-text-disabled)" }}>Energy (Total)</p>
+                                  <p className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>{equipmentMetadata.operating_data.energy_kwh.toLocaleString()} kWh</p>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="text-center py-8" style={{ color: "var(--color-sentinel-text-disabled)" }}>
+                              <Activity className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                              <p className="text-sm">No operating data available</p>
+                              <p className="text-xs mt-1">Click "Discover" to fetch operating statistics</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Notes Tab */}
+                      {metadataTab === "notes" && (
+                        <div className="space-y-3">
+                          {editingNotes ? (
+                            <div>
+                              <textarea
+                                value={notesValue}
+                                onChange={(e) => setNotesValue(e.target.value)}
+                                className="w-full h-32 p-3 rounded-lg text-sm resize-none"
+                                style={{
+                                  background: "var(--color-sentinel-bg-secondary)",
+                                  color: "var(--color-sentinel-text-primary)",
+                                  border: "1px solid var(--color-sentinel-border)",
+                                }}
+                                placeholder="Add notes about this equipment..."
+                              />
+                              <div className="flex gap-2 mt-2">
+                                <button
+                                  onClick={handleSaveNotes}
+                                  disabled={savingNotes}
+                                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm"
+                                  style={{ background: "var(--color-sentinel-green)", color: "white" }}
+                                >
+                                  <Save className="h-4 w-4" />
+                                  {savingNotes ? "Saving..." : "Save"}
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setEditingNotes(false);
+                                    setNotesValue(equipmentMetadata?.notes || "");
+                                  }}
+                                  className="px-3 py-2 rounded-lg text-sm"
+                                  style={{ background: "var(--color-sentinel-bg-secondary)", color: "var(--color-sentinel-text-secondary)" }}
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div>
+                              {equipmentMetadata?.notes ? (
+                                <div
+                                  className="p-4 rounded-lg whitespace-pre-wrap text-sm"
+                                  style={{ background: "var(--color-sentinel-bg-secondary)", color: "var(--color-sentinel-text-primary)" }}
+                                >
+                                  {equipmentMetadata.notes}
+                                </div>
+                              ) : (
+                                <div className="text-center py-6" style={{ color: "var(--color-sentinel-text-disabled)" }}>
+                                  <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                                  <p className="text-sm">No notes for this equipment</p>
+                                </div>
+                              )}
+                              <button
+                                onClick={() => setEditingNotes(true)}
+                                className="flex items-center gap-2 px-3 py-2 mt-3 rounded-lg text-sm"
+                                style={{ background: "var(--color-sentinel-bg-secondary)", color: "var(--color-sentinel-text-secondary)" }}
+                              >
+                                <Edit3 className="h-4 w-4" />
+                                {equipmentMetadata?.notes ? "Edit Notes" : "Add Notes"}
+                              </button>
+                            </div>
+                          )}
+                          {equipmentMetadata?.last_discovery && (
+                            <p className="text-xs mt-4" style={{ color: "var(--color-sentinel-text-disabled)" }}>
+                              Last discovered: {new Date(equipmentMetadata.last_discovery).toLocaleString()}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {/* Control Status Banner */}
+                  {!selectedEquipment.controllable && (
+                    <div
+                      className="p-3 rounded-lg text-center mt-4"
+                      style={{
+                        background: "rgba(107, 114, 128, 0.1)",
+                        border: "1px solid var(--color-sentinel-border)",
+                      }}
+                    >
+                      <p className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                        This equipment is monitored only — no BMS control points available.
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

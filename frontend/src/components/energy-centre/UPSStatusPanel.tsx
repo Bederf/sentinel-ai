@@ -8,7 +8,7 @@
  * - Load percentage
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, Title, Text, Badge, Grid, Metric, ProgressBar, Flex } from '@tremor/react';
 import { energyCentreApi } from '../../lib/energyCentreApi';
 import type { UPSSummary } from '../../lib/energyCentreApi';
@@ -31,13 +31,7 @@ export function UPSStatusPanel({ siteId, compact = false, onBatteryAlert }: UPSS
   const [summary, setSummary] = useState<UPSSummary | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadData();
-    const interval = setInterval(loadData, 5000);
-    return () => clearInterval(interval);
-  }, [siteId]);
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     try {
       const data = await energyCentreApi.getUPSSummary(siteId);
       setSummary(data);
@@ -50,10 +44,16 @@ export function UPSStatusPanel({ siteId, compact = false, onBatteryAlert }: UPSS
       }
 
       setLoading(false);
-    } catch (err) {
+    } catch (_err) {
       setLoading(false);
     }
-  }
+  }, [siteId, onBatteryAlert]);
+
+  useEffect(() => {
+    loadData();
+    const interval = setInterval(loadData, 5000);
+    return () => clearInterval(interval);
+  }, [loadData]);
 
   if (loading) {
     return (

@@ -107,6 +107,7 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
   const [safetySummary, setSafetySummary] = useState<DeviceSafetySummary | null>(null);
   const [loadingSafety, setLoadingSafety] = useState(false);
   const [optimizationStatus, setOptimizationStatus] = useState<OptimizationStatusType>("unknown");
+  const [optimizationMode, setOptimizationMode] = useState<"automatic" | "supervised">("supervised");
   const [hasRecommendation, setHasRecommendation] = useState(false);
   const [showRecommendationModal, setShowRecommendationModal] = useState(false);
   const [currentRecommendation, setCurrentRecommendation] = useState<OptimizationRecommendation | null>(null);
@@ -228,6 +229,8 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
       try {
         const status = await api.getOptimizationStatus(site.id);
         setOptimizationStatus(status.optimization_status);
+        // Set the optimization mode (automatic or supervised)
+        setOptimizationMode(status.optimization_settings?.mode || "supervised");
         // Track if there's a recommendation available (for lightbulb icon)
         // Only show lightbulb if there are actual recommendations to review
         const hasRecs = !!(status.last_recommendation &&
@@ -237,6 +240,7 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
       } catch (error) {
         console.error('Failed to fetch optimization status:', error);
         setOptimizationStatus('error');
+        setOptimizationMode("supervised");
         setHasRecommendation(false);
       }
     };
@@ -454,6 +458,7 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
               >
                 <OptimizationStatusBadge
                   status={optimizationStatus}
+                  mode={optimizationMode}
                   size="sm"
                   lastOptimization={site.last_optimization}
                   hasRecommendation={hasRecommendation}

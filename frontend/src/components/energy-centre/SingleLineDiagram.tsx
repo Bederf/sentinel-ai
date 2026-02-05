@@ -7,7 +7,7 @@
  * - Energized path highlighting
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, Title, Text, Badge } from '@tremor/react';
 import { energyCentreApi } from '../../lib/energyCentreApi';
 import type { SLDData, SLDNode } from '../../lib/energyCentreApi';
@@ -101,13 +101,7 @@ export function SingleLineDiagram({ siteId, compact = false }: SingleLineDiagram
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadData();
-    const interval = setInterval(loadData, 3000);
-    return () => clearInterval(interval);
-  }, [siteId]);
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     try {
       const data = await energyCentreApi.getSLDData(siteId);
       setSldData(data);
@@ -116,7 +110,13 @@ export function SingleLineDiagram({ siteId, compact = false }: SingleLineDiagram
       setError(err instanceof Error ? err.message : 'Failed to load SLD data');
       setLoading(false);
     }
-  }
+  }, [siteId]);
+
+  useEffect(() => {
+    loadData();
+    const interval = setInterval(loadData, 3000);
+    return () => clearInterval(interval);
+  }, [loadData]);
 
   if (loading) {
     return (

@@ -14,10 +14,10 @@
  */
 
 import { useState, useEffect, useCallback } from "react";
-import { RefreshCw, Users, Lightbulb, AlertTriangle, Cpu, Eye, Zap, Building2, ChevronDown } from "lucide-react";
+import { RefreshCw, Users, Lightbulb, AlertTriangle, Cpu, Eye, Zap, Building2, ChevronDown, X, Radio, Clock, ThermometerSun, Wrench } from "lucide-react";
 import { OccupancyHeatmap } from "./OccupancyHeatmap";
 import { api, daliApi } from "../lib/api";
-import type { BuildingOccupancy, DALIStats, ZoneLighting, Site } from "../lib/api";
+import type { BuildingOccupancy, DALIStats, ZoneLighting, ZoneOccupancy, DALISensor, DALILuminaire, Site } from "../lib/api";
 
 // Get occupancy color based on percentage
 function getOccupancyColor(percent: number): string {
@@ -45,6 +45,15 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [sites, setSites] = useState<Site[]>([]);
   const [selectedSiteId, setSelectedSiteId] = useState<string>("site-002"); // Default to Sandton City
+
+  // Zone details panel state
+  const [selectedZone, setSelectedZone] = useState<ZoneOccupancy | null>(null);
+  const [zoneDetails, setZoneDetails] = useState<{
+    sensors: DALISensor[];
+    luminaires: DALILuminaire[];
+    lighting: ZoneLighting | null;
+  } | null>(null);
+  const [loadingZoneDetails, setLoadingZoneDetails] = useState(false);
 
   // Filter sites to only show DALI-enabled buildings
   const daliSites = sites.filter(site => DALI_ENABLED_SITES.includes(site.id));
@@ -122,6 +131,32 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
 
   const handleRefresh = () => {
     fetchData(true);
+  };
+
+  // Handle zone click - fetch zone details
+  const handleZoneClick = async (zone: ZoneOccupancy) => {
+    setSelectedZone(zone);
+    setLoadingZoneDetails(true);
+    setZoneDetails(null);
+
+    try {
+      const [sensors, luminaires, lighting] = await Promise.all([
+        daliApi.getSensors(zone.zone_id),
+        daliApi.getLuminaires(zone.zone_id),
+        daliApi.getZoneLighting(zone.zone_id),
+      ]);
+
+      setZoneDetails({ sensors, luminaires, lighting });
+    } catch (err) {
+      console.error("Failed to fetch zone details:", err);
+    } finally {
+      setLoadingZoneDetails(false);
+    }
+  };
+
+  const closeZoneDetails = () => {
+    setSelectedZone(null);
+    setZoneDetails(null);
   };
 
   const formatTime = (date: Date) => {
@@ -538,7 +573,351 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
           floors={buildingOccupancy.floors}
           zoneLighting={zoneLighting}
           loading={loading}
+          onZoneClick={handleZoneClick}
         />
+
+        {/* Zone Detail Slide-out Panel */}
+        {selectedZone && (
+          <div
+            className="fixed inset-0 z-50 flex justify-end"
+            style={{ background: "rgba(0, 0, 0, 0.5)" }}
+            onClick={closeZoneDetails}
+          >
+            <div
+              className="w-full max-w-md h-full overflow-y-auto"
+              style={{
+                background: "var(--color-sentinel-bg-primary)",
+                borderLeft: "1px solid var(--color-sentinel-border)",
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div
+                className="sticky top-0 p-4 flex items-center justify-between"
+                style={{
+                  background: "var(--color-sentinel-bg-primary)",
+                  borderBottom: "1px solid var(--color-sentinel-border)",
+                }}
+              >
+                <div>
+                  <h3
+                    className="font-medium text-base"
+                    style={{ color: "var(--color-sentinel-text-primary)" }}
+                  >
+                    {selectedZone.zone_name}
+                  </h3>
+                  <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                    Floor {selectedZone.floor} • {selectedZone.total_sensors} sensors
+                  </span>
+                </div>
+                <button
+                  onClick={closeZoneDetails}
+                  className="p-2 rounded hover:brightness-110"
+                  style={{
+                    background: "var(--color-sentinel-bg-secondary)",
+                    color: "var(--color-sentinel-text-secondary)",
+                  }}
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              {/* Loading State */}
+              {loadingZoneDetails && (
+                <div className="p-4 space-y-4">
+                  {[1, 2, 3].map((i) => (
+                    <div
+                      key={i}
+                      className="animate-pulse h-20 rounded"
+                      style={{ background: "var(--color-sentinel-bg-secondary)" }}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {/* Zone Details */}
+              {zoneDetails && !loadingZoneDetails && (
+                <div className="p-4 space-y-4">
+                  {/* Zone Stats */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div
+                      className="rounded p-3"
+                      style={{
+                        background: "var(--color-sentinel-bg-panel)",
+                        border: "1px solid var(--color-sentinel-border)",
+                      }}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <Users className="h-4 w-4" style={{ color: "var(--color-sentinel-blue)" }} />
+                        <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                          Occupancy
+                        </span>
+                      </div>
+                      <span
+                        className="text-xl font-bold"
+                        style={{ color: getOccupancyColor(selectedZone.occupancy_percent) }}
+                      >
+                        {selectedZone.occupancy_percent}%
+                      </span>
+                    </div>
+                    <div
+                      className="rounded p-3"
+                      style={{
+                        background: "var(--color-sentinel-bg-panel)",
+                        border: "1px solid var(--color-sentinel-border)",
+                      }}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <Zap className="h-4 w-4" style={{ color: "var(--color-sentinel-amber)" }} />
+                        <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                          Power
+                        </span>
+                      </div>
+                      <span
+                        className="text-xl font-bold"
+                        style={{ color: "var(--color-sentinel-text-primary)" }}
+                      >
+                        {((zoneDetails.lighting?.total_power_watts || 0) / 1000).toFixed(2)} kW
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Energy Waste Alert */}
+                  {zoneDetails.lighting?.energy_waste_detected && (
+                    <div
+                      className="rounded p-3 flex items-center gap-2"
+                      style={{
+                        background: "rgba(245, 158, 11, 0.1)",
+                        border: "1px solid rgba(245, 158, 11, 0.3)",
+                      }}
+                    >
+                      <AlertTriangle className="h-4 w-4 flex-shrink-0" style={{ color: "var(--color-sentinel-amber)" }} />
+                      <span className="text-xs" style={{ color: "var(--color-sentinel-amber)" }}>
+                        {zoneDetails.lighting.energy_waste_reason || "Energy waste detected"}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Sensors Section */}
+                  <div>
+                    <h4
+                      className="text-sm font-medium mb-2 flex items-center gap-2"
+                      style={{ color: "var(--color-sentinel-text-primary)" }}
+                    >
+                      <Radio className="h-4 w-4" style={{ color: "var(--color-sentinel-blue)" }} />
+                      Sensors ({zoneDetails.sensors.length})
+                    </h4>
+                    <div className="space-y-2">
+                      {zoneDetails.sensors.length === 0 ? (
+                        <div
+                          className="text-xs p-2 rounded"
+                          style={{
+                            background: "var(--color-sentinel-bg-secondary)",
+                            color: "var(--color-sentinel-text-secondary)",
+                          }}
+                        >
+                          No sensors in this zone
+                        </div>
+                      ) : (
+                        zoneDetails.sensors.map((sensor) => (
+                          <div
+                            key={sensor.id}
+                            className="rounded p-3"
+                            style={{
+                              background: "var(--color-sentinel-bg-panel)",
+                              border: "1px solid var(--color-sentinel-border)",
+                            }}
+                          >
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                                {sensor.id}
+                              </span>
+                              <span
+                                className="text-xs px-2 py-0.5 rounded"
+                                style={{
+                                  background: (sensor.status || "unknown") === "online"
+                                    ? "rgba(16, 185, 129, 0.15)"
+                                    : "rgba(220, 38, 38, 0.15)",
+                                  color: (sensor.status || "unknown") === "online"
+                                    ? "var(--color-sentinel-green)"
+                                    : "var(--color-sentinel-red)",
+                                }}
+                              >
+                                {sensor.status || "unknown"}
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 text-xs">
+                              <div style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                                <span>Type: </span>
+                                <span style={{ color: "var(--color-sentinel-text-primary)" }}>{sensor.type || "unknown"}</span>
+                              </div>
+                              <div style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                                <span>Desk: </span>
+                                <span style={{ color: "var(--color-sentinel-text-primary)" }}>{sensor.desk_id || "-"}</span>
+                              </div>
+                              <div style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                                <span>Occupied: </span>
+                                <span style={{ color: sensor.occupied ? "var(--color-sentinel-green)" : "var(--color-sentinel-text-disabled)" }}>
+                                  {sensor.occupied ? "Yes" : "No"}
+                                </span>
+                              </div>
+                              {sensor.lux_level !== null && (
+                                <div style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                                  <span>Lux: </span>
+                                  <span style={{ color: "var(--color-sentinel-text-primary)" }}>{sensor.lux_level}</span>
+                                </div>
+                              )}
+                            </div>
+                            {sensor.last_motion && (
+                              <div className="mt-2 flex items-center gap-1 text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>
+                                <Clock className="h-3 w-3" />
+                                Last motion: {new Date(sensor.last_motion).toLocaleTimeString()}
+                              </div>
+                            )}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Luminaires Section */}
+                  <div>
+                    <h4
+                      className="text-sm font-medium mb-2 flex items-center gap-2"
+                      style={{ color: "var(--color-sentinel-text-primary)" }}
+                    >
+                      <Lightbulb className="h-4 w-4" style={{ color: "var(--color-sentinel-amber)" }} />
+                      Luminaires ({zoneDetails.luminaires.length})
+                    </h4>
+                    <div className="space-y-2">
+                      {zoneDetails.luminaires.length === 0 ? (
+                        <div
+                          className="text-xs p-2 rounded"
+                          style={{
+                            background: "var(--color-sentinel-bg-secondary)",
+                            color: "var(--color-sentinel-text-secondary)",
+                          }}
+                        >
+                          No luminaires in this zone
+                        </div>
+                      ) : (
+                        zoneDetails.luminaires.map((luminaire) => (
+                          <div
+                            key={luminaire.id}
+                            className="rounded p-3"
+                            style={{
+                              background: "var(--color-sentinel-bg-panel)",
+                              border: (luminaire.status || "unknown") === "fault"
+                                ? "1px solid rgba(220, 38, 38, 0.5)"
+                                : "1px solid var(--color-sentinel-border)",
+                            }}
+                          >
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                                {luminaire.id}
+                              </span>
+                              <span
+                                className="text-xs px-2 py-0.5 rounded"
+                                style={{
+                                  background: (luminaire.status || "unknown") === "online"
+                                    ? "rgba(16, 185, 129, 0.15)"
+                                    : (luminaire.status || "unknown") === "fault"
+                                    ? "rgba(220, 38, 38, 0.15)"
+                                    : "rgba(142, 142, 142, 0.15)",
+                                  color: (luminaire.status || "unknown") === "online"
+                                    ? "var(--color-sentinel-green)"
+                                    : (luminaire.status || "unknown") === "fault"
+                                    ? "var(--color-sentinel-red)"
+                                    : "var(--color-sentinel-text-secondary)",
+                                }}
+                              >
+                                {luminaire.status || "unknown"}
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 text-xs">
+                              <div style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                                <span>Type: </span>
+                                <span style={{ color: "var(--color-sentinel-text-primary)" }}>
+                                  {(luminaire.type || "unknown").replace("_", " ")}
+                                </span>
+                              </div>
+                              <div style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                                <span>Power: </span>
+                                <span style={{ color: "var(--color-sentinel-text-primary)" }}>{luminaire.power_watts ?? 0}W</span>
+                              </div>
+                              <div style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                                <span>Brightness: </span>
+                                <span style={{ color: "var(--color-sentinel-text-primary)" }}>{luminaire.brightness_percent ?? 0}%</span>
+                              </div>
+                              <div style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                                <span>Runtime: </span>
+                                <span style={{ color: "var(--color-sentinel-text-primary)" }}>
+                                  {(luminaire.runtime_hours ?? 0).toLocaleString()}h
+                                </span>
+                              </div>
+                              {luminaire.color_temp_kelvin && (
+                                <div style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                                  <ThermometerSun className="h-3 w-3 inline mr-1" />
+                                  <span style={{ color: "var(--color-sentinel-text-primary)" }}>
+                                    {luminaire.color_temp_kelvin}K
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                            {luminaire.fault_code && (
+                              <div
+                                className="mt-2 flex items-center gap-1 text-xs p-2 rounded"
+                                style={{
+                                  background: "rgba(220, 38, 38, 0.1)",
+                                  color: "var(--color-sentinel-red)",
+                                }}
+                              >
+                                <Wrench className="h-3 w-3" />
+                                Fault: {luminaire.fault_code}
+                              </div>
+                            )}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Summary Footer */}
+                  {zoneDetails.lighting && (
+                    <div
+                      className="rounded p-3 text-xs"
+                      style={{
+                        background: "var(--color-sentinel-bg-secondary)",
+                        color: "var(--color-sentinel-text-secondary)",
+                      }}
+                    >
+                      <div className="flex justify-between mb-1">
+                        <span>Active Luminaires:</span>
+                        <span style={{ color: "var(--color-sentinel-text-primary)" }}>
+                          {zoneDetails.lighting.active_luminaires} / {zoneDetails.lighting.total_luminaires}
+                        </span>
+                      </div>
+                      <div className="flex justify-between mb-1">
+                        <span>Avg Brightness:</span>
+                        <span style={{ color: "var(--color-sentinel-text-primary)" }}>
+                          {zoneDetails.lighting.avg_brightness}%
+                        </span>
+                      </div>
+                      {zoneDetails.lighting.faulty_luminaires > 0 && (
+                        <div className="flex justify-between">
+                          <span>Faulty:</span>
+                          <span style={{ color: "var(--color-sentinel-amber)" }}>
+                            {zoneDetails.lighting.faulty_luminaires}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     );
   }

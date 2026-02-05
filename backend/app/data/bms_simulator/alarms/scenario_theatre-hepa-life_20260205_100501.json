@@ -1,0 +1,72 @@
+[
+  {
+    "timestamp": "2026-02-05T00:00:00",
+    "equipment_id": "UMH-AHU-L3-TH2",
+    "equipment_type": "theatre_ahu",
+    "alarm_code": "FILTER_DP",
+    "severity": "info",
+    "description": "Prefilter DP trending upward - schedule inspection",
+    "point_name": "prefilter_dp",
+    "point_value": 180,
+    "threshold_value": 200,
+    "acknowledged": false,
+    "cleared": false,
+    "notes": "ML prediction: HEPA replacement in 60 days"
+  },
+  {
+    "timestamp": "2026-03-07T00:00:00",
+    "equipment_id": "UMH-AHU-L3-TH2",
+    "equipment_type": "theatre_ahu",
+    "alarm_code": "HEPA_DP_HI",
+    "severity": "warning",
+    "description": "HEPA filter DP high - schedule replacement",
+    "point_name": "hepa_dp",
+    "point_value": 380,
+    "threshold_value": 350,
+    "acknowledged": false,
+    "cleared": false,
+    "notes": "Filter loading at 75% - order replacement filters"
+  },
+  {
+    "timestamp": "2026-03-22T00:00:00",
+    "equipment_id": "UMH-AHU-L3-TH2",
+    "equipment_type": "theatre_ahu",
+    "alarm_code": "HEPA_DP_HI",
+    "severity": "warning",
+    "description": "HEPA filter DP high - replacement overdue",
+    "point_name": "hepa_dp",
+    "point_value": 420,
+    "threshold_value": 350,
+    "acknowledged": false,
+    "cleared": false,
+    "notes": "URGENT: Schedule filter change this week"
+  },
+  {
+    "timestamp": "2026-04-01T00:00:00",
+    "equipment_id": "UMH-AHU-L3-TH2",
+    "equipment_type": "theatre_ahu",
+    "alarm_code": "HEPA_DP_CRIT",
+    "severity": "critical",
+    "description": "HEPA filter DP critical - replace immediately",
+    "point_name": "hepa_dp",
+    "point_value": 480,
+    "threshold_value": 450,
+    "acknowledged": false,
+    "cleared": false,
+    "notes": "Filter change scheduled for tomorrow between surgeries"
+  },
+  {
+    "timestamp": "2026-04-06T00:00:00",
+    "equipment_id": "UMH-AHU-L3-TH2",
+    "equipment_type": "theatre_ahu",
+    "alarm_code": "HEPA_DP_HI",
+    "severity": "warning",
+    "description": "HEPA filter replaced",
+    "point_name": "hepa_dp",
+    "point_value": 180,
+    "acknowledged": false,
+    "cleared": true,
+    "cleared_at": "2026-04-06T00:00:00",
+    "notes": "New filters installed, DP returned to baseline"
+  }
+]

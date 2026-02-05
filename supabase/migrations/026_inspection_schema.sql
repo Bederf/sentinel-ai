@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS inspection_schedules (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
 
     -- What to inspect
-    equipment_id TEXT NOT NULL REFERENCES equipment(equipment_id),
+    equipment_id UUID NOT NULL REFERENCES equipment(id),
     element_id UUID REFERENCES equipment_elements(id), -- Optional: specific element
 
     -- Schedule definition
@@ -107,7 +107,7 @@ CREATE TABLE IF NOT EXISTS inspection_tasks (
     task_description TEXT,
 
     -- What to inspect
-    equipment_id TEXT NOT NULL REFERENCES equipment(equipment_id),
+    equipment_id UUID NOT NULL REFERENCES equipment(id),
     element_id UUID REFERENCES equipment_elements(id), -- Optional
 
     -- Scheduling
@@ -219,7 +219,7 @@ CREATE TABLE IF NOT EXISTS inspection_deficiencies (
     -- Source inspection
     result_id UUID NOT NULL REFERENCES inspection_results(id),
     task_id UUID NOT NULL REFERENCES inspection_tasks(id),
-    equipment_id TEXT NOT NULL REFERENCES equipment(equipment_id),
+    equipment_id UUID NOT NULL REFERENCES equipment(id),
 
     -- Element affected (optional)
     element_id UUID REFERENCES equipment_elements(id),
@@ -280,7 +280,7 @@ CREATE TABLE IF NOT EXISTS inspection_measurements (
     -- Reference to inspection
     result_id UUID NOT NULL REFERENCES inspection_results(id),
     task_id UUID NOT NULL REFERENCES inspection_tasks(id),
-    equipment_id TEXT NOT NULL REFERENCES equipment(equipment_id),
+    equipment_id UUID NOT NULL REFERENCES equipment(id),
 
     -- What was measured
     measurement_type TEXT NOT NULL, -- temperature, pressure, vibration, etc.
@@ -318,10 +318,10 @@ CREATE INDEX IF NOT EXISTS idx_measurements_deviation ON inspection_measurements
 -- Summary of inspection status across all equipment
 CREATE OR REPLACE VIEW v_inspection_overview AS
 SELECT
-    e.equipment_id,
-    e.equipment_name,
-    e.equipment_type,
-    e.site_id,
+    e.id,
+    e.name,
+    e.type,
+    e.building_id,
     COUNT(DISTINCT s.id) as active_schedules,
     COUNT(DISTINCT t.id) FILTER (WHERE t.status = 'scheduled') as scheduled_tasks,
     COUNT(DISTINCT t.id) FILTER (WHERE t.status = 'in_progress') as in_progress_tasks,
@@ -330,10 +330,10 @@ SELECT
     COUNT(DISTINCT d.id) FILTER (WHERE d.is_resolved = FALSE) as open_deficiencies,
     COUNT(DISTINCT d.id) FILTER (WHERE d.severity = 'critical' AND d.is_resolved = FALSE) as critical_deficiencies
 FROM equipment e
-LEFT JOIN inspection_schedules s ON e.equipment_id = s.equipment_id AND s.is_active = TRUE
-LEFT JOIN inspection_tasks t ON e.equipment_id = t.equipment_id
-LEFT JOIN inspection_deficiencies d ON e.equipment_id = d.equipment_id
-GROUP BY e.equipment_id, e.equipment_name, e.equipment_type, e.site_id;
+LEFT JOIN inspection_schedules s ON e.id = s.equipment_id AND s.is_active = TRUE
+LEFT JOIN inspection_tasks t ON e.id = t.equipment_id
+LEFT JOIN inspection_deficiencies d ON e.id = d.equipment_id
+GROUP BY e.id, e.name, e.type, e.building_id;
 
 -- View: v_inspection_tasks_due
 -- Upcoming and overdue inspection tasks
@@ -342,7 +342,7 @@ SELECT
     t.id,
     t.task_name,
     t.equipment_id,
-    e.equipment_name,
+    e.name,
     t.element_id,
     t.assigned_to,
     t.scheduled_date,
@@ -356,7 +356,7 @@ SELECT
         ELSE 'scheduled'
     END as urgency
 FROM inspection_tasks t
-JOIN equipment e ON t.equipment_id = e.equipment_id
+JOIN equipment e ON t.equipment_id = e.id
 WHERE t.status IN ('scheduled', 'in_progress')
 ORDER BY t.due_date ASC;
 
@@ -364,18 +364,19 @@ ORDER BY t.due_date ASC;
 -- Inspection statistics per equipment
 CREATE OR REPLACE VIEW v_equipment_inspection_summary AS
 SELECT
-    e.equipment_id,
-    e.equipment_name,
+    e.id,
+    e.name,
     COUNT(DISTINCT r.id) as total_inspections,
-    AVG(r.actual_duration_minutes) FILTER (WHERE r.actual_duration_minutes IS NOT NULL) as avg_duration_minutes,
+    AVG(EXTRACT(EPOCH FROM (r.completed_at - r.started_at))/60) FILTER (WHERE r.started_at IS NOT NULL AND r.completed_at IS NOT NULL) as avg_duration_minutes,
     COUNT(DISTINCT d.id) FILTER (WHERE d.is_resolved = FALSE) as open_deficiencies,
     COUNT(DISTINCT d.id) FILTER (WHERE d.severity = 'critical' AND d.is_resolved = FALSE) as critical_deficiencies,
     MAX(r.inspection_date) as last_inspection_date,
     AVG(CASE WHEN r.overall_status = 'pass' THEN 1 ELSE 0 END) as pass_rate
 FROM equipment e
-LEFT JOIN inspection_results r ON e.equipment_id = r.equipment_id
-LEFT JOIN inspection_deficiencies d ON e.equipment_id = d.equipment_id
-GROUP BY e.equipment_id, e.equipment_name;
+LEFT JOIN inspection_tasks t ON e.id = t.equipment_id
+LEFT JOIN inspection_results r ON t.id = r.task_id
+LEFT JOIN inspection_deficiencies d ON e.id = d.equipment_id
+GROUP BY e.id, e.name;
 
 -- View: v_critical_inspection_findings
 -- Recent critical deficiencies
@@ -385,7 +386,7 @@ SELECT
     d.deficiency_title,
     d.severity,
     d.equipment_id,
-    e.equipment_name,
+    e.name,
     d.reported_date,
     d.recommended_action,
     d.estimated_repair_cost_min,
@@ -393,7 +394,7 @@ SELECT
     r.inspection_date,
     r.inspected_by
 FROM inspection_deficiencies d
-JOIN equipment e ON d.equipment_id = e.equipment_id
+JOIN equipment e ON d.equipment_id = e.id
 JOIN inspection_results r ON d.result_id = r.id
 WHERE d.severity IN ('critical', 'safety')
   AND d.is_resolved = FALSE
@@ -549,10 +550,10 @@ INSERT INTO inspection_checklist_templates (
             "critical": false
         }
     ]',
-    '["flashlight", "thermal_gun", "vibration_analyzer", "multimeter", "load_bank"]'::TEXT[],
-    '["generator_maintenance", "vibration_analysis", "thermal_imaging"]'::TEXT[],
-    '["lockout_tagout", "fire_extinguisher_nearby", "ventilation_check"]'::TEXT[],
-    '["safety_glasses", "gloves", "hearing_protection", "face_shield"]'::TEXT[],
+    ARRAY['flashlight', 'thermal_gun', 'vibration_analyzer', 'multimeter', 'load_bank'],
+    ARRAY['generator_maintenance', 'vibration_analysis', 'thermal_imaging'],
+    ARRAY['lockout_tagout', 'fire_extinguisher_nearby', 'ventilation_check'],
+    ARRAY['safety_glasses', 'gloves', 'hearing_protection', 'face_shield'],
     'system'
 ) ON CONFLICT DO NOTHING;
 
@@ -633,10 +634,10 @@ INSERT INTO inspection_checklist_templates (
             "critical": false
         }
     ]',
-    '["pressure_gauges", "thermal_gun", "clamp_meter", "leak_detector", "vibration_analyzer"]'::TEXT[],
-    '["chiller_maintenance", "refrigeration", "vibration_analysis"]'::TEXT[],
-    '["lockout_tagout", "refrigerant_handling_cert", "confined_space"]'::TEXT[],
-    '["safety_glasses", "gloves", "refrigerant_gloves", "face_shield"]'::TEXT[],
+    ARRAY['pressure_gauges', 'thermal_gun', 'clamp_meter', 'leak_detector', 'vibration_analyzer'],
+    ARRAY['chiller_maintenance', 'refrigeration', 'vibration_analysis'],
+    ARRAY['lockout_tagout', 'refrigerant_handling_cert', 'confined_space'],
+    ARRAY['safety_glasses', 'gloves', 'refrigerant_gloves', 'face_shield'],
     'system'
 ) ON CONFLICT DO NOTHING;
 

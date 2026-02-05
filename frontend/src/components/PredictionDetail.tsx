@@ -46,10 +46,13 @@ interface PredictionDetailProps {
       repeat_period_months?: number;
       alarm_frequency?: Record<string, number>;
       asset_age_years?: number;
+      age_years?: number; // Alternate field name from API
       expected_life_years?: number;
       technician_notes?: string[];
       health_score?: number;
       health_trend?: string;
+      anomaly_score?: number;
+      observation?: string;
       // Support both latest_reading (legacy) and last_reading (auto-generated)
       latest_reading?: {
         parameter: string;
@@ -264,8 +267,8 @@ export function PredictionDetail({ prediction, isOpen, onClose, onCreateWorkOrde
               color="var(--color-grafana-orange)"
             />
             <MetricCard
-              value={prediction.evidence?.asset_age_years ? `${prediction.evidence.asset_age_years} yrs` : (prediction.evidence?.health_score ? `${prediction.evidence.health_score}%` : "N/A")}
-              label={prediction.evidence?.asset_age_years ? "Asset Age" : "Health Score"}
+              value={(prediction.evidence?.asset_age_years ?? prediction.evidence?.age_years) ? `${prediction.evidence?.asset_age_years ?? prediction.evidence?.age_years} yrs` : (prediction.evidence?.health_score ? `${prediction.evidence.health_score}%` : "N/A")}
+              label={(prediction.evidence?.asset_age_years ?? prediction.evidence?.age_years) ? "Asset Age" : "Health Score"}
               color="var(--color-grafana-cyan)"
             />
           </div>
@@ -328,6 +331,18 @@ export function PredictionDetail({ prediction, isOpen, onClose, onCreateWorkOrde
                   {prediction.evidence.repeat_work_orders} work orders in {prediction.evidence.repeat_period_months || 12} months
                 </span>
               )}
+              {prediction.evidence?.anomaly_score !== undefined && (
+                <span
+                  className="text-xs px-2 py-1 rounded flex items-center gap-1"
+                  style={{
+                    background: prediction.evidence.anomaly_score > 0.5 ? "rgba(220, 38, 38, 0.15)" : prediction.evidence.anomaly_score > 0.3 ? "rgba(255, 152, 48, 0.15)" : "rgba(50, 116, 217, 0.15)",
+                    color: prediction.evidence.anomaly_score > 0.5 ? "var(--color-grafana-red)" : prediction.evidence.anomaly_score > 0.3 ? "var(--color-status-warning)" : "var(--color-grafana-blue)",
+                  }}
+                >
+                  <Activity className="h-3 w-3" />
+                  Anomaly score: {Math.round(prediction.evidence.anomaly_score * 100)}%
+                </span>
+              )}
               {prediction.evidence?.health_trend && (
                 <span
                   className="text-xs px-2 py-1 rounded flex items-center gap-1"
@@ -353,6 +368,21 @@ export function PredictionDetail({ prediction, isOpen, onClose, onCreateWorkOrde
                 </span>
               )}
             </div>
+
+            {/* Observation note if available */}
+            {prediction.evidence?.observation && (
+              <div
+                className="mt-3 p-3 rounded text-sm"
+                style={{
+                  background: "var(--color-grafana-bg-secondary)",
+                  border: "1px solid var(--color-grafana-border)",
+                  color: "var(--color-grafana-text-secondary)",
+                }}
+              >
+                <span className="font-medium" style={{ color: "var(--color-grafana-text-primary)" }}>Observation: </span>
+                {prediction.evidence.observation}
+              </div>
+            )}
           </div>
 
           {/* Contributing Factors */}

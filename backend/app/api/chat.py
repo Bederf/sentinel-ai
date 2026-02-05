@@ -27,6 +27,7 @@ class ChatRequest(BaseModel):
     message: str
     conversation_id: str | None = None
     search_docs: bool = True  # Default to documentation RAG mode
+    site_id: str | None = None  # Selected building/site for context
 
 
 class ChatMetadata(BaseModel):
@@ -63,18 +64,26 @@ def format_sse_chunk(chunk: str) -> str:
     return '\n'.join(sse_lines) + '\n\n'
 
 
-async def generate_sse_stream(user_message: str, use_tools: bool = True) -> AsyncGenerator[str, None]:
+async def generate_sse_stream(user_message: str, use_tools: bool = True, site_id: str | None = None) -> AsyncGenerator[str, None]:
     """
     Generate SSE-formatted stream from Claude response.
 
     Args:
         user_message: The user's message to send to Claude
         use_tools: Whether to enable tool calling for device control
+        site_id: Selected building/site for context (e.g., "site-002")
 
     Yields:
         SSE-formatted data chunks
     """
-    messages = [{"role": "user", "content": user_message}]
+    # Add site context to the message if provided
+    if site_id:
+        context_prefix = f"[Context: User is asking about building/site '{site_id}']\n\n"
+        message_with_context = context_prefix + user_message
+    else:
+        message_with_context = user_message
+
+    messages = [{"role": "user", "content": message_with_context}]
 
     try:
         if use_tools:
@@ -119,7 +128,7 @@ async def generate_static_sse(message: str) -> AsyncGenerator[str, None]:
     yield "data: [DONE]\n\n"
 
 
-async def generate_docs_sse_stream(user_message: str) -> AsyncGenerator[str, None]:
+async def generate_docs_sse_stream(user_message: str, site_id: str | None = None) -> AsyncGenerator[str, None]:
     """
     Generate SSE-formatted stream for documentation search mode.
 
@@ -128,6 +137,7 @@ async def generate_docs_sse_stream(user_message: str) -> AsyncGenerator[str, Non
 
     Args:
         user_message: The user's question about SENTINEL documentation
+        site_id: Selected building/site for context (e.g., "site-002")
 
     Yields:
         SSE-formatted data chunks
@@ -139,7 +149,14 @@ async def generate_docs_sse_stream(user_message: str) -> AsyncGenerator[str, Non
         # Build system prompt with documentation context
         system_prompt = get_doc_rag_system_prompt(doc_results)
 
-        messages = [{"role": "user", "content": user_message}]
+        # Add site context to the message if provided
+        if site_id:
+            context_prefix = f"[Context: User is asking about building/site '{site_id}']\n\n"
+            message_with_context = context_prefix + user_message
+        else:
+            message_with_context = user_message
+
+        messages = [{"role": "user", "content": message_with_context}]
 
         # Stream response with documentation context (no device control tools)
         async for chunk in claude_service.stream_response(
@@ -203,7 +220,7 @@ async def chat(request: ChatRequest) -> StreamingResponse:
             }
         )
 
-    logger.info(f"Chat request: conversation_id={request.conversation_id}, search_docs={request.search_docs}, message={user_message[:50]}...")
+    logger.info(f"Chat request: conversation_id={request.conversation_id}, search_docs={request.search_docs}, site_id={request.site_id}, message={user_message[:50]}...")
 
     # 1. Documentation search mode takes priority - this is Q&A, not device control
     #    No work order detection or demo cache in docs mode
@@ -213,11 +230,11 @@ async def chat(request: ChatRequest) -> StreamingResponse:
                 status_code=503,
                 detail="Claude AI is not configured. Set ANTHROPIC_API_KEY in environment.",
             )
-        logger.info("Documentation search mode enabled")
+        logger.info(f"Documentation search mode enabled, site_id={request.site_id}")
         # Log query for feature request tracking
         log_chat_query(user_message)
         return StreamingResponse(
-            generate_docs_sse_stream(user_message),
+            generate_docs_sse_stream(user_message, request.site_id),
             media_type="text/event-stream",
             headers={
                 "Cache-Control": "no-cache",
@@ -288,7 +305,7 @@ async def chat(request: ChatRequest) -> StreamingResponse:
         )
 
     return StreamingResponse(
-        generate_sse_stream(user_message),
+        generate_sse_stream(user_message, use_tools=True, site_id=request.site_id),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

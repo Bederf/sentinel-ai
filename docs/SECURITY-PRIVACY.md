@@ -354,7 +354,9 @@ We never extract, copy, or retain your building data."
 ### Access Control
 
 - Role-based access control (RBAC) for FM team
+- **User site access control**: Users only see buildings they're authorized to access
 - Audit logging for all control actions
+- **Login audit log**: All authentication attempts logged with IP, user agent, outcome
 - Revocable remote support access
 
 ### Network Security
@@ -368,6 +370,25 @@ We never extract, copy, or retain your building data."
 - Local model cannot "leak" data to third parties
 - No training on client data
 - Static model weights (no automatic updates)
+
+### Authentication & Login Audit
+
+- **Login audit log**: Every authentication attempt is logged to database
+- Captured data: user email, IP address, user agent, timestamp, success/failure
+- **Suspicious activity detection**: Automated analysis for:
+  - Multiple failed logins from same IP (brute force detection)
+  - Users logging in from many different IPs (credential theft indicator)
+  - Unusual surge in new user registrations
+- Admin endpoints for security monitoring (`/api/admin/login-audit/*`)
+- Configurable log retention (default 90 days)
+
+### Site Access Control
+
+- Users only see buildings they're authorized to access
+- ADMIN role has full access to all buildings
+- New users automatically get access to default building
+- Admin endpoints to grant/revoke access per user per building
+- All access changes are auditable
 
 ### Encryption
 

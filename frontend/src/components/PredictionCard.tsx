@@ -35,8 +35,20 @@ interface PredictionCardProps {
     evidence: {
       repeat_work_orders?: number;
       asset_age_years?: number;
+      age_years?: number; // Alternate field name
+      expected_life_years?: number;
       health_score?: number;
       health_trend?: string;
+      anomaly_score?: number;
+      observation?: string;
+      alarm_frequency?: Record<string, number>;
+      latest_reading?: {
+        parameter?: string;
+        value?: number;
+        baseline?: number;
+        threshold?: number;
+        trend?: string;
+      };
     };
   };
   onClick?: () => void;
@@ -328,7 +340,8 @@ export function PredictionCard({ prediction, onClick }: PredictionCardProps) {
         </div>
 
         {/* Evidence Metrics */}
-        <div className="grid grid-cols-2 gap-3 mb-3">
+        <div className="grid grid-cols-3 gap-2 mb-3">
+          {/* Health Score */}
           <div
             className="p-2 rounded"
             style={{ background: "var(--color-sentinel-bg-secondary)" }}
@@ -342,7 +355,7 @@ export function PredictionCard({ prediction, onClick }: PredictionCardProps) {
                 className="text-xs"
                 style={{ color: "var(--color-sentinel-text-disabled)" }}
               >
-                Health Score
+                Health
               </span>
             </div>
             <span
@@ -363,6 +376,8 @@ export function PredictionCard({ prediction, onClick }: PredictionCardProps) {
               )}
             </span>
           </div>
+
+          {/* Health Trend */}
           <div
             className="p-2 rounded"
             style={{ background: "var(--color-sentinel-bg-secondary)" }}
@@ -376,18 +391,145 @@ export function PredictionCard({ prediction, onClick }: PredictionCardProps) {
                 className="text-xs"
                 style={{ color: "var(--color-sentinel-text-disabled)" }}
               >
-                Health Trend
+                Trend
               </span>
             </div>
             <span
-              className="text-lg font-medium capitalize"
+              className="text-sm font-medium capitalize"
               style={{
-                color: prediction.evidence?.health_trend === "declining"
+                color: prediction.evidence?.latest_reading?.trend === "decreasing" || prediction.evidence?.health_trend === "declining"
                   ? "var(--color-sentinel-red)"
                   : "#a78bfa",
               }}
             >
-              {prediction.evidence?.health_trend ?? "N/A"}
+              {prediction.evidence?.latest_reading?.trend ?? prediction.evidence?.health_trend ?? "N/A"}
+            </span>
+          </div>
+
+          {/* Asset Age */}
+          <div
+            className="p-2 rounded"
+            style={{ background: "var(--color-sentinel-bg-secondary)" }}
+          >
+            <div className="flex items-center gap-1 mb-1">
+              <Calendar
+                className="h-3 w-3"
+                style={{ color: "var(--color-sentinel-amber)" }}
+              />
+              <span
+                className="text-xs"
+                style={{ color: "var(--color-sentinel-text-disabled)" }}
+              >
+                Age
+              </span>
+            </div>
+            <span
+              className="text-sm font-medium"
+              style={{
+                color: (prediction.evidence?.asset_age_years ?? prediction.evidence?.age_years) !== undefined &&
+                       prediction.evidence?.expected_life_years !== undefined &&
+                       (prediction.evidence?.asset_age_years ?? prediction.evidence?.age_years ?? 0) > prediction.evidence.expected_life_years * 0.8
+                  ? "var(--color-sentinel-red)"
+                  : "var(--color-sentinel-amber)",
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              {(prediction.evidence?.asset_age_years ?? prediction.evidence?.age_years) !== undefined
+                ? `${prediction.evidence?.asset_age_years ?? prediction.evidence?.age_years}y`
+                : "N/A"}
+              {prediction.evidence?.expected_life_years !== undefined && (
+                <span
+                  className="text-xs ml-0.5"
+                  style={{ color: "var(--color-sentinel-text-disabled)" }}
+                >
+                  /{prediction.evidence.expected_life_years}y
+                </span>
+              )}
+            </span>
+          </div>
+        </div>
+
+        {/* Second row of evidence */}
+        <div className="grid grid-cols-2 gap-2 mb-3">
+          {/* Anomaly Score / Alarms */}
+          <div
+            className="p-2 rounded"
+            style={{ background: "var(--color-sentinel-bg-secondary)" }}
+          >
+            <div className="flex items-center gap-1 mb-1">
+              <AlertTriangle
+                className="h-3 w-3"
+                style={{ color: "var(--color-sentinel-red)" }}
+              />
+              <span
+                className="text-xs"
+                style={{ color: "var(--color-sentinel-text-disabled)" }}
+              >
+                {prediction.evidence?.anomaly_score !== undefined ? "Anomaly" : "Alarms"}
+              </span>
+            </div>
+            <span
+              className="text-sm font-medium"
+              style={{
+                color: prediction.evidence?.anomaly_score !== undefined
+                  ? prediction.evidence.anomaly_score > 0.5
+                    ? "var(--color-sentinel-red)"
+                    : prediction.evidence.anomaly_score > 0.3
+                      ? "var(--color-sentinel-amber)"
+                      : "var(--color-sentinel-text-primary)"
+                  : prediction.evidence?.alarm_frequency
+                    ? Object.values(prediction.evidence.alarm_frequency).reduce((a, b) => a + b, 0) > 5
+                      ? "var(--color-sentinel-red)"
+                      : "var(--color-sentinel-text-primary)"
+                    : "var(--color-sentinel-text-disabled)",
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              {prediction.evidence?.anomaly_score !== undefined
+                ? `${Math.round(prediction.evidence.anomaly_score * 100)}%`
+                : prediction.evidence?.alarm_frequency
+                  ? Object.values(prediction.evidence.alarm_frequency).reduce((a, b) => a + b, 0)
+                  : "N/A"}
+            </span>
+          </div>
+
+          {/* Last Reading */}
+          <div
+            className="p-2 rounded"
+            style={{ background: "var(--color-sentinel-bg-secondary)" }}
+          >
+            <div className="flex items-center gap-1 mb-1">
+              <Activity
+                className="h-3 w-3"
+                style={{ color: "var(--color-sentinel-green)" }}
+              />
+              <span
+                className="text-xs"
+                style={{ color: "var(--color-sentinel-text-disabled)" }}
+              >
+                Last Reading
+              </span>
+            </div>
+            <span
+              className="text-sm font-medium"
+              style={{
+                color: prediction.evidence?.latest_reading?.value !== undefined &&
+                       prediction.evidence?.latest_reading?.threshold !== undefined &&
+                       prediction.evidence.latest_reading.value < prediction.evidence.latest_reading.threshold
+                  ? "var(--color-sentinel-red)"
+                  : "var(--color-sentinel-green)",
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              {prediction.evidence?.latest_reading?.value ?? "N/A"}
+              {prediction.evidence?.latest_reading?.baseline !== undefined && (
+                <span
+                  className="text-xs ml-1"
+                  style={{ color: "var(--color-sentinel-text-disabled)" }}
+                >
+                  / {prediction.evidence.latest_reading.baseline}
+                </span>
+              )}
             </span>
           </div>
         </div>

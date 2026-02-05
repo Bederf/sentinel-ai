@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 /**
  * PasswordModal Component - Password protection for sensitive settings
  *

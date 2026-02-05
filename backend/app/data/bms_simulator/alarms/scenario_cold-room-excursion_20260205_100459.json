@@ -1,0 +1,61 @@
+[
+  {
+    "timestamp": "2026-01-06T03:00:00",
+    "equipment_id": "UMH-COLD-L1-001",
+    "equipment_type": "cold_room",
+    "alarm_code": "TEMP_HI",
+    "severity": "warning",
+    "description": "Cold room temperature high - check compressor",
+    "point_name": "cabinet_temp",
+    "point_value": 6.5,
+    "threshold_value": 6.0,
+    "acknowledged": false,
+    "cleared": false,
+    "notes": "Temperature rising above normal range"
+  },
+  {
+    "timestamp": "2026-01-06T07:00:00",
+    "equipment_id": "UMH-COLD-L1-001",
+    "equipment_type": "cold_room",
+    "alarm_code": "TEMP_CRIT",
+    "severity": "critical",
+    "description": "Cold room temperature critical - vaccine storage compromised",
+    "point_name": "cabinet_temp",
+    "point_value": 8.5,
+    "threshold_value": 8.0,
+    "acknowledged": false,
+    "cleared": false,
+    "notes": "URGENT: Vaccine cold chain at risk"
+  },
+  {
+    "timestamp": "2026-01-06T08:00:00",
+    "equipment_id": "UMH-COLD-L1-001",
+    "equipment_type": "cold_room",
+    "alarm_code": "TEMP_CRIT",
+    "severity": "critical",
+    "description": "Cold room temperature critical - vaccine storage compromised",
+    "point_name": "cabinet_temp",
+    "point_value": 8.2,
+    "threshold_value": 8.0,
+    "acknowledged": true,
+    "acknowledged_by": "Maintenance Tech",
+    "acknowledged_at": "2026-01-06T08:00:00",
+    "cleared": false,
+    "notes": "Technician on site, compressor being serviced"
+  },
+  {
+    "timestamp": "2026-01-06T11:00:00",
+    "equipment_id": "UMH-COLD-L1-001",
+    "equipment_type": "cold_room",
+    "alarm_code": "TEMP_HI",
+    "severity": "warning",
+    "description": "Cold room temperature high - check compressor",
+    "point_name": "cabinet_temp",
+    "point_value": 4.5,
+    "threshold_value": 6.0,
+    "acknowledged": true,
+    "cleared": true,
+    "cleared_at": "2026-01-06T11:00:00",
+    "notes": "Compressor repaired, temperature returned to normal"
+  }
+]

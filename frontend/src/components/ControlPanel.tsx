@@ -276,9 +276,9 @@ export function ControlPanel({
           />
         );
 
-      case "multistate_value":
+      case "multistate_value": {
         // Handle states as array (from backend) or object (legacy)
-        const statesData = (point as any).states || point.metadata?.states || [];
+        const statesData = (point as unknown as { states?: string[] }).states || point.metadata?.states || [];
         const options = Array.isArray(statesData)
           ? statesData.map((label: string, index: number) => ({
               value: index,
@@ -299,6 +299,7 @@ export function ControlPanel({
             disabled={disabled}
           />
         );
+      }
 
       default:
         return (

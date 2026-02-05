@@ -1,0 +1,397 @@
+name,object_type,instance,units,present_value,description,min_value,max_value,writable
+STC/RF/AHU-01/SupplyAirTemp,analogInput,1000,degC,15.2,Supply air temperature,12.0,25.0,False
+STC/RF/AHU-01/ReturnAirTemp,analogInput,1001,degC,23.5,Return air temperature,18.0,30.0,False
+STC/RF/AHU-01/FanStatus,binaryValue,1002,,1,Fan on/off status,,,True
+STC/RF/AHU-01/FanSpeed,analogValue,1003,percent,70,Fan speed percentage,0,100,True
+STC/RF/AHU-01/DamperPosition,analogValue,1004,percent,30,Outside air damper position,0,100,True
+STC/RF/AHU-01/FilterPressure,analogInput,1005,pascals,125,Filter differential pressure,0,350,False
+STC/B1/CH-01/ChwSupplyTemp,analogInput,1006,degC,7.0,Chilled water supply temperature,4.0,15.0,False
+STC/B1/CH-01/ChwReturnTemp,analogInput,1007,degC,12.0,Chilled water return temperature,8.0,20.0,False
+STC/B1/CH-01/ChwSupplyTempSetpoint,analogValue,1008,degC,7.0,Chilled water supply temperature setpoint,5.0,12.0,True
+STC/B1/CH-01/ChillerStatus,multistateValue,1009,,1,Chiller operational status,,,True
+STC/B1/CH-01/CompressorAmps,analogInput,1010,amps,145,Compressor current draw,0,300,False
+STC/L1/FCU-01/RoomTemp,analogInput,1011,degC,22.8,Room temperature,16.0,32.0,False
+STC/L1/FCU-01/RoomTempSetpoint,analogValue,1012,degC,22.0,Room temperature setpoint,18.0,26.0,True
+STC/L1/FCU-01/FanSpeed,multistateValue,1013,,2,Fan speed setting,,,True
+STC/L1/FCU-01/ValvePosition,analogValue,1014,percent,45,Chilled water valve position,0,100,True
+STC/L2/ZC-01/ZoneTemp,analogInput,1015,degC,22.5,Average zone temperature,16.0,30.0,False
+STC/L2/ZC-01/ZoneCoolingSetpoint,analogValue,1016,degC,22.0,Zone cooling temperature setpoint,20.0,26.0,True
+STC/L2/ZC-01/ZoneHeatingSetpoint,analogValue,1017,degC,20.0,Zone heating temperature setpoint,18.0,24.0,True
+STC/L2/ZC-01/Mode,multistateValue,1018,,1,HVAC operating mode,,,True
+STC/L2/FCU-03/RoomTemp,analogInput,1019,degC,22.5,Room temperature,16.0,32.0,False
+STC/L2/FCU-03/RoomTempSetpoint,analogValue,1020,degC,22.0,Room temperature setpoint,18.0,26.0,True
+STC/L2/FCU-03/FanSpeed,multistateValue,1021,,2,Fan speed setting,,,True
+STC/L2/FCU-03/ValvePosition,analogValue,1022,percent,65,Chilled water valve position,0,100,True
+STC/L2/FCU-03/FcuStatus,multistateValue,1023,,1,FCU operational status,,,True
+STC/L2/FCU-04/RoomTemp,analogInput,1024,degC,23.0,Room temperature,16.0,32.0,False
+STC/L2/FCU-04/RoomTempSetpoint,analogValue,1025,degC,22.0,Room temperature setpoint,18.0,26.0,True
+STC/L2/FCU-04/FanSpeed,multistateValue,1026,,2,Fan speed setting,,,True
+STC/L2/FCU-04/ValvePosition,analogValue,1027,percent,65,Chilled water valve position,0,100,True
+STC/L2/FCU-04/FcuStatus,multistateValue,1028,,1,FCU operational status,,,True
+STC/L1/FCU-01/RoomTemp,analogInput,1029,degC,21.5,Room temperature,16.0,32.0,False
+STC/L1/FCU-01/RoomTempSetpoint,analogValue,1030,degC,22.0,Room temperature setpoint,18.0,26.0,True
+STC/L1/FCU-01/FanSpeed,multistateValue,1031,,2,Fan speed setting,,,True
+STC/L1/FCU-01/ValvePosition,analogValue,1032,percent,65,Chilled water valve position,0,100,True
+STC/L1/FCU-01/FcuStatus,multistateValue,1033,,1,FCU operational status,,,True
+STC/L1/FCU-02/RoomTemp,analogInput,1034,degC,24.0,Room temperature,16.0,32.0,False
+STC/L1/FCU-02/RoomTempSetpoint,analogValue,1035,degC,22.0,Room temperature setpoint,18.0,26.0,True
+STC/L1/FCU-02/FanSpeed,multistateValue,1036,,2,Fan speed setting,,,True
+STC/L1/FCU-02/ValvePosition,analogValue,1037,percent,65,Chilled water valve position,0,100,True
+STC/L1/FCU-02/FcuStatus,multistateValue,1038,,1,FCU operational status,,,True
+STC/L0/FCU-01/RoomTemp,analogInput,1039,degC,22.0,Room temperature,16.0,32.0,False
+STC/L0/FCU-01/RoomTempSetpoint,analogValue,1040,degC,22.0,Room temperature setpoint,18.0,26.0,True
+STC/L0/FCU-01/FanSpeed,multistateValue,1041,,2,Fan speed setting,,,True
+STC/L0/FCU-01/ValvePosition,analogValue,1042,percent,65,Chilled water valve position,0,100,True
+STC/L0/FCU-01/FcuStatus,multistateValue,1043,,1,FCU operational status,,,True
+STC/L2/AHU-01/SupplyAirTemp,analogInput,1044,degC,14.0,Supply air temperature,10.0,25.0,False
+STC/L2/AHU-01/SupplyAirTempSetpoint,analogValue,1045,degC,14.0,Supply air temperature setpoint,12.0,18.0,True
+STC/L2/AHU-01/ReturnAirTemp,analogInput,1046,degC,23.0,Return air temperature,18.0,28.0,False
+STC/L2/AHU-01/FanStatus,multistateValue,1047,,1,Supply fan status,,,True
+STC/L2/AHU-01/FanSpeed,analogValue,1048,percent,75,Fan speed,0,100,True
+STC/L2/AHU-01/OutsideAirDamper,analogValue,1049,percent,25,Outside air damper position,10,100,True
+STC/L2/AHU-01/ChwValve,analogValue,1050,percent,60,Chilled water valve position,0,100,True
+STC/L1/AHU-01/SupplyAirTemp,analogInput,1051,degC,14.0,Supply air temperature,10.0,25.0,False
+STC/L1/AHU-01/SupplyAirTempSetpoint,analogValue,1052,degC,14.0,Supply air temperature setpoint,12.0,18.0,True
+STC/L1/AHU-01/ReturnAirTemp,analogInput,1053,degC,23.0,Return air temperature,18.0,28.0,False
+STC/L1/AHU-01/FanStatus,multistateValue,1054,,1,Supply fan status,,,True
+STC/L1/AHU-01/FanSpeed,analogValue,1055,percent,75,Fan speed,0,100,True
+STC/L1/AHU-01/OutsideAirDamper,analogValue,1056,percent,25,Outside air damper position,10,100,True
+STC/L1/AHU-01/ChwValve,analogValue,1057,percent,60,Chilled water valve position,0,100,True
+STC/L0/AHU-01/SupplyAirTemp,analogInput,1058,degC,14.0,Supply air temperature,10.0,25.0,False
+STC/L0/AHU-01/SupplyAirTempSetpoint,analogValue,1059,degC,14.0,Supply air temperature setpoint,12.0,18.0,True
+STC/L0/AHU-01/ReturnAirTemp,analogInput,1060,degC,23.0,Return air temperature,18.0,28.0,False
+STC/L0/AHU-01/FanStatus,multistateValue,1061,,1,Supply fan status,,,True
+STC/L0/AHU-01/FanSpeed,analogValue,1062,percent,75,Fan speed,0,100,True
+STC/L0/AHU-01/OutsideAirDamper,analogValue,1063,percent,25,Outside air damper position,10,100,True
+STC/L0/AHU-01/ChwValve,analogValue,1064,percent,60,Chilled water valve position,0,100,True
+STC/L2/VAV-01/DamperPosition,analogValue,1065,percent,40,VAV damper position,0,100,True
+STC/L2/VAV-01/AirflowActual,analogInput,1066,litersPerSecond,200,Actual airflow,0,600,False
+STC/L2/VAV-01/AirflowSetpoint,analogValue,1067,litersPerSecond,250,Airflow setpoint,50,500,True
+STC/L2/VAV-01/DischargeAirTemp,analogInput,1068,degC,14.5,Discharge air temperature,10,30,False
+STC/L2/VAV-01/HeatingValve,analogValue,1069,percent,0,Reheat valve position,0,100,True
+STC/L2/VAV-02/DamperPosition,analogValue,1070,percent,50,VAV damper position,0,100,True
+STC/L2/VAV-02/AirflowActual,analogInput,1071,litersPerSecond,250,Actual airflow,0,600,False
+STC/L2/VAV-02/AirflowSetpoint,analogValue,1072,litersPerSecond,250,Airflow setpoint,50,500,True
+STC/L2/VAV-02/DischargeAirTemp,analogInput,1073,degC,14.5,Discharge air temperature,10,30,False
+STC/L2/VAV-02/HeatingValve,analogValue,1074,percent,0,Reheat valve position,0,100,True
+STC/L2/VAV-03/DamperPosition,analogValue,1075,percent,50,VAV damper position,0,100,True
+STC/L2/VAV-03/AirflowActual,analogInput,1076,litersPerSecond,250,Actual airflow,0,600,False
+STC/L2/VAV-03/AirflowSetpoint,analogValue,1077,litersPerSecond,250,Airflow setpoint,50,500,True
+STC/L2/VAV-03/DischargeAirTemp,analogInput,1078,degC,14.5,Discharge air temperature,10,30,False
+STC/L2/VAV-03/HeatingValve,analogValue,1079,percent,0,Reheat valve position,0,100,True
+STC/L2/VAV-04/DamperPosition,analogValue,1080,percent,50,VAV damper position,0,100,True
+STC/L2/VAV-04/AirflowActual,analogInput,1081,litersPerSecond,250,Actual airflow,0,600,False
+STC/L2/VAV-04/AirflowSetpoint,analogValue,1082,litersPerSecond,250,Airflow setpoint,50,500,True
+STC/L2/VAV-04/DischargeAirTemp,analogInput,1083,degC,14.5,Discharge air temperature,10,30,False
+STC/L2/VAV-04/HeatingValve,analogValue,1084,percent,0,Reheat valve position,0,100,True
+STC/L2/VAV-05/DamperPosition,analogValue,1085,percent,49,VAV damper position,0,100,True
+STC/L2/VAV-05/AirflowActual,analogInput,1086,litersPerSecond,245,Actual airflow,0,600,False
+STC/L2/VAV-05/AirflowSetpoint,analogValue,1087,litersPerSecond,250,Airflow setpoint,50,500,True
+STC/L2/VAV-05/DischargeAirTemp,analogInput,1088,degC,14.5,Discharge air temperature,10,30,False
+STC/L2/VAV-05/HeatingValve,analogValue,1089,percent,0,Reheat valve position,0,100,True
+STC/L1/VAV-01/DamperPosition,analogValue,1090,percent,43,VAV damper position,0,100,True
+STC/L1/VAV-01/AirflowActual,analogInput,1091,litersPerSecond,215,Actual airflow,0,600,False
+STC/L1/VAV-01/AirflowSetpoint,analogValue,1092,litersPerSecond,250,Airflow setpoint,50,500,True
+STC/L1/VAV-01/DischargeAirTemp,analogInput,1093,degC,14.5,Discharge air temperature,10,30,False
+STC/L1/VAV-01/HeatingValve,analogValue,1094,percent,0,Reheat valve position,0,100,True
+STC/L1/VAV-02/DamperPosition,analogValue,1095,percent,46,VAV damper position,0,100,True
+STC/L1/VAV-02/AirflowActual,analogInput,1096,litersPerSecond,230,Actual airflow,0,600,False
+STC/L1/VAV-02/AirflowSetpoint,analogValue,1097,litersPerSecond,250,Airflow setpoint,50,500,True
+STC/L1/VAV-02/DischargeAirTemp,analogInput,1098,degC,14.5,Discharge air temperature,10,30,False
+STC/L1/VAV-02/HeatingValve,analogValue,1099,percent,0,Reheat valve position,0,100,True
+STC/L1/VAV-03/DamperPosition,analogValue,1100,percent,52,VAV damper position,0,100,True
+STC/L1/VAV-03/AirflowActual,analogInput,1101,litersPerSecond,260,Actual airflow,0,600,False
+STC/L1/VAV-03/AirflowSetpoint,analogValue,1102,litersPerSecond,250,Airflow setpoint,50,500,True
+STC/L1/VAV-03/DischargeAirTemp,analogInput,1103,degC,14.5,Discharge air temperature,10,30,False
+STC/L1/VAV-03/HeatingValve,analogValue,1104,percent,0,Reheat valve position,0,100,True
+STC/L1/VAV-04/DamperPosition,analogValue,1105,percent,40,VAV damper position,0,100,True
+STC/L1/VAV-04/AirflowActual,analogInput,1106,litersPerSecond,200,Actual airflow,0,600,False
+STC/L1/VAV-04/AirflowSetpoint,analogValue,1107,litersPerSecond,250,Airflow setpoint,50,500,True
+STC/L1/VAV-04/DischargeAirTemp,analogInput,1108,degC,14.5,Discharge air temperature,10,30,False
+STC/L1/VAV-04/HeatingValve,analogValue,1109,percent,0,Reheat valve position,0,100,True
+STC/L1/VAV-05/DamperPosition,analogValue,1110,percent,46,VAV damper position,0,100,True
+STC/L1/VAV-05/AirflowActual,analogInput,1111,litersPerSecond,230,Actual airflow,0,600,False
+STC/L1/VAV-05/AirflowSetpoint,analogValue,1112,litersPerSecond,250,Airflow setpoint,50,500,True
+STC/L1/VAV-05/DischargeAirTemp,analogInput,1113,degC,14.5,Discharge air temperature,10,30,False
+STC/L1/VAV-05/HeatingValve,analogValue,1114,percent,0,Reheat valve position,0,100,True
+STC/L0/VAV-01/DamperPosition,analogValue,1115,percent,49,VAV damper position,0,100,True
+STC/L0/VAV-01/AirflowActual,analogInput,1116,litersPerSecond,245,Actual airflow,0,600,False
+STC/L0/VAV-01/AirflowSetpoint,analogValue,1117,litersPerSecond,250,Airflow setpoint,50,500,True
+STC/L0/VAV-01/DischargeAirTemp,analogInput,1118,degC,14.5,Discharge air temperature,10,30,False
+STC/L0/VAV-01/HeatingValve,analogValue,1119,percent,0,Reheat valve position,0,100,True
+STC/L0/VAV-02/DamperPosition,analogValue,1120,percent,40,VAV damper position,0,100,True
+STC/L0/VAV-02/AirflowActual,analogInput,1121,litersPerSecond,200,Actual airflow,0,600,False
+STC/L0/VAV-02/AirflowSetpoint,analogValue,1122,litersPerSecond,250,Airflow setpoint,50,500,True
+STC/L0/VAV-02/DischargeAirTemp,analogInput,1123,degC,14.5,Discharge air temperature,10,30,False
+STC/L0/VAV-02/HeatingValve,analogValue,1124,percent,0,Reheat valve position,0,100,True
+STC/L0/VAV-03/DamperPosition,analogValue,1125,percent,95,VAV damper position,0,100,True
+STC/L0/VAV-03/AirflowActual,analogInput,1126,litersPerSecond,475,Actual airflow,0,600,False
+STC/L0/VAV-03/AirflowSetpoint,analogValue,1127,litersPerSecond,250,Airflow setpoint,50,500,True
+STC/L0/VAV-03/DischargeAirTemp,analogInput,1128,degC,14.5,Discharge air temperature,10,30,False
+STC/L0/VAV-03/HeatingValve,analogValue,1129,percent,0,Reheat valve position,0,100,True
+STC/L0/VAV-04/DamperPosition,analogValue,1130,percent,50,VAV damper position,0,100,True
+STC/L0/VAV-04/AirflowActual,analogInput,1131,litersPerSecond,250,Actual airflow,0,600,False
+STC/L0/VAV-04/AirflowSetpoint,analogValue,1132,litersPerSecond,250,Airflow setpoint,50,500,True
+STC/L0/VAV-04/DischargeAirTemp,analogInput,1133,degC,14.5,Discharge air temperature,10,30,False
+STC/L0/VAV-04/HeatingValve,analogValue,1134,percent,0,Reheat valve position,0,100,True
+STC/L0/VAV-05/DamperPosition,analogValue,1135,percent,45,VAV damper position,0,100,True
+STC/L0/VAV-05/AirflowActual,analogInput,1136,litersPerSecond,225,Actual airflow,0,600,False
+STC/L0/VAV-05/AirflowSetpoint,analogValue,1137,litersPerSecond,250,Airflow setpoint,50,500,True
+STC/L0/VAV-05/DischargeAirTemp,analogInput,1138,degC,14.5,Discharge air temperature,10,30,False
+STC/L0/VAV-05/HeatingValve,analogValue,1139,percent,0,Reheat valve position,0,100,True
+STC/G/FP-01/PanelStatus,multistateValue,1140,,2,Fire alarm panel overall status,,,False
+STC/G/FP-01/ZoneAlarmActive,binaryValue,1141,,0,Any zone alarm currently active,,,False
+STC/G/FP-01/BatteryVoltage,analogInput,1142,volts,25.2,Panel backup battery voltage,20.0,30.0,False
+STC/G/FP-01/DetectorFaultCount,analogInput,1143,,1,Number of detectors in fault state,0,200,False
+STC/G/FP-01/LastTestDate,analogValue,1144,,20260120,Last system test date (encoded as YYYYMMDD),,,False
+STC/L0/FP-01/Position,analogInput,1145,percent,100,Damper position percentage,0,100,False
+STC/L0/FP-01/Status,multistateValue,1146,,0,Damper operational status,,,False
+STC/L0/FP-01/Command,binaryValue,1147,,1,Damper open/close command (priority 1 fire system only),,,True
+STC/L0/FP-02/Position,analogInput,1148,percent,100,Damper position percentage,0,100,False
+STC/L0/FP-02/Status,multistateValue,1149,,0,Damper operational status,,,False
+STC/L0/FP-02/Command,binaryValue,1150,,1,Damper open/close command,,,True
+STC/L1/FP-01/Position,analogInput,1151,percent,35,Damper position percentage,0,100,False
+STC/L1/FP-01/Status,multistateValue,1152,,3,Damper operational status,,,False
+STC/L1/FP-01/Command,binaryValue,1153,,1,Damper open/close command,,,True
+STC/L1/FP-02/Position,analogInput,1154,percent,100,Damper position percentage,0,100,False
+STC/L1/FP-02/Status,multistateValue,1155,,0,Damper operational status,,,False
+STC/L1/FP-02/Command,binaryValue,1156,,1,Damper open/close command,,,True
+STC/L2/FP-01/Position,analogInput,1157,percent,100,Damper position percentage,0,100,False
+STC/L2/FP-01/Status,multistateValue,1158,,0,Damper operational status,,,False
+STC/L2/FP-01/Command,binaryValue,1159,,1,Damper open/close command,,,True
+STC/L2/FP-02/Position,analogInput,1160,percent,100,Damper position percentage,0,100,False
+STC/L2/FP-02/Status,multistateValue,1161,,0,Damper operational status,,,False
+STC/L2/FP-02/Command,binaryValue,1162,,1,Damper open/close command,,,True
+STC/G/FP-01/FanStatus,multistateValue,1163,,0,Pressurization fan operational status,,,False
+STC/G/FP-01/SpeedPct,analogInput,1164,percent,0,Fan speed percentage,0,100,False
+STC/G/FP-01/DifferentialPressurePa,analogInput,1165,pascals,0,Stairwell differential pressure,0,100,False
+STC/G/FP-02/FanStatus,multistateValue,1166,,0,Pressurization fan operational status,,,False
+STC/G/FP-02/SpeedPct,analogInput,1167,percent,0,Fan speed percentage,0,100,False
+STC/G/FP-02/DifferentialPressurePa,analogInput,1168,pascals,0,Stairwell differential pressure,0,100,False
+STC/G/SEC-01/DoorStatus,binaryInput,1169,,0,Door open/closed status,,,False
+STC/G/SEC-01/LockStatus,binaryValue,1170,,1,Electric lock engaged/disengaged,,,True
+STC/G/SEC-01/AccessGranted,binaryInput,1171,,1,Last access granted status,,,False
+STC/G/SEC-01/TamperAlarm,binaryInput,1172,,0,Tamper alarm status,,,False
+STC/G/SEC-01/ReaderBattery,analogInput,1173,percent,95,Reader battery level,0,100,False
+STC/L1/SEC-01/DoorStatus,binaryInput,1174,,0,Door open/closed status,,,False
+STC/L1/SEC-01/LockStatus,binaryValue,1175,,1,Electric lock engaged/disengaged,,,True
+STC/L1/SEC-01/AccessGranted,binaryInput,1176,,1,Last access granted status,,,False
+STC/L1/SEC-01/TamperAlarm,binaryInput,1177,,0,Tamper alarm status,,,False
+STC/L1/SEC-01/ReaderBattery,analogInput,1178,percent,88,Reader battery level,0,100,False
+STC/L2/SEC-01/DoorStatus,binaryInput,1179,,0,Door open/closed status,,,False
+STC/L2/SEC-01/LockStatus,binaryValue,1180,,1,Electric lock engaged/disengaged,,,True
+STC/L2/SEC-01/AccessGranted,binaryInput,1181,,1,Last access granted status,,,False
+STC/L2/SEC-01/TamperAlarm,binaryInput,1182,,0,Tamper alarm status,,,False
+STC/L2/SEC-01/ReaderBattery,analogInput,1183,percent,91,Reader battery level,0,100,False
+STC/L1/SEC-SRV/DoorStatus,binaryInput,1184,,0,Door open/closed status,,,False
+STC/L1/SEC-SRV/LockStatus,binaryValue,1185,,1,Electric lock engaged/disengaged,,,True
+STC/L1/SEC-SRV/AccessGranted,binaryInput,1186,,1,Last access granted status,,,False
+STC/L1/SEC-SRV/TamperAlarm,binaryInput,1187,,0,Tamper alarm status,,,False
+STC/L1/SEC-SRV/ReaderBattery,analogInput,1188,percent,96,Reader battery level,0,100,False
+STC/G/SEC-01/CameraStatus,multistateValue,1189,,1,Camera operational status,,,False
+STC/G/SEC-01/MotionDetected,binaryInput,1190,,1,Motion detection status,,,False
+STC/G/SEC-01/Recording,binaryInput,1191,,1,Recording status,,,False
+STC/G/SEC-01/DiskUsage,analogInput,1192,percent,62,NVR disk usage,0,100,False
+STC/L1/SEC-01/CameraStatus,multistateValue,1193,,1,Camera operational status,,,False
+STC/L1/SEC-01/MotionDetected,binaryInput,1194,,0,Motion detection status,,,False
+STC/L1/SEC-01/Recording,binaryInput,1195,,1,Recording status,,,False
+STC/L1/SEC-01/DiskUsage,analogInput,1196,percent,62,NVR disk usage,0,100,False
+STC/L1/SEC-SRV/CameraStatus,multistateValue,1197,,1,Camera operational status,,,False
+STC/L1/SEC-SRV/MotionDetected,binaryInput,1198,,0,Motion detection status,,,False
+STC/L1/SEC-SRV/Recording,binaryInput,1199,,1,Recording status,,,False
+STC/L1/SEC-SRV/DiskUsage,analogInput,1200,percent,62,NVR disk usage,0,100,False
+STC/L2/DIFF-A01/AirflowCfm,analogInput,1201,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L2/DIFF-A01/DamperPosition,analogValue,1202,percent,50,Diffuser damper position,0,100,True
+STC/L2/DIFF-A01/RoomTemp,analogInput,1203,degC,22.5,Zone temperature,16,32,False
+STC/L2/DIFF-A01/Occupancy,binaryInput,1204,,1,Zone occupancy status,,,False
+STC/L2/DIFF-A01/Co2Level,analogInput,1205,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L2/DIFF-A02/AirflowCfm,analogInput,1206,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L2/DIFF-A02/DamperPosition,analogValue,1207,percent,50,Diffuser damper position,0,100,True
+STC/L2/DIFF-A02/RoomTemp,analogInput,1208,degC,22.5,Zone temperature,16,32,False
+STC/L2/DIFF-A02/Occupancy,binaryInput,1209,,1,Zone occupancy status,,,False
+STC/L2/DIFF-A02/Co2Level,analogInput,1210,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L2/DIFF-B01/AirflowCfm,analogInput,1211,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L2/DIFF-B01/DamperPosition,analogValue,1212,percent,50,Diffuser damper position,0,100,True
+STC/L2/DIFF-B01/RoomTemp,analogInput,1213,degC,22.5,Zone temperature,16,32,False
+STC/L2/DIFF-B01/Occupancy,binaryInput,1214,,1,Zone occupancy status,,,False
+STC/L2/DIFF-B01/Co2Level,analogInput,1215,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L2/DIFF-B02/AirflowCfm,analogInput,1216,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L2/DIFF-B02/DamperPosition,analogValue,1217,percent,50,Diffuser damper position,0,100,True
+STC/L2/DIFF-B02/RoomTemp,analogInput,1218,degC,22.5,Zone temperature,16,32,False
+STC/L2/DIFF-B02/Occupancy,binaryInput,1219,,1,Zone occupancy status,,,False
+STC/L2/DIFF-B02/Co2Level,analogInput,1220,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L2/DIFF-C01/AirflowCfm,analogInput,1221,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L2/DIFF-C01/DamperPosition,analogValue,1222,percent,50,Diffuser damper position,0,100,True
+STC/L2/DIFF-C01/RoomTemp,analogInput,1223,degC,22.5,Zone temperature,16,32,False
+STC/L2/DIFF-C01/Occupancy,binaryInput,1224,,1,Zone occupancy status,,,False
+STC/L2/DIFF-C01/Co2Level,analogInput,1225,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L2/DIFF-C02/AirflowCfm,analogInput,1226,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L2/DIFF-C02/DamperPosition,analogValue,1227,percent,50,Diffuser damper position,0,100,True
+STC/L2/DIFF-C02/RoomTemp,analogInput,1228,degC,22.5,Zone temperature,16,32,False
+STC/L2/DIFF-C02/Occupancy,binaryInput,1229,,1,Zone occupancy status,,,False
+STC/L2/DIFF-C02/Co2Level,analogInput,1230,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L2/DIFF-C03/AirflowCfm,analogInput,1231,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L2/DIFF-C03/DamperPosition,analogValue,1232,percent,50,Diffuser damper position,0,100,True
+STC/L2/DIFF-C03/RoomTemp,analogInput,1233,degC,22.5,Zone temperature,16,32,False
+STC/L2/DIFF-C03/Occupancy,binaryInput,1234,,1,Zone occupancy status,,,False
+STC/L2/DIFF-C03/Co2Level,analogInput,1235,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L2/DIFF-D01/AirflowCfm,analogInput,1236,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L2/DIFF-D01/DamperPosition,analogValue,1237,percent,50,Diffuser damper position,0,100,True
+STC/L2/DIFF-D01/RoomTemp,analogInput,1238,degC,22.5,Zone temperature,16,32,False
+STC/L2/DIFF-D01/Occupancy,binaryInput,1239,,1,Zone occupancy status,,,False
+STC/L2/DIFF-D01/Co2Level,analogInput,1240,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L2/DIFF-D02/AirflowCfm,analogInput,1241,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L2/DIFF-D02/DamperPosition,analogValue,1242,percent,50,Diffuser damper position,0,100,True
+STC/L2/DIFF-D02/RoomTemp,analogInput,1243,degC,22.5,Zone temperature,16,32,False
+STC/L2/DIFF-D02/Occupancy,binaryInput,1244,,1,Zone occupancy status,,,False
+STC/L2/DIFF-D02/Co2Level,analogInput,1245,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L2/DIFF-D03/AirflowCfm,analogInput,1246,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L2/DIFF-D03/DamperPosition,analogValue,1247,percent,50,Diffuser damper position,0,100,True
+STC/L2/DIFF-D03/RoomTemp,analogInput,1248,degC,22.5,Zone temperature,16,32,False
+STC/L2/DIFF-D03/Occupancy,binaryInput,1249,,1,Zone occupancy status,,,False
+STC/L2/DIFF-D03/Co2Level,analogInput,1250,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L2/DIFF-E01/AirflowCfm,analogInput,1251,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L2/DIFF-E01/DamperPosition,analogValue,1252,percent,50,Diffuser damper position,0,100,True
+STC/L2/DIFF-E01/RoomTemp,analogInput,1253,degC,22.5,Zone temperature,16,32,False
+STC/L2/DIFF-E01/Occupancy,binaryInput,1254,,1,Zone occupancy status,,,False
+STC/L2/DIFF-E01/Co2Level,analogInput,1255,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L2/DIFF-E02/AirflowCfm,analogInput,1256,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L2/DIFF-E02/DamperPosition,analogValue,1257,percent,50,Diffuser damper position,0,100,True
+STC/L2/DIFF-E02/RoomTemp,analogInput,1258,degC,22.5,Zone temperature,16,32,False
+STC/L2/DIFF-E02/Occupancy,binaryInput,1259,,1,Zone occupancy status,,,False
+STC/L2/DIFF-E02/Co2Level,analogInput,1260,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L2/DIFF-E03/AirflowCfm,analogInput,1261,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L2/DIFF-E03/DamperPosition,analogValue,1262,percent,50,Diffuser damper position,0,100,True
+STC/L2/DIFF-E03/RoomTemp,analogInput,1263,degC,22.5,Zone temperature,16,32,False
+STC/L2/DIFF-E03/Occupancy,binaryInput,1264,,1,Zone occupancy status,,,False
+STC/L2/DIFF-E03/Co2Level,analogInput,1265,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L1/DIFF-A01/AirflowCfm,analogInput,1266,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L1/DIFF-A01/DamperPosition,analogValue,1267,percent,50,Diffuser damper position,0,100,True
+STC/L1/DIFF-A01/RoomTemp,analogInput,1268,degC,22.5,Zone temperature,16,32,False
+STC/L1/DIFF-A01/Occupancy,binaryInput,1269,,1,Zone occupancy status,,,False
+STC/L1/DIFF-A01/Co2Level,analogInput,1270,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L1/DIFF-A02/AirflowCfm,analogInput,1271,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L1/DIFF-A02/DamperPosition,analogValue,1272,percent,50,Diffuser damper position,0,100,True
+STC/L1/DIFF-A02/RoomTemp,analogInput,1273,degC,22.5,Zone temperature,16,32,False
+STC/L1/DIFF-A02/Occupancy,binaryInput,1274,,1,Zone occupancy status,,,False
+STC/L1/DIFF-A02/Co2Level,analogInput,1275,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L1/DIFF-B01/AirflowCfm,analogInput,1276,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L1/DIFF-B01/DamperPosition,analogValue,1277,percent,50,Diffuser damper position,0,100,True
+STC/L1/DIFF-B01/RoomTemp,analogInput,1278,degC,22.5,Zone temperature,16,32,False
+STC/L1/DIFF-B01/Occupancy,binaryInput,1279,,1,Zone occupancy status,,,False
+STC/L1/DIFF-B01/Co2Level,analogInput,1280,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L1/DIFF-B02/AirflowCfm,analogInput,1281,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L1/DIFF-B02/DamperPosition,analogValue,1282,percent,50,Diffuser damper position,0,100,True
+STC/L1/DIFF-B02/RoomTemp,analogInput,1283,degC,22.5,Zone temperature,16,32,False
+STC/L1/DIFF-B02/Occupancy,binaryInput,1284,,1,Zone occupancy status,,,False
+STC/L1/DIFF-B02/Co2Level,analogInput,1285,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L1/DIFF-C01/AirflowCfm,analogInput,1286,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L1/DIFF-C01/DamperPosition,analogValue,1287,percent,50,Diffuser damper position,0,100,True
+STC/L1/DIFF-C01/RoomTemp,analogInput,1288,degC,22.5,Zone temperature,16,32,False
+STC/L1/DIFF-C01/Occupancy,binaryInput,1289,,1,Zone occupancy status,,,False
+STC/L1/DIFF-C01/Co2Level,analogInput,1290,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L1/DIFF-C02/AirflowCfm,analogInput,1291,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L1/DIFF-C02/DamperPosition,analogValue,1292,percent,50,Diffuser damper position,0,100,True
+STC/L1/DIFF-C02/RoomTemp,analogInput,1293,degC,22.5,Zone temperature,16,32,False
+STC/L1/DIFF-C02/Occupancy,binaryInput,1294,,1,Zone occupancy status,,,False
+STC/L1/DIFF-C02/Co2Level,analogInput,1295,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L1/DIFF-C03/AirflowCfm,analogInput,1296,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L1/DIFF-C03/DamperPosition,analogValue,1297,percent,50,Diffuser damper position,0,100,True
+STC/L1/DIFF-C03/RoomTemp,analogInput,1298,degC,22.5,Zone temperature,16,32,False
+STC/L1/DIFF-C03/Occupancy,binaryInput,1299,,1,Zone occupancy status,,,False
+STC/L1/DIFF-C03/Co2Level,analogInput,1300,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L1/DIFF-D01/AirflowCfm,analogInput,1301,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L1/DIFF-D01/DamperPosition,analogValue,1302,percent,50,Diffuser damper position,0,100,True
+STC/L1/DIFF-D01/RoomTemp,analogInput,1303,degC,22.5,Zone temperature,16,32,False
+STC/L1/DIFF-D01/Occupancy,binaryInput,1304,,1,Zone occupancy status,,,False
+STC/L1/DIFF-D01/Co2Level,analogInput,1305,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L1/DIFF-D02/AirflowCfm,analogInput,1306,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L1/DIFF-D02/DamperPosition,analogValue,1307,percent,50,Diffuser damper position,0,100,True
+STC/L1/DIFF-D02/RoomTemp,analogInput,1308,degC,22.5,Zone temperature,16,32,False
+STC/L1/DIFF-D02/Occupancy,binaryInput,1309,,1,Zone occupancy status,,,False
+STC/L1/DIFF-D02/Co2Level,analogInput,1310,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L1/DIFF-D03/AirflowCfm,analogInput,1311,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L1/DIFF-D03/DamperPosition,analogValue,1312,percent,50,Diffuser damper position,0,100,True
+STC/L1/DIFF-D03/RoomTemp,analogInput,1313,degC,22.5,Zone temperature,16,32,False
+STC/L1/DIFF-D03/Occupancy,binaryInput,1314,,1,Zone occupancy status,,,False
+STC/L1/DIFF-D03/Co2Level,analogInput,1315,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L1/DIFF-E01/AirflowCfm,analogInput,1316,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L1/DIFF-E01/DamperPosition,analogValue,1317,percent,50,Diffuser damper position,0,100,True
+STC/L1/DIFF-E01/RoomTemp,analogInput,1318,degC,22.5,Zone temperature,16,32,False
+STC/L1/DIFF-E01/Occupancy,binaryInput,1319,,1,Zone occupancy status,,,False
+STC/L1/DIFF-E01/Co2Level,analogInput,1320,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L1/DIFF-E02/AirflowCfm,analogInput,1321,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L1/DIFF-E02/DamperPosition,analogValue,1322,percent,50,Diffuser damper position,0,100,True
+STC/L1/DIFF-E02/RoomTemp,analogInput,1323,degC,22.5,Zone temperature,16,32,False
+STC/L1/DIFF-E02/Occupancy,binaryInput,1324,,1,Zone occupancy status,,,False
+STC/L1/DIFF-E02/Co2Level,analogInput,1325,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L1/DIFF-E03/AirflowCfm,analogInput,1326,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L1/DIFF-E03/DamperPosition,analogValue,1327,percent,50,Diffuser damper position,0,100,True
+STC/L1/DIFF-E03/RoomTemp,analogInput,1328,degC,22.5,Zone temperature,16,32,False
+STC/L1/DIFF-E03/Occupancy,binaryInput,1329,,1,Zone occupancy status,,,False
+STC/L1/DIFF-E03/Co2Level,analogInput,1330,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L0/DIFF-A01/AirflowCfm,analogInput,1331,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L0/DIFF-A01/DamperPosition,analogValue,1332,percent,50,Diffuser damper position,0,100,True
+STC/L0/DIFF-A01/RoomTemp,analogInput,1333,degC,22.5,Zone temperature,16,32,False
+STC/L0/DIFF-A01/Occupancy,binaryInput,1334,,1,Zone occupancy status,,,False
+STC/L0/DIFF-A01/Co2Level,analogInput,1335,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L0/DIFF-A02/AirflowCfm,analogInput,1336,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L0/DIFF-A02/DamperPosition,analogValue,1337,percent,50,Diffuser damper position,0,100,True
+STC/L0/DIFF-A02/RoomTemp,analogInput,1338,degC,22.5,Zone temperature,16,32,False
+STC/L0/DIFF-A02/Occupancy,binaryInput,1339,,1,Zone occupancy status,,,False
+STC/L0/DIFF-A02/Co2Level,analogInput,1340,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L0/DIFF-B01/AirflowCfm,analogInput,1341,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L0/DIFF-B01/DamperPosition,analogValue,1342,percent,50,Diffuser damper position,0,100,True
+STC/L0/DIFF-B01/RoomTemp,analogInput,1343,degC,22.5,Zone temperature,16,32,False
+STC/L0/DIFF-B01/Occupancy,binaryInput,1344,,1,Zone occupancy status,,,False
+STC/L0/DIFF-B01/Co2Level,analogInput,1345,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L0/DIFF-B02/AirflowCfm,analogInput,1346,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L0/DIFF-B02/DamperPosition,analogValue,1347,percent,50,Diffuser damper position,0,100,True
+STC/L0/DIFF-B02/RoomTemp,analogInput,1348,degC,22.5,Zone temperature,16,32,False
+STC/L0/DIFF-B02/Occupancy,binaryInput,1349,,1,Zone occupancy status,,,False
+STC/L0/DIFF-B02/Co2Level,analogInput,1350,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L0/DIFF-C01/AirflowCfm,analogInput,1351,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L0/DIFF-C01/DamperPosition,analogValue,1352,percent,50,Diffuser damper position,0,100,True
+STC/L0/DIFF-C01/RoomTemp,analogInput,1353,degC,22.5,Zone temperature,16,32,False
+STC/L0/DIFF-C01/Occupancy,binaryInput,1354,,1,Zone occupancy status,,,False
+STC/L0/DIFF-C01/Co2Level,analogInput,1355,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L0/DIFF-C02/AirflowCfm,analogInput,1356,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L0/DIFF-C02/DamperPosition,analogValue,1357,percent,50,Diffuser damper position,0,100,True
+STC/L0/DIFF-C02/RoomTemp,analogInput,1358,degC,22.5,Zone temperature,16,32,False
+STC/L0/DIFF-C02/Occupancy,binaryInput,1359,,1,Zone occupancy status,,,False
+STC/L0/DIFF-C02/Co2Level,analogInput,1360,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L0/DIFF-C03/AirflowCfm,analogInput,1361,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L0/DIFF-C03/DamperPosition,analogValue,1362,percent,50,Diffuser damper position,0,100,True
+STC/L0/DIFF-C03/RoomTemp,analogInput,1363,degC,22.5,Zone temperature,16,32,False
+STC/L0/DIFF-C03/Occupancy,binaryInput,1364,,1,Zone occupancy status,,,False
+STC/L0/DIFF-C03/Co2Level,analogInput,1365,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L0/DIFF-D01/AirflowCfm,analogInput,1366,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L0/DIFF-D01/DamperPosition,analogValue,1367,percent,50,Diffuser damper position,0,100,True
+STC/L0/DIFF-D01/RoomTemp,analogInput,1368,degC,22.5,Zone temperature,16,32,False
+STC/L0/DIFF-D01/Occupancy,binaryInput,1369,,1,Zone occupancy status,,,False
+STC/L0/DIFF-D01/Co2Level,analogInput,1370,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L0/DIFF-D02/AirflowCfm,analogInput,1371,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L0/DIFF-D02/DamperPosition,analogValue,1372,percent,50,Diffuser damper position,0,100,True
+STC/L0/DIFF-D02/RoomTemp,analogInput,1373,degC,22.5,Zone temperature,16,32,False
+STC/L0/DIFF-D02/Occupancy,binaryInput,1374,,1,Zone occupancy status,,,False
+STC/L0/DIFF-D02/Co2Level,analogInput,1375,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L0/DIFF-D03/AirflowCfm,analogInput,1376,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L0/DIFF-D03/DamperPosition,analogValue,1377,percent,50,Diffuser damper position,0,100,True
+STC/L0/DIFF-D03/RoomTemp,analogInput,1378,degC,22.5,Zone temperature,16,32,False
+STC/L0/DIFF-D03/Occupancy,binaryInput,1379,,1,Zone occupancy status,,,False
+STC/L0/DIFF-D03/Co2Level,analogInput,1380,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L0/DIFF-E01/AirflowCfm,analogInput,1381,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L0/DIFF-E01/DamperPosition,analogValue,1382,percent,50,Diffuser damper position,0,100,True
+STC/L0/DIFF-E01/RoomTemp,analogInput,1383,degC,22.5,Zone temperature,16,32,False
+STC/L0/DIFF-E01/Occupancy,binaryInput,1384,,1,Zone occupancy status,,,False
+STC/L0/DIFF-E01/Co2Level,analogInput,1385,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L0/DIFF-E02/AirflowCfm,analogInput,1386,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L0/DIFF-E02/DamperPosition,analogValue,1387,percent,50,Diffuser damper position,0,100,True
+STC/L0/DIFF-E02/RoomTemp,analogInput,1388,degC,22.5,Zone temperature,16,32,False
+STC/L0/DIFF-E02/Occupancy,binaryInput,1389,,1,Zone occupancy status,,,False
+STC/L0/DIFF-E02/Co2Level,analogInput,1390,partsPerMillion,650,Zone CO2 level,400,2000,False
+STC/L0/DIFF-E03/AirflowCfm,analogInput,1391,cubicFeetPerMinute,200,Diffuser airflow rate,50,400,False
+STC/L0/DIFF-E03/DamperPosition,analogValue,1392,percent,50,Diffuser damper position,0,100,True
+STC/L0/DIFF-E03/RoomTemp,analogInput,1393,degC,22.5,Zone temperature,16,32,False
+STC/L0/DIFF-E03/Occupancy,binaryInput,1394,,1,Zone occupancy status,,,False
+STC/L0/DIFF-E03/Co2Level,analogInput,1395,partsPerMillion,650,Zone CO2 level,400,2000,False

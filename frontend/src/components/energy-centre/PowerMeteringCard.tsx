@@ -8,7 +8,7 @@
  * - Power quality (THD)
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, Title, Text, Metric, Grid, Badge, Flex } from '@tremor/react';
 import { energyCentreApi } from '../../lib/energyCentreApi';
 import type { PowerMeter } from '../../lib/energyCentreApi';
@@ -28,23 +28,23 @@ export function PowerMeteringCard({ siteId, compact = false }: PowerMeteringCard
   const [meter, setMeter] = useState<PowerMeter | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadData();
-    const interval = setInterval(loadData, 5000);
-    return () => clearInterval(interval);
-  }, [siteId]);
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     try {
       const meters = await energyCentreApi.getMeters(siteId, 'main');
       if (meters.length > 0) {
         setMeter(meters[0]);
       }
       setLoading(false);
-    } catch (err) {
+    } catch (_err) {
       setLoading(false);
     }
-  }
+  }, [siteId]);
+
+  useEffect(() => {
+    loadData();
+    const interval = setInterval(loadData, 5000);
+    return () => clearInterval(interval);
+  }, [loadData]);
 
   if (loading) {
     return (

@@ -73,7 +73,7 @@ export function ChatMessage({ role, content, isStreaming }: ChatMessageProps) {
             <ReactMarkdown
               components={{
                 // Style headings with better hierarchy
-                h1: ({ node, ...props }) => (
+                h1: ({ ...props }) => (
                   <h1
                     className="font-semibold mb-3 mt-4 first:mt-0"
                     style={{
@@ -85,7 +85,7 @@ export function ChatMessage({ role, content, isStreaming }: ChatMessageProps) {
                     {...props}
                   />
                 ),
-                h2: ({ node, ...props }) => (
+                h2: ({ ...props }) => (
                   <h2
                     className="font-semibold mb-2 mt-4 first:mt-0"
                     style={{
@@ -95,7 +95,7 @@ export function ChatMessage({ role, content, isStreaming }: ChatMessageProps) {
                     {...props}
                   />
                 ),
-                h3: ({ node, ...props }) => (
+                h3: ({ ...props }) => (
                   <h3
                     className="font-semibold mb-2 mt-3 first:mt-0"
                     style={{
@@ -106,7 +106,7 @@ export function ChatMessage({ role, content, isStreaming }: ChatMessageProps) {
                   />
                 ),
                 // Style paragraphs with better spacing
-                p: ({ node, ...props }) => (
+                p: ({ ...props }) => (
                   <p
                     className="mb-3 last:mb-0"
                     style={{
@@ -117,7 +117,7 @@ export function ChatMessage({ role, content, isStreaming }: ChatMessageProps) {
                   />
                 ),
                 // Style lists with better spacing and indentation
-                ul: ({ node, ...props }) => (
+                ul: ({ ...props }) => (
                   <ul
                     className="mb-3 ml-4 space-y-1.5 last:mb-0"
                     style={{
@@ -127,7 +127,7 @@ export function ChatMessage({ role, content, isStreaming }: ChatMessageProps) {
                     {...props}
                   />
                 ),
-                ol: ({ node, ...props }) => (
+                ol: ({ ...props }) => (
                   <ol
                     className="mb-3 ml-4 space-y-1.5 last:mb-0"
                     style={{
@@ -137,7 +137,7 @@ export function ChatMessage({ role, content, isStreaming }: ChatMessageProps) {
                     {...props}
                   />
                 ),
-                li: ({ node, ...props }) => (
+                li: ({ ...props }) => (
                   <li
                     className="pl-1"
                     style={{
@@ -148,7 +148,7 @@ export function ChatMessage({ role, content, isStreaming }: ChatMessageProps) {
                   />
                 ),
                 // Style code blocks
-                code: ({ node, inline, ...props }: any) =>
+                code: ({ inline, ...props }: { inline?: boolean; className?: string; children?: React.ReactNode }) =>
                   inline ? (
                     <code
                       className="px-1.5 py-0.5 rounded text-xs font-mono"
@@ -172,7 +172,7 @@ export function ChatMessage({ role, content, isStreaming }: ChatMessageProps) {
                     />
                   ),
                 // Style strong (bold) text with better visibility
-                strong: ({ node, ...props }) => (
+                strong: ({ ...props }) => (
                   <strong
                     className="font-semibold"
                     style={{
@@ -183,7 +183,7 @@ export function ChatMessage({ role, content, isStreaming }: ChatMessageProps) {
                   />
                 ),
                 // Style emphasis (italic)
-                em: ({ node, ...props }) => (
+                em: ({ ...props }) => (
                   <em
                     className="italic"
                     style={{
@@ -194,7 +194,7 @@ export function ChatMessage({ role, content, isStreaming }: ChatMessageProps) {
                   />
                 ),
                 // Style links
-                a: ({ node, ...props }) => (
+                a: ({ ...props }) => (
                   <a
                     className="underline"
                     style={{
@@ -205,7 +205,7 @@ export function ChatMessage({ role, content, isStreaming }: ChatMessageProps) {
                   />
                 ),
                 // Style horizontal rules for section breaks
-                hr: ({ node, ...props }) => (
+                hr: ({ ...props }) => (
                   <hr
                     className="my-4 border-0"
                     style={{
@@ -215,7 +215,7 @@ export function ChatMessage({ role, content, isStreaming }: ChatMessageProps) {
                   />
                 ),
                 // Style blockquotes
-                blockquote: ({ node, ...props }) => (
+                blockquote: ({ ...props }) => (
                   <blockquote
                     className="border-l-4 pl-4 my-3 italic"
                     style={{

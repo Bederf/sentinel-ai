@@ -26,12 +26,15 @@ import {
   VideoOff,
   Lock,
   Unlock,
+  Building2,
+  ChevronDown,
 } from "lucide-react";
-import { securityApi } from "../lib/api";
+import api, { securityApi } from "../lib/api";
 import type {
   SecuritySystemStatus,
   SecurityCamera,
   SecurityAlarmZone,
+  Site,
 } from "../lib/api";
 import { AccessEventsPanel } from "./AccessEventsPanel";
 import { SecurityOccupancyPanel } from "./SecurityOccupancyPanel";
@@ -40,6 +43,8 @@ export function SecurityDashboard() {
   const [status, setStatus] = useState<SecuritySystemStatus | null>(null);
   const [cameras, setCameras] = useState<SecurityCamera[]>([]);
   const [alarmZones, setAlarmZones] = useState<SecurityAlarmZone[]>([]);
+  const [sites, setSites] = useState<Site[]>([]);
+  const [selectedSiteId, setSelectedSiteId] = useState<string>("site-002");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -70,10 +75,28 @@ export function SecurityDashboard() {
     }
   }, []);
 
-  // Fetch on mount
+  // Fetch sites on mount
+  useEffect(() => {
+    const loadSites = async () => {
+      try {
+        const sitesData = await api.getSites();
+        setSites(sitesData.sort((a, b) => a.name.localeCompare(b.name)));
+        // Default to site-002 (Sandton City) if available, otherwise first site
+        const defaultSite = sitesData.find(s => s.id === "site-002") || sitesData[0];
+        if (defaultSite) {
+          setSelectedSiteId(defaultSite.id);
+        }
+      } catch (err) {
+        console.error("Failed to load sites:", err);
+      }
+    };
+    loadSites();
+  }, []);
+
+  // Fetch security data on mount and when site changes
   useEffect(() => {
     fetchData();
-  }, [fetchData]);
+  }, [fetchData, selectedSiteId]);
 
   // Auto-refresh every 15 seconds
   useEffect(() => {
@@ -203,6 +226,39 @@ export function SecurityDashboard() {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            {/* Building Selector */}
+            <div className="relative">
+              <Building2
+                className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4"
+                style={{ color: "var(--color-sentinel-text-secondary)" }}
+              />
+              <select
+                value={selectedSiteId}
+                onChange={(e) => setSelectedSiteId(e.target.value)}
+                className="pl-9 pr-8 py-1.5 text-sm rounded appearance-none cursor-pointer"
+                style={{
+                  background: "var(--color-sentinel-bg-secondary)",
+                  border: "1px solid var(--color-sentinel-border)",
+                  color: "var(--color-sentinel-text-primary)",
+                  outline: "none",
+                  minWidth: "200px",
+                }}
+              >
+                {sites.length > 0 ? (
+                  sites.map((site) => (
+                    <option key={site.id} value={site.id}>
+                      {site.name}
+                    </option>
+                  ))
+                ) : (
+                  <option value="site-002">Sandton City Office Tower</option>
+                )}
+              </select>
+              <ChevronDown
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 pointer-events-none"
+                style={{ color: "var(--color-sentinel-text-secondary)" }}
+              />
+            </div>
             {lastUpdated && (
               <span
                 className="text-xs"

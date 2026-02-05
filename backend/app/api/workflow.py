@@ -30,6 +30,12 @@ from app.services.workflow_triggers import (
     TriggerResult,
     EffectivenessResult,
 )
+from app.database.supabase_client import get_supabase_client
+from app.database.repositories.equipment_repository import EquipmentRepository
+from app.database.repositories.prediction_repository import PredictionRepository
+from app.database.repositories.baseline_repository import BaselineRepository
+from app.database.repositories.inspection_repository import InspectionRepository
+from app.database.repositories.work_order_repository import get_work_order_repository
 
 logger = logging.getLogger(__name__)
 
@@ -351,6 +357,232 @@ async def get_effectiveness_result(work_order_id: str):
         )
 
     return result.model_dump()
+
+
+# ============================================================================
+# Dashboard Endpoints
+# ============================================================================
+
+class DashboardEquipmentItem(BaseModel):
+    """Equipment item for workflow dashboard."""
+    equipment_id: str
+    name: str
+    type: str
+    current_state: str
+
+
+class DashboardWorkflowState(BaseModel):
+    """Workflow state for dashboard."""
+    equipment_id: str
+    current_state: str
+    state_history: List[dict]
+    baseline_summary: dict
+    inspection_status: dict
+    ml_prediction: Optional[dict]
+    active_repairs: List[dict]
+
+
+class DashboardResponse(BaseModel):
+    """Response for workflow dashboard."""
+    equipment: List[DashboardEquipmentItem]
+    workflow_states: dict  # keyed by equipment_id
+
+
+def determine_workflow_state(
+    has_active_prediction: bool,
+    prediction_probability: float,
+    has_pending_inspection: bool,
+    has_active_work_order: bool,
+    has_baseline_deviation: bool
+) -> str:
+    """Determine the current workflow state based on various factors."""
+    if has_active_work_order:
+        return "repair_in_progress"
+    if has_pending_inspection:
+        return "inspection_pending"
+    if has_active_prediction and prediction_probability >= 0.5:
+        return "anomaly_detected"
+    if has_baseline_deviation:
+        return "anomaly_detected"
+    return "healthy"
+
+
+@router.get("/dashboard/equipment", response_model=DashboardResponse)
+async def get_dashboard_equipment(
+    site_id: Optional[str] = Query(None, description="Filter by site/building code")
+):
+    """
+    Get equipment workflow data for the dashboard.
+
+    Returns equipment list with workflow states, predictions, baselines, and work orders.
+    """
+    client = get_supabase_client()
+    if not client:
+        raise HTTPException(status_code=500, detail="Database not available")
+
+    try:
+        # Get building UUID from site_id code
+        building_uuid = None
+        if site_id:
+            building_result = client.table("buildings").select("id").eq("code", site_id).execute()
+            if building_result.data:
+                building_uuid = building_result.data[0]["id"]
+
+        # Initialize repositories
+        equipment_repo = EquipmentRepository()
+        prediction_repo = PredictionRepository()
+        baseline_repo = BaselineRepository()
+        inspection_repo = InspectionRepository()
+        work_order_repo = get_work_order_repository()
+
+        # Get equipment
+        if building_uuid:
+            equipment_list = equipment_repo.get_all(building_id=building_uuid)
+        else:
+            equipment_list = equipment_repo.get_all()
+
+        dashboard_equipment = []
+        workflow_states = {}
+
+        for eq in equipment_list:
+            eq_uuid = eq.get("id")
+            eq_code = eq.get("code", eq_uuid)
+            eq_name = eq.get("name", eq_code)
+            eq_type = eq.get("equipment_type") or eq.get("type", "unknown")
+
+            # Get active predictions for this equipment
+            predictions = prediction_repo.get_active_by_equipment(eq_uuid) if eq_uuid else []
+            has_active_prediction = len(predictions) > 0
+            prediction_probability = 0.0
+            prediction_data = None
+
+            if predictions:
+                pred = predictions[0]
+                prediction_probability = pred.get("probability_percent", 0) / 100.0
+                prediction_data = {
+                    "failure_probability": prediction_probability,
+                    "timeframe": pred.get("timeframe", "30 days"),
+                    "confidence": pred.get("severity", "medium"),
+                    "explanation": pred.get("description", "ML prediction based on sensor data")
+                }
+
+            # Get baseline summary
+            try:
+                baseline_summary = await baseline_repo.get_baseline_summary(eq_uuid) if eq_uuid else {}
+            except Exception:
+                baseline_summary = {}
+
+            total_baselines = baseline_summary.get("total_baselines", 0)
+            has_baseline_deviation = False  # Would need to check recent comparisons
+
+            # Get recent inspections
+            try:
+                recent_tasks = await inspection_repo.get_tasks_by_equipment(eq_uuid, limit=1) if eq_uuid else []
+            except Exception:
+                recent_tasks = []
+
+            has_pending_inspection = any(t.status in ("scheduled", "in_progress") for t in recent_tasks)
+            last_inspection = recent_tasks[0] if recent_tasks else None
+
+            inspection_status = {
+                "last_inspection": last_inspection.scheduled_date if last_inspection else None,
+                "status": last_inspection.status if last_inspection else "none",
+                "findings": last_inspection.completion_notes if last_inspection else ""
+            }
+
+            # Get active work orders
+            work_orders = await work_order_repo.get_work_orders_for_equipment(
+                eq_uuid, status="in_progress", limit=5
+            ) if eq_uuid else []
+            has_active_work_order = len(work_orders) > 0
+
+            active_repairs = [
+                {
+                    "id": wo.get("code", wo.get("id")),
+                    "title": wo.get("title"),
+                    "priority": wo.get("priority"),
+                    "status": wo.get("status")
+                }
+                for wo in work_orders
+            ]
+
+            # Determine workflow state
+            current_state = determine_workflow_state(
+                has_active_prediction=has_active_prediction,
+                prediction_probability=prediction_probability,
+                has_pending_inspection=has_pending_inspection,
+                has_active_work_order=has_active_work_order,
+                has_baseline_deviation=has_baseline_deviation
+            )
+
+            # Build state history from available data
+            state_history = []
+
+            # Add onboarding → monitoring transition (default)
+            state_history.append({
+                "from": "onboarding",
+                "to": "monitoring",
+                "timestamp": eq.get("created_at", ""),
+                "trigger": "baseline_captured"
+            })
+
+            # Add prediction-triggered transitions
+            if has_active_prediction:
+                state_history.append({
+                    "from": "monitoring",
+                    "to": "anomaly_detected",
+                    "timestamp": predictions[0].get("created_at", ""),
+                    "trigger": "ml_prediction"
+                })
+
+            # Add inspection transitions
+            if has_pending_inspection and last_inspection:
+                state_history.append({
+                    "from": "anomaly_detected" if has_active_prediction else "monitoring",
+                    "to": "inspection_pending",
+                    "timestamp": last_inspection.created_at,
+                    "trigger": "automated_task"
+                })
+
+            # Add work order transitions
+            if has_active_work_order:
+                state_history.append({
+                    "from": "inspection_pending" if has_pending_inspection else "anomaly_detected",
+                    "to": "repair_in_progress",
+                    "timestamp": work_orders[0].get("created_at", ""),
+                    "trigger": "work_order_created"
+                })
+
+            # Add to dashboard
+            dashboard_equipment.append(DashboardEquipmentItem(
+                equipment_id=eq_code,
+                name=eq_name,
+                type=eq_type,
+                current_state=current_state
+            ))
+
+            workflow_states[eq_code] = DashboardWorkflowState(
+                equipment_id=eq_code,
+                current_state=current_state,
+                state_history=state_history,
+                baseline_summary={
+                    "total_baselines": total_baselines,
+                    "latest_baseline": baseline_summary.get("last_baseline_date"),
+                    "deviation_detected": has_baseline_deviation
+                },
+                inspection_status=inspection_status,
+                ml_prediction=prediction_data,
+                active_repairs=active_repairs
+            ).model_dump()
+
+        return DashboardResponse(
+            equipment=dashboard_equipment,
+            workflow_states=workflow_states
+        )
+
+    except Exception as e:
+        logger.error(f"Error fetching dashboard data: {e}")
+        raise HTTPException(status_code=500, detail=f"Error fetching dashboard data: {str(e)}")
 
 
 # ============================================================================

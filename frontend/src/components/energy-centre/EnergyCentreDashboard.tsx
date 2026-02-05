@@ -48,13 +48,7 @@ export function EnergyCentreDashboard({ siteId, onAIRecommendation, enabledModul
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState(0);
 
-  useEffect(() => {
-    loadOverview();
-    const interval = setInterval(loadOverview, 10000);
-    return () => clearInterval(interval);
-  }, [siteId]);
-
-  async function loadOverview() {
+  const loadOverview = useCallback(async () => {
     try {
       const data = await energyCentreApi.getSCADAOverview(siteId);
       setOverview(data);
@@ -69,10 +63,17 @@ export function EnergyCentreDashboard({ siteId, onAIRecommendation, enabledModul
       }
 
       setLoading(false);
-    } catch (err) {
+    } catch (_err) {
       setLoading(false);
     }
-  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [siteId]);
+
+  useEffect(() => {
+    loadOverview();
+    const interval = setInterval(loadOverview, 10000);
+    return () => clearInterval(interval);
+  }, [loadOverview]);
 
   // AI-driven recommendation generation based on telemetry
   const generateRecommendations = useCallback((data: SCADAOverview, modules: string[]): AIRecommendation[] => {

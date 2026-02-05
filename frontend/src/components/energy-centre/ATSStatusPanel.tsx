@@ -8,7 +8,7 @@
  * - Interlock status
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, Title, Text, Badge, Grid, Flex, Metric } from '@tremor/react';
 import { energyCentreApi } from '../../lib/energyCentreApi';
 import type { ATSStatus } from '../../lib/energyCentreApi';
@@ -38,13 +38,7 @@ export function ATSStatusPanel({ siteId, compact = false, onTransferEvent }: ATS
   const [previousPositions, setPreviousPositions] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadData();
-    const interval = setInterval(loadData, 2000);
-    return () => clearInterval(interval);
-  }, [siteId]);
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     try {
       const units = await energyCentreApi.getATSUnits(siteId);
 
@@ -72,10 +66,16 @@ export function ATSStatusPanel({ siteId, compact = false, onTransferEvent }: ATS
 
       setAtsUnits(statuses);
       setLoading(false);
-    } catch (err) {
+    } catch (_err) {
       setLoading(false);
     }
-  }
+  }, [siteId, onTransferEvent, previousPositions]);
+
+  useEffect(() => {
+    loadData();
+    const interval = setInterval(loadData, 2000);
+    return () => clearInterval(interval);
+  }, [loadData]);
 
   if (loading) {
     return (

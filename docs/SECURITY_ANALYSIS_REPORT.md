@@ -18,8 +18,8 @@ This report provides a comprehensive security analysis of the SENTINEL BMS Intel
 |------|--------|---------|
 | **AI Safety** | ✅ Strong | Multi-layer safety validation prevents AI from executing unsafe commands |
 | **Data Privacy** | ✅ Compliant | No building data sent to AI providers; local processing available |
-| **Access Control** | ⚠️ In Progress | 4-level authorization model implemented; full RBAC in development |
-| **Audit Trail** | ✅ Comprehensive | Full audit logging with SIEM integration via Loki/Promtail |
+| **Access Control** | ✅ Implemented | 4-level authorization model + user site access control (building-level permissions) |
+| **Audit Trail** | ✅ Comprehensive | Full audit logging + login audit with suspicious activity detection |
 | **Safety Systems** | ✅ Robust | 25+ configurable safety rules with interlock protection |
 
 **Overall Risk Assessment:** **LOW to MODERATE** - Mitigated through strong safety architecture.
@@ -263,17 +263,40 @@ The **RemoteCommandService** enforces:
 8. Return result with rollback info
 ```
 
-### 4.3 Authentication Status
+### 4.3 User Site Access Control
+
+SENTINEL implements **building-level access control** where users only see buildings they're authorized to access:
+
+| Role | Building Access |
+|------|----------------|
+| **ADMIN** | All buildings (bypass filtering) |
+| **OPERATOR** | Assigned buildings only |
+| **AUDITOR** | Assigned buildings only |
+| **New Users** | Default building (site-002) automatically granted |
+
+**Admin Endpoints:**
+- `GET /api/admin/user-access/users/{email}` - View user's accessible buildings
+- `POST /api/admin/user-access/grant` - Grant building access
+- `DELETE /api/admin/user-access/revoke` - Revoke building access
+- `GET /api/admin/user-access/building/{code}/users` - List users with access to building
+
+**Key files:**
+- Migration: `supabase/migrations/035_user_site_access.sql`
+- Repository: `backend/app/database/repositories/user_site_access_repository.py`
+- API: `backend/app/api/user_access.py`
+
+### 4.4 Authentication Status
 
 **Current Implementation:**
-- ❌ No production authentication implemented (demo mode)
+- ✅ Email-based authentication with JWT tokens (30-day expiry)
 - ✅ Authorization model defined (AuthorizationLevel enum)
 - ✅ Remote command authorization checks in place
 - ✅ Audit logging captures user context
+- ✅ Login audit log with suspicious activity detection
+- ✅ User site access control (building-level permissions)
 
 **Required for Production:**
 ```
-[ ] Implement OAuth2/OIDC authentication
 [ ] Integrate with corporate SSO (Azure AD, Okta)
 [ ] Add MFA for ENGINEER-level actions
 [ ] Implement session management
@@ -326,7 +349,40 @@ SENTINEL provides **comprehensive audit logging** with dual output:
 }
 ```
 
-### 5.2 SIEM Integration
+### 5.2 Login Audit Log
+
+SENTINEL maintains a dedicated **login audit log** for authentication events:
+
+**Logged Data:**
+| Field | Description |
+|-------|-------------|
+| `user_email` | Email address of user attempting login |
+| `user_id` | Internal user ID |
+| `user_role` | Role assigned (admin, operator, auditor) |
+| `source_ip` | Client IP address (supports proxy headers) |
+| `user_agent` | Browser/client user agent string |
+| `login_at` | Timestamp of login attempt |
+| `is_new_user` | Whether this was a first-time login |
+| `success` | Whether login succeeded |
+| `failure_reason` | Reason for failure (if applicable) |
+
+**Admin Endpoints:**
+- `GET /api/admin/login-audit/recent` - Recent logins with filtering
+- `GET /api/admin/login-audit/stats?hours=24` - Login statistics
+- `GET /api/admin/login-audit/user/{email}` - User login history
+- `GET /api/admin/login-audit/suspicious` - Suspicious activity detection
+
+**Suspicious Activity Detection:**
+- Multiple failed logins from same IP (brute force indicator)
+- Users logging in from many different IPs (credential theft)
+- Unusual surge in new user registrations
+
+**Key files:**
+- Migration: `supabase/migrations/036_login_audit_log.sql`
+- Repository: `backend/app/database/repositories/login_audit_repository.py`
+- API: `backend/app/api/login_audit.py`
+
+### 5.3 SIEM Integration
 
 Structured logs are emitted to `sentinel.audit` logger and shipped to Loki:
 - **High severity** (critical, high) → WARNING level
@@ -343,9 +399,12 @@ Structured logs are emitted to `sentinel.audit` logger and shipped to Loki:
 
 # Rate limit warnings
 {event_type="RATE_LIMIT_EXCEEDED"}
+
+# Failed login attempts
+{event_type="login"} |= "success=false"
 ```
 
-### 5.3 Compliance Mapping
+### 5.4 Compliance Mapping
 
 | Regulation | Requirement | SENTINEL Coverage |
 |------------|-------------|-------------------|

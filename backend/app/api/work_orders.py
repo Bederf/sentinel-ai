@@ -466,3 +466,337 @@ async def start_technician_work_order(work_order_id: str):
     work_order["updated_at"] = datetime.now()
 
     return work_order
+
+
+# ============================================================================
+# Supabase Work Order Endpoints (for Clawd bot integration)
+# ============================================================================
+
+class SupabaseWorkOrderCreate(BaseModel):
+    """Create work order in Supabase."""
+    equipment_code: str
+    title: str
+    description: Optional[str] = None
+    priority: str = "medium"  # low, medium, high, urgent
+    scheduled_date: Optional[str] = None
+    estimated_duration_hours: Optional[int] = None
+    created_by: str = "SENTINEL"
+
+
+class SupabaseWorkOrderResponse(BaseModel):
+    """Response from Supabase work order creation."""
+    id: str
+    code: str
+    equipment_code: Optional[str] = None
+    title: str
+    priority: str
+    status: str
+    assigned_to: Optional[str] = None
+    technician_email: Optional[str] = None
+    technician_phone: Optional[str] = None
+    technician_telegram_id: Optional[str] = None
+    created_at: str
+
+
+class TechnicianLookupResponse(BaseModel):
+    """Technician lookup response."""
+    id: Optional[str] = None
+    name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    telegram_id: Optional[str] = None
+    specialty: Optional[str] = None
+    found: bool = False
+
+
+@router.get("/work-orders/technician-for-equipment/{equipment_code}", response_model=TechnicianLookupResponse)
+async def get_technician_for_equipment(equipment_code: str):
+    """
+    Get the assigned technician for a piece of equipment.
+
+    Looks up the site assignment based on equipment type → specialty mapping.
+    Used by Clawd bot to determine who to email for a work order.
+    """
+    from app.database.repositories.technician_repository import get_technician_repository
+
+    repo = get_technician_repository()
+    tech = await repo.get_technician_for_equipment_code(equipment_code)
+
+    if tech:
+        return TechnicianLookupResponse(
+            id=tech.get("id"),
+            name=tech.get("name"),
+            email=tech.get("email"),
+            phone=tech.get("phone"),
+            telegram_id=tech.get("telegram_id"),
+            specialty=tech.get("specialty"),
+            found=True
+        )
+
+    return TechnicianLookupResponse(found=False)
+
+
+@router.post("/work-orders/supabase", response_model=SupabaseWorkOrderResponse)
+async def create_supabase_work_order(work_order: SupabaseWorkOrderCreate):
+    """
+    Create a work order in Supabase, linked to equipment.
+
+    Automatically looks up and assigns the technician for the equipment.
+    Used by Clawd bot when creating work orders.
+    """
+    from app.database.repositories.work_order_repository import get_work_order_repository
+    from app.database.repositories.technician_repository import get_technician_repository
+
+    wo_repo = get_work_order_repository()
+    tech_repo = get_technician_repository()
+
+    # Get technician for this equipment
+    tech = await tech_repo.get_technician_for_equipment_code(work_order.equipment_code)
+
+    # Create work order payload
+    wo_data = {
+        "equipment_code": work_order.equipment_code,
+        "title": work_order.title,
+        "description": work_order.description,
+        "priority": work_order.priority,
+        "scheduled_date": work_order.scheduled_date,
+        "estimated_duration_hours": work_order.estimated_duration_hours,
+        "created_by": work_order.created_by,
+        "status": "scheduled",
+    }
+
+    # Assign technician if found
+    if tech:
+        wo_data["assigned_to"] = tech.get("name")
+        wo_data["assigned_team"] = tech.get("specialty")
+
+    # Create in Supabase
+    created = await wo_repo.create_work_order(wo_data)
+
+    if not created:
+        raise HTTPException(status_code=500, detail="Failed to create work order in Supabase")
+
+    return SupabaseWorkOrderResponse(
+        id=created.get("id"),
+        code=created.get("code"),
+        equipment_code=work_order.equipment_code,
+        title=created.get("title"),
+        priority=created.get("priority"),
+        status=created.get("status"),
+        assigned_to=created.get("assigned_to"),
+        technician_email=tech.get("email") if tech else None,
+        technician_phone=tech.get("phone") if tech else None,
+        technician_telegram_id=tech.get("telegram_id") if tech else None,
+        created_at=created.get("created_at")
+    )
+
+
+@router.get("/work-orders/supabase/{code}")
+async def get_supabase_work_order(code: str):
+    """Get a work order from Supabase by its code."""
+    from app.database.repositories.work_order_repository import get_work_order_repository
+
+    repo = get_work_order_repository()
+    wo = await repo.get_work_order_by_code(code)
+
+    if not wo:
+        raise HTTPException(status_code=404, detail="Work order not found")
+
+    return wo
+
+
+@router.get("/work-orders/equipment-info/{equipment_code}")
+async def get_equipment_info_for_technician(equipment_code: str):
+    """Get detailed equipment information for technicians.
+
+    This endpoint is designed for Clawd bot integration - when a technician
+    asks for more details about the equipment they're working on, Clawd can
+    fetch this information.
+
+    Returns comprehensive equipment details including:
+    - Basic info (name, type, category, location)
+    - Network info (IP, MAC, protocol addresses)
+    - Device info (manufacturer, model, serial, firmware)
+    - Operating data (runtime hours, lamp hours, capacity)
+    - Notes from facility managers
+    - Health status and recent issues
+
+    Args:
+        equipment_code: Equipment code (e.g., S002-CHILLER-B1-001)
+
+    Returns:
+        Equipment details formatted for technician reference
+    """
+    from app.database.repositories.equipment_metadata_repository import EquipmentMetadataRepository
+    from app.database.supabase_client import get_supabase_client
+
+    repo = EquipmentMetadataRepository()
+    metadata = repo.get_equipment_metadata(equipment_code)
+
+    if not metadata:
+        raise HTTPException(status_code=404, detail=f"Equipment {equipment_code} not found")
+
+    # Parse JSONB fields if they're strings
+    import json
+    network_info = metadata.get("network_info") or {}
+    device_info = metadata.get("device_info") or {}
+    operating_data = metadata.get("operating_data") or {}
+
+    if isinstance(network_info, str):
+        network_info = json.loads(network_info) if network_info else {}
+    if isinstance(device_info, str):
+        device_info = json.loads(device_info) if device_info else {}
+    if isinstance(operating_data, str):
+        operating_data = json.loads(operating_data) if operating_data else {}
+
+    # Format response for technician (easy to read in Telegram)
+    response = {
+        "equipment_code": metadata.get("code", equipment_code),
+        "name": metadata.get("name", "Unknown"),
+        "type": metadata.get("type", "unknown"),
+        "status": metadata.get("status", "unknown"),
+        "health_score": metadata.get("health_score"),
+        "location": metadata.get("location"),
+
+        # Device identification
+        "manufacturer": device_info.get("manufacturer") or metadata.get("manufacturer"),
+        "model": device_info.get("model") or metadata.get("model"),
+        "serial_number": device_info.get("serial_number") or metadata.get("serial_number"),
+        "firmware_version": device_info.get("firmware_version"),
+        "gtin": device_info.get("gtin"),
+
+        # Network/addressing info
+        "ip_address": network_info.get("ip_address"),
+        "mac_address": network_info.get("mac_address"),
+        "protocol": network_info.get("protocol"),
+        "dali_address": (
+            f"Line {network_info.get('dali_line', 1)}, Address {network_info.get('dali_address')}"
+            if network_info.get("dali_address") is not None else None
+        ),
+        "bacnet_device_id": network_info.get("bacnet_device_id"),
+        "modbus_address": network_info.get("modbus_address"),
+
+        # Operating data
+        "runtime_hours": operating_data.get("runtime_hours"),
+        "lamp_hours": operating_data.get("lamp_hours"),
+        "rated_capacity": operating_data.get("rated_capacity"),
+        "power_cycles": operating_data.get("power_cycles"),
+
+        # Service info
+        "install_date": metadata.get("install_date"),
+        "last_service": metadata.get("last_service"),
+        "commissioning_date": metadata.get("commissioning_date"),
+        "warranty_expiry": metadata.get("warranty_expiry"),
+
+        # Notes from facility manager
+        "notes": metadata.get("notes"),
+
+        # Discovery info
+        "last_discovery": metadata.get("last_discovery"),
+    }
+
+    # Remove None values for cleaner response
+    response = {k: v for k, v in response.items() if v is not None}
+
+    return response
+
+
+@router.get("/work-orders/equipment-summary/{equipment_code}")
+async def get_equipment_summary_for_telegram(equipment_code: str):
+    """Get a formatted text summary of equipment for Telegram display.
+
+    Returns a pre-formatted text block suitable for sending directly
+    to Telegram without additional formatting.
+
+    Args:
+        equipment_code: Equipment code
+
+    Returns:
+        Text summary formatted for Telegram
+    """
+    # Reuse the detailed endpoint
+    try:
+        info = await get_equipment_info_for_technician(equipment_code)
+    except HTTPException:
+        raise
+
+    # Format as readable text for Telegram
+    lines = [
+        f"📋 *{info.get('name', 'Unknown Equipment')}*",
+        f"Code: `{info.get('equipment_code', equipment_code)}`",
+        "",
+    ]
+
+    # Status and health
+    status = info.get("status", "unknown").upper()
+    status_emoji = "🟢" if status == "NORMAL" else "🟡" if status == "WARNING" else "🔴" if status == "CRITICAL" else "⚪"
+    lines.append(f"{status_emoji} Status: {status}")
+    if info.get("health_score"):
+        lines.append(f"❤️ Health: {info['health_score']}%")
+
+    # Location
+    if info.get("location"):
+        lines.append(f"📍 Location: {info['location']}")
+
+    lines.append("")
+
+    # Device info section
+    if any(info.get(k) for k in ["manufacturer", "model", "serial_number"]):
+        lines.append("*Device Info:*")
+        if info.get("manufacturer"):
+            lines.append(f"  Manufacturer: {info['manufacturer']}")
+        if info.get("model"):
+            lines.append(f"  Model: {info['model']}")
+        if info.get("serial_number"):
+            lines.append(f"  Serial: `{info['serial_number']}`")
+        if info.get("firmware_version"):
+            lines.append(f"  Firmware: v{info['firmware_version']}")
+        lines.append("")
+
+    # Network info section
+    if any(info.get(k) for k in ["ip_address", "dali_address", "bacnet_device_id", "modbus_address"]):
+        lines.append("*Network Info:*")
+        if info.get("ip_address"):
+            lines.append(f"  IP: `{info['ip_address']}`")
+        if info.get("mac_address"):
+            lines.append(f"  MAC: `{info['mac_address']}`")
+        if info.get("protocol"):
+            lines.append(f"  Protocol: {info['protocol'].upper()}")
+        if info.get("dali_address"):
+            lines.append(f"  DALI: {info['dali_address']}")
+        if info.get("bacnet_device_id"):
+            lines.append(f"  BACnet ID: {info['bacnet_device_id']}")
+        if info.get("modbus_address"):
+            lines.append(f"  Modbus: {info['modbus_address']}")
+        lines.append("")
+
+    # Operating data section
+    if any(info.get(k) for k in ["runtime_hours", "lamp_hours", "rated_capacity"]):
+        lines.append("*Operating Data:*")
+        if info.get("runtime_hours"):
+            lines.append(f"  Runtime: {info['runtime_hours']:,} hrs")
+        if info.get("lamp_hours"):
+            lines.append(f"  Lamp Hours: {info['lamp_hours']:,} hrs")
+        if info.get("rated_capacity"):
+            lines.append(f"  Capacity: {info['rated_capacity']}")
+        lines.append("")
+
+    # Service info
+    if any(info.get(k) for k in ["last_service", "warranty_expiry"]):
+        lines.append("*Service Info:*")
+        if info.get("last_service"):
+            lines.append(f"  Last Service: {info['last_service']}")
+        if info.get("warranty_expiry"):
+            lines.append(f"  Warranty: {info['warranty_expiry']}")
+        lines.append("")
+
+    # Notes
+    if info.get("notes"):
+        lines.append("*Notes:*")
+        lines.append(f"_{info['notes']}_")
+
+    return {
+        "equipment_code": equipment_code,
+        "text": "\n".join(lines),
+        "parse_mode": "Markdown",
+    }

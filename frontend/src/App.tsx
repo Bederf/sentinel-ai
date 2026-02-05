@@ -108,7 +108,7 @@ function App() {
   };
 
   // Handle when an individual alert is marked as read
-  const handleAlertRead = (_alertId: string) => {
+  const handleAlertRead = () => {
     setUnreadAlertCount((prev) => Math.max(0, prev - 1));
   };
 
@@ -224,7 +224,7 @@ function App() {
   // Show email entry if not authenticated
   if (!currentUser) {
     console.log('Showing email entry (user =', currentUser, ')');
-    return <EmailEntry onSuccess={(user, token) => {
+    return <EmailEntry onSuccess={(user) => {
       console.log('Login success:', user);
       setCurrentUser(user);
     }} />;

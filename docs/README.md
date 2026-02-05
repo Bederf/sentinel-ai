@@ -52,12 +52,17 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - **[Routine Inspection & Maintenance](04-features/45-routine-inspection-maintenance.md)** - Field inspection workflow with baseline tracking (Phase 45)
 - **[Repair Effectiveness & ML Feedback Loop](04-features/46-repair-effectiveness-ml-feedback.md)** - Post-repair validation, ML feedback, follow-up scheduling, cost-benefit analysis (Phase 57)
 - **[Phases 44-46 Integration: Complete Asset Management Workflow](04-features/44-46-integration-workflow.md)** - Unified workflow from baseline to repair validation
+- **[Service Feedback System](04-features/service-feedback-system.md)** - Equipment-type specific feedback from technicians with health score updates
 
 #### Remote Operations
 - **[Remote Operations](04-features/remote-operations.md)** - Remote monitoring, command execution, and smart dispatch with task bundling (Phase 59)
 
 #### Onboarding & Integration
 - **[Niagara BMS Connection Wizard](04-features/niagara-connection-wizard.md)** - 4-step wizard: connect to Niagara supervisor, discover BACnet points, AI-classify, approve
+
+#### Simulation & Demo
+- **[24-Hour Lifecycle Simulation](04-features/lifecycle-simulation.md)** - Full building day simulation for testing AI optimization, faults, alerts, repairs
+- **[Demo Simulation Control](04-features/demo-simulation-control.md)** - Simple trigger/reset endpoints for demos
 
 #### Additional Features
 - [Technician Chat](04-features/technician-chat.md) - Guided fault diagnosis (Phase 19)
@@ -77,10 +82,12 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 
 ### 🔒 Security & Governance
 - **[Security Documentation Suite](08-security/README.md)** - Complete security policy suite for FSR supplier onboarding
+- **[FSR Gap Analysis - Updated](FSR_GAP_ANALYSIS_UPDATE.md)** - Current assessment against FSR V8 questionnaire
 - [Information Security Framework](08-security/information-security-framework.md) - Governance structure, ISO role, policy hierarchy
 - [Information Security Strategy](08-security/information-security-strategy.md) - Maturity targets, remediation roadmap
 - [Information Security Policy](08-security/information-security-policy.md) - Overarching policy covering all 18 FSR domains
 - [Acceptable Usage Policy](08-security/acceptable-usage-policy.md) - Infrastructure, communication, and data handling rules
+- [Audit Logging](06-safety-compliance/audit-logging.md) - Device control and login audit trail
 
 ### 🔗 Integrations
 - [DALI-HVAC Integration](07-integrations/dali-hvac-integration.md) - Cross-system comfort diagnosis

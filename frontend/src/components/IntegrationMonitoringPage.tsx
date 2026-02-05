@@ -215,7 +215,8 @@ function StatusBadge({ status }: { status: SyncJobSummary["status"] }) {
 }
 
 // Format processing time
-function formatDuration(ms: number): string {
+function formatDuration(ms: number | null | undefined): string {
+  if (ms === null || ms === undefined) return "—";
   if (ms < 1000) return `${ms}ms`;
   if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
   return `${(ms / 60000).toFixed(1)}min`;
@@ -262,6 +263,13 @@ export function IntegrationMonitoringPage() {
   const [sites, setSites] = useState<Site[]>([]);
   const [selectedBuildingId, setSelectedBuildingId] = useState<string | null>(null);
   const [showWizard, setShowWizard] = useState(false);
+
+  // Auto-select first building when sites are loaded
+  useEffect(() => {
+    if (sites.length > 0 && !selectedBuildingId) {
+      setSelectedBuildingId(sites[0].id);
+    }
+  }, [sites, selectedBuildingId]);
 
   // Loading states
   const [loadingHealth, setLoadingHealth] = useState(true);
@@ -464,7 +472,7 @@ export function IntegrationMonitoringPage() {
           {/* Building Filter */}
           <select
             value={selectedBuildingId || ""}
-            onChange={(e) => setSelectedBuildingId(e.target.value || null)}
+            onChange={(e) => setSelectedBuildingId(e.target.value)}
             className="text-sm rounded px-3 py-2"
             style={{
               background: "var(--color-sentinel-bg-secondary)",
@@ -472,7 +480,6 @@ export function IntegrationMonitoringPage() {
               color: "var(--color-sentinel-text-primary)",
             }}
           >
-            <option value="">All Buildings</option>
             {sites.map((site) => (
               <option key={site.id} value={site.id}>
                 {site.name}

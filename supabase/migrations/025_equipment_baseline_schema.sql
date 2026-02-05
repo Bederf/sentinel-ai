@@ -3,12 +3,12 @@
 -- Phase: 44 - Asset Baseline Assessment
 
 -- ============================================================================
--- Table: equipment_baselines
+-- Table: asset_baseline_assessments
 -- Stores baseline readings captured for each equipment instance
 -- ============================================================================
-CREATE TABLE IF NOT EXISTS equipment_baselines (
+CREATE TABLE IF NOT EXISTS asset_baseline_assessments (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    equipment_id TEXT NOT NULL REFERENCES equipment(equipment_id),
+    equipment_id UUID NOT NULL REFERENCES equipment(id),
     baseline_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     captured_by TEXT NOT NULL, -- Engineer name or 'automated'
     baseline_type TEXT NOT NULL DEFAULT 'initial', -- initial, periodic, post_repair
@@ -34,14 +34,23 @@ CREATE TABLE IF NOT EXISTS equipment_baselines (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Add status column if table existed without it (from partial migration)
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                   WHERE table_name = 'asset_baseline_assessments' AND column_name = 'status') THEN
+        ALTER TABLE asset_baseline_assessments ADD COLUMN status TEXT NOT NULL DEFAULT 'active';
+    END IF;
+END $$;
+
 -- Indexes for equipment baseline queries
-CREATE INDEX IF NOT EXISTS idx_equipment_baselines_equipment_id ON equipment_baselines(equipment_id);
-CREATE INDEX IF NOT EXISTS idx_equipment_baselines_equipment_active ON equipment_baselines(equipment_id, status) WHERE status = 'active';
-CREATE INDEX IF NOT EXISTS idx_equipment_baselines_date ON equipment_baselines(baseline_date DESC);
-CREATE INDEX IF NOT EXISTS idx_equipment_baselines_type ON equipment_baselines(baseline_type);
+CREATE INDEX IF NOT EXISTS idx_asset_baseline_assessments_equipment_id ON asset_baseline_assessments(equipment_id);
+CREATE INDEX IF NOT EXISTS idx_asset_baseline_assessments_equipment_active ON asset_baseline_assessments(equipment_id, status) WHERE status = 'active';
+CREATE INDEX IF NOT EXISTS idx_asset_baseline_assessments_date ON asset_baseline_assessments(baseline_date DESC);
+CREATE INDEX IF NOT EXISTS idx_asset_baseline_assessments_type ON asset_baseline_assessments(baseline_type);
 
 -- Enable GIN index for JSONB queries on baseline_values
-CREATE INDEX IF NOT EXISTS idx_equipment_baselines_values ON equipment_baselines USING GIN (baseline_values);
+CREATE INDEX IF NOT EXISTS idx_asset_baseline_assessments_values ON asset_baseline_assessments USING GIN (baseline_values);
 
 -- ============================================================================
 -- Table: equipment_elements
@@ -50,7 +59,7 @@ CREATE INDEX IF NOT EXISTS idx_equipment_baselines_values ON equipment_baselines
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS equipment_elements (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    equipment_id TEXT NOT NULL REFERENCES equipment(equipment_id),
+    equipment_id UUID NOT NULL REFERENCES equipment(id),
     element_id TEXT NOT NULL, -- Unique within equipment (e.g., 'bearing_1', 'filter_A')
 
     element_type TEXT NOT NULL, -- bearing, filter, coil, compressor_stage, etc.
@@ -123,9 +132,9 @@ CREATE TABLE IF NOT EXISTS baseline_comparisons (
 
     -- What we're comparing (equipment or element)
     comparison_type TEXT NOT NULL, -- equipment_baseline or element_baseline
-    baseline_id UUID, -- References either equipment_baselines or element_baselines
+    baseline_id UUID, -- References either asset_baseline_assessments or element_baselines
 
-    equipment_id TEXT REFERENCES equipment(equipment_id),
+    equipment_id UUID REFERENCES equipment(id),
     element_id UUID REFERENCES equipment_elements(id),
 
     -- When the comparison was made
@@ -165,11 +174,11 @@ CREATE INDEX IF NOT EXISTS idx_baseline_comparisons_results ON baseline_comparis
 -- ============================================================================
 CREATE OR REPLACE VIEW v_equipment_baseline_summary AS
 SELECT
-    e.equipment_id,
-    e.equipment_name,
-    e.equipment_type,
-    e.site_id,
-    COUNT DISTINCT eb.id) FILTER (WHERE eb.status = 'active') as active_baselines,
+    e.id as equipment_id,
+    e.name as equipment_name,
+    e.type as equipment_type,
+    e.building_id as site_id,
+    COUNT(DISTINCT eb.id) FILTER (WHERE eb.status = 'active') as active_baselines,
     MAX(eb.baseline_date) as last_baseline_date,
     -- Days since last baseline
     CURRENT_DATE - MAX(eb.baseline_date)::date as days_since_baseline,
@@ -177,10 +186,10 @@ SELECT
     COUNT(DISTINCT el.id) as total_elements,
     COUNT(DISTINCT elb.id) FILTER (WHERE elb.status = 'active') as elements_with_baselines
 FROM equipment e
-LEFT JOIN equipment_baselines eb ON e.equipment_id = eb.equipment_id
-LEFT JOIN equipment_elements el ON e.equipment_id = el.equipment_id
+LEFT JOIN asset_baseline_assessments eb ON e.id = eb.equipment_id
+LEFT JOIN equipment_elements el ON e.id = el.equipment_id
 LEFT JOIN element_baselines elb ON el.id = elb.element_id
-GROUP BY e.equipment_id, e.equipment_name, e.equipment_type, e.site_id;
+GROUP BY e.id, e.name, e.type, e.building_id;
 
 -- ============================================================================
 -- View: v_critical_baseline_deviations
@@ -191,8 +200,8 @@ SELECT
     bc.id,
     bc.comparison_date,
     bc.equipment_id,
-    e.equipment_name,
-    e.equipment_type,
+    e.name as equipment_name,
+    e.type as equipment_type,
     bc.comparison_type,
     bc.overall_status,
     bc.max_deviation_percent,
@@ -201,7 +210,7 @@ SELECT
     -- Extract the specific metrics that are in warning/critical status
     jsonb_object_keys(bc.comparison_results) as metric_name
 FROM baseline_comparisons bc
-JOIN equipment e ON bc.equipment_id = e.equipment_id
+JOIN equipment e ON bc.equipment_id = e.id
 WHERE bc.overall_status IN ('warning', 'critical')
   AND bc.comparison_date >= NOW() - INTERVAL '30 days'
 ORDER BY bc.comparison_date DESC;
@@ -218,8 +227,8 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Create triggers for automatic timestamp updates
-CREATE TRIGGER update_equipment_baselines_updated_at
-    BEFORE UPDATE ON equipment_baselines
+CREATE TRIGGER update_asset_baseline_assessments_updated_at
+    BEFORE UPDATE ON asset_baseline_assessments
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
@@ -236,19 +245,19 @@ CREATE TRIGGER update_element_baselines_updated_at
 -- ============================================================================
 -- RLS (Row Level Security) Policies
 -- ============================================================================
-ALTER TABLE equipment_baselines ENABLE ROW LEVEL SECURITY;
+ALTER TABLE asset_baseline_assessments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE equipment_elements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE element_baselines ENABLE ROW LEVEL SECURITY;
 ALTER TABLE baseline_comparisons ENABLE ROW LEVEL SECURITY;
 
 -- Allow read access to all authenticated users (fine-grained permissions in API)
-CREATE POLICY "Allow read for authenticated users" ON equipment_baselines FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "Allow read for authenticated users" ON asset_baseline_assessments FOR SELECT USING (auth.role() = 'authenticated');
 CREATE POLICY "Allow read for authenticated users" ON equipment_elements FOR SELECT USING (auth.role() = 'authenticated');
 CREATE POLICY "Allow read for authenticated users" ON element_baselines FOR SELECT USING (auth.role() = 'authenticated');
 CREATE POLICY "Allow read for authenticated users" ON baseline_comparisons FOR SELECT USING (auth.role() = 'authenticated');
 
 -- Allow insert/update for facility managers (role check in API)
-CREATE POLICY "Allow write for authenticated users" ON equipment_baselines FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Allow write for authenticated users" ON asset_baseline_assessments FOR ALL USING (auth.role() = 'authenticated');
 CREATE POLICY "Allow write for authenticated users" ON equipment_elements FOR ALL USING (auth.role() = 'authenticated');
 CREATE POLICY "Allow write for authenticated users" ON element_baselines FOR ALL USING (auth.role() = 'authenticated');
 CREATE POLICY "Allow write for authenticated users" ON baseline_comparisons FOR ALL USING (auth.role() = 'authenticated');
@@ -256,7 +265,7 @@ CREATE POLICY "Allow write for authenticated users" ON baseline_comparisons FOR 
 -- ============================================================================
 -- Comments for documentation
 -- ============================================================================
-COMMENT ON TABLE equipment_baselines IS 'Stores baseline readings captured for each equipment instance during onboarding and maintenance';
+COMMENT ON TABLE asset_baseline_assessments IS 'Stores baseline readings captured for each equipment instance during onboarding and maintenance';
 COMMENT ON TABLE equipment_elements IS 'Defines individual elements/components within equipment (bearings, filters, etc.)';
 COMMENT ON TABLE element_baselines IS 'Stores baseline readings for individual equipment elements';
 COMMENT ON TABLE baseline_comparisons IS 'Stores automated comparison results between current readings and baselines';

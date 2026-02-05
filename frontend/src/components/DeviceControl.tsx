@@ -59,7 +59,7 @@ export function DeviceControl({
         />
       );
 
-    case "multistate_value":
+    case "multistate_value": {
       // Special handling for chiller status points
       if (point.name.toLowerCase().includes('chiller_status') ||
           point.description.toLowerCase().includes('chiller operational status')) {
@@ -99,6 +99,7 @@ export function DeviceControl({
           error={error}
         />
       );
+    }
 
     default:
       // Read-only display for non-writable points

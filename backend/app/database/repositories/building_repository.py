@@ -2,6 +2,7 @@
 
 from typing import List, Optional, Dict, Any
 from app.database.supabase_client import get_supabase_client
+from app.models.auth import SentinelRole
 
 
 class BuildingRepository:
@@ -206,3 +207,58 @@ class BuildingRepository:
         except Exception:
             # View may not exist (migrations not applied)
             return None
+
+    def get_all_for_user(
+        self,
+        user_email: str,
+        user_role: SentinelRole,
+        region: Optional[str] = None,
+        site_type: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get all buildings accessible to a user with optional filtering.
+
+        ADMIN role sees all buildings.
+        Other roles see only buildings they have been granted access to.
+
+        Args:
+            user_email: User's email address
+            user_role: User's role
+            region: Filter by region
+            site_type: Filter by building type
+
+        Returns:
+            List of buildings the user can access
+        """
+        # ADMIN sees all buildings
+        if user_role == SentinelRole.ADMIN:
+            return self.get_all(region=region, site_type=site_type)
+
+        # Other roles need to check user_site_access
+        try:
+            email = user_email.lower().strip()
+
+            # Get building IDs user has access to
+            access_result = self.client.table('user_site_access').select(
+                'building_id'
+            ).eq('user_email', email).execute()
+
+            if not access_result.data:
+                return []
+
+            building_ids = [a['building_id'] for a in access_result.data]
+
+            # Get buildings with those IDs
+            query = self.client.table('buildings').select("*").in_('id', building_ids)
+
+            if region:
+                query = query.eq('region', region)
+            if site_type:
+                query = query.eq('type', site_type)
+
+            response = query.execute()
+            return response.data or []
+
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Error getting buildings for user: {e}")
+            return []

@@ -508,7 +508,11 @@ class PointMappingService:
         discovery_id: str,
         mappings: Dict[str, EquipmentMapping],
     ) -> Dict[str, Any]:
-        """Save mappings to Supabase (best-effort, optional)."""
+        """Save equipment to Supabase buildings and equipment tables.
+
+        Creates or finds the building record, then creates equipment records
+        for all approved mappings.
+        """
         try:
             from app.database.supabase_client import get_supabase_client
             client = get_supabase_client()
@@ -516,14 +520,85 @@ class PointMappingService:
             if client is None:
                 return {"success": False, "reason": "Supabase not configured"}
 
-            # Store as metadata in a discovery_results table or similar
-            # For now, this is a best-effort write
-            logger.debug("Supabase write for discovery %s (placeholder)", discovery_id)
-            return {"success": False, "reason": "Supabase integration pending"}
+            # Get site_id from first mapping
+            site_id = next((m.site_id for m in mappings.values() if m.site_id), "")
+            if not site_id:
+                return {"success": False, "reason": "No site_id in mappings"}
+
+            # 1. Get or create building record
+            building_result = client.table("buildings").select("id").eq("code", site_id).execute()
+
+            if building_result.data:
+                building_id = building_result.data[0]["id"]
+            else:
+                # Load building.json and create record
+                building_json = self._load_building_json(site_id)
+                if not building_json:
+                    return {"success": False, "reason": f"building.json not found for {site_id}"}
+
+                metadata = building_json.get("metadata", {})
+                insert_result = client.table("buildings").insert({
+                    "code": site_id,
+                    "name": building_json.get("name", site_id),
+                    "address": building_json.get("address", ""),
+                    "type": metadata.get("type", "office"),
+                    "region": "South Africa",  # Default region
+                    "sqm": metadata.get("sqm", 0),
+                    "floors": metadata.get("total_floors", 1),
+                }).execute()
+                building_id = insert_result.data[0]["id"]
+                logger.info("Created building record in Supabase: %s -> %s", site_id, building_id)
+
+            # 2. Insert equipment records
+            equipment_created = 0
+            for eid, mapping in mappings.items():
+                if eid == "UNASSIGNED":
+                    continue
+
+                # Check if equipment already exists
+                existing = client.table("equipment").select("id").eq("code", mapping.equipment_id).execute()
+                if existing.data:
+                    continue  # Skip existing
+
+                try:
+                    client.table("equipment").insert({
+                        "building_id": building_id,
+                        "code": mapping.equipment_id,
+                        "name": mapping.equipment_name,
+                        "equipment_type": mapping.equipment_type,
+                        "status": "normal",
+                        "metadata": {
+                            "source": "niagara_discovery",
+                            "discovery_id": discovery_id,
+                            "confidence": mapping.confidence,
+                            "point_count": len(mapping.points),
+                        },
+                    }).execute()
+                    equipment_created += 1
+                except Exception as e:
+                    logger.warning("Failed to create equipment %s in Supabase: %s", mapping.equipment_id, e)
+
+            logger.info(
+                "Saved %d equipment records to Supabase for discovery %s",
+                equipment_created, discovery_id,
+            )
+            return {"success": True, "equipment_created": equipment_created}
 
         except Exception as e:
-            logger.debug("Supabase save skipped: %s", e)
+            logger.error("Supabase save failed: %s", e)
             return {"success": False, "reason": str(e)}
+
+    def _load_building_json(self, site_id: str) -> Optional[Dict[str, Any]]:
+        """Load building.json for a site."""
+        try:
+            filepath = BUILDINGS_DIR / site_id / "building.json"
+            if not filepath.exists():
+                return None
+            with open(filepath) as f:
+                return json.load(f)
+        except Exception as e:
+            logger.warning("Failed to load building.json for %s: %s", site_id, e)
+            return None
 
     def get_mappings(self, discovery_id: str) -> Optional[Dict[str, EquipmentMapping]]:
         """Get cached mappings for a discovery."""

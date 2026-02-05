@@ -1,0 +1,78 @@
+{
+  "site_id": "site-002",
+  "config": {
+    "site_id": "site-002",
+    "vendor": "siemens_desigo",
+    "seed": 42,
+    "start_date": "2026-01-06",
+    "days": 7,
+    "interval_minutes": 15,
+    "include_degradation": true,
+    "degradation_equipment": [
+      "S002-CHILLER-B1-001"
+    ],
+    "include_diffusers": true
+  },
+  "timestamp": "2026-02-05T09:31:46.584639",
+  "files": {
+    "point_list": "/opt/bms-intelligence/backend/app/data/bms_simulator/exports/point_list_site-002_siemens-desigo_20260205_093146.csv",
+    "trends": [
+      "/opt/bms-intelligence/backend/app/data/bms_simulator/trends/trends_site-002_7d_20260205_093147.csv"
+    ],
+    "alarms": "/opt/bms-intelligence/backend/app/data/bms_simulator/alarms/alarms_site-002_20260205_093148.json"
+  },
+  "summary": {
+    "points": {
+      "site_id": "site-002",
+      "total_devices": 82,
+      "total_points": 396,
+      "devices_by_type": {
+        "ahu": 4,
+        "chiller": 1,
+        "fcu": 6,
+        "zone_controller": 1,
+        "vav": 15,
+        "fire_safety": 9,
+        "security": 7,
+        "diffuser": 39
+      },
+      "points_by_type": {
+        "ahu": 27,
+        "chiller": 5,
+        "fcu": 29,
+        "zone_controller": 4,
+        "vav": 75,
+        "fire_safety": 29,
+        "security": 32,
+        "diffuser": 195
+      }
+    },
+    "trends": {
+      "days": 7,
+      "interval_minutes": 15,
+      "total_intervals": 672
+    },
+    "alarms": {
+      "total_alarms": 17,
+      "by_severity": {
+        "warning": 17
+      },
+      "by_equipment_type": {
+        "diffuser": 7,
+        "security": 3,
+        "vav": 4,
+        "fire_safety": 3
+      },
+      "by_alarm_code": {
+        "DAMPER_FAIL": 6,
+        "COMM_FAIL": 2,
+        "FLOW_LO": 4,
+        "BATTERY_LOW": 4,
+        "FLOW_HI": 1
+      },
+      "cleared_count": 14,
+      "acknowledged_count": 0
+    }
+  },
+  "elapsed_seconds": 2.270897
+}

@@ -1,5 +1,6 @@
 """Predictions API endpoints - AI-driven failure predictions from Supabase."""
 
+import json
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
@@ -10,6 +11,22 @@ from app.services.prediction_generator import get_prediction_generator
 router = APIRouter()
 
 
+def _parse_json_field(value, default):
+    """Parse a field that might be a JSON string or already an object.
+
+    Supabase JSONB fields can be returned as strings in some cases.
+    This helper ensures we always get the parsed object.
+    """
+    if value is None:
+        return default
+    if isinstance(value, str):
+        try:
+            return json.loads(value)
+        except (json.JSONDecodeError, TypeError):
+            return default
+    return value
+
+
 def format_prediction_for_frontend(pred: dict) -> dict:
     """Format Supabase prediction data to match frontend expectations.
 
@@ -17,26 +34,26 @@ def format_prediction_for_frontend(pred: dict) -> dict:
 
     Maps database severity values to frontend states:
     - critical → critical
-    - high → high
-    - medium → warning
-    - low → healthy
+    - warning → warning (also maps 'high' for backwards compatibility)
+    - healthy → healthy (also maps 'low', 'medium' for backwards compatibility)
     """
     # Extract related data
     building = pred.get('building', {})
     equipment = pred.get('equipment', {})
 
     # Map database severity to frontend severity
-    # DB values: critical, high, medium, low
+    # DB values (after migration 032): critical, warning, healthy
+    # Legacy DB values: critical, high, medium, low
     # Frontend expects: critical, high, warning, healthy
     db_severity = pred['severity']
     if db_severity == 'critical':
         severity = 'critical'
-    elif db_severity == 'high':
-        severity = 'high'
-    elif db_severity == 'medium':
+    elif db_severity in ('warning', 'high'):
         severity = 'warning'
-    else:  # low or any other value
+    elif db_severity in ('healthy', 'low', 'medium'):
         severity = 'healthy'
+    else:
+        severity = 'healthy'  # Default fallback
 
     # Extract financial impact
     financial_impact = {
@@ -64,10 +81,10 @@ def format_prediction_for_frontend(pred: dict) -> dict:
         'timeframe_days': pred['timeframe_days'],
         'severity': severity,  # Mapped to system values
 
-        # Evidence
-        'evidence': pred.get('evidence', {}),
-        'contributing_factors': pred.get('contributing_factors', []),
-        'similar_failures': pred.get('similar_failures', []),
+        # Evidence - parse JSON strings if needed (Supabase returns JSONB as strings)
+        'evidence': _parse_json_field(pred.get('evidence'), {}),
+        'contributing_factors': _parse_json_field(pred.get('contributing_factors'), []),
+        'similar_failures': _parse_json_field(pred.get('similar_failures'), []),
 
         # Financial
         'financial_impact': financial_impact,
@@ -121,7 +138,7 @@ async def list_predictions(
                 "predictions": [],
                 "total": 0,
                 "avg_probability": 0,
-                "by_severity": {"critical": 0, "high": 0, "medium": 0, "low": 0},
+                "by_severity": {"critical": 0, "warning": 0, "healthy": 0},
             }
 
     if severity:
@@ -155,8 +172,8 @@ async def list_predictions(
         total_repair = 0
         total_loss = 0
 
-    # Count by severity
-    severity_counts = {"critical": 0, "high": 0, "medium": 0, "low": 0}
+    # Count by severity (uses new schema: critical, warning, healthy)
+    severity_counts = {"critical": 0, "warning": 0, "healthy": 0}
     for pred in formatted_predictions:
         sev = pred['severity'].lower()
         if sev in severity_counts:

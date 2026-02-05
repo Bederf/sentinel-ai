@@ -146,7 +146,7 @@ CREATE INDEX IF NOT EXISTS idx_sensor_anomalies_followup ON sensor_anomalies(req
 CREATE TABLE IF NOT EXISTS asset_run_reports (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     equipment_id UUID NOT NULL REFERENCES equipment(id),
-    site_id UUID REFERENCES sites(id),
+    site_id UUID REFERENCES buildings(id),
 
     -- Asset class determines which extension table to join
     asset_class VARCHAR(20) NOT NULL CHECK (asset_class IN (

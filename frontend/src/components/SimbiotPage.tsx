@@ -32,23 +32,18 @@ export function SimbiotPage() {
   }
 
   return (
-    <div className="h-full overflow-y-auto flex items-center justify-center p-4 md:p-6">
-      <div
-        className="w-full max-w-4xl rounded-lg"
-        style={{
-          background: "var(--color-sentinel-bg-panel)",
-          border: "1px solid var(--color-sentinel-border)",
-        }}
-      >
-        <div className="p-6">
-          <BMSConnectionWizard
-            key={wizardKey}
-            siteId={selectedSiteId}
-            sites={sites}
-            onClose={() => setWizardKey((k) => k + 1)}
-            onComplete={() => setWizardKey((k) => k + 1)}
-          />
-        </div>
+    <div
+      className="h-full overflow-y-auto"
+      style={{ background: "var(--color-sentinel-bg-canvas)" }}
+    >
+      <div className="p-4 md:p-6 lg:p-8">
+        <BMSConnectionWizard
+          key={wizardKey}
+          siteId={selectedSiteId}
+          sites={sites}
+          onClose={() => setWizardKey((k) => k + 1)}
+          onComplete={() => setWizardKey((k) => k + 1)}
+        />
       </div>
     </div>
   );

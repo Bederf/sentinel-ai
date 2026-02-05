@@ -1,0 +1,17 @@
+Collecting BAC0
+  Downloading bac0-2025.9.15-py3-none-any.whl.metadata (2.9 kB)
+Collecting BACpypes3 (from BAC0)
+  Downloading bacpypes3-0.0.102-py3-none-any.whl.metadata (833 bytes)
+Collecting colorama (from BAC0)
+  Downloading colorama-0.4.6-py2.py3-none-any.whl.metadata (17 kB)
+Requirement already satisfied: python-dotenv in /opt/bms-intelligence/backend/venv/lib/python3.11/site-packages (from BAC0) (1.2.1)
+Requirement already satisfied: pytz in /opt/bms-intelligence/backend/venv/lib/python3.11/site-packages (from BAC0) (2025.2)
+Collecting aiosqlite (from BAC0)
+  Downloading aiosqlite-0.22.1-py3-none-any.whl.metadata (4.3 kB)
+Downloading bac0-2025.9.15-py3-none-any.whl (120 kB)
+Downloading aiosqlite-0.22.1-py3-none-any.whl (17 kB)
+Downloading bacpypes3-0.0.102-py3-none-any.whl (308 kB)
+Downloading colorama-0.4.6-py2.py3-none-any.whl (25 kB)
+Installing collected packages: BACpypes3, colorama, aiosqlite, BAC0
+
+Successfully installed BAC0-2025.9.15 BACpypes3-0.0.102 aiosqlite-0.22.1 colorama-0.4.6

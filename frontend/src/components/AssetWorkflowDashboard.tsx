@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   CheckCircle2,
   AlertTriangle,
@@ -11,163 +11,16 @@ import {
   Shield,
   ChevronRight,
   ArrowLeft,
+  RefreshCw,
 } from 'lucide-react';
+import {
+  workflowApi,
+  type WorkflowEquipmentItem,
+  type WorkflowState,
+} from '../lib/api';
 
-// Types
-interface WorkflowState {
-  equipment_id: string;
-  current_state: string;
-  state_history: StateTransition[];
-  baseline_summary: BaselineSummary;
-  inspection_status: InspectionStatus;
-  ml_prediction: MLPrediction | null;
-  active_repairs: WorkOrder[];
-}
-
-interface StateTransition {
-  from: string;
-  to: string;
-  timestamp: string;
-  trigger: string;
-}
-
-interface BaselineSummary {
-  total_baselines: number;
-  latest_baseline: string;
-  deviation_detected: boolean;
-}
-
-interface InspectionStatus {
-  last_inspection: string;
-  status: string;
-  findings: string;
-}
-
-interface MLPrediction {
-  failure_probability: number;
-  timeframe: string;
-  confidence: string;
-  explanation: string;
-}
-
-interface WorkOrder {
-  id: string;
-  title: string;
-  priority: string;
-  status: string;
-}
-
-interface Equipment {
-  equipment_id: string;
-  name: string;
-  type: string;
-  current_state: string;
-}
-
-// Mock data (will be replaced with API calls)
-const mockEquipment: Equipment[] = [
-  {
-    equipment_id: 'chiller-001',
-    name: 'Main Chiller',
-    type: 'chiller',
-    current_state: 'healthy'
-  },
-  {
-    equipment_id: 'generator-002',
-    name: 'Standby Generator #2',
-    type: 'generator',
-    current_state: 'healthy'
-  },
-  {
-    equipment_id: 'ahu-003',
-    name: 'Level 3 AHU',
-    type: 'ahu',
-    current_state: 'anomaly_detected'
-  }
-];
-
-const mockWorkflowState: Record<string, WorkflowState> = {
-  'chiller-001': {
-    equipment_id: 'chiller-001',
-    current_state: 'healthy',
-    state_history: [
-      { from: 'onboarding', to: 'monitoring', timestamp: '2025-08-01', trigger: 'baseline_captured' },
-      { from: 'monitoring', to: 'anomaly_detected', timestamp: '2026-01-01', trigger: 'ml_prediction' },
-      { from: 'anomaly_detected', to: 'inspection_pending', timestamp: '2026-01-01', trigger: 'automated_task' },
-      { from: 'inspection_pending', to: 'deficiency_found', timestamp: '2026-01-15', trigger: 'inspection_complete' },
-      { from: 'deficiency_found', to: 'repair_in_progress', timestamp: '2026-01-16', trigger: 'work_order_created' },
-      { from: 'repair_in_progress', to: 'validation_pending', timestamp: '2026-01-20', trigger: 'repair_complete' },
-      { from: 'validation_pending', to: 'healthy', timestamp: '2026-01-20', trigger: 'effectiveness_validated' }
-    ],
-    baseline_summary: {
-      total_baselines: 4,
-      latest_baseline: '2026-01-20',
-      deviation_detected: false
-    },
-    inspection_status: {
-      last_inspection: '2026-01-22',
-      status: 'pass',
-      findings: 'Post-repair verification. Vibration back to normal (1.9 mm/s).'
-    },
-    ml_prediction: {
-      failure_probability: 0.05,
-      timeframe: '90 days',
-      confidence: 'high',
-      explanation: 'All parameters within normal range. No anomalies detected.'
-    },
-    active_repairs: []
-  },
-  'generator-002': {
-    equipment_id: 'generator-002',
-    current_state: 'healthy',
-    state_history: [
-      { from: 'onboarding', to: 'monitoring', timestamp: '2018-03-15', trigger: 'baseline_captured' }
-    ],
-    baseline_summary: {
-      total_baselines: 2,
-      latest_baseline: '2026-01-10',
-      deviation_detected: false
-    },
-    inspection_status: {
-      last_inspection: '2026-01-10',
-      status: 'pass',
-      findings: 'All values within normal range. No issues detected.'
-    },
-    ml_prediction: {
-      failure_probability: 0.05,
-      timeframe: '90 days',
-      confidence: 'high',
-      explanation: 'All parameters within normal range. No anomalies detected.'
-    },
-    active_repairs: []
-  },
-  'ahu-003': {
-    equipment_id: 'ahu-003',
-    current_state: 'anomaly_detected',
-    state_history: [
-      { from: 'onboarding', to: 'monitoring', timestamp: '2019-06-10', trigger: 'baseline_captured' },
-      { from: 'monitoring', to: 'anomaly_detected', timestamp: '2026-01-28', trigger: 'ml_prediction' },
-      { from: 'anomaly_detected', to: 'inspection_pending', timestamp: '2026-01-28', trigger: 'automated_task' }
-    ],
-    baseline_summary: {
-      total_baselines: 2,
-      latest_baseline: '2026-01-28',
-      deviation_detected: true
-    },
-    inspection_status: {
-      last_inspection: '2026-01-28',
-      status: 'scheduled',
-      findings: 'ML detected fan motor bearing degradation. Verify and inspect.'
-    },
-    ml_prediction: {
-      failure_probability: 0.72,
-      timeframe: '14 days',
-      confidence: 'medium',
-      explanation: 'Fan motor showing early signs of bearing degradation. Vibration up 73% with elevated current draw.'
-    },
-    active_repairs: []
-  }
-};
+// Re-export types from API for local use
+type Equipment = WorkflowEquipmentItem;
 
 function getStateColor(state: string) {
   switch (state) {
@@ -206,21 +59,68 @@ function getStateIcon(state: string) {
 }
 
 export function AssetWorkflowDashboard() {
-  const [equipment] = useState<Equipment[]>(mockEquipment);
+  const [equipment, setEquipment] = useState<Equipment[]>([]);
+  const [workflowStates, setWorkflowStates] = useState<Record<string, WorkflowState>>({});
   const [selectedEquipment, setSelectedEquipment] = useState<string | null>(null);
   const [workflowState, setWorkflowState] = useState<WorkflowState | null>(null);
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
+  // Fetch equipment list and workflow states from API
+  const fetchDashboardData = useCallback(async () => {
+    try {
+      setError(null);
+      const data = await workflowApi.getDashboardEquipment();
+      setEquipment(data.equipment);
+      setWorkflowStates(data.workflow_states);
+    } catch (err) {
+      console.error('Failed to fetch workflow dashboard data:', err);
+      setError('Failed to load equipment data');
+    } finally {
+      setInitialLoading(false);
+    }
+  }, []);
+
+  // Initial fetch
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
+
+  // When equipment is selected, get its workflow state from the cached data
   useEffect(() => {
     if (selectedEquipment) {
       setLoading(true);
-      // Simulate API call
-      setTimeout(() => {
-        setWorkflowState(mockWorkflowState[selectedEquipment] || null);
-        setLoading(false);
-      }, 500);
+      // Use cached workflow state from initial fetch
+      const state = workflowStates[selectedEquipment];
+      if (state) {
+        setWorkflowState(state);
+      } else {
+        setWorkflowState(null);
+      }
+      setLoading(false);
     }
-  }, [selectedEquipment]);
+  }, [selectedEquipment, workflowStates]);
+
+  // Show initial loading state
+  if (initialLoading) {
+    return (
+      <div
+        className="h-full overflow-y-auto p-4 md:p-6 flex items-center justify-center"
+        style={{ background: 'var(--color-sentinel-bg-canvas)' }}
+      >
+        <div className="flex items-center gap-3">
+          <Activity
+            className="h-6 w-6 animate-spin"
+            style={{ color: 'var(--color-sentinel-blue)' }}
+          />
+          <span style={{ color: 'var(--color-sentinel-text-secondary)' }}>
+            Loading equipment workflow data...
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -229,29 +129,55 @@ export function AssetWorkflowDashboard() {
     >
       {/* Page Header */}
       <div className="mb-6">
-        <div className="flex items-center gap-3 mb-1">
-          <div
-            className="p-2 rounded"
-            style={{ background: 'rgba(59, 130, 246, 0.15)' }}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3 mb-1">
+            <div
+              className="p-2 rounded"
+              style={{ background: 'rgba(59, 130, 246, 0.15)' }}
+            >
+              <Shield className="h-5 w-5" style={{ color: 'var(--color-sentinel-blue)' }} />
+            </div>
+            <div>
+              <h1
+                className="text-lg font-semibold"
+                style={{ color: 'var(--color-sentinel-text-primary)' }}
+              >
+                Asset Management Workflow
+              </h1>
+              <p
+                className="text-sm"
+                style={{ color: 'var(--color-sentinel-text-secondary)' }}
+              >
+                Complete visibility from onboarding through repair validation
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={fetchDashboardData}
+            className="p-2 rounded transition-colors"
+            style={{ color: 'var(--color-sentinel-text-secondary)' }}
+            onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-sentinel-bg-secondary)'}
+            onMouseLeave={(e) => e.currentTarget.style.background = ''}
+            title="Refresh data"
           >
-            <Shield className="h-5 w-5" style={{ color: 'var(--color-sentinel-blue)' }} />
-          </div>
-          <div>
-            <h1
-              className="text-lg font-semibold"
-              style={{ color: 'var(--color-sentinel-text-primary)' }}
-            >
-              Asset Management Workflow
-            </h1>
-            <p
-              className="text-sm"
-              style={{ color: 'var(--color-sentinel-text-secondary)' }}
-            >
-              Complete visibility from onboarding through repair validation
-            </p>
-          </div>
+            <RefreshCw className="h-4 w-4" />
+          </button>
         </div>
       </div>
+
+      {/* Error State */}
+      {error && (
+        <div
+          className="rounded-md p-4 mb-6 flex items-center gap-3"
+          style={{
+            background: 'rgba(220, 38, 38, 0.1)',
+            border: '1px solid rgba(220, 38, 38, 0.3)',
+          }}
+        >
+          <XCircle className="h-5 w-5" style={{ color: 'var(--color-sentinel-red)' }} />
+          <span style={{ color: 'var(--color-sentinel-text-primary)' }}>{error}</span>
+        </div>
+      )}
 
       {/* Equipment Fleet Panel */}
       <div
@@ -273,6 +199,15 @@ export function AssetWorkflowDashboard() {
             >
               Equipment Fleet
             </h3>
+            <span
+              className="text-xs px-2 py-1 rounded"
+              style={{
+                background: 'var(--color-sentinel-bg-secondary)',
+                color: 'var(--color-sentinel-text-secondary)',
+              }}
+            >
+              {equipment.length} total
+            </span>
           </div>
           <span
             className="text-xs px-2 py-1 rounded"
@@ -287,6 +222,17 @@ export function AssetWorkflowDashboard() {
 
         {/* Equipment Grid */}
         <div className="p-4">
+          {equipment.length === 0 ? (
+            <div className="text-center py-8">
+              <Activity
+                className="h-8 w-8 mx-auto mb-3"
+                style={{ color: 'var(--color-sentinel-text-disabled)' }}
+              />
+              <p style={{ color: 'var(--color-sentinel-text-secondary)' }}>
+                No equipment found. Equipment will appear here once added to the system.
+              </p>
+            </div>
+          ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {equipment.map((eq) => {
               const StateIcon = getStateIcon(eq.current_state);
@@ -353,6 +299,7 @@ export function AssetWorkflowDashboard() {
               );
             })}
           </div>
+          )}
         </div>
       </div>
 
@@ -390,7 +337,11 @@ function EquipmentWorkflowDetail({
   workflowState: WorkflowState;
   onBack: () => void;
 }) {
-  const StateIcon = getStateIcon(workflowState.current_state);
+  // Get icon component and render it - must use useMemo to avoid creating component during render
+  const stateIconElement = useMemo(() => {
+    const IconComponent = getStateIcon(workflowState.current_state);
+    return <IconComponent className="h-3.5 w-3.5" />;
+  }, [workflowState.current_state]);
 
   return (
     <div className="space-y-4">
@@ -435,7 +386,7 @@ function EquipmentWorkflowDetail({
               color: getStateColor(workflowState.current_state),
             }}
           >
-            <StateIcon className="h-3.5 w-3.5" />
+            {stateIconElement}
             {workflowState.current_state.replace(/_/g, ' ')}
           </span>
         </div>
@@ -726,6 +677,94 @@ function EquipmentWorkflowDetail({
                 </p>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Active Repairs - Service Feedback */}
+      {workflowState.active_repairs && workflowState.active_repairs.length > 0 && (
+        <div
+          className="rounded-md overflow-hidden"
+          style={{
+            background: 'var(--color-sentinel-bg-panel)',
+            border: '1px solid var(--color-sentinel-border)',
+          }}
+        >
+          <div
+            className="p-4 flex items-center gap-3"
+            style={{ borderBottom: '1px solid var(--color-sentinel-border)' }}
+          >
+            <div
+              className="p-2 rounded"
+              style={{ background: 'rgba(59, 130, 246, 0.15)' }}
+            >
+              <Wrench className="h-4 w-4" style={{ color: 'var(--color-sentinel-blue)' }} />
+            </div>
+            <h3
+              className="font-medium text-sm"
+              style={{ color: 'var(--color-sentinel-text-primary)' }}
+            >
+              Active Repairs
+            </h3>
+          </div>
+          <div className="p-4 space-y-3">
+            {workflowState.active_repairs.map((repair) => (
+              <div
+                key={repair.id}
+                className="p-3 rounded-md flex items-center justify-between"
+                style={{
+                  background: 'var(--color-sentinel-bg-secondary)',
+                  border: '1px solid var(--color-sentinel-border)',
+                }}
+              >
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="text-sm font-medium"
+                      style={{ color: 'var(--color-sentinel-text-primary)' }}
+                    >
+                      {repair.title}
+                    </span>
+                    <span
+                      className="text-xs px-2 py-0.5 rounded-full uppercase"
+                      style={{
+                        background: repair.priority === 'urgent' || repair.priority === 'high'
+                          ? 'rgba(220, 38, 38, 0.15)'
+                          : 'rgba(245, 158, 11, 0.15)',
+                        color: repair.priority === 'urgent' || repair.priority === 'high'
+                          ? 'var(--color-sentinel-red)'
+                          : 'var(--color-sentinel-amber)',
+                      }}
+                    >
+                      {repair.priority}
+                    </span>
+                  </div>
+                  <span
+                    className="text-xs"
+                    style={{ color: 'var(--color-sentinel-text-secondary)' }}
+                  >
+                    {repair.id} &middot; {repair.status}
+                  </span>
+                </div>
+                <div
+                  className="text-xs px-3 py-1.5 rounded flex items-center gap-1.5"
+                  style={{
+                    background: 'rgba(59, 130, 246, 0.15)',
+                    color: 'var(--color-sentinel-blue)',
+                  }}
+                >
+                  <Clock className="h-3.5 w-3.5" />
+                  Awaiting Service Feedback
+                </div>
+              </div>
+            ))}
+            <p
+              className="text-xs mt-2"
+              style={{ color: 'var(--color-sentinel-text-secondary)' }}
+            >
+              Technicians submit service feedback via Clawd bot after completing repairs.
+              Feedback includes readings, photos, and observations that update equipment health.
+            </p>
           </div>
         </div>
       )}

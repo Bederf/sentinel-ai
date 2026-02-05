@@ -295,12 +295,6 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
     }
   };
 
-  // Handle risk card click - open detail modal
-  const handleRiskCardClick = (equipment: BuildingEquipmentItem) => {
-    setSelectedRiskEquipment(equipment);
-    setShowRiskModal(true);
-  };
-
   // Close risk detail modal
   const closeRiskModal = () => {
     setShowRiskModal(false);
@@ -444,25 +438,25 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
         value: stats.total_equipment,
         icon: <Cpu className="h-5 w-5" />,
         // Only show delta if uptime_percent exists and is not null/undefined
-        delta: (stats as any).uptime_percent !== undefined && (stats as any).uptime_percent !== null 
-          ? (stats as any).uptime_percent - 95 
+        delta: stats.uptime_percent !== undefined && stats.uptime_percent !== null
+          ? stats.uptime_percent - 95
           : undefined,
-        deltaText: (stats as any).uptime_percent !== undefined && (stats as any).uptime_percent !== null 
-          ? "vs 95% target" 
+        deltaText: stats.uptime_percent !== undefined && stats.uptime_percent !== null
+          ? "vs 95% target"
           : undefined,
         accentColor: "cyan" as const,
       },
       'kpi-active-risks': {
         title: "Active Risks",
-        value: (stats as any).active_alerts || 0,
+        value: stats.active_alerts || 0,
         icon: <Bell className="h-5 w-5" />,
         // Show critical count if any
-        delta: (stats as any).critical_alerts > 0
-          ? -((stats as any).critical_alerts * 10)
+        delta: stats.critical_alerts > 0
+          ? -(stats.critical_alerts * 10)
           : undefined,
         isInverseTrend: true,
-        deltaText: (stats as any).critical_alerts > 0
-          ? `${(stats as any).critical_alerts} critical`
+        deltaText: stats.critical_alerts > 0
+          ? `${stats.critical_alerts} critical`
           : undefined,
         accentColor: "orange" as const,
       },

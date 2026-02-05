@@ -112,11 +112,11 @@ export function EnergyChart({
           </span>
         </div>
         <div className="h-72 flex flex-col justify-end space-y-2">
-          {[...Array(6)].map((_, i) => (
+          {[45, 72, 38, 65, 50, 80].map((height, i) => (
             <div
               key={i}
               className="skeleton"
-              style={{ height: `${Math.random() * 60 + 20}px` }}
+              style={{ height: `${height}px` }}
             />
           ))}
         </div>

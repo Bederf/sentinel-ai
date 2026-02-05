@@ -55,6 +55,11 @@ from app.api import auth  # Authentication endpoints
 from app.api import user_access  # User site access management
 from app.api import login_audit  # Login audit logs
 from app.api import mfa  # Phase 58.1 MFA for privileged access (FSR 4.6)
+from app.api import equipment_metadata  # Equipment notes and metadata
+from app.api import dali_discovery  # DALI device discovery
+from app.api import equipment_discovery  # Unified equipment discovery (DALI, BACnet, Modbus)
+from app.api import service_feedback  # Phase 59 Service feedback & health score integration
+from app.api import lifecycle_simulation  # 24-hour building lifecycle simulation
 from app.middleware.audit_middleware import AuditMiddleware
 from app.middleware.security_logging import SecurityLoggingMiddleware
 from app.services.background_scheduler import scheduler_service
@@ -146,16 +151,25 @@ app.include_router(niagara_discovery.router, tags=["niagara-discovery"])  # Phas
 app.include_router(fire.router, tags=["fire"])  # Phase 61-01 Fire & Life Safety
 app.include_router(security.router, tags=["security"])  # Phase 58-01 Security Module
 app.include_router(work_orders.router, prefix="/api", tags=["work-orders"])  # Work orders
+app.include_router(service_feedback.router, tags=["service-feedback"])  # Phase 59 Service feedback & health score
+app.include_router(lifecycle_simulation.router, tags=["lifecycle-simulation"])  # 24-hour building lifecycle simulation
 app.include_router(inspection.router, tags=["inspection"])  # Phase 55 Routine Inspection & Maintenance
 app.include_router(auth.router)  # Authentication (email-based login)
 app.include_router(user_access.router)  # User site access management (admin)
 app.include_router(login_audit.router)  # Login audit logs (admin)
 app.include_router(mfa.router)  # Phase 58.1 MFA for privileged access (FSR 4.6)
+app.include_router(equipment_metadata.router, prefix="/api", tags=["equipment-metadata"])  # Equipment notes/metadata
+app.include_router(dali_discovery.router, prefix="/api", tags=["dali-discovery"])  # DALI device discovery
+app.include_router(equipment_discovery.router, prefix="/api", tags=["equipment-discovery"])  # Unified discovery
 
 
 @app.on_event("startup")
 async def startup_event():
     """Initialize background services on startup."""
+    # Initialize device manager with mock devices + building equipment
+    from app.api.devices import startup_event as devices_startup
+    await devices_startup()
+
     # Start background scheduler for demo data generation
     scheduler_service.start()
 

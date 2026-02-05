@@ -26,6 +26,7 @@ import api from "../lib/api";
 import type {
   OptimizationStatusResponse,
   OptimizationRecommendation,
+  MonthlySavingsSummary,
 } from "../lib/api";
 
 type OptimizationStatusType = OptimizationStatusResponse['optimization_status'];
@@ -44,6 +45,7 @@ export function OptimizationInfoCard({
   const [lastOptimization, setLastOptimization] = useState<string | null>(null);
   const [currentRecommendation, setCurrentRecommendation] =
     useState<OptimizationRecommendation | null>(null);
+  const [monthlySavings, setMonthlySavings] = useState<MonthlySavingsSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [showRecommendationModal, setShowRecommendationModal] = useState(false);
 
@@ -62,6 +64,7 @@ export function OptimizationInfoCard({
         setOptimizationStatus(status.optimization_status);
         setLastOptimization(status.last_optimization);
         setCurrentRecommendation(status.last_recommendation);
+        setMonthlySavings(status.monthly_savings || null);
       } catch (error) {
         console.error("[OptimizationInfoCard] Failed to fetch optimization status:", error);
         setOptimizationStatus("error");
@@ -263,13 +266,13 @@ export function OptimizationInfoCard({
               className="text-lg font-semibold"
               style={{ color: "var(--color-sentinel-text-primary)" }}
             >
-              R0
+              R{monthlySavings?.monthly_savings_zar?.toLocaleString() || "0"}
             </div>
             <div
               className="text-xs"
               style={{ color: "var(--color-sentinel-text-secondary)" }}
             >
-              Saved
+              Saved {monthlySavings?.applied_recommendations ? `(${monthlySavings.applied_recommendations} optimizations)` : ""}
             </div>
           </div>
 
@@ -306,6 +309,54 @@ export function OptimizationInfoCard({
             </div>
           </div>
         </div>
+
+        {/* Pending Recommendation Preview - show projected savings */}
+        {currentRecommendation && currentRecommendation.projected_savings && (
+          <div
+            className="mt-3 p-3 rounded-md"
+            style={{
+              background: "rgba(245, 158, 11, 0.1)",
+              border: "1px solid var(--color-sentinel-amber)",
+            }}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <Lightbulb
+                    className="h-4 w-4"
+                    style={{ color: "var(--color-sentinel-amber)" }}
+                  />
+                  <span
+                    className="text-xs font-medium"
+                    style={{ color: "var(--color-sentinel-amber)" }}
+                  >
+                    {isAutomatic ? "Next Optimization" : "Pending Approval"}
+                  </span>
+                </div>
+                <div
+                  className="text-sm"
+                  style={{ color: "var(--color-sentinel-text-secondary)" }}
+                >
+                  {currentRecommendation.recommendations?.length || 0} setpoint changes
+                </div>
+              </div>
+              <div className="text-right">
+                <div
+                  className="text-lg font-semibold"
+                  style={{ color: "var(--color-sentinel-green)" }}
+                >
+                  R{currentRecommendation.projected_savings.cost_zar_per_hour?.toFixed(0) || "0"}/hr
+                </div>
+                <div
+                  className="text-xs"
+                  style={{ color: "var(--color-sentinel-text-secondary)" }}
+                >
+                  projected savings
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Recommendation Modal - only in supervised mode */}

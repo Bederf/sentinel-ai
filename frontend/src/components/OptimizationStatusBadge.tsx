@@ -2,11 +2,10 @@
  * OptimizationStatusBadge Component - AI optimization status indicator
  *
  * Displays optimization status for a building with lightbulb icons:
- * - Optimized (accepted): Green lightbulb, no pulse
- * - Recommendation Pending: Amber lightbulb, pulsing
- * - Rejected/Warning: Amber lightbulb, no pulse
+ * - Automatic mode: Green lightbulb (AI is managing the building)
+ * - Supervised mode + recommendation pending: Amber lightbulb, pulsing
  * - Error: Red X icon
- * - No recommendation: No badge shown
+ * - Supervised mode + no recommendation: No badge shown
  *
  * Supports size variants and shows optional timestamp.
  */
@@ -15,9 +14,11 @@ import { Lightbulb, XCircle } from "lucide-react";
 import { useMemo } from "react";
 
 export type OptimizationStatus = "optimized" | "recommendation_pending" | "warning" | "error" | "unknown";
+export type OptimizationMode = "automatic" | "supervised";
 
 interface OptimizationStatusBadgeProps {
   status: OptimizationStatus;
+  mode?: OptimizationMode;
   size?: "sm" | "md";
   lastOptimization?: string | null | undefined;
   className?: string;
@@ -47,6 +48,7 @@ function formatRelativeTime(timestamp: string | null | undefined): string | null
 
 export function OptimizationStatusBadge({
   status,
+  mode = "supervised",
   size = "md",
   lastOptimization,
   className = "",
@@ -64,7 +66,7 @@ export function OptimizationStatusBadge({
     md: "h-4 w-4",
   };
 
-  // Determine what to show based on status and recommendation
+  // Determine what to show based on mode and recommendation
   const getBadgeConfig = () => {
     // Error state - always show error icon
     if (status === "error") {
@@ -75,11 +77,12 @@ export function OptimizationStatusBadge({
         bg: "rgba(220, 38, 38, 0.15)",
         pulse: false,
         showTime: false,
+        tooltip: "Optimization error",
       };
     }
 
-    // Optimized (accepted) - green lightbulb, no pulse
-    if (status === "optimized") {
+    // Automatic mode - always show green lightbulb (AI is managing)
+    if (mode === "automatic") {
       return {
         show: true,
         icon: Lightbulb,
@@ -87,12 +90,12 @@ export function OptimizationStatusBadge({
         bg: "rgba(16, 185, 129, 0.15)",
         pulse: false,
         showTime: true,
+        tooltip: "Auto-optimization enabled",
       };
     }
 
-    // Has recommendation pending or warning - amber lightbulb, pulsing
-    // Pulse on warning too since there are still recommendations to review
-    if (hasRecommendation && (status === "recommendation_pending" || status === "warning")) {
+    // Supervised mode + has recommendation - amber lightbulb, pulsing
+    if (mode === "supervised" && hasRecommendation) {
       return {
         show: true,
         icon: Lightbulb,
@@ -100,22 +103,11 @@ export function OptimizationStatusBadge({
         bg: "rgba(245, 158, 11, 0.15)",
         pulse: true,
         showTime: false,
+        tooltip: "Recommendation pending approval",
       };
     }
 
-    // Has recommendation but unknown status - amber lightbulb, no pulse
-    if (hasRecommendation && status === "unknown") {
-      return {
-        show: true,
-        icon: Lightbulb,
-        color: "var(--color-sentinel-amber)",
-        bg: "rgba(245, 158, 11, 0.15)",
-        pulse: false,
-        showTime: false,
-      };
-    }
-
-    // No recommendation and not optimized - don't show badge
+    // Supervised mode without recommendation - don't show badge
     return {
       show: false,
       icon: Lightbulb,
@@ -123,6 +115,7 @@ export function OptimizationStatusBadge({
       bg: "",
       pulse: false,
       showTime: false,
+      tooltip: "",
     };
   };
 

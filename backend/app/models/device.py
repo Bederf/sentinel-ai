@@ -29,6 +29,11 @@ class DeviceType(Enum):
     FIRE_SAFETY = "fire_safety"
     ACCESS_CONTROL = "access_control"
     POWER = "power"
+    REFRIGERATION = "refrigeration"
+    MEDICAL = "medical"
+    LIFT = "lift"
+    CONTROLLER = "controller"
+    METER = "meter"
     OTHER = "other"
 
 
@@ -51,6 +56,15 @@ class ZoneType(Enum):
     PLANT_ROOM = "plant_room"        # Priority 5 - equipment only
     PARKING = "parking"              # Priority 6 - minimal HVAC
     BANKING_HALL = "banking_hall"    # Priority 2 - customer facing
+    STAIRWELL = "stairwell"          # Priority 6 - minimal HVAC
+    CORRIDOR = "corridor"            # Priority 5 - circulation
+    RESTROOM = "restroom"            # Priority 4 - hygiene
+    KITCHEN = "kitchen"              # Priority 3 - staff amenity
+    STORAGE = "storage"              # Priority 6 - minimal HVAC
+    RECEPTION = "reception"          # Priority 3 - visitor facing
+    ROOF = "roof"                    # Priority 6 - equipment only
+    BASEMENT = "basement"            # Priority 5 - varies
+    UNKNOWN = "unknown"              # Default for unclassified zones
 
 
 class ExposureDirection(Enum):
@@ -369,7 +383,10 @@ class SecurityDevice(Device):
 
 def create_device_from_dict(data: Dict[str, Any]) -> Device:
     """Create appropriate device type from dictionary data."""
-    device_type = DeviceType(data.get("device_type", "other"))
+    try:
+        device_type = DeviceType(data.get("device_type", "other"))
+    except ValueError:
+        device_type = DeviceType.OTHER
 
     # Set default values for required fields
     data.setdefault("id", str(uuid.uuid4()))
@@ -385,11 +402,17 @@ def create_device_from_dict(data: Dict[str, Any]) -> Device:
     # Handle device_location (new structured format)
     if "device_location" in data and isinstance(data["device_location"], dict):
         loc_data = data["device_location"]
-        # Convert zone_type and exposure strings to enums if present
+        # Convert zone_type and exposure strings to enums if present (with fallback)
         if "zone_type" in loc_data and isinstance(loc_data["zone_type"], str):
-            loc_data["zone_type"] = ZoneType(loc_data["zone_type"])
+            try:
+                loc_data["zone_type"] = ZoneType(loc_data["zone_type"])
+            except ValueError:
+                loc_data["zone_type"] = ZoneType.UNKNOWN
         if "exposure" in loc_data and isinstance(loc_data["exposure"], str):
-            loc_data["exposure"] = ExposureDirection(loc_data["exposure"])
+            try:
+                loc_data["exposure"] = ExposureDirection(loc_data["exposure"])
+            except ValueError:
+                loc_data["exposure"] = ExposureDirection.INTERIOR
         data["device_location"] = DeviceLocation(**loc_data)
     elif "location" in data and isinstance(data["location"], str):
         # Legacy string location - create basic DeviceLocation
@@ -426,13 +449,22 @@ def create_device_from_dict(data: Dict[str, Any]) -> Device:
         if "location" in metadata:
             data["location"] = metadata["location"]
 
-    # Convert string enums to Enum instances
+    # Convert string enums to Enum instances (with fallbacks for invalid values)
     if isinstance(data.get("device_type"), str):
-        data["device_type"] = DeviceType(data["device_type"])
+        try:
+            data["device_type"] = DeviceType(data["device_type"])
+        except ValueError:
+            data["device_type"] = DeviceType.OTHER
     if isinstance(data.get("protocol"), str):
-        data["protocol"] = ProtocolType(data["protocol"])
+        try:
+            data["protocol"] = ProtocolType(data["protocol"])
+        except ValueError:
+            data["protocol"] = ProtocolType.MOCK
     if isinstance(data.get("status"), str):
-        data["status"] = DeviceStatus(data["status"])
+        try:
+            data["status"] = DeviceStatus(data["status"])
+        except ValueError:
+            data["status"] = DeviceStatus.ONLINE
 
     # Convert points dictionary to DevicePoint objects
     if "points" in data and isinstance(data["points"], dict):
@@ -445,12 +477,22 @@ def create_device_from_dict(data: Dict[str, Any]) -> Device:
                 points_dict[point_name] = DevicePoint(**point_data)
         data["points"] = points_dict
 
-    # Create appropriate device subclass
+    # Get valid fields for each device class to filter out unknown kwargs
+    device_fields = {f.name for f in Device.__dataclass_fields__.values()}
+    hvac_fields = device_fields | {f.name for f in HVACDevice.__dataclass_fields__.values()}
+    lighting_fields = device_fields | {f.name for f in LightingDevice.__dataclass_fields__.values()}
+    security_fields = device_fields | {f.name for f in SecurityDevice.__dataclass_fields__.values()}
+
+    # Create appropriate device subclass with filtered data
     if device_type == DeviceType.HVAC:
-        return HVACDevice(**data)
+        filtered = {k: v for k, v in data.items() if k in hvac_fields}
+        return HVACDevice(**filtered)
     elif device_type == DeviceType.LIGHTING:
-        return LightingDevice(**data)
+        filtered = {k: v for k, v in data.items() if k in lighting_fields}
+        return LightingDevice(**filtered)
     elif device_type == DeviceType.SECURITY:
-        return SecurityDevice(**data)
+        filtered = {k: v for k, v in data.items() if k in security_fields}
+        return SecurityDevice(**filtered)
     else:
-        return Device(**data)
+        filtered = {k: v for k, v in data.items() if k in device_fields}
+        return Device(**filtered)

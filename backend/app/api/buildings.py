@@ -24,8 +24,54 @@ from fastapi import APIRouter, HTTPException, UploadFile, File
 from pydantic import BaseModel
 
 from app.services.building_loader import get_building_loader, Building
+from app.services.device_abstraction import device_manager
 
 logger = logging.getLogger(__name__)
+
+
+def _normalize_device_id(device_id: str) -> str:
+    """Normalize device ID to S### format for matching.
+
+    Converts 'site-002-xxx' to 'S002-xxx' format.
+    """
+    import re
+    # Match 'site-NNN-' prefix and convert to 'SNNN-'
+    match = re.match(r'^site-(\d+)-(.+)$', device_id, re.IGNORECASE)
+    if match:
+        site_num = match.group(1).zfill(3)  # Zero-pad to 3 digits
+        rest = match.group(2)
+        return f"S{site_num}-{rest}"
+    return device_id
+
+
+def _is_device_controllable(device_id: str, equipment_points: dict) -> bool:
+    """Check if device is controllable by checking equipment points or device_manager.
+
+    First checks if the equipment JSON has writable points.
+    If not, falls back to checking if the device exists in device_manager with writable points.
+    Handles ID format differences (site-002-xxx vs S002-xxx).
+    """
+    # Check equipment JSON points first
+    if any(p.get("writable", False) for p in equipment_points.values()):
+        return True
+
+    # Fall back to device_manager (which includes mock_devices.json)
+    # Access the internal _devices dict directly since this is a sync function
+    try:
+        # Try original ID first
+        device = device_manager._devices.get(device_id)
+
+        # If not found, try normalized ID (site-002-xxx -> S002-xxx)
+        if not device:
+            normalized_id = _normalize_device_id(device_id)
+            device = device_manager._devices.get(normalized_id)
+
+        if device and device.points:
+            return any(p.writable for p in device.points.values())
+    except Exception as e:
+        logger.debug(f"Could not check device_manager for {device_id}: {e}")
+
+    return False
 router = APIRouter(prefix="/api/buildings", tags=["Building Management"])
 
 # Data path
@@ -697,7 +743,10 @@ async def get_building_equipment(building_id: str) -> dict:
                         "model": eq.get("model"),
                         "metadata": eq.get("metadata", {}),
                     },
-                    "controllable": eq_type not in ["sensor", "power_meter"],
+                    "controllable": _is_device_controllable(
+                        eq.get("code", eq.get("id", "")),
+                        eq.get("points", {})
+                    ),
                 })
 
                 # Update category stats
@@ -710,6 +759,29 @@ async def get_building_equipment(building_id: str) -> dict:
                     categories[category]["warning"] += 1
                 elif status == "critical":
                     categories[category]["critical"] += 1
+
+            # Merge controllable status from building equipment directory (Niagara discovery)
+            # The directory files have points with writable=true that Supabase doesn't have
+            building_path = DATA_PATH / site_code
+            equipment_dir = building_path / "equipment"
+            if equipment_dir.exists():
+                # Build lookup from directory files for controllable status
+                dir_controllable = {}
+                for eq_file in equipment_dir.glob("*.json"):
+                    try:
+                        with open(eq_file) as f:
+                            eq = json.load(f)
+                        eq_id = eq.get("id", eq.get("code", ""))
+                        points = eq.get("points", {})
+                        if any(p.get("writable", False) for p in points.values()):
+                            dir_controllable[eq_id] = True
+                    except Exception as e:
+                        logger.warning(f"Failed to load equipment from {eq_file}: {e}")
+
+                # Update controllable status for existing equipment
+                for eq_item in equipment_list:
+                    if eq_item["id"] in dir_controllable:
+                        eq_item["controllable"] = True
 
             return {
                 "building_id": building_id,
@@ -1066,7 +1138,57 @@ async def get_building_equipment(building_id: str) -> dict:
                         "controllable": True,
                     })
 
-    # 5. Legacy Equipment from equipment.json
+    # 5. Equipment from building equipment directory (Niagara discovery)
+    equipment_dir = building_path / "equipment"
+    if equipment_dir.exists():
+        existing_ids = {eq["id"] for eq in equipment_list}  # Avoid duplicates
+        for eq_file in equipment_dir.glob("*.json"):
+            try:
+                with open(eq_file) as f:
+                    eq = json.load(f)
+
+                eq_id = eq.get("id", eq.get("code", ""))
+                if eq_id in existing_ids:
+                    continue  # Skip duplicates
+
+                eq_type = eq.get("equipment_type", eq.get("device_type", "unknown"))
+                type_to_category = {
+                    "ahu": "HVAC", "fcu": "HVAC", "vav": "HVAC", "chiller": "HVAC",
+                    "cooling_tower": "HVAC", "pump": "HVAC", "boiler": "HVAC",
+                    "hvac": "HVAC", "split_unit": "HVAC",
+                    "generator": "Generator Plant",
+                    "ups": "Energy Centre", "transformer": "Energy Centre",
+                    "ats": "Energy Centre", "power_meter": "Energy Centre", "meter": "Energy Centre",
+                    "dali_controller": "Lighting", "dali_zone": "Lighting", "luminaire": "Lighting",
+                    "lighting": "Lighting",
+                    "sensor": "Sensors", "zone": "Building Systems",
+                }
+                category = type_to_category.get(eq_type.lower(), "Other")
+                status, health = get_status_health(eq.get("status", "normal"))
+
+                equipment_list.append({
+                    "id": eq_id,
+                    "name": eq.get("name", eq_id),
+                    "type": eq_type,
+                    "category": category,
+                    "status": status,
+                    "health": health,
+                    "location": eq.get("location", ""),
+                    "building_id": site_code,
+                    "building_name": building.name,
+                    "site_id": building_id,
+                    "details": {
+                        "manufacturer": eq.get("manufacturer"),
+                        "model": eq.get("model"),
+                        "metadata": eq.get("metadata", {}),
+                    },
+                    "controllable": _is_device_controllable(eq_id, eq.get("points", {})),
+                })
+                existing_ids.add(eq_id)
+            except Exception as e:
+                logger.warning(f"Failed to load equipment from {eq_file}: {e}")
+
+    # 6. Legacy Equipment from equipment.json
     equipment_file = Path(__file__).parent.parent / "data" / "equipment.json"
     if equipment_file.exists():
         with open(equipment_file) as f:
@@ -1125,7 +1247,10 @@ async def get_building_equipment(building_id: str) -> dict:
                             "manufacturer": eq.get("manufacturer"),
                             "model": eq.get("model"),
                         },
-                        "controllable": bool(eq.get("points")),
+                        "controllable": _is_device_controllable(
+                            eq.get("id", ""),
+                            eq.get("points", {})
+                        ),
                     })
 
     # Summary by category

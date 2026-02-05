@@ -2,17 +2,23 @@
 
 import json
 import logging
+import re
 from pathlib import Path
-from typing import Optional, Literal
+from typing import List, Optional, Literal
 
-from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
 
 from app.config.settings import settings
 from app.database.repositories import BuildingRepository, AlertRepository
+from app.middleware.auth_middleware import require_auth
+from app.models.auth import AuthContext, AuthLevel, SentinelRole
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+# Buildings directory for demo data and new site creation
+BUILDINGS_DIR = Path(__file__).parent.parent / "data" / "buildings"
 
 # Load sites data (fallback)
 DATA_DIR = Path(__file__).parent.parent / "data"
@@ -169,6 +175,32 @@ def get_equipment_status_breakdown(building_uuid: str) -> dict:
     except Exception as e:
         logger.warning(f"Failed to get equipment status breakdown: {e}")
         return {"total": 0, "ok": 0, "warning": 0, "critical": 0}
+
+
+def get_prediction_risk_count(building_uuid: str) -> int:
+    """Get count of active predictions with warning/critical severity for a building.
+
+    This is the consolidated risk count (replacing alert_count).
+
+    Args:
+        building_uuid: Building UUID
+
+    Returns:
+        Count of active risk predictions
+    """
+    try:
+        from app.database.supabase_client import get_supabase_client
+        client = get_supabase_client()
+
+        # Count predictions with warning or critical severity
+        result = client.table("predictions").select("id", count="exact").eq(
+            "building_id", building_uuid
+        ).eq("status", "active").in_("severity", ["warning", "critical"]).execute()
+
+        return result.count or 0
+    except Exception as e:
+        logger.warning(f"Failed to get prediction risk count: {e}")
+        return 0
 
 
 def calculate_site_status(site_alerts: list[dict]) -> Literal["normal", "warning", "critical"]:
@@ -331,15 +363,31 @@ class SiteListResponse(BaseModel):
 
 def get_sites_from_supabase(
     region: Optional[str] = None,
-    site_type: Optional[str] = None
+    site_type: Optional[str] = None,
+    user_email: Optional[str] = None,
+    user_role: Optional[SentinelRole] = None
 ) -> tuple[list[dict], bool]:
-    """Try to get sites from Supabase. Returns (sites, success)."""
+    """Try to get sites from Supabase. Returns (sites, success).
+
+    If user_email and user_role are provided, filters buildings by user access.
+    ADMIN role sees all buildings, others see only assigned buildings.
+    """
     if settings.use_json_storage:
         return [], False
 
     try:
         repo = BuildingRepository()
-        buildings = repo.get_all(region=region, site_type=site_type)
+
+        # Filter by user access if auth context provided
+        if user_email and user_role:
+            buildings = repo.get_all_for_user(
+                user_email=user_email,
+                user_role=user_role,
+                region=region,
+                site_type=site_type
+            )
+        else:
+            buildings = repo.get_all(region=region, site_type=site_type)
 
         if not buildings:
             return [], False
@@ -357,8 +405,8 @@ def get_sites_from_supabase(
 
             # Fallback to legacy equipment count
             eq_count = repo.get_equipment_count(building_uuid) if building_uuid else 0
-            # Count active alerts for the "Risks" display
-            alert_count = repo.get_alert_count(building_uuid, status='active') if building_uuid else 0
+            # Count active risks from predictions (consolidated risk system)
+            alert_count = get_prediction_risk_count(building_uuid) if building_uuid else 0
 
             # Get equipment status breakdown
             equipment_status = get_equipment_status_breakdown(building_uuid) if building_uuid else None
@@ -390,8 +438,8 @@ def get_site_from_supabase(site_id: str) -> tuple[Optional[dict], bool]:
 
         # Fallback to legacy equipment count
         eq_count = repo.get_equipment_count(building_uuid) if building_uuid else 0
-        # Count active alerts for the "Risks" display
-        alert_count = repo.get_alert_count(building_uuid, status='active') if building_uuid else 0
+        # Count active risks from predictions (consolidated risk system)
+        alert_count = get_prediction_risk_count(building_uuid) if building_uuid else 0
 
         # Get equipment status breakdown
         equipment_status = get_equipment_status_breakdown(building_uuid) if building_uuid else None
@@ -406,11 +454,25 @@ def get_site_from_supabase(site_id: str) -> tuple[Optional[dict], bool]:
 async def list_sites(
     region: Optional[str] = Query(None, description="Filter by region"),
     site_type: Optional[str] = Query(None, alias="type", description="Filter by type"),
+    auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED)),
 ) -> SiteListResponse:
-    """List all sites with optional filtering."""
+    """List all sites with optional filtering.
 
-    # Try Supabase first
-    sites, success = get_sites_from_supabase(region, site_type)
+    ADMIN users see all buildings.
+    Other users see only buildings they have been granted access to.
+    """
+
+    # Extract user info from auth context
+    user_email = auth.email
+    user_role = auth.role
+
+    # Try Supabase first (with user filtering)
+    sites, success = get_sites_from_supabase(
+        region=region,
+        site_type=site_type,
+        user_email=user_email,
+        user_role=user_role
+    )
 
     if success and sites:
         result = []
@@ -464,6 +526,236 @@ async def list_sites(
 
     # Convert back to SiteResponse objects (with extra fields preserved)
     return SiteListResponse(total=len(result), sites=[SiteResponse(**s) for s in result])
+
+
+# ============= Demo Buildings Endpoint =============
+# NOTE: These specific routes MUST come before /sites/{site_id} to avoid being caught by the wildcard
+
+
+class DemoBuilding(BaseModel):
+    """Demo building available for discovery simulation."""
+    id: str
+    name: str
+    type: str
+    equipment_count: int
+    description: str
+
+
+@router.get("/sites/demo-buildings", response_model=List[DemoBuilding])
+async def list_demo_buildings() -> List[DemoBuilding]:
+    """List demo buildings available for discovery simulation.
+
+    Scans buildings directory for sites that have equipment files.
+    These can be used as demo data sources during onboarding.
+    """
+    registry_path = BUILDINGS_DIR / "_registry.json"
+
+    if not registry_path.exists():
+        return []
+
+    with open(registry_path) as f:
+        registry = json.load(f)
+
+    demo_buildings = []
+    for site_id in registry.get("active_buildings", []):
+        building_file = BUILDINGS_DIR / site_id / "building.json"
+        equipment_dir = BUILDINGS_DIR / site_id / "equipment"
+
+        if not building_file.exists():
+            continue
+
+        if not equipment_dir.exists():
+            continue
+
+        with open(building_file) as f:
+            building = json.load(f)
+
+        # Count equipment files
+        equipment_count = len(list(equipment_dir.glob("*.json")))
+        if equipment_count == 0:
+            continue  # Skip sites with no demo equipment
+
+        metadata = building.get("metadata", {})
+        building_type = metadata.get("type", "office")
+
+        demo_buildings.append(DemoBuilding(
+            id=site_id,
+            name=building.get("name", site_id),
+            type=building_type,
+            equipment_count=equipment_count,
+            description=f"{equipment_count} equipment, {building_type.replace('_', ' ')}",
+        ))
+
+    return demo_buildings
+
+
+# ============= Site Creation Endpoints =============
+
+
+class CreateSiteRequest(BaseModel):
+    """Request to create a new site."""
+    name: str = Field(..., description="Site name")
+    address: str = Field("", description="Site address")
+    region: str = Field("Gauteng", description="Region/province")
+    type: str = Field("office", description="Building type (office, retail, hospital, industrial)")
+    floors: List[str] = Field(default_factory=list, description="Floor list e.g. ['B1', 'G', 'L1', 'L2']")
+    sqm: int = Field(0, description="Total floor area in square meters")
+
+
+class CreateSiteResponse(BaseModel):
+    """Response from site creation."""
+    id: str
+    name: str
+    status: str
+
+
+class NextSiteIdResponse(BaseModel):
+    """Response with next available site ID."""
+    next_id: str
+
+
+def _get_next_site_number() -> int:
+    """Scan registry to find the highest site number and return next available."""
+    registry_path = BUILDINGS_DIR / "_registry.json"
+
+    if not registry_path.exists():
+        return 1
+
+    with open(registry_path) as f:
+        registry = json.load(f)
+
+    max_num = 0
+    for site_id in registry.get("active_buildings", []):
+        # Extract number from site-XXX format
+        match = re.match(r"site-(\d+)", site_id)
+        if match:
+            num = int(match.group(1))
+            if num > max_num:
+                max_num = num
+
+    return max_num + 1
+
+
+@router.get("/sites/next-id", response_model=NextSiteIdResponse)
+async def get_next_site_id() -> NextSiteIdResponse:
+    """Get next available site ID (e.g., site-005)."""
+    next_num = _get_next_site_number()
+    return NextSiteIdResponse(next_id=f"site-{next_num:03d}")
+
+
+@router.post("/sites", response_model=CreateSiteResponse)
+async def create_site(request: CreateSiteRequest) -> CreateSiteResponse:
+    """Create a new site with auto-generated ID.
+
+    1. Determines next site ID from buildings directory
+    2. Creates building.json in buildings/{site_id}/
+    3. Creates empty equipment/ directory
+    4. Adds to _registry.json
+    5. Creates building record in Supabase (if configured)
+    """
+    # 1. Determine next site ID
+    next_num = _get_next_site_number()
+    site_id = f"site-{next_num:03d}"
+
+    # 2. Create building directory structure
+    site_dir = BUILDINGS_DIR / site_id
+    equipment_dir = site_dir / "equipment"
+
+    try:
+        site_dir.mkdir(parents=True, exist_ok=True)
+        equipment_dir.mkdir(parents=True, exist_ok=True)
+    except Exception as e:
+        logger.error(f"Failed to create site directory: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to create site directory: {e}")
+
+    # 3. Create building.json
+    building_data = {
+        "id": site_id,
+        "name": request.name,
+        "display_name": request.name,
+        "address": request.address,
+        "timezone": "Africa/Johannesburg",
+        "floors": request.floors or ["G"],
+        "features": {
+            "hvac": True,
+            "dali": False,
+            "desk_diagnosis": False,
+            "load_shedding_optimization": True,
+        },
+        "bms": {
+            "vendor": "Unknown",
+            "system": "Unknown",
+            "protocol": "BACnet/IP",
+        },
+        "contacts": {},
+        "metadata": {
+            "type": request.type,
+            "total_floors": len(request.floors) if request.floors else 1,
+            "sqm": request.sqm,
+            "total_devices": 0,
+            "on_bms_count": 0,
+            "bms_coverage_pct": 0,
+        },
+    }
+
+    building_file = site_dir / "building.json"
+    try:
+        with open(building_file, "w") as f:
+            json.dump(building_data, f, indent=2)
+    except Exception as e:
+        logger.error(f"Failed to write building.json: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to write building configuration: {e}")
+
+    # 4. Update registry
+    registry_path = BUILDINGS_DIR / "_registry.json"
+    try:
+        if registry_path.exists():
+            with open(registry_path) as f:
+                registry = json.load(f)
+        else:
+            registry = {"active_buildings": [], "default_building": site_id}
+
+        if site_id not in registry.get("active_buildings", []):
+            registry.setdefault("active_buildings", []).append(site_id)
+
+        with open(registry_path, "w") as f:
+            json.dump(registry, f, indent=2)
+    except Exception as e:
+        logger.error(f"Failed to update registry: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to update registry: {e}")
+
+    # 5. Create in Supabase (best-effort)
+    if not settings.use_json_storage:
+        try:
+            from app.database.supabase_client import get_supabase_client
+            client = get_supabase_client()
+            if client:
+                client.table("buildings").insert({
+                    "code": site_id,
+                    "name": request.name,
+                    "address": request.address,
+                    "type": request.type,
+                    "region": request.region,
+                    "sqm": request.sqm,
+                    "floors": len(request.floors) if request.floors else 1,
+                    "timezone": "Africa/Johannesburg",
+                }).execute()
+                logger.info(f"Created building in Supabase: {site_id}")
+        except Exception as e:
+            # Log but don't fail - JSON is primary storage
+            logger.warning(f"Failed to create building in Supabase: {e}")
+
+    logger.info(f"Created new site: {site_id} ({request.name})")
+
+    return CreateSiteResponse(
+        id=site_id,
+        name=request.name,
+        status="created",
+    )
+
+
+# ============= Get Single Site Endpoint =============
+# NOTE: This MUST come after the specific routes above
 
 
 @router.get("/sites/{site_id}", response_model=SiteResponse)

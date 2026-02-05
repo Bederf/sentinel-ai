@@ -124,15 +124,17 @@ class PointDiscoveryService:
         site_id: str,
         device_bacnet_id: Optional[int] = None,
         use_demo: bool = True,
+        demo_building_id: Optional[str] = None,
         bms_vendor: Optional[str] = None,
     ) -> DiscoveryResult:
         """Run full point discovery and classification workflow.
 
         Args:
             device_ip: IP address of the BACnet device (JACE/Supervisor)
-            site_id: SENTINEL site ID for mapping
+            site_id: SENTINEL site ID for mapping (the NEW site being created)
             device_bacnet_id: Optional BACnet device instance ID
             use_demo: If True, use demo points when BACnet unavailable
+            demo_building_id: Demo building ID to load data from (e.g., 'site-004')
 
         Returns:
             DiscoveryResult with classified points and summary
@@ -146,15 +148,15 @@ class PointDiscoveryService:
         )
 
         logger.info(
-            "Starting point discovery %s for device %s (site %s)",
-            discovery_id, device_ip, site_id,
+            "Starting point discovery %s for device %s (site %s, demo_building=%s)",
+            discovery_id, device_ip, site_id, demo_building_id,
         )
 
         try:
             # Phase 1: Discover points
             result.status = "discovering"
             raw_points = await self._discover_points(
-                device_ip, device_bacnet_id, use_demo
+                device_ip, device_bacnet_id, use_demo, demo_building_id
             )
             result.raw_points = [p if isinstance(p, dict) else p.to_dict() for p in raw_points]
 
@@ -196,6 +198,7 @@ class PointDiscoveryService:
         device_ip: str,
         device_bacnet_id: Optional[int],
         use_demo: bool,
+        demo_building_id: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """Discover points from BACnet device or demo data.
 
@@ -206,6 +209,7 @@ class PointDiscoveryService:
             device_ip: Device IP address
             device_bacnet_id: BACnet device ID
             use_demo: Fall back to demo data if BACnet unavailable
+            demo_building_id: Demo building ID to load data from (e.g., 'site-004')
 
         Returns:
             List of point dicts with name, description, object_type, etc.
@@ -242,7 +246,7 @@ class PointDiscoveryService:
 
         # Fall back to demo data
         if use_demo or self._demo_mode:
-            return self._load_demo_points()
+            return self._load_demo_points(demo_building_id)
 
         raise BACnetException(
             f"BACnet client not running and demo mode disabled for {device_ip}"
@@ -341,17 +345,103 @@ class PointDiscoveryService:
 
         return detailed_points
 
-    def _load_demo_points(self) -> List[Dict[str, Any]]:
-        """Load demo points from haystack_tags.json for testing."""
+    def _load_demo_points(self, demo_building_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Load demo points from a demo building's equipment files.
+
+        Args:
+            demo_building_id: ID of demo building to load data from (e.g., 'site-004').
+                            If None, falls back to haystack_tags.json demo points.
+
+        Returns:
+            List of point dicts with name, description, object_type, etc.
+        """
+        # If demo_building_id is provided, load from that building's equipment files
+        if demo_building_id:
+            equipment_dir = DATA_DIR.parent / "buildings" / demo_building_id / "equipment"
+
+            if equipment_dir.exists():
+                points = self._load_points_from_equipment_dir(equipment_dir, demo_building_id)
+                if points:
+                    logger.info(
+                        "Loaded %d demo points from %s equipment files",
+                        len(points), demo_building_id,
+                    )
+                    return points
+                else:
+                    logger.warning(
+                        "Demo building %s has no equipment files, falling back to haystack_tags.json",
+                        demo_building_id,
+                    )
+            else:
+                logger.warning(
+                    "Demo building %s equipment directory not found: %s, falling back to haystack_tags.json",
+                    demo_building_id, equipment_dir,
+                )
+
+        # Fallback to haystack_tags.json
+        return self._load_from_haystack_tags()
+
+    def _load_points_from_equipment_dir(
+        self, equipment_dir: Path, demo_building_id: str
+    ) -> List[Dict[str, Any]]:
+        """Extract demo points from a building's equipment files.
+
+        Args:
+            equipment_dir: Path to equipment directory
+            demo_building_id: ID of the demo building for logging
+
+        Returns:
+            List of point dicts ready for classification
+        """
+        points = []
+        instance_counter = 1000
+
+        for eq_file in sorted(equipment_dir.glob("*.json")):
+            try:
+                with open(eq_file) as f:
+                    equipment = json.load(f)
+
+                eq_id = equipment.get("id", eq_file.stem)
+                eq_name = equipment.get("name", eq_id)
+                eq_type = equipment.get("equipment_type", "unknown")
+                eq_points = equipment.get("points", {})
+
+                for point_name, point_def in eq_points.items():
+                    # Determine object type based on point definition
+                    obj_type = point_def.get("object_type", "analogInput")
+
+                    points.append({
+                        "name": f"{eq_id}.{point_name}",
+                        "description": f"{eq_name} - {point_name.replace('_', ' ').title()}",
+                        "object_type": obj_type,
+                        "instance": instance_counter,
+                        "units": point_def.get("unit", ""),
+                        "present_value": point_def.get("default_value", 0),
+                        "writable": point_def.get("writable", False),
+                        # Extra fields to help classification
+                        "_equipment_id": eq_id,
+                        "_equipment_type": eq_type,
+                        "_point_type": point_def.get("point_type", "sensor"),
+                    })
+                    instance_counter += 1
+
+            except (json.JSONDecodeError, KeyError) as e:
+                logger.warning("Failed to parse equipment file %s: %s", eq_file.name, e)
+                continue
+
+        return points
+
+    def _load_from_haystack_tags(self) -> List[Dict[str, Any]]:
+        """Load demo points from haystack_tags.json (legacy fallback)."""
         try:
             tags_path = DATA_DIR / "haystack_tags.json"
             with open(tags_path) as f:
                 data = json.load(f)
             demo_points = data.get("demo_points", [])
-            logger.info("Loaded %d demo points for classification", len(demo_points))
+            logger.info("Loaded %d demo points from haystack_tags.json", len(demo_points))
             return demo_points
         except (FileNotFoundError, json.JSONDecodeError) as e:
-            logger.error("Failed to load demo points: %s", e)
+            logger.error("Failed to load demo points from haystack_tags.json: %s", e)
             return []
 
     def _classify_discovered_points(

@@ -8,7 +8,7 @@
  * - Predictive health indicators
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, Title, Text, Badge, Grid, Metric, ProgressBar, Flex } from '@tremor/react';
 import { generatorApi } from '../../lib/energyCentreApi';
 import type { Generator, GeneratorGroupStatus, GeneratorHealth, FuelStatus } from '../../lib/energyCentreApi';
@@ -43,13 +43,7 @@ export function GeneratorSynoptic({ siteId, groupId, onHealthAlert }: GeneratorS
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadData();
-    const interval = setInterval(loadData, 5000); // Poll every 5 seconds
-    return () => clearInterval(interval);
-  }, [siteId, groupId]);
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     try {
       // Get groups first if no specific groupId
       let targetGroupId = groupId;
@@ -96,7 +90,13 @@ export function GeneratorSynoptic({ siteId, groupId, onHealthAlert }: GeneratorS
       setError(err instanceof Error ? err.message : 'Failed to load generator data');
       setLoading(false);
     }
-  }
+  }, [siteId, groupId, onHealthAlert]);
+
+  useEffect(() => {
+    loadData();
+    const interval = setInterval(loadData, 5000); // Poll every 5 seconds
+    return () => clearInterval(interval);
+  }, [loadData]);
 
   if (loading) {
     return (

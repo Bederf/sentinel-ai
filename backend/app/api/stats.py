@@ -68,14 +68,15 @@ def get_stats_from_supabase() -> Optional[dict]:
 
         avg_health = round(total_health / total_equipment, 1) if total_equipment > 0 else 0
 
-        # Get active alerts
-        alerts_result = client.table("alerts").select("severity", count="exact").eq("status", "active").execute()
-        active_alerts = alerts_result.data or []
+        # Get active risks from predictions (consolidated risk system)
+        # Predictions with severity 'critical' or 'warning' are considered active risks
+        predictions_result = client.table("predictions").select("severity").eq("status", "active").execute()
+        active_predictions = predictions_result.data or []
 
-        alert_critical = sum(1 for a in active_alerts if a.get("severity") == "critical")
-        alert_warning = sum(1 for a in active_alerts if a.get("severity") == "warning")
-        alert_info = sum(1 for a in active_alerts if a.get("severity") == "info")
-        alert_total = len(active_alerts)
+        alert_critical = sum(1 for p in active_predictions if p.get("severity") == "critical")
+        alert_warning = sum(1 for p in active_predictions if p.get("severity") == "warning")
+        alert_info = 0  # Predictions don't have 'info' severity
+        alert_total = alert_critical + alert_warning  # Only count critical and warning as risks
 
         # Get sensor count
         sensors_result = client.table("sensors").select("id", count="exact").execute()

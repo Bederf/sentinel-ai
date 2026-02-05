@@ -26,6 +26,7 @@ The audit system captures:
 - **Safety validations**: All safety rule checks and their outcomes
 - **System events**: Service starts, configuration changes, escalations
 - **Before/after values**: Complete state history for forensic analysis
+- **Login events**: All authentication attempts with user, IP, and outcome
 
 ```mermaid
 graph LR
@@ -543,6 +544,84 @@ except Exception as e:
 1. Monitor `audit_log.json` file size
 2. Reduce `max_entries` or implement archival
 3. Set up log rotation at the OS level
+
+## Login Audit Log
+
+In addition to device control auditing, SENTINEL maintains a separate login audit log for security compliance and threat detection.
+
+### Login audit table
+
+All authentication attempts are logged to the `login_audit` table:
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | UUID | Unique entry ID |
+| `user_email` | TEXT | Email of the user attempting login |
+| `user_id` | TEXT | User's internal ID |
+| `user_role` | TEXT | Role assigned (admin, operator, auditor) |
+| `source_ip` | TEXT | Client IP address |
+| `user_agent` | TEXT | Browser/client user agent string |
+| `login_at` | TIMESTAMPTZ | When the login occurred |
+| `is_new_user` | BOOLEAN | Whether this was a first-time login |
+| `success` | BOOLEAN | Whether the login succeeded |
+| `failure_reason` | TEXT | Reason for failure (if applicable) |
+
+### Login audit API
+
+Admin-only endpoints for security monitoring:
+
+```bash
+# Get recent logins (with optional filters)
+curl "http://localhost:9095/api/admin/login-audit/recent?limit=100"
+curl "http://localhost:9095/api/admin/login-audit/recent?user_email=operator@example.com"
+curl "http://localhost:9095/api/admin/login-audit/recent?source_ip=192.168.1.100"
+curl "http://localhost:9095/api/admin/login-audit/recent?success_only=false"  # Failed logins only
+curl "http://localhost:9095/api/admin/login-audit/recent?hours=24"
+
+# Get login statistics
+curl "http://localhost:9095/api/admin/login-audit/stats?hours=24"
+
+# Get login history for specific user
+curl "http://localhost:9095/api/admin/login-audit/user/operator@example.com"
+
+# Detect suspicious activity
+curl "http://localhost:9095/api/admin/login-audit/suspicious?hours=24"
+```
+
+### Suspicious activity detection
+
+The `/suspicious` endpoint analyzes login patterns to identify:
+
+- **Multiple failed logins from same IP**: IPs with 5+ failures in the time period
+- **Multi-IP users**: Users logging in from 5+ different IPs
+- **New user surge**: More than 10 new user registrations in the time period
+
+Response example:
+```json
+{
+  "period_hours": 24,
+  "failed_ips": [
+    {"ip": "192.168.1.100", "count": 12}
+  ],
+  "multi_ip_users": [
+    {"email": "user@example.com", "ip_count": 7}
+  ],
+  "new_user_surge": false,
+  "new_user_count": 3
+}
+```
+
+### Log retention
+
+Login logs can be pruned using the database function:
+
+```sql
+-- Keep last 90 days of logs (default)
+SELECT cleanup_old_login_logs(90);
+
+-- Keep last 30 days
+SELECT cleanup_old_login_logs(30);
+```
 
 ## Related documents
 

@@ -20,6 +20,7 @@ router = APIRouter()
 
 # Data directory for mock devices
 DATA_DIR = Path(__file__).parent.parent / "data"
+BUILDINGS_DIR = DATA_DIR / "buildings"
 
 
 async def load_mock_devices() -> List[dict]:
@@ -31,16 +32,162 @@ async def load_mock_devices() -> List[dict]:
     return []
 
 
-@router.on_event("startup")
-async def startup_event():
-    """Initialize device manager on startup."""
+async def load_controllable_equipment_from_buildings() -> List[dict]:
+    """Load controllable equipment from building directories.
+
+    Scans all building equipment directories and returns equipment
+    that has at least one writable point (controllable).
+    """
+    controllable_devices = []
+
+    # Get active buildings from registry
+    registry_path = BUILDINGS_DIR / "_registry.json"
+    if not registry_path.exists():
+        logger.warning("Building registry not found")
+        return []
+
+    with open(registry_path) as f:
+        registry = json.load(f)
+
+    active_buildings = registry.get("active_buildings", [])
+
+    for building_id in active_buildings:
+        equipment_dir = BUILDINGS_DIR / building_id / "equipment"
+        if not equipment_dir.exists():
+            continue
+
+        for eq_file in equipment_dir.glob("*.json"):
+            try:
+                with open(eq_file) as f:
+                    eq_data = json.load(f)
+
+                # Check if equipment has any writable points
+                points = eq_data.get("points", {})
+                has_writable = any(
+                    p.get("writable", False) for p in points.values()
+                )
+
+                if not has_writable:
+                    continue
+
+                # Transform equipment format to device format
+                device_data = _transform_equipment_to_device(eq_data)
+                if device_data:
+                    controllable_devices.append(device_data)
+
+            except Exception as e:
+                logger.warning(f"Failed to load equipment {eq_file}: {e}")
+
+    logger.info(f"Loaded {len(controllable_devices)} controllable devices from building directories")
+    return controllable_devices
+
+
+def _transform_equipment_to_device(eq_data: dict) -> Optional[dict]:
+    """Transform equipment JSON format to device manager format."""
     try:
+        device_id = eq_data.get("id")
+        if not device_id:
+            return None
+
+        # Transform points to device format
+        transformed_points = {}
+        for point_name, point_data in eq_data.get("points", {}).items():
+            transformed_points[point_name] = {
+                "name": point_name,
+                "point_type": _map_point_type(point_data.get("object_type", "analogValue")),
+                "description": point_data.get("description", f"{point_name} point"),
+                "unit": point_data.get("unit", ""),
+                "default_value": point_data.get("default_value"),
+                "writable": point_data.get("writable", False),
+                "min_value": point_data.get("min_value"),
+                "max_value": point_data.get("max_value"),
+            }
+
+        # Build device data structure
+        device_data = {
+            "id": device_id,
+            "name": eq_data.get("name", device_id),
+            "device_type": eq_data.get("device_type", "hvac"),
+            "protocol": eq_data.get("protocol", "bacnet"),
+            "site_id": eq_data.get("site_id"),
+            "points": transformed_points,
+            "metadata": {
+                **eq_data.get("metadata", {}),
+                "equipment_type": eq_data.get("equipment_type"),
+                "source": "building_equipment",
+            }
+        }
+
+        # Add hvac_type if applicable
+        eq_type = eq_data.get("equipment_type", "").lower()
+        if eq_type in ["ahu", "chiller", "cooling_tower", "boiler", "fcu", "vav", "pump"]:
+            device_data["hvac_type"] = eq_type
+
+        return device_data
+
+    except Exception as e:
+        logger.warning(f"Failed to transform equipment: {e}")
+        return None
+
+
+def _map_point_type(bacnet_type: str) -> str:
+    """Map BACnet object type to device point type."""
+    type_map = {
+        "analogValue": "analog_value",
+        "analogInput": "analog_input",
+        "analogOutput": "analog_output",
+        "binaryValue": "binary_value",
+        "binaryInput": "binary_input",
+        "binaryOutput": "binary_output",
+        "multistateValue": "multistate_value",
+        "multistateInput": "multistate_input",
+        "multistateOutput": "multistate_output",
+    }
+    return type_map.get(bacnet_type, "analog_value")
+
+
+async def startup_event():
+    """Initialize device manager on startup.
+
+    Called from main.py startup event.
+    Loads mock devices + controllable equipment from building directories.
+    """
+    try:
+        print("[DEVICES] Starting device manager initialization...")
+
         # Load mock devices for demo
         devices_data = await load_mock_devices()
+        mock_count = len(devices_data)
+        print(f"[DEVICES] Loaded {mock_count} mock devices")
+
+        # Load controllable equipment from building directories
+        building_devices = await load_controllable_equipment_from_buildings()
+        print(f"[DEVICES] Loaded {len(building_devices)} controllable building equipment")
+
+        # Get existing device IDs to avoid duplicates
+        existing_ids = {d["id"] for d in devices_data}
+
+        # Add building devices that don't already exist in mock_devices
+        added_count = 0
+        for device in building_devices:
+            if device["id"] not in existing_ids:
+                devices_data.append(device)
+                existing_ids.add(device["id"])
+                added_count += 1
+
+        print(f"[DEVICES] Added {added_count} building devices (after dedup)")
+
         await device_manager.initialize(devices_data)
-        logger.info(f"Device manager initialized with {len(devices_data)} mock devices")
+        print(f"[DEVICES] Device manager initialized with {len(devices_data)} total devices")
+        logger.info(
+            f"Device manager initialized with {mock_count} mock devices + "
+            f"{added_count} building equipment = {len(devices_data)} total"
+        )
     except Exception as e:
+        print(f"[DEVICES] ERROR: Failed to initialize device manager: {e}")
         logger.error(f"Failed to initialize device manager: {e}")
+        import traceback
+        traceback.print_exc()
         # Initialize empty manager if loading fails
         await device_manager.initialize([])
 
