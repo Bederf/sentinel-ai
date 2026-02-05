@@ -70,38 +70,17 @@ export function ModuleProvider({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Load available modules on mount
-  useEffect(() => {
-    loadAvailableModules();
-  }, []);
-
-  // Load site data when site changes
-  useEffect(() => {
-    if (siteId) {
-      loadSiteData();
-    }
-  }, [siteId]);
-
-  // Poll recommendations
-  useEffect(() => {
-    if (siteId) {
-      const interval = setInterval(() => {
-        loadRecommendations();
-      }, 15000); // Every 15 seconds
-      return () => clearInterval(interval);
-    }
-  }, [siteId]);
-
-  async function loadAvailableModules() {
+  // Define loaders as useCallback to satisfy exhaustive-deps
+  const loadAvailableModules = useCallback(async () => {
     try {
       const modules = await moduleRegistryApi.getAvailableModules();
       setAvailableModules(modules);
     } catch (err) {
       console.error('Failed to load available modules:', err);
     }
-  }
+  }, []);
 
-  async function loadSiteData() {
+  const loadSiteData = useCallback(async () => {
     if (!siteId) return;
 
     setLoading(true);
@@ -122,9 +101,9 @@ export function ModuleProvider({
     } finally {
       setLoading(false);
     }
-  }
+  }, [siteId]);
 
-  async function loadRecommendations() {
+  const loadRecommendations = useCallback(async () => {
     if (!siteId) return;
 
     try {
@@ -133,7 +112,29 @@ export function ModuleProvider({
     } catch (err) {
       console.error('Failed to load recommendations:', err);
     }
-  }
+  }, [siteId]);
+
+  // Load available modules on mount
+  useEffect(() => {
+    loadAvailableModules();
+  }, [loadAvailableModules]);
+
+  // Load site data when site changes
+  useEffect(() => {
+    if (siteId) {
+      loadSiteData();
+    }
+  }, [siteId, loadSiteData]);
+
+  // Poll recommendations
+  useEffect(() => {
+    if (siteId) {
+      const interval = setInterval(() => {
+        loadRecommendations();
+      }, 15000); // Every 15 seconds
+      return () => clearInterval(interval);
+    }
+  }, [siteId, loadRecommendations]);
 
   const setSite = useCallback((id: string, name: string) => {
     setSiteIdState(id);
@@ -148,24 +149,20 @@ export function ModuleProvider({
       throw new Error('Site not set');
     }
 
-    try {
-      const instance = await moduleRegistryApi.activateModule(siteId, siteName, moduleType, config);
-      setActiveModules(prev => {
-        const existing = prev.findIndex(m => m.module_type === moduleType);
-        if (existing >= 0) {
-          const updated = [...prev];
-          updated[existing] = instance;
-          return updated;
-        }
-        return [...prev, instance];
-      });
+    const instance = await moduleRegistryApi.activateModule(siteId, siteName, moduleType, config);
+    setActiveModules(prev => {
+      const existing = prev.findIndex(m => m.module_type === moduleType);
+      if (existing >= 0) {
+        const updated = [...prev];
+        updated[existing] = instance;
+        return updated;
+      }
+      return [...prev, instance];
+    });
 
-      // Refresh integration summary
-      const summary = await moduleRegistryApi.getIntegrationSummary(siteId);
-      setIntegrationSummary(summary);
-    } catch (err) {
-      throw err;
-    }
+    // Refresh integration summary
+    const summary = await moduleRegistryApi.getIntegrationSummary(siteId);
+    setIntegrationSummary(summary);
   }, [siteId, siteName]);
 
   const deactivateModule = useCallback(async (moduleType: ModuleType) => {
@@ -202,7 +199,7 @@ export function ModuleProvider({
     }).catch(err => {
       console.error('Failed to add recommendation:', err);
     });
-  }, [siteId]);
+  }, [siteId, loadRecommendations]);
 
   const acknowledgeRecommendation = useCallback(async (recommendationId: string) => {
     if (!siteId) return;
@@ -239,7 +236,7 @@ export function ModuleProvider({
 
   const refreshRecommendations = useCallback(async () => {
     await loadRecommendations();
-  }, [siteId]);
+  }, [loadRecommendations]);
 
   const getActiveIntegrations = useCallback(() => {
     if (!integrationSummary) return [];

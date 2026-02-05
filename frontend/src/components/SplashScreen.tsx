@@ -15,7 +15,12 @@ interface SplashScreenProps {
 export function SplashScreen({ onComplete, minDisplayTime = 2500 }: SplashScreenProps) {
   const [fadeOut, setFadeOut] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const startTimeRef = useRef(Date.now());
+  const startTimeRef = useRef<number>(0);
+
+  // Initialize start time on mount - avoid calling Date.now() during render
+  useEffect(() => {
+    startTimeRef.current = Date.now();
+  }, []);
 
   useEffect(() => {
     console.log('SplashScreen: Component mounted');

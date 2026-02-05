@@ -42,6 +42,7 @@ export function TemperatureControl({
   const [isDragging, setIsDragging] = useState(false);
 
   // Sync inputValue and sliderValue when value prop changes externally
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional prop sync
   useEffect(() => {
     if (!isEditing) {
       setInputValue(value.toString());

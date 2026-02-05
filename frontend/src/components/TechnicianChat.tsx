@@ -11,7 +11,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import type { FormEvent, KeyboardEvent } from 'react';
-import { Send, MoreHorizontal, Wrench, Search, AlertTriangle, CheckCircle, Info, ChevronDown, ChevronUp, ExternalLink, Clipboard, PlayCircle, Eye, ImageIcon } from 'lucide-react';
+import { Send, Wrench, Search, AlertTriangle, CheckCircle, Info, ChevronDown, ChevronUp, ExternalLink, Clipboard, PlayCircle, Eye, ImageIcon } from 'lucide-react';
 import DiagnosisFlow from './DiagnosisFlow';
 import PhotoCapture from './PhotoCapture';
 

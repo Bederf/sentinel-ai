@@ -544,7 +544,7 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> 
     try {
       const errorData = await response.json();
       errorMessage = errorData.detail || errorData.message || JSON.stringify(errorData);
-    } catch {}
+    } catch { /* ignore JSON parse errors */ }
     throw new Error(`API Error: ${errorMessage}`);
   }
 

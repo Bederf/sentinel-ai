@@ -227,7 +227,7 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
         user: "Operator",
       };
       setActionHistory([newAction, ...actionHistory]);
-    } catch (err) {
+    } catch (_err) {
       const newAction: ActionHistoryItem = {
         timestamp: new Date().toLocaleString(),
         action: `Execute: ${matchedScenario?.site_name || selectedScenario} — Failed`,
