@@ -1,8 +1,8 @@
 # SENTINEL Third-Party Security Register
 
 **Document Owner:** Information Security Officer
-**Version:** 1.0
-**Effective Date:** 2026-02-04
+**Version:** 1.1
+**Effective Date:** 2026-02-05
 **Review Cadence:** Register reviewed quarterly; full assessments annually
 **FSR Reference:** Domain 4.16 -- Third Party Security
 **Classification:** Confidential
@@ -33,31 +33,31 @@ This register covers all external service providers that:
 
 ### 3.1 Infrastructure Providers
 
-| Provider | Service | Data Access | Classification | Location | Security Assessment | Agreement Date | Next Review | Risk Rating | Notes |
-|----------|---------|-------------|----------------|----------|---------------------|----------------|-------------|-------------|-------|
-| **Contabo** | VPS hosting | Full infrastructure access to all data (disk, network, memory) | Confidential | South Africa (JNB) / Germany (NUE) | ISO 27001 certified; SOC 2 Type II | 2025-01-01 | 2026-01-01 | **Medium** | Single VPS risk mitigated by daily snapshots and config-as-code rebuild procedure |
-| **Cloudflare** | CDN, WAF, DNS, Tunnel (zero-trust networking) | Processes all inbound/outbound web traffic; terminates TLS | Confidential | Global (edge nodes); configurable geo-restrictions | SOC 2 Type II; ISO 27001; PCI DSS Level 1 | 2025-01-01 | 2026-01-01 | **Low** | Enterprise-grade security; no data persistence at edge; tunnel encrypts end-to-end |
+| Provider | Service | Data Access | Classification | Location | Security Assessment | Agreement Date | Next Review | Risk Rating | PIA Reference | Notes |
+|----------|---------|-------------|----------------|----------|---------------------|----------------|-------------|-------------|---------------|-------|
+| **Contabo** | VPS hosting | Full infrastructure access to all data (disk, network, memory) | Confidential | South Africa (JNB) / Germany (NUE) | ISO 27001 certified; SOC 2 Type II | 2025-01-01 | 2026-01-01 | **Medium** | N/A (infrastructure) | Single VPS risk mitigated by daily snapshots and config-as-code rebuild procedure |
+| **Cloudflare** | CDN, WAF, DNS, Tunnel (zero-trust networking) | Processes all inbound/outbound web traffic; terminates TLS | Confidential | Global (edge nodes); configurable geo-restrictions | SOC 2 Type II; ISO 27001; PCI DSS Level 1 | 2025-01-01 | 2026-01-01 | **Low** | N/A (no PI stored) | Enterprise-grade security; no data persistence at edge; tunnel encrypts end-to-end |
 
 ### 3.2 AI and Data Processing Providers
 
-| Provider | Service | Data Access | Classification | Location | Security Assessment | Agreement Date | Next Review | Risk Rating | Notes |
-|----------|---------|-------------|----------------|----------|---------------------|----------------|-------------|-------------|-------|
-| **Anthropic** | Claude API (AI chat, analysis, optimization) | Processes chat queries which may contain building data, occupant names, desk locations, comfort complaints | Confidential | **United States** (cross-border transfer) | SOC 2 Type II; responsible AI policy; API data not used for training | 2025-06-01 | 2026-06-01 | **Medium** | Cross-border transfer requires POPIA s72 assessment. Ollama fallback available. Data processed ephemerally (not retained). |
-| **Supabase** | PostgreSQL database hosting | Stores all application data including PI (names, phone numbers, consent records, work orders, audit logs) | Restricted | AWS regions (configurable; af-south-1 preferred) | SOC 2 Type II; ISO 27001; HIPAA compliant | 2025-01-01 | 2026-01-01 | **Medium** | JSON file fallback mitigates availability risk. Data encrypted at rest (AES-256). |
+| Provider | Service | Data Access | Classification | Location | Security Assessment | Agreement Date | Next Review | Risk Rating | PIA Reference | Notes |
+|----------|---------|-------------|----------------|----------|---------------------|----------------|-------------|-------------|---------------|-------|
+| **Anthropic** | Claude API (AI chat, analysis, optimization) | Processes chat queries which may contain building data, occupant names, desk locations, comfort complaints | Confidential | **United States** (cross-border transfer) | SOC 2 Type II; responsible AI policy; API data not used for training | 2025-06-01 | 2026-06-01 | **Medium** | [PIA-2026-001](pia-claude-api.md) | Cross-border transfer requires POPIA s72 assessment. Ollama fallback available. Data processed ephemerally (not retained). |
+| **Supabase** | PostgreSQL database hosting | Stores all application data including PI (names, phone numbers, consent records, work orders, audit logs) | Restricted | AWS regions (configurable; af-south-1 preferred) | SOC 2 Type II; ISO 27001; HIPAA compliant | 2025-01-01 | 2026-01-01 | **Medium** | N/A (SA hosting preferred) | JSON file fallback mitigates availability risk. Data encrypted at rest (AES-256). |
 
 ### 3.3 Messaging Providers
 
-| Provider | Service | Data Access | Classification | Location | Security Assessment | Agreement Date | Next Review | Risk Rating | Notes |
-|----------|---------|-------------|----------------|----------|---------------------|----------------|-------------|-------------|-------|
-| **Meta / WhatsApp** | WhatsApp Business API (occupant messaging) | Processes occupant phone numbers, names, and facilities request messages | Confidential | **Global** (Meta infrastructure; cross-border transfer) | WhatsApp Business API terms; end-to-end encryption for messages | 2025-09-01 | 2026-09-01 | **Medium** | Cross-border transfer requires POPIA s72 consent. Phone numbers are PI. Minimal data transferred -- only message content. |
-| **Telegram** | Bot API (technician and occupant messaging via Clawd bot) | Processes occupant and technician phone numbers, names, and messages | Confidential | **Global** (Telegram infrastructure; cross-border transfer) | Telegram Bot API terms; client-server encryption (not E2E for bots) | 2025-09-01 | 2026-09-01 | **Medium** | Cross-border transfer requires POPIA s72 consent. Bot messages not end-to-end encrypted. Minimal data transferred. |
+| Provider | Service | Data Access | Classification | Location | Security Assessment | Agreement Date | Next Review | Risk Rating | PIA Reference | Notes |
+|----------|---------|-------------|----------------|----------|---------------------|----------------|-------------|-------------|---------------|-------|
+| **Meta / WhatsApp** | WhatsApp Business API (occupant messaging) | Processes occupant phone numbers, names, and facilities request messages | Confidential | **Global** (Meta infrastructure; cross-border transfer) | WhatsApp Business API terms; end-to-end encryption for messages | 2025-09-01 | 2026-09-01 | **Medium** | [PIA-2026-002](pia-clawd-messaging.md) | Cross-border transfer requires POPIA s72 consent. Phone numbers are PI. Minimal data transferred -- only message content. |
+| **Telegram** | Bot API (technician and occupant messaging via Clawd bot) | Processes occupant and technician phone numbers, names, and messages | Confidential | **Global** (Telegram infrastructure; cross-border transfer) | Telegram Bot API terms; client-server encryption (not E2E for bots) | 2025-09-01 | 2026-09-01 | **Medium** | [PIA-2026-002](pia-clawd-messaging.md) | Cross-border transfer requires POPIA s72 consent. Bot messages not end-to-end encrypted. Minimal data transferred. |
 
 ### 3.4 Business Application Providers
 
-| Provider | Service | Data Access | Classification | Location | Security Assessment | Agreement Date | Next Review | Risk Rating | Notes |
-|----------|---------|-------------|----------------|----------|---------------------|----------------|-------------|-------------|-------|
-| **MRI Evolution / FSI** | CAFM Public API (work order management, asset data exchange) | Exchanges work orders, asset IDs, technician assignments, site data | Confidential | **South Africa** | FSI security assessment (vendor questionnaire) | 2025-01-01 | 2026-01-01 | **Low** | South African hosted; no cross-border transfer. SIMBIOT Concept Connector dormant until FSI API credentials configured. |
-| **GitHub** | Source code hosting, CI/CD (GitHub Actions), security scanning (Dependabot, CodeQL) | Stores source code, CI/CD configuration, security scan results, dependency vulnerability reports | Confidential | **United States** (cross-border transfer) | SOC 2 Type II; ISO 27001; FedRAMP authorized | 2025-01-01 | 2026-01-01 | **Low** | No PI in source code. Security scan results may contain vulnerability information. Private repositories with branch protection. |
+| Provider | Service | Data Access | Classification | Location | Security Assessment | Agreement Date | Next Review | Risk Rating | PIA Reference | Notes |
+|----------|---------|-------------|----------------|----------|---------------------|----------------|-------------|-------------|---------------|-------|
+| **MRI Evolution / FSI** | CAFM Public API (work order management, asset data exchange) | Exchanges work orders, asset IDs, technician assignments, site data | Confidential | **South Africa** | FSI security assessment (vendor questionnaire) | 2025-01-01 | 2026-01-01 | **Low** | N/A (SA hosted) | South African hosted; no cross-border transfer. SIMBIOT Concept Connector dormant until FSI API credentials configured. |
+| **GitHub** | Source code hosting, CI/CD (GitHub Actions), security scanning (Dependabot, CodeQL) | Stores source code, CI/CD configuration, security scan results, dependency vulnerability reports | Confidential | **United States** (cross-border transfer) | SOC 2 Type II; ISO 27001; FedRAMP authorized | 2025-01-01 | 2026-01-01 | **Low** | N/A (no PI) | No PI in source code. Security scan results may contain vulnerability information. Private repositories with branch protection. |
 
 ### 3.5 Self-Hosted Components (Not Third Parties)
 
@@ -188,6 +188,7 @@ SENTINEL must promptly notify the FSR client of:
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 1.0 | 2026-02-04 | SENTINEL Platform Team | Initial register creation |
+| 1.1 | 2026-02-05 | SENTINEL Platform Team | Added PIA Reference column to all provider tables; linked to PIA-2026-001 (Claude API) and PIA-2026-002 (Clawd messaging) |
 
 **Review schedule:**
 - Register reviewed quarterly (provider status, risk ratings, compliance)
@@ -201,14 +202,22 @@ SENTINEL must promptly notify the FSR client of:
 
 | Document | Location |
 |----------|----------|
+| **Privacy Impact Assessments** | |
+| PIA Template | `docs/08-security/privacy-impact-assessment-template.md` |
+| PIA: Claude API (PIA-2026-001) | `docs/08-security/pia-claude-api.md` |
+| PIA: Clawd Messaging (PIA-2026-002) | `docs/08-security/pia-clawd-messaging.md` |
+| POPIA Section 72 Register | `docs/08-security/popia-cross-border-register.md` |
+| **Policies and Standards** | |
 | Data Privacy Policy | `docs/08-security/data-privacy-policy.md` |
 | Consent and Privacy Controls | `docs/08-security/consent-and-privacy.md` |
 | Business Continuity Policy | `docs/08-security/business-continuity-policy.md` |
 | Access Control Implementation | `docs/08-security/access-control-implementation.md` |
 | Vulnerability Management | `docs/08-security/vulnerability-management.md` |
 | SIMBIOT Concept Connector | `docs/07-integrations/simbiot-concept-connector.md` |
+| **External Standards** | |
 | POPIA | Protection of Personal Information Act, 2013 |
 | ISO 27001:2022 | Information Security Management Systems |
+| ISO 29134:2017 | Guidelines for Privacy Impact Assessment |
 
 ---
 
