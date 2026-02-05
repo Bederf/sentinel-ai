@@ -4,6 +4,7 @@ Authentication API endpoints for SENTINEL BMS Platform.
 Simple email-based authentication for demo purposes.
 Users enter their email address and receive a JWT token for session management.
 
+FSR Domain: 4.6 - Logical Access Control (MFA for privileged access)
 FSR Domain: 4.7 - Logical Access Control
 """
 
@@ -21,6 +22,7 @@ from app.models.auth import (
     AuthLevel,
     SentinelRole,
 )
+from app.services.mfa_service import get_mfa_service
 
 logger = logging.getLogger(__name__)
 
@@ -122,18 +124,24 @@ async def login_with_email(request: Request, email: str):
     Known demo users get specific roles (admin, operator, developer, auditor).
     Unknown emails automatically get AUDITOR (read-only) role.
 
+    For ADMIN users, MFA is required (FSR 4.6.3). If MFA is required:
+    - If not enrolled: Returns mfa_required=true, mfa_enrolled=false (prompt enrollment)
+    - If enrolled but not verified: Returns mfa_required=true, mfa_enrolled=true (prompt challenge)
+    - Token is only issued after MFA verification for users with MFA enabled
+
     Args:
         request: FastAPI request
         email: User's email address
 
     Returns:
-        LoginResponse with JWT token (valid for 30 days), user info, and role
+        LoginResponse with JWT token (valid for 30 days), user info, role, and MFA status
     """
     email = email.strip().lower()
 
     # Look up user in demo store
     user_data = _DEMO_USERS.get(email)
 
+    is_new_user = False
     if user_data:
         # Known demo user
         user_info = user_data.copy()
@@ -147,13 +155,74 @@ async def login_with_email(request: Request, email: str):
             "full_name": email.split("@")[0].title(),
             "role": SentinelRole.AUDITOR,  # Read-only by default
         }
+        is_new_user = True
         logger.info(f"New user login: {email} as AUDITOR (read-only)")
 
-    # Create JWT token
-    token = _create_jwt_token(user_info)
+    # Check MFA status for the user (FSR 4.6.3 - MFA for privileged access)
+    mfa_service = get_mfa_service()
+    mfa_required = mfa_service.is_mfa_required(user_info["role"])
+    mfa_enrolled = mfa_service.is_mfa_enrolled(email)
+    mfa_enabled = mfa_service.is_mfa_enabled(email)
 
     # Get client IP
     source_ip = _extract_ip_address(request)
+    user_agent = request.headers.get("User-Agent")
+
+    # If MFA is required and enabled, don't issue token yet - require MFA challenge
+    if mfa_required and mfa_enabled:
+        logger.info(f"MFA challenge required for {email} (admin with MFA enabled)")
+
+        # Log partial login (awaiting MFA)
+        try:
+            from app.database.repositories.login_audit_repository import (
+                get_login_audit_repository,
+            )
+            audit_repo = get_login_audit_repository()
+            audit_repo.log_login(
+                user_email=email,
+                user_id=user_info["user_id"],
+                user_role=user_info["role"].value,
+                source_ip=source_ip,
+                user_agent=user_agent,
+                is_new_user=is_new_user,
+                success=True,  # Auth succeeded, MFA pending
+                failure_reason="mfa_challenge_pending",
+            )
+        except Exception as e:
+            logger.warning(f"Failed to audit log login for {email}: {e}")
+
+        # Return partial auth response - frontend must complete MFA challenge
+        return {
+            "token": None,  # No token until MFA verified
+            "user": {
+                "id": user_info["user_id"],
+                "email": user_info["email"],
+                "full_name": user_info["full_name"],
+                "role": user_info["role"].value,
+            },
+            "expires_at": None,
+            "mfa_required": True,
+            "mfa_enrolled": True,
+            "mfa_challenge_pending": True,
+            "message": "MFA verification required. Please enter your TOTP code.",
+        }
+
+    # If MFA is required but not enrolled, issue token but flag enrollment needed
+    # This allows the user to access the MFA enrollment endpoints
+    token = _create_jwt_token(user_info)
+
+    # Grant default building access for new users
+    if is_new_user:
+        try:
+            from app.database.repositories.user_site_access_repository import (
+                get_user_site_access_repository,
+            )
+            access_repo = get_user_site_access_repository()
+            if access_repo.grant_default_access(email, granted_by="system"):
+                logger.info(f"Granted default building access to new user: {email}")
+        except Exception as e:
+            # Non-critical, user can be granted access later by admin
+            logger.warning(f"Failed to grant default access to {email}: {e}")
 
     # Log the login
     logger.info(
@@ -161,7 +230,26 @@ async def login_with_email(request: Request, email: str):
         f"role={user_info['role'].value} ip={source_ip}"
     )
 
-    return {
+    # Audit log the login to database
+    try:
+        from app.database.repositories.login_audit_repository import (
+            get_login_audit_repository,
+        )
+        audit_repo = get_login_audit_repository()
+        audit_repo.log_login(
+            user_email=email,
+            user_id=user_info["user_id"],
+            user_role=user_info["role"].value,
+            source_ip=source_ip,
+            user_agent=user_agent,
+            is_new_user=is_new_user,
+            success=True,
+        )
+    except Exception as e:
+        # Non-critical, don't fail login if audit fails
+        logger.warning(f"Failed to audit log login for {email}: {e}")
+
+    response = {
         "token": token,
         "user": {
             "id": user_info["user_id"],
@@ -170,6 +258,101 @@ async def login_with_email(request: Request, email: str):
             "role": user_info["role"].value,
         },
         "expires_at": (datetime.utcnow() + timedelta(days=30)).isoformat(),
+        "mfa_required": mfa_required,
+        "mfa_enrolled": mfa_enrolled,
+        "mfa_challenge_pending": False,
+    }
+
+    # Add enrollment prompt for admins who haven't enrolled yet
+    if mfa_required and not mfa_enrolled:
+        response["message"] = "MFA enrollment required for admin users. Please set up MFA."
+
+    return response
+
+
+@router.post("/login/mfa-complete")
+async def complete_mfa_login(request: Request, email: str, mfa_code: str):
+    """Complete login after MFA verification.
+
+    Called after initial login when MFA challenge is pending.
+    Verifies the TOTP code and issues the JWT token.
+
+    Args:
+        request: FastAPI request
+        email: User's email address (from initial login)
+        mfa_code: 6-digit TOTP code from authenticator app
+
+    Returns:
+        LoginResponse with JWT token if MFA verification successful
+
+    Raises:
+        HTTPException 400 if MFA verification fails
+        HTTPException 404 if user not found
+    """
+    email = email.strip().lower()
+
+    # Look up user
+    user_data = _DEMO_USERS.get(email)
+    if not user_data:
+        # Check if it's a dynamic user (non-demo)
+        user_data = {
+            "user_id": f"user-{email[:8]}",
+            "email": email,
+            "full_name": email.split("@")[0].title(),
+            "role": SentinelRole.AUDITOR,
+        }
+
+    user_info = user_data.copy() if isinstance(user_data.get("role"), SentinelRole) else user_data
+
+    # Verify MFA code
+    mfa_service = get_mfa_service()
+    source_ip = _extract_ip_address(request)
+    user_agent = request.headers.get("User-Agent")
+
+    success, error = mfa_service.verify_code(
+        user_email=email,
+        code=mfa_code,
+        source_ip=source_ip,
+        user_agent=user_agent,
+    )
+
+    if not success:
+        logger.warning(f"MFA verification failed for {email}: {error}")
+        raise HTTPException(status_code=400, detail=error)
+
+    # MFA verified - issue token
+    token = _create_jwt_token(user_info)
+
+    logger.info(f"MFA login completed for {email}")
+
+    # Update audit log
+    try:
+        from app.database.repositories.login_audit_repository import (
+            get_login_audit_repository,
+        )
+        audit_repo = get_login_audit_repository()
+        audit_repo.log_login(
+            user_email=email,
+            user_id=user_info["user_id"],
+            user_role=user_info["role"].value if isinstance(user_info["role"], SentinelRole) else user_info["role"],
+            source_ip=source_ip,
+            user_agent=user_agent,
+            is_new_user=False,
+            success=True,
+        )
+    except Exception as e:
+        logger.warning(f"Failed to audit log MFA login for {email}: {e}")
+
+    return {
+        "token": token,
+        "user": {
+            "id": user_info["user_id"],
+            "email": user_info["email"],
+            "full_name": user_info["full_name"],
+            "role": user_info["role"].value if isinstance(user_info["role"], SentinelRole) else user_info["role"],
+        },
+        "expires_at": (datetime.utcnow() + timedelta(days=30)).isoformat(),
+        "mfa_verified": True,
     }
 
 
