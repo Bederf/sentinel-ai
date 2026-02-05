@@ -33,13 +33,14 @@ interface PredictionDetailProps {
     id: string;
     equipment_name: string;
     site_name: string;
+    site_id?: string;
     equipment_type: string;
     prediction_type: string;
     probability_percent: number;
     confidence: "high" | "medium" | "low";
     predicted_failure_date: string;
     timeframe_days: number;
-    severity: "critical" | "high" | "medium" | "low";
+    severity: "critical" | "warning" | "healthy";
     evidence: {
       repeat_work_orders?: number;
       repeat_period_months?: number;
@@ -218,7 +219,7 @@ export function PredictionDetail({ prediction, isOpen, onClose, onCreateWorkOrde
                   color: severityConfig.color,
                 }}
               >
-                {prediction.severity.toUpperCase()}
+                {(prediction.severity || "unknown").toUpperCase()}
               </span>
               <span
                 className="text-xs font-medium px-2 py-0.5 rounded"
@@ -236,7 +237,7 @@ export function PredictionDetail({ prediction, isOpen, onClose, onCreateWorkOrde
                   color: "var(--color-grafana-text-secondary)",
                 }}
               >
-                {prediction.equipment_type.toUpperCase()}
+                {(prediction.equipment_type || "equipment").toUpperCase()}
               </span>
             </div>
           </div>
@@ -732,7 +733,7 @@ export function PredictionDetail({ prediction, isOpen, onClose, onCreateWorkOrde
               <CheckCircle2 className="h-5 w-5 mt-0.5" style={{ color: severityConfig.color }} />
               <div>
                 <span className="text-sm font-semibold" style={{ color: severityConfig.color }}>
-                  {prediction.urgency.toUpperCase()}
+                  {(prediction.urgency || "pending").toUpperCase()}
                 </span>
                 <p
                   className="text-sm mt-1"

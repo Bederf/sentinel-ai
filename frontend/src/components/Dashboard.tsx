@@ -15,8 +15,6 @@ import { useState, useEffect, useMemo } from "react";
 import {
   Building2,
   AlertTriangle,
-  AlertCircle,
-  XCircle,
   Cpu,
   Shield,
   Bell,
@@ -104,8 +102,6 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
   const [energyFilterSiteId, setEnergyFilterSiteId] = useState<string | null>(null);
   const [selectedDays, setSelectedDays] = useState<TimePeriod>(30);
 
-  // At-risk equipment state (warning/critical status)
-  const [atRiskEquipment, setAtRiskEquipment] = useState<BuildingEquipmentItem[]>([]);
 
   // Risk detail modal state
   const [selectedRiskEquipment, setSelectedRiskEquipment] = useState<BuildingEquipmentItem | null>(null);
@@ -152,49 +148,9 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
         ]);
         setStats(statsData);
         setSites(sitesData);
-        // Filter predictions to show only critical and high severity
-        setPredictions(predictionsData.predictions.filter(p => p.severity === 'critical' || p.severity === 'high'));
+        // Filter predictions to show only critical and warning severity (from health thresholds)
+        setPredictions(predictionsData.predictions.filter(p => p.severity === 'critical' || p.severity === 'warning'));
         setError(null);
-
-        // Load at-risk equipment from ALL sites
-        try {
-          const allRiskEquipment: BuildingEquipmentItem[] = [];
-
-          // Fetch equipment from each site in parallel
-          const equipmentPromises = sitesData.map(async (site) => {
-            try {
-              const equipmentData = await api.getBuildingEquipment(site.id);
-              // Filter for warning and critical status only
-              return equipmentData.equipment.filter(
-                (e) => e.status === "warning" || e.status === "critical"
-              );
-            } catch (err) {
-              console.warn(`Failed to load equipment for site ${site.id}:`, err);
-              return [];
-            }
-          });
-
-          const results = await Promise.all(equipmentPromises);
-
-          // Combine all at-risk equipment
-          results.forEach((siteEquipment) => {
-            allRiskEquipment.push(...siteEquipment);
-          });
-
-          // Sort by severity (critical first) then by health (lowest first)
-          allRiskEquipment.sort((a, b) => {
-            // Critical comes before warning
-            if (a.status === "critical" && b.status !== "critical") return -1;
-            if (b.status === "critical" && a.status !== "critical") return 1;
-            // Then sort by health (lower = higher risk)
-            return a.health - b.health;
-          });
-
-          setAtRiskEquipment(allRiskEquipment);
-        } catch (eqErr) {
-          console.error("Failed to load at-risk equipment:", eqErr);
-          setAtRiskEquipment([]);
-        }
       } catch (err) {
         console.error("Failed to load dashboard data:", err);
         setError("Failed to load dashboard data");
@@ -264,9 +220,9 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
   const normalSites = sites.filter((s) => s.status === "normal").length;
   const warningSites = sites.filter((s) => s.status === "warning").length;
 
-  // Filter predictions to only show critical/high severity
+  // Filter predictions to only show critical/warning severity (from health thresholds)
   const criticalPredictions = predictions.filter(p =>
-    p.severity === 'critical' || p.severity === 'high'
+    p.severity === 'critical' || p.severity === 'warning'
   );
 
   // Calculate total potential savings from filtered predictions only
@@ -799,154 +755,146 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
   );
 
   // Render Risk Predictions section
-  const renderRiskPredictions = () => (
+  const renderRiskPredictions = () => {
+    // Find highest risk prediction (critical first, then by probability)
+    const sortedPredictions = [...predictions].sort((a, b) => {
+      // Critical comes before warning
+      if (a.severity === "critical" && b.severity !== "critical") return -1;
+      if (b.severity === "critical" && a.severity !== "critical") return 1;
+      // Then sort by probability (higher = higher risk)
+      return b.probability_percent - a.probability_percent;
+    });
+    const highestRiskPrediction = sortedPredictions[0];
+
+    return (
     <DashboardSection id="risk-predictions">
       <div className="mt-6 space-y-6">
         {/* ROI Summary Card */}
         {predictions.length > 0 && <ROISummaryCard predictions={predictions} />}
 
-        {/* Hero Risk Card - Highest Risk Equipment */}
-        {atRiskEquipment.length > 0 && (() => {
-          // Find highest risk: critical first, then warning, sorted by lowest health
-          const sortedRisk = [...atRiskEquipment].sort((a, b) => {
-            // Critical comes before warning
-            if (a.status === "critical" && b.status !== "critical") return -1;
-            if (b.status === "critical" && a.status !== "critical") return 1;
-            // Then sort by health (lower = higher risk)
-            return a.health - b.health;
-          });
-          const highestRisk = sortedRisk[0];
-          const riskProbability = highestRisk.status === "critical"
-            ? Math.max(80, 100 - highestRisk.health)
-            : Math.max(60, 100 - highestRisk.health);
-
-          return (
-            <div
-              className="rounded-md overflow-hidden cursor-pointer hover:brightness-105 transition-all"
-              style={{
-                background: highestRisk.status === "critical"
-                  ? "linear-gradient(135deg, rgba(220, 38, 38, 0.2) 0%, rgba(220, 38, 38, 0.1) 100%)"
-                  : "linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(245, 158, 11, 0.1) 100%)",
-                border: `1px solid ${highestRisk.status === "critical" ? "rgba(220, 38, 38, 0.4)" : "rgba(245, 158, 11, 0.4)"}`,
-              }}
-              onClick={() => handleRiskCardClick(highestRisk)}
-            >
-              <div className="p-5">
-                <div className="flex items-start justify-between mb-4">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span
-                        className="text-xs px-2 py-0.5 rounded font-medium uppercase"
-                        style={{
-                          background: highestRisk.status === "critical" ? "rgba(220, 38, 38, 0.3)" : "rgba(245, 158, 11, 0.3)",
-                          color: highestRisk.status === "critical" ? "var(--color-sentinel-red)" : "var(--color-sentinel-amber)",
-                        }}
-                      >
-                        Highest Risk - Immediate Attention Required
-                      </span>
-                    </div>
-                    <h3
-                      className="text-lg font-semibold"
-                      style={{ color: "var(--color-sentinel-text-primary)" }}
+        {/* Hero Card - Highest Risk Prediction */}
+        {highestRiskPrediction && (
+          <div
+            className="rounded-md overflow-hidden cursor-pointer hover:brightness-105 transition-all"
+            style={{
+              background: highestRiskPrediction.severity === "critical"
+                ? "linear-gradient(135deg, rgba(220, 38, 38, 0.2) 0%, rgba(220, 38, 38, 0.1) 100%)"
+                : "linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(245, 158, 11, 0.1) 100%)",
+              border: `1px solid ${highestRiskPrediction.severity === "critical" ? "rgba(220, 38, 38, 0.4)" : "rgba(245, 158, 11, 0.4)"}`,
+            }}
+            onClick={() => handlePredictionClick(highestRiskPrediction)}
+          >
+            <div className="p-5">
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span
+                      className="text-xs px-2 py-0.5 rounded font-medium uppercase"
+                      style={{
+                        background: highestRiskPrediction.severity === "critical" ? "rgba(220, 38, 38, 0.3)" : "rgba(245, 158, 11, 0.3)",
+                        color: highestRiskPrediction.severity === "critical" ? "var(--color-sentinel-red)" : "var(--color-sentinel-amber)",
+                      }}
                     >
-                      {highestRisk.name}
-                    </h3>
-                    <p
-                      className="text-sm"
-                      style={{ color: "var(--color-sentinel-text-secondary)" }}
-                    >
-                      {highestRisk.category} • {highestRisk.type} • {highestRisk.location}
-                    </p>
-                    <p
-                      className="text-xs"
-                      style={{ color: "var(--color-sentinel-text-secondary)" }}
-                    >
-                      {highestRisk.building_name} • Site ID: {highestRisk.site_id}
-                    </p>
+                      Highest Risk - Immediate Attention Required
+                    </span>
                   </div>
-                  <div className="text-right">
-                    <div
-                      className="text-3xl font-bold"
-                      style={{
-                        color: highestRisk.status === "critical" ? "var(--color-sentinel-red)" : "var(--color-sentinel-amber)",
-                      }}
-                    >
-                      {highestRisk.health}%
-                    </div>
-                    <div
-                      className="text-xs uppercase font-medium"
-                      style={{
-                        color: highestRisk.status === "critical" ? "var(--color-sentinel-red)" : "var(--color-sentinel-amber)",
-                      }}
-                    >
-                      Health Score
-                    </div>
+                  <h3
+                    className="text-lg font-semibold"
+                    style={{ color: "var(--color-sentinel-text-primary)" }}
+                  >
+                    {highestRiskPrediction.equipment_name}
+                  </h3>
+                  <p
+                    className="text-sm"
+                    style={{ color: "var(--color-sentinel-text-secondary)" }}
+                  >
+                    {highestRiskPrediction.equipment_type} • {highestRiskPrediction.prediction_type.replace(/_/g, " ")}
+                  </p>
+                  <p
+                    className="text-xs"
+                    style={{ color: "var(--color-sentinel-text-secondary)" }}
+                  >
+                    {highestRiskPrediction.site_name} • Site ID: {highestRiskPrediction.site_id}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <div
+                    className="text-3xl font-bold"
+                    style={{
+                      color: highestRiskPrediction.severity === "critical" ? "var(--color-sentinel-red)" : "var(--color-sentinel-amber)",
+                    }}
+                  >
+                    {highestRiskPrediction.probability_percent}%
+                  </div>
+                  <div
+                    className="text-xs uppercase font-medium"
+                    style={{
+                      color: highestRiskPrediction.severity === "critical" ? "var(--color-sentinel-red)" : "var(--color-sentinel-amber)",
+                    }}
+                  >
+                    Failure Probability
                   </div>
                 </div>
+              </div>
 
-                <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-3 gap-4">
+                <div
+                  className="p-3 rounded"
+                  style={{ background: "rgba(0, 0, 0, 0.2)" }}
+                >
                   <div
-                    className="p-3 rounded"
-                    style={{ background: "rgba(0, 0, 0, 0.2)" }}
+                    className="text-xs mb-1"
+                    style={{ color: "var(--color-sentinel-text-secondary)" }}
                   >
-                    <div
-                      className="text-xs mb-1"
-                      style={{ color: "var(--color-sentinel-text-secondary)" }}
-                    >
-                      Risk Level
-                    </div>
-                    <div
-                      className="text-lg font-semibold"
-                      style={{
-                        color: highestRisk.status === "critical" ? "var(--color-sentinel-red)" : "var(--color-sentinel-amber)",
-                      }}
-                    >
-                      {riskProbability}%
-                    </div>
+                    Timeframe
                   </div>
                   <div
-                    className="p-3 rounded"
-                    style={{ background: "rgba(0, 0, 0, 0.2)" }}
+                    className="text-lg font-semibold"
+                    style={{ color: "var(--color-sentinel-text-primary)" }}
                   >
-                    <div
-                      className="text-xs mb-1"
-                      style={{ color: "var(--color-sentinel-text-secondary)" }}
-                    >
-                      Status
-                    </div>
-                    <div
-                      className="text-lg font-semibold uppercase"
-                      style={{
-                        color: highestRisk.status === "critical" ? "var(--color-sentinel-red)" : "var(--color-sentinel-amber)",
-                      }}
-                    >
-                      {highestRisk.status}
-                    </div>
+                    {highestRiskPrediction.timeframe_days} days
+                  </div>
+                </div>
+                <div
+                  className="p-3 rounded"
+                  style={{ background: "rgba(0, 0, 0, 0.2)" }}
+                >
+                  <div
+                    className="text-xs mb-1"
+                    style={{ color: "var(--color-sentinel-text-secondary)" }}
+                  >
+                    Confidence
                   </div>
                   <div
-                    className="p-3 rounded"
-                    style={{ background: "rgba(0, 0, 0, 0.2)" }}
+                    className="text-lg font-semibold uppercase"
+                    style={{ color: "var(--color-sentinel-text-primary)" }}
                   >
-                    <div
-                      className="text-xs mb-1"
-                      style={{ color: "var(--color-sentinel-text-secondary)" }}
-                    >
-                      Action Required
-                    </div>
-                    <div
-                      className="text-sm font-medium"
-                      style={{ color: "var(--color-sentinel-text-primary)" }}
-                    >
-                      {highestRisk.status === "critical" ? "Immediate Action Required" : "Schedule Maintenance"}
-                    </div>
+                    {highestRiskPrediction.confidence}
+                  </div>
+                </div>
+                <div
+                  className="p-3 rounded"
+                  style={{ background: "rgba(0, 0, 0, 0.2)" }}
+                >
+                  <div
+                    className="text-xs mb-1"
+                    style={{ color: "var(--color-sentinel-text-secondary)" }}
+                  >
+                    Potential Loss
+                  </div>
+                  <div
+                    className="text-lg font-semibold"
+                    style={{ color: "var(--color-sentinel-red)" }}
+                  >
+                    {formatZAR(highestRiskPrediction.financial_impact?.potential_loss_zar || 0)}
                   </div>
                 </div>
               </div>
             </div>
-          );
-        })()}
+          </div>
+        )}
 
-        {/* Predictions Panel */}
+        {/* Risk Intelligence Panel */}
         <div
           className="rounded-md overflow-hidden"
           style={{
@@ -1001,92 +949,6 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
             )}
           </div>
 
-          {/* At-Risk Equipment List */}
-          {atRiskEquipment.length > 0 && (
-            <div
-              className="p-4"
-              style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}
-            >
-              <h4
-                className="text-sm font-medium mb-3"
-                style={{ color: "var(--color-sentinel-text-primary)" }}
-              >
-                Equipment Requiring Attention
-              </h4>
-              <div className="space-y-2">
-                {atRiskEquipment.map((equip) => (
-                  <div
-                    key={equip.id}
-                    className="flex items-center justify-between p-3 rounded cursor-pointer hover:brightness-110 transition-all"
-                    style={{
-                      background: equip.status === "critical"
-                        ? "rgba(220, 38, 38, 0.1)"
-                        : "rgba(245, 158, 11, 0.1)",
-                      border: `1px solid ${equip.status === "critical"
-                        ? "rgba(220, 38, 38, 0.3)"
-                        : "rgba(245, 158, 11, 0.3)"}`,
-                    }}
-                    onClick={() => handleRiskCardClick(equip)}
-                  >
-                    <div className="flex items-center gap-3">
-                      {equip.status === "critical" ? (
-                        <XCircle className="h-5 w-5" style={{ color: "var(--color-sentinel-red)" }} />
-                      ) : (
-                        <AlertCircle className="h-5 w-5" style={{ color: "var(--color-sentinel-amber)" }} />
-                      )}
-                      <div>
-                        <div
-                          className="font-medium text-sm"
-                          style={{ color: "var(--color-sentinel-text-primary)" }}
-                        >
-                          {equip.name}
-                        </div>
-                        <div
-                          className="text-xs"
-                          style={{ color: "var(--color-sentinel-text-secondary)" }}
-                        >
-                          {equip.category} • {equip.location}
-                        </div>
-                        <div
-                          className="text-xs"
-                          style={{ color: "var(--color-sentinel-text-secondary)" }}
-                        >
-                          {equip.building_name}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div
-                        className="text-right"
-                      >
-                        <div
-                          className="text-sm font-medium"
-                          style={{
-                            color: equip.status === "critical"
-                              ? "var(--color-sentinel-red)"
-                              : "var(--color-sentinel-amber)",
-                          }}
-                        >
-                          {equip.health}%
-                        </div>
-                        <div
-                          className="text-xs uppercase"
-                          style={{
-                            color: equip.status === "critical"
-                              ? "var(--color-sentinel-red)"
-                              : "var(--color-sentinel-amber)",
-                          }}
-                        >
-                          {equip.status}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* Predictions Grid */}
           <div className="p-4">
             {predictions.length === 0 ? (
@@ -1115,6 +977,7 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
       </div>
     </DashboardSection>
   );
+  };
 
   // Render Comfort Assistant section
   const renderComfortAssistant = () => (

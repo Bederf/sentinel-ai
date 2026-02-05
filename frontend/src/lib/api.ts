@@ -102,6 +102,96 @@ export interface BuildingEquipmentResponse {
   equipment: BuildingEquipmentItem[];
 }
 
+// Equipment metadata (from /api/equipment/{id}/metadata)
+export interface EquipmentNetworkInfo {
+  ip_address?: string;
+  mac_address?: string;
+  gateway_ip?: string;
+  dali_line?: number;
+  dali_address?: number;
+  bacnet_device_id?: number;
+  bacnet_network?: number;
+  modbus_address?: number;
+  modbus_port?: number;
+  protocol?: string;
+}
+
+export interface EquipmentDeviceInfo {
+  gtin?: string;
+  serial_number?: string;
+  manufacturer?: string;
+  model?: string;
+  firmware_version?: string;
+  hardware_version?: string;
+  device_type?: string;
+  vendor_id?: number;
+}
+
+export interface EquipmentOperatingData {
+  lamp_hours?: number;
+  runtime_hours?: number;
+  power_cycles?: number;
+  total_runtime_hours?: number;
+  last_fault?: string;
+  fault_count?: number;
+  energy_kwh?: number;
+  system_status?: string;
+  rated_capacity?: string;
+  battery_cycles?: number;
+  transfer_count?: number;
+}
+
+export interface EquipmentMetadata {
+  id: string;
+  code: string;
+  name: string;
+  type: string;
+  manufacturer?: string;
+  model?: string;
+  serial_number?: string;
+  notes?: string;
+  network_info?: EquipmentNetworkInfo;
+  device_info?: EquipmentDeviceInfo;
+  operating_data?: EquipmentOperatingData;
+  commissioning_date?: string;
+  warranty_expiry?: string;
+  last_discovery?: string;
+  install_date?: string;
+  last_service?: string;
+  status?: string;
+  health_score?: number;
+  location?: string;
+}
+
+export interface EquipmentMetadataResponse {
+  equipment: EquipmentMetadata;
+  has_notes: boolean;
+  has_network_info: boolean;
+  has_device_info: boolean;
+  last_discovery?: string;
+}
+
+export interface NotesHistoryItem {
+  id: string;
+  equipment_id: string;
+  notes_before?: string;
+  notes_after?: string;
+  changed_by: string;
+  changed_at: string;
+  change_reason?: string;
+}
+
+export interface EquipmentDiscoveryResult {
+  equipment_code: string;
+  protocol: string;
+  status: string;
+  network_info?: EquipmentNetworkInfo;
+  device_info?: EquipmentDeviceInfo;
+  operating_data?: EquipmentOperatingData;
+  saved: boolean;
+  error?: string;
+}
+
 // Site/Building interface (summary view)
 export interface Site {
   id: string;
@@ -520,6 +610,13 @@ export interface OptimizationHistoryEntry {
   details?: string;
 }
 
+// Monthly savings summary
+export interface MonthlySavingsSummary {
+  monthly_savings_zar: number;
+  savings_per_hour_zar: number;
+  applied_recommendations: number;
+}
+
 // Full optimization status response
 export interface OptimizationStatusResponse {
   site_id: string;
@@ -534,6 +631,7 @@ export interface OptimizationStatusResponse {
   last_optimization: string | null;
   optimization_history: OptimizationHistoryEntry[];
   error_message?: string;
+  monthly_savings?: MonthlySavingsSummary;
 }
 
 // Dashboard stats interface
@@ -632,7 +730,7 @@ export interface Prediction {
   confidence: "high" | "medium" | "low";
   predicted_failure_date: string;
   timeframe_days: number;
-  severity: "critical" | "high" | "medium" | "low";
+  severity: "critical" | "warning" | "healthy";
   evidence: {
     repeat_work_orders: number;
     repeat_period_months: number;
@@ -764,7 +862,8 @@ export async function streamChat(
   message: string,
   conversationId: string | undefined,
   onChunk: (chunk: string) => void,
-  searchDocs: boolean = true
+  searchDocs: boolean = true,
+  siteId?: string
 ): Promise<void> {
   const url = `${API_BASE_URL}/api/chat`;
 
@@ -781,6 +880,7 @@ export async function streamChat(
       message,
       conversation_id: conversationId,
       search_docs: searchDocs,
+      site_id: siteId,
     }),
   });
 
@@ -972,6 +1072,98 @@ export const api = {
     return fetchApi<DeviceControlResponse>(`/api/equipment/${equipmentId}/control`, {
       method: "POST",
       body: JSON.stringify({ point, value, priority }),
+    });
+  },
+
+  // ============= Equipment Metadata API Methods =============
+
+  /**
+   * Get full metadata for equipment
+   * @param equipmentId - Equipment UUID or code
+   */
+  async getEquipmentMetadata(equipmentId: string): Promise<EquipmentMetadataResponse> {
+    return fetchApi<EquipmentMetadataResponse>(`/api/equipment/${equipmentId}/metadata`);
+  },
+
+  /**
+   * Update equipment notes
+   * @param equipmentId - Equipment UUID or code
+   * @param notes - New notes content
+   * @param changedBy - User making the change
+   * @param changeReason - Optional reason for change
+   */
+  async updateEquipmentNotes(
+    equipmentId: string,
+    notes: string,
+    changedBy: string,
+    changeReason?: string
+  ): Promise<{ status: string; equipment: EquipmentMetadata; message: string }> {
+    return fetchApi(`/api/equipment/${equipmentId}/notes`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        notes,
+        changed_by: changedBy,
+        change_reason: changeReason,
+      }),
+    });
+  },
+
+  /**
+   * Get notes change history for equipment
+   * @param equipmentId - Equipment UUID or code
+   * @param limit - Max records to return
+   */
+  async getEquipmentNotesHistory(
+    equipmentId: string,
+    limit: number = 20
+  ): Promise<{ equipment_id: string; history: NotesHistoryItem[]; count: number }> {
+    return fetchApi(`/api/equipment/${equipmentId}/notes/history?limit=${limit}`);
+  },
+
+  /**
+   * Discover equipment information (auto-detect protocol)
+   * @param equipmentCode - Equipment code
+   * @param useSimulated - Fall back to simulated data if discovery fails
+   */
+  async discoverEquipment(
+    equipmentCode: string,
+    useSimulated: boolean = true
+  ): Promise<EquipmentDiscoveryResult> {
+    return fetchApi<EquipmentDiscoveryResult>(
+      `/api/equipment/${equipmentCode}/discover?use_simulated=${useSimulated}`
+    );
+  },
+
+  /**
+   * Trigger full discovery for equipment
+   * @param equipmentCode - Equipment code
+   * @param protocol - Protocol: dali, bacnet, modbus, or auto
+   * @param options - Additional discovery options
+   */
+  async triggerEquipmentDiscovery(
+    equipmentCode: string,
+    protocol: string = "auto",
+    options: {
+      ipAddress?: string;
+      daliLine?: number;
+      daliAddress?: number;
+      bacnetDeviceId?: number;
+      modbusUnitId?: number;
+      useSimulated?: boolean;
+    } = {}
+  ): Promise<EquipmentDiscoveryResult> {
+    return fetchApi<EquipmentDiscoveryResult>("/api/equipment/discover", {
+      method: "POST",
+      body: JSON.stringify({
+        equipment_code: equipmentCode,
+        protocol,
+        ip_address: options.ipAddress,
+        dali_line: options.daliLine,
+        dali_address: options.daliAddress,
+        bacnet_device_id: options.bacnetDeviceId,
+        modbus_unit_id: options.modbusUnitId,
+        use_simulated: options.useSimulated ?? true,
+      }),
     });
   },
 
@@ -2435,6 +2627,16 @@ export const daliApi = {
     if (!response.ok) throw new Error('Failed to fetch DALI stats');
     return response.json();
   },
+
+  /**
+   * Get combined zone summary (occupancy + lighting)
+   * @param zoneId - Zone ID
+   */
+  getZoneSummary: async (zoneId: string): Promise<{ occupancy: ZoneOccupancy; lighting: ZoneLighting }> => {
+    const response = await fetch(`${API_BASE_URL}/api/dali/zones/${zoneId}/summary`);
+    if (!response.ok) throw new Error('Failed to fetch zone summary');
+    return response.json();
+  },
 };
 
 // ============= Comfort Complaints Interfaces (Phase 23) =============
@@ -3086,6 +3288,7 @@ export interface DiscoverClassifyRequest {
   site_id: string;
   device_bacnet_id?: number;
   use_demo: boolean;
+  demo_building_id?: string;  // Demo building ID to load data from
   bms_vendor?: BMSVendor;
 }
 
@@ -3105,15 +3308,18 @@ export interface NiagaraMappingSummary {
     equipment_type: string;
     equipment_name: string;
     points: Array<{
-      name: string;
+      name?: string;
+      original_name?: string;  // Backend uses this field
       point_type: string;
       confidence: string;
       brick_class?: string;
       unit?: string;
+      point_category?: string;
     }>;
     confidence: string;
+    point_count?: number;
   }>;
-  validation: Record<string, string | number | boolean>;
+  validation: Record<string, unknown>;
   total_points: number;
   equipment_count: number;
   confidence_breakdown: Record<string, number>;
@@ -3173,6 +3379,52 @@ export const niagaraApi = {
 
 /** Backward-compatible alias for niagaraApi */
 export const bmsApi = niagaraApi;
+
+// ============= Sites API Interfaces (Onboarding Wizard) =============
+
+export interface DemoBuilding {
+  id: string;
+  name: string;
+  type: string;
+  equipment_count: number;
+  description: string;
+}
+
+export interface CreateSiteRequest {
+  name: string;
+  address?: string;
+  region?: string;
+  type?: string;
+  floors?: string[];
+  sqm?: number;
+}
+
+export interface CreateSiteResponse {
+  id: string;
+  name: string;
+  status: string;
+}
+
+export interface NextSiteIdResponse {
+  next_id: string;
+}
+
+export const sitesApi = {
+  /** Get list of demo buildings available for discovery simulation */
+  getDemoBuildings: () =>
+    fetchApi<DemoBuilding[]>('/api/sites/demo-buildings'),
+
+  /** Get next available site ID (e.g., site-005) */
+  getNextSiteId: () =>
+    fetchApi<NextSiteIdResponse>('/api/sites/next-id'),
+
+  /** Create a new site */
+  createSite: (data: CreateSiteRequest) =>
+    fetchApi<CreateSiteResponse>('/api/sites', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+};
 
 // ============= Security Module Interfaces (Phase 58) =============
 
@@ -3323,6 +3575,242 @@ export const securityApi = {
     fetchApi<{ recommendations: OccupancyRecommendation[]; count: number }>(
       "/api/security/occupancy/recommendations"
     ),
+};
+
+// ============= Workflow API =============
+
+export interface WorkflowEquipmentItem {
+  equipment_id: string;
+  name: string;
+  type: string;
+  current_state: string;
+}
+
+export interface WorkflowStateTransition {
+  from: string;
+  to: string;
+  timestamp: string;
+  trigger: string;
+}
+
+export interface WorkflowBaselineSummary {
+  total_baselines: number;
+  latest_baseline: string | null;
+  deviation_detected: boolean;
+}
+
+export interface WorkflowInspectionStatus {
+  last_inspection: string | null;
+  status: string;
+  findings: string;
+}
+
+export interface WorkflowMLPrediction {
+  failure_probability: number;
+  timeframe: string;
+  confidence: string;
+  explanation: string;
+}
+
+export interface WorkflowWorkOrder {
+  id: string;
+  title: string;
+  priority: string;
+  status: string;
+}
+
+export interface WorkflowState {
+  equipment_id: string;
+  current_state: string;
+  state_history: WorkflowStateTransition[];
+  baseline_summary: WorkflowBaselineSummary;
+  inspection_status: WorkflowInspectionStatus;
+  ml_prediction: WorkflowMLPrediction | null;
+  active_repairs: WorkflowWorkOrder[];
+}
+
+export interface WorkflowDashboardResponse {
+  equipment: WorkflowEquipmentItem[];
+  workflow_states: Record<string, WorkflowState>;
+}
+
+export const workflowApi = {
+  /** Get workflow dashboard data for all equipment */
+  getDashboardEquipment: (siteId?: string) => {
+    const params = new URLSearchParams();
+    if (siteId) params.set("site_id", siteId);
+    const qs = params.toString();
+    return fetchApi<WorkflowDashboardResponse>(
+      `/api/workflow/dashboard/equipment${qs ? `?${qs}` : ""}`
+    );
+  },
+
+  /** Get workflow status for specific equipment */
+  getWorkflowStatus: (equipmentId: string) =>
+    fetchApi<WorkflowState>(`/api/workflow/status/${equipmentId}`),
+
+  /** Get trigger history */
+  getTriggerHistory: (equipmentId?: string) => {
+    const params = new URLSearchParams();
+    if (equipmentId) params.set("equipment_id", equipmentId);
+    const qs = params.toString();
+    return fetchApi<{ count: number; triggers: any[] }>(
+      `/api/workflow/triggers/history${qs ? `?${qs}` : ""}`
+    );
+  },
+
+  /** Get pending inspections for equipment */
+  getPendingInspections: (equipmentId: string) =>
+    fetchApi<{ equipment_id: string; count: number; inspections: any[] }>(
+      `/api/workflow/triggers/inspections/${equipmentId}`
+    ),
+
+  /** Get pending work orders for equipment */
+  getPendingWorkOrders: (equipmentId: string) =>
+    fetchApi<{ equipment_id: string; count: number; work_orders: any[] }>(
+      `/api/workflow/triggers/work-orders/${equipmentId}`
+    ),
+};
+
+// ============= Service Feedback API =============
+
+export interface FeedbackSessionStart {
+  session_id: string;
+  equipment_code: string;
+  equipment_type: string;
+  service_type: string;
+  required_items: string[];
+  optional_items: string[];
+  first_prompt: {
+    key: string;
+    prompt: string;
+    required: boolean;
+  } | null;
+}
+
+export interface FeedbackSessionStatus {
+  session_id: string;
+  status: string;
+  equipment_code: string;
+  equipment_type: string;
+  service_type: string;
+  progress: {
+    required_collected: number;
+    required_total: number;
+    optional_collected: number;
+    optional_total: number;
+    percent_complete: number;
+  };
+  items_collected: string[];
+  next_item: {
+    key: string;
+    prompt: string;
+    required: boolean;
+  } | null;
+  started_at: string | null;
+  completed_at: string | null;
+}
+
+export interface FeedbackItemResult {
+  item_key: string;
+  item_type: string;
+  value: any;
+  unit: string | null;
+  baseline_value: number | null;
+  deviation_percent: number | null;
+  health_impact: "positive" | "neutral" | "negative" | "critical";
+  notes: string | null;
+}
+
+export interface FeedbackCompletionResult {
+  success: boolean;
+  session_id: string;
+  equipment_code: string;
+  health_score_change: number;
+  items_collected: number;
+  feedback_summary: {
+    readings: any[];
+    attachments: any[];
+    observations: any[];
+    impact_counts: {
+      positive: number;
+      neutral: number;
+      negative: number;
+      critical: number;
+    };
+  };
+  warnings: string[];
+  completed_at: string | null;
+  error?: string;
+  message?: string;
+}
+
+export interface FeedbackTemplate {
+  equipment_type: string;
+  service_type: string;
+  required_items: string[];
+  optional_items: string[];
+  prompts: Record<string, string>;
+  validation_rules: Record<string, any>;
+}
+
+export const serviceFeedbackApi = {
+  /** Start a feedback collection session for a work order */
+  startSession: (workOrderId: string, equipmentCode: string, serviceType: string = "minor") =>
+    fetchApi<FeedbackSessionStart>("/api/service-feedback/start", {
+      method: "POST",
+      body: JSON.stringify({
+        work_order_id: workOrderId,
+        equipment_code: equipmentCode,
+        service_type: serviceType,
+      }),
+    }),
+
+  /** Get session status */
+  getSessionStatus: (sessionId: string) =>
+    fetchApi<FeedbackSessionStatus>(`/api/service-feedback/session/${sessionId}`),
+
+  /** Submit a reading/measurement */
+  submitReading: (sessionId: string, itemKey: string, value: any, unit?: string, notes?: string) =>
+    fetchApi<FeedbackItemResult>(`/api/service-feedback/session/${sessionId}/reading`, {
+      method: "POST",
+      body: JSON.stringify({ item_key: itemKey, value, unit, notes }),
+    }),
+
+  /** Submit an observation/note */
+  submitObservation: (sessionId: string, content: string, itemKey: string = "observation", notes?: string) =>
+    fetchApi<FeedbackItemResult>(`/api/service-feedback/session/${sessionId}/observation`, {
+      method: "POST",
+      body: JSON.stringify({ item_key: itemKey, content, notes }),
+    }),
+
+  /** Complete the feedback session */
+  completeSession: (sessionId: string, force: boolean = false) =>
+    fetchApi<FeedbackCompletionResult>(
+      `/api/service-feedback/session/${sessionId}/complete?force=${force}`,
+      { method: "POST" }
+    ),
+
+  /** Get feedback template for equipment type */
+  getTemplate: (equipmentType: string, serviceType: string = "minor") =>
+    fetchApi<FeedbackTemplate>(`/api/service-feedback/template/${equipmentType}?service_type=${serviceType}`),
+
+  /** List all available templates */
+  listTemplates: () =>
+    fetchApi<{
+      equipment_types: string[];
+      count: number;
+      templates: Record<string, any>;
+    }>("/api/service-feedback/templates"),
+
+  /** Get health impact rules */
+  getHealthImpactRules: () =>
+    fetchApi<{
+      description: string;
+      impact_levels: Record<string, any>;
+      score_bounds: { min_change: number; max_change: number };
+      health_status_thresholds: Record<string, string>;
+    }>("/api/service-feedback/health-impact-rules"),
 };
 
 // ============= Authentication API =============

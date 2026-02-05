@@ -31,7 +31,7 @@ interface PredictionCardProps {
     confidence: "high" | "medium" | "low";
     predicted_failure_date: string;
     timeframe_days: number;
-    severity: "critical" | "warning" | "high" | "medium" | "low";
+    severity: "critical" | "warning" | "healthy";
     evidence: {
       repeat_work_orders?: number;
       asset_age_years?: number;

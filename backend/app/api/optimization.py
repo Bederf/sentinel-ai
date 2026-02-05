@@ -419,15 +419,16 @@ def load_sites():
                 # Convert database format to expected format
                 sites = []
                 for b in buildings:
+                    # Handle None values explicitly - .get() default doesn't work when key exists with None
                     site = {
                         "id": b.get("code") or b.get("id"),
                         "name": b.get("name"),
-                        "optimization_enabled": b.get("optimization_enabled", False),
-                        "optimization_status": b.get("optimization_status", "unknown"),
-                        "optimization_settings": b.get("optimization_settings"),
+                        "optimization_enabled": b.get("optimization_enabled") or False,
+                        "optimization_status": b.get("optimization_status") or "unknown",
+                        "optimization_settings": b.get("optimization_settings") or {},
                         "last_recommendation": b.get("last_recommendation"),
                         "last_optimization": b.get("last_optimization"),
-                        "optimization_history": b.get("optimization_history", []),
+                        "optimization_history": b.get("optimization_history") or [],
                         "error_message": b.get("error_message"),
                         "_uuid": b.get("id"),  # Store UUID for updates
                     }
@@ -440,7 +441,8 @@ def load_sites():
     filepath = DATA_DIR / "_legacy" / "sites.json"
     if filepath.exists():
         with open(filepath) as f:
-            return json.load(f)
+            result = json.load(f)
+            return result if isinstance(result, list) else []
     return []
 
 
@@ -513,13 +515,13 @@ async def analyze_optimization(request: AnalyzeRequest) -> Dict[str, Any]:
         cross_system_count = len(rec_dict.get("cross_system_recommendations", []) or [])
 
         # Update site status
-        sites = load_sites()
-        site = next((s for s in sites if s["id"] == request.site_id), None)
+        sites = load_sites() or []
+        site = next((s for s in sites if s.get("id") == request.site_id), None)
 
         # Check if site is in automatic mode (auto-apply without human approval)
         site_mode = "supervised"
         if site:
-            site_settings = site.get("optimization_settings", {})
+            site_settings = site.get("optimization_settings") or {}
             site_mode = site_settings.get("mode", "supervised")
 
         auto_applied = False
@@ -602,6 +604,8 @@ async def analyze_optimization(request: AnalyzeRequest) -> Dict[str, Any]:
             history_action = "auto_applied" if auto_applied else "analyzed"
             history_result = "success" if (auto_applied or validation["allowed"]) else "warning"
 
+            # Include projected savings in history for tracking
+            projected_savings = rec_dict.get("projected_savings", {})
             history_entry = OptimizationHistoryEntry(
                 timestamp=datetime.now().isoformat(),
                 action=history_action,
@@ -615,6 +619,7 @@ async def analyze_optimization(request: AnalyzeRequest) -> Dict[str, Any]:
                     "cross_system_recommendations": cross_system_count,
                     "auto_applied": auto_applied,
                     "mode": site_mode,
+                    "projected_savings_zar_per_hour": projected_savings.get("cost_zar_per_hour", 0) if auto_applied else 0,
                 }
             )
             site["optimization_history"].append(history_entry.to_dict())
@@ -812,16 +817,21 @@ async def approve_optimization(
         audit_logger.flush()
 
         # Update site status
-        sites = load_sites()
-        site = next((s for s in sites if s["id"] == body.site_id), None)
+        sites = load_sites() or []
+        site = next((s for s in sites if s.get("id") == body.site_id), None)
         if site:
             if all_success:
+                # Capture projected savings before clearing recommendation
+                last_rec = site.get("last_recommendation") or {}
+                projected_savings = last_rec.get("projected_savings", {}) if last_rec else {}
+                savings_per_hour = projected_savings.get("cost_zar_per_hour", 0)
+
                 site["optimization_status"] = OptimizationStatus.OPTIMIZED.value
                 site["last_optimization"] = datetime.now().isoformat()
                 # Clear the recommendation after successful approval
                 site["last_recommendation"] = None
 
-                # Add to history
+                # Add to history with savings tracking
                 if not site.get("optimization_history"):
                     site["optimization_history"] = []
 
@@ -833,6 +843,7 @@ async def approve_optimization(
                     details={
                         "recommendation_id": body.recommendation_id,
                         "setpoints_applied": len(body.setpoints_to_apply),
+                        "projected_savings_zar_per_hour": savings_per_hour,
                     }
                 )
                 site["optimization_history"].append(history_entry.to_dict())
@@ -873,6 +884,63 @@ async def approve_optimization(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+def calculate_monthly_savings(optimization_history: Optional[List[Dict[str, Any]]]) -> Dict[str, Any]:
+    """Calculate total savings for the current month from optimization history.
+
+    Sums up projected_savings_zar_per_hour from approved/auto_applied entries
+    and estimates monthly savings based on operating hours.
+
+    Args:
+        optimization_history: List of optimization history entries (can be None)
+
+    Returns:
+        Dict with monthly_savings_zar and breakdown
+    """
+    # Handle None or empty history
+    if not optimization_history:
+        return {
+            "monthly_savings_zar": 0.0,
+            "savings_per_hour_zar": 0.0,
+            "applied_recommendations": 0,
+        }
+
+    now = datetime.now()
+    current_month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    total_savings_per_hour = 0.0
+    applied_count = 0
+
+    for entry in optimization_history:
+        # Check if entry is from current month
+        try:
+            entry_time = datetime.fromisoformat(entry.get("timestamp", ""))
+            if entry_time < current_month_start:
+                continue
+        except (ValueError, TypeError):
+            continue
+
+        # Only count approved or auto_applied entries
+        action = entry.get("action", "")
+        result = entry.get("result", "")
+        if action in ("approved", "auto_applied") and result == "success":
+            details = entry.get("details", {})
+            if isinstance(details, dict):
+                savings = details.get("projected_savings_zar_per_hour", 0)
+                if savings:
+                    total_savings_per_hour += float(savings)
+                    applied_count += 1
+
+    # Estimate monthly savings (assuming 10 hours/day operating, 22 working days)
+    operating_hours_per_month = 10 * 22  # 220 hours
+    monthly_savings = total_savings_per_hour * operating_hours_per_month
+
+    return {
+        "monthly_savings_zar": round(monthly_savings, 2),
+        "savings_per_hour_zar": round(total_savings_per_hour, 2),
+        "applied_recommendations": applied_count,
+    }
+
+
 @router.get("/optimization/status/{site_id}")
 async def get_optimization_status(site_id: str) -> Dict[str, Any]:
     """
@@ -888,27 +956,33 @@ async def get_optimization_status(site_id: str) -> Dict[str, Any]:
         Site optimization status with history
     """
     try:
-        sites = load_sites()
-        site = next((s for s in sites if s["id"] == site_id), None)
+        sites = load_sites() or []
+        site = next((s for s in sites if s.get("id") == site_id), None)
 
         if not site:
             raise HTTPException(status_code=404, detail=f"Site {site_id} not found")
 
-        # Build status response
+        # Calculate monthly savings from history (handle None)
+        history = site.get("optimization_history") or []
+        savings_summary = calculate_monthly_savings(history)
+
+        # Build status response (use 'or' pattern since .get() default doesn't work when key exists with None)
+        default_settings = {
+            "mode": "supervised",
+            "last_analysis": None,
+            "analysis_interval_minutes": 15,
+        }
         status = {
             "site_id": site.get("id"),
             "site_name": site.get("name"),
-            "optimization_enabled": site.get("optimization_enabled", False),
-            "optimization_status": site.get("optimization_status", OptimizationStatus.UNKNOWN.value),
-            "optimization_settings": site.get("optimization_settings", {
-                "mode": "supervised",
-                "last_analysis": None,
-                "analysis_interval_minutes": 15,
-            }),
+            "optimization_enabled": site.get("optimization_enabled") or False,
+            "optimization_status": site.get("optimization_status") or OptimizationStatus.UNKNOWN.value,
+            "optimization_settings": site.get("optimization_settings") or default_settings,
             "last_recommendation": site.get("last_recommendation"),
             "last_optimization": site.get("last_optimization"),
-            "optimization_history": site.get("optimization_history", []),
+            "optimization_history": history,
             "error_message": site.get("error_message"),
+            "monthly_savings": savings_summary,
         }
 
         return status
@@ -935,8 +1009,8 @@ async def toggle_optimization(site_id: str, request: ToggleRequest) -> Dict[str,
         Updated optimization settings
     """
     try:
-        sites = load_sites()
-        site = next((s for s in sites if s["id"] == site_id), None)
+        sites = load_sites() or []
+        site = next((s for s in sites if s.get("id") == site_id), None)
 
         if not site:
             raise HTTPException(status_code=404, detail=f"Site {site_id} not found")

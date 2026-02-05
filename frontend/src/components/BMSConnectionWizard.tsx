@@ -1,4 +1,4 @@
-import { useReducer, useCallback } from "react";
+import { useReducer, useCallback, useEffect, useState } from "react";
 import {
   CheckCircle,
   AlertTriangle,
@@ -9,14 +9,16 @@ import {
   Search,
   ClipboardCheck,
   ShieldCheck,
+  Building2,
 } from "lucide-react";
 import type {
   Site,
   NiagaraMappingSummary,
   DiscoverClassifyResponse,
   BMSVendor,
+  DemoBuilding,
 } from "../lib/api";
-import { niagaraApi } from "../lib/api";
+import { niagaraApi, sitesApi } from "../lib/api";
 
 // ============= BMS Vendor Definitions =============
 
@@ -44,6 +46,14 @@ type ApproveStatus = "idle" | "approving" | "approved" | "failed";
 
 interface WizardState {
   step: number;
+  // New site details
+  siteName: string;
+  siteAddress: string;
+  siteRegion: string;
+  siteType: string;
+  siteFloors: string;  // Comma-separated list
+  siteSqm: number;
+  // BMS connection
   bmsVendor: BMSVendor;
   host: string;
   port: number;
@@ -51,7 +61,8 @@ interface WizardState {
   password: string;
   useHttps: boolean;
   useDemoData: boolean;
-  siteId: string;
+  demoBuildingId: string;  // Selected demo building for data source
+  siteId: string;  // Auto-generated on site creation
   connectionStatus: ConnectionStatus;
   connectionMessage: string;
   discoveryId: string | null;
@@ -232,20 +243,29 @@ const labelStyle: React.CSSProperties = {
 
 export function BMSConnectionWizard({
   siteId: initialSiteId,
-  sites,
+  sites: _sites,  // Kept for backward compatibility, not used in new onboarding flow
   onClose,
   onComplete,
 }: BMSConnectionWizardProps) {
   const [state, dispatch] = useReducer(wizardReducer, {
     step: 1,
+    // New site details
+    siteName: "",
+    siteAddress: "",
+    siteRegion: "Gauteng",
+    siteType: "office",
+    siteFloors: "G, L1, L2",
+    siteSqm: 5000,
+    // BMS connection
     bmsVendor: "niagara",
     host: "",
     port: 80,
     username: "",
     password: "",
     useHttps: false,
-    useDemoData: false,
-    siteId: initialSiteId || (sites.length > 0 ? sites[0].id : ""),
+    useDemoData: true,  // Default to demo mode for wizard
+    demoBuildingId: "",
+    siteId: initialSiteId || "",
     connectionStatus: "idle",
     connectionMessage: "",
     discoveryId: null,
@@ -260,6 +280,29 @@ export function BMSConnectionWizard({
     error: null,
   });
 
+  // Fetch demo buildings on mount
+  const [demoBuildings, setDemoBuildings] = useState<DemoBuilding[]>([]);
+  const [demoBuildingsLoading, setDemoBuildingsLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchDemoBuildings = async () => {
+      setDemoBuildingsLoading(true);
+      try {
+        const buildings = await sitesApi.getDemoBuildings();
+        setDemoBuildings(buildings);
+        // Auto-select first demo building if available
+        if (buildings.length > 0 && !state.demoBuildingId) {
+          dispatch({ type: "SET_FIELD", field: "demoBuildingId", value: buildings[0].id });
+        }
+      } catch (err) {
+        console.error("Failed to fetch demo buildings:", err);
+      } finally {
+        setDemoBuildingsLoading(false);
+      }
+    };
+    fetchDemoBuildings();
+  }, []);
+
   const isNiagara = state.bmsVendor === "niagara";
   const vendorLabel = BMS_VENDORS.find((v) => v.value === state.bmsVendor)?.label ?? state.bmsVendor;
 
@@ -268,12 +311,59 @@ export function BMSConnectionWizard({
     dispatch({ type: "SET_CONNECTION_STATUS", status: "testing" });
     dispatch({ type: "SET_ERROR", error: null });
 
-    if (state.useDemoData) {
+    // Validate site name is provided
+    if (!state.siteName.trim()) {
       dispatch({
         type: "SET_CONNECTION_STATUS",
-        status: "connected",
-        message: "Demo mode — using pre-seeded discovery data",
+        status: "failed",
+        message: "Please enter a site name",
       });
+      return;
+    }
+
+    if (state.useDemoData) {
+      // Validate demo building is selected
+      if (!state.demoBuildingId) {
+        dispatch({
+          type: "SET_CONNECTION_STATUS",
+          status: "failed",
+          message: "Please select a demo building to use as data source",
+        });
+        return;
+      }
+
+      // Create the new site first
+      try {
+        const floorsArray = state.siteFloors
+          .split(",")
+          .map((f) => f.trim())
+          .filter((f) => f);
+
+        const siteResult = await sitesApi.createSite({
+          name: state.siteName,
+          address: state.siteAddress,
+          region: state.siteRegion,
+          type: state.siteType,
+          floors: floorsArray,
+          sqm: state.siteSqm,
+        });
+
+        // Store the created site ID
+        dispatch({ type: "SET_FIELD", field: "siteId", value: siteResult.id });
+
+        const demoBuilding = demoBuildings.find((b) => b.id === state.demoBuildingId);
+        dispatch({
+          type: "SET_CONNECTION_STATUS",
+          status: "connected",
+          message: `Site "${state.siteName}" created (${siteResult.id}). Demo data from "${demoBuilding?.name || state.demoBuildingId}" ready.`,
+        });
+      } catch (err) {
+        dispatch({
+          type: "SET_CONNECTION_STATUS",
+          status: "failed",
+          message: err instanceof Error ? err.message : "Failed to create site",
+        });
+      }
       return;
     }
 
@@ -321,7 +411,7 @@ export function BMSConnectionWizard({
         message: err instanceof Error ? err.message : "Connection failed",
       });
     }
-  }, [state.bmsVendor, state.host, state.port, state.username, state.password, state.useHttps, state.useDemoData]);
+  }, [state.bmsVendor, state.host, state.port, state.username, state.password, state.useHttps, state.useDemoData, state.siteName, state.siteAddress, state.siteRegion, state.siteType, state.siteFloors, state.siteSqm, state.demoBuildingId, demoBuildings]);
 
   // ---------- Step 2: Discover & Classify ----------
   const handleDiscover = useCallback(async () => {
@@ -333,6 +423,7 @@ export function BMSConnectionWizard({
         device_ip: state.useDemoData ? "demo" : state.host,
         site_id: state.siteId,
         use_demo: state.useDemoData,
+        demo_building_id: state.useDemoData ? state.demoBuildingId : undefined,
         bms_vendor: state.bmsVendor,
       });
       dispatch({ type: "SET_DISCOVERY", id: res.discovery_id, summary: res });
@@ -342,7 +433,7 @@ export function BMSConnectionWizard({
         error: err instanceof Error ? err.message : "Discovery failed",
       });
     }
-  }, [state.host, state.siteId, state.useDemoData, state.bmsVendor]);
+  }, [state.host, state.siteId, state.useDemoData, state.demoBuildingId, state.bmsVendor]);
 
   // ---------- Step 3: Load Mappings ----------
   const handleLoadMappings = useCallback(async () => {
@@ -415,6 +506,30 @@ export function BMSConnectionWizard({
     }
   };
 
+  // Site type options
+  const SITE_TYPES = [
+    { value: "office", label: "Office" },
+    { value: "retail", label: "Retail" },
+    { value: "hospital", label: "Hospital" },
+    { value: "private_hospital", label: "Private Hospital" },
+    { value: "industrial", label: "Industrial" },
+    { value: "warehouse", label: "Warehouse" },
+    { value: "data_centre", label: "Data Centre" },
+    { value: "mixed_use", label: "Mixed Use" },
+  ];
+
+  const REGIONS = [
+    "Gauteng",
+    "Western Cape",
+    "KwaZulu-Natal",
+    "Eastern Cape",
+    "Free State",
+    "Limpopo",
+    "Mpumalanga",
+    "North West",
+    "Northern Cape",
+  ];
+
   // ============= Render Steps =============
 
   const renderStep1 = () => (
@@ -424,239 +539,458 @@ export function BMSConnectionWizard({
           className="text-lg font-semibold mb-1"
           style={{ color: "var(--color-sentinel-text-primary)" }}
         >
-          Connect to BMS
+          Ingest New Building
         </h3>
         <p
           className="text-sm"
           style={{ color: "var(--color-sentinel-text-secondary)" }}
         >
-          Select your BMS vendor and configure connection details. SENTINEL will discover and classify your building automation points.
+          Enter details for your new building, then configure the BMS connection or select demo data.
         </p>
       </div>
 
-      {/* BMS Vendor selector */}
-      <div>
-        <label className="block text-sm font-medium mb-1" style={labelStyle}>
-          BMS Vendor
-        </label>
-        <select
-          value={state.bmsVendor}
-          onChange={(e) => {
-            dispatch({
-              type: "SET_FIELD",
-              field: "bmsVendor",
-              value: e.target.value,
-            });
-            // Reset connection status when vendor changes
-            dispatch({ type: "SET_CONNECTION_STATUS", status: "idle" });
-          }}
-          className="w-full rounded px-3 py-2 text-sm"
-          style={inputStyle}
-        >
-          {BMS_VENDORS.map((v) => (
-            <option key={v.value} value={v.value}>
-              {v.label} ({v.protocol})
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* Demo toggle */}
-      <label
-        className="flex items-center gap-3 p-3 rounded cursor-pointer"
+      {/* New Site Details Section */}
+      <div
+        className="rounded-lg p-4"
         style={{
-          background: state.useDemoData
-            ? "var(--color-sentinel-blue)11"
-            : "var(--color-sentinel-bg-secondary)",
-          border: `1px solid ${state.useDemoData ? "var(--color-sentinel-blue)" : "var(--color-sentinel-border)"}`,
+          background: "var(--color-sentinel-bg-secondary)",
+          border: "1px solid var(--color-sentinel-border)",
         }}
       >
-        <input
-          type="checkbox"
-          checked={state.useDemoData}
-          onChange={(e) =>
-            dispatch({
-              type: "SET_FIELD",
-              field: "useDemoData",
-              value: e.target.checked,
-            })
-          }
-          className="w-4 h-4"
-        />
-        <div>
-          <span
-            className="text-sm font-medium"
+        <div className="flex items-center gap-2 mb-3">
+          <Building2 className="w-5 h-5" style={{ color: "var(--color-sentinel-blue)" }} />
+          <h4
+            className="text-sm font-semibold"
             style={{ color: "var(--color-sentinel-text-primary)" }}
           >
-            Use Demo Data
-          </span>
-          <p
-            className="text-xs mt-0.5"
-            style={{ color: "var(--color-sentinel-text-secondary)" }}
-          >
-            Skip real connection and use pre-seeded Sandton City discovery data
-          </p>
+            New Site Details
+          </h4>
         </div>
-      </label>
 
-      {/* Site selector */}
-      <div>
-        <label className="block text-sm font-medium mb-1" style={labelStyle}>
-          Target Site
-        </label>
-        <select
-          value={state.siteId}
-          onChange={(e) =>
-            dispatch({
-              type: "SET_FIELD",
-              field: "siteId",
-              value: e.target.value,
-            })
-          }
-          className="w-full rounded px-3 py-2 text-sm"
-          style={inputStyle}
-        >
-          {sites.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* Connection fields — hidden in demo mode */}
-      {!state.useDemoData && isNiagara && (
         <div className="grid grid-cols-2 gap-4">
-          <div className="col-span-2 sm:col-span-1">
-            <label
-              className="block text-sm font-medium mb-1"
-              style={labelStyle}
-            >
-              Host / IP Address
+          {/* Site Name */}
+          <div className="col-span-2">
+            <label className="block text-sm font-medium mb-1" style={labelStyle}>
+              Site Name *
             </label>
             <input
               type="text"
-              value={state.host}
+              value={state.siteName}
               onChange={(e) =>
                 dispatch({
                   type: "SET_FIELD",
-                  field: "host",
+                  field: "siteName",
                   value: e.target.value,
                 })
               }
-              placeholder="192.168.1.100"
+              placeholder="e.g., Client Hospital, Main Office Tower"
               className="w-full rounded px-3 py-2 text-sm"
               style={inputStyle}
             />
           </div>
+
+          {/* Address */}
+          <div className="col-span-2">
+            <label className="block text-sm font-medium mb-1" style={labelStyle}>
+              Address
+            </label>
+            <input
+              type="text"
+              value={state.siteAddress}
+              onChange={(e) =>
+                dispatch({
+                  type: "SET_FIELD",
+                  field: "siteAddress",
+                  value: e.target.value,
+                })
+              }
+              placeholder="123 Main Street, City"
+              className="w-full rounded px-3 py-2 text-sm"
+              style={inputStyle}
+            />
+          </div>
+
+          {/* Region */}
           <div className="col-span-2 sm:col-span-1">
-            <label
-              className="block text-sm font-medium mb-1"
-              style={labelStyle}
+            <label className="block text-sm font-medium mb-1" style={labelStyle}>
+              Region
+            </label>
+            <select
+              value={state.siteRegion}
+              onChange={(e) =>
+                dispatch({
+                  type: "SET_FIELD",
+                  field: "siteRegion",
+                  value: e.target.value,
+                })
+              }
+              className="w-full rounded px-3 py-2 text-sm"
+              style={inputStyle}
             >
-              Port
+              {REGIONS.map((r) => (
+                <option key={r} value={r}>{r}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Type */}
+          <div className="col-span-2 sm:col-span-1">
+            <label className="block text-sm font-medium mb-1" style={labelStyle}>
+              Building Type
+            </label>
+            <select
+              value={state.siteType}
+              onChange={(e) =>
+                dispatch({
+                  type: "SET_FIELD",
+                  field: "siteType",
+                  value: e.target.value,
+                })
+              }
+              className="w-full rounded px-3 py-2 text-sm"
+              style={inputStyle}
+            >
+              {SITE_TYPES.map((t) => (
+                <option key={t.value} value={t.value}>{t.label}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Floors */}
+          <div className="col-span-2 sm:col-span-1">
+            <label className="block text-sm font-medium mb-1" style={labelStyle}>
+              Floors (comma-separated)
+            </label>
+            <input
+              type="text"
+              value={state.siteFloors}
+              onChange={(e) =>
+                dispatch({
+                  type: "SET_FIELD",
+                  field: "siteFloors",
+                  value: e.target.value,
+                })
+              }
+              placeholder="B1, G, L1, L2, L3"
+              className="w-full rounded px-3 py-2 text-sm"
+              style={inputStyle}
+            />
+          </div>
+
+          {/* sqm */}
+          <div className="col-span-2 sm:col-span-1">
+            <label className="block text-sm font-medium mb-1" style={labelStyle}>
+              Floor Area (sqm)
             </label>
             <input
               type="number"
-              value={state.port}
+              value={state.siteSqm}
               onChange={(e) =>
                 dispatch({
                   type: "SET_FIELD",
-                  field: "port",
-                  value: parseInt(e.target.value, 10) || 80,
+                  field: "siteSqm",
+                  value: parseInt(e.target.value, 10) || 0,
                 })
               }
               className="w-full rounded px-3 py-2 text-sm"
               style={inputStyle}
             />
           </div>
-          <div className="col-span-2 sm:col-span-1">
-            <label
-              className="block text-sm font-medium mb-1"
-              style={labelStyle}
-            >
-              Username
-            </label>
+        </div>
+      </div>
+
+      {/* BMS Connection Section */}
+      <div
+        className="rounded-lg p-4"
+        style={{
+          background: "var(--color-sentinel-bg-secondary)",
+          border: "1px solid var(--color-sentinel-border)",
+        }}
+      >
+        <div className="flex items-center gap-2 mb-3">
+          <Wifi className="w-5 h-5" style={{ color: "var(--color-sentinel-blue)" }} />
+          <h4
+            className="text-sm font-semibold"
+            style={{ color: "var(--color-sentinel-text-primary)" }}
+          >
+            BMS Connection
+          </h4>
+        </div>
+
+        {/* BMS Vendor selector */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium mb-1" style={labelStyle}>
+            BMS Vendor
+          </label>
+          <select
+            value={state.bmsVendor}
+            onChange={(e) => {
+              dispatch({
+                type: "SET_FIELD",
+                field: "bmsVendor",
+                value: e.target.value,
+              });
+              dispatch({ type: "SET_CONNECTION_STATUS", status: "idle" });
+            }}
+            className="w-full rounded px-3 py-2 text-sm"
+            style={inputStyle}
+          >
+            {BMS_VENDORS.map((v) => (
+              <option key={v.value} value={v.value}>
+                {v.label} ({v.protocol})
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Connection Mode Toggle */}
+        <div className="space-y-2">
+          {/* Real BMS option */}
+          <label
+            className="flex items-center gap-3 p-3 rounded cursor-pointer"
+            style={{
+              background: !state.useDemoData
+                ? "var(--color-sentinel-blue)11"
+                : "transparent",
+              border: `1px solid ${!state.useDemoData ? "var(--color-sentinel-blue)" : "var(--color-sentinel-border)"}`,
+            }}
+          >
             <input
-              type="text"
-              value={state.username}
-              onChange={(e) =>
+              type="radio"
+              name="connectionMode"
+              checked={!state.useDemoData}
+              onChange={() =>
                 dispatch({
                   type: "SET_FIELD",
-                  field: "username",
-                  value: e.target.value,
+                  field: "useDemoData",
+                  value: false,
                 })
               }
-              placeholder="admin"
-              className="w-full rounded px-3 py-2 text-sm"
-              style={inputStyle}
+              className="w-4 h-4"
             />
-          </div>
-          <div className="col-span-2 sm:col-span-1">
-            <label
-              className="block text-sm font-medium mb-1"
-              style={labelStyle}
-            >
-              Password
-            </label>
+            <div>
+              <span
+                className="text-sm font-medium"
+                style={{ color: "var(--color-sentinel-text-primary)" }}
+              >
+                Real BMS Connection
+              </span>
+              <p
+                className="text-xs mt-0.5"
+                style={{ color: "var(--color-sentinel-text-secondary)" }}
+              >
+                Connect to a live BMS system
+              </p>
+            </div>
+          </label>
+
+          {/* Demo Data option */}
+          <label
+            className="flex items-center gap-3 p-3 rounded cursor-pointer"
+            style={{
+              background: state.useDemoData
+                ? "var(--color-sentinel-blue)11"
+                : "transparent",
+              border: `1px solid ${state.useDemoData ? "var(--color-sentinel-blue)" : "var(--color-sentinel-border)"}`,
+            }}
+          >
             <input
-              type="password"
-              value={state.password}
-              onChange={(e) =>
+              type="radio"
+              name="connectionMode"
+              checked={state.useDemoData}
+              onChange={() =>
                 dispatch({
                   type: "SET_FIELD",
-                  field: "password",
-                  value: e.target.value,
+                  field: "useDemoData",
+                  value: true,
                 })
               }
-              className="w-full rounded px-3 py-2 text-sm"
-              style={inputStyle}
+              className="w-4 h-4"
             />
-          </div>
-          <div className="col-span-2">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={state.useHttps}
+            <div>
+              <span
+                className="text-sm font-medium"
+                style={{ color: "var(--color-sentinel-text-primary)" }}
+              >
+                Use Demo Data
+              </span>
+              <p
+                className="text-xs mt-0.5"
+                style={{ color: "var(--color-sentinel-text-secondary)" }}
+              >
+                Select a demo building to simulate discovery
+              </p>
+            </div>
+          </label>
+        </div>
+
+        {/* Demo Building Picker - shown when Demo Data is selected */}
+        {state.useDemoData && (
+          <div className="mt-4">
+            <label className="block text-sm font-medium mb-1" style={labelStyle}>
+              Demo Data Source
+            </label>
+            {demoBuildingsLoading ? (
+              <div className="flex items-center gap-2 text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Loading demo buildings...
+              </div>
+            ) : demoBuildings.length === 0 ? (
+              <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                No demo buildings available
+              </p>
+            ) : (
+              <select
+                value={state.demoBuildingId}
                 onChange={(e) =>
                   dispatch({
                     type: "SET_FIELD",
-                    field: "useHttps",
-                    value: e.target.checked,
+                    field: "demoBuildingId",
+                    value: e.target.value,
                   })
                 }
-                className="w-4 h-4"
-              />
-              <span
-                className="text-sm"
-                style={{ color: "var(--color-sentinel-text-primary)" }}
+                className="w-full rounded px-3 py-2 text-sm"
+                style={inputStyle}
               >
-                Use HTTPS
-              </span>
-            </label>
+                {demoBuildings.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name} — {b.equipment_count} equipment, {b.type.replace("_", " ")}
+                  </option>
+                ))}
+              </select>
+            )}
+            {state.demoBuildingId && demoBuildings.length > 0 && (
+              <p
+                className="text-xs mt-1"
+                style={{ color: "var(--color-sentinel-text-secondary)" }}
+              >
+                Equipment from <strong>{demoBuildings.find(b => b.id === state.demoBuildingId)?.name}</strong> will be imported into your new site.
+              </p>
+            )}
           </div>
-        </div>
-      )}
+        )}
 
-      {/* BACnet-only info for non-Niagara vendors (not in demo mode) */}
-      {!state.useDemoData && !isNiagara && (
-        <div
-          className="p-3 rounded text-sm"
-          style={{
-            background: "var(--color-sentinel-bg-secondary)",
-            border: "1px solid var(--color-sentinel-border)",
-            color: "var(--color-sentinel-text-secondary)",
-          }}
-        >
-          No credentials required. SENTINEL will broadcast a BACnet WhoIs on the local network (UDP port 47808) to discover {vendorLabel} controllers.
-        </div>
-      )}
+        {/* Real BMS Connection fields — shown when Real BMS is selected */}
+        {!state.useDemoData && isNiagara && (
+          <div className="grid grid-cols-2 gap-4 mt-4">
+            <div className="col-span-2 sm:col-span-1">
+              <label className="block text-sm font-medium mb-1" style={labelStyle}>
+                Host / IP Address
+              </label>
+              <input
+                type="text"
+                value={state.host}
+                onChange={(e) =>
+                  dispatch({
+                    type: "SET_FIELD",
+                    field: "host",
+                    value: e.target.value,
+                  })
+                }
+                placeholder="192.168.1.100"
+                className="w-full rounded px-3 py-2 text-sm"
+                style={inputStyle}
+              />
+            </div>
+            <div className="col-span-2 sm:col-span-1">
+              <label className="block text-sm font-medium mb-1" style={labelStyle}>
+                Port
+              </label>
+              <input
+                type="number"
+                value={state.port}
+                onChange={(e) =>
+                  dispatch({
+                    type: "SET_FIELD",
+                    field: "port",
+                    value: parseInt(e.target.value, 10) || 80,
+                  })
+                }
+                className="w-full rounded px-3 py-2 text-sm"
+                style={inputStyle}
+              />
+            </div>
+            <div className="col-span-2 sm:col-span-1">
+              <label className="block text-sm font-medium mb-1" style={labelStyle}>
+                Username
+              </label>
+              <input
+                type="text"
+                value={state.username}
+                onChange={(e) =>
+                  dispatch({
+                    type: "SET_FIELD",
+                    field: "username",
+                    value: e.target.value,
+                  })
+                }
+                placeholder="admin"
+                className="w-full rounded px-3 py-2 text-sm"
+                style={inputStyle}
+              />
+            </div>
+            <div className="col-span-2 sm:col-span-1">
+              <label className="block text-sm font-medium mb-1" style={labelStyle}>
+                Password
+              </label>
+              <input
+                type="password"
+                value={state.password}
+                onChange={(e) =>
+                  dispatch({
+                    type: "SET_FIELD",
+                    field: "password",
+                    value: e.target.value,
+                  })
+                }
+                className="w-full rounded px-3 py-2 text-sm"
+                style={inputStyle}
+              />
+            </div>
+            <div className="col-span-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={state.useHttps}
+                  onChange={(e) =>
+                    dispatch({
+                      type: "SET_FIELD",
+                      field: "useHttps",
+                      value: e.target.checked,
+                    })
+                  }
+                  className="w-4 h-4"
+                />
+                <span className="text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                  Use HTTPS
+                </span>
+              </label>
+            </div>
+          </div>
+        )}
 
-      {/* Test connection button */}
+        {/* BACnet-only info for non-Niagara vendors (not in demo mode) */}
+        {!state.useDemoData && !isNiagara && (
+          <div
+            className="p-3 rounded text-sm mt-4"
+            style={{
+              background: "var(--color-sentinel-bg-primary)",
+              border: "1px solid var(--color-sentinel-border)",
+              color: "var(--color-sentinel-text-secondary)",
+            }}
+          >
+            No credentials required. SENTINEL will broadcast a BACnet WhoIs on the local network (UDP port 47808) to discover {vendorLabel} controllers.
+          </div>
+        )}
+      </div>
+
+      {/* Test connection / Create Site button */}
       <button
         onClick={handleTestConnection}
         disabled={
           state.connectionStatus === "testing" ||
+          !state.siteName.trim() ||
+          (state.useDemoData && !state.demoBuildingId) ||
           (!state.useDemoData && isNiagara && !state.host)
         }
         className="flex items-center gap-2 px-4 py-2 rounded text-sm font-medium transition-opacity disabled:opacity-50"
@@ -667,10 +1001,12 @@ export function BMSConnectionWizard({
       >
         {state.connectionStatus === "testing" ? (
           <Loader2 className="w-4 h-4 animate-spin" />
+        ) : state.useDemoData ? (
+          <Building2 className="w-4 h-4" />
         ) : (
           <Wifi className="w-4 h-4" />
         )}
-        {state.useDemoData ? "Enable Demo Mode" : "Test Connection"}
+        {state.useDemoData ? "Create Site & Enable Demo" : "Test Connection"}
       </button>
 
       {/* Connection result */}
@@ -806,34 +1142,84 @@ export function BMSConnectionWizard({
                 }}
               >
                 <h4
-                  className="text-sm font-semibold mb-2"
+                  className="text-sm font-semibold mb-3"
                   style={{ color: "var(--color-sentinel-text-primary)" }}
                 >
                   Classification Summary
                 </h4>
-                <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {Object.entries(state.discoverySummary.summary).map(
-                    ([key, val]) => (
-                      <div
-                        key={key}
-                        className="flex justify-between"
-                        style={{
-                          color: "var(--color-sentinel-text-secondary)",
-                        }}
-                      >
-                        <span className="capitalize">
-                          {key.replace(/_/g, " ")}
-                        </span>
-                        <span
-                          className="font-medium"
+                    ([key, val]) => {
+                      // Skip arrays and complex objects in top-level display
+                      if (Array.isArray(val)) return null;
+
+                      // Handle nested objects (like equipment_type_counts, confidence_counts)
+                      if (typeof val === "object" && val !== null) {
+                        return (
+                          <div
+                            key={key}
+                            className="rounded p-3"
+                            style={{
+                              background: "var(--color-sentinel-bg-primary)",
+                              border: "1px solid var(--color-sentinel-border)",
+                            }}
+                          >
+                            <h5
+                              className="text-xs font-semibold mb-2 capitalize"
+                              style={{ color: "var(--color-sentinel-text-secondary)" }}
+                            >
+                              {key.replace(/_/g, " ")}
+                            </h5>
+                            <div className="space-y-1">
+                              {Object.entries(val as Record<string, unknown>).map(
+                                ([subKey, subVal]) => (
+                                  <div
+                                    key={subKey}
+                                    className="flex justify-between text-sm"
+                                  >
+                                    <span
+                                      className="capitalize"
+                                      style={{ color: "var(--color-sentinel-text-secondary)" }}
+                                    >
+                                      {subKey.replace(/_/g, " ")}
+                                    </span>
+                                    <span
+                                      className="font-medium"
+                                      style={{ color: "var(--color-sentinel-text-primary)" }}
+                                    >
+                                      {String(subVal)}
+                                    </span>
+                                  </div>
+                                ),
+                              )}
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      // Simple values (numbers, strings)
+                      return (
+                        <div
+                          key={key}
+                          className="flex justify-between text-sm"
                           style={{
-                            color: "var(--color-sentinel-text-primary)",
+                            color: "var(--color-sentinel-text-secondary)",
                           }}
                         >
-                          {String(val)}
-                        </span>
-                      </div>
-                    ),
+                          <span className="capitalize">
+                            {key.replace(/_/g, " ")}
+                          </span>
+                          <span
+                            className="font-medium"
+                            style={{
+                              color: "var(--color-sentinel-text-primary)",
+                            }}
+                          >
+                            {String(val)}
+                          </span>
+                        </div>
+                      );
+                    },
                   )}
                 </div>
               </div>
@@ -921,16 +1307,24 @@ export function BMSConnectionWizard({
 
           {/* Confidence breakdown */}
           {state.mappings.confidence_breakdown && (
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-3">
               {Object.entries(state.mappings.confidence_breakdown).map(
                 ([level, count]) => (
                   <div
                     key={level}
-                    className="flex items-center gap-1.5 text-sm"
-                    style={{ color: "var(--color-sentinel-text-secondary)" }}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded"
+                    style={{
+                      background: "var(--color-sentinel-bg-secondary)",
+                      border: "1px solid var(--color-sentinel-border)",
+                    }}
                   >
                     <ConfidenceBadge confidence={level} />
-                    <span>{count}</span>
+                    <span
+                      className="text-sm font-medium"
+                      style={{ color: "var(--color-sentinel-text-primary)" }}
+                    >
+                      {count}
+                    </span>
                   </div>
                 ),
               )}
@@ -986,9 +1380,9 @@ export function BMSConnectionWizard({
                               color: "var(--color-sentinel-text-primary)",
                             }}
                           >
-                            {eq.equipment_name}
+                            {eq.equipment_name || eq.equipment_id || "Unknown Equipment"}
                           </span>
-                          <ConfidenceBadge confidence={eq.confidence} />
+                          <ConfidenceBadge confidence={eq.confidence || "unknown"} />
                         </div>
                         <span
                           className="text-xs"
@@ -996,8 +1390,8 @@ export function BMSConnectionWizard({
                             color: "var(--color-sentinel-text-secondary)",
                           }}
                         >
-                          {eq.equipment_type} · {eq.equipment_id} ·{" "}
-                          {eq.points.length} points
+                          {eq.equipment_type || "unknown"} · {eq.equipment_id} ·{" "}
+                          {eq.points?.length || 0} points
                         </span>
                       </div>
                     </div>
@@ -1037,7 +1431,7 @@ export function BMSConnectionWizard({
                           </tr>
                         </thead>
                         <tbody>
-                          {eq.points.map((pt, idx) => (
+                          {eq.points.map((pt: Record<string, unknown>, idx: number) => (
                             <tr
                               key={idx}
                               className="border-t"
@@ -1050,17 +1444,17 @@ export function BMSConnectionWizard({
                               }}
                             >
                               <td className="px-3 py-1.5 font-mono text-xs">
-                                {pt.name}
+                                {(pt.name || pt.original_name || "—") as string}
                               </td>
-                              <td className="px-3 py-1.5">{pt.point_type}</td>
+                              <td className="px-3 py-1.5">{String(pt.point_type || "—")}</td>
                               <td className="px-3 py-1.5">
-                                <ConfidenceBadge confidence={pt.confidence} />
+                                <ConfidenceBadge confidence={pt.confidence as string} />
                               </td>
                               <td className="px-3 py-1.5 text-xs">
-                                {pt.brick_class || "\u2014"}
+                                {String(pt.brick_class || "—")}
                               </td>
                               <td className="px-3 py-1.5 text-xs">
-                                {pt.unit || "\u2014"}
+                                {String(pt.unit || "—")}
                               </td>
                             </tr>
                           ))}
@@ -1271,25 +1665,39 @@ export function BMSConnectionWizard({
   const stepRenderers = [renderStep1, renderStep2, renderStep3, renderStep4];
 
   return (
-    <div>
+    <div className="max-w-5xl mx-auto">
       <h2
-        className="text-xl font-bold mb-6"
+        className="text-2xl font-bold mb-2"
         style={{ color: "var(--color-sentinel-text-primary)" }}
       >
         BMS Connection Wizard
       </h2>
+      <p
+        className="text-sm mb-8"
+        style={{ color: "var(--color-sentinel-text-secondary)" }}
+      >
+        Connect your building management system to SENTINEL for AI-powered monitoring and control.
+      </p>
 
       <StepIndicator currentStep={state.step} />
 
       {/* Step content */}
-      <div className="min-h-[300px]">{stepRenderers[state.step - 1]()}</div>
+      <div
+        className="min-h-[400px] rounded-lg p-6"
+        style={{
+          background: "var(--color-sentinel-bg-panel)",
+          border: "1px solid var(--color-sentinel-border)",
+        }}
+      >
+        {stepRenderers[state.step - 1]()}
+      </div>
 
       {/* Navigation */}
       {state.step < 4 && (
-        <div className="flex justify-between mt-8 pt-4 border-t" style={{ borderColor: "var(--color-sentinel-border)" }}>
+        <div className="flex justify-between mt-6">
           <button
             onClick={state.step === 1 ? onClose : goBack}
-            className="px-4 py-2 rounded text-sm font-medium transition-opacity"
+            className="px-5 py-2.5 rounded text-sm font-medium transition-opacity"
             style={{
               background: "var(--color-sentinel-bg-secondary)",
               border: "1px solid var(--color-sentinel-border)",
@@ -1301,7 +1709,7 @@ export function BMSConnectionWizard({
           <button
             onClick={goNext}
             disabled={!canGoNext()}
-            className="px-4 py-2 rounded text-sm font-medium transition-opacity disabled:opacity-40"
+            className="px-5 py-2.5 rounded text-sm font-medium transition-opacity disabled:opacity-40"
             style={{
               background: "var(--color-sentinel-blue)",
               color: "#fff",
@@ -1314,10 +1722,10 @@ export function BMSConnectionWizard({
 
       {/* Step 4 has its own Done/Approve buttons */}
       {state.step === 4 && state.approveStatus !== "approved" && (
-        <div className="flex justify-start mt-8 pt-4 border-t" style={{ borderColor: "var(--color-sentinel-border)" }}>
+        <div className="flex justify-start mt-6">
           <button
             onClick={goBack}
-            className="px-4 py-2 rounded text-sm font-medium"
+            className="px-5 py-2.5 rounded text-sm font-medium"
             style={{
               background: "var(--color-sentinel-bg-secondary)",
               border: "1px solid var(--color-sentinel-border)",

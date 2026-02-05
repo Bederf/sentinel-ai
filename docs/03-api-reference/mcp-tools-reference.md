@@ -232,8 +232,12 @@ Write value to device point **with safety validation**.
 List active alarms with filtering.
 
 **Parameters:**
-- `building_id` (string, optional): Filter by building
-- `severity` (string, optional): "critical", "high", "medium", "low"
+- `building_id` (string, optional): Filter by building/site ID
+- `asset_id` (string, optional): Filter by asset/equipment ID
+- `severity` (array of strings, optional): Filter by severity levels - "critical", "warning", "info"
+- `state` (string, optional): Filter by alarm state - "active", "acknowledged", "cleared", "all" (default: "all")
+- `from_time` (string, optional): Start time filter (ISO format)
+- `to_time` (string, optional): End time filter (ISO format)
 - `limit` (integer, optional): Max results (default: 50)
 
 **Returns:**

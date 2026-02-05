@@ -88,7 +88,7 @@ export function OptimizationSettings({
   const [filterMode, setFilterMode] = useState<FilterMode>("all");
   const [expandedSite, setExpandedSite] = useState<string | null>(null);
   // Reserved for future bulk operations
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+   
   const [, setShowBulkConfirm] = useState<"enable" | "disable" | null>(null);
   const [stats, setStats] = useState({
     totalSites: 0,
@@ -434,8 +434,10 @@ export function OptimizationSettings({
                     {site.optimization_enabled && siteStatus?.optimizationStatus && (
                       <OptimizationStatusBadge
                         status={siteStatus.optimizationStatus}
+                        mode={site.optimization_settings?.mode || "supervised"}
                         size="sm"
                         lastOptimization={site.last_optimization}
+                        hasRecommendation={siteStatus.optimizationStatus === "recommendation_pending"}
                       />
                     )}
 
