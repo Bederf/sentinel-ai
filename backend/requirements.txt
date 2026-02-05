@@ -50,3 +50,6 @@ reportlab>=4.0.0
 
 # BACnet/IP Protocol (Niagara Integration)
 BAC0>=24.3.25
+
+# MFA/TOTP (Phase 58.1 FSR Compliance - Domain 4.6)
+pyotp>=2.9.0
