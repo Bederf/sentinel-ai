@@ -367,9 +367,6 @@ export default function TechnicianChat() {
               Your expert colleague in your pocket
             </p>
           </div>
-          <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
-            <MoreHorizontal className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-          </button>
         </div>
       </div>
 

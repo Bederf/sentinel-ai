@@ -11,9 +11,10 @@
 
 import { useState, useRef, useEffect } from "react";
 import type { FormEvent, KeyboardEvent } from "react";
-import { Send, MessageSquare, Bot, BookOpen } from "lucide-react";
+import { Send, MessageSquare, Bot, BookOpen, Building2, ChevronDown } from "lucide-react";
 import { ChatMessage } from "./ChatMessage";
-import { streamChat } from "../lib/api";
+import api, { streamChat } from "../lib/api";
+import type { Site } from "../lib/api";
 
 interface Message {
   id: string;
@@ -27,9 +28,29 @@ export function Chat() {
   const [isLoading, setIsLoading] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
   const [searchDocs, setSearchDocs] = useState(false);
+  const [sites, setSites] = useState<Site[]>([]);
+  const [selectedSiteId, setSelectedSiteId] = useState<string>("site-002");
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Fetch sites on mount
+  useEffect(() => {
+    const loadSites = async () => {
+      try {
+        const sitesData = await api.getSites();
+        setSites(sitesData.sort((a, b) => a.name.localeCompare(b.name)));
+        // Default to Sandton City (site-002) or first site
+        const defaultSite = sitesData.find(s => s.id === "site-002") || sitesData[0];
+        if (defaultSite) {
+          setSelectedSiteId(defaultSite.id);
+        }
+      } catch (error) {
+        console.error("Failed to load sites:", error);
+      }
+    };
+    loadSites();
+  }, []);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -64,7 +85,7 @@ export function Chat() {
       await streamChat(trimmedInput, undefined, (chunk) => {
         fullResponse += chunk;
         setStreamingContent(fullResponse);
-      }, searchDocs);
+      }, searchDocs, selectedSiteId);
 
       // When streaming completes, add assistant message with full content
       setMessages((prev) => [
@@ -112,31 +133,61 @@ export function Chat() {
     >
       {/* Header */}
       <div
-        className="flex-none p-4 flex items-center gap-3"
+        className="flex-none p-4 flex items-center justify-between"
         style={{ borderBottom: "1px solid var(--color-grafana-border)" }}
       >
-        <div
-          className="p-2 rounded"
-          style={{ background: "rgba(50, 116, 217, 0.15)" }}
-        >
-          <MessageSquare
-            className="h-5 w-5"
-            style={{ color: "var(--color-grafana-blue)" }}
-          />
+        <div className="flex items-center gap-3">
+          <div
+            className="p-2 rounded"
+            style={{ background: "rgba(50, 116, 217, 0.15)" }}
+          >
+            <MessageSquare
+              className="h-5 w-5"
+              style={{ color: "var(--color-grafana-blue)" }}
+            />
+          </div>
+          <div>
+            <h3
+              className="font-medium text-sm"
+              style={{ color: "var(--color-grafana-text-primary)" }}
+            >
+              SENTINEL
+            </h3>
+            <span
+              className="text-xs"
+              style={{ color: "var(--color-grafana-text-secondary)" }}
+            >
+              AI-powered facilities management support
+            </span>
+          </div>
         </div>
-        <div>
-          <h3
-            className="font-medium text-sm"
-            style={{ color: "var(--color-grafana-text-primary)" }}
+
+        {/* Building selector */}
+        <div className="relative">
+          <select
+            value={selectedSiteId}
+            onChange={(e) => setSelectedSiteId(e.target.value)}
+            className="appearance-none pl-8 pr-8 py-1.5 text-sm rounded cursor-pointer focus:outline-none focus:ring-1"
+            style={{
+              background: "var(--color-grafana-bg-secondary)",
+              border: "1px solid var(--color-grafana-border)",
+              color: "var(--color-grafana-text-primary)",
+            }}
           >
-            SENTINEL
-          </h3>
-          <span
-            className="text-xs"
+            {sites.map((site) => (
+              <option key={site.id} value={site.id}>
+                {site.name}
+              </option>
+            ))}
+          </select>
+          <Building2
+            className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none"
             style={{ color: "var(--color-grafana-text-secondary)" }}
-          >
-            AI-powered facilities management support
-          </span>
+          />
+          <ChevronDown
+            className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none"
+            style={{ color: "var(--color-grafana-text-secondary)" }}
+          />
         </div>
       </div>
 
@@ -229,7 +280,7 @@ export function Chat() {
           <button
             type="button"
             onClick={() => setSearchDocs(!searchDocs)}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs transition-all"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs transition-all hover:brightness-110 hover:scale-105"
             style={{
               background: searchDocs
                 ? "rgba(50, 116, 217, 0.2)"
@@ -284,7 +335,7 @@ export function Chat() {
           <button
             type="submit"
             disabled={isLoading || !input.trim()}
-            className="px-3 py-2 md:px-4 md:py-2 rounded flex items-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-3 py-2 md:px-4 md:py-2 rounded flex items-center gap-2 transition-all hover:brightness-110 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:brightness-100 disabled:hover:scale-100"
             style={{
               background: isLoading || !input.trim()
                 ? "var(--color-grafana-border)"

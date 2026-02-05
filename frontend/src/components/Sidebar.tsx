@@ -85,7 +85,7 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
       {/* Mobile hamburger button */}
       <button
         onClick={() => setIsMobileOpen(!isMobileOpen)}
-        className="md:hidden fixed top-4 left-4 z-50 p-2 rounded-md transition-colors"
+        className="md:hidden fixed top-4 left-4 z-50 p-2 rounded-md transition-colors hover:brightness-125"
         style={{
           background: "var(--color-grafana-bg-secondary)",
           border: "1px solid var(--color-grafana-border)",
@@ -147,9 +147,9 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
           {/* Toggle button - moves with sidebar state, only visible on large screens */}
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}
-            className={`hidden lg:flex absolute top-1/2 transform -translate-y-1/2 p-1 rounded hover:bg-sentinel-bg-secondary transition-all duration-200 ${
-              isCollapsed 
-                ? 'left-1/2 -translate-x-1/2' 
+            className={`hidden lg:flex absolute top-1/2 transform -translate-y-1/2 p-1 rounded hover:brightness-125 hover:scale-110 transition-all duration-200 ${
+              isCollapsed
+                ? 'left-1/2 -translate-x-1/2'
                 : 'right-2'
             }`}
             style={{
@@ -192,6 +192,8 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
                   w-full flex items-center gap-3 px-4 py-2.5 mb-1 mx-auto
                   transition-all duration-150 ease-in-out
                   md:justify-center lg:justify-start
+                  hover:brightness-110
+                  ${!isActive ? 'hover:bg-[var(--color-sentinel-bg-secondary)]' : ''}
                 `}
                 style={{
                   background: isActive ? "var(--color-sentinel-bg-secondary)" : "transparent",
@@ -229,7 +231,7 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
                   onCustomizeDashboard();
                   setIsMobileOpen(false);
                 }}
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 md:justify-center lg:justify-start"
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 md:justify-center lg:justify-start hover:brightness-125 hover:scale-[1.02]"
                 style={{
                   background: "rgba(245, 158, 11, 0.1)",
                   border: "1px solid rgba(245, 158, 11, 0.3)",
@@ -257,7 +259,7 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
           >
             <button
               onClick={() => setIsAboutOpen(!isAboutOpen)}
-              className={`w-full flex items-center gap-3 px-1 py-2 transition-all duration-150 md:justify-center ${isCollapsed ? 'lg:justify-center' : 'lg:justify-start'}`}
+              className={`w-full flex items-center gap-3 px-1 py-2 transition-all duration-150 md:justify-center hover:brightness-125 ${isCollapsed ? 'lg:justify-center' : 'lg:justify-start'}`}
               style={{
                 color: isAboutOpen
                   ? "var(--color-sentinel-text-primary)"
