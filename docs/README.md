@@ -42,6 +42,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - [Fleet Learning API](03-api-reference/fleet-learning-api.md) - Cross-site patterns, global models, fine-tuning (Phase 45-02)
 - [MLOps API](03-api-reference/mlops-api.md) - Drift detection, ML alerts, retraining triggers, success metrics (Phase 45-03)
 - [Solar & BESS API](03-api-reference/solar-api.md) - Solar PV, BESS dispatch, grid compliance, financial reporting, maintenance (Phase 34)
+- [Contract Management API](03-api-reference/contracts-api.md) - Organizations, contracts, SLA terms, equipment assignments, budgets, condition assessments (Phase 48)
 
 ### ✨ Features
 

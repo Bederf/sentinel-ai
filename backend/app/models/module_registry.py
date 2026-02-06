@@ -24,6 +24,9 @@ class ModuleType(str, Enum):
     FIRE = "fire"
     ACCESS = "access"
     SOLAR = "solar"
+    ML = "ml"
+    SUSTAINABILITY = "sustainability"
+    CONTRACTS = "contracts"
 
 
 class ModuleStatus(str, Enum):
@@ -218,6 +221,36 @@ MODULE_DEFINITIONS: Dict[ModuleType, ModuleDefinition] = {
         integrates_with=[ModuleType.ENERGY, ModuleType.HVAC],
         telemetry_points=["pv_power_kw", "bess_soc", "bess_mode", "grid_import_kw", "grid_export_kw", "inverter_status", "pr_ratio"],
         ai_features=["generation_forecast", "arbitrage_optimisation", "fault_detection", "self_consumption_maximisation"]
+    ),
+    ModuleType.ML: ModuleDefinition(
+        module_type=ModuleType.ML,
+        name="Fleet ML",
+        version="1.0.0",
+        description="Cross-site machine learning insights, anomaly detection, and predictive maintenance",
+        capabilities=[
+            ModuleCapability("fleet_insights", "Fleet Insights", "Cross-site pattern recognition and benchmarking"),
+            ModuleCapability("anomaly_detection", "Anomaly Detection", "LSTM/Autoencoder-based anomaly detection"),
+            ModuleCapability("predictive_maintenance", "Predictive Maintenance", "Failure probability forecasting"),
+            ModuleCapability("mlops_monitoring", "MLOps Monitoring", "Model performance tracking and drift detection"),
+        ],
+        integrates_with=[ModuleType.HVAC, ModuleType.ENERGY, ModuleType.SOLAR],
+        telemetry_points=["model_accuracy", "inference_latency", "anomaly_score", "drift_metric"],
+        ai_features=["cross_site_benchmarking", "model_retraining", "explainable_predictions", "fleet_health_scoring"]
+    ),
+    ModuleType.SUSTAINABILITY: ModuleDefinition(
+        module_type=ModuleType.SUSTAINABILITY,
+        name="Sustainability & ESG",
+        version="1.0.0",
+        description="Carbon tracking, ESG reporting, and sustainability compliance",
+        capabilities=[
+            ModuleCapability("carbon_tracking", "Carbon Tracking", "Scope 1/2/3 emissions monitoring"),
+            ModuleCapability("esg_reporting", "ESG Reporting", "Automated sustainability report generation"),
+            ModuleCapability("compliance_monitoring", "Compliance Monitoring", "Regulatory compliance tracking"),
+            ModuleCapability("green_certification", "Green Certification", "GBCSA/LEED/WELL certification support"),
+        ],
+        integrates_with=[ModuleType.ENERGY, ModuleType.SOLAR, ModuleType.HVAC],
+        telemetry_points=["carbon_emissions_kg", "energy_intensity", "water_usage", "waste_diversion_rate"],
+        ai_features=["emissions_forecasting", "reduction_recommendations", "benchmark_comparison", "report_generation"]
     ),
 }
 
