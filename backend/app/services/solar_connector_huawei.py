@@ -158,6 +158,12 @@ class SimulatedHuaweiConnector(SolarConnector):
         rated_kva = cfg.get("rated_kva", 330)
         # Add per-inverter variance (+-3%)
         inv_variance = 1.0 + random.uniform(-0.03, 0.03)
+
+        # --- Simulated fault: FNB-INV-H07 consistently underperforms by ~12%
+        #     due to string fault on MPPT tracker 4 ---
+        if inverter_id == "FNB-INV-H07":
+            inv_variance *= 0.88  # 12% reduction
+
         ac_power = rated_kva * solar_factor * inv_variance * 0.97  # 97% avg efficiency
         dc_power = ac_power / 0.97 if ac_power > 0 else 0
         efficiency = (ac_power / dc_power * 100) if dc_power > 0 else 0
@@ -188,9 +194,15 @@ class SimulatedHuaweiConnector(SolarConnector):
             status="online" if solar_factor > 0.01 else "standby",
             frequency_hz=round(50.0 + random.uniform(-0.05, 0.05), 2),
             power_factor=round(0.99 + random.uniform(-0.01, 0.005), 3),
-            daily_yield_kwh=round(rated_kva * 5.2 * solar_factor * random.uniform(0.92, 1.0), 1),
+            daily_yield_kwh=round(
+                rated_kva * 5.2 * solar_factor * random.uniform(0.92, 1.0)
+                * (0.88 if inverter_id == "FNB-INV-H07" else 1.0), 1
+            ),
             total_yield_mwh=round(rated_kva * 1460 * random.uniform(0.85, 0.95) / 1000, 1),
-            alarms=[],
+            alarms=(
+                ["String fault detected on MPPT tracker 4"]
+                if inverter_id == "FNB-INV-H07" else []
+            ),
             last_poll=now.isoformat(),
         )
         self._inverter_state[inverter_id] = inv
@@ -217,9 +229,16 @@ class SimulatedHuaweiConnector(SolarConnector):
                 variance = 1.0 + random.uniform(-0.05, 0.02)
                 panels_on_string = cfg.get("panels_per_string", 14)
 
+                # --- Simulated fault: H07 MPPT tracker 4 strings degraded
+                #     Reduces current by ~30% (soiling + partial disconnect) ---
+                mppt4_fault = (
+                    inverter_id == "FNB-INV-H07" and mppt == 4
+                )
+                fault_factor = 0.70 if mppt4_fault else 1.0
+
                 voc = 49.5 * panels_on_string  # ~693V at Voc
                 vmp = 41.7 * panels_on_string * solar_factor * variance
-                imp = (panel_rating_w / 41.7) * solar_factor * variance
+                imp = (panel_rating_w / 41.7) * solar_factor * variance * fault_factor
                 dc_power = (vmp * imp / 1000) if solar_factor > 0 else 0
 
                 strings.append(SolarString(

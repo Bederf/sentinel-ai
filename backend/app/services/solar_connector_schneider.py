@@ -200,7 +200,16 @@ class SimulatedSchneiderConnector(SolarConnector):
                 variance = 1.0 + random.uniform(-0.05, 0.02)
                 panels_on_string = cfg.get("panels_per_string", 10)
 
-                vmp = 37.0 * panels_on_string * solar_factor * variance
+                # --- Simulated fault: S15 MPPT3 string 1 has bypass diode
+                #     issue — voltage drops ~15% while current stays normal ---
+                bypass_diode_fault = (
+                    inverter_id == "FNB-INV-S15"
+                    and mppt == 3
+                    and s_idx == 1
+                )
+                voltage_factor = 0.85 if bypass_diode_fault else 1.0
+
+                vmp = 37.0 * panels_on_string * solar_factor * variance * voltage_factor
                 imp = (panel_rating_w / 37.0) * solar_factor * variance
                 dc_power = (vmp * imp / 1000) if solar_factor > 0 else 0
 
