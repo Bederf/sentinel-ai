@@ -65,6 +65,7 @@ from app.api import simulation_analytics  # Simulation analytics pipeline
 from app.api import local_chat  # Phase 44-03 Local LLM conversational interface
 from app.api import ml_retraining  # Phase 45-01 Online Learning & Automated Retraining
 from app.api import fleet_learning  # Phase 45-02 Fleet Learning & Cross-Site Insights
+from app.api import mlops  # Phase 45-03 MLOps Monitoring & Success Metrics
 from app.api import sustainability  # Phase 29 Sustainability & ESG module
 from app.middleware.audit_middleware import AuditMiddleware
 from app.middleware.security_logging import SecurityLoggingMiddleware
@@ -171,6 +172,7 @@ app.include_router(cache.router, tags=["cache"])  # Redis cache management
 app.include_router(local_chat.router, prefix="/api", tags=["local-chat"])  # Phase 44-03 Local LLM chat
 app.include_router(ml_retraining.router, tags=["ml-retraining"])  # Phase 45-01 Online Learning & Retraining
 app.include_router(fleet_learning.router, tags=["fleet-learning"])  # Phase 45-02 Fleet Learning & Cross-Site Insights
+app.include_router(mlops.router, tags=["mlops"])  # Phase 45-03 MLOps Monitoring & Success Metrics
 app.include_router(sustainability.router, prefix="/api", tags=["sustainability"])  # Phase 29 Sustainability & ESG
 
 
