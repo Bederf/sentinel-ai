@@ -4,7 +4,7 @@ type: "guide"
 status: "approved"
 version: "1.0.0"
 created: "2026-01-30"
-updated: "2026-01-30"
+updated: "2026-02-06"
 author: "Sentinel Development Team"
 tags: ["documentation", "overview"]
 domain: "general"
@@ -30,8 +30,17 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - [Naming Conventions](02-architecture/naming-conventions.md) - Device ID and point naming
 
 ### 📚 API Reference
-- [REST API Endpoints](03-api-reference/rest-api-endpoints.md) - Complete API reference
 - [MCP Tools Reference](03-api-reference/mcp-tools-reference.md) - Model Context Protocol tools
+- [Service Feedback API](03-api-reference/service-feedback-api.md) - Technician feedback collection with health scoring (Phase 41-01)
+- [Condition Monitoring API](03-api-reference/condition-api.md) - Trends, degradation, RUL, fleet risk (Phase 41-03)
+- [Time-Series API](03-api-reference/timeseries-api.md) - Sensor data write/query with InfluxDB (Phase 42-01)
+- [Data Quality API](03-api-reference/data-quality-api.md) - Sensor health, gaps, ML training readiness (Phase 42-03)
+- [ML Predictions API](03-api-reference/ml-predictions-api.md) - LSTM forecasting, anomaly detection, maintenance recommendations (Phase 43)
+- [RAG API](03-api-reference/rag-api.md) - Vector search, knowledge base, document management (Phase 44-01)
+- [Local Chat API](03-api-reference/local-chat-api.md) - Natural language query endpoints (Phase 44-03)
+- [ML Retraining API](03-api-reference/ml-retraining-api.md) - Model retraining, performance monitoring, A/B testing (Phase 45-01)
+- [Fleet Learning API](03-api-reference/fleet-learning-api.md) - Cross-site patterns, global models, fine-tuning (Phase 45-02)
+- [MLOps API](03-api-reference/mlops-api.md) - Drift detection, ML alerts, retraining triggers, success metrics (Phase 45-03)
 
 ### ✨ Features
 
@@ -46,6 +55,10 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - **[AI Operations & Monitoring](04-features/ai-operations-monitoring.md)** - Day-to-day AI monitoring & recommendations (control-aware)
 - **[Health Scoring System](04-features/health-scoring-system.md)** - Equipment health calculation with configurable thresholds
 - **[44-02: Explainable AI for ML Predictions](04-features/44-02-explainable-ai.md)** - Natural language explanations for AI predictions (Phase 44-02)
+- **[44-03: Conversational Interface](04-features/44-03-conversational-interface.md)** - Natural language queries over ML predictions via local Ollama LLM (Phase 44-03)
+- **[45-01: Online Learning & Automated Retraining](04-features/45-01-online-learning.md)** - Model freshness monitoring, auto-retraining, A/B testing (Phase 45-01)
+- **[45-02: Fleet Learning & Cross-Site Insights](04-features/45-02-fleet-learning.md)** - Anonymized fleet patterns, global models, local fine-tuning (Phase 45-02)
+- **[45-03: MLOps Monitoring & Success Metrics](04-features/45-03-mlops-monitoring.md)** - Drift detection, ML alerting, retraining triggers, metrics dashboard (Phase 45-03)
 
 #### Asset Management Workflow
 - **[Asset Baseline Assessment](04-features/44-asset-baseline-assessment.md)** - Asset condition scoring and maintenance cost modeling (Phase 44)
@@ -62,12 +75,17 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 
 #### Simulation & Demo
 - **[24-Hour Lifecycle Simulation](04-features/lifecycle-simulation.md)** - Full building day simulation for testing AI optimization, faults, alerts, repairs
+- **[Simulation Analytics Pipeline](04-features/simulation-analytics-pipeline.md)** - JSONL event logging and optimization profile analysis (asset sweating, comfort first, cost saving)
 - **[Demo Simulation Control](04-features/demo-simulation-control.md)** - Simple trigger/reset endpoints for demos
+
+#### Sustainability & ESG
+- **[Sustainability & ESG Module](04-features/29-sentinel-sustainability.md)** - Carbon emissions (Scope 1/2/3), energy efficiency benchmarks, Green Star SA self-assessment (Phase 29)
 
 #### Additional Features
 - [Technician Chat](04-features/technician-chat.md) - Guided fault diagnosis (Phase 19)
 - [AI-Assisted Onboarding](04-features/ai-assisted-onboarding.md) - Import BMS data via MCP tools
-- [41 - ML Knowledge Capture](04-features/41-ml-knowledge-capture-01.md) - OCR and data collection
+- [41-01/02 - ML Knowledge Capture](04-features/41-ml-knowledge-capture-01.md) - OCR and data collection
+- [41-03 - Vibration & Audio Analysis](04-features/41-03-vibration-audio-analysis.md) - phyphox sensor data, bearing defect detection, condition scoring
 - [42 - Data Collection & Storage](04-features/42-data-collection-storage.md) - InfluxDB integration
 - [43 - ML Model Development](04-features/43-ml-model-development.md) - LSTM and Autoencoder models
 - [18 - Fault Code Database](04-features/18-fault-code-database.md) - Equipment fault diagnosis
@@ -136,7 +154,7 @@ docs/
 ├── 10-security/             # Auth, audit, API keys
 ├── 11-testing/              # Unit tests, integration tests
 ├── 12-development/          # Workflow, tooling, best practices
-├── 13-modules/              # Bolt-on module system (Energy, HVAC, Security, Lighting)
+├── 13-modules/              # Bolt-on module system (Energy, HVAC, Security, Lighting, Sustainability)
 ├── 14-south-africa-context/ # Load shedding, Eskom
 ├── 15-troubleshooting/      # Common issues, diagnostics
 ├── 16-glossary/             # BMS terms, acronyms
@@ -227,9 +245,9 @@ When adding new documentation:
 ## Status
 
 - **Total Directories:** 17
-- **Total Documents:** 18 (in progress)
-- **With Frontmatter:** 12
-- **Target:** 25-30 core documents
+- **Total Documents:** 30+
+- **With Frontmatter:** 23+
+- **Target:** 25-30 core documents (met)
 
 ## Next Actions
 
