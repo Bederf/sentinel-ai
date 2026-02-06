@@ -8,7 +8,7 @@ of the underlying protocol (BACnet, Modbus, mock, etc.).
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 import uuid
 
 
@@ -34,6 +34,8 @@ class DeviceType(Enum):
     LIFT = "lift"
     CONTROLLER = "controller"
     METER = "meter"
+    SOLAR = "solar"
+    BESS = "bess"
     OTHER = "other"
 
 
