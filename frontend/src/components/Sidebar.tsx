@@ -35,7 +35,7 @@ import {
   BarChart3,
 } from "lucide-react";
 
-export type View = "dashboard" | "chat" | "technician" | "control" | "control-audit" | "optimization" | "settings" | "integrations" | "occupancy" | "workflow" | "security" | "simbiot" | "simulation" | "fleet";
+export type View = "dashboard" | "chat" | "technician" | "control" | "control-audit" | "optimization" | "settings" | "integrations" | "occupancy" | "workflow" | "security" | "simbiot" | "simulation" | "fleet" | "mlops";
 
 interface SidebarProps {
   currentView: View;
@@ -72,6 +72,7 @@ const navItems: NavItem[] = [
   { id: "security", label: "Security", icon: ShieldCheck, description: "Access & CCTV" },
   { id: "simulation", label: "Simulation", icon: FlaskConical, description: "Lifecycle & Analytics" },
   { id: "fleet", label: "Fleet ML", icon: BarChart3, description: "Cross-Site Insights" },
+  { id: "mlops", label: "ML Metrics", icon: Activity, description: "MLOps Monitoring" },
 ];
 
 export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomizeDashboard }: SidebarProps) {

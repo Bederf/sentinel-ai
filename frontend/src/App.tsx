@@ -22,6 +22,7 @@ import { SecurityDashboard } from "./components/SecurityDashboard";
 import { SimbiotPage } from "./components/SimbiotPage";
 import { SimulationDashboard } from "./components/SimulationDashboard";
 import { FleetInsights } from "./components/FleetInsights";
+import { MLMetrics } from "./components/MLMetrics";
 
 interface HealthStatus {
   status: string;
@@ -288,6 +289,7 @@ function App() {
                  currentView === "simbiot" ? "SIMBIOT" :
                  currentView === "simulation" ? "Simulation" :
                  currentView === "fleet" ? "Fleet ML Insights" :
+                 currentView === "mlops" ? "ML Metrics" :
                  "AI Assistant"}
               </h1>
             </div>
@@ -587,6 +589,8 @@ function App() {
             </div>
           ) : currentView === "fleet" ? (
             <FleetInsights />
+          ) : currentView === "mlops" ? (
+            <MLMetrics />
           ) : (
             <div className="h-full p-4 md:p-6">
               <div className="h-full max-w-4xl mx-auto">
