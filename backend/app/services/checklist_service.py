@@ -17,6 +17,10 @@ from pathlib import Path
 import json
 import logging
 
+from app.database.repositories.checklist_template_repository import (
+    get_checklist_template_repository,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -33,9 +37,20 @@ class ChecklistService:
     """
 
     def __init__(self):
-        """Initialize ChecklistService with template path."""
+        """Initialize ChecklistService with template path and lazy Supabase repo."""
         self._templates_cache: Optional[Dict[str, Any]] = None
         self._templates_path = Path(__file__).parent.parent / "data" / "inspection_checklist_templates.json"
+        self._repo = None  # Lazy-init Supabase repository
+
+    @property
+    def repo(self):
+        """Lazy-init Supabase repository. Returns None if unavailable."""
+        if self._repo is None:
+            try:
+                self._repo = get_checklist_template_repository()
+            except Exception:
+                self._repo = None
+        return self._repo
 
     def _load_templates(self) -> Dict[str, Any]:
         """
@@ -60,12 +75,24 @@ class ChecklistService:
         """
         Get checklist template by ID.
 
+        Tries Supabase first, falls back to JSON file.
+
         Args:
-            template_id: Unique template identifier (e.g., 'chiller_weekly')
+            template_id: Unique template identifier (UUID or JSON key like 'chiller_weekly')
 
         Returns:
             Template dict or None if not found.
         """
+        # Try Supabase first
+        if self.repo:
+            try:
+                result = self.repo.get_template(template_id)
+                if result:
+                    return result
+            except Exception as e:
+                logger.warning(f"Supabase template lookup failed: {e}")
+
+        # Fall back to JSON
         templates = self._load_templates()
         return templates.get(template_id)
 
@@ -73,12 +100,24 @@ class ChecklistService:
         """
         Get all templates for an equipment type.
 
+        Tries Supabase first, falls back to JSON file.
+
         Args:
             equipment_type: Equipment type (e.g., 'chiller', 'ahu', 'generator')
 
         Returns:
             List of matching template dicts.
         """
+        # Try Supabase first
+        if self.repo:
+            try:
+                results = self.repo.get_templates_for_equipment_type(equipment_type)
+                if results:
+                    return results
+            except Exception as e:
+                logger.warning(f"Supabase equipment type lookup failed: {e}")
+
+        # Fall back to JSON
         templates = self._load_templates()
         return [
             t for t in templates.values()
@@ -93,6 +132,8 @@ class ChecklistService:
         """
         Get best matching template for equipment and inspection type.
 
+        Tries Supabase first with exact match, falls back to JSON best-match.
+
         Args:
             equipment_type: Equipment type (e.g., 'chiller', 'ahu')
             inspection_type: Inspection type (e.g., 'routine', 'preventive')
@@ -100,7 +141,24 @@ class ChecklistService:
         Returns:
             Matching template dict or None if no match.
         """
-        templates = self.get_templates_by_equipment_type(equipment_type)
+        # Try Supabase first for exact match
+        if self.repo:
+            try:
+                results = self.repo.get_templates_for_equipment_type(equipment_type)
+                if results:
+                    matching = [
+                        t for t in results
+                        if t.get("inspection_type") == inspection_type
+                    ]
+                    if matching:
+                        return matching[0]
+                    # Return first Supabase result as fallback
+                    return results[0]
+            except Exception as e:
+                logger.warning(f"Supabase inspection template lookup failed: {e}")
+
+        # Fall back to JSON-based lookup
+        templates = self._get_json_templates_by_equipment_type(equipment_type)
 
         if not templates:
             logger.warning(f"No templates found for equipment_type={equipment_type}")
@@ -119,25 +177,91 @@ class ChecklistService:
         )
         return templates[0]
 
+    def _get_json_templates_by_equipment_type(self, equipment_type: str) -> List[Dict[str, Any]]:
+        """Get templates from JSON file only (no Supabase).
+
+        Used as internal fallback when Supabase is unavailable.
+        """
+        templates = self._load_templates()
+        return [
+            t for t in templates.values()
+            if t.get("equipment_type") == equipment_type
+        ]
+
+    def get_oem_template(
+        self,
+        equipment_type: str,
+        manufacturer: str,
+        model: str = None
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Get OEM-specific template by manufacturer.
+
+        Only available via Supabase (OEM templates are AI-generated
+        and stored in the database, not in JSON files).
+
+        Args:
+            equipment_type: Equipment type (e.g., 'chiller').
+            manufacturer: Manufacturer name (e.g., 'Carrier').
+            model: Optional model for more specific matching.
+
+        Returns:
+            OEM-specific template dict or None if not found.
+        """
+        if self.repo:
+            try:
+                return self.repo.get_oem_template(equipment_type, manufacturer, model)
+            except Exception as e:
+                logger.warning(f"Supabase OEM template lookup failed: {e}")
+        return None  # No OEM fallback in JSON
+
     def list_all_templates(self) -> List[Dict[str, Any]]:
         """
         List all available templates with summary info.
 
+        Merges Supabase templates with JSON templates, deduplicating by name.
+
         Returns:
             List of template summaries with id, name, equipment_type, item_count.
         """
+        results = []
+        seen_names = set()
+
+        # Try Supabase first
+        if self.repo:
+            try:
+                supabase_templates = self.repo.list_all_templates()
+                for t in supabase_templates:
+                    name = t.get("template_name", "")
+                    seen_names.add(name.lower())
+                    results.append({
+                        "template_id": t.get("id"),
+                        "template_name": name,
+                        "equipment_type": t.get("equipment_type"),
+                        "inspection_type": t.get("inspection_type"),
+                        "estimated_duration_minutes": t.get("estimated_duration_minutes"),
+                        "item_count": len(t.get("checklist_items", [])),
+                        "source": "supabase",
+                    })
+            except Exception as e:
+                logger.warning(f"Supabase template listing failed: {e}")
+
+        # Add JSON templates not already in Supabase
         templates = self._load_templates()
-        return [
-            {
-                "template_id": t.get("template_id"),
-                "template_name": t.get("template_name"),
-                "equipment_type": t.get("equipment_type"),
-                "inspection_type": t.get("inspection_type"),
-                "estimated_duration_minutes": t.get("estimated_duration_minutes"),
-                "item_count": len(t.get("checklist_items", []))
-            }
-            for t in templates.values()
-        ]
+        for t in templates.values():
+            name = t.get("template_name", "")
+            if name.lower() not in seen_names:
+                results.append({
+                    "template_id": t.get("template_id"),
+                    "template_name": name,
+                    "equipment_type": t.get("equipment_type"),
+                    "inspection_type": t.get("inspection_type"),
+                    "estimated_duration_minutes": t.get("estimated_duration_minutes"),
+                    "item_count": len(t.get("checklist_items", [])),
+                    "source": "json",
+                })
+
+        return results
 
     def calculate_completion_status(
         self,
