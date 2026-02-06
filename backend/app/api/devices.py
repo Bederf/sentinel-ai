@@ -11,9 +11,13 @@ from pathlib import Path
 from typing import List, Optional, Any, Union
 
 from fastapi import APIRouter, HTTPException, Query, Body, Request
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from app.models.device import Device, DeviceValue
 from app.services.device_abstraction import device_manager
+
+limiter = Limiter(key_func=get_remote_address)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -311,6 +315,7 @@ async def read_device_point(
 
 
 @router.post("/devices/{device_id}/control", response_model=dict)
+@limiter.limit("10/minute")
 async def control_device(
     request: Request,
     device_id: str,

@@ -53,3 +53,6 @@ BAC0>=24.3.25
 
 # MFA/TOTP (Phase 58.1 FSR Compliance - Domain 4.6)
 pyotp>=2.9.0
+
+# Rate Limiting (Phase 58.3 Security Hardening)
+slowapi>=0.1.9

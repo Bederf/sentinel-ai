@@ -14,6 +14,8 @@ from typing import Optional
 
 import jwt as pyjwt
 from fastapi import APIRouter, HTTPException, Request
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from app.config.settings import settings
 from app.models.auth import (
@@ -23,6 +25,8 @@ from app.models.auth import (
     SentinelRole,
 )
 from app.services.mfa_service import get_mfa_service
+
+limiter = Limiter(key_func=get_remote_address)
 
 logger = logging.getLogger(__name__)
 
@@ -115,6 +119,7 @@ def _extract_ip_address(request: Request) -> str:
 
 
 @router.post("/login")
+@limiter.limit("5/minute")
 async def login_with_email(request: Request, email: str):
     """Login with email address (simple authentication).
 
@@ -271,6 +276,7 @@ async def login_with_email(request: Request, email: str):
 
 
 @router.post("/login/mfa-complete")
+@limiter.limit("5/minute")
 async def complete_mfa_login(request: Request, email: str, mfa_code: str):
     """Complete login after MFA verification.
 

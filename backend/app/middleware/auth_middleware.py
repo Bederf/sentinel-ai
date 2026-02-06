@@ -351,7 +351,30 @@ def require_auth(level: AuthLevel = AuthLevel.AUTHENTICATED):
     async def _dependency(request: Request) -> AuthContext:
         # DEMO_MODE bypass: allow all requests but log them
         if settings.demo_mode:
+            # Block DEMO_MODE bypass in production environment
+            if settings.environment == "production":
+                logger.error(
+                    "DEMO_MODE bypass attempted in production environment - "
+                    f"path={request.url.path}"
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="Service misconfigured",
+                )
+
             source_ip = _extract_ip_address(request)
+
+            # Restrict demo mode to localhost only (C-4)
+            _LOCALHOST_IPS = {"127.0.0.1", "::1", "localhost", "testclient", "unknown"}
+            if source_ip not in _LOCALHOST_IPS:
+                logger.warning(
+                    f"DEMO_MODE access denied from non-local IP: "
+                    f"ip={source_ip} path={request.url.path}"
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Demo mode is only available from localhost",
+                )
 
             # Still try to authenticate if credentials are provided
             auth_ctx = await _authenticate_request(request)
@@ -450,7 +473,30 @@ def require_role(*roles: SentinelRole):
     async def _dependency(request: Request) -> AuthContext:
         # DEMO_MODE bypass
         if settings.demo_mode:
+            if settings.environment == "production":
+                logger.error(
+                    "DEMO_MODE role bypass attempted in production - "
+                    f"path={request.url.path}"
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="Service misconfigured",
+                )
+
             source_ip = _extract_ip_address(request)
+
+            # Restrict demo mode to localhost only (C-4)
+            _LOCALHOST_IPS = {"127.0.0.1", "::1", "localhost", "testclient", "unknown"}
+            if source_ip not in _LOCALHOST_IPS:
+                logger.warning(
+                    f"DEMO_MODE role access denied from non-local IP: "
+                    f"ip={source_ip} path={request.url.path}"
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Demo mode is only available from localhost",
+                )
+
             auth_ctx = await _authenticate_request(request)
             if auth_ctx:
                 request.state.auth = auth_ctx

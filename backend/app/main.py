@@ -376,11 +376,13 @@ async def startup_event():
 
     # Start model freshness check (runs daily)
     # Phase 45-01: Checks model age and R² score, auto-retrains stale models
-    scheduler_service.add_model_check_job(interval_seconds=86400)  # 24 hours
+    if hasattr(scheduler_service, "add_model_check_job"):
+        scheduler_service.add_model_check_job(interval_seconds=86400)  # 24 hours
 
     # Start performance monitor (runs hourly)
     # Phase 45-01: Evaluates prediction accuracy against actual alerts
-    scheduler_service.add_performance_monitor_job(interval_seconds=3600)  # 1 hour
+    if hasattr(scheduler_service, "add_performance_monitor_job"):
+        scheduler_service.add_performance_monitor_job(interval_seconds=3600)  # 1 hour
 
     # BMS simulation service - DISABLED for demo stability
     # try:
@@ -400,7 +402,21 @@ async def startup_event():
 
     # SIMBIOT Concept Evolution connector
     # Auto-initializes when SIMBIOT_API_URL and SIMBIOT_API_KEY env vars are set
-    await simbiot_service.initialise_from_settings()
+    if hasattr(simbiot_service, 'initialise_from_settings'):
+        await simbiot_service.initialise_from_settings()
+    elif settings.simbiot_api_url and settings.simbiot_api_key:
+        try:
+            from simbiot_concept import ConceptConfig
+            config = ConceptConfig(
+                api_url=settings.simbiot_api_url,
+                api_key=settings.simbiot_api_key,
+                username=settings.simbiot_username,
+                password=settings.simbiot_password,
+            )
+            await simbiot_service.initialise(config)
+            print(f"[SIMBIOT] Connected to {settings.simbiot_api_url}")
+        except Exception as e:
+            print(f"[SIMBIOT] Failed to initialize: {e}")
 
 
 @app.on_event("shutdown")

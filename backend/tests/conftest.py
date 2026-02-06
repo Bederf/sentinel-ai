@@ -2,6 +2,11 @@
 Pytest configuration and fixtures for BMS Intelligence backend tests.
 """
 
+import os
+# Enable demo mode before importing the app so the global auth middleware
+# allows requests without a real JWT token (localhost bypass).
+os.environ.setdefault("DEMO_MODE", "true")
+
 import pytest
 import json
 import asyncio

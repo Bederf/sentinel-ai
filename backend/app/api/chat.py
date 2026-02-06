@@ -4,9 +4,11 @@ import logging
 import os
 from typing import AsyncGenerator
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request as FastAPIRequest
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from app.services.claude_service import claude_service
 from app.services.demo_cache import DemoCache
@@ -15,6 +17,8 @@ from app.services.doc_rag_service import search_documentation, get_doc_rag_syste
 from app.services.feature_request_logger import log_chat_query
 from app.services.prompt_injection_guard import check_query_safety
 from app.config.settings import settings
+
+limiter = Limiter(key_func=get_remote_address)
 
 logger = logging.getLogger(__name__)
 
@@ -181,7 +185,8 @@ async def generate_docs_sse_stream(user_message: str, site_id: str | None = None
 
 
 @router.post("/chat")
-async def chat(request: ChatRequest) -> StreamingResponse:
+@limiter.limit("20/minute")
+async def chat(request: FastAPIRequest, chat_request: ChatRequest) -> StreamingResponse:
     """
     Chat with Claude AI using Server-Sent Events streaming.
 
@@ -201,10 +206,10 @@ async def chat(request: ChatRequest) -> StreamingResponse:
     Returns:
         StreamingResponse with SSE content type
     """
-    if not request.message.strip():
+    if not chat_request.message.strip():
         raise HTTPException(status_code=400, detail="Message cannot be empty")
 
-    user_message = request.message.strip()
+    user_message = chat_request.message.strip()
 
     # Security: Check for prompt injection attempts
     is_safe, rejection_reason, injections = check_query_safety(user_message)
@@ -220,21 +225,21 @@ async def chat(request: ChatRequest) -> StreamingResponse:
             }
         )
 
-    logger.info(f"Chat request: conversation_id={request.conversation_id}, search_docs={request.search_docs}, site_id={request.site_id}, message={user_message[:50]}...")
+    logger.info(f"Chat request: conversation_id={chat_request.conversation_id}, search_docs={chat_request.search_docs}, site_id={chat_request.site_id}, message={user_message[:50]}...")
 
     # 1. Documentation search mode takes priority - this is Q&A, not device control
     #    No work order detection or demo cache in docs mode
-    if request.search_docs:
+    if chat_request.search_docs:
         if not claude_service.is_configured():
             raise HTTPException(
                 status_code=503,
                 detail="Claude AI is not configured. Set ANTHROPIC_API_KEY in environment.",
             )
-        logger.info(f"Documentation search mode enabled, site_id={request.site_id}")
+        logger.info(f"Documentation search mode enabled, site_id={chat_request.site_id}")
         # Log query for feature request tracking
         log_chat_query(user_message)
         return StreamingResponse(
-            generate_docs_sse_stream(user_message, request.site_id),
+            generate_docs_sse_stream(user_message, chat_request.site_id),
             media_type="text/event-stream",
             headers={
                 "Cache-Control": "no-cache",
@@ -305,7 +310,7 @@ async def chat(request: ChatRequest) -> StreamingResponse:
         )
 
     return StreamingResponse(
-        generate_sse_stream(user_message, use_tools=True, site_id=request.site_id),
+        generate_sse_stream(user_message, use_tools=True, site_id=chat_request.site_id),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
