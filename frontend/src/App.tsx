@@ -10,7 +10,7 @@ import { ControlDashboard } from "./components/ControlDashboard";
 import { ControlAuditTrail } from "./components/ControlAuditTrail";
 import { OptimizationPage } from "./pages/OptimizationPage";
 import { Settings } from "./components/Settings";
-import { Sidebar, type View } from "./components/Sidebar";
+import { Sidebar } from "./components/Sidebar";
 import { SplashScreen } from "./components/SplashScreen";
 import { EmailEntry } from "./components/EmailEntry";
 import { AlertFeed } from "./components/AlertFeed";
@@ -23,10 +23,50 @@ import { SimbiotPage } from "./components/SimbiotPage";
 import { SimulationDashboard } from "./components/SimulationDashboard";
 import { FleetInsights } from "./components/FleetInsights";
 import { MLMetrics } from "./components/MLMetrics";
+import { SustainabilityDashboard } from "./components/sustainability";
+import { SolarDashboard } from "./components/solar/SolarDashboard";
+import { ContractManagementPage } from "./pages/ContractManagementPage";
+import { ModuleProvider, useModules } from "./contexts/ModuleContext";
+import { type View, VIEW_TITLES, isModuleGatedView, getRequiredModule } from "./lib/navigation";
 
 interface HealthStatus {
   status: string;
   version: string;
+}
+
+/**
+ * Guard component that checks module access for gated views.
+ * Must be rendered inside ModuleProvider.
+ */
+function ViewGuard({
+  currentView,
+  userRole,
+  onRedirect,
+  children,
+}: {
+  currentView: View;
+  userRole?: string;
+  onRedirect: (view: View) => void;
+  children: React.ReactNode;
+}) {
+  const { isModuleActive } = useModules();
+
+  useEffect(() => {
+    if (isModuleGatedView(currentView)) {
+      const requiredModule = getRequiredModule(currentView);
+      if (requiredModule && !isModuleActive(requiredModule)) {
+        toast.info(`The "${VIEW_TITLES[currentView]}" module is not active for this site.`);
+        onRedirect("dashboard");
+      }
+    }
+    // Check internal views (simulation requires admin)
+    if (currentView === "simulation" && userRole !== "admin") {
+      toast.info("Simulation is only available to administrators.");
+      onRedirect("dashboard");
+    }
+  }, [currentView, isModuleActive, userRole, onRedirect]);
+
+  return <>{children}</>;
 }
 
 function App() {
@@ -217,9 +257,7 @@ function App() {
 
   // Show splash screen on initial load
   if (showSplash) {
-    console.log('Showing splash screen');
     return <SplashScreen onComplete={() => {
-      console.log('Splash complete, setting showSplash to false');
       setShowSplash(false);
     }} />;
   }
@@ -234,6 +272,7 @@ function App() {
   }
 
   return (
+    <ModuleProvider initialSiteId="sandton" initialSiteName="Sandton Data Centre">
     <div
       className="h-screen flex"
       style={{ background: "var(--color-sentinel-bg-canvas)" }}
@@ -244,6 +283,7 @@ function App() {
         onViewChange={handleViewChange}
         version={health?.version || "13.0"}
         onCustomizeDashboard={() => setShowCardLibrary(true)}
+        userRole={currentUser?.role}
       />
 
       {/* Main Content Area */}
@@ -277,20 +317,7 @@ function App() {
                 className="text-base font-medium"
                 style={{ color: "var(--color-sentinel-text-primary)" }}
               >
-                {currentView === "dashboard" ? "Dashboard" :
-                 currentView === "control" ? "Control Dashboard" :
-                 currentView === "control-audit" ? "Control Audit Trail" :
-                 currentView === "optimization" ? "Load Shedding Optimization" :
-                 currentView === "settings" ? "Settings" :
-                 currentView === "technician" ? "Technician Chat" :
-                 currentView === "integrations" ? "Integration Monitoring" :
-                 currentView === "occupancy" ? "DALI Occupancy" :
-                 currentView === "security" ? "Security" :
-                 currentView === "simbiot" ? "SIMBIOT" :
-                 currentView === "simulation" ? "Simulation" :
-                 currentView === "fleet" ? "Fleet ML Insights" :
-                 currentView === "mlops" ? "ML Metrics" :
-                 "AI Assistant"}
+                {VIEW_TITLES[currentView] || "AI Assistant"}
               </h1>
             </div>
             <span
@@ -543,6 +570,7 @@ function App() {
           className="flex-1 overflow-hidden"
           style={{ background: "var(--color-sentinel-bg-canvas)" }}
         >
+          <ViewGuard currentView={currentView} userRole={currentUser?.role} onRedirect={handleViewChange}>
           {currentView === "dashboard" ? (
             <Dashboard
               key={viewRefreshKey}
@@ -587,10 +615,16 @@ function App() {
             <div className="h-full overflow-y-auto">
               <SimulationDashboard />
             </div>
+          ) : currentView === "sustainability" ? (
+            <SustainabilityDashboard />
           ) : currentView === "fleet" ? (
             <FleetInsights />
           ) : currentView === "mlops" ? (
             <MLMetrics />
+          ) : currentView === "solar" ? (
+            <SolarDashboard />
+          ) : currentView === "contracts" ? (
+            <ContractManagementPage />
           ) : (
             <div className="h-full p-4 md:p-6">
               <div className="h-full max-w-4xl mx-auto">
@@ -598,6 +632,7 @@ function App() {
               </div>
             </div>
           )}
+          </ViewGuard>
         </main>
       </div>
 
@@ -614,6 +649,7 @@ function App() {
         theme="dark"
       />
     </div>
+    </ModuleProvider>
   );
 }
 
