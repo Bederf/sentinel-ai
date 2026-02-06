@@ -1405,6 +1405,307 @@ async def create_work_order_tool(
 
 
 # ============================================================================
+# Contract Management Tools (Phase 48-02)
+# ============================================================================
+
+
+async def get_contracts_tool(
+    building_id: Optional[str] = None,
+    organization_code: Optional[str] = None,
+    status: Optional[str] = None,
+    include_sla: bool = False
+) -> Dict[str, Any]:
+    """
+    Get contracts with optional filters.
+
+    MCP Tool: get_contracts
+
+    Args:
+        building_id: Filter by building/site ID
+        organization_code: Filter by organization code (e.g., ORG-FNB)
+        status: Filter by status - active, expired, draft
+        include_sla: Include SLA terms in response (default false)
+
+    Returns:
+        Dictionary with contracts list and total count
+    """
+    buildings_path = Path(__file__).parent.parent / "data" / "buildings"
+    contracts = []
+
+    # Scan all building directories for contract.json files
+    if buildings_path.exists():
+        for building_dir in sorted(buildings_path.iterdir()):
+            if not building_dir.is_dir() or building_dir.name.startswith("_"):
+                continue
+
+            # Filter by building_id if specified
+            if building_id and building_dir.name != building_id:
+                continue
+
+            contract_file = building_dir / "contract.json"
+            if not contract_file.exists():
+                continue
+
+            try:
+                with open(contract_file, "r") as f:
+                    contract_data = json.load(f)
+            except Exception as e:
+                logger.warning(f"Failed to load contract for {building_dir.name}: {e}")
+                continue
+
+            # Filter by organization_code
+            if organization_code:
+                org = contract_data.get("organization", {})
+                if org.get("code") != organization_code:
+                    continue
+
+            # Filter by status
+            contract_info = contract_data.get("contract", {})
+            if status and contract_info.get("status") != status:
+                continue
+
+            # Build summary
+            summary = {
+                "building_id": building_dir.name,
+                "contract_code": contract_data.get("contract_code"),
+                "organization": contract_data.get("organization", {}).get("name"),
+                "organization_code": contract_data.get("organization", {}).get("code"),
+                "type": contract_info.get("type"),
+                "status": contract_info.get("status"),
+                "start_date": contract_info.get("start_date"),
+                "end_date": contract_info.get("end_date"),
+                "monthly_fee_zar": contract_info.get("monthly_fee_zar"),
+                "auto_renew": contract_info.get("auto_renew"),
+            }
+
+            if include_sla:
+                summary["sla_terms"] = contract_data.get("sla_terms", [])
+
+            contracts.append(summary)
+
+    return {
+        "contracts": contracts,
+        "total": len(contracts)
+    }
+
+
+async def add_building_contract_tool(
+    building_code: str,
+    organization_name: str,
+    organization_code: str,
+    contract_type: str,
+    monthly_fee_zar: float,
+    start_date: str,
+    end_date: str,
+    sla_terms: Optional[List[Dict[str, Any]]] = None,
+    budget: Optional[Dict[str, Any]] = None,
+    condition_assessment: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """
+    Create a detailed contract for a building.
+
+    MCP Tool: add_building_contract
+
+    Writes contract.json to the building directory and updates building.json
+    with basic contract fields (dual-write pattern).
+
+    Args:
+        building_code: Building/site ID (e.g., site-002)
+        organization_name: Client organization name
+        organization_code: Organization code (e.g., ORG-FNB)
+        contract_type: Contract type (full_maintenance, preventive_only, ad_hoc, consulting)
+        monthly_fee_zar: Monthly fee in ZAR
+        start_date: Contract start date (YYYY-MM-DD)
+        end_date: Contract end date (YYYY-MM-DD)
+        sla_terms: Optional SLA terms array
+        budget: Optional budget breakdown object
+        condition_assessment: Optional condition assessment object
+
+    Returns:
+        Success status with contract code
+    """
+    buildings_path = Path(__file__).parent.parent / "data" / "buildings"
+    building_path = buildings_path / building_code
+
+    if not building_path.exists():
+        return {
+            "success": False,
+            "error": f"Building '{building_code}' not found"
+        }
+
+    # Generate contract code
+    year = start_date[:4] if start_date else str(datetime.now().year)
+    org_short = organization_code.replace("ORG-", "") if organization_code.startswith("ORG-") else organization_code
+    contract_code = f"CON-{org_short}-{building_code.upper()}-{year}"
+
+    # Build contract data
+    contract_data = {
+        "contract_code": contract_code,
+        "organization": {
+            "code": organization_code,
+            "name": organization_name,
+            "tier": "enterprise",
+            "primary_contact_name": "",
+            "primary_contact_email": "",
+            "primary_contact_phone": ""
+        },
+        "contract": {
+            "type": contract_type,
+            "status": "active",
+            "start_date": start_date,
+            "end_date": end_date,
+            "auto_renew": False,
+            "monthly_fee_zar": monthly_fee_zar,
+            "pricing_basis": "fixed_monthly",
+            "payment_terms": "30 days net",
+            "billing_cycle_days": 30
+        },
+        "sla_terms": sla_terms or [],
+        "budget": budget or {},
+        "condition_assessment": condition_assessment or {},
+        "profitability_snapshot": {
+            "ytd_revenue_zar": monthly_fee_zar,
+            "ytd_direct_costs_zar": 0,
+            "ytd_overhead_zar": 0,
+            "ytd_penalties_zar": 0,
+            "gross_margin_percent": 0,
+            "net_margin_percent": 0
+        }
+    }
+
+    # Write contract.json
+    contract_file = building_path / "contract.json"
+    with open(contract_file, "w") as f:
+        json.dump(contract_data, f, indent=2)
+
+    # Update building.json with basic contract fields
+    building_file = building_path / "building.json"
+    if building_file.exists():
+        try:
+            with open(building_file, "r") as f:
+                building_data = json.load(f)
+
+            building_data["client_name"] = organization_name
+            building_data["organization_code"] = organization_code
+            building_data["monthly_fee_zar"] = monthly_fee_zar
+            building_data["contract_start"] = start_date
+            building_data["contract_end"] = end_date
+            building_data["contract_type"] = contract_type
+
+            with open(building_file, "w") as f:
+                json.dump(building_data, f, indent=2)
+        except Exception as e:
+            logger.warning(f"Failed to update building.json for {building_code}: {e}")
+
+    logger.info(f"Created contract {contract_code} for building {building_code}")
+
+    return {
+        "success": True,
+        "contract_code": contract_code,
+        "building_code": building_code,
+        "message": f"Contract created for building {building_code}"
+    }
+
+
+async def get_contract_profitability_tool(
+    building_code: Optional[str] = None,
+    year: Optional[int] = None,
+    month: Optional[int] = None
+) -> Dict[str, Any]:
+    """
+    Get contract profitability snapshot.
+
+    MCP Tool: get_contract_profitability
+
+    Args:
+        building_code: Filter by building (all buildings if not specified)
+        year: Filter by year (default: current year)
+        month: Filter by month (optional)
+
+    Returns:
+        Profitability data with portfolio summary
+    """
+    buildings_path = Path(__file__).parent.parent / "data" / "buildings"
+    profitability = []
+    total_revenue = 0
+    total_costs = 0
+    at_risk = 0
+
+    target_year = year or datetime.now().year
+
+    if buildings_path.exists():
+        for building_dir in sorted(buildings_path.iterdir()):
+            if not building_dir.is_dir() or building_dir.name.startswith("_"):
+                continue
+
+            if building_code and building_dir.name != building_code:
+                continue
+
+            contract_file = building_dir / "contract.json"
+            if not contract_file.exists():
+                continue
+
+            try:
+                with open(contract_file, "r") as f:
+                    contract_data = json.load(f)
+            except Exception as e:
+                logger.warning(f"Failed to load contract for {building_dir.name}: {e}")
+                continue
+
+            snapshot = contract_data.get("profitability_snapshot", {})
+            contract_info = contract_data.get("contract", {})
+            org = contract_data.get("organization", {})
+
+            revenue = snapshot.get("ytd_revenue_zar", 0)
+            direct_costs = snapshot.get("ytd_direct_costs_zar", 0)
+            overhead = snapshot.get("ytd_overhead_zar", 0)
+            penalties = snapshot.get("ytd_penalties_zar", 0)
+
+            gross_margin = snapshot.get("gross_margin_percent", 0)
+            net_margin = snapshot.get("net_margin_percent", 0)
+
+            # Flag at-risk if net margin below 10%
+            is_at_risk = net_margin < 10.0
+
+            entry = {
+                "building_id": building_dir.name,
+                "organization": org.get("name"),
+                "contract_code": contract_data.get("contract_code"),
+                "contract_type": contract_info.get("type"),
+                "monthly_fee_zar": contract_info.get("monthly_fee_zar", 0),
+                "ytd_revenue_zar": revenue,
+                "ytd_direct_costs_zar": direct_costs,
+                "ytd_overhead_zar": overhead,
+                "ytd_penalties_zar": penalties,
+                "gross_margin_percent": gross_margin,
+                "net_margin_percent": net_margin,
+                "at_risk": is_at_risk,
+                "year": target_year
+            }
+
+            profitability.append(entry)
+            total_revenue += revenue
+            total_costs += direct_costs + overhead + penalties
+            if is_at_risk:
+                at_risk += 1
+
+    portfolio_margin = round(
+        ((total_revenue - total_costs) / total_revenue * 100) if total_revenue > 0 else 0, 1
+    )
+
+    return {
+        "profitability": profitability,
+        "portfolio_summary": {
+            "total_revenue_zar": total_revenue,
+            "total_costs_zar": total_costs,
+            "portfolio_margin_percent": portfolio_margin,
+            "total_contracts": len(profitability),
+            "at_risk_contracts": at_risk
+        }
+    }
+
+
+# ============================================================================
 # Building Management Tools (for onboarding)
 # ============================================================================
 
@@ -1438,10 +1739,16 @@ async def create_building_tool(
     address: str = "",
     floors: List[str] = None,
     features: Dict[str, bool] = None,
+    client_name: Optional[str] = None,
+    monthly_fee_zar: Optional[float] = None,
+    contract_start: Optional[str] = None,
+    contract_end: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Create a new building configuration.
 
     Writes to both Supabase (primary) and JSON files (backup).
+    When contract fields (client_name, monthly_fee_zar, contract_start, contract_end)
+    are provided, a basic contract.json is also created.
     """
     import json
     import uuid
@@ -1474,6 +1781,16 @@ async def create_building_tool(
         },
         "metadata": {}
     }
+
+    # Add contract fields to building data if provided
+    if client_name:
+        building_data["client_name"] = client_name
+    if monthly_fee_zar is not None:
+        building_data["monthly_fee_zar"] = monthly_fee_zar
+    if contract_start:
+        building_data["contract_start"] = contract_start
+    if contract_end:
+        building_data["contract_end"] = contract_end
 
     supabase_written = False
 
@@ -1519,9 +1836,50 @@ async def create_building_tool(
     with open(building_path / "zones.json", "w") as f:
         json.dump([], f, indent=2)
 
+    # 3. Auto-create contract.json if contract fields provided
+    contract_created = False
+    if client_name and monthly_fee_zar and contract_start and contract_end:
+        year = contract_start[:4]
+        contract_data = {
+            "contract_code": f"CON-{building_id.upper()}-{year}",
+            "organization": {
+                "code": "",
+                "name": client_name,
+                "tier": "standard",
+                "primary_contact_name": "",
+                "primary_contact_email": "",
+                "primary_contact_phone": ""
+            },
+            "contract": {
+                "type": "full_maintenance",
+                "status": "active",
+                "start_date": contract_start,
+                "end_date": contract_end,
+                "auto_renew": False,
+                "monthly_fee_zar": monthly_fee_zar,
+                "pricing_basis": "fixed_monthly",
+                "payment_terms": "30 days net",
+                "billing_cycle_days": 30
+            },
+            "sla_terms": [],
+            "budget": {},
+            "condition_assessment": {},
+            "profitability_snapshot": {
+                "ytd_revenue_zar": monthly_fee_zar,
+                "ytd_direct_costs_zar": 0,
+                "ytd_overhead_zar": 0,
+                "ytd_penalties_zar": 0,
+                "gross_margin_percent": 0,
+                "net_margin_percent": 0
+            }
+        }
+        with open(building_path / "contract.json", "w") as f:
+            json.dump(contract_data, f, indent=2)
+        contract_created = True
+
     logger.info(f"Created building via MCP: {building_id}")
 
-    return {
+    result = {
         "success": True,
         "building_id": building_id,
         "name": name,
@@ -1534,6 +1892,11 @@ async def create_building_tool(
             f"Call activate_building with building_id='{building_id}'"
         ]
     }
+    if contract_created:
+        result["contract_created"] = True
+        result["message"] = f"Building '{name}' created with contract. Add desks/zones, then activate."
+
+    return result
 
 
 async def activate_building_tool(
@@ -3219,6 +3582,22 @@ MCP_TOOLS = [
                 "features": {
                     "type": "object",
                     "description": "Features to enable: {hvac: true, dali: false, desk_diagnosis: true}"
+                },
+                "client_name": {
+                    "type": "string",
+                    "description": "Optional client/organization name for auto-creating a basic contract"
+                },
+                "monthly_fee_zar": {
+                    "type": "number",
+                    "description": "Optional monthly fee in ZAR (requires client_name, contract_start, contract_end)"
+                },
+                "contract_start": {
+                    "type": "string",
+                    "description": "Optional contract start date YYYY-MM-DD (requires client_name, monthly_fee_zar, contract_end)"
+                },
+                "contract_end": {
+                    "type": "string",
+                    "description": "Optional contract end date YYYY-MM-DD (requires client_name, monthly_fee_zar, contract_start)"
                 }
             },
             "required": ["building_id", "name"]
@@ -3596,6 +3975,109 @@ MCP_TOOLS = [
             },
             "required": []
         }
+    },
+    # Contract Management tools (Phase 48-02)
+    {
+        "name": "get_contracts",
+        "description": "Get contracts for managed buildings. Returns contract details including organization, type, fees, and dates. Optionally includes SLA terms. Use this when someone asks about contracts, SLAs, client agreements, or 'what is our SLA for building X'.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "building_id": {
+                    "type": "string",
+                    "description": "Filter by building/site ID (e.g., site-002)"
+                },
+                "organization_code": {
+                    "type": "string",
+                    "description": "Filter by organization code (e.g., ORG-FNB)"
+                },
+                "status": {
+                    "type": "string",
+                    "enum": ["active", "expired", "draft"],
+                    "description": "Filter by contract status"
+                },
+                "include_sla": {
+                    "type": "boolean",
+                    "description": "Include SLA terms in response (default: false)",
+                    "default": False
+                }
+            },
+            "required": []
+        }
+    },
+    {
+        "name": "add_building_contract",
+        "description": "Create a detailed contract for a building. Writes contract data and updates building configuration with contract fields. Use this during building onboarding to set up commercial agreements.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "building_code": {
+                    "type": "string",
+                    "description": "Building/site ID (e.g., site-002)"
+                },
+                "organization_name": {
+                    "type": "string",
+                    "description": "Client organization name (e.g., FNB Commercial Property)"
+                },
+                "organization_code": {
+                    "type": "string",
+                    "description": "Organization code (e.g., ORG-FNB)"
+                },
+                "contract_type": {
+                    "type": "string",
+                    "enum": ["full_maintenance", "preventive_only", "ad_hoc", "consulting"],
+                    "description": "Type of maintenance contract"
+                },
+                "monthly_fee_zar": {
+                    "type": "number",
+                    "description": "Monthly contract fee in ZAR"
+                },
+                "start_date": {
+                    "type": "string",
+                    "description": "Contract start date (YYYY-MM-DD)"
+                },
+                "end_date": {
+                    "type": "string",
+                    "description": "Contract end date (YYYY-MM-DD)"
+                },
+                "sla_terms": {
+                    "type": "array",
+                    "description": "Optional SLA terms array with metric_type, target_value, penalty details",
+                    "items": {"type": "object"}
+                },
+                "budget": {
+                    "type": "object",
+                    "description": "Optional budget breakdown (monthly_total_zar, breakdown, equipment_type_budgets)"
+                },
+                "condition_assessment": {
+                    "type": "object",
+                    "description": "Optional condition assessment (overall_score, mechanical/electrical/structural scores)"
+                }
+            },
+            "required": ["building_code", "organization_name", "organization_code", "contract_type", "monthly_fee_zar", "start_date", "end_date"]
+        }
+    },
+    {
+        "name": "get_contract_profitability",
+        "description": "Get contract profitability snapshot for one or all buildings. Returns revenue, costs, margins, and at-risk flags. Use this when someone asks about contract profitability, margins, financial performance, or 'how profitable is building X'.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "building_code": {
+                    "type": "string",
+                    "description": "Filter by building/site ID (all buildings if not specified)"
+                },
+                "year": {
+                    "type": "integer",
+                    "description": "Filter by year (default: current year)"
+                },
+                "month": {
+                    "type": "integer",
+                    "description": "Filter by month (optional)"
+                }
+            },
+            "required": []
+        }
     }
 ]
 
@@ -3658,6 +4140,10 @@ class SIMBIOTMCPServer:
             "get_solar_savings": get_solar_savings_tool,
             "get_solar_forecast": get_solar_forecast_tool,
             "get_solar_diagnostics": get_solar_diagnostics_tool,
+            # Contract Management tools (Phase 48-02)
+            "get_contracts": get_contracts_tool,
+            "add_building_contract": add_building_contract_tool,
+            "get_contract_profitability": get_contract_profitability_tool,
         }
         logger.info("SIMBIOTMCPServer initialized with %d tools", len(self.tools))
 
