@@ -41,6 +41,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - [ML Retraining API](03-api-reference/ml-retraining-api.md) - Model retraining, performance monitoring, A/B testing (Phase 45-01)
 - [Fleet Learning API](03-api-reference/fleet-learning-api.md) - Cross-site patterns, global models, fine-tuning (Phase 45-02)
 - [MLOps API](03-api-reference/mlops-api.md) - Drift detection, ML alerts, retraining triggers, success metrics (Phase 45-03)
+- [Solar & BESS API](03-api-reference/solar-api.md) - Solar PV, BESS dispatch, grid compliance, financial reporting, maintenance (Phase 34)
 
 ### ✨ Features
 
@@ -77,6 +78,9 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - **[24-Hour Lifecycle Simulation](04-features/lifecycle-simulation.md)** - Full building day simulation for testing AI optimization, faults, alerts, repairs
 - **[Simulation Analytics Pipeline](04-features/simulation-analytics-pipeline.md)** - JSONL event logging and optimization profile analysis (asset sweating, comfort first, cost saving)
 - **[Demo Simulation Control](04-features/demo-simulation-control.md)** - Simple trigger/reset endpoints for demos
+
+#### Solar & Energy Storage
+- **[Solar & BESS Optimisation Module](04-features/34-solar-bess-module.md)** - Data ingestion, performance monitoring, NRS 097 compliance, arbitrage, demand management, forecasting, health analytics, maintenance, financial reporting (Phase 34)
 
 #### Sustainability & ESG
 - **[Sustainability & ESG Module](04-features/29-sentinel-sustainability.md)** - Carbon emissions (Scope 1/2/3), energy efficiency benchmarks, Green Star SA self-assessment (Phase 29)
