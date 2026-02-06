@@ -10,6 +10,7 @@ Provides real-time and historical data for solar installations:
   - Performance monitoring: PR, inverter peer comparison, string anomalies
   - Diagnostics: prioritised issues with cost impact and recommended actions
   - Grid compliance: NRS 097-2-1 monitoring, SSEG reporting, certificates
+  - Energy arbitrage: TOU tariff optimisation, BESS dispatch scheduling, savings
 """
 
 from typing import Optional
@@ -19,6 +20,8 @@ from fastapi import APIRouter, HTTPException, Query
 from app.services.solar_ingestion_service import get_solar_ingestion_service
 from app.services.solar_performance_service import get_solar_performance_service
 from app.services.solar_compliance_service import get_solar_compliance_service
+from app.services.solar_arbitrage_engine import get_solar_arbitrage_engine
+from app.services.solar_dispatch_service import get_solar_dispatch_service
 
 router = APIRouter()
 
@@ -361,4 +364,98 @@ async def get_compliance_events(
         "site_id": site_id,
         "event_count": len(events),
         "events": [e.to_dict() for e in events],
+    }
+
+
+# === Energy arbitrage & dispatch endpoints (34-05) ===
+
+
+@router.get("/solar/sites/{site_id}/dispatch/schedule")
+async def get_dispatch_schedule(site_id: str):
+    """Get today's 24-hour BESS dispatch schedule optimised for TOU arbitrage.
+
+    Returns time slots with charge/discharge/idle/solar_priority actions,
+    target SOC, tariff band, rate, and projected daily savings in ZAR.
+    Load shedding adjustments are included when announced.
+    """
+    engine = get_solar_arbitrage_engine()
+    schedule = engine.generate_dispatch_schedule(site_id)
+    return schedule.to_dict()
+
+
+@router.get("/solar/sites/{site_id}/dispatch/status")
+async def get_dispatch_status(site_id: str):
+    """Get current dispatch state: mode, action, BESS SOC, savings so far.
+
+    Returns the autonomous dispatch service status including current action,
+    BESS state of charge, tariff band, next scheduled action change,
+    cumulative savings for today, and dispatch cycle count.
+    """
+    svc = get_solar_dispatch_service()
+    status = svc.get_dispatch_status(site_id)
+    if not status:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No dispatch service running for site '{site_id}'",
+        )
+    return status.to_dict()
+
+
+@router.get("/solar/sites/{site_id}/dispatch/log")
+async def get_dispatch_log(
+    site_id: str,
+    hours: int = Query(24, ge=1, le=168, description="Hours of history (1-168)"),
+):
+    """Get dispatch event history for a site.
+
+    Returns timestamped dispatch events showing BESS actions, SOC changes,
+    tariff bands, grid flows, and solar generation. Events are sorted
+    most recent first. Default 24 hours, max 7 days.
+    """
+    svc = get_solar_dispatch_service()
+    events = svc.get_dispatch_log(site_id, hours=hours)
+    return {
+        "site_id": site_id,
+        "hours": hours,
+        "event_count": len(events),
+        "events": [e.to_dict() for e in events],
+    }
+
+
+@router.get("/solar/sites/{site_id}/arbitrage/savings")
+async def get_arbitrage_savings(
+    site_id: str,
+    period: str = Query("day", description="Period: day, week, or month"),
+):
+    """Get energy arbitrage savings calculation.
+
+    Compares actual cost with BESS (TOU optimisation) vs hypothetical cost
+    without BESS (all energy at prevailing tariff). Returns savings in ZAR,
+    percentage, and breakdown of peak kWh avoided and off-peak kWh charged.
+    """
+    engine = get_solar_arbitrage_engine()
+    if period not in ("day", "week", "month"):
+        raise HTTPException(
+            status_code=400,
+            detail="Period must be 'day', 'week', or 'month'",
+        )
+    savings = engine.calculate_daily_savings(site_id, period=period)
+    return savings.to_dict()
+
+
+@router.get("/solar/sites/{site_id}/tariff/current")
+async def get_current_tariff(site_id: str):
+    """Get the current City Power TOU tariff band and rate.
+
+    Returns the active tariff band (peak/standard/off_peak), energy charge,
+    network charge, total rate in ZAR/kWh, season (summer/winter),
+    and the current period time window.
+    """
+    engine = get_solar_arbitrage_engine()
+    band = engine.get_current_tariff_band()
+    return {
+        "site_id": site_id,
+        "tariff": band.to_dict(),
+        "utility": "City Power Johannesburg",
+        "tariff_name": "TOU Commercial - Large Power User",
     }
