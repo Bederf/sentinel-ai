@@ -11,6 +11,8 @@ Provides real-time and historical data for solar installations:
   - Diagnostics: prioritised issues with cost impact and recommended actions
   - Grid compliance: NRS 097-2-1 monitoring, SSEG reporting, certificates
   - Energy arbitrage: TOU tariff optimisation, BESS dispatch scheduling, savings
+  - Demand management: peak shaving, NMD tracking, load deferral
+  - Self-consumption: ratio tracking, energy balance, export management
 """
 
 from typing import Optional
@@ -22,6 +24,8 @@ from app.services.solar_performance_service import get_solar_performance_service
 from app.services.solar_compliance_service import get_solar_compliance_service
 from app.services.solar_arbitrage_engine import get_solar_arbitrage_engine
 from app.services.solar_dispatch_service import get_solar_dispatch_service
+from app.services.solar_demand_service import get_solar_demand_service
+from app.services.solar_selfconsumption_service import get_solar_selfconsumption_service
 
 router = APIRouter()
 
@@ -459,3 +463,110 @@ async def get_current_tariff(site_id: str):
         "utility": "City Power Johannesburg",
         "tariff_name": "TOU Commercial - Large Power User",
     }
+
+
+# === Demand management endpoints (34-06) ===
+
+
+@router.get("/solar/sites/{site_id}/demand/status")
+async def get_demand_status(site_id: str):
+    """Get current demand status with NMD headroom and peak shaving state.
+
+    Returns current building demand, monthly peak, NMD limit, headroom,
+    demand trend, alert level, and whether BESS peak shaving is active.
+    """
+    svc = get_solar_demand_service()
+    status = svc.get_current_demand(site_id)
+    return status.to_dict()
+
+
+@router.get("/solar/sites/{site_id}/demand/profile")
+async def get_demand_profile(
+    site_id: str,
+    period: str = Query("day", description="Period: day or week"),
+):
+    """Get 15-minute demand profile with BESS peak shaving overlay.
+
+    Returns demand intervals showing building load, solar offset, BESS
+    offset, and net demand. Includes peak demand time, average demand,
+    and peak reduction from BESS shaving.
+    """
+    svc = get_solar_demand_service()
+    profile = svc.get_demand_profile(site_id, period=period)
+    return profile.to_dict()
+
+
+@router.get("/solar/sites/{site_id}/demand/nmd")
+async def get_nmd_status(site_id: str):
+    """Get NMD compliance status with ratchet history and alert level.
+
+    Returns NMD limit, current utilisation, alert level (normal/warning/critical),
+    ratchet risk flag, 12-month peak history, and estimated annual penalty.
+    City Power demand charge: R155.50/kVA/month.
+    """
+    svc = get_solar_demand_service()
+    nmd = svc.check_nmd_status(site_id)
+    return nmd.to_dict()
+
+
+@router.get("/solar/sites/{site_id}/demand/savings")
+async def get_demand_savings(
+    site_id: str,
+    period: str = Query("month", description="Period: month"),
+):
+    """Get demand charge savings from BESS peak shaving.
+
+    Compares unmanaged peak (without BESS) vs managed peak (with BESS
+    shaving). Calculates savings at City Power demand charge rate of
+    R155.50/kVA/month. Shows peak reduction in kW and savings in ZAR.
+    """
+    svc = get_solar_demand_service()
+    savings = svc.calculate_demand_savings(site_id, period=period)
+    return savings.to_dict()
+
+
+# === Self-consumption endpoints (34-06) ===
+
+
+@router.get("/solar/sites/{site_id}/selfconsumption")
+async def get_selfconsumption(
+    site_id: str,
+    period: str = Query("day", description="Period: day, week, or month"),
+):
+    """Get self-consumption and self-sufficiency ratios for a period.
+
+    Self-consumption ratio: % of solar generation used on-site (target >95%).
+    Self-sufficiency ratio: % of building consumption met by solar + BESS.
+    Returns full breakdown of solar flows (self-consumed, to BESS, exported)
+    and grid/BESS contribution.
+    """
+    svc = get_solar_selfconsumption_service()
+    if period not in ("day", "week", "month"):
+        raise HTTPException(
+            status_code=400,
+            detail="Period must be 'day', 'week', or 'month'",
+        )
+    metrics = svc.get_selfconsumption_ratio(site_id, period=period)
+    return metrics.to_dict()
+
+
+@router.get("/solar/sites/{site_id}/energy-balance")
+async def get_energy_balance(
+    site_id: str,
+    period: str = Query("day", description="Period: day, week, or month"),
+):
+    """Get complete energy balance breakdown for a period.
+
+    Shows all energy flows: solar generated, solar self-consumed, solar to
+    BESS, solar exported, grid imported, BESS discharged, building consumed.
+    Includes 15-minute interval detail for daily view and balance sanity check
+    (supply = demand).
+    """
+    svc = get_solar_selfconsumption_service()
+    if period not in ("day", "week", "month"):
+        raise HTTPException(
+            status_code=400,
+            detail="Period must be 'day', 'week', or 'month'",
+        )
+    balance = svc.get_energy_balance(site_id, period=period)
+    return balance.to_dict()
