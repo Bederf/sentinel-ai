@@ -1,0 +1,207 @@
+/**
+ * Solar PV & BESS API Client
+ *
+ * Fetches solar installation data from backend:
+ *  - Site overview (generation, BESS, grid flow)
+ *  - Inverter fleet status
+ *  - BESS container status
+ *  - Performance metrics (PR, trends)
+ *  - Diagnostics (issues, cost impact)
+ *  - Grid compliance (NRS 097-2-1)
+ */
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || "";
+
+function authHeaders(): Record<string, string> {
+  const token = localStorage.getItem("sentinel_token");
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
+async function fetchJson<T>(endpoint: string): Promise<T> {
+  const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    let msg = res.statusText;
+    try {
+      const err = await res.json();
+      msg = err.detail || err.message || JSON.stringify(err);
+    } catch {
+      /* ignore */
+    }
+    throw new Error(msg);
+  }
+  return res.json();
+}
+
+// ============= Response Interfaces =============
+
+/** Site overview returned by GET /api/solar/sites/{siteId}/overview */
+export interface SolarOverview {
+  site_id: string;
+  site_name: string;
+  installed_capacity_kwp: number;
+  current_generation_kw: number;
+  daily_yield_kwh: number;
+  expected_daily_yield_kwh: number;
+  performance_ratio: number;
+  bess_soc_percent: number;
+  bess_mode: string;
+  grid_import_kw: number;
+  grid_export_kw: number;
+  self_consumption_percent: number;
+  estimated_savings_today_zar: number;
+  plants: SolarPlant[];
+}
+
+export interface SolarPlant {
+  plant_id: string;
+  plant_name: string;
+  capacity_kwp: number;
+  current_generation_kw: number;
+  inverter_count: number;
+  status: "normal" | "warning" | "fault";
+}
+
+/** Single inverter returned inside inverter list */
+export interface SolarInverter {
+  inverter_id: string;
+  name: string;
+  manufacturer: string;
+  model: string;
+  plant_id: string;
+  plant_name: string;
+  rated_power_kw: number;
+  current_power_kw: number;
+  daily_yield_kwh: number;
+  efficiency_percent: number;
+  temperature_c: number;
+  status: "normal" | "warning" | "fault" | "offline";
+  mppt_count: number;
+  string_count: number;
+}
+
+/** Inverter list response */
+export interface InverterListResponse {
+  site_id: string;
+  inverter_count: number;
+  inverters: SolarInverter[];
+}
+
+/** BESS container status */
+export interface BESSStatus {
+  bess_id: string;
+  name: string;
+  manufacturer: string;
+  model: string;
+  total_capacity_kwh: number;
+  usable_capacity_kwh: number;
+  soc_percent: number;
+  soh_percent: number;
+  mode: "charging" | "discharging" | "idle" | "standby" | "fault";
+  charge_power_kw: number;
+  discharge_power_kw: number;
+  current_power_kw: number;
+  temperature_c: number;
+  cycle_count: number;
+  estimated_runtime_min: number;
+  rack_count: number;
+  alarms: string[];
+  status: "normal" | "warning" | "fault";
+}
+
+/** Performance metrics from GET /api/solar/sites/{siteId}/performance */
+export interface PerformanceMetrics {
+  site_id: string;
+  period: string;
+  performance_ratio: number;
+  pr_rating: "excellent" | "good" | "acceptable" | "poor";
+  target_pr: number;
+  trend_direction: "up" | "down" | "stable";
+  total_generation_kwh: number;
+  expected_generation_kwh: number;
+  irradiance_kwh_m2: number;
+}
+
+/** Diagnostic issue */
+export interface DiagnosticIssue {
+  issue_id: string;
+  severity: "critical" | "high" | "medium" | "low";
+  category: string;
+  equipment_id: string;
+  equipment_name: string;
+  description: string;
+  probable_cause: string;
+  recommended_action: string;
+  confidence: number;
+  estimated_cost_impact_zar: number;
+}
+
+/** Diagnostic report */
+export interface DiagnosticReport {
+  site_id: string;
+  timestamp: string;
+  overall_health: "healthy" | "attention" | "critical";
+  issue_count: number;
+  issues: DiagnosticIssue[];
+  total_cost_impact_zar: number;
+}
+
+/** Compliance status */
+export interface ComplianceStatus {
+  site_id: string;
+  overall_status: "compliant" | "warning" | "violation";
+  voltage: { status: string; details: string };
+  frequency: { status: string; details: string };
+  power_quality: { status: string; details: string };
+  export_limit: { status: string; details: string };
+  certificates: { status: string; details: string };
+  last_checked: string;
+}
+
+// ============= API Functions =============
+
+/**
+ * Fetch site overview with generation, BESS SOC, grid flow.
+ */
+export async function fetchSolarOverview(siteId: string): Promise<SolarOverview> {
+  return fetchJson<SolarOverview>(`/api/solar/sites/${siteId}/overview`);
+}
+
+/**
+ * Fetch all inverters for a site with current readings.
+ */
+export async function fetchInverters(siteId: string): Promise<InverterListResponse> {
+  return fetchJson<InverterListResponse>(`/api/solar/sites/${siteId}/inverters`);
+}
+
+/**
+ * Fetch BESS container status: SOC, mode, power, health.
+ */
+export async function fetchBESSStatus(siteId: string): Promise<BESSStatus> {
+  return fetchJson<BESSStatus>(`/api/solar/sites/${siteId}/bess`);
+}
+
+/**
+ * Fetch performance metrics (PR, trends).
+ */
+export async function fetchPerformance(siteId: string): Promise<PerformanceMetrics> {
+  return fetchJson<PerformanceMetrics>(`/api/solar/sites/${siteId}/performance`);
+}
+
+/**
+ * Fetch prioritised diagnostic issues with cost impact.
+ */
+export async function fetchDiagnostics(siteId: string): Promise<DiagnosticReport> {
+  return fetchJson<DiagnosticReport>(`/api/solar/sites/${siteId}/diagnostics`);
+}
+
+/**
+ * Fetch NRS 097-2-1 compliance status.
+ */
+export async function fetchCompliance(siteId: string): Promise<ComplianceStatus> {
+  return fetchJson<ComplianceStatus>(`/api/solar/sites/${siteId}/compliance`);
+}
