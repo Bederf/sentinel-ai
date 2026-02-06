@@ -23,6 +23,7 @@ class ModuleType(str, Enum):
     LIGHTING = "lighting"
     FIRE = "fire"
     ACCESS = "access"
+    SOLAR = "solar"
 
 
 class ModuleStatus(str, Enum):
@@ -202,6 +203,22 @@ MODULE_DEFINITIONS: Dict[ModuleType, ModuleDefinition] = {
         telemetry_points=["luminaire_level", "scene_active", "lux_level", "emergency_status", "power_consumption"],
         ai_features=["occupancy_based_control", "energy_optimization", "circadian_lighting", "fault_detection"]
     ),
+    ModuleType.SOLAR: ModuleDefinition(
+        module_type=ModuleType.SOLAR,
+        name="Solar & BESS",
+        version="1.0.0",
+        description="Solar PV generation, battery storage, and grid-tied optimisation",
+        capabilities=[
+            ModuleCapability("pv_monitoring", "PV Monitoring", "Inverter fleet and string-level monitoring"),
+            ModuleCapability("bess_management", "BESS Management", "Battery SOC, dispatch, and health tracking"),
+            ModuleCapability("energy_arbitrage", "Energy Arbitrage", "TOU tariff-based charge/discharge optimisation"),
+            ModuleCapability("grid_compliance", "Grid Compliance", "NRS 097-2-1 compliance monitoring"),
+            ModuleCapability("performance_analytics", "Performance Analytics", "PR calculation and inverter peer comparison"),
+        ],
+        integrates_with=[ModuleType.ENERGY, ModuleType.HVAC],
+        telemetry_points=["pv_power_kw", "bess_soc", "bess_mode", "grid_import_kw", "grid_export_kw", "inverter_status", "pr_ratio"],
+        ai_features=["generation_forecast", "arbitrage_optimisation", "fault_detection", "self_consumption_maximisation"]
+    ),
 }
 
 
@@ -246,5 +263,21 @@ INTEGRATION_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "target": ModuleType.HVAC,
         "trigger": "peak_demand_warning",
         "action": "pre_cool_then_reduce",
+    },
+    "energy_solar_generation": {
+        "name": "Solar Generation Contribution",
+        "description": "Include solar generation in total energy accounting",
+        "source": ModuleType.SOLAR,
+        "target": ModuleType.ENERGY,
+        "trigger": "solar_generation_update",
+        "action": "update_generation_contribution",
+    },
+    "solar_generator_coordination": {
+        "name": "Solar-Generator Coordination",
+        "description": "Avoid generator start when solar + BESS can serve load",
+        "source": ModuleType.SOLAR,
+        "target": ModuleType.ENERGY,
+        "trigger": "generator_start_request",
+        "action": "check_solar_bess_capacity",
     },
 }

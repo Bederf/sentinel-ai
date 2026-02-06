@@ -13,7 +13,8 @@ import {
   DollarSign,
   Shield,
   BarChart3,
-  Activity
+  Activity,
+  Sun,
 } from 'lucide-react';
 
 // Card definition with metadata
@@ -101,6 +102,14 @@ export const SECTION_CARDS: CardDefinition[] = [
     name: 'Risk Intelligence',
     description: 'AI predictions and ROI analysis',
     icon: <Shield className="w-4 h-4" />,
+    category: 'section',
+    defaultVisible: true
+  },
+  {
+    id: 'solar-bess',
+    name: 'Solar & BESS',
+    description: 'Solar generation, battery storage, inverter fleet, and energy flow',
+    icon: <Sun className="w-4 h-4" />,
     category: 'section',
     defaultVisible: true
   }

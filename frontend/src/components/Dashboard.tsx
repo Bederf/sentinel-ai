@@ -21,6 +21,7 @@ import {
   DollarSign,
   RefreshCw,
   LayoutGrid,
+  Sun,
 } from "lucide-react";
 import {
   DndContext,
@@ -52,6 +53,10 @@ import { RiskDetailModal } from "./RiskDetailModal";
 import { ROISummaryCard } from "./ROISummaryCard";
 import { OccupancyPanel } from "./OccupancyPanel";
 import ComfortComplaintPanel from "./ComfortComplaintPanel";
+import { SolarOverviewPanel } from "./solar/SolarOverviewPanel";
+import { BESSStatusPanel } from "./solar/BESSStatusPanel";
+import { InverterStatusMatrix } from "./solar/InverterStatusMatrix";
+import { EnergyFlowDiagram } from "./solar/EnergyFlowDiagram";
 import { type View } from "./Sidebar";
 import CardLibrary from "./CardLibrary";
 import { DEFAULT_KPI_CARDS, DEFAULT_SECTIONS } from "../lib/cardDefinitions";
@@ -67,7 +72,8 @@ type DashboardSectionId =
   | 'energy-analytics'
   | 'risk-predictions'
   | 'comfort-assistant'
-  | 'occupancy-dashboard';
+  | 'occupancy-dashboard'
+  | 'solar-bess';
 
 type KPICardId =
   | 'kpi-protected-sites'
@@ -111,6 +117,7 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
   const [sectionOrder, setSectionOrder] = useState<DashboardSectionId[]>([
     'kpi-row',
     'site-protection',
+    'solar-bess',
     'energy-analytics',
     'risk-predictions',
     'comfort-assistant',
@@ -994,10 +1001,63 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
     </DashboardSection>
   );
 
+  // Render Solar & BESS section (conditionally shown when solar module active)
+  const renderSolarBess = () => {
+    // Check if any site has the solar module active
+    // For now, always show for the demo site (sandton)
+    const solarSiteId = "fairlands-solar-001";
+
+    return (
+      <DashboardSection id="solar-bess">
+        <div className="mt-6 space-y-4">
+          {/* Section Header */}
+          <div className="flex items-center gap-3 mb-2">
+            <div
+              className="p-2 rounded"
+              style={{ background: "rgba(250, 204, 21, 0.15)" }}
+            >
+              <Sun
+                className="h-5 w-5"
+                style={{ color: "#FACC15" }}
+              />
+            </div>
+            <div>
+              <h3
+                className="font-medium text-sm"
+                style={{ color: "var(--color-sentinel-text-primary)" }}
+              >
+                Solar & BESS
+              </h3>
+              <span
+                className="text-xs"
+                style={{ color: "var(--color-sentinel-text-secondary)" }}
+              >
+                FNB Fairlands Campus &mdash; 3.875 MWp PV | 5,015 kWh BESS
+              </span>
+            </div>
+          </div>
+
+          {/* Top: Solar Overview */}
+          <SolarOverviewPanel siteId={solarSiteId} />
+
+          {/* Middle: Energy Flow Diagram */}
+          <EnergyFlowDiagram siteId={solarSiteId} />
+
+          {/* Bottom: BESS + Inverter Matrix side by side */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <BESSStatusPanel siteId={solarSiteId} />
+            <InverterStatusMatrix siteId={solarSiteId} />
+          </div>
+        </div>
+      </DashboardSection>
+    );
+  };
+
   // Section renderer map
   const sectionRenderers: Record<DashboardSectionId, () => JSX.Element | null> = {
     'kpi-row': renderKPIRow,
     'site-protection': renderSiteProtection,
+    'solar-bess': renderSolarBess,
     'energy-analytics': renderEnergyAnalytics,
     'risk-predictions': renderRiskPredictions,
     'comfort-assistant': renderComfortAssistant,

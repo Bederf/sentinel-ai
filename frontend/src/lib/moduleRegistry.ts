@@ -10,7 +10,7 @@ const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:9095';
 
 // ==================== Types ====================
 
-export type ModuleType = 'hvac' | 'energy' | 'security' | 'lighting' | 'fire' | 'access';
+export type ModuleType = 'hvac' | 'energy' | 'security' | 'lighting' | 'fire' | 'access' | 'solar';
 export type ModuleStatus = 'active' | 'inactive' | 'error' | 'maintenance';
 export type RecommendationType = 'optimization' | 'maintenance' | 'alert' | 'cross_system' | 'predictive';
 export type RecommendationPriority = 'low' | 'medium' | 'high' | 'critical';
@@ -302,6 +302,7 @@ export const MODULE_ICONS: Record<ModuleType, string> = {
   lighting: 'sun',
   fire: 'flame',
   access: 'key',
+  solar: 'sun',
 };
 
 export const MODULE_COLORS: Record<ModuleType, string> = {
@@ -311,6 +312,7 @@ export const MODULE_COLORS: Record<ModuleType, string> = {
   lighting: 'yellow',
   fire: 'red',
   access: 'green',
+  solar: 'yellow',
 };
 
 export const PRIORITY_COLORS: Record<RecommendationPriority, string> = {
