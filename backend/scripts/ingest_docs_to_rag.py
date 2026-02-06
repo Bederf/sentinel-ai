@@ -54,6 +54,9 @@ PRIORITY_DOCS = [
     'docs/08-security/information-security-risk-register.md',
     'docs/08-security/third-party-security-register.md',
     '.planning/phases/64-risk-governance-foundation/FSR-GAP-ANALYSIS.md',
+    # Contract management
+    'docs/04-features/48-contract-management.md',
+    'docs/03-api-reference/contracts-api.md',
 ]
 
 
@@ -129,6 +132,22 @@ def get_doc_category(filepath: Path) -> str:
         return 'general'
 
 
+# Map category to valid document_type (matches 028_expand_document_types.sql constraint)
+CATEGORY_TO_DOC_TYPE = {
+    'api': 'api_reference',
+    'integrations': 'integration_guide',
+    'safety': 'safety_procedure',
+    'security': 'system_documentation',
+    'architecture': 'system_documentation',
+    'features': 'system_documentation',
+    'testing': 'system_documentation',
+    'regional': 'system_documentation',
+    'system': 'system_documentation',
+    'overview': 'system_documentation',
+    'general': 'system_documentation',
+}
+
+
 async def main():
     """Main ingestion function."""
     print("Documentation RAG Ingestion Script")
@@ -180,14 +199,17 @@ async def main():
                 print(f"   Skipping (exists): {relative_path}")
                 continue
 
+            # Map category to valid document_type
+            doc_type = CATEGORY_TO_DOC_TYPE.get(category, 'system_documentation')
+
             # Add document
             doc_result = vector_db.add_document(
                 code=code,
                 title=title,
-                document_type='documentation',
+                document_type=doc_type,
                 equipment_type='system',  # General system documentation
                 full_text=content,
-                source='project_docs',
+                source='system_docs',
                 summary=f"Documentation: {category} - {title}",
                 keywords=[category, 'sentinel', 'bms', 'documentation']
             )
@@ -235,6 +257,8 @@ async def main():
         "How does incident response work?",
         "What is the FirstRand security gap analysis?",
         "POPIA data privacy policy",
+        "What is our SLA for the Sandton contract?",
+        "How does contract management work?",
     ]
 
     for query in test_queries:
