@@ -1,0 +1,75 @@
+{
+  "utility": "City Power Johannesburg",
+  "tariff_name": "TOU Commercial - Large Power User",
+  "effective_date": "2026-07-01",
+  "currency": "ZAR",
+  "vat_inclusive": false,
+  "sseg_feed_in": {
+    "rate_c_kwh": 78.5,
+    "max_export_kw": 3900,
+    "nrs_097_required": true,
+    "category": "B"
+  },
+  "energy_charge_c_kwh": {
+    "summer": {
+      "peak": 345.67,
+      "standard": 187.23,
+      "off_peak": 112.45
+    },
+    "winter": {
+      "peak": 489.12,
+      "standard": 215.89,
+      "off_peak": 134.67
+    }
+  },
+  "demand_charge_r_kva": {
+    "summer": 189.45,
+    "winter": 267.89
+  },
+  "network_charge_c_kwh": {
+    "summer": {
+      "peak": 45.12,
+      "standard": 28.67,
+      "off_peak": 15.23
+    },
+    "winter": {
+      "peak": 52.34,
+      "standard": 33.12,
+      "off_peak": 18.45
+    }
+  },
+  "time_bands": {
+    "summer": {
+      "months": [9, 10, 11, 12, 1, 2, 3, 4, 5, 6],
+      "peak": [
+        { "start": "07:00", "end": "10:00" },
+        { "start": "18:00", "end": "20:00" }
+      ],
+      "standard": [
+        { "start": "06:00", "end": "07:00" },
+        { "start": "10:00", "end": "18:00" },
+        { "start": "20:00", "end": "22:00" }
+      ],
+      "off_peak": [
+        { "start": "22:00", "end": "06:00" }
+      ]
+    },
+    "winter": {
+      "months": [7, 8],
+      "peak": [
+        { "start": "06:00", "end": "09:00" },
+        { "start": "17:00", "end": "19:00" }
+      ],
+      "standard": [
+        { "start": "09:00", "end": "17:00" },
+        { "start": "19:00", "end": "22:00" }
+      ],
+      "off_peak": [
+        { "start": "22:00", "end": "06:00" }
+      ]
+    }
+  },
+  "service_charge_r_month": 8456.78,
+  "reactive_energy_surcharge_c_kvarh": 23.45,
+  "notes": "Rates are indicative for planning purposes. Actual rates subject to NERSA approval and City Power gazette."
+}

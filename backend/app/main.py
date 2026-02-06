@@ -1,9 +1,17 @@
 """BMS Intelligence Backend - FastAPI Application."""
 
-from fastapi import FastAPI
+import logging
+
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from slowapi import Limiter
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+from slowapi.util import get_remote_address
 
 from app.config.settings import settings
+from app.middleware.auth_middleware import _authenticate_request, _extract_ip_address
 from app.api import health, sites, equipment, sensors, alerts, stats, chat, energy, predictions, optimization, devices, audit, safety, autonomous, simulation
 from app.api import settings as settings_api  # JSON-based (deprecated)
 from app.api import settings_db  # Supabase-based (new)
@@ -67,11 +75,14 @@ from app.api import ml_retraining  # Phase 45-01 Online Learning & Automated Ret
 from app.api import fleet_learning  # Phase 45-02 Fleet Learning & Cross-Site Insights
 from app.api import mlops  # Phase 45-03 MLOps Monitoring & Success Metrics
 from app.api import sustainability  # Phase 29 Sustainability & ESG module
+from app.api import solar  # Phase 34 Solar PV & BESS ingestion
 from app.middleware.audit_middleware import AuditMiddleware
 from app.middleware.security_logging import SecurityLoggingMiddleware
 from app.services.background_scheduler import scheduler_service
 from app.services.health_simulation_service import health_simulation_service  # Supabase health simulation
 from app.services.simbiot_service import simbiot_service  # SIMBIOT Concept Evolution connector
+
+_logger = logging.getLogger("sentinel.security")
 
 app = FastAPI(
     title=settings.app_name,
@@ -79,14 +90,120 @@ app = FastAPI(
     description="Building Management System Intelligence Platform",
 )
 
-# Configure CORS
+# =============================================================================
+# Rate Limiting (Phase 58-03 H-1)
+# =============================================================================
+limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
+app.state.limiter = limiter
+app.add_middleware(SlowAPIMiddleware)
+
+
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
+    """Return 429 with Retry-After header when rate limit exceeded."""
+    return JSONResponse(
+        status_code=429,
+        content={"detail": "Rate limit exceeded. Please try again later."},
+        headers={"Retry-After": str(exc.retry_after)},
+    )
+
+
+# =============================================================================
+# CORS (Phase 58-03 H-2) — restricted to configured origins
+# =============================================================================
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
+
+
+# =============================================================================
+# Security Headers (Phase 58-03 H-6, H-7)
+# =============================================================================
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    """Add standard security headers to every response."""
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    if not settings.debug:
+        response.headers["Strict-Transport-Security"] = (
+            "max-age=31536000; includeSubDomains"
+        )
+    return response
+
+
+# =============================================================================
+# Global Authentication Enforcement (Phase 58-03 C-1)
+# =============================================================================
+# Paths that do not require authentication
+_PUBLIC_PATHS = {
+    "/api/auth/login",
+    "/api/auth/login/mfa-complete",
+    "/api/auth/register",
+    "/api/auth/mfa/verify",
+    "/api/auth/verify",
+    "/docs",
+    "/openapi.json",
+    "/redoc",
+    "/health",
+    "/api/health",
+}
+_PUBLIC_PREFIXES = (
+    "/api/clawd-webhooks",  # Telegram bot callbacks (authenticated via webhook secret)
+    "/api/mcp-sse",  # MCP SSE transport (authenticated at MCP layer)
+)
+_LOCALHOST_IPS = {"127.0.0.1", "::1", "localhost", "testclient"}
+
+
+@app.middleware("http")
+async def enforce_authentication(request: Request, call_next):
+    """Global auth enforcement -- all /api/ routes require auth unless whitelisted."""
+    path = request.url.path
+
+    # Skip non-API routes and public paths
+    if (
+        path in _PUBLIC_PATHS
+        or path.startswith(_PUBLIC_PREFIXES)
+        or not path.startswith("/api/")
+    ):
+        return await call_next(request)
+
+    # In demo mode, allow localhost without credentials
+    if settings.demo_mode:
+        source_ip = _extract_ip_address(request)
+        # Also treat unknown/missing client as local (e.g. test clients)
+        if source_ip in _LOCALHOST_IPS or source_ip == "unknown":
+            # Try real auth first; fall back to demo context
+            auth_ctx = await _authenticate_request(request)
+            request.state.auth = auth_ctx  # may be None (endpoints handle via Depends)
+            return await call_next(request)
+        # Non-localhost in demo mode: require real auth
+        auth_ctx = await _authenticate_request(request)
+        if auth_ctx is None:
+            return JSONResponse(
+                status_code=403,
+                content={"detail": "Demo mode is only available from localhost"},
+            )
+        request.state.auth = auth_ctx
+        return await call_next(request)
+
+    # Production / non-demo: require real authentication
+    auth_ctx = await _authenticate_request(request)
+    if auth_ctx is None:
+        return JSONResponse(
+            status_code=401,
+            content={"detail": "Authentication required"},
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    request.state.auth = auth_ctx
+    return await call_next(request)
+
 
 # Add security logging middleware (Phase 63 - FSR compliance)
 # SecurityLoggingMiddleware runs first (outermost), captures all security events
@@ -174,11 +291,56 @@ app.include_router(ml_retraining.router, tags=["ml-retraining"])  # Phase 45-01 
 app.include_router(fleet_learning.router, tags=["fleet-learning"])  # Phase 45-02 Fleet Learning & Cross-Site Insights
 app.include_router(mlops.router, tags=["mlops"])  # Phase 45-03 MLOps Monitoring & Success Metrics
 app.include_router(sustainability.router, prefix="/api", tags=["sustainability"])  # Phase 29 Sustainability & ESG
+app.include_router(solar.router, prefix="/api", tags=["solar"])  # Phase 34 Solar PV & BESS
 
 
 @app.on_event("startup")
 async def startup_event():
     """Initialize background services on startup."""
+    import logging
+    _logger = logging.getLogger("sentinel.startup")
+
+    # === Security startup checks ===
+
+    # Block DEMO_MODE in production
+    if settings.environment == "production" and settings.demo_mode:
+        raise RuntimeError(
+            "DEMO_MODE cannot be enabled in production environment. "
+            "Set DEMO_MODE=false or ENVIRONMENT=development."
+        )
+
+    # Require JWT secret when not in DEMO_MODE (C-2: Secure JWT signing)
+    if not settings.demo_mode and not settings.jwt_secret_key and not settings.supabase_key:
+        raise RuntimeError(
+            "JWT_SECRET_KEY (or SUPABASE_KEY) must be set when DEMO_MODE is disabled. "
+            "Generate a 256-bit secret: python -c \"import secrets; print(secrets.token_hex(32))\" "
+            "and set JWT_SECRET_KEY in your .env file."
+        )
+
+    # Warn about weak JWT secrets (less than 32 characters)
+    _jwt_key = settings.jwt_secret_key or settings.supabase_key
+    if _jwt_key and len(_jwt_key) < 32 and not settings.demo_mode:
+        _logger.warning(
+            "JWT_SECRET_KEY is shorter than 32 characters — consider using a "
+            "256-bit secret: python -c \"import secrets; print(secrets.token_hex(32))\""
+        )
+
+    # Warn about DEMO_MODE
+    if settings.demo_mode:
+        _logger.warning(
+            "DEMO_MODE is enabled - authentication is bypassed, "
+            "all requests get ADMIN role. Do NOT use in production."
+        )
+
+    # Warn about missing methodology password
+    if not settings.demo_mode and not settings.jwt_secret_key:
+        _logger.warning(
+            "JWT_SECRET_KEY not set - falling back to SUPABASE_KEY for JWT signing. "
+            "Set JWT_SECRET_KEY for a dedicated signing secret."
+        )
+
+    _logger.info(f"Environment: {settings.environment}, Demo mode: {settings.demo_mode}")
+
     # Initialize Redis cache connection
     from app.services.cache_service import cache
     if cache.is_connected:
@@ -237,10 +399,8 @@ async def startup_event():
     #     print(f"Failed to start health simulation service: {e}")
 
     # SIMBIOT Concept Evolution connector
-    # Enable when FSI API credentials are configured
-    # from simbiot_concept import ConceptConfig
-    # config = ConceptConfig(api_base_url="https://developer.fsiservices.com", ...)
-    # await simbiot_service.initialise(config)
+    # Auto-initializes when SIMBIOT_API_URL and SIMBIOT_API_KEY env vars are set
+    await simbiot_service.initialise_from_settings()
 
 
 @app.on_event("shutdown")
