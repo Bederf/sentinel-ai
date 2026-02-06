@@ -9,6 +9,7 @@ Provides real-time and historical data for solar installations:
   - Connector health status
   - Performance monitoring: PR, inverter peer comparison, string anomalies
   - Diagnostics: prioritised issues with cost impact and recommended actions
+  - Grid compliance: NRS 097-2-1 monitoring, SSEG reporting, certificates
 """
 
 from typing import Optional
@@ -17,6 +18,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from app.services.solar_ingestion_service import get_solar_ingestion_service
 from app.services.solar_performance_service import get_solar_performance_service
+from app.services.solar_compliance_service import get_solar_compliance_service
 
 router = APIRouter()
 
@@ -226,3 +228,137 @@ async def get_diagnostics(site_id: str):
             detail=f"Solar site '{site_id}' not found or no data available"
         )
     return report.to_dict()
+
+
+# === Grid compliance endpoints (34-03) ===
+
+
+@router.get("/solar/sites/{site_id}/compliance")
+async def get_compliance_status(site_id: str):
+    """Get overall grid compliance status (traffic-light) with breakdown per standard.
+
+    Returns NRS 097-2-1 compliance summary covering voltage, frequency,
+    power quality, export limits, and certificate validity. Status is
+    compliant (green), warning (yellow), or violation (red).
+    """
+    svc = get_solar_compliance_service()
+    result = await svc.get_overall_compliance(site_id)
+    if not result:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Solar site '{site_id}' not found"
+        )
+    return result
+
+
+@router.get("/solar/sites/{site_id}/compliance/voltage")
+async def get_voltage_compliance(site_id: str):
+    """Get voltage compliance detail with violation history.
+
+    Checks all meter/inverter voltage readings against NRS 097-2-1 limits:
+    normal range 207-253V, disconnect thresholds 195.5V/264.5V.
+    Includes 24-hour violation count and current reading details.
+    """
+    svc = get_solar_compliance_service()
+    result = await svc.check_voltage_compliance(site_id)
+    return result.to_dict()
+
+
+@router.get("/solar/sites/{site_id}/compliance/frequency")
+async def get_frequency_compliance(site_id: str):
+    """Get frequency compliance detail with violation history.
+
+    Checks grid frequency against NRS 097-2-1 limits:
+    normal range 49.0-51.0 Hz, disconnect thresholds 47.5/52.0 Hz.
+    Includes 24-hour violation count and current reading details.
+    """
+    svc = get_solar_compliance_service()
+    result = await svc.check_frequency_compliance(site_id)
+    return result.to_dict()
+
+
+@router.get("/solar/sites/{site_id}/compliance/power-quality")
+async def get_power_quality_compliance(site_id: str):
+    """Get power quality compliance: THD, power factor, DC injection.
+
+    Monitors Total Harmonic Distortion (max 5%), DC injection (max 0.5%),
+    and power factor (min 0.95) per NRS 097-2-1 requirements.
+    """
+    svc = get_solar_compliance_service()
+    result = await svc.check_power_quality(site_id)
+    return result.to_dict()
+
+
+@router.get("/solar/sites/{site_id}/compliance/export")
+async def get_export_compliance(site_id: str):
+    """Get export limit compliance status.
+
+    Verifies grid export against SSEG Category B limits. Checks zero-export
+    enforcement (with tolerance) or export cap if configured. Returns current
+    export power and limit details.
+    """
+    svc = get_solar_compliance_service()
+    result = await svc.check_export_compliance(site_id)
+    return result.to_dict()
+
+
+@router.get("/solar/sites/{site_id}/compliance/certificates")
+async def get_certificate_status(site_id: str):
+    """Get NRS 097 certificate status for all equipment.
+
+    Tracks certificate validity, edition currency (current edition is
+    NRS 097-2-1:2024 Ed.3), and expiry dates. Flags outdated editions
+    and approaching/passed expiry dates.
+    """
+    svc = get_solar_compliance_service()
+    certificates = await svc.check_certificate_validity(site_id)
+    return {
+        "site_id": site_id,
+        "certificate_count": len(certificates),
+        "valid": sum(1 for c in certificates if c.status == "valid"),
+        "warnings": sum(1 for c in certificates if c.status in ("expiry_warning", "edition_outdated")),
+        "expired": sum(1 for c in certificates if c.status == "expired"),
+        "certificates": [c.to_dict() for c in certificates],
+    }
+
+
+@router.get("/solar/sites/{site_id}/compliance/report")
+async def get_compliance_report(
+    site_id: str,
+    period: str = Query("month", description="Reporting period: day, week, or month"),
+):
+    """Generate full compliance report for utility (SSEG) submission.
+
+    Aggregates all compliance checks (voltage, frequency, power quality,
+    export, certificates) and compliance events into a structured report
+    suitable for submission to City Power Johannesburg.
+    """
+    svc = get_solar_compliance_service()
+    report = await svc.generate_compliance_report(site_id, period=period)
+    if not report:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Solar site '{site_id}' not found"
+        )
+    return report.to_dict()
+
+
+@router.get("/solar/sites/{site_id}/compliance/events")
+async def get_compliance_events(
+    site_id: str,
+    from_ts: Optional[str] = Query(None, alias="from", description="Start timestamp (ISO 8601)"),
+    to_ts: Optional[str] = Query(None, alias="to", description="End timestamp (ISO 8601)"),
+):
+    """Get compliance event log filtered by time range.
+
+    Returns historical compliance events including voltage/frequency violations,
+    reconnection events, certificate warnings, and export limit breaches.
+    Events are sorted by timestamp (most recent first).
+    """
+    svc = get_solar_compliance_service()
+    events = await svc.get_compliance_events(site_id, from_ts=from_ts, to_ts=to_ts)
+    return {
+        "site_id": site_id,
+        "event_count": len(events),
+        "events": [e.to_dict() for e in events],
+    }

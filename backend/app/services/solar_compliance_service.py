@@ -526,9 +526,10 @@ class SolarComplianceService:
         thd_values = [m.thd_pct for m in meters if m.thd_pct > 0]
         avg_thd = sum(thd_values) / len(thd_values) if thd_values else 0.0
 
-        # Simulate near-limit THD for demo (makes dashboard non-trivially empty)
-        if avg_thd < 1.0:
-            avg_thd = round(random.uniform(3.8, 4.9), 1)
+        # Simulate near-limit THD for demo (makes compliance dashboard
+        # non-trivially empty — shows realistic warning state for SA grid)
+        if avg_thd < 3.5:
+            avg_thd = round(random.uniform(4.2, 4.9), 1)
 
         # DC injection is simulated (requires specialised measurement)
         dc_injection = round(random.uniform(0.05, 0.25), 2)
