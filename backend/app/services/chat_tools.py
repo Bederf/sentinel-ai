@@ -1933,6 +1933,92 @@ async def get_security_status() -> dict[str, Any]:
 
 
 # Tool definitions for Claude API
+# ============================================================================
+# Solar Chat Tool Handlers (34-09)
+# ============================================================================
+
+
+async def get_solar_overview(site_id: str = "fairlands") -> dict[str, Any]:
+    """Get solar site overview — generation, BESS, grid, savings."""
+    try:
+        from app.services.solar_ingestion_service import get_solar_ingestion_service
+        svc = get_solar_ingestion_service()
+        overview = await svc.get_site_overview(site_id)
+        if not overview:
+            return {"error": f"Solar site '{site_id}' not found"}
+        return {"success": True, **overview}
+    except Exception as e:
+        logger.error(f"get_solar_overview error: {e}")
+        return {"error": str(e)}
+
+
+async def get_bess_status_chat(site_id: str = "fairlands") -> dict[str, Any]:
+    """Get BESS battery status — SOC, mode, health."""
+    try:
+        from app.services.solar_ingestion_service import get_solar_ingestion_service
+        svc = get_solar_ingestion_service()
+        bess = await svc.get_bess_status(site_id)
+        if not bess:
+            return {"error": f"No BESS found at site '{site_id}'"}
+        return {"success": True, **bess.to_dict()}
+    except Exception as e:
+        logger.error(f"get_bess_status error: {e}")
+        return {"error": str(e)}
+
+
+async def get_solar_savings(
+    site_id: str = "fairlands",
+    period: str = "ytd",
+) -> dict[str, Any]:
+    """Get solar savings — monthly/YTD financial summary."""
+    try:
+        from app.services.solar_financial_service import get_solar_financial_service
+        svc = get_solar_financial_service()
+        summary = svc.get_financial_summary(site_id, period=period)
+        return {"success": True, **summary.to_dict()}
+    except Exception as e:
+        logger.error(f"get_solar_savings error: {e}")
+        return {"error": str(e)}
+
+
+async def get_solar_diagnostics(site_id: str = "fairlands") -> dict[str, Any]:
+    """Get solar diagnostics — underperformers, issues, maintenance."""
+    try:
+        from app.services.solar_performance_service import get_solar_performance_service
+        perf = get_solar_performance_service()
+        report = await perf.get_diagnostic_summary(site_id)
+        if not report:
+            return {"error": f"No diagnostics for site '{site_id}'"}
+        result = {"success": True, **report.to_dict()}
+        # Add maintenance recommendations
+        try:
+            from app.services.solar_maintenance_service import get_solar_maintenance_service
+            maint = get_solar_maintenance_service()
+            recs = await maint.evaluate_maintenance_needs(site_id)
+            result["maintenance_recommendations"] = [r.to_dict() for r in recs[:5]]
+        except Exception:
+            pass
+        return result
+    except Exception as e:
+        logger.error(f"get_solar_diagnostics error: {e}")
+        return {"error": str(e)}
+
+
+async def get_solar_forecast(
+    site_id: str = "fairlands",
+    hours: int = 24,
+) -> dict[str, Any]:
+    """Get solar generation forecast — next 24h with confidence."""
+    try:
+        from app.services.solar_forecast_service import get_solar_forecast_service
+        svc = get_solar_forecast_service()
+        forecast = svc.get_forecast(site_id, hours_ahead=hours)
+        return {"success": True, **forecast.to_dict()}
+    except Exception as e:
+        logger.error(f"get_solar_forecast error: {e}")
+        return {"error": str(e)}
+
+
 CHAT_TOOLS = [
     {
         "name": "list_devices",
@@ -2246,6 +2332,92 @@ CHAT_TOOLS = [
             "properties": {},
             "required": []
         }
+    },
+    # Solar chat tools (34-09)
+    {
+        "name": "get_solar_overview",
+        "description": "Get solar site overview including current generation (kW), daily yield (kWh), BESS State of Charge, grid import/export, performance ratio, and estimated savings. Use this when someone asks 'How much solar did we generate today?', about solar output, PV panels, or the solar dashboard.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "site_id": {
+                    "type": "string",
+                    "description": "Solar site ID (default: fairlands)",
+                    "default": "fairlands"
+                }
+            },
+            "required": []
+        }
+    },
+    {
+        "name": "get_bess_status",
+        "description": "Get BESS (Battery) status including State of Charge (SOC%), current mode (charging/discharging/idle), health, power flow, and cycle count. Use this when someone asks 'What is the battery level?', about BESS, battery storage, or energy storage status.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "site_id": {
+                    "type": "string",
+                    "description": "Solar site ID (default: fairlands)",
+                    "default": "fairlands"
+                }
+            },
+            "required": []
+        }
+    },
+    {
+        "name": "get_solar_savings",
+        "description": "Get solar and BESS financial savings summary including arbitrage, demand charge, self-consumption, and diesel avoidance savings. Returns YTD totals, monthly breakdown, and ROI. Use this when someone asks 'How much have we saved this month?', about solar ROI, financial performance, or cost savings.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "site_id": {
+                    "type": "string",
+                    "description": "Solar site ID (default: fairlands)",
+                    "default": "fairlands"
+                },
+                "period": {
+                    "type": "string",
+                    "description": "Period: ytd or month",
+                    "default": "ytd"
+                }
+            },
+            "required": []
+        }
+    },
+    {
+        "name": "get_solar_diagnostics",
+        "description": "Get solar diagnostics including underperforming inverters, string anomalies, maintenance recommendations, and cost impact. Use this when someone asks 'Which inverters are underperforming?', about solar problems, faults, or maintenance needs.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "site_id": {
+                    "type": "string",
+                    "description": "Solar site ID (default: fairlands)",
+                    "default": "fairlands"
+                }
+            },
+            "required": []
+        }
+    },
+    {
+        "name": "get_solar_forecast",
+        "description": "Get solar generation forecast for the next 24-72 hours with confidence bands. Returns hourly predicted output in kW. Use this when someone asks 'What is tomorrow's generation forecast?', about expected solar production, or upcoming generation.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "site_id": {
+                    "type": "string",
+                    "description": "Solar site ID (default: fairlands)",
+                    "default": "fairlands"
+                },
+                "hours": {
+                    "type": "integer",
+                    "description": "Forecast horizon in hours (default: 24)",
+                    "default": 24
+                }
+            },
+            "required": []
+        }
     }
 ]
 
@@ -2269,6 +2441,12 @@ TOOL_HANDLERS = {
     "correct_point_classification": correct_point_classification,
     "get_fire_system_status": get_fire_system_status,
     "get_security_status": get_security_status,
+    # Solar tools (34-09)
+    "get_solar_overview": get_solar_overview,
+    "get_bess_status": get_bess_status_chat,
+    "get_solar_savings": get_solar_savings,
+    "get_solar_diagnostics": get_solar_diagnostics,
+    "get_solar_forecast": get_solar_forecast,
 }
 
 

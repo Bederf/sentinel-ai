@@ -16,6 +16,8 @@ Provides real-time and historical data for solar installations:
   - Generation forecasting: 72-hour ensemble forecast, clear-sky profile, accuracy
   - Generator coordination: priority dispatch, diesel avoidance, LS automation
   - Health analytics: degradation tracking, BESS SoH, warranty evidence (34-08)
+  - Maintenance scheduling: condition-based recommendations, work orders, PPM (34-09)
+  - Financial reporting: monthly savings, YTD summary, carbon offset (34-09)
 """
 
 from typing import Optional
@@ -32,6 +34,8 @@ from app.services.solar_selfconsumption_service import get_solar_selfconsumption
 from app.services.solar_forecast_service import get_solar_forecast_service
 from app.services.solar_generator_coordinator import get_solar_generator_coordinator
 from app.services.solar_health_service import get_solar_health_service
+from app.services.solar_maintenance_service import get_solar_maintenance_service
+from app.services.solar_financial_service import get_solar_financial_service
 
 router = APIRouter()
 
@@ -825,3 +829,115 @@ async def generate_warranty_evidence(site_id: str, equipment_id: str):
             detail=f"Equipment '{equipment_id}' not found at site '{site_id}'",
         )
     return package.to_dict()
+
+
+# === Maintenance scheduling endpoints (34-09) ===
+
+
+@router.get("/solar/sites/{site_id}/maintenance/schedule")
+async def get_maintenance_schedule(site_id: str):
+    """Get 90-day maintenance calendar (PPM + condition-based).
+
+    Returns scheduled preventive maintenance (panel cleaning, inspections,
+    thermal imaging) and condition-based entries from equipment health
+    evaluation. Each entry includes date, type, priority, duration,
+    and estimated cost.
+    """
+    svc = get_solar_maintenance_service()
+    calendar = await svc.get_maintenance_schedule(site_id)
+    return calendar.to_dict()
+
+
+@router.get("/solar/sites/{site_id}/maintenance/recommendations")
+async def get_maintenance_recommendations(site_id: str):
+    """Get current maintenance recommendations from condition evaluation.
+
+    Evaluates: panel soiling, inverter service needs (runtime, faults,
+    thermal events), BESS maintenance (cycle milestones, cell imbalance),
+    and string repairs (persistent underperformance). Returns prioritised
+    recommendations with estimated cost and due date.
+    """
+    svc = get_solar_maintenance_service()
+    recs = await svc.evaluate_maintenance_needs(site_id)
+    return {
+        "site_id": site_id,
+        "recommendation_count": len(recs),
+        "urgent": sum(1 for r in recs if r.priority.value == "urgent"),
+        "soon": sum(1 for r in recs if r.priority.value == "soon"),
+        "routine": sum(1 for r in recs if r.priority.value == "routine"),
+        "recommendations": [r.to_dict() for r in recs],
+    }
+
+
+@router.post("/solar/sites/{site_id}/maintenance/generate-work-orders")
+async def generate_maintenance_work_orders(site_id: str):
+    """Create work orders from urgent/soon maintenance recommendations.
+
+    Converts condition-based recommendations with priority 'urgent' or
+    'soon' into work orders. Auto-assigns to electrical (solar) team
+    following existing work order patterns (Clawd notification ready).
+    """
+    svc = get_solar_maintenance_service()
+    work_orders = await svc.generate_work_orders(site_id)
+    return {
+        "site_id": site_id,
+        "work_orders_created": len(work_orders),
+        "work_orders": [wo.to_dict() for wo in work_orders],
+    }
+
+
+# === Financial reporting endpoints (34-09) ===
+
+
+@router.get("/solar/sites/{site_id}/financial/monthly")
+async def get_monthly_financial_report(
+    site_id: str,
+    month: int = Query(..., ge=1, le=12, description="Month (1-12)"),
+    year: int = Query(..., ge=2024, le=2030, description="Year"),
+):
+    """Get monthly financial report with savings breakdown.
+
+    Returns SENTINEL optimisation value: arbitrage savings (TOU),
+    demand charge savings (peak shaving), self-consumption value
+    (avoided export), diesel avoidance (generator hours saved).
+    Includes counterfactual comparison (cost with vs without SENTINEL).
+    """
+    svc = get_solar_financial_service()
+    report = svc.generate_monthly_report(site_id, month, year)
+    return report.to_dict()
+
+
+@router.get("/solar/sites/{site_id}/financial/summary")
+async def get_financial_summary(
+    site_id: str,
+    period: str = Query("ytd", description="Period: ytd (year-to-date)"),
+):
+    """Get YTD financial summary with ROI calculation.
+
+    Returns cumulative savings, monthly breakdown, average monthly
+    savings, SENTINEL licence fee, ROI percentage, and payback period.
+    """
+    svc = get_solar_financial_service()
+    summary = svc.get_financial_summary(site_id, period=period)
+    return summary.to_dict()
+
+
+@router.get("/solar/sites/{site_id}/financial/carbon")
+async def get_carbon_offset(
+    site_id: str,
+    period: str = Query("month", description="Period: month or ytd"),
+):
+    """Get carbon offset report.
+
+    Calculates CO2 avoided from solar generation (Eskom emission factor
+    0.95 kg/kWh) and diesel avoidance (2.68 kg/L). Returns total CO2
+    in kg and tonnes, with tree-equivalent for context.
+    """
+    svc = get_solar_financial_service()
+    if period not in ("month", "ytd"):
+        raise HTTPException(
+            status_code=400,
+            detail="Period must be 'month' or 'ytd'",
+        )
+    carbon = svc.get_carbon_offset(site_id, period=period)
+    return carbon.to_dict()

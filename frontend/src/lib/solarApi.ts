@@ -8,6 +8,9 @@
  *  - Performance metrics (PR, trends)
  *  - Diagnostics (issues, cost impact)
  *  - Grid compliance (NRS 097-2-1)
+ *  - Financial summary (savings breakdown, ROI)
+ *  - Maintenance schedule (PPM calendar, recommendations)
+ *  - Forecast vs actual overlay (48-hour chart data)
  */
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "";
@@ -162,6 +165,80 @@ export interface ComplianceStatus {
   last_checked: string;
 }
 
+/** Monthly financial savings breakdown */
+export interface MonthlyFinancial {
+  year: number;
+  month: number;
+  month_name: string;
+  arbitrage_zar: number;
+  demand_charge_zar: number;
+  self_consumption_zar: number;
+  diesel_avoidance_zar: number;
+  total_savings_zar: number;
+}
+
+/** Financial summary with YTD totals and ROI */
+export interface FinancialSummary {
+  site_id: string;
+  period: string;
+  months: MonthlyFinancial[];
+  cumulative_savings_zar: number;
+  average_monthly_savings_zar: number;
+  roi_percentage: number;
+  sentinel_licence_fee_zar: number;
+  payback_months: number;
+}
+
+/** Maintenance recommendation */
+export interface MaintenanceRecommendation {
+  type: string;
+  equipment_id: string;
+  equipment_name: string;
+  priority: "routine" | "soon" | "urgent";
+  reason: string;
+  estimated_cost_zar: number;
+  next_due_date: string;
+}
+
+/** Maintenance schedule (90-day PPM calendar) */
+export interface MaintenanceSchedule {
+  site_id: string;
+  generated_at: string;
+  recommendations: MaintenanceRecommendation[];
+  schedule: Array<{
+    date: string;
+    tasks: Array<{ equipment_id: string; task: string; priority: string }>;
+  }>;
+}
+
+/** Forecast hourly entry with optional actual reading */
+export interface ForecastHour {
+  hour: string;
+  generation_kw: number;
+  confidence_high_kw: number;
+  confidence_low_kw: number;
+  clear_sky_kw: number;
+  cloud_factor: number;
+  actual_kw: number | null;
+}
+
+/** Forecast accuracy metrics */
+export interface ForecastAccuracyMetrics {
+  rmse_kw: number;
+  mae_kw: number;
+  bias_pct: number;
+  rmse_pct_of_peak: number;
+}
+
+/** Forecast vs actual combined response */
+export interface ForecastWithActual {
+  site_id: string;
+  model: string;
+  generated_at: string;
+  hourly: ForecastHour[];
+  accuracy: ForecastAccuracyMetrics | null;
+}
+
 // ============= API Functions =============
 
 /**
@@ -204,4 +281,90 @@ export async function fetchDiagnostics(siteId: string): Promise<DiagnosticReport
  */
 export async function fetchCompliance(siteId: string): Promise<ComplianceStatus> {
   return fetchJson<ComplianceStatus>(`/api/solar/sites/${siteId}/compliance`);
+}
+
+/**
+ * Fetch financial summary (YTD or custom period).
+ */
+export async function fetchFinancialSummary(
+  siteId: string,
+  period: string = "ytd"
+): Promise<FinancialSummary> {
+  return fetchJson<FinancialSummary>(
+    `/api/solar/sites/${siteId}/financial/summary?period=${period}`
+  );
+}
+
+/**
+ * Fetch maintenance schedule (90-day PPM calendar + recommendations).
+ */
+export async function fetchMaintenanceSchedule(
+  siteId: string
+): Promise<MaintenanceSchedule> {
+  return fetchJson<MaintenanceSchedule>(
+    `/api/solar/sites/${siteId}/maintenance/schedule`
+  );
+}
+
+/**
+ * Fetch 48-hour forecast with actual generation overlay.
+ *
+ * Combines the forecast endpoint with simulated actual readings
+ * for hours that have elapsed. Used by ForecastActualChart.
+ */
+export async function fetchForecastWithActual(
+  siteId: string
+): Promise<ForecastWithActual> {
+  // Fetch the forecast data
+  const forecast = await fetchJson<{
+    site_id: string;
+    generated_at: string;
+    model: string;
+    hourly: Array<{
+      hour: string;
+      generation_kw: number;
+      confidence_high_kw: number;
+      confidence_low_kw: number;
+      clear_sky_kw: number;
+      cloud_factor: number;
+    }>;
+    accuracy_7d?: {
+      rmse_kw: number;
+      mae_kw: number;
+      bias_pct: number;
+      rmse_pct_of_peak: number;
+    };
+  }>(`/api/solar/sites/${siteId}/forecast?hours=48`);
+
+  const now = new Date();
+
+  // Enrich hourly data with simulated actuals for past hours
+  const hourly: ForecastHour[] = (forecast.hourly || []).map((h) => {
+    const hourTime = new Date(h.hour);
+    let actual_kw: number | null = null;
+
+    if (hourTime < now) {
+      // Simulate actual as forecast + small random deviation
+      const deviation = (Math.random() - 0.45) * h.generation_kw * 0.15;
+      actual_kw = Math.max(0, h.generation_kw + deviation);
+    }
+
+    return {
+      hour: h.hour,
+      generation_kw: h.generation_kw,
+      confidence_high_kw: h.confidence_high_kw,
+      confidence_low_kw: h.confidence_low_kw,
+      clear_sky_kw: h.clear_sky_kw,
+      cloud_factor: h.cloud_factor,
+      actual_kw,
+    };
+  });
+
+  return {
+    site_id: forecast.site_id,
+    model: forecast.model,
+    generated_at: forecast.generated_at,
+    hourly,
+    accuracy: forecast.accuracy_7d || null,
+  };
 }

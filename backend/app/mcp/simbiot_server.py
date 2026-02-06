@@ -2760,6 +2760,118 @@ async def configure_asset_metrics_tool(
 
 
 # ============================================================================
+# Solar MCP Tool Functions (34-09)
+# ============================================================================
+
+
+async def get_solar_overview_tool(site_id: str = "fairlands") -> Dict[str, Any]:
+    """Get solar site overview — generation, BESS SOC, grid status, PR.
+
+    MCP Tool: get_solar_overview
+    """
+    try:
+        from app.services.solar_ingestion_service import get_solar_ingestion_service
+        svc = get_solar_ingestion_service()
+        overview = await svc.get_site_overview(site_id)
+        if not overview:
+            return {"error": f"Solar site '{site_id}' not found"}
+        return overview
+    except Exception as e:
+        logger.error(f"get_solar_overview error: {e}")
+        return {"error": str(e)}
+
+
+async def get_bess_status_tool(site_id: str = "fairlands") -> Dict[str, Any]:
+    """Get BESS status — SOC, mode, health, dispatch schedule.
+
+    MCP Tool: get_bess_status
+    """
+    try:
+        from app.services.solar_ingestion_service import get_solar_ingestion_service
+        svc = get_solar_ingestion_service()
+        bess = await svc.get_bess_status(site_id)
+        if not bess:
+            return {"error": f"No BESS found at site '{site_id}'"}
+        result = bess.to_dict()
+        # Add dispatch info
+        try:
+            from app.services.solar_dispatch_service import get_solar_dispatch_service
+            dispatch = get_solar_dispatch_service()
+            status = dispatch.get_dispatch_status(site_id)
+            if status:
+                result["dispatch"] = status.to_dict()
+        except Exception:
+            pass
+        return result
+    except Exception as e:
+        logger.error(f"get_bess_status error: {e}")
+        return {"error": str(e)}
+
+
+async def get_solar_savings_tool(
+    site_id: str = "fairlands",
+    period: str = "ytd",
+) -> Dict[str, Any]:
+    """Get financial summary — daily/monthly/YTD savings breakdown.
+
+    MCP Tool: get_solar_savings
+    """
+    try:
+        from app.services.solar_financial_service import get_solar_financial_service
+        svc = get_solar_financial_service()
+        summary = svc.get_financial_summary(site_id, period=period)
+        return summary.to_dict()
+    except Exception as e:
+        logger.error(f"get_solar_savings error: {e}")
+        return {"error": str(e)}
+
+
+async def get_solar_forecast_tool(
+    site_id: str = "fairlands",
+    hours: int = 24,
+) -> Dict[str, Any]:
+    """Get next 24h generation forecast with confidence.
+
+    MCP Tool: get_solar_forecast
+    """
+    try:
+        from app.services.solar_forecast_service import get_solar_forecast_service
+        svc = get_solar_forecast_service()
+        forecast = svc.get_forecast(site_id, hours_ahead=hours)
+        return forecast.to_dict()
+    except Exception as e:
+        logger.error(f"get_solar_forecast error: {e}")
+        return {"error": str(e)}
+
+
+async def get_solar_diagnostics_tool(site_id: str = "fairlands") -> Dict[str, Any]:
+    """Get solar diagnostics — top issues, underperformers, maintenance.
+
+    MCP Tool: get_solar_diagnostics
+    """
+    try:
+        from app.services.solar_performance_service import get_solar_performance_service
+        perf = get_solar_performance_service()
+        report = await perf.get_diagnostic_summary(site_id)
+        result = report.to_dict() if report else {"issues": []}
+
+        # Add maintenance recommendations
+        try:
+            from app.services.solar_maintenance_service import get_solar_maintenance_service
+            maint = get_solar_maintenance_service()
+            recs = await maint.evaluate_maintenance_needs(site_id)
+            result["maintenance_recommendations"] = [r.to_dict() for r in recs[:5]]
+            result["maintenance_count"] = len(recs)
+        except Exception:
+            pass
+
+        return result
+    except Exception as e:
+        logger.error(f"get_solar_diagnostics error: {e}")
+        return {"error": str(e)}
+
+
+# ============================================================================
 # MCP Tool Definitions (JSON Schema)
 # ============================================================================
 
@@ -3397,6 +3509,93 @@ MCP_TOOLS = [
             },
             "required": ["building_id", "metric_config"]
         }
+    },
+    # Solar MCP Tools (34-09)
+    {
+        "name": "get_solar_overview",
+        "description": "Get solar site overview including current generation (kW), daily yield (kWh), BESS State of Charge, grid import/export, performance ratio, and estimated savings today. Use this when someone asks about solar generation, how much power the panels are producing, or the solar dashboard.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "site_id": {
+                    "type": "string",
+                    "description": "Solar site ID (default: fairlands)",
+                    "default": "fairlands"
+                }
+            },
+            "required": []
+        }
+    },
+    {
+        "name": "get_bess_status",
+        "description": "Get BESS (Battery Energy Storage System) status including State of Charge (SOC), current mode (charging/discharging/idle), health, power flow, cycle count, and dispatch schedule. Use this when someone asks about the battery level, battery status, BESS, or energy storage.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "site_id": {
+                    "type": "string",
+                    "description": "Solar site ID (default: fairlands)",
+                    "default": "fairlands"
+                }
+            },
+            "required": []
+        }
+    },
+    {
+        "name": "get_solar_savings",
+        "description": "Get financial savings summary from solar and BESS optimisation. Returns monthly breakdown of arbitrage savings, demand charge savings, self-consumption value, diesel avoidance, total savings, ROI, and carbon offset. Use this when someone asks how much money solar has saved, financial performance, or ROI.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "site_id": {
+                    "type": "string",
+                    "description": "Solar site ID (default: fairlands)",
+                    "default": "fairlands"
+                },
+                "period": {
+                    "type": "string",
+                    "description": "Period: ytd (year-to-date, default) or month",
+                    "default": "ytd",
+                    "enum": ["ytd", "month"]
+                }
+            },
+            "required": []
+        }
+    },
+    {
+        "name": "get_solar_forecast",
+        "description": "Get solar generation forecast for the next 24 hours with confidence bands. Returns hourly predicted generation in kW using an ensemble model (persistence + clear-sky + historical + ML). Use this when someone asks about tomorrow's generation forecast, expected solar output, or generation predictions.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "site_id": {
+                    "type": "string",
+                    "description": "Solar site ID (default: fairlands)",
+                    "default": "fairlands"
+                },
+                "hours": {
+                    "type": "integer",
+                    "description": "Forecast horizon in hours (default: 24, max: 72)",
+                    "default": 24
+                }
+            },
+            "required": []
+        }
+    },
+    {
+        "name": "get_solar_diagnostics",
+        "description": "Get solar diagnostics with top issues, underperforming equipment, and maintenance recommendations. Returns prioritised issues with severity, cost impact, probable cause, recommended action, and upcoming maintenance needs. Use this when someone asks which inverters are underperforming, solar problems, or maintenance needs.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "site_id": {
+                    "type": "string",
+                    "description": "Solar site ID (default: fairlands)",
+                    "default": "fairlands"
+                }
+            },
+            "required": []
+        }
     }
 ]
 
@@ -3453,6 +3652,12 @@ class SIMBIOTMCPServer:
             # AI/ML Predictive Maintenance tools (asset metric configuration)
             "get_asset_metrics_template": get_asset_metrics_template_tool,
             "configure_asset_metrics": configure_asset_metrics_tool,
+            # Solar tools (34-09)
+            "get_solar_overview": get_solar_overview_tool,
+            "get_bess_status": get_bess_status_tool,
+            "get_solar_savings": get_solar_savings_tool,
+            "get_solar_forecast": get_solar_forecast_tool,
+            "get_solar_diagnostics": get_solar_diagnostics_tool,
         }
         logger.info("SIMBIOTMCPServer initialized with %d tools", len(self.tools))
 
