@@ -1,13 +1,15 @@
 """Solar Generation Forecast Service -- 72-hour rolling forecast engine.
 
-Provides generation forecasts using layered statistical models:
+Provides generation forecasts using layered statistical + ML models:
   1. Persistence model (baseline): Tomorrow = Today
   2. Clear-sky model: Theoretical max based on solar geometry for Joburg (-26.2deg)
   3. Historical average model: Mean of same weekday over past 4 weeks
-  4. Weighted ensemble: 30% persistence + 30% clear-sky + 40% historical
+  4. ML gradient boosting model: Trained on synthetic historical data (34-08)
+  5. Weighted ensemble: 20% persistence + 20% clear-sky + 30% historical + 30% ML
 
-ML models (LSTM, gradient boosting) deferred to Plan 34-08 (Wave 3).
-These statistical models are sufficient for Wave 2 dispatch scheduling.
+The ML model (gradient boosting) was added in Plan 34-08 as a foundation for
+future LSTM/transformer models. It uses features: hour_of_day, day_of_year,
+cloud_cover_estimate, temperature, yesterday_generation.
 
 Solar geometry for southern hemisphere (Johannesburg):
   - Declination: delta = 23.45 * sin(360/365 * (284 + day_of_year))
@@ -250,20 +252,25 @@ class SolarGeometry:
 
 
 class SolarForecastService:
-    """72-hour rolling generation forecast using statistical models.
+    """72-hour rolling generation forecast using statistical + ML models.
 
     Loads site configuration (lat/lng/capacity) from fairlands_config.json
-    and generates forecasts using an ensemble of simple models.
+    and generates forecasts using an ensemble of statistical and ML models.
 
     The forecast is used by the arbitrage engine (34-05) to decide whether
     to charge BESS aggressively overnight (cloudy forecast) or rely on
     solar to charge during the day (sunny forecast).
+
+    ML model (34-08): Simple gradient boosting trained on 90 days of
+    synthetic historical data. Features: hour_of_day, day_of_year,
+    cloud_cover_estimate, temperature, yesterday_generation.
     """
 
-    # Default ensemble weights
-    WEIGHT_PERSISTENCE = 0.30
-    WEIGHT_CLEAR_SKY = 0.30
-    WEIGHT_HISTORICAL = 0.40
+    # Ensemble weights (updated in 34-08 to include ML model)
+    WEIGHT_PERSISTENCE = 0.20
+    WEIGHT_CLEAR_SKY = 0.20
+    WEIGHT_HISTORICAL = 0.30
+    WEIGHT_ML = 0.30
 
     # Panel derating factors
     TEMP_DERATE = 0.92  # Temperature derating (JHB summer ~35C)
@@ -275,8 +282,12 @@ class SolarForecastService:
         self._persistence_cache: Dict[str, List[float]] = {}  # site_id -> 24h actuals
         self._historical_cache: Dict[str, List[List[float]]] = {}  # site_id -> weeks of 24h data
         self._geometry = SolarGeometry()
+        # ML model state (34-08)
+        self._ml_models: Dict[str, "_GradientBoostingModel"] = {}  # site_id -> model
+        self._ml_accuracy: Dict[str, Dict[str, float]] = {}  # site_id -> accuracy metrics
         self._load_site_configs()
         self._seed_demo_data()
+        self._train_ml_models()
 
     def _load_site_configs(self) -> None:
         """Load solar site configurations."""
@@ -449,6 +460,8 @@ class SolarForecastService:
                 gen_kw = clear_sky_kw * 0.85  # Assume 85% typical conditions
             elif model == "historical":
                 gen_kw = self._historical_forecast(site_id, forecast_hour)
+            elif model == "ml":
+                gen_kw = self._ml_forecast(site_id, forecast_date, forecast_hour)
             else:  # weighted_ensemble
                 gen_kw = self._ensemble_forecast(site_id, lat, lng, capacity, forecast_date, forecast_hour)
 
@@ -677,6 +690,51 @@ class SolarForecastService:
             return 0.0
         return sum(values) / len(values)
 
+    def _ml_forecast(
+        self,
+        site_id: str,
+        forecast_date: date,
+        hour: int,
+    ) -> float:
+        """ML gradient boosting forecast for a single hour.
+
+        Uses trained model with features: hour_of_day, day_of_year,
+        cloud_cover_estimate, temperature, yesterday_generation.
+        Falls back to historical model if ML model not trained.
+        """
+        model = self._ml_models.get(site_id)
+        if not model:
+            return self._historical_forecast(site_id, hour)
+
+        # Build feature vector
+        day_of_year = forecast_date.timetuple().tm_yday
+
+        # Cloud cover estimate from persistence deviation
+        persistence_val = self._persistence_forecast(site_id, hour)
+        config = self._site_configs.get(site_id, {})
+        capacity = config.get("capacity_kwp", 3900)
+        clear_sky = self._get_clear_sky_generation(
+            config.get("latitude", -26.13),
+            config.get("longitude", 27.97),
+            capacity,
+            forecast_date,
+            hour,
+        )
+        cloud_estimate = 1.0 - (persistence_val / clear_sky) if clear_sky > 0 else 0.5
+        cloud_estimate = max(0.0, min(1.0, cloud_estimate))
+
+        # Temperature estimate (seasonal — JHB)
+        month = forecast_date.month
+        seasonal_temps = {1: 25, 2: 24, 3: 22, 4: 19, 5: 16, 6: 13,
+                         7: 13, 8: 16, 9: 19, 10: 21, 11: 23, 12: 25}
+        temp = seasonal_temps.get(month, 20)
+
+        # Yesterday generation (from persistence cache)
+        yesterday_gen = persistence_val
+
+        features = [hour, day_of_year, cloud_estimate, temp, yesterday_gen]
+        return model.predict(features)
+
     def _ensemble_forecast(
         self,
         site_id: str,
@@ -686,23 +744,296 @@ class SolarForecastService:
         forecast_date: date,
         hour: int,
     ) -> float:
-        """Weighted ensemble: 30% persistence + 30% clear-sky + 40% historical.
+        """Weighted ensemble: 20% persistence + 20% clear-sky + 30% historical + 30% ML.
 
         The ensemble smooths out noise from individual models:
         - Persistence captures yesterday's actual conditions
         - Clear-sky captures the theoretical envelope
         - Historical captures seasonal and weekday patterns
+        - ML captures non-linear patterns from training data
         """
         persistence = self._persistence_forecast(site_id, hour)
         clear_sky = self._get_clear_sky_generation(lat, lng, capacity_kwp, forecast_date, hour) * 0.85
         historical = self._historical_forecast(site_id, hour)
+        ml = self._ml_forecast(site_id, forecast_date, hour)
 
         ensemble = (
             self.WEIGHT_PERSISTENCE * persistence
             + self.WEIGHT_CLEAR_SKY * clear_sky
             + self.WEIGHT_HISTORICAL * historical
+            + self.WEIGHT_ML * ml
         )
         return max(0.0, ensemble)
+
+    # === ML Model Training (34-08) ===
+
+    def _train_ml_models(self) -> None:
+        """Train gradient boosting models for all registered sites.
+
+        Generates 90 days of synthetic training data and fits a simple
+        decision-tree ensemble model. This is a foundation — full
+        LSTM/transformer models are future work beyond Phase 34.
+        """
+        for site_id, config in self._site_configs.items():
+            try:
+                model = self._train_site_model(site_id, config)
+                if model:
+                    self._ml_models[site_id] = model
+                    logger.info("Trained ML forecast model for site %s", site_id)
+            except Exception as e:
+                logger.error("Failed to train ML model for %s: %s", site_id, e)
+
+    def _train_site_model(
+        self, site_id: str, config: Dict
+    ) -> Optional["_GradientBoostingModel"]:
+        """Train ML model for a single site on 90 days of synthetic data.
+
+        Features: hour_of_day, day_of_year, cloud_cover, temperature, yesterday_gen
+        Target: generation_kw
+        """
+        lat = config["latitude"]
+        lng = config["longitude"]
+        capacity = config["capacity_kwp"]
+        today = date.today()
+
+        # Generate 90 days of training data
+        features_list: List[List[float]] = []
+        targets: List[float] = []
+
+        for day_offset in range(90, 0, -1):
+            d = today - timedelta(days=day_offset)
+            seed = hash(f"{site_id}-train-{d.isoformat()}") % 10000
+            profile = self._generate_realistic_profile(lat, lng, capacity, d, cloud_seed=seed)
+            day_of_year = d.timetuple().tm_yday
+
+            # Seasonal temperature
+            month = d.month
+            seasonal_temps = {1: 25, 2: 24, 3: 22, 4: 19, 5: 16, 6: 13,
+                              7: 13, 8: 16, 9: 19, 10: 21, 11: 23, 12: 25}
+            temp = seasonal_temps.get(month, 20)
+
+            # Yesterday's profile for feature
+            yesterday = today - timedelta(days=day_offset + 1)
+            yesterday_seed = hash(f"{site_id}-train-{yesterday.isoformat()}") % 10000
+            yesterday_profile = self._generate_realistic_profile(
+                lat, lng, capacity, yesterday, cloud_seed=yesterday_seed
+            )
+
+            for hour in range(24):
+                cs = self._get_clear_sky_generation(lat, lng, capacity, d, hour)
+                actual = profile[hour]
+                cloud = 1.0 - (actual / cs) if cs > 0 else 0.5
+                cloud = max(0.0, min(1.0, cloud))
+
+                yesterday_gen = yesterday_profile[hour] if hour < len(yesterday_profile) else 0.0
+
+                features_list.append([hour, day_of_year, cloud, temp, yesterday_gen])
+                targets.append(actual)
+
+        if not features_list:
+            return None
+
+        # Train the model
+        model = _GradientBoostingModel(capacity_kwp=capacity)
+        model.fit(features_list, targets)
+
+        # Calculate accuracy on the training data (in-sample, for tracking)
+        predictions = [model.predict(f) for f in features_list]
+        rmse = math.sqrt(sum((p - t) ** 2 for p, t in zip(predictions, targets)) / len(targets))
+        mae = sum(abs(p - t) for p, t in zip(predictions, targets)) / len(targets)
+
+        self._ml_accuracy[site_id] = {
+            "training_samples": len(targets),
+            "rmse_kw": rmse,
+            "mae_kw": mae,
+            "rmse_pct_of_capacity": (rmse / capacity * 100) if capacity > 0 else 0,
+        }
+        logger.info(
+            "ML model for %s: RMSE=%.1f kW (%.1f%% of capacity), MAE=%.1f kW",
+            site_id, rmse, self._ml_accuracy[site_id]["rmse_pct_of_capacity"], mae,
+        )
+
+        return model
+
+    def train_site_model(self, site_id: str) -> bool:
+        """Public API: retrain ML model for a site.
+
+        Returns True if training succeeded.
+        """
+        config = self._site_configs.get(site_id)
+        if not config:
+            return False
+        model = self._train_site_model(site_id, config)
+        if model:
+            self._ml_models[site_id] = model
+            return True
+        return False
+
+    def get_ml_forecast(
+        self, site_id: str, hours_ahead: int = 24
+    ) -> List[HourlyGeneration]:
+        """Get ML-only forecast for a site.
+
+        Returns hourly generation predictions using only the gradient boosting model.
+        """
+        config = self._site_configs.get(site_id)
+        if not config:
+            return []
+
+        lat = config["latitude"]
+        lng = config["longitude"]
+        capacity = config["capacity_kwp"]
+        now = datetime.now(timezone.utc)
+        sast_now = now + timedelta(hours=2)
+
+        result: List[HourlyGeneration] = []
+        for offset in range(hours_ahead):
+            forecast_dt = sast_now + timedelta(hours=offset)
+            forecast_hour = forecast_dt.hour
+            forecast_date = forecast_dt.date()
+
+            gen_kw = self._ml_forecast(site_id, forecast_date, forecast_hour)
+            cs_kw = self._get_clear_sky_generation(lat, lng, capacity, forecast_date, forecast_hour)
+
+            uncertainty_pct = min(0.30, 0.05 + offset * 0.005)
+            hour_ts = forecast_dt.strftime("%Y-%m-%dT%H:%M")
+
+            result.append(HourlyGeneration(
+                hour=hour_ts,
+                generation_kw=gen_kw,
+                confidence_high_kw=gen_kw * (1.0 + uncertainty_pct),
+                confidence_low_kw=max(0.0, gen_kw * (1.0 - uncertainty_pct)),
+                clear_sky_kw=cs_kw,
+                cloud_factor=(gen_kw / cs_kw) if cs_kw > 0 else 0.0,
+            ))
+
+        return result
+
+    def get_ml_accuracy(self, site_id: str) -> Optional[Dict[str, Any]]:
+        """Get ML model accuracy metrics for a site."""
+        return self._ml_accuracy.get(site_id)
+
+
+class _GradientBoostingModel:
+    """Simple gradient boosting regression model.
+
+    Implements a lightweight ensemble of decision stumps (depth-1 trees)
+    trained with gradient boosting on MSE loss. No external dependencies
+    required (no scikit-learn, no xgboost).
+
+    This is deliberately simple — a foundation for future ML work.
+    Production models would use scikit-learn GradientBoostingRegressor
+    or XGBoost/LightGBM.
+    """
+
+    def __init__(
+        self,
+        n_estimators: int = 50,
+        learning_rate: float = 0.1,
+        capacity_kwp: float = 3900,
+    ):
+        self.n_estimators = n_estimators
+        self.learning_rate = learning_rate
+        self.capacity_kwp = capacity_kwp
+        self._trees: List[Dict[str, Any]] = []
+        self._base_prediction: float = 0.0
+
+    def fit(self, features: List[List[float]], targets: List[float]) -> None:
+        """Train the model using gradient boosting on decision stumps."""
+        n = len(targets)
+        if n == 0:
+            return
+
+        # Start with mean prediction
+        self._base_prediction = sum(targets) / n
+
+        # Residuals
+        residuals = [t - self._base_prediction for t in targets]
+
+        for _ in range(self.n_estimators):
+            # Find best split (decision stump)
+            best_stump = self._find_best_stump(features, residuals)
+            if best_stump is None:
+                break
+
+            self._trees.append(best_stump)
+
+            # Update residuals
+            for i in range(n):
+                pred = self._predict_stump(best_stump, features[i])
+                residuals[i] -= self.learning_rate * pred
+
+    def predict(self, features: List[float]) -> float:
+        """Predict generation for a single feature vector."""
+        prediction = self._base_prediction
+        for tree in self._trees:
+            prediction += self.learning_rate * self._predict_stump(tree, features)
+        # Clamp to [0, capacity]
+        return max(0.0, min(self.capacity_kwp, prediction))
+
+    def _find_best_stump(
+        self,
+        features: List[List[float]],
+        residuals: List[float],
+    ) -> Optional[Dict[str, Any]]:
+        """Find the best single-feature split that minimises MSE of residuals."""
+        n = len(features)
+        if n < 4:
+            return None
+
+        n_features = len(features[0])
+        best_mse = float("inf")
+        best_stump = None
+
+        for feat_idx in range(n_features):
+            # Get unique split points (sample to keep fast)
+            values = sorted(set(f[feat_idx] for f in features))
+            if len(values) < 2:
+                continue
+
+            # Test a subset of split points for speed
+            step = max(1, len(values) // 20)
+            split_candidates = values[::step]
+
+            for split_val in split_candidates:
+                left_residuals = []
+                right_residuals = []
+
+                for i in range(n):
+                    if features[i][feat_idx] <= split_val:
+                        left_residuals.append(residuals[i])
+                    else:
+                        right_residuals.append(residuals[i])
+
+                if len(left_residuals) < 2 or len(right_residuals) < 2:
+                    continue
+
+                left_mean = sum(left_residuals) / len(left_residuals)
+                right_mean = sum(right_residuals) / len(right_residuals)
+
+                # MSE reduction
+                mse = (
+                    sum((r - left_mean) ** 2 for r in left_residuals)
+                    + sum((r - right_mean) ** 2 for r in right_residuals)
+                )
+
+                if mse < best_mse:
+                    best_mse = mse
+                    best_stump = {
+                        "feature": feat_idx,
+                        "threshold": split_val,
+                        "left_value": left_mean,
+                        "right_value": right_mean,
+                    }
+
+        return best_stump
+
+    @staticmethod
+    def _predict_stump(stump: Dict[str, Any], features: List[float]) -> float:
+        """Predict using a single decision stump."""
+        if features[stump["feature"]] <= stump["threshold"]:
+            return stump["left_value"]
+        return stump["right_value"]
 
 
 # === Singleton ===

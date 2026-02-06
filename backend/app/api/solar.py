@@ -15,6 +15,7 @@ Provides real-time and historical data for solar installations:
   - Self-consumption: ratio tracking, energy balance, export management
   - Generation forecasting: 72-hour ensemble forecast, clear-sky profile, accuracy
   - Generator coordination: priority dispatch, diesel avoidance, LS automation
+  - Health analytics: degradation tracking, BESS SoH, warranty evidence (34-08)
 """
 
 from typing import Optional
@@ -30,6 +31,7 @@ from app.services.solar_demand_service import get_solar_demand_service
 from app.services.solar_selfconsumption_service import get_solar_selfconsumption_service
 from app.services.solar_forecast_service import get_solar_forecast_service
 from app.services.solar_generator_coordinator import get_solar_generator_coordinator
+from app.services.solar_health_service import get_solar_health_service
 
 router = APIRouter()
 
@@ -687,3 +689,139 @@ async def get_generator_events(
         "event_count": len(events),
         "events": [e.to_dict() for e in events],
     }
+
+
+# === Health analytics endpoints (34-08) ===
+
+
+@router.get("/solar/sites/{site_id}/health")
+async def get_fleet_health(site_id: str):
+    """Get fleet health overview: degradation summary, BESS SoH, alerts.
+
+    Returns average fleet degradation rate, worst inverter with degradation
+    details, BESS State-of-Health summary (SoH, cycles, cell imbalance),
+    estimated replacement year, and prioritised health issues.
+    """
+    svc = get_solar_health_service()
+    health = await svc.get_fleet_health(site_id)
+    if not health:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Solar site '{site_id}' not found",
+        )
+    return health
+
+
+@router.get("/solar/sites/{site_id}/health/inverters/{inverter_id}")
+async def get_inverter_health(site_id: str, inverter_id: str):
+    """Get single inverter health detail with degradation rate.
+
+    Returns commissioning date, years in service, baseline vs current PR,
+    annual degradation rate with rating (normal/elevated/accelerated),
+    end-of-life prediction, monthly health timeline, and cost impact.
+    """
+    svc = get_solar_health_service()
+
+    # Get degradation for this specific inverter
+    degradation = await svc.calculate_degradation_rate(site_id, inverter_id=inverter_id)
+    if not degradation or not degradation.inverters:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Inverter '{inverter_id}' not found at site '{site_id}'",
+        )
+
+    inv = degradation.inverters[0]
+
+    # Get timeline and EOL prediction
+    timeline = await svc.get_health_timeline(site_id, inverter_id, months=12)
+    eol = await svc.predict_end_of_life(site_id, inverter_id)
+
+    result = inv.to_dict()
+    if timeline:
+        result["health_timeline"] = timeline.to_dict()
+    if eol:
+        result["eol_prediction"] = eol.to_dict()
+
+    return result
+
+
+@router.get("/solar/sites/{site_id}/health/bess")
+async def get_bess_health(site_id: str):
+    """Get BESS State-of-Health with rack-level detail.
+
+    Returns SoH percentage, cycle count vs warranty limit, cell imbalance
+    per rack, temperature distribution, calendar aging, estimated
+    replacement year, and health alerts.
+    """
+    svc = get_solar_health_service()
+    health = await svc.get_bess_health(site_id)
+    if not health:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No BESS found at site '{site_id}'",
+        )
+    return health.to_dict()
+
+
+@router.get("/solar/sites/{site_id}/health/bess/cycles")
+async def get_bess_cycle_history(
+    site_id: str,
+    months: int = Query(12, ge=1, le=24, description="Months of history (1-24)"),
+):
+    """Get monthly BESS cycle history.
+
+    Returns monthly cycle count, average depth of discharge, equivalent
+    full cycles (cycle_count x avg_DoD), and average temperature.
+    Shows seasonal patterns: summer months have fewer grid cycles
+    (more solar), winter months have more.
+    """
+    svc = get_solar_health_service()
+    history = await svc.get_bess_cycle_history(site_id, months=months)
+    if not history:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No BESS found at site '{site_id}'",
+        )
+    return {
+        "site_id": site_id,
+        "months": months,
+        "cycle_history": [c.to_dict() for c in history],
+    }
+
+
+@router.get("/solar/sites/{site_id}/health/degradation")
+async def get_degradation_ranking(site_id: str):
+    """Get fleet-wide degradation ranking for all inverters.
+
+    Returns all inverters sorted by degradation rate (worst first)
+    with commissioning date, baseline vs current PR, annual decline
+    rate, degradation rating, end-of-life prediction, and cost impact.
+    """
+    svc = get_solar_health_service()
+    degradation = await svc.calculate_degradation_rate(site_id)
+    if not degradation:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Solar site '{site_id}' not found",
+        )
+    return degradation.to_dict()
+
+
+@router.post("/solar/sites/{site_id}/health/warranty-evidence/{equipment_id}")
+async def generate_warranty_evidence(site_id: str, equipment_id: str):
+    """Generate warranty evidence package for an inverter or BESS.
+
+    Collects operational data summary, degradation trend, environmental
+    conditions, fault log, and performance vs specification into a
+    structured report suitable for manufacturer warranty claim submission.
+
+    Equipment ID must contain 'INV' for inverters or 'BESS' for battery.
+    """
+    svc = get_solar_health_service()
+    package = await svc.generate_warranty_evidence(site_id, equipment_id)
+    if not package:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Equipment '{equipment_id}' not found at site '{site_id}'",
+        )
+    return package.to_dict()
