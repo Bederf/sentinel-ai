@@ -9,6 +9,7 @@ FSR Domain: 4.7 - Logical Access Control
 """
 
 import logging
+from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -31,6 +32,34 @@ limiter = Limiter(key_func=get_remote_address)
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
+
+# ---------------------------------------------------------------------------
+# Brute-force protection (Phase 58-04 M-5)
+# In-memory tracking: 5 failed attempts per email within 15 minutes = lockout
+# ---------------------------------------------------------------------------
+_login_attempts: dict[str, list[datetime]] = defaultdict(list)
+_MAX_LOGIN_ATTEMPTS = 5
+_LOCKOUT_MINUTES = 15
+
+
+def _check_brute_force(identifier: str) -> None:
+    """Raise 429 if too many recent failed login attempts for *identifier*."""
+    now = datetime.utcnow()
+    cutoff = now - timedelta(minutes=_LOCKOUT_MINUTES)
+    # Prune old entries
+    recent = [t for t in _login_attempts[identifier] if t > cutoff]
+    _login_attempts[identifier] = recent
+    if len(recent) >= _MAX_LOGIN_ATTEMPTS:
+        logger.warning(f"Brute-force lockout triggered for {identifier}")
+        raise HTTPException(
+            status_code=429,
+            detail=f"Too many login attempts. Try again in {_LOCKOUT_MINUTES} minutes.",
+        )
+
+
+def _record_failed_attempt(identifier: str) -> None:
+    """Record a failed login attempt for *identifier*."""
+    _login_attempts[identifier].append(datetime.utcnow())
 
 # Demo users store - in production this would be in Supabase
 # Email -> User mapping
@@ -90,7 +119,7 @@ def _create_jwt_token(user_data: dict) -> str:
         "role": user_data["role"].value,
         "full_name": user_data["full_name"],
         "iat": datetime.utcnow(),
-        "exp": datetime.utcnow() + timedelta(days=30),  # Token expires in 30 days
+        "exp": datetime.utcnow() + timedelta(hours=settings.jwt_expiration_hours),
         "iss": "sentinel.bms",
     }
 
@@ -124,7 +153,7 @@ async def login_with_email(request: Request, email: str):
     """Login with email address (simple authentication).
 
     The email address IS the credential - no password required.
-    Once logged in, users stay authenticated for 30 days.
+    Token expires after jwt_expiration_hours (default 8h, one work shift).
 
     Known demo users get specific roles (admin, operator, developer, auditor).
     Unknown emails automatically get AUDITOR (read-only) role.
@@ -139,9 +168,12 @@ async def login_with_email(request: Request, email: str):
         email: User's email address
 
     Returns:
-        LoginResponse with JWT token (valid for 30 days), user info, role, and MFA status
+        LoginResponse with JWT token, user info, role, and MFA status
     """
     email = email.strip().lower()
+
+    # Brute-force check (Phase 58-04 M-5) — keyed by email
+    _check_brute_force(email)
 
     # Look up user in demo store
     user_data = _DEMO_USERS.get(email)
@@ -262,7 +294,7 @@ async def login_with_email(request: Request, email: str):
             "full_name": user_info["full_name"],
             "role": user_info["role"].value,
         },
-        "expires_at": (datetime.utcnow() + timedelta(days=30)).isoformat(),
+        "expires_at": (datetime.utcnow() + timedelta(hours=settings.jwt_expiration_hours)).isoformat(),
         "mfa_required": mfa_required,
         "mfa_enrolled": mfa_enrolled,
         "mfa_challenge_pending": False,
@@ -297,6 +329,9 @@ async def complete_mfa_login(request: Request, email: str, mfa_code: str):
     """
     email = email.strip().lower()
 
+    # Brute-force check (Phase 58-04 M-5) — keyed by email
+    _check_brute_force(email)
+
     # Look up user
     user_data = _DEMO_USERS.get(email)
     if not user_data:
@@ -323,6 +358,7 @@ async def complete_mfa_login(request: Request, email: str, mfa_code: str):
     )
 
     if not success:
+        _record_failed_attempt(email)
         logger.warning(f"MFA verification failed for {email}: {error}")
         raise HTTPException(status_code=400, detail=error)
 
@@ -357,7 +393,7 @@ async def complete_mfa_login(request: Request, email: str, mfa_code: str):
             "full_name": user_info["full_name"],
             "role": user_info["role"].value if isinstance(user_info["role"], SentinelRole) else user_info["role"],
         },
-        "expires_at": (datetime.utcnow() + timedelta(days=30)).isoformat(),
+        "expires_at": (datetime.utcnow() + timedelta(hours=settings.jwt_expiration_hours)).isoformat(),
         "mfa_verified": True,
     }
 

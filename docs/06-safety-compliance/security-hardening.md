@@ -2,7 +2,7 @@
 title: "Security Hardening"
 type: "reference"
 status: "approved"
-version: "1.0.0"
+version: "2.0.0"
 created: "2026-02-06"
 updated: "2026-02-06"
 author: "Sentinel Development Team"
@@ -176,9 +176,74 @@ HSTS is only set when `DEBUG=false` to avoid issues in local development.
 | `backend/requirements.txt`              | Added `slowapi>=0.1.9`                        |
 | `backend/tests/conftest.py`             | Enable demo mode for test environment         |
 
-## Next Steps (Phase 58-04)
+## Medium Priority Fixes (Phase 58-04)
 
-- Input validation hardening (request body size limits, schema validation)
-- JWT expiration reduction (30 days -> 24 hours with refresh tokens)
-- Brute force protection (account lockout after N failures)
-- CSRF protection for cookie-based auth flows
+Completed as part of Phase 58-04. These fixes complement the critical/high priority work from 58-03.
+
+| ID   | Severity | Fix                                        | Status |
+|------|----------|--------------------------------------------|--------|
+| M-1  | Medium   | Pydantic input validation on device control | Done   |
+| H-5  | High     | Subprocess call sanitisation               | Done   |
+| M-3  | Medium   | JWT expiration reduced to 8 hours          | Done   |
+| M-4  | Medium   | Sensitive data redacted from audit logs     | Done   |
+| M-5  | Medium   | Brute force protection (5 attempts/15 min) | Done   |
+| M-8  | Medium   | Generic error handler hides stack traces    | Done   |
+
+### Input Validation on Device Control (M-1)
+
+`DeviceControlRequest` Pydantic model validates all device control requests:
+
+- **point**: alphanumeric + `_` `-` `.` `/` only, max 100 characters
+- **value**: numeric -1000 to 10000, boolean, or string (max 200 chars, no shell metacharacters)
+- **priority**: integer 1-16 (enforced by Pydantic `ge`/`le`)
+
+This catches malformed input before it reaches the safety engine or device adapter.
+
+### Subprocess Sanitisation (H-5)
+
+`AlertNotifier._sanitize_for_shell()` strips shell metacharacters (`;&|` backtick `$(){}[]<>!#\`) from alert messages before passing to `subprocess.run()`. Arguments are always passed as a list (never `shell=True`) for defence in depth.
+
+### JWT Expiration (M-3)
+
+Token lifetime reduced from 30 days to 8 hours (one work shift). Configurable via `JWT_EXPIRATION_HOURS` environment variable. Default: 8.
+
+### Audit Log Sanitisation (M-4)
+
+`_sanitize_log_data()` in `audit_middleware.py` recursively redacts sensitive keys:
+`password`, `token`, `secret`, `api_key`, `authorization`, `access_token`, `refresh_token`, `jwt`, `credential`, etc.
+
+Applied to both request body and query parameter extraction.
+
+### Brute Force Protection (M-5)
+
+In-memory tracking keyed by email address:
+- **Limit**: 5 failed attempts within 15 minutes
+- **Response**: HTTP 429 with retry message
+- **Scope**: Login and MFA completion endpoints
+- Complements slowapi rate limiting which is keyed by IP address
+
+### Generic Error Handler (M-8)
+
+Global `Exception` handler in `main.py`:
+- **Debug mode**: Returns full error detail (`str(exc)`)
+- **Production**: Logs full error server-side, returns generic `"Internal server error"` to client
+
+### Files Modified (58-04)
+
+| File                                                  | Changes                              |
+|-------------------------------------------------------|--------------------------------------|
+| `backend/app/api/devices.py`                          | Pydantic DeviceControlRequest model  |
+| `backend/app/services/clawd_integration/alert_notifier.py` | Subprocess sanitisation        |
+| `backend/app/config/settings.py`                      | `jwt_expiration_hours` setting       |
+| `backend/app/api/auth.py`                             | 8h expiry, brute force protection    |
+| `backend/app/middleware/audit_middleware.py`           | Recursive log data sanitisation      |
+| `backend/app/main.py`                                 | Global exception handler             |
+
+### Deferred / Accepted Risk
+
+| ID   | Item                    | Status         | Rationale                                              |
+|------|-------------------------|----------------|--------------------------------------------------------|
+| H-3  | Password authentication | Deferred       | Supabase Auth integration planned                      |
+| M-2  | Request body size limits| Deferred       | Low risk with current JSON payloads                    |
+| M-6  | CSP header              | Deferred       | Frontend served via Vite dev server; CSP on prod proxy |
+| M-7  | CSRF protection         | Accepted risk  | API uses Bearer tokens (not cookies)                   |

@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     # JWT secret key (required when not in DEMO_MODE)
     jwt_secret_key: str = ""
 
+    # JWT token expiration (Phase 58-04 M-3: reduced from 30 days to 8 hours)
+    jwt_expiration_hours: int = 8
+
     # Clawd webhook secret (required for Telegram bot integration)
     clawd_webhook_secret: str = ""
 

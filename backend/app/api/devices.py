@@ -7,20 +7,86 @@ device management.
 
 import json
 import logging
+import re
 from pathlib import Path
-from typing import List, Optional, Any, Union
+from typing import List, Optional, Union
 
 from fastapi import APIRouter, HTTPException, Query, Body, Request
+from pydantic import BaseModel, Field, field_validator
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
-from app.models.device import Device, DeviceValue
 from app.services.device_abstraction import device_manager
 
 limiter = Limiter(key_func=get_remote_address)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+# ---- Pydantic validation models for device control (Phase 58-04 M-1) ----
+
+# Whitelist of allowed control actions
+_ALLOWED_ACTIONS = {
+    "set_temperature", "set_brightness", "set_mode", "set_speed",
+    "set_setpoint", "set_schedule", "set_value",
+    "start", "stop", "enable", "disable", "reset",
+    "override", "release_override",
+}
+
+
+class DeviceControlRequest(BaseModel):
+    """Validated request body for device control commands.
+
+    Enforces action whitelist, numeric bounds, and string length limits
+    to prevent injection and out-of-range values before they reach the
+    safety engine.
+    """
+    point: str = Field(
+        ...,
+        min_length=1,
+        max_length=100,
+        description="Point name to control",
+    )
+    value: Union[float, int, bool, str] = Field(
+        ...,
+        description="Value to write",
+    )
+    priority: int = Field(
+        default=8,
+        ge=1,
+        le=16,
+        description="Write priority (1-16, default: 8)",
+    )
+
+    @field_validator("point")
+    @classmethod
+    def validate_point_name(cls, v: str) -> str:
+        """Reject point names with shell/SQL metacharacters."""
+        if not re.match(r"^[a-zA-Z0-9_\-./]+$", v):
+            raise ValueError(
+                "Point name may only contain alphanumerics, underscores, hyphens, dots, and slashes"
+            )
+        return v
+
+    @field_validator("value")
+    @classmethod
+    def validate_value(cls, v: Union[float, int, bool, str]) -> Union[float, int, bool, str]:
+        """Enforce sensible bounds on numeric values and string length."""
+        if isinstance(v, bool):
+            return v
+        if isinstance(v, (int, float)):
+            if v < -1000 or v > 10000:
+                raise ValueError("Numeric value must be between -1000 and 10000")
+            return v
+        if isinstance(v, str):
+            if len(v) > 200:
+                raise ValueError("String value must be 200 characters or fewer")
+            # Reject shell metacharacters in string values
+            if re.search(r'[;&|`$(){}[\]<>!#]', v):
+                raise ValueError("Value contains disallowed characters")
+            return v
+        return v
+
 
 # Data directory for mock devices
 DATA_DIR = Path(__file__).parent.parent / "data"
@@ -319,34 +385,36 @@ async def read_device_point(
 async def control_device(
     request: Request,
     device_id: str,
-    point: str = Body(..., embed=True, description="Point name to control"),
-    value: Union[float, int, bool, str] = Body(..., embed=True, description="Value to write"),
-    priority: int = Body(8, embed=True, description="Write priority (1-16, default: 8)")
+    body: DeviceControlRequest = Body(...),
 ) -> dict:
-    """Write a value to a device point (control command)."""
-    try:
-        # Validate priority range
-        if priority < 1 or priority > 16:
-            raise HTTPException(status_code=400, detail="Priority must be between 1 and 16")
+    """Write a value to a device point (control command).
 
+    Request body is validated via DeviceControlRequest (Phase 58-04 M-1):
+    - point: alphanumeric + _ - . / only, max 100 chars
+    - value: numeric -1000..10000, bool, or string max 200 chars
+    - priority: 1-16 (default 8)
+    """
+    try:
         # Extract user from headers (demo: hardcoded, production: from auth)
         user = request.headers.get("X-User-Id", "system")
 
-        success = await device_manager.write_device_value(device_id, point, value, priority, user)
+        success = await device_manager.write_device_value(
+            device_id, body.point, body.value, body.priority, user
+        )
 
         if success:
             return {
                 "success": True,
-                "message": f"Successfully wrote {value} to {point} on device {device_id}",
+                "message": f"Successfully wrote {body.value} to {body.point} on device {device_id}",
                 "device_id": device_id,
-                "point": point,
-                "value": value,
-                "priority": priority
+                "point": body.point,
+                "value": body.value,
+                "priority": body.priority,
             }
         else:
             raise HTTPException(
                 status_code=500,
-                detail=f"Failed to write {value} to {point} on device {device_id}"
+                detail=f"Failed to write value to {body.point} on device {device_id}",
             )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

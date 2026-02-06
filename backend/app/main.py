@@ -109,6 +109,27 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
 
 
 # =============================================================================
+# Generic Error Handler (Phase 58-04 M-8)
+# Hide internal stack traces in non-debug / production mode.
+# =============================================================================
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Catch-all handler that hides internals in production."""
+    if settings.debug:
+        # In debug mode, return full detail for developer convenience
+        return JSONResponse(
+            status_code=500,
+            content={"detail": str(exc)},
+        )
+    # Log the real error server-side, return a generic message to the client
+    _logger.error(f"Unhandled exception on {request.method} {request.url.path}: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"},
+    )
+
+
+# =============================================================================
 # CORS (Phase 58-03 H-2) — restricted to configured origins
 # =============================================================================
 app.add_middleware(

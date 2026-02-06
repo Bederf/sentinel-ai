@@ -19,6 +19,32 @@ from app.models.audit_log import AuditActionType, AuditResultType
 
 logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# Sensitive data sanitisation (Phase 58-04 M-4)
+# ---------------------------------------------------------------------------
+_SENSITIVE_KEYS = {
+    "password", "token", "secret", "api_key", "apikey",
+    "authorization", "access_token", "refresh_token",
+    "jwt", "credential", "credit_card", "ssn",
+}
+
+
+def _sanitize_log_data(data: dict) -> dict:
+    """Recursively redact values whose keys look sensitive.
+
+    Keys are matched case-insensitively against _SENSITIVE_KEYS.
+    Nested dicts are sanitised recursively; other types are left as-is.
+    """
+    sanitized: dict = {}
+    for k, v in data.items():
+        if k.lower() in _SENSITIVE_KEYS:
+            sanitized[k] = "***REDACTED***"
+        elif isinstance(v, dict):
+            sanitized[k] = _sanitize_log_data(v)
+        else:
+            sanitized[k] = v
+    return sanitized
+
 
 class AuditMiddleware(BaseHTTPMiddleware):
     """Middleware for auditing API requests."""
@@ -268,11 +294,15 @@ class AuditMiddleware(BaseHTTPMiddleware):
             return "API_REQUEST"
 
     async def _extract_request_data(self, request: Request) -> Dict[str, Any]:
-        """Extract request data for auditing."""
+        """Extract request data for auditing.
+
+        Phase 58-04 M-4: All extracted data is run through _sanitize_log_data
+        to strip tokens, passwords, API keys, and other sensitive values.
+        """
         try:
             # For GET requests, use query params
             if request.method == "GET":
-                return dict(request.query_params)
+                return _sanitize_log_data(dict(request.query_params))
 
             # For other methods, try to get JSON body
             content_type = request.headers.get("content-type", "")
@@ -280,13 +310,8 @@ class AuditMiddleware(BaseHTTPMiddleware):
                 try:
                     body = await request.json()
                     if isinstance(body, dict):
-                        # Sanitize sensitive data
-                        sanitized = body.copy()
-                        for key in ["password", "token", "secret", "key"]:
-                            if key in sanitized:
-                                sanitized[key] = "***REDACTED***"
-                        return sanitized
-                except:
+                        return _sanitize_log_data(body)
+                except Exception:
                     pass
 
             return {"content_type": content_type}
