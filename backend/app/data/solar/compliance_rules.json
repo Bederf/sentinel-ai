@@ -1,0 +1,54 @@
+{
+  "nrs_097_2_1": {
+    "description": "Inverter grid connection requirements per NRS 097-2-1",
+    "voltage_limits": {
+      "nominal_v": 230,
+      "min_v": 207,
+      "max_v": 253,
+      "disconnect_low_v": 195.5,
+      "disconnect_high_v": 264.5,
+      "reconnect_delay_s": 60
+    },
+    "frequency_limits": {
+      "nominal_hz": 50,
+      "min_hz": 49.0,
+      "max_hz": 51.0,
+      "disconnect_low_hz": 47.5,
+      "disconnect_high_hz": 52.0
+    },
+    "power_quality": {
+      "max_thd_pct": 5.0,
+      "max_dc_injection_pct": 0.5,
+      "power_factor_min": 0.95
+    },
+    "anti_islanding": {
+      "detection_time_s": 2.0,
+      "test_standard": "IEC 62116"
+    }
+  },
+  "sseg_category_b": {
+    "description": "SSEG Category B (>100 kW to 1 MW per phase)",
+    "export_limit_kw": null,
+    "zero_export_required": false,
+    "reporting_interval": "monthly",
+    "metering_requirement": "bidirectional_ct"
+  },
+  "nrs_097_certificates": [
+    {
+      "equipment": "Huawei SUN2000-330KTL-H1/H2",
+      "cert_no": "CN-PVES-250406",
+      "standard": "NRS 097-2-1:2024 Ed.3",
+      "date": "2025-10-17",
+      "issuer": "Intertek",
+      "expiry": null
+    },
+    {
+      "equipment": "Schneider Conext CL 25000E",
+      "cert_no": "U14-0636",
+      "standard": "NRS 097-2-1:2010 Ed.1",
+      "date": "2014-11-21",
+      "issuer": "Bureau Veritas",
+      "expiry": null
+    }
+  ]
+}
