@@ -60,10 +60,15 @@ from app.api import dali_discovery  # DALI device discovery
 from app.api import equipment_discovery  # Unified equipment discovery (DALI, BACnet, Modbus)
 from app.api import service_feedback  # Phase 59 Service feedback & health score integration
 from app.api import lifecycle_simulation  # 24-hour building lifecycle simulation
+from app.api import cache  # Redis cache management
+from app.api import simulation_analytics  # Simulation analytics pipeline
+from app.api import local_chat  # Phase 44-03 Local LLM conversational interface
+from app.api import ml_retraining  # Phase 45-01 Online Learning & Automated Retraining
+from app.api import fleet_learning  # Phase 45-02 Fleet Learning & Cross-Site Insights
+from app.api import sustainability  # Phase 29 Sustainability & ESG module
 from app.middleware.audit_middleware import AuditMiddleware
 from app.middleware.security_logging import SecurityLoggingMiddleware
 from app.services.background_scheduler import scheduler_service
-from app.api.simulation import simulation_service  # BMS simulation service
 from app.services.health_simulation_service import health_simulation_service  # Supabase health simulation
 from app.services.simbiot_service import simbiot_service  # SIMBIOT Concept Evolution connector
 
@@ -153,6 +158,7 @@ app.include_router(security.router, tags=["security"])  # Phase 58-01 Security M
 app.include_router(work_orders.router, prefix="/api", tags=["work-orders"])  # Work orders
 app.include_router(service_feedback.router, tags=["service-feedback"])  # Phase 59 Service feedback & health score
 app.include_router(lifecycle_simulation.router, tags=["lifecycle-simulation"])  # 24-hour building lifecycle simulation
+app.include_router(simulation_analytics.router, tags=["simulation-analytics"])  # Simulation analytics pipeline
 app.include_router(inspection.router, tags=["inspection"])  # Phase 55 Routine Inspection & Maintenance
 app.include_router(auth.router)  # Authentication (email-based login)
 app.include_router(user_access.router)  # User site access management (admin)
@@ -161,11 +167,23 @@ app.include_router(mfa.router)  # Phase 58.1 MFA for privileged access (FSR 4.6)
 app.include_router(equipment_metadata.router, prefix="/api", tags=["equipment-metadata"])  # Equipment notes/metadata
 app.include_router(dali_discovery.router, prefix="/api", tags=["dali-discovery"])  # DALI device discovery
 app.include_router(equipment_discovery.router, prefix="/api", tags=["equipment-discovery"])  # Unified discovery
+app.include_router(cache.router, tags=["cache"])  # Redis cache management
+app.include_router(local_chat.router, prefix="/api", tags=["local-chat"])  # Phase 44-03 Local LLM chat
+app.include_router(ml_retraining.router, tags=["ml-retraining"])  # Phase 45-01 Online Learning & Retraining
+app.include_router(fleet_learning.router, tags=["fleet-learning"])  # Phase 45-02 Fleet Learning & Cross-Site Insights
+app.include_router(sustainability.router, prefix="/api", tags=["sustainability"])  # Phase 29 Sustainability & ESG
 
 
 @app.on_event("startup")
 async def startup_event():
     """Initialize background services on startup."""
+    # Initialize Redis cache connection
+    from app.services.cache_service import cache
+    if cache.is_connected:
+        print("Redis cache connected successfully")
+    else:
+        print("Redis cache unavailable - running without caching")
+
     # Initialize device manager with mock devices + building equipment
     from app.api.devices import startup_event as devices_startup
     await devices_startup()
@@ -191,6 +209,14 @@ async def startup_event():
     # - Healthy equipment (>=90%): Optimization & preventive maintenance
     # - At-risk equipment (<90%): Maintenance & repair recommendations
     scheduler_service.add_recommendation_generation_job(interval_seconds=600)  # 10 minutes
+
+    # Start model freshness check (runs daily)
+    # Phase 45-01: Checks model age and R² score, auto-retrains stale models
+    scheduler_service.add_model_check_job(interval_seconds=86400)  # 24 hours
+
+    # Start performance monitor (runs hourly)
+    # Phase 45-01: Evaluates prediction accuracy against actual alerts
+    scheduler_service.add_performance_monitor_job(interval_seconds=3600)  # 1 hour
 
     # BMS simulation service - DISABLED for demo stability
     # try:
