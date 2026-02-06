@@ -372,6 +372,7 @@ class SolarArbitrageEngine:
         self,
         site_id: str,
         target_date: Optional[date] = None,
+        forecast_cloudy: Optional[bool] = None,
     ) -> DispatchSchedule:
         """Generate day-ahead BESS dispatch plan optimised for TOU arbitrage.
 
@@ -382,6 +383,11 @@ class SolarArbitrageEngine:
             excess to BESS
           - Evening peak (18:00-20:00 summer / 17:00-19:00 winter): Discharge
           - Standard evening (20:00-22:00 summer / 19:00-22:00 winter): Idle
+
+        Forecast-aware adjustments (when forecast_cloudy is provided):
+          - Cloudy forecast: Charge BESS more aggressively overnight (full rate)
+            because solar won't be sufficient to charge during standard hours.
+          - Sunny forecast: Moderate overnight charge; rely on solar midday.
 
         Respects BESS constraints:
           - Min SOC 10%, Max SOC 95%
@@ -424,18 +430,40 @@ class SolarArbitrageEngine:
                 # Charge BESS during off-peak
                 # Calculate hours (handle overnight)
                 hours = self._period_hours(start_str, end_str)
-                charge_power = min(
-                    self.BESS_RATED_POWER_KW,
-                    usable_kwh / hours if hours > 0 else self.BESS_RATED_POWER_KW,
-                )
+
+                # Forecast-aware charging strategy
+                if forecast_cloudy is True:
+                    # Cloudy tomorrow: charge aggressively to full capacity
+                    # because solar won't provide enough to charge during standard hours
+                    charge_power = self.BESS_RATED_POWER_KW
+                    target_soc = self.BESS_MAX_SOC_PCT
+                    note = "Cloudy forecast: aggressive overnight charge (solar insufficient tomorrow)"
+                elif forecast_cloudy is False:
+                    # Sunny tomorrow: moderate charge; solar will top up during standard
+                    charge_power = min(
+                        self.BESS_RATED_POWER_KW * 0.6,  # 60% charge rate
+                        usable_kwh * 0.6 / hours if hours > 0 else self.BESS_RATED_POWER_KW * 0.6,
+                    )
+                    target_soc = 70.0  # Only charge to 70%; solar handles the rest
+                    note = "Sunny forecast: moderate overnight charge (solar will top up midday)"
+                else:
+                    # No forecast available: standard strategy
+                    charge_power = min(
+                        self.BESS_RATED_POWER_KW,
+                        usable_kwh / hours if hours > 0 else self.BESS_RATED_POWER_KW,
+                    )
+                    target_soc = self.BESS_MAX_SOC_PCT
+                    note = ""
+
                 slots.append(DispatchSlot(
                     start=start_str,
                     end=end_str,
                     action=DispatchActionType.CHARGE.value,
                     power_kw=charge_power,
-                    target_soc_pct=self.BESS_MAX_SOC_PCT,
+                    target_soc_pct=target_soc,
                     tariff_band=band_name,
                     rate_per_kwh=rate,
+                    note=note,
                 ))
 
             elif band_name == "peak":
@@ -464,27 +492,31 @@ class SolarArbitrageEngine:
                 # For morning/afternoon standard, go solar priority
                 # For evening standard (after 20:00), idle
                 start_h = int(start_str.split(":")[0])
-                if start_h >= 10 and start_h < 18:
-                    slots.append(DispatchSlot(
-                        start=start_str,
-                        end=end_str,
-                        action=DispatchActionType.SOLAR_PRIORITY.value,
-                        power_kw=0,
-                        tariff_band=band_name,
-                        rate_per_kwh=rate,
-                        note="BESS absorbs excess solar generation",
-                    ))
-                elif start_h >= 9 and start_h < 17:
-                    # Winter standard midday
-                    slots.append(DispatchSlot(
-                        start=start_str,
-                        end=end_str,
-                        action=DispatchActionType.SOLAR_PRIORITY.value,
-                        power_kw=0,
-                        tariff_band=band_name,
-                        rate_per_kwh=rate,
-                        note="BESS absorbs excess solar generation",
-                    ))
+                is_midday = (start_h >= 10 and start_h < 18) or (start_h >= 9 and start_h < 17)
+
+                if is_midday:
+                    # Forecast-aware standard period behaviour
+                    if forecast_cloudy is True:
+                        # Cloudy: BESS conserves energy, doesn't expect solar top-up
+                        slots.append(DispatchSlot(
+                            start=start_str,
+                            end=end_str,
+                            action=DispatchActionType.IDLE.value,
+                            power_kw=0,
+                            tariff_band=band_name,
+                            rate_per_kwh=rate,
+                            note="Cloudy forecast: BESS conserving for evening peak",
+                        ))
+                    else:
+                        slots.append(DispatchSlot(
+                            start=start_str,
+                            end=end_str,
+                            action=DispatchActionType.SOLAR_PRIORITY.value,
+                            power_kw=0,
+                            tariff_band=band_name,
+                            rate_per_kwh=rate,
+                            note="BESS absorbs excess solar generation",
+                        ))
                 else:
                     # Early morning or evening standard: idle
                     slots.append(DispatchSlot(

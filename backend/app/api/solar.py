@@ -13,6 +13,8 @@ Provides real-time and historical data for solar installations:
   - Energy arbitrage: TOU tariff optimisation, BESS dispatch scheduling, savings
   - Demand management: peak shaving, NMD tracking, load deferral
   - Self-consumption: ratio tracking, energy balance, export management
+  - Generation forecasting: 72-hour ensemble forecast, clear-sky profile, accuracy
+  - Generator coordination: priority dispatch, diesel avoidance, LS automation
 """
 
 from typing import Optional
@@ -26,6 +28,8 @@ from app.services.solar_arbitrage_engine import get_solar_arbitrage_engine
 from app.services.solar_dispatch_service import get_solar_dispatch_service
 from app.services.solar_demand_service import get_solar_demand_service
 from app.services.solar_selfconsumption_service import get_solar_selfconsumption_service
+from app.services.solar_forecast_service import get_solar_forecast_service
+from app.services.solar_generator_coordinator import get_solar_generator_coordinator
 
 router = APIRouter()
 
@@ -570,3 +574,116 @@ async def get_energy_balance(
         )
     balance = svc.get_energy_balance(site_id, period=period)
     return balance.to_dict()
+
+
+# === Generation forecast endpoints (34-07) ===
+
+
+@router.get("/solar/sites/{site_id}/forecast")
+async def get_generation_forecast(
+    site_id: str,
+    hours: int = Query(72, ge=1, le=168, description="Forecast horizon in hours (1-168)"),
+):
+    """Get 72-hour generation forecast with confidence bands.
+
+    Returns hourly generation predictions using a weighted ensemble model
+    (30% persistence, 30% clear-sky, 40% historical average). Confidence
+    bands widen from 5% to 35% over the forecast horizon. Includes daily
+    totals, clear-sky comparison, and 7-day accuracy metrics (RMSE, MAE, bias).
+    """
+    svc = get_solar_forecast_service()
+    forecast = svc.get_forecast(site_id, hours_ahead=hours)
+    if not forecast.hourly:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Solar site '{site_id}' not found or no forecast data",
+        )
+    return forecast.to_dict()
+
+
+@router.get("/solar/sites/{site_id}/forecast/accuracy")
+async def get_forecast_accuracy(
+    site_id: str,
+    days: int = Query(7, ge=1, le=30, description="Accuracy period in days (1-30)"),
+):
+    """Get forecast vs actual accuracy metrics.
+
+    Returns RMSE (root mean square error), MAE (mean absolute error),
+    and bias percentage comparing forecast predictions against metered
+    generation. RMSE is also expressed as percentage of peak capacity.
+    Target: RMSE < 15% of peak for statistical models.
+    """
+    svc = get_solar_forecast_service()
+    accuracy = svc.get_forecast_accuracy(site_id, days=days)
+    return accuracy.to_dict()
+
+
+# === Generator coordination endpoints (34-07) ===
+
+
+@router.get("/solar/sites/{site_id}/generator/status")
+async def get_generator_status(site_id: str):
+    """Get current dispatch priority stack and generator need assessment.
+
+    Returns the active energy source (Solar > BESS > Grid > Generator),
+    status of each tier in the priority stack, and whether the generator
+    should be started based on current BESS SOC, load shedding state,
+    and solar availability. Generator is the absolute last resort.
+    """
+    coord = get_solar_generator_coordinator()
+    priority = coord.get_dispatch_priority(site_id)
+    assessment = coord.evaluate_generator_need(site_id)
+    return {
+        "site_id": site_id,
+        "priority": priority.to_dict(),
+        "generator_assessment": assessment.to_dict(),
+    }
+
+
+@router.get("/solar/sites/{site_id}/generator/avoidance")
+async def get_diesel_avoidance(
+    site_id: str,
+    period: str = Query("month", description="Period: day, week, or month"),
+):
+    """Get diesel avoidance savings from Solar+BESS.
+
+    Calculates generator hours avoided, diesel litres saved, and ZAR
+    saved by using Solar+BESS instead of generators during load shedding.
+    Generator consumption: ~30 L/hour at 70% load, diesel at R22/litre.
+    Shows load shedding event count, generator starts, and avoided starts.
+    """
+    coord = get_solar_generator_coordinator()
+    if period not in ("day", "week", "month"):
+        raise HTTPException(
+            status_code=400,
+            detail="Period must be 'day', 'week', or 'month'",
+        )
+    avoidance = coord.calculate_diesel_avoidance(site_id, period=period)
+    return avoidance.to_dict()
+
+
+@router.get("/solar/sites/{site_id}/generator/events")
+async def get_generator_events(
+    site_id: str,
+    period: str = Query("month", description="Period: day, week, or month"),
+):
+    """Get generator event log for a period.
+
+    Returns timestamped generator events including starts, stops, avoided
+    starts (BESS sustained load), and LS override events. Each event
+    includes BESS SOC, solar generation, building load, and fuel usage.
+    Events sorted most recent first.
+    """
+    coord = get_solar_generator_coordinator()
+    if period not in ("day", "week", "month"):
+        raise HTTPException(
+            status_code=400,
+            detail="Period must be 'day', 'week', or 'month'",
+        )
+    events = coord.get_generator_events(site_id, period=period)
+    return {
+        "site_id": site_id,
+        "period": period,
+        "event_count": len(events),
+        "events": [e.to_dict() for e in events],
+    }
