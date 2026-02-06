@@ -31,9 +31,11 @@ import {
   SlidersHorizontal,
   ShieldCheck,
   Plug,
+  FlaskConical,
+  BarChart3,
 } from "lucide-react";
 
-export type View = "dashboard" | "chat" | "technician" | "control" | "control-audit" | "optimization" | "settings" | "integrations" | "occupancy" | "workflow" | "security" | "simbiot";
+export type View = "dashboard" | "chat" | "technician" | "control" | "control-audit" | "optimization" | "settings" | "integrations" | "occupancy" | "workflow" | "security" | "simbiot" | "simulation" | "fleet";
 
 interface SidebarProps {
   currentView: View;
@@ -68,6 +70,8 @@ const navItems: NavItem[] = [
   { id: "simbiot", label: "SIMBIOT", icon: Plug, description: "BMS Connection Wizard" },
   { id: "integrations", label: "Integrations", icon: Activity, description: "BMS Integration Health" },
   { id: "security", label: "Security", icon: ShieldCheck, description: "Access & CCTV" },
+  { id: "simulation", label: "Simulation", icon: FlaskConical, description: "Lifecycle & Analytics" },
+  { id: "fleet", label: "Fleet ML", icon: BarChart3, description: "Cross-Site Insights" },
 ];
 
 export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomizeDashboard }: SidebarProps) {

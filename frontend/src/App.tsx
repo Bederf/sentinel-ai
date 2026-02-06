@@ -20,6 +20,8 @@ import { AssetWorkflowDashboard } from "./components/AssetWorkflowDashboard";
 import { OccupancyPanel } from "./components/OccupancyPanel";
 import { SecurityDashboard } from "./components/SecurityDashboard";
 import { SimbiotPage } from "./components/SimbiotPage";
+import { SimulationDashboard } from "./components/SimulationDashboard";
+import { FleetInsights } from "./components/FleetInsights";
 
 interface HealthStatus {
   status: string;
@@ -284,6 +286,8 @@ function App() {
                  currentView === "occupancy" ? "DALI Occupancy" :
                  currentView === "security" ? "Security" :
                  currentView === "simbiot" ? "SIMBIOT" :
+                 currentView === "simulation" ? "Simulation" :
+                 currentView === "fleet" ? "Fleet ML Insights" :
                  "AI Assistant"}
               </h1>
             </div>
@@ -577,6 +581,12 @@ function App() {
             <SecurityDashboard />
           ) : currentView === "simbiot" ? (
             <SimbiotPage />
+          ) : currentView === "simulation" ? (
+            <div className="h-full overflow-y-auto">
+              <SimulationDashboard />
+            </div>
+          ) : currentView === "fleet" ? (
+            <FleetInsights />
           ) : (
             <div className="h-full p-4 md:p-6">
               <div className="h-full max-w-4xl mx-auto">
