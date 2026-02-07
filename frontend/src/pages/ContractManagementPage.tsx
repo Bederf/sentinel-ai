@@ -288,11 +288,7 @@ interface KPICardProps {
 function KPICard({ title, value, subtitle, icon, trend }: KPICardProps) {
   return (
     <div
-      className="rounded-lg p-4"
-      style={{
-        background: "var(--color-sentinel-bg-panel)",
-        border: "1px solid var(--color-sentinel-border)",
-      }}
+      className="glass-card p-4"
     >
       <div className="flex items-start justify-between mb-3">
         <span
@@ -589,11 +585,7 @@ export function ContractManagementPage() {
             {[1, 2, 3, 4].map((i) => (
               <div
                 key={i}
-                className="rounded-lg p-4 animate-pulse"
-                style={{
-                  background: "var(--color-sentinel-bg-panel)",
-                  border: "1px solid var(--color-sentinel-border)",
-                }}
+                className="glass-card p-4 animate-pulse"
               >
                 <div
                   className="h-3 w-24 rounded mb-4"
@@ -612,11 +604,7 @@ export function ContractManagementPage() {
           </div>
           {/* Skeleton table */}
           <div
-            className="rounded-lg p-4 animate-pulse"
-            style={{
-              background: "var(--color-sentinel-bg-panel)",
-              border: "1px solid var(--color-sentinel-border)",
-            }}
+            className="glass-panel p-4 animate-pulse"
           >
             {[1, 2, 3].map((i) => (
               <div
@@ -757,11 +745,7 @@ export function ContractManagementPage() {
 
         {/* Section 2: Contract List */}
         <div
-          className="rounded-lg overflow-hidden"
-          style={{
-            background: "var(--color-sentinel-bg-panel)",
-            border: "1px solid var(--color-sentinel-border)",
-          }}
+          className="glass-panel overflow-hidden"
         >
           <div
             className="px-4 py-3 flex items-center justify-between"
@@ -1053,11 +1037,7 @@ export function ContractManagementPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Section 3: SLA Tracking */}
             <div
-              className="rounded-lg overflow-hidden"
-              style={{
-                background: "var(--color-sentinel-bg-panel)",
-                border: "1px solid var(--color-sentinel-border)",
-              }}
+              className="glass-panel overflow-hidden"
             >
               <div
                 className="px-4 py-3 flex items-center gap-2"
@@ -1277,11 +1257,7 @@ export function ContractManagementPage() {
 
             {/* Section 4: Budget Overview */}
             <div
-              className="rounded-lg overflow-hidden"
-              style={{
-                background: "var(--color-sentinel-bg-panel)",
-                border: "1px solid var(--color-sentinel-border)",
-              }}
+              className="glass-panel overflow-hidden"
             >
               <div
                 className="px-4 py-3 flex items-center gap-2"
@@ -1603,11 +1579,7 @@ export function ContractManagementPage() {
         {/* Contact details for selected contract */}
         {selectedContract && (
           <div
-            className="rounded-lg p-4"
-            style={{
-              background: "var(--color-sentinel-bg-panel)",
-              border: "1px solid var(--color-sentinel-border)",
-            }}
+            className="glass-panel p-4"
           >
             <div className="flex items-center gap-2 mb-3">
               <Users

@@ -4,6 +4,7 @@ import { useHealthThresholds } from "../hooks/useHealthThresholds";
 import { ThresholdEditor } from "./ThresholdEditor";
 import { SafetyRulesEditor } from "./SafetyRulesEditor";
 import { PasswordModal } from "./PasswordModal";
+import { NotificationSettings } from "./NotificationSettings";
 
 interface SettingsProps {
   onError?: (error: string) => void;
@@ -90,11 +91,7 @@ export function Settings({ onError }: SettingsProps) {
       <div className="space-y-6 max-w-4xl">
         {/* Health Score Thresholds */}
         <div
-          className="rounded-md overflow-hidden"
-          style={{
-            background: "var(--color-sentinel-bg-panel)",
-            border: "1px solid var(--color-sentinel-border)",
-          }}
+          className="glass-panel overflow-hidden"
         >
           <div className="p-4 border-b" style={{ borderColor: "var(--color-sentinel-border)" }}>
             <div className="flex items-center gap-3">
@@ -145,10 +142,9 @@ export function Settings({ onError }: SettingsProps) {
 
         {/* Safety Rules */}
         <div
-          className="rounded-md overflow-hidden"
+          className="glass-panel overflow-hidden"
           style={{
-            background: "var(--color-sentinel-bg-panel)",
-            border: `1px solid ${safetyRulesUnlocked ? "var(--color-sentinel-amber)" : "var(--color-sentinel-border)"}`,
+            border: safetyRulesUnlocked ? `1px solid var(--color-sentinel-amber)` : undefined,
           }}
         >
           <div className="p-4 border-b" style={{ borderColor: "var(--color-sentinel-border)" }}>
@@ -239,13 +235,9 @@ export function Settings({ onError }: SettingsProps) {
           </div>
         </div>
 
-        {/* Notification Settings - Coming Soon */}
+        {/* Notification Settings */}
         <div
-          className="rounded-md overflow-hidden opacity-60"
-          style={{
-            background: "var(--color-sentinel-bg-panel)",
-            border: "1px solid var(--color-sentinel-border)",
-          }}
+          className="glass-panel overflow-hidden"
         >
           <div className="p-4 border-b" style={{ borderColor: "var(--color-sentinel-border)" }}>
             <div className="flex items-center gap-3">
@@ -266,33 +258,26 @@ export function Settings({ onError }: SettingsProps) {
                   Notification Settings
                 </h2>
                 <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                  Configure alert notifications and delivery preferences
+                  Configure alert commands and notification preferences for Clawd bot
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="p-8 text-center">
-            <Bell className="h-12 w-12 mx-auto mb-3" style={{ color: "var(--color-sentinel-text-disabled)" }} />
-            <p
-              className="text-sm font-medium mb-1"
-              style={{ color: "var(--color-sentinel-text-primary)" }}
-            >
-              Coming Soon
-            </p>
-            <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-              Notification settings will be available in a future update
-            </p>
+          <div className="p-4">
+            <NotificationSettings
+              onError={onError}
+              onSuccess={() => {
+                setSaveSuccess(true);
+                setTimeout(() => setSaveSuccess(false), 3000);
+              }}
+            />
           </div>
         </div>
 
         {/* Display Settings - Coming Soon */}
         <div
-          className="rounded-md overflow-hidden opacity-60"
-          style={{
-            background: "var(--color-sentinel-bg-panel)",
-            border: "1px solid var(--color-sentinel-border)",
-          }}
+          className="glass-panel overflow-hidden opacity-60"
         >
           <div className="p-4 border-b" style={{ borderColor: "var(--color-sentinel-border)" }}>
             <div className="flex items-center gap-3">

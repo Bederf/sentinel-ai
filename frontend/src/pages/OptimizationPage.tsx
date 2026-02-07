@@ -21,10 +21,12 @@ import {
   BarChart,
   Clock,
   CheckCircle,
+  Building2,
+  ChevronDown,
 } from "lucide-react";
 import { Table, TableHead, TableRow, TableHeaderCell, TableBody, TableCell, Button } from "@tremor/react";
 import api from "../lib/api";
-import type { OptimizationScenario, OptimizationStatusResponse } from "../lib/api";
+import type { OptimizationScenario, OptimizationStatusResponse, Site } from "../lib/api";
 import { OptimizationPanel } from "../components/OptimizationPanel";
 
 // Sentinel-styled Badge component
@@ -109,6 +111,8 @@ interface OptimizationPageProps {
 
 export function OptimizationPage({ onError }: OptimizationPageProps) {
   // State
+  const [sites, setSites] = useState<Site[]>([]);
+  const [selectedSiteId, setSelectedSiteId] = useState<string>("site-002");
   const [allScenarios, setAllScenarios] = useState<OptimizationScenario[]>([]);
   const [scenarios, setScenarios] = useState<ScenarioComparison[]>([]);
   const [actionHistory, setActionHistory] = useState<ActionHistoryItem[]>([]);
@@ -122,6 +126,15 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [selectedScenario, setSelectedScenario] = useState<string | null>(null);
 
+  // Fetch sites on mount
+  useEffect(() => {
+    api.getSites().then((sitesData) => {
+      setSites(sitesData);
+      const defaultSite = sitesData.find(s => s.id === "site-002") || sitesData[0];
+      if (defaultSite) setSelectedSiteId(defaultSite.id);
+    }).catch(() => {});
+  }, []);
+
   useEffect(() => {
     const loadOptimizationData = async () => {
       try {
@@ -130,7 +143,7 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
         // Fetch scenarios and optimization status in parallel
         const [scenarioData, statusData] = await Promise.all([
           api.getOptimizationScenarios().catch(() => [] as OptimizationScenario[]),
-          api.getOptimizationStatus("site-001").catch(() => null as OptimizationStatusResponse | null),
+          api.getOptimizationStatus(selectedSiteId).catch(() => null as OptimizationStatusResponse | null),
         ]);
 
         setAllScenarios(scenarioData);
@@ -204,7 +217,7 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
     };
 
     loadOptimizationData();
-  }, []);
+  }, [selectedSiteId]);
 
   const handleExecuteOptimization = (scenarioId: string) => {
     setSelectedScenario(scenarioId);
@@ -216,7 +229,7 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
 
     // Find the matching scenario's site_id for precooling
     const matchedScenario = allScenarios.find((s) => s.scenario_id === selectedScenario);
-    const targetSiteId = matchedScenario?.site_id || "site-001";
+    const targetSiteId = matchedScenario?.site_id || selectedSiteId;
 
     try {
       const result = await api.startPrecooling(targetSiteId, selectedScenario || undefined);
@@ -252,11 +265,7 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
     return (
       <div className="h-full overflow-y-auto p-4 md:p-6" style={{ background: "var(--color-sentinel-bg-canvas)" }}>
         <div
-          className="rounded-md p-8 text-center"
-          style={{
-            background: "var(--color-sentinel-bg-panel)",
-            border: "1px solid var(--color-sentinel-border)",
-          }}
+          className="glass-panel p-8 text-center"
         >
           <div
             className="h-12 w-12 mx-auto mb-4 rounded-full flex items-center justify-center"
@@ -281,16 +290,12 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
       {/* Main Optimization Panel - Hero Section */}
       <div className="mb-6">
         <div
-          className="rounded-md overflow-hidden"
-          style={{
-            background: "var(--color-sentinel-bg-panel)",
-            border: "1px solid var(--color-sentinel-border)",
-          }}
+          className="glass-panel overflow-hidden"
         >
           {/* Panel Header */}
           <div
             className="p-4 flex items-center justify-between"
-            style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}
+            style={{ borderBottom: "1px solid var(--glass-border)" }}
           >
             <div className="flex items-center gap-3">
               <div
@@ -314,7 +319,41 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
                 </span>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
+              {/* Building Selector */}
+              <div className="relative">
+                <Building2
+                  className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4"
+                  style={{ color: "var(--color-sentinel-text-secondary)" }}
+                />
+                <ChevronDown
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 h-3 w-3 pointer-events-none"
+                  style={{ color: "var(--color-sentinel-text-secondary)" }}
+                />
+                <select
+                  value={selectedSiteId}
+                  onChange={(e) => setSelectedSiteId(e.target.value)}
+                  className="pl-9 pr-7 py-1.5 text-sm rounded appearance-none cursor-pointer"
+                  style={{
+                    background: "var(--color-sentinel-bg-secondary)",
+                    border: "1px solid var(--color-sentinel-border)",
+                    color: "var(--color-sentinel-text-primary)",
+                    outline: "none",
+                    minWidth: "200px",
+                  }}
+                >
+                  {sites.length > 0 ? (
+                    sites.map((site) => (
+                      <option key={site.id} value={site.id}>
+                        {site.name}
+                      </option>
+                    ))
+                  ) : (
+                    <option value="site-002">Sandton City Office Tower</option>
+                  )}
+                </select>
+              </div>
+
               <SentinelBadge variant="success" size="lg">
                 <div className="flex items-center gap-2">
                   <div
@@ -337,11 +376,7 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
       {/* Metrics Grid - KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div
-          className="rounded-md p-4"
-          style={{
-            background: "var(--color-sentinel-bg-panel)",
-            border: "1px solid var(--color-sentinel-border)",
-          }}
+          className="glass-card p-4"
         >
           <div className="flex items-center justify-between">
             <div>
@@ -374,11 +409,7 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
         </div>
 
         <div
-          className="rounded-md p-4"
-          style={{
-            background: "var(--color-sentinel-bg-panel)",
-            border: "1px solid var(--color-sentinel-border)",
-          }}
+          className="glass-card p-4"
         >
           <div className="flex items-center justify-between">
             <div>
@@ -411,11 +442,7 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
         </div>
 
         <div
-          className="rounded-md p-4"
-          style={{
-            background: "var(--color-sentinel-bg-panel)",
-            border: "1px solid var(--color-sentinel-border)",
-          }}
+          className="glass-card p-4"
         >
           <div className="flex items-center justify-between">
             <div>
@@ -448,11 +475,7 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
         </div>
 
         <div
-          className="rounded-md p-4"
-          style={{
-            background: "var(--color-sentinel-bg-panel)",
-            border: "1px solid var(--color-sentinel-border)",
-          }}
+          className="glass-card p-4"
         >
           <div className="flex items-center justify-between">
             <div>
@@ -489,16 +512,12 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Scenario Comparison */}
         <div
-          className="rounded-md overflow-hidden"
-          style={{
-            background: "var(--color-sentinel-bg-panel)",
-            border: "1px solid var(--color-sentinel-border)",
-          }}
+          className="glass-panel overflow-hidden"
         >
           {/* Panel Header */}
           <div
             className="p-4 flex items-center justify-between"
-            style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}
+            style={{ borderBottom: "1px solid var(--glass-border)" }}
           >
             <div className="flex items-center gap-3">
               <div
@@ -601,16 +620,12 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
 
         {/* Action History */}
         <div
-          className="rounded-md overflow-hidden"
-          style={{
-            background: "var(--color-sentinel-bg-panel)",
-            border: "1px solid var(--color-sentinel-border)",
-          }}
+          className="glass-panel overflow-hidden"
         >
           {/* Panel Header */}
           <div
             className="p-4 flex items-center justify-between"
-            style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}
+            style={{ borderBottom: "1px solid var(--glass-border)" }}
           >
             <div className="flex items-center gap-3">
               <div
@@ -696,11 +711,7 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
             onClick={() => setShowConfirmModal(false)}
           />
           <div
-            className="relative z-10 rounded-md p-6"
-            style={{
-              background: "var(--color-sentinel-bg-panel)",
-              border: "1px solid var(--color-sentinel-border)",
-            }}
+            className="relative z-10 glass-panel p-6"
           >
             <div className="mb-4">
               <span
