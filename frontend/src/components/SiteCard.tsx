@@ -398,11 +398,7 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
 
   return (
     <div
-      className={`relative rounded-md overflow-hidden transition-all duration-150 ${onClick ? "cursor-pointer hover:brightness-110" : ""}`}
-      style={{
-        background: "var(--color-sentinel-bg-panel)",
-        border: "1px solid var(--color-sentinel-border)",
-      }}
+      className={`relative rounded-md overflow-hidden transition-all duration-150 glass-card ${onClick ? "cursor-pointer hover:brightness-110" : ""}`}
       onClick={handleClick}
     >
       {/* Left status accent bar */}
