@@ -512,11 +512,7 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
         style={{ background: "var(--color-sentinel-bg-canvas)" }}
       >
         <div
-          className="p-8 rounded-md text-center"
-          style={{
-            background: "var(--color-sentinel-bg-panel)",
-            border: "1px solid var(--color-sentinel-border)",
-          }}
+          className="p-8 rounded-md text-center glass-panel"
         >
           <AlertTriangle
             className="h-12 w-12 mx-auto mb-4"
@@ -590,16 +586,12 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
       <DashboardSection id="site-protection">
         <div className="lg:col-span-3">
           <div
-            className="rounded-md overflow-hidden"
-            style={{
-              background: "var(--color-sentinel-bg-panel)",
-              border: "1px solid var(--color-sentinel-border)",
-            }}
+            className="rounded-md overflow-hidden glass-panel"
           >
           {/* Panel Header */}
           <div
             className="p-4 flex items-center justify-between"
-            style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}
+            style={{ borderBottom: "1px solid var(--glass-border)" }}
           >
             <div className="flex items-center gap-3">
               <div
@@ -675,16 +667,12 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
     <DashboardSection id="energy-analytics">
       <div className="mt-6">
         <div
-          className="rounded-md overflow-hidden"
-          style={{
-            background: "var(--color-sentinel-bg-panel)",
-            border: "1px solid var(--color-sentinel-border)",
-          }}
+          className="rounded-md overflow-hidden glass-panel"
         >
           {/* Panel Header with Filters */}
           <div
             className="p-4 flex flex-wrap items-center justify-between gap-4"
-            style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}
+            style={{ borderBottom: "1px solid var(--glass-border)" }}
           >
             <h3
               className="font-medium text-sm"
@@ -897,16 +885,12 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
 
         {/* Risk Intelligence Panel */}
         <div
-          className="rounded-md overflow-hidden"
-          style={{
-            background: "var(--color-sentinel-bg-panel)",
-            border: "1px solid var(--color-sentinel-border)",
-          }}
+          className="rounded-md overflow-hidden glass-panel"
         >
           {/* Panel Header */}
           <div
             className="p-4 flex items-center justify-between"
-            style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}
+            style={{ borderBottom: "1px solid var(--glass-border)" }}
           >
             <div className="flex items-center gap-3">
               <div
@@ -1081,10 +1065,8 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
         <div className="flex justify-end mb-4">
           <button
             onClick={() => setIsCardLibraryOpen(true)}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors hover:opacity-80"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors hover:opacity-80 glass-subtle"
             style={{
-              background: "var(--color-sentinel-bg-panel)",
-              border: "1px solid var(--color-sentinel-border)",
               color: "var(--color-sentinel-text-secondary)",
             }}
           >
