@@ -3879,3 +3879,13 @@ const apiWithAuth = {
 };
 
 export default apiWithAuth;
+
+// ============= Profitability Analytics Types =============
+// Re-export from profitabilityApi for convenience
+export type {
+  PortfolioMetrics,
+  ContractProfitabilityDetail,
+  ProfitabilityTrend,
+  LossLeaderAnalysis,
+  AssetROI,
+} from "./profitabilityApi";
