@@ -1,0 +1,72 @@
+{
+  "chiller": {
+    "equipment_type": "chiller",
+    "annual_hours_planned": 24,
+    "callouts_per_year": 3,
+    "parts_replacement_cycle_months": 12,
+    "labor_rate_zar": 850.00,
+    "typical_monthly_breakdown": {
+      "labor_budget_zar": 1800.00,
+      "parts_budget_zar": 4500.00,
+      "consumables_budget_zar": 800.00,
+      "subcontractor_budget_zar": 0.00,
+      "callout_budget_zar": 1500.00
+    }
+  },
+  "ahu": {
+    "equipment_type": "ahu",
+    "annual_hours_planned": 16,
+    "callouts_per_year": 2,
+    "parts_replacement_cycle_months": 6,
+    "labor_rate_zar": 750.00,
+    "typical_monthly_breakdown": {
+      "labor_budget_zar": 1200.00,
+      "parts_budget_zar": 1800.00,
+      "consumables_budget_zar": 400.00,
+      "subcontractor_budget_zar": 0.00,
+      "callout_budget_zar": 1000.00
+    }
+  },
+  "generator": {
+    "equipment_type": "generator",
+    "annual_hours_planned": 36,
+    "callouts_per_year": 4,
+    "parts_replacement_cycle_months": 12,
+    "labor_rate_zar": 950.00,
+    "typical_monthly_breakdown": {
+      "labor_budget_zar": 3000.00,
+      "parts_budget_zar": 6500.00,
+      "consumables_budget_zar": 1200.00,
+      "subcontractor_budget_zar": 500.00,
+      "callout_budget_zar": 2000.00
+    }
+  },
+  "dali_controller": {
+    "equipment_type": "dali_controller",
+    "annual_hours_planned": 8,
+    "callouts_per_year": 1,
+    "parts_replacement_cycle_months": 24,
+    "labor_rate_zar": 650.00,
+    "typical_monthly_breakdown": {
+      "labor_budget_zar": 500.00,
+      "parts_budget_zar": 300.00,
+      "consumables_budget_zar": 100.00,
+      "subcontractor_budget_zar": 0.00,
+      "callout_budget_zar": 500.00
+    }
+  },
+  "power_meter": {
+    "equipment_type": "power_meter",
+    "annual_hours_planned": 4,
+    "callouts_per_year": 1,
+    "parts_replacement_cycle_months": 60,
+    "labor_rate_zar": 550.00,
+    "typical_monthly_breakdown": {
+      "labor_budget_zar": 200.00,
+      "parts_budget_zar": 100.00,
+      "consumables_budget_zar": 50.00,
+      "subcontractor_budget_zar": 0.00,
+      "callout_budget_zar": 300.00
+    }
+  }
+}

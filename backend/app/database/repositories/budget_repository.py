@@ -12,10 +12,12 @@ logger = logging.getLogger(__name__)
 
 
 class BudgetRepository:
-    """Repository for budget CRUD operations."""
+    """Repository for budget CRUD operations with template support."""
 
     def __init__(self):
         self.client = get_supabase_client()
+        self._templates: Optional[Dict[str, Any]] = None
+        self._load_templates()
 
     def get_by_contract(
         self,
@@ -174,6 +176,103 @@ class BudgetRepository:
         except Exception as e:
             logger.error(f"Error getting budget {budget_id}: {e}")
             return None
+
+
+    def _load_templates(self) -> None:
+        """
+        Load budget templates from JSON file into memory cache.
+
+        Templates are loaded once on initialization and cached for performance.
+        """
+        import json
+        from pathlib import Path
+
+        template_file = Path(__file__).parent.parent.parent / "data" / "budget_templates.json"
+
+        if not template_file.exists():
+            logger.warning(f"Budget templates file not found: {template_file}")
+            self._templates = {}
+            return
+
+        try:
+            with open(template_file, "r") as f:
+                self._templates = json.load(f)
+            logger.info(f"Loaded {len(self._templates)} budget templates")
+        except Exception as e:
+            logger.error(f"Error loading budget templates: {e}")
+            self._templates = {}
+
+    def get_template(self, equipment_type: str) -> Optional[Dict[str, Any]]:
+        """
+        Get budget template for a specific equipment type.
+
+        Args:
+            equipment_type: Equipment type (chiller, ahu, generator, etc.)
+
+        Returns:
+            Template dict, or None if not found
+        """
+        return self._templates.get(equipment_type)
+
+    def get_budget_templates(self) -> Dict[str, Any]:
+        """
+        Get all available budget templates.
+
+        Returns:
+            Dict of all templates keyed by equipment_type
+        """
+        return self._templates.copy() if self._templates else {}
+
+    def create_from_template(
+        self,
+        contract_id: str,
+        equipment_type: str,
+        year: int,
+        month: Optional[int] = None
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Create a budget entry using equipment-type template defaults.
+
+        Args:
+            contract_id: Contract UUID
+            equipment_type: Equipment type for template lookup
+            year: Budget year
+            month: Optional budget month (1-12), if None creates annual budget
+
+        Returns:
+            Created budget dict, or None on error
+        """
+        template = self.get_template(equipment_type)
+        if not template:
+            logger.warning(f"No template found for equipment type: {equipment_type}")
+            return None
+
+        breakdown = template.get("typical_monthly_breakdown", {})
+
+        # Generate unique code
+        import uuid
+        code = f"BUD-{equipment_type.upper()}-{year}"
+        if month:
+            code += f"-{month:02d}"
+
+        budget_data = {
+            "id": str(uuid.uuid4()),
+            "code": code,
+            "contract_id": contract_id,
+            "equipment_type": equipment_type,
+            "budget_year": year,
+            "budget_month": month,
+            "labor_budget_zar": breakdown.get("labor_budget_zar", 0.0),
+            "parts_budget_zar": breakdown.get("parts_budget_zar", 0.0),
+            "consumables_budget_zar": breakdown.get("consumables_budget_zar", 0.0),
+            "subcontractor_budget_zar": breakdown.get("subcontractor_budget_zar", 0.0),
+            "callout_budget_zar": breakdown.get("callout_budget_zar", 0.0),
+            "warning_threshold_pct": 80.0,
+            "critical_threshold_pct": 100.0,
+            "status": "draft"
+        }
+
+        return self.create(budget_data)
 
 
 # Singleton instance
