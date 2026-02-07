@@ -4,7 +4,7 @@ type: "reference"
 status: "approved"
 version: "1.0.0"
 created: "2026-02-06"
-updated: "2026-02-06"
+updated: "2026-02-07"
 author: "Sentinel Development Team"
 tags: ["api", "contracts", "sla", "budget", "organizations", "commercial"]
 domain: "bms"
@@ -15,7 +15,7 @@ estimated_read_time: 12
 
 # Contract Management API Reference
 
-Phase 48 Contract Management endpoints. Provides CRUD operations for FM commercial intelligence: organizations, contracts, SLA terms, equipment assignments, budgets, and condition assessments.
+Phase 48 Contract Management endpoints with Phase 50/51 extensions. Provides CRUD operations for FM commercial intelligence: organizations, contracts, SLA terms, equipment assignments, budgets, condition assessments, SLA compliance monitoring, and profitability analytics.
 
 Base path: `/api/contracts`
 
@@ -240,6 +240,119 @@ List all SLA terms for a contract.
   "count": 1
 }
 ```
+
+## SLA Monitoring (Phase 50)
+
+### GET `/api/contracts/sla/performance/{contract_id}`
+
+Get SLA performance history with compliance metrics.
+
+**Query Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| months | int | No | Number of months to return (default 12) |
+
+**Response:**
+```json
+{
+  "contract_id": "uuid",
+  "performance": [
+    {
+      "period_start": "2026-02-01",
+      "period_end": "2026-02-28",
+      "metric_type": "response_time",
+      "compliance_percentage": 95.0,
+      "compliance_status": "compliant",
+      "breach_count": 0,
+      "clawback_amount_zar": 0.0
+    }
+  ]
+}
+```
+
+### GET `/api/contracts/sla/breaches/{contract_id}`
+
+Get SLA breach events for a contract.
+
+**Query Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| severity | string | No | Filter by minor, major, critical |
+
+**Response:**
+```json
+{
+  "breaches": [
+    {
+      "metric_type": "resolution_time",
+      "breach_severity": "major",
+      "breach_percentage": 22.5,
+      "occurred_at": "2026-02-12T12:00:00",
+      "clawback_amount_zar": 5000
+    }
+  ]
+}
+```
+
+### GET `/api/contracts/sla/summary/{contract_id}`
+
+Get SLA compliance summary (overall compliance, breach counts, total clawbacks).
+
+### POST `/api/contracts/sla/recalculate/{contract_id}`
+
+Trigger compliance recalculation for the current month.
+
+**Response:**
+```json
+{
+  "recalculated": true,
+  "performance": { "contract_id": "uuid" }
+}
+```
+
+## Profitability Analytics (Phase 51)
+
+### GET `/api/contracts/profitability/portfolio`
+
+Portfolio-wide profitability metrics.
+
+**Query Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| period_start | date | No | Start date (YYYY-MM-DD) |
+| period_end | date | No | End date (YYYY-MM-DD) |
+
+**Response:**
+```json
+{
+  "total_contracts": 12,
+  "total_revenue_zar": 285000,
+  "total_cost_zar": 168000,
+  "gross_margin_zar": 117000,
+  "gross_margin_percentage": 41.1,
+  "profit_contracts": 9,
+  "loss_contracts": 3,
+  "avg_margin_percentage": 18.6,
+  "period_start": "2026-02-01",
+  "period_end": "2026-02-28"
+}
+```
+
+### GET `/api/contracts/profitability/contract/{contract_id}`
+
+Detailed per-contract profitability breakdown.
+
+### GET `/api/contracts/profitability/loss-leaders`
+
+List loss-making contracts with root cause analysis.
+
+### GET `/api/contracts/profitability/trends/{contract_id}`
+
+Monthly profitability trend series (default 12 months).
+
+### GET `/api/contracts/profitability/asset-roi/{contract_id}/{equipment_id}`
+
+Asset-level ROI calculation for a specific equipment item.
 
 ### POST `/api/contracts/{contract_id}/sla-terms`
 

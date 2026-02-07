@@ -26,6 +26,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 
 ### 🏗️ Architecture
 - [System Overview](02-architecture/system-overview.md) - High-level architecture
+- [Module System](02-architecture/module-system.md) - Bolt-on module architecture, activation, cross-module integrations
 - [Device Abstraction Layer](02-architecture/device-abstraction-layer.md) - Protocol-agnostic interface
 - [Naming Conventions](02-architecture/naming-conventions.md) - Device ID and point naming
 
@@ -42,7 +43,9 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - [Fleet Learning API](03-api-reference/fleet-learning-api.md) - Cross-site patterns, global models, fine-tuning (Phase 45-02)
 - [MLOps API](03-api-reference/mlops-api.md) - Drift detection, ML alerts, retraining triggers, success metrics (Phase 45-03)
 - [Solar & BESS API](03-api-reference/solar-api.md) - Solar PV, BESS dispatch, grid compliance, financial reporting, maintenance (Phase 34)
+- [Water Meter API](03-api-reference/water-api.md) - Water consumption monitoring, leak detection, trending, alert management (Phase 35)
 - [Contract Management API](03-api-reference/contracts-api.md) - Organizations, contracts, SLA terms, equipment assignments, budgets, condition assessments (Phase 48)
+- [Risk-Based Pricing API](03-api-reference/pricing-api.md) - Quote calculations, SLA tier pricing, risk buffers (Phase 52)
 
 ### ✨ Features
 
@@ -83,12 +86,14 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 
 #### Solar & Energy Storage
 - **[Solar & BESS Optimisation Module](04-features/34-solar-bess-module.md)** - Data ingestion, performance monitoring, NRS 097 compliance, arbitrage, demand management, forecasting, health analytics, maintenance, financial reporting (Phase 34)
+- **[Water Meter Integration & Leak Detection](04-features/35-water-meter-integration.md)** - Modbus pulse counter integration, 3-algorithm leak detection, consumption trending, alert management, water dashboard (Phase 35)
 
 #### Sustainability & ESG
 - **[Sustainability & ESG Module](04-features/29-sentinel-sustainability.md)** - Carbon emissions (Scope 1/2/3), energy efficiency benchmarks, Green Star SA self-assessment (Phase 29)
 
 #### Contract Management
 - **[Contract Management Module](04-features/48-contract-management.md)** - Portfolio KPIs, SLA compliance tracking, budget variance analysis, profitability dashboard (Phase 48)
+- **[SLA Monitoring & Profitability](04-features/50-52-commercial-analytics.md)** - SLA compliance tracking, profitability dashboards, and risk-based pricing (Phases 50-52)
 
 #### Additional Features
 - [Technician Chat](04-features/technician-chat.md) - Guided fault diagnosis (Phase 19)
