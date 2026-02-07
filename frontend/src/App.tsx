@@ -26,6 +26,7 @@ import { MLMetrics } from "./components/MLMetrics";
 import { SustainabilityDashboard } from "./components/sustainability";
 import { SolarDashboard } from "./components/solar/SolarDashboard";
 import { ContractManagementPage } from "./pages/ContractManagementPage";
+import { ProfitabilityDashboardPage } from "./pages/ProfitabilityDashboardPage";
 import { ModuleProvider, useModules } from "./contexts/ModuleContext";
 import { type View, VIEW_TITLES, isModuleGatedView, getRequiredModule } from "./lib/navigation";
 
@@ -628,6 +629,8 @@ function App() {
             <SolarDashboard />
           ) : currentView === "contracts" ? (
             <ContractManagementPage />
+          ) : currentView === "profitability" ? (
+            <ProfitabilityDashboardPage />
           ) : (
             <div className="h-full p-4 md:p-6">
               <div className="h-full max-w-4xl mx-auto">

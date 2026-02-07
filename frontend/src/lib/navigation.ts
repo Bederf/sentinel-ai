@@ -48,7 +48,8 @@ export type View =
   | "solar"
   | "fleet"
   | "mlops"
-  | "contracts";
+  | "contracts"
+  | "profitability";
 
 export type NavCategory = "base" | "addon" | "internal";
 
@@ -83,36 +84,45 @@ export const VIEW_TITLES: Record<View, string> = {
   fleet: "Fleet ML Insights",
   mlops: "ML Metrics",
   contracts: "Contract Management",
+  profitability: "Profitability Dashboard",
 };
 
 /**
- * Base navigation items - always visible to all authenticated users.
+ * Base navigation items - always visible, cannot be disabled.
+ * These are essential for platform operation.
  */
 export const BASE_NAV_ITEMS: NavItem[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, description: "System overview", category: "base" },
   { id: "chat", label: "Chat", icon: MessageSquare, description: "AI Assistant", category: "base" },
-  { id: "control", label: "Control", icon: Shield, description: "Building Controls", category: "base" },
-  { id: "control-audit", label: "Control Audit", icon: ClipboardList, description: "Control System Logs", category: "base" },
-  { id: "workflow", label: "Asset Workflow", icon: GitBranch, description: "Lifecycle Management", category: "base" },
-  { id: "simbiot", label: "SIMBIOT", icon: Plug, description: "BMS Connection Wizard", category: "base" },
-  { id: "contracts", label: "Contracts", icon: FileText, description: "Contract & SLA Management", category: "base" },
-  { id: "integrations", label: "Integrations", icon: Activity, description: "BMS Integration Health", category: "base" },
   { id: "settings", label: "Settings", icon: SettingsIcon, description: "System Configuration", category: "base" },
 ];
 
 /**
- * Add-on navigation items - visible only when the required module is active.
- * These represent paid bolt-on modules.
+ * Module-gated navigation items - visible only when the required module is active.
+ * All modules ship with every deployment; clients activate/deactivate per site.
+ *
+ * Core modules (control, assets, simbiot, integrations) are typically always active
+ * but CAN be disabled if a client doesn't need them.
  */
 export const ADDON_NAV_ITEMS: NavItem[] = [
-  { id: "technician", label: "Tech Chat", icon: Wrench, description: "Fault Diagnosis", category: "addon", requiredModule: "hvac", defaultOrder: 0 },
-  { id: "optimization", label: "Optimization", icon: Zap, description: "Load Shedding AI", category: "addon", requiredModule: "energy", defaultOrder: 1 },
-  { id: "occupancy", label: "Occupancy", icon: Users, description: "DALI Lighting", category: "addon", requiredModule: "lighting", defaultOrder: 2 },
-  { id: "security", label: "Security", icon: ShieldCheck, description: "Access & CCTV", category: "addon", requiredModule: "security", defaultOrder: 3 },
-  { id: "solar", label: "Solar & BESS", icon: Sun, description: "PV & Battery Storage", category: "addon", requiredModule: "solar", defaultOrder: 4 },
-  { id: "sustainability", label: "ESG", icon: Leaf, description: "Sustainability & Carbon", category: "addon", requiredModule: "sustainability", defaultOrder: 5 },
-  { id: "fleet", label: "Fleet ML", icon: BarChart3, description: "Cross-Site Insights", category: "addon", requiredModule: "ml", defaultOrder: 6 },
-  { id: "mlops", label: "ML Metrics", icon: Activity, description: "MLOps Monitoring", category: "addon", requiredModule: "ml", defaultOrder: 7 },
+  // Core operations modules
+  { id: "control", label: "Control", icon: Shield, description: "Building Controls", category: "addon", requiredModule: "control", defaultOrder: 0 },
+  { id: "control-audit", label: "Control Audit", icon: ClipboardList, description: "Control System Logs", category: "addon", requiredModule: "control", defaultOrder: 1 },
+  { id: "workflow", label: "Asset Workflow", icon: GitBranch, description: "Lifecycle Management", category: "addon", requiredModule: "assets", defaultOrder: 2 },
+  { id: "simbiot", label: "SIMBIOT", icon: Plug, description: "BMS Connection Wizard", category: "addon", requiredModule: "simbiot", defaultOrder: 3 },
+  { id: "integrations", label: "Integrations", icon: Activity, description: "BMS Integration Health", category: "addon", requiredModule: "integrations", defaultOrder: 4 },
+  // Building system modules
+  { id: "technician", label: "Tech Chat", icon: Wrench, description: "Fault Diagnosis", category: "addon", requiredModule: "hvac", defaultOrder: 10 },
+  { id: "optimization", label: "Optimization", icon: Zap, description: "Load Shedding AI", category: "addon", requiredModule: "energy", defaultOrder: 11 },
+  { id: "occupancy", label: "Occupancy", icon: Users, description: "DALI Lighting", category: "addon", requiredModule: "lighting", defaultOrder: 12 },
+  { id: "security", label: "Security", icon: ShieldCheck, description: "Access & CCTV", category: "addon", requiredModule: "security", defaultOrder: 13 },
+  { id: "solar", label: "Solar & BESS", icon: Sun, description: "PV & Battery Storage", category: "addon", requiredModule: "solar", defaultOrder: 14 },
+  { id: "sustainability", label: "ESG", icon: Leaf, description: "Sustainability & Carbon", category: "addon", requiredModule: "sustainability", defaultOrder: 15 },
+  { id: "contracts", label: "Contracts", icon: FileText, description: "Contract & SLA Management", category: "addon", requiredModule: "contracts", defaultOrder: 16 },
+  { id: "profitability", label: "Profitability", icon: TrendingUp, description: "Profitability Analytics", category: "addon", requiredModule: "contracts", defaultOrder: 17 },
+  // Intelligence modules
+  { id: "fleet", label: "Fleet ML", icon: BarChart3, description: "Cross-Site Insights", category: "addon", requiredModule: "ml", defaultOrder: 20 },
+  { id: "mlops", label: "ML Metrics", icon: Activity, description: "MLOps Monitoring", category: "addon", requiredModule: "ml", defaultOrder: 21 },
 ];
 
 /**
