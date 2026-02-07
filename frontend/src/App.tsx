@@ -25,6 +25,7 @@ import { FleetInsights } from "./components/FleetInsights";
 import { MLMetrics } from "./components/MLMetrics";
 import { SustainabilityDashboard } from "./components/sustainability";
 import { SolarDashboard } from "./components/solar/SolarDashboard";
+import { WaterPanel } from "./components/water";
 import { ContractManagementPage } from "./pages/ContractManagementPage";
 import { ProfitabilityDashboardPage } from "./pages/ProfitabilityDashboardPage";
 import { ModuleProvider, useModules } from "./contexts/ModuleContext";
@@ -50,10 +51,10 @@ function ViewGuard({
   onRedirect: (view: View) => void;
   children: React.ReactNode;
 }) {
-  const { isModuleActive } = useModules();
+  const { isModuleActive, loading, siteId } = useModules();
 
   useEffect(() => {
-    if (isModuleGatedView(currentView)) {
+    if (!loading && siteId && isModuleGatedView(currentView)) {
       const requiredModule = getRequiredModule(currentView);
       if (requiredModule && !isModuleActive(requiredModule)) {
         toast.info(`The "${VIEW_TITLES[currentView]}" module is not active for this site.`);
@@ -122,6 +123,8 @@ function App() {
   // Fetch and count unread alerts
   useEffect(() => {
     const fetchUnreadCount = async () => {
+      const token = localStorage.getItem("sentinel_token");
+      if (!token) return;
       try {
         const alerts = await api.getAlerts();
         // Count unread alerts (not acknowledged or created after last viewed time)
@@ -620,13 +623,17 @@ function App() {
               <SimulationDashboard />
             </div>
           ) : currentView === "sustainability" ? (
-            <SustainabilityDashboard />
+            <div className="h-full overflow-y-auto p-4 md:p-6">
+              <SustainabilityDashboard />
+            </div>
           ) : currentView === "fleet" ? (
             <FleetInsights />
           ) : currentView === "mlops" ? (
             <MLMetrics />
           ) : currentView === "solar" ? (
             <SolarDashboard />
+          ) : currentView === "water" ? (
+            <WaterPanel />
           ) : currentView === "contracts" ? (
             <ContractManagementPage />
           ) : currentView === "profitability" ? (

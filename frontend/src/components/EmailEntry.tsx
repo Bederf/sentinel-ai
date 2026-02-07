@@ -108,13 +108,17 @@ export function EmailEntry({ onSuccess }: EmailEntryProps) {
       {/* Logo and Title */}
       <div className="flex flex-col items-center mb-8">
         <div
-          className="w-16 h-16 rounded-xl flex items-center justify-center mb-4"
+          className="w-16 h-16 rounded-xl flex items-center justify-center mb-4 overflow-hidden"
           style={{
             background: "linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(59, 130, 246, 0.1))",
             border: "1px solid rgba(59, 130, 246, 0.3)",
           }}
         >
-          <Shield className="w-8 h-8" style={{ color: "var(--color-sentinel-blue)" }} />
+          <img
+            src="/images/sentinel-logo.png"
+            alt="Sentinel"
+            className="w-12 h-12 object-contain"
+          />
         </div>
         <h1
           className="text-2xl font-bold tracking-wide mb-2"
@@ -221,7 +225,11 @@ export function EmailEntry({ onSuccess }: EmailEntryProps) {
         className="mt-6 text-xs flex items-center gap-1"
         style={{ color: "var(--color-sentinel-text-disabled)" }}
       >
-        <Shield className="w-3 h-3" />
+        <img
+          src="/images/sentinel-logo.png"
+          alt=""
+          className="w-3 h-3 opacity-70"
+        />
         Your email is your login. You'll stay signed in for 30 days.
       </p>
     </div>

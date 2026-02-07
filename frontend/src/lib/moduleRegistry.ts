@@ -10,7 +10,7 @@ const API_BASE = import.meta.env.VITE_API_URL || "";
 
 // ==================== Types ====================
 
-export type ModuleType = 'control' | 'assets' | 'simbiot' | 'integrations' | 'notifications' | 'hvac' | 'energy' | 'security' | 'lighting' | 'fire' | 'access' | 'solar' | 'ml' | 'sustainability' | 'contracts';
+export type ModuleType = 'control' | 'assets' | 'simbiot' | 'integrations' | 'notifications' | 'hvac' | 'energy' | 'security' | 'lighting' | 'fire' | 'access' | 'solar' | 'water' | 'ml' | 'sustainability' | 'contracts';
 export type ModuleStatus = 'active' | 'inactive' | 'error' | 'maintenance';
 export type RecommendationType = 'optimization' | 'maintenance' | 'alert' | 'cross_system' | 'predictive';
 export type RecommendationPriority = 'low' | 'medium' | 'high' | 'critical';
@@ -326,6 +326,7 @@ export const MODULE_ICONS: Record<ModuleType, string> = {
   fire: 'flame',
   access: 'key',
   solar: 'sun',
+  water: 'droplets',
   ml: 'bar-chart',
   sustainability: 'leaf',
   contracts: 'file-text',
@@ -344,6 +345,7 @@ export const MODULE_COLORS: Record<ModuleType, string> = {
   fire: 'red',
   access: 'green',
   solar: 'yellow',
+  water: 'blue',
   ml: 'cyan',
   sustainability: 'emerald',
   contracts: 'orange',

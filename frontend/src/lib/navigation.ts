@@ -27,6 +27,8 @@ import {
   Leaf,
   Sun,
   FileText,
+  TrendingUp,
+  Droplets,
 } from "lucide-react";
 import type { ModuleType } from "./moduleRegistry";
 
@@ -46,6 +48,7 @@ export type View =
   | "simulation"
   | "sustainability"
   | "solar"
+  | "water"
   | "fleet"
   | "mlops"
   | "contracts"
@@ -81,6 +84,7 @@ export const VIEW_TITLES: Record<View, string> = {
   simulation: "Simulation",
   sustainability: "Sustainability & ESG",
   solar: "Solar & BESS",
+  water: "Water Consumption",
   fleet: "Fleet ML Insights",
   mlops: "ML Metrics",
   contracts: "Contract Management",
@@ -117,9 +121,10 @@ export const ADDON_NAV_ITEMS: NavItem[] = [
   { id: "occupancy", label: "Occupancy", icon: Users, description: "DALI Lighting", category: "addon", requiredModule: "lighting", defaultOrder: 12 },
   { id: "security", label: "Security", icon: ShieldCheck, description: "Access & CCTV", category: "addon", requiredModule: "security", defaultOrder: 13 },
   { id: "solar", label: "Solar & BESS", icon: Sun, description: "PV & Battery Storage", category: "addon", requiredModule: "solar", defaultOrder: 14 },
-  { id: "sustainability", label: "ESG", icon: Leaf, description: "Sustainability & Carbon", category: "addon", requiredModule: "sustainability", defaultOrder: 15 },
-  { id: "contracts", label: "Contracts", icon: FileText, description: "Contract & SLA Management", category: "addon", requiredModule: "contracts", defaultOrder: 16 },
-  { id: "profitability", label: "Profitability", icon: TrendingUp, description: "Profitability Analytics", category: "addon", requiredModule: "contracts", defaultOrder: 17 },
+  { id: "water", label: "Water", icon: Droplets, description: "Water Consumption", category: "addon", requiredModule: "water", defaultOrder: 15 },
+  { id: "sustainability", label: "ESG", icon: Leaf, description: "Sustainability & Carbon", category: "addon", requiredModule: "sustainability", defaultOrder: 16 },
+  { id: "contracts", label: "Contracts", icon: FileText, description: "Contract & SLA Management", category: "addon", requiredModule: "contracts", defaultOrder: 17 },
+  { id: "profitability", label: "Profitability", icon: TrendingUp, description: "Profitability Analytics", category: "addon", requiredModule: "contracts", defaultOrder: 18 },
   // Intelligence modules
   { id: "fleet", label: "Fleet ML", icon: BarChart3, description: "Cross-Site Insights", category: "addon", requiredModule: "ml", defaultOrder: 20 },
   { id: "mlops", label: "ML Metrics", icon: Activity, description: "MLOps Monitoring", category: "addon", requiredModule: "ml", defaultOrder: 21 },
