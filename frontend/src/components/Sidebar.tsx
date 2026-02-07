@@ -1,88 +1,197 @@
 /**
  * Sidebar Navigation Component - SENTINEL Branding
  *
- * Features:
- * - SENTINEL shield logo with amber accent
- * - Dark panel design with amber accent indicators
- * - Navigation items: Dashboard, Chat, Integrations, etc.
- * - Lucide icons with SENTINEL styling
- * - Collapsible on mobile (hamburger menu)
- * - Active view highlighting with left border accent
+ * Module-gated sidebar with three sections:
+ * - Base: always visible (Dashboard, Chat, Control, etc.)
+ * - Modules: visible when required module is active (paid add-ons)
+ * - Internal: visible to admin users only (Simulation)
+ *
+ * Add-on items can be reordered with up/down arrows (persisted in localStorage).
  */
 
-import { useState } from "react";
+import { useState, useMemo, useCallback } from "react";
 import {
-  MessageSquare,
-  LayoutDashboard,
   Menu,
   X,
-  Shield,
   ChevronDown,
   ChevronRight,
   ChevronLeft,
+  ChevronUp,
   Info,
-  ClipboardList,
-  Settings as SettingsIcon,
-  Zap,
-  Wrench,
-  Activity,
-  Users,
-  GitBranch,
   SlidersHorizontal,
-  ShieldCheck,
-  Plug,
-  FlaskConical,
-  BarChart3,
 } from "lucide-react";
+import { useModules } from "../contexts/ModuleContext";
+import {
+  type View,
+  type NavItem,
+  BASE_NAV_ITEMS,
+  ADDON_NAV_ITEMS,
+  INTERNAL_NAV_ITEMS,
+  getPersistedAddonOrder,
+  persistAddonOrder,
+} from "../lib/navigation";
 
-export type View = "dashboard" | "chat" | "technician" | "control" | "control-audit" | "optimization" | "settings" | "integrations" | "occupancy" | "workflow" | "security" | "simbiot" | "simulation" | "fleet" | "mlops";
+export type { View } from "../lib/navigation";
 
 interface SidebarProps {
   currentView: View;
   onViewChange: (view: View) => void;
   version?: string;
   onCustomizeDashboard?: () => void;
+  userRole?: string;
 }
 
-interface SidebarProps {
-  currentView: View;
-  onViewChange: (view: View) => void;
-  version?: string;
-}
-
-interface NavItem {
-  id: View;
-  label: string;
-  icon: typeof MessageSquare;
-  description?: string;
-}
-
-const navItems: NavItem[] = [
-  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, description: "System overview" },
-  { id: "chat", label: "Chat", icon: MessageSquare, description: "AI Assistant" },
-  { id: "technician", label: "Tech Chat", icon: Wrench, description: "Fault Diagnosis" },
-  { id: "optimization", label: "Optimization", icon: Zap, description: "Load Shedding AI" },
-  { id: "occupancy", label: "Occupancy", icon: Users, description: "DALI Lighting" },
-  { id: "control", label: "Control", icon: Shield, description: "Building Controls" },
-  { id: "control-audit", label: "Control Audit", icon: ClipboardList, description: "Control System Logs" },
-  { id: "settings", label: "Settings", icon: SettingsIcon, description: "System Configuration" },
-  { id: "workflow", label: "Asset Workflow", icon: GitBranch, description: "Lifecycle Management" },
-  { id: "simbiot", label: "SIMBIOT", icon: Plug, description: "BMS Connection Wizard" },
-  { id: "integrations", label: "Integrations", icon: Activity, description: "BMS Integration Health" },
-  { id: "security", label: "Security", icon: ShieldCheck, description: "Access & CCTV" },
-  { id: "simulation", label: "Simulation", icon: FlaskConical, description: "Lifecycle & Analytics" },
-  { id: "fleet", label: "Fleet ML", icon: BarChart3, description: "Cross-Site Insights" },
-  { id: "mlops", label: "ML Metrics", icon: Activity, description: "MLOps Monitoring" },
-];
-
-export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomizeDashboard }: SidebarProps) {
+export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomizeDashboard, userRole }: SidebarProps) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(true); // Start minimized
+  const [addonOrder, setAddonOrder] = useState<View[]>(() => getPersistedAddonOrder());
+
+  const { isModuleActive, activeModules } = useModules();
+
+  // Compute visible addon items, filtered by active modules and sorted by user order
+  const visibleAddons = useMemo(() => {
+    const active = ADDON_NAV_ITEMS.filter(
+      (item) => item.requiredModule && isModuleActive(item.requiredModule)
+    );
+
+    // Sort by persisted order, falling back to defaultOrder
+    if (addonOrder.length > 0) {
+      return [...active].sort((a, b) => {
+        const aIdx = addonOrder.indexOf(a.id);
+        const bIdx = addonOrder.indexOf(b.id);
+        const aOrder = aIdx >= 0 ? aIdx : (a.defaultOrder ?? 999);
+        const bOrder = bIdx >= 0 ? bIdx : (b.defaultOrder ?? 999);
+        return aOrder - bOrder;
+      });
+    }
+
+    return [...active].sort((a, b) => (a.defaultOrder ?? 0) - (b.defaultOrder ?? 0));
+  }, [isModuleActive, addonOrder]);
+
+  // Compute visible internal items, filtered by role
+  const visibleInternal = useMemo(() => {
+    return INTERNAL_NAV_ITEMS.filter(
+      (item) => !item.requiredRole || userRole === item.requiredRole
+    );
+  }, [userRole]);
 
   const handleNavClick = (view: View) => {
     onViewChange(view);
     setIsMobileOpen(false);
+  };
+
+  // Reorder addon items
+  const moveAddon = useCallback((itemId: View, direction: "up" | "down") => {
+    setAddonOrder((prev) => {
+      // Build current order from visible addons
+      const currentIds = visibleAddons.map((i) => i.id);
+      const ordered = prev.length > 0
+        ? [...currentIds].sort((a, b) => {
+            const aIdx = prev.indexOf(a);
+            const bIdx = prev.indexOf(b);
+            return (aIdx >= 0 ? aIdx : 999) - (bIdx >= 0 ? bIdx : 999);
+          })
+        : currentIds;
+
+      const idx = ordered.indexOf(itemId);
+      if (idx < 0) return prev;
+
+      const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+      if (swapIdx < 0 || swapIdx >= ordered.length) return prev;
+
+      const newOrder = [...ordered];
+      [newOrder[idx], newOrder[swapIdx]] = [newOrder[swapIdx], newOrder[idx]];
+
+      persistAddonOrder(newOrder);
+      return newOrder;
+    });
+  }, [visibleAddons]);
+
+  const renderNavItem = (item: NavItem, isActive: boolean, showReorder?: { index: number; total: number }) => {
+    const Icon = item.icon;
+
+    return (
+      <div key={item.id} className="relative group">
+        <button
+          onClick={() => handleNavClick(item.id)}
+          className={`
+            w-full flex items-center gap-3 px-4 py-2.5 mb-1 mx-auto
+            transition-all duration-150 ease-in-out
+            md:justify-center lg:justify-start
+            hover:brightness-110
+            ${!isActive ? 'hover:bg-white/5' : ''}
+          `}
+          style={{
+            background: isActive ? "rgba(255, 255, 255, 0.08)" : "transparent",
+            borderLeft: isActive ? "3px solid var(--color-sentinel-amber)" : "3px solid transparent",
+            color: isActive ? "var(--color-sentinel-text-primary)" : "var(--color-sentinel-text-secondary)",
+          }}
+          aria-current={isActive ? "page" : undefined}
+        >
+          <Icon
+            className="h-5 w-5 flex-shrink-0"
+            style={{
+              color: isActive ? "var(--color-sentinel-amber)" : "var(--color-sentinel-text-secondary)",
+            }}
+          />
+          <div className={`flex flex-col items-start flex-1 md:hidden ${isCollapsed ? 'lg:hidden' : 'lg:flex'}`}>
+            <span className="font-medium text-sm">{item.label}</span>
+            {item.description && (
+              <span
+                className="text-xs"
+                style={{ color: "var(--color-grafana-text-disabled)" }}
+              >
+                {item.description}
+              </span>
+            )}
+          </div>
+        </button>
+
+        {/* Reorder arrows for addon items (expanded sidebar only) */}
+        {showReorder && !isCollapsed && (
+          <div className={`absolute right-2 top-1/2 -translate-y-1/2 hidden lg:flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity`}>
+            {showReorder.index > 0 && (
+              <button
+                onClick={(e) => { e.stopPropagation(); moveAddon(item.id, "up"); }}
+                className="p-0.5 rounded hover:bg-[var(--color-sentinel-bg-panel)] transition-colors"
+                aria-label={`Move ${item.label} up`}
+              >
+                <ChevronUp className="h-3 w-3" style={{ color: "var(--color-sentinel-text-secondary)" }} />
+              </button>
+            )}
+            {showReorder.index < showReorder.total - 1 && (
+              <button
+                onClick={(e) => { e.stopPropagation(); moveAddon(item.id, "down"); }}
+                className="p-0.5 rounded hover:bg-[var(--color-sentinel-bg-panel)] transition-colors"
+                aria-label={`Move ${item.label} down`}
+              >
+                <ChevronDown className="h-3 w-3" style={{ color: "var(--color-sentinel-text-secondary)" }} />
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Module emoji mapping for About section
+  const moduleEmojis: Record<string, string> = {
+    control: "\uD83D\uDEE1\uFE0F", // shield
+    assets: "\uD83D\uDD27", // wrench
+    simbiot: "\uD83D\uDD0C", // plug
+    integrations: "\uD83D\uDCE1", // satellite
+    notifications: "\uD83D\uDD14", // bell
+    contracts: "\uD83D\uDCC4", // document
+    hvac: "\u2744", // snowflake
+    energy: "\u26A1",
+    security: "\uD83D\uDD12",
+    lighting: "\uD83D\uDCA1",
+    fire: "\uD83D\uDD25",
+    access: "\uD83D\uDD11",
+    solar: "\u2600\uFE0F",
+    ml: "\uD83E\uDDE0",
+    sustainability: "\uD83C\uDF3F",
   };
 
   return (
@@ -90,11 +199,7 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
       {/* Mobile hamburger button */}
       <button
         onClick={() => setIsMobileOpen(!isMobileOpen)}
-        className="md:hidden fixed top-4 left-4 z-50 p-2 rounded-md transition-colors hover:brightness-125"
-        style={{
-          background: "var(--color-grafana-bg-secondary)",
-          border: "1px solid var(--color-grafana-border)",
-        }}
+        className="md:hidden fixed top-4 left-4 z-50 p-2 rounded-md transition-colors hover:brightness-125 glass-subtle"
         aria-label={isMobileOpen ? "Close menu" : "Open menu"}
       >
         {isMobileOpen ? (
@@ -124,8 +229,10 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
           flex flex-col
         `}
         style={{
-          background: "var(--color-grafana-bg-primary)",
-          borderRight: "1px solid var(--color-grafana-border)",
+          background: "var(--glass-bg)",
+          backdropFilter: "var(--glass-blur-heavy, blur(24px))",
+          WebkitBackdropFilter: "var(--glass-blur-heavy, blur(24px))",
+          borderRight: "1px solid var(--glass-border)",
         }}
       >
         {/* Sidebar Header */}
@@ -149,7 +256,7 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
               </div>
             </div>
           </div>
-          {/* Toggle button - moves with sidebar state, only visible on large screens */}
+          {/* Toggle button */}
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}
             className={`hidden lg:flex absolute top-1/2 transform -translate-y-1/2 p-1 rounded hover:brightness-125 hover:scale-110 transition-all duration-200 ${
@@ -158,8 +265,8 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
                 : 'right-2'
             }`}
             style={{
-              background: "var(--color-sentinel-bg-secondary)",
-              border: "1px solid var(--color-sentinel-border)",
+              background: "rgba(255, 255, 255, 0.08)",
+              border: "1px solid var(--glass-border)",
             }}
             aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
@@ -173,6 +280,7 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
 
         {/* Navigation items */}
         <nav className="flex-1 py-4 overflow-y-auto" role="navigation">
+          {/* Base section */}
           <div className="px-3 mb-2">
             <span
               className={`text-xs font-medium uppercase tracking-wider md:hidden ${isCollapsed ? 'lg:hidden' : 'lg:block'}`}
@@ -182,51 +290,54 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
             </span>
           </div>
 
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = currentView === item.id;
+          {BASE_NAV_ITEMS.map((item) =>
+            renderNavItem(item, currentView === item.id)
+          )}
 
-            return (
-              <button
-                key={item.id}
-                onClick={() => {
-                  // Always navigate to the selected view, even if already active
-                  handleNavClick(item.id);
-                }}
-                className={`
-                  w-full flex items-center gap-3 px-4 py-2.5 mb-1 mx-auto
-                  transition-all duration-150 ease-in-out
-                  md:justify-center lg:justify-start
-                  hover:brightness-110
-                  ${!isActive ? 'hover:bg-[var(--color-sentinel-bg-secondary)]' : ''}
-                `}
-                style={{
-                  background: isActive ? "var(--color-sentinel-bg-secondary)" : "transparent",
-                  borderLeft: isActive ? "3px solid var(--color-sentinel-amber)" : "3px solid transparent",
-                  color: isActive ? "var(--color-sentinel-text-primary)" : "var(--color-sentinel-text-secondary)",
-                }}
-                aria-current={isActive ? "page" : undefined}
+          {/* Addon section - only shown if there are active add-on modules */}
+          {visibleAddons.length > 0 && (
+            <>
+              <div
+                className="mx-3 mt-3 mb-2 pt-3"
+                style={{ borderTop: "1px solid var(--color-grafana-border)" }}
               >
-                <Icon
-                  className="h-5 w-5 flex-shrink-0"
-                  style={{
-                    color: isActive ? "var(--color-sentinel-amber)" : "var(--color-sentinel-text-secondary)",
-                  }}
-                />
-                <div className={`flex flex-col items-start md:hidden ${isCollapsed ? 'lg:hidden' : 'lg:flex'}`}>
-                  <span className="font-medium text-sm">{item.label}</span>
-                  {item.description && (
-                    <span
-                      className="text-xs"
-                      style={{ color: "var(--color-grafana-text-disabled)" }}
-                    >
-                      {item.description}
-                    </span>
-                  )}
-                </div>
-              </button>
-            );
-          })}
+                <span
+                  className={`text-xs font-medium uppercase tracking-wider md:hidden ${isCollapsed ? 'lg:hidden' : 'lg:block'}`}
+                  style={{ color: "var(--color-grafana-text-disabled)" }}
+                >
+                  Modules
+                </span>
+              </div>
+
+              {visibleAddons.map((item, index) =>
+                renderNavItem(item, currentView === item.id, {
+                  index,
+                  total: visibleAddons.length,
+                })
+              )}
+            </>
+          )}
+
+          {/* Internal section - only shown if there are visible internal items */}
+          {visibleInternal.length > 0 && (
+            <>
+              <div
+                className="mx-3 mt-3 mb-2 pt-3"
+                style={{ borderTop: "1px solid var(--color-grafana-border)" }}
+              >
+                <span
+                  className={`text-xs font-medium uppercase tracking-wider md:hidden ${isCollapsed ? 'lg:hidden' : 'lg:block'}`}
+                  style={{ color: "var(--color-grafana-text-disabled)" }}
+                >
+                  Internal
+                </span>
+              </div>
+
+              {visibleInternal.map((item) =>
+                renderNavItem(item, currentView === item.id)
+              )}
+            </>
+          )}
 
           {/* Customize Dashboard Button */}
           {onCustomizeDashboard && (
@@ -315,25 +426,28 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
                       Active Modules
                     </div>
                     <div className="flex flex-wrap gap-1.5">
-                      {[
-                        { name: "Energy", icon: "⚡" },
-                        { name: "HVAC", icon: "❄" },
-                        { name: "Lighting", icon: "💡" },
-                        { name: "ML", icon: "🧠" },
-                      ].map((mod) => (
-                        <span
-                          key={mod.name}
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium"
-                          style={{
-                            background: "rgba(245, 158, 11, 0.15)",
-                            border: "1px solid rgba(245, 158, 11, 0.3)",
-                            color: "var(--color-sentinel-amber)",
-                          }}
-                        >
-                          <span>{mod.icon}</span>
-                          {mod.name}
+                      {activeModules.length > 0 ? (
+                        activeModules
+                          .filter((m) => m.status === "active")
+                          .map((mod) => (
+                            <span
+                              key={mod.module_type}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium"
+                              style={{
+                                background: "rgba(245, 158, 11, 0.15)",
+                                border: "1px solid rgba(245, 158, 11, 0.3)",
+                                color: "var(--color-sentinel-amber)",
+                              }}
+                            >
+                              <span>{moduleEmojis[mod.module_type] || "\u2699\uFE0F"}</span>
+                              {mod.module_type.toUpperCase()}
+                            </span>
+                          ))
+                      ) : (
+                        <span style={{ color: "var(--color-sentinel-text-disabled)" }}>
+                          No modules active
                         </span>
-                      ))}
+                      )}
                     </div>
                   </div>
 
@@ -349,19 +463,19 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
                       style={{ color: "var(--color-sentinel-text-secondary)" }}
                     >
                       <li className="flex items-start gap-2">
-                        <span style={{ color: "var(--color-sentinel-amber)" }}>•</span>
+                        <span style={{ color: "var(--color-sentinel-amber)" }}>&#8226;</span>
                         Natural language queries across building data
                       </li>
                       <li className="flex items-start gap-2">
-                        <span style={{ color: "var(--color-sentinel-amber)" }}>•</span>
+                        <span style={{ color: "var(--color-sentinel-amber)" }}>&#8226;</span>
                         Predictive maintenance with failure forecasting
                       </li>
                       <li className="flex items-start gap-2">
-                        <span style={{ color: "var(--color-sentinel-amber)" }}>•</span>
+                        <span style={{ color: "var(--color-sentinel-amber)" }}>&#8226;</span>
                         Anomaly detection with contextual analysis
                       </li>
                       <li className="flex items-start gap-2">
-                        <span style={{ color: "var(--color-sentinel-amber)" }}>•</span>
+                        <span style={{ color: "var(--color-sentinel-amber)" }}>&#8226;</span>
                         Cross-site pattern recognition
                       </li>
                     </ul>
