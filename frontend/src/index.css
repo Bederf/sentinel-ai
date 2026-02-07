@@ -712,6 +712,15 @@
     border-radius: var(--radius-glass) var(--radius-glass) 0 0;
     pointer-events: none;
   }
+
+  /* Tremor glass compatibility */
+  .glass [data-tremor-card],
+  .glass-card [data-tremor-card],
+  .glass-panel [data-tremor-card] {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
 }
 
 /* Mobile: reduced blur for glass performance */
