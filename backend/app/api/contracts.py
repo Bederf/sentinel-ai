@@ -793,3 +793,171 @@ async def get_asset_roi(
     service = get_profitability_service()
     roi = service.calculate_asset_roi(contract_id, equipment_id)
     return roi
+
+
+# ============================================================================
+# SLA Monitoring Endpoints (Phase 50)
+# ============================================================================
+
+
+@router.get("/sla/performance/{contract_id}")
+async def get_sla_performance(
+    contract_id: str,
+    months: int = Query(12, ge=1, le=24, description="Number of months to retrieve"),
+):
+    """
+    Get SLA performance history for a contract.
+
+    Returns historical performance data with compliance metrics,
+    breach details, and clawback amounts for each period.
+    """
+    from app.database.repositories import get_sla_repository
+
+    repo = get_sla_repository()
+    performance = repo.get_performance_history(contract_id, months)
+
+    return {
+        "contract_id": contract_id,
+        "months": months,
+        "performance": performance,
+        "total_records": len(performance),
+    }
+
+
+@router.get("/sla/breaches/{contract_id}")
+async def get_sla_breaches(
+    contract_id: str,
+    severity: Optional[str] = Query(None, description="Filter by severity: minor, major, critical"),
+):
+    """
+    Get SLA breach events for a contract.
+
+    Returns all breach events with details, optionally filtered by severity.
+    Includes work order references for incident correlation.
+    """
+    from app.database.repositories import get_sla_repository
+    from app.models.contract import SLABreachSeverity
+
+    repo = get_sla_repository()
+
+    # Convert severity string to enum if provided
+    severity_enum = None
+    if severity:
+        try:
+            severity_enum = SLABreachSeverity(severity)
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid severity: {severity}. Must be: minor, major, critical"
+            )
+
+    breaches = repo.get_breach_events(contract_id, severity_enum)
+
+    return {
+        "contract_id": contract_id,
+        "severity_filter": severity,
+        "breaches": breaches,
+        "total_breaches": len(breaches),
+    }
+
+
+@router.get("/sla/summary/{contract_id}")
+async def get_sla_summary(contract_id: str):
+    """
+    Get overall SLA compliance summary for a contract.
+
+    Returns aggregated metrics including:
+    - Overall compliance percentage
+    - Total breaches (by severity)
+    - Total clawback amount
+    - SLA term breakdown
+    """
+    from app.database.repositories import get_sla_repository
+
+    repo = get_sla_repository()
+    summary = repo.get_compliance_summary(contract_id)
+
+    return summary
+
+
+@router.post("/sla/recalculate/{contract_id}")
+async def recalculate_sla(
+    contract_id: str,
+    force: bool = Query(False, description="Force recalculation even if recently calculated"),
+):
+    """
+    Trigger SLA compliance recalculation for current month.
+
+    Recalculates SLA performance for the current period,
+    detects new breaches, and updates clawback amounts.
+    Useful after work order updates or manual corrections.
+    """
+    from datetime import date
+    from app.services.sla_compliance_service import get_sla_compliance_service
+    from app.database.repositories import get_sla_repository
+
+    service = get_sla_compliance_service()
+    repo = get_sla_repository()
+
+    # Get current month period
+    current_month_start = date.today().replace(day=1)
+    # Calculate last day of current month
+    if current_month_start.month == 12:
+        current_month_end = current_month_start.replace(
+            year=current_month_start.year + 1,
+            month=1,
+            day=1
+        ) - __import__("datetime").timedelta(days=1)
+    else:
+        current_month_end = current_month_start.replace(
+            month=current_month_start.month + 1,
+            day=1
+        ) - __import__("datetime").timedelta(days=1)
+
+    # Get SLA terms for contract
+    contracts = repo.get_contracts_with_sla()
+    contract = next((c for c in contracts if c["id"] == contract_id), None)
+
+    if not contract:
+        raise HTTPException(status_code=404, detail=f"Contract {contract_id} not found")
+
+    results = []
+
+    # Recalculate each SLA term
+    for sla_term in contract.get("sla_terms", []):
+        try:
+            performance = service.calculate_period_performance(
+                contract_id=contract_id,
+                sla_term_id=sla_term["id"],
+                period_start=current_month_start,
+                period_end=current_month_end,
+            )
+
+            # Store performance record
+            repo.create_performance_record(performance)
+
+            results.append({
+                "sla_term_id": sla_term["id"],
+                "sla_type": sla_term["sla_type"],
+                "compliance_status": performance.compliance_status.value,
+                "compliance_percentage": performance.compliance_percentage,
+                "breach_count": performance.breach_count,
+                "clawback_amount_zar": performance.clawback_amount_zar,
+            })
+
+        except Exception as e:
+            logger.error(f"Failed to recalculate SLA {sla_term['id']}: {e}")
+            results.append({
+                "sla_term_id": sla_term["id"],
+                "sla_type": sla_term["sla_type"],
+                "error": str(e),
+            })
+
+    return {
+        "contract_id": contract_id,
+        "period_start": current_month_start.isoformat(),
+        "period_end": current_month_end.isoformat(),
+        "recalculated": True,
+        "results": results,
+    }
+
