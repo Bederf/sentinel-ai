@@ -504,6 +504,99 @@ async def get_budget_variance(
 
 
 # ============================================================================
+# Budget Template Endpoints (Phase 49)
+# ============================================================================
+
+
+@router.get("/budgets/templates")
+async def get_budget_templates():
+    """
+    Get all available budget templates by equipment type.
+
+    Returns template definitions with typical monthly breakdowns for
+    different equipment categories (chiller, AHU, generator, etc.).
+    """
+    from app.database.repositories.budget_repository import get_budget_repository
+
+    repo = get_budget_repository()
+    templates = repo.get_budget_templates()
+    return {"templates": templates, "count": len(templates)}
+
+
+@router.get("/budgets/templates/{equipment_type}")
+async def get_budget_template(equipment_type: str):
+    """
+    Get budget template for a specific equipment type.
+
+    Args:
+        equipment_type: Equipment type (chiller, ahu, generator, dali_controller, power_meter)
+
+    Returns:
+        Template dict with labor rate, planned hours, and monthly breakdown
+    """
+    from app.database.repositories.budget_repository import get_budget_repository
+
+    repo = get_budget_repository()
+    template = repo.get_template(equipment_type)
+
+    if not template:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No budget template found for equipment type: {equipment_type}"
+        )
+
+    return template
+
+
+@router.post("/budgets/from-template", status_code=201)
+async def create_budget_from_template(
+    contract_id: str = Query(..., description="Contract UUID"),
+    equipment_type: str = Query(..., description="Equipment type for template lookup"),
+    year: int = Query(..., description="Budget year", ge=2020, le=2100),
+    month: Optional[int] = Query(None, description="Budget month (1-12), if None creates annual budget", ge=1, le=12)
+):
+    """
+    Create a budget entry using equipment-type template defaults.
+
+    Automatically populates budget amounts from the predefined template
+    for the specified equipment type. Templates include typical monthly
+    breakdowns for labor, parts, consumables, subcontractor, and callout costs.
+
+    Args:
+        contract_id: Contract UUID to link budget to
+        equipment_type: Equipment type (chiller, ahu, generator, dali_controller, power_meter)
+        year: Budget year (e.g., 2026)
+        month: Optional budget month (1-12). If omitted, creates annual budget
+
+    Returns:
+        Created budget entry with template-based amounts
+    """
+    from app.database.repositories.budget_repository import get_budget_repository
+
+    repo = get_budget_repository()
+
+    # Validate template exists
+    template = repo.get_template(equipment_type)
+    if not template:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No budget template found for equipment type: {equipment_type}. "
+                   f"Available types: chiller, ahu, generator, dali_controller, power_meter"
+        )
+
+    # Create budget from template
+    budget = repo.create_from_template(contract_id, equipment_type, year, month)
+
+    if not budget:
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to create budget from template"
+        )
+
+    return budget
+
+
+# ============================================================================
 # Condition Assessment Endpoints
 # ============================================================================
 
