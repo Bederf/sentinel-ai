@@ -664,7 +664,7 @@ async def get_portfolio_profitability(
     Returns aggregated revenue, costs, margins, and contract counts
     across all active contracts for the specified period.
     """
-    from datetime import datetime
+    from datetime import date, timedelta
     from app.services.profitability_service import get_profitability_service
 
     # Default to current month
@@ -672,7 +672,6 @@ async def get_portfolio_profitability(
         today = date.today()
         period_start = today.replace(day=1).isoformat()
     if not period_end:
-        from datetime import timedelta
         today = date.today()
         if today.month == 12:
             next_month = today.replace(year=today.year + 1, month=1, day=1)
@@ -700,6 +699,7 @@ async def get_contract_profitability(
     Returns revenue breakdown, cost components, margin analysis,
     trend data, and asset metrics for the specified contract.
     """
+    from datetime import date, timedelta
     from app.services.profitability_service import get_profitability_service
 
     # Default to current month
@@ -707,7 +707,6 @@ async def get_contract_profitability(
         today = date.today()
         period_start = today.replace(day=1).isoformat()
     if not period_end:
-        from datetime import timedelta
         today = date.today()
         if today.month == 12:
             next_month = today.replace(year=today.year + 1, month=1, day=1)
@@ -736,6 +735,7 @@ async def get_loss_leaders(
     Returns contracts with negative margins, identified root causes,
     actionable recommendations, and cumulative loss tracking.
     """
+    from datetime import date, timedelta
     from app.services.profitability_service import get_profitability_service
 
     # Default to current month
@@ -743,7 +743,6 @@ async def get_loss_leaders(
         today = date.today()
         period_start = today.replace(day=1).isoformat()
     if not period_end:
-        from datetime import timedelta
         today = date.today()
         if today.month == 12:
             next_month = today.replace(year=today.year + 1, month=1, day=1)

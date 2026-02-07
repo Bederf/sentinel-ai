@@ -454,7 +454,6 @@ class SLAComplianceService:
         compliance_status: SLAComplianceStatus,
     ) -> str:
         """Map compliance status to SLAPerformanceStatus enum value."""
-        from app.models.contract import SLAPerformanceStatus
 
         mapping = {
             SLAComplianceStatus.COMPLIANT: "calculated",

@@ -24,7 +24,6 @@ from app.models.contract import (
     SLABreachSeverity,
     SLAComplianceStatus,
     SLAMetricType,
-    SLAPerformance,
     SLAPerformanceWithCompliance,
     SLATerm,
 )
@@ -219,7 +218,7 @@ class SLARepository:
             List of contracts with SLA terms
         """
         # Demo implementation
-        from app.models.contract import Contract, SLAType, MeasurementPeriod
+        from app.models.contract import SLAType, MeasurementPeriod
 
         mock_contracts = [
             {
@@ -302,7 +301,6 @@ class SLARepository:
     ) -> Optional[SLAPerformanceWithCompliance]:
         """Create performance record in Supabase."""
         try:
-            from supabase import create_client
 
             # Check if Supabase is configured
             if not self._is_supabase_configured():
@@ -360,7 +358,7 @@ class SLARepository:
                 if cutoff_date.month == 1:
                     cutoff_date = cutoff_date.replace(year=cutoff_date.year - 1, month=12)
                 else:
-                    cutoff_date = cutoff_date.replace(month=cut_date.month - 1)
+                    cutoff_date = cutoff_date.replace(month=cutoff_date.month - 1)
 
             result = (
                 client.table("sla_performance")
