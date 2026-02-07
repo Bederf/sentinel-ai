@@ -28,7 +28,41 @@ router = APIRouter()
 # === Consumption endpoints ===
 
 
-@router.get("/water/consumption/{site}")
+@router.get("/water/sites/{site}/flow")
+async def get_current_flow(site: str):
+    """Get current flow rate for a site.
+
+    Args:
+        site: Building site code (e.g., "site-002")
+
+    Returns:
+        Current flow rate in LPM with timestamp
+    """
+    try:
+        svc = get_water_ingestion_service()
+        latest = svc.get_latest_consumption(site)
+
+        if not latest:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No consumption data found for site '{site}'"
+            )
+
+        return {
+            "site": site,
+            "flow_rate_lpm": latest.flow_rate_lpm if latest else 0.0,
+            "timestamp": latest.timestamp if latest else datetime.now().isoformat(),
+            "meter_id": latest.meter_id if latest else None,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching current flow for {site}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/water/sites/{site}/consumption")
 async def get_consumption(
     site: str,
     start_date: Optional[str] = Query(None, description="Start date (ISO format)"),
@@ -73,7 +107,7 @@ async def get_consumption(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/water/consumption/{site}/current")
+@router.get("/water/sites/{site}/current")
 async def get_current_consumption(site: str):
     """Get current flow rate and latest consumption reading.
 
@@ -102,7 +136,7 @@ async def get_current_consumption(site: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/water/trending/{site}")
+@router.get("/water/sites/{site}/trending")
 async def get_consumption_trends(
     site: str,
     period: str = Query("week", description="Period: day, week, month"),
@@ -202,7 +236,7 @@ async def get_consumption_trends(
 # === Alert endpoints ===
 
 
-@router.get("/water/alerts/{site}")
+@router.get("/water/sites/{site}/alerts")
 async def get_alerts(
     site: str,
     severity: Optional[str] = Query(None, description="Filter by severity: low, medium, high, critical"),
@@ -249,7 +283,7 @@ async def get_alerts(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/water/alerts/{site}/active")
+@router.get("/water/sites/{site}/alerts/active")
 async def get_active_alerts(site: str):
     """Get all active (unresolved) leak alerts.
 
