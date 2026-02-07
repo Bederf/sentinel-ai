@@ -293,8 +293,8 @@ function App() {
           className="flex-none h-14 px-4 flex items-center justify-between sticky top-0 z-40"
           style={{
             background: "var(--glass-bg)",
-            backdropFilter: "var(--glass-blur)",
-            WebkitBackdropFilter: "var(--glass-blur)",
+            backdropFilter: "blur(var(--glass-blur)) saturate(180%)",
+            WebkitBackdropFilter: "blur(var(--glass-blur)) saturate(180%)",
             borderBottom: "1px solid var(--glass-border)",
             borderRadius: 0,
           }}

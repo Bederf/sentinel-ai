@@ -230,8 +230,8 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
         `}
         style={{
           background: "var(--glass-bg)",
-          backdropFilter: "var(--glass-blur-heavy, blur(24px))",
-          WebkitBackdropFilter: "var(--glass-blur-heavy, blur(24px))",
+          backdropFilter: "blur(var(--glass-blur-lg)) saturate(180%)",
+          WebkitBackdropFilter: "blur(var(--glass-blur-lg)) saturate(180%)",
           borderRight: "1px solid var(--glass-border)",
         }}
       >

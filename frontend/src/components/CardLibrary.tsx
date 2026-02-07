@@ -137,8 +137,8 @@ export default function CardLibrary({
         className="fixed right-0 top-0 h-full w-full max-w-md z-50 shadow-2xl overflow-hidden flex flex-col"
         style={{
           background: 'var(--glass-bg)',
-          backdropFilter: 'var(--glass-blur-heavy, blur(24px))',
-          WebkitBackdropFilter: 'var(--glass-blur-heavy, blur(24px))',
+          backdropFilter: 'blur(var(--glass-blur-lg)) saturate(180%)',
+          WebkitBackdropFilter: 'blur(var(--glass-blur-lg)) saturate(180%)',
           borderLeft: '1px solid var(--glass-border)',
         }}
       >
