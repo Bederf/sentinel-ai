@@ -1,0 +1,143 @@
+"""
+Pricing models for actuarial pricing engine.
+
+Phase 52-01: Risk-Based Pricing Tools
+Models for equipment condition, age, ML risk buffers, SLA tiers, and quote calculations.
+"""
+
+from enum import Enum
+from typing import Optional, Dict, Any, List
+from pydantic import BaseModel, Field
+from decimal import Decimal
+from datetime import date
+
+
+class SLATier(str, Enum):
+    """Service Level Agreement tiers with different response times and uptime targets."""
+    basic = "basic"  # 99% uptime, 24hr response
+    standard = "standard"  # 99.5% uptime, 8hr response
+    premium = "premium"  # 99.9% uptime, 4hr response
+    enterprise = "enterprise"  # 99.95% uptime, 2hr response
+
+
+class ConditionFactor(BaseModel):
+    """Equipment condition assessment factor for pricing adjustments."""
+    equipment_id: str
+    overall_score: int = Field(..., ge=1, le=5, description="Condition score 1-5 from assessment")
+    age_years: float = Field(..., ge=0, description="Equipment age in years")
+    condition_multiplier: Decimal = Field(default=Decimal("1.0"), description="1.0-2.0 based on score")
+    age_multiplier: Decimal = Field(default=Decimal("1.0"), description="1.0-1.5 based on age")
+
+
+class RiskBuffer(BaseModel):
+    """ML failure prediction risk buffer for pricing."""
+    equipment_id: str
+    failure_probability: Decimal = Field(..., ge=Decimal("0"), le=Decimal("1"), description="Failure probability from ML (0-1)")
+    health_score: int = Field(..., ge=0, le=100, description="Health score 0-100")
+    risk_buffer_pct: Decimal = Field(default=Decimal("0"), ge=Decimal("0"), le=Decimal("50"), description="Risk buffer percentage 0-50%")
+
+
+class PricingCalculation(BaseModel):
+    """Complete pricing calculation with all adjustments and breakdowns."""
+    contract_id: Optional[str] = None
+    building_id: str
+    equipment_list: List[str]
+    sla_tier: SLATier
+
+    # Base costs
+    total_base_cost_zar: Decimal = Field(..., description="Base cost from templates")
+
+    # Adjustments
+    condition_adjustment_zar: Decimal = Field(default=Decimal("0"), description="Condition-based adjustment")
+    age_adjustment_zar: Decimal = Field(default=Decimal("0"), description="Age-based adjustment")
+    risk_buffer_zar: Decimal = Field(default=Decimal("0"), description="ML risk buffer adjustment")
+    sla_adjustment_zar: Decimal = Field(default=Decimal("0"), description="SLA tier premium adjustment")
+
+    # Margin
+    target_margin_pct: Decimal = Field(..., ge=Decimal("0"), le=Decimal("100"), description="Target margin percentage")
+    margin_amount_zar: Decimal = Field(default=Decimal("0"), description="Margin amount in ZAR")
+
+    # Final
+    recommended_monthly_fee_zar: Decimal = Field(..., description="Recommended monthly fee")
+    confidence_level: str = Field(..., description="Confidence: high, medium, low")
+
+    # Breakdown
+    cost_breakdown: Dict[str, Any] = Field(default_factory=dict, description="Detailed cost breakdown")
+
+
+class QuoteRequest(BaseModel):
+    """Request for pricing quote calculation."""
+    building_id: str
+    equipment_codes: List[str] = Field(..., min_items=1, description="List of equipment codes to quote")
+    sla_tier: SLATier
+    contract_months: int = Field(default=12, ge=1, le=60, description="Contract duration in months")
+    include_benchmarks: bool = Field(default=True, description="Include market benchmark comparison")
+
+
+class QuoteResponse(BaseModel):
+    """Response from pricing quote calculation."""
+    request_id: str
+    recommended_fee_zar: Decimal = Field(..., description="Recommended monthly fee")
+    fee_range_zar: Dict[str, Decimal] = Field(..., description="Min, target, max fee range")
+    cost_breakdown: Dict[str, Decimal] = Field(..., description="Cost component breakdown")
+    risk_factors: List[str] = Field(default_factory=list, description="Identified risk factors")
+    assumptions: List[str] = Field(default_factory=list, description="Quote assumptions")
+    market_comparison: Optional[Dict[str, Any]] = Field(None, description="Market benchmark data")
+    valid_until: date = Field(..., description="Quote validity date")
+
+
+class EquipmentTypePricing(BaseModel):
+    """Equipment-type specific pricing template data."""
+    equipment_type: str
+    monthly_base_cost: Decimal
+    typical_monthly_breakdown: Dict[str, Decimal]
+    condition_impact: bool = True
+    age_impact: bool = True
+    ml_risk_applicable: bool = True
+
+
+class MarginTarget(BaseModel):
+    """Target margin settings by SLA tier."""
+    sla_tier: SLATier
+    margin_pct: Decimal
+    multiplier: Decimal = Field(..., description="SLA premium multiplier")
+
+
+class PricingConfig(BaseModel):
+    """Global pricing configuration."""
+    enabled: bool = True
+    default_margin_pct: Decimal = Decimal("25")
+    condition_multipliers: Dict[int, Decimal] = Field(
+        default_factory=lambda: {
+            5: Decimal("1.0"),  # Excellent - no adjustment
+            4: Decimal("1.25"),  # Good
+            3: Decimal("1.5"),   # Fair
+            2: Decimal("1.75"),  # Poor
+            1: Decimal("2.0")    # Critical
+        }
+    )
+    age_multipliers: Dict[str, Decimal] = Field(
+        default_factory=lambda: {
+            "0-5": Decimal("1.0"),
+            "5-10": Decimal("1.1"),
+            "10-15": Decimal("1.2"),
+            "15-20": Decimal("1.3"),
+            "20+": Decimal("1.5")
+        }
+    )
+    sla_multipliers: Dict[str, Decimal] = Field(
+        default_factory=lambda: {
+            "basic": Decimal("1.0"),
+            "standard": Decimal("1.15"),
+            "premium": Decimal("1.3"),
+            "enterprise": Decimal("1.5")
+        }
+    )
+    margin_targets: List[MarginTarget] = Field(
+        default_factory=lambda: [
+            MarginTarget(sla_tier=SLATier.basic, margin_pct=Decimal("20"), multiplier=Decimal("1.0")),
+            MarginTarget(sla_tier=SLATier.standard, margin_pct=Decimal("25"), multiplier=Decimal("1.15")),
+            MarginTarget(sla_tier=SLATier.premium, margin_pct=Decimal("30"), multiplier=Decimal("1.3")),
+            MarginTarget(sla_tier=SLATier.enterprise, margin_pct=Decimal("35"), multiplier=Decimal("1.5"))
+        ]
+    )
