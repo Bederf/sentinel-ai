@@ -3,9 +3,18 @@ import React from 'react';
 export interface CardProps {
   children: React.ReactNode;
   className?: string;
+  glass?: boolean;
 }
 
-export const Card: React.FC<CardProps> = ({ children, className = '' }) => {
+export const Card: React.FC<CardProps> = ({ children, className = '', glass = false }) => {
+  if (glass) {
+    return (
+      <div className={`glass-card ${className}`}>
+        {children}
+      </div>
+    );
+  }
+
   return (
     <div
       className={`rounded-lg shadow-md ${className}`}
