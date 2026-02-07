@@ -155,6 +155,71 @@ class ProfitabilityStatus(str, Enum):
 
 
 # ============================================================================
+# Phase 49: Cost Tracking & Budgeting - Additional Enums
+# ============================================================================
+
+
+class LaborCostType(str, Enum):
+    """Labor cost subcategory for detailed tracking."""
+    PLANNED_MAINTENANCE = "planned_maintenance"
+    EMERGENCY_CALLOUT = "emergency_callout"
+    BREAKDOWN_REPAIR = "breakdown_repair"
+    TRAVEL_TIME = "travel_time"
+    OVERTIME = "overtime"
+
+
+class PartsCostType(str, Enum):
+    """Parts cost subcategory for detailed tracking."""
+    SCHEDULED_REPLACEMENT = "scheduled_replacement"
+    UNPLANNED_REPAIR = "unplanned_repair"
+    CONSUMABLES = "consumables"
+    CALIBRATION_MATERIALS = "calibration_materials"
+
+
+class CalloutType(str, Enum):
+    """Callout type for billing differentiation."""
+    BUSINESS_HOURS = "business_hours"
+    AFTER_HOURS = "after_hours"
+    WEEKEND = "weekend"
+    PUBLIC_HOLIDAY = "public_holiday"
+
+
+# ============================================================================
+# Phase 49: Cost Line Item and Budget Template Models
+# ============================================================================
+
+
+class CostLineItem(BaseModel):
+    """Individual cost line item for work orders and service feedback."""
+    model_config = ConfigDict(from_attributes=True)
+
+    category: str = Field(..., description="Cost category: labor, parts, subcontractor, callout")
+    subcategory: str = Field(..., description="Subcategory from LaborCostType, PartsCostType, etc.")
+    description: str = Field(..., description="Line item description")
+    quantity: float = Field(..., ge=0, description="Quantity (hours, units, etc.)")
+    unit_price_zar: float = Field(..., ge=0, description="Unit price in ZAR with 2 decimal precision")
+    total_zar: float = Field(..., ge=0, description="Total price = quantity * unit_price")
+    equipment_type: Optional[str] = Field(None, description="Equipment type for template linking")
+    work_order_id: Optional[str] = Field(None, description="Associated work order")
+    recorded_at: datetime = Field(default_factory=datetime.now, description="Timestamp when recorded")
+
+
+class BudgetTemplate(BaseModel):
+    """Budget template for equipment-type specific budget defaults."""
+    model_config = ConfigDict(from_attributes=True)
+
+    equipment_type: str = Field(..., description="Equipment type: chiller, ahu, generator, dali_controller, power_meter")
+    annual_hours_planned: int = Field(..., ge=0, description="Expected planned maintenance hours per year")
+    callouts_per_year: int = Field(..., ge=0, description="Average emergency callouts per year")
+    parts_replacement_cycle_months: int = Field(..., ge=1, description="Typical parts replacement cycle in months")
+    labor_rate_zar: float = Field(..., ge=0, description="Standard labor rate per hour in ZAR")
+    typical_monthly_breakdown: Dict[str, float] = Field(
+        ...,
+        description="Monthly budget breakdown by category: labor_budget_zar, parts_budget_zar, etc."
+    )
+
+
+# ============================================================================
 # Phase 50: SLA Monitoring & Alerts - Additional Enums
 # ============================================================================
 
