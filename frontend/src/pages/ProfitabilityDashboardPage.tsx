@@ -56,6 +56,7 @@ import type {
   ProfitabilityTrend,
   LossLeaderAnalysis,
 } from "../lib/profitabilityApi";
+import { PageLoading } from "../components/PageLoading";
 
 // ============= Period Filter =============
 
@@ -183,6 +184,8 @@ export function ProfitabilityDashboardPage() {
     "margin"
   );
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
 
   // Get period range from filter
   const periodRange = useMemo(() => getPeriodRange(periodFilter), [periodFilter]);
@@ -200,6 +203,86 @@ export function ProfitabilityDashboardPage() {
   // Format percentage
   const formatPercent = (value: number) => {
     return `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`;
+  };
+
+  const statusRank = (status: ContractProfitabilityDetail["status"]) => {
+    switch (status) {
+      case "profitable":
+        return 2;
+      case "break_even":
+        return 1;
+      default:
+        return 0;
+    }
+  };
+
+  const formatStatusLabel = (status: ContractProfitabilityDetail["status"]) => {
+    if (status === "break_even") return "Break Even";
+    return status.charAt(0).toUpperCase() + status.slice(1);
+  };
+
+  const aggregatePortfolioTrends = (
+    allTrends: ProfitabilityTrend[][]
+  ): ProfitabilityTrend[] => {
+    const periodMap = new Map<
+      string,
+      { revenue: number; cost: number; margin: number; marginPctSum: number; count: number }
+    >();
+
+    allTrends.forEach((trendList) => {
+      trendList.forEach((trend) => {
+        const entry = periodMap.get(trend.period) || {
+          revenue: 0,
+          cost: 0,
+          margin: 0,
+          marginPctSum: 0,
+          count: 0,
+        };
+        entry.revenue += trend.revenue_zar;
+        entry.cost += trend.cost_zar;
+        entry.margin += trend.margin_zar;
+        entry.marginPctSum += trend.margin_pct;
+        entry.count += 1;
+        periodMap.set(trend.period, entry);
+      });
+    });
+
+    const periods = Array.from(periodMap.keys()).sort();
+    const aggregated: ProfitabilityTrend[] = [];
+
+    periods.forEach((period) => {
+      const entry = periodMap.get(period);
+      if (!entry || entry.count === 0) {
+        return;
+      }
+      const marginPct = entry.marginPctSum / entry.count;
+      aggregated.push({
+        contract_id: "portfolio",
+        period,
+        revenue_zar: entry.revenue,
+        cost_zar: entry.cost,
+        margin_zar: entry.margin,
+        margin_pct: Number(marginPct.toFixed(2)),
+        trend: "stable",
+      });
+    });
+
+    aggregated.forEach((point, index) => {
+      if (index === 0) {
+        point.trend = "stable";
+        return;
+      }
+      const prev = aggregated[index - 1];
+      if (point.margin_pct > prev.margin_pct + 2) {
+        point.trend = "improving";
+      } else if (point.margin_pct < prev.margin_pct - 2) {
+        point.trend = "declining";
+      } else {
+        point.trend = "stable";
+      }
+    });
+
+    return aggregated;
   };
 
   // Fetch portfolio metrics
@@ -243,10 +326,17 @@ export function ProfitabilityDashboardPage() {
     const fetchContracts = async () => {
       try {
         setLoading(true);
-        // Note: In production, we'd have a batch endpoint
-        // For now, we'll use demo data or fetch individually
-        // TODO: Implement batch contract fetching API
-        setContracts([]);
+        const contractList = await profitabilityApi.getContractList("active");
+        const contractDetails = await Promise.all(
+          contractList.map((contract) =>
+            profitabilityApi.getContractProfitability(
+              contract.id,
+              periodRange.start,
+              periodRange.end
+            )
+          )
+        );
+        setContracts(contractDetails);
         setError(null);
       } catch (err) {
         console.error("Failed to fetch contracts:", err);
@@ -269,9 +359,17 @@ export function ProfitabilityDashboardPage() {
             12
           );
           setTrends(response.trends);
+        } else if (contracts.length > 0) {
+          const responses = await Promise.all(
+            contracts.map((contract) =>
+              profitabilityApi.getProfitabilityTrends(contract.contract_id, 12)
+            )
+          );
+          const aggregated = aggregatePortfolioTrends(
+            responses.map((response) => response.trends)
+          );
+          setTrends(aggregated);
         } else {
-          // Portfolio average trends
-          // TODO: Implement portfolio trend endpoint
           setTrends([]);
         }
       } catch (err) {
@@ -281,7 +379,7 @@ export function ProfitabilityDashboardPage() {
     };
 
     fetchTrends();
-  }, [selectedContractId]);
+  }, [selectedContractId, contracts]);
 
   // Sort contracts
   const sortedContracts = useMemo(() => {
@@ -292,16 +390,16 @@ export function ProfitabilityDashboardPage() {
 
       switch (sortField) {
         case "margin":
-          aVal = a.margin_pct;
-          bVal = b.margin_pct;
+          aVal = a.gross_margin_percentage;
+          bVal = b.gross_margin_percentage;
           break;
         case "revenue":
-          aVal = a.revenue.net_revenue;
-          bVal = b.revenue.net_revenue;
+          aVal = a.net_revenue_zar;
+          bVal = b.net_revenue_zar;
           break;
         case "status":
-          aVal = a.status;
-          bVal = b.status;
+          aVal = statusRank(a.status);
+          bVal = statusRank(b.status);
           break;
         default:
           return 0;
@@ -309,8 +407,8 @@ export function ProfitabilityDashboardPage() {
 
       if (typeof aVal === "string" && typeof bVal === "string") {
         return sortDirection === "asc"
-          ? aVal.localeCompare(bVal)
-          : bVal.localeCompare(aVal);
+          ? (aVal as string).localeCompare(bVal as string)
+          : (bVal as string).localeCompare(aVal as string);
       }
 
       return sortDirection === "asc"
@@ -326,10 +424,23 @@ export function ProfitabilityDashboardPage() {
     const query = searchQuery.toLowerCase();
     return sortedContracts.filter(
       (c) =>
-        c.organization_name.toLowerCase().includes(query) ||
-        c.building_name.toLowerCase().includes(query)
+        c.contract_name.toLowerCase().includes(query) ||
+        (c.building_name || c.building_id || "")
+          .toLowerCase()
+          .includes(query)
     );
   }, [sortedContracts, searchQuery]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, periodRange, contracts.length]);
+
+  const paginatedContracts = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredContracts.slice(start, start + pageSize);
+  }, [filteredContracts, currentPage]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredContracts.length / pageSize));
 
   // Handle sort
   const handleSort = (field: typeof sortField) => {
@@ -354,16 +465,7 @@ export function ProfitabilityDashboardPage() {
   // Loading state
   if (loading) {
     return (
-      <div className="space-y-6">
-        {/* KPI Cards Skeleton */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map((i) => (
-            <Card key={i} className="glass-panel animate-pulse">
-              <div className="h-20" />
-            </Card>
-          ))}
-        </div>
-      </div>
+      <PageLoading message="Loading profitability data..." />
     );
   }
 
@@ -434,7 +536,7 @@ export function ProfitabilityDashboardPage() {
           title="Total Revenue"
           value={
             portfolioMetrics
-              ? formatZAR(portfolioMetrics.total_revenue)
+              ? formatZAR(portfolioMetrics.total_revenue_zar)
               : "R0"
           }
           subtitle={`${portfolioMetrics?.total_contracts || 0} contracts`}
@@ -444,28 +546,28 @@ export function ProfitabilityDashboardPage() {
           title="Gross Margin"
           value={
             portfolioMetrics
-              ? formatZAR(portfolioMetrics.gross_margin)
+              ? formatZAR(portfolioMetrics.gross_margin_zar)
               : "R0"
           }
           subtitle={
             portfolioMetrics
-              ? `Avg ${formatPercent(portfolioMetrics.avg_margin_pct)}`
+              ? `Avg ${formatPercent(portfolioMetrics.avg_margin_percentage)}`
               : "0%"
           }
           trend={
-            portfolioMetrics && portfolioMetrics.avg_margin_pct > 0
+            portfolioMetrics && portfolioMetrics.avg_margin_percentage > 0
               ? "up"
               : "neutral"
           }
-          color={portfolioMetrics && portfolioMetrics.avg_margin_pct > 0 ? "green" : "gray"}
+          color={portfolioMetrics && portfolioMetrics.avg_margin_percentage > 0 ? "green" : "gray"}
         />
         <KPICard
           title="Profitable"
-          value={`${portfolioMetrics?.profit_count || 0}`}
+          value={`${portfolioMetrics?.profit_contracts || 0}`}
           subtitle={
             portfolioMetrics && portfolioMetrics.total_contracts > 0
               ? `${Math.round(
-                  (portfolioMetrics.profit_count /
+                  (portfolioMetrics.profit_contracts /
                     portfolioMetrics.total_contracts) *
                     100
                 )}% of portfolio`
@@ -475,17 +577,17 @@ export function ProfitabilityDashboardPage() {
         />
         <KPICard
           title="Loss-Making"
-          value={`${portfolioMetrics?.loss_count || 0}`}
+          value={`${portfolioMetrics?.loss_contracts || 0}`}
           subtitle={
             portfolioMetrics && portfolioMetrics.total_contracts > 0
               ? `${Math.round(
-                  (portfolioMetrics.loss_count /
+                  (portfolioMetrics.loss_contracts /
                     portfolioMetrics.total_contracts) *
                     100
                 )}% of portfolio`
               : "0%"
           }
-          color={portfolioMetrics && portfolioMetrics.loss_count > 0 ? "red" : "gray"}
+          color={portfolioMetrics && portfolioMetrics.loss_contracts > 0 ? "red" : "gray"}
         />
       </div>
 
@@ -511,7 +613,7 @@ export function ProfitabilityDashboardPage() {
                     style={{ color: "var(--color-sentinel-text-primary)" }}
                     className="font-medium"
                   >
-                    {leader.organization_name} - {leader.building_name}
+                    {leader.contract_name}
                   </Text>
                   <Text
                     style={{ color: "var(--color-sentinel-text-secondary)" }}
@@ -525,13 +627,13 @@ export function ProfitabilityDashboardPage() {
                     style={{ color: "var(--color-sentinel-red)" }}
                     className="font-semibold"
                   >
-                    {formatZAR(leader.loss_amount)}
+                    {formatZAR(leader.loss_amount_zar)}
                   </Text>
                   <Text
                     style={{ color: "var(--color-sentinel-text-secondary)" }}
                     className="text-xs block"
                   >
-                    {formatPercent(leader.loss_pct)}
+                    {formatPercent(leader.loss_percentage)}
                   </Text>
                 </div>
               </div>
@@ -622,7 +724,7 @@ export function ProfitabilityDashboardPage() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {filteredContracts.length === 0 ? (
+              {paginatedContracts.length === 0 ? (
                 <TableRow>
                   <TableCell
                     colSpan={6}
@@ -637,7 +739,7 @@ export function ProfitabilityDashboardPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredContracts.map((contract) => (
+                paginatedContracts.map((contract) => (
                   <TableRow
                     key={contract.contract_id}
                     className="cursor-pointer hover:bg-opacity-50 transition-colors"
@@ -655,13 +757,13 @@ export function ProfitabilityDashboardPage() {
                     >
                       <div>
                         <div className="font-medium">
-                          {contract.organization_name}
+                          {contract.contract_name}
                         </div>
                         <div
                           className="text-xs"
                           style={{ color: "var(--color-sentinel-text-secondary)" }}
                         >
-                          {contract.building_name}
+                          {contract.building_name || contract.building_id}
                         </div>
                       </div>
                     </TableCell>
@@ -669,13 +771,13 @@ export function ProfitabilityDashboardPage() {
                       className="text-right"
                       style={{ color: "var(--color-sentinel-text-primary)" }}
                     >
-                      {formatZAR(contract.revenue.net_revenue)}
+                      {formatZAR(contract.net_revenue_zar)}
                     </TableCell>
                     <TableCell
                       className="text-right"
                       style={{ color: "var(--color-sentinel-text-primary)" }}
                     >
-                      {formatZAR(contract.costs.total_costs)}
+                      {formatZAR(contract.total_cost_zar)}
                     </TableCell>
                     <TableCell
                       className="text-right"
@@ -683,18 +785,18 @@ export function ProfitabilityDashboardPage() {
                     >
                       <div>
                         <div className="font-medium">
-                          {formatZAR(contract.gross_margin)}
+                          {formatZAR(contract.gross_margin_zar)}
                         </div>
                         <div
                           className="text-xs"
                           style={{
                             color:
-                              contract.margin_pct >= 0
+                              contract.gross_margin_percentage >= 0
                                 ? "var(--color-sentinel-green)"
                                 : "var(--color-sentinel-red)",
                           }}
                         >
-                          {formatPercent(contract.margin_pct)}
+                          {formatPercent(contract.gross_margin_percentage)}
                         </div>
                       </div>
                     </TableCell>
@@ -704,18 +806,18 @@ export function ProfitabilityDashboardPage() {
                     >
                       <div>
                         <div className="font-medium">
-                          {formatZAR(contract.net_margin)}
+                          {formatZAR(contract.gross_margin_zar)}
                         </div>
                         <div
                           className="text-xs"
                           style={{
                             color:
-                              contract.margin_pct >= 0
+                              contract.gross_margin_percentage >= 0
                                 ? "var(--color-sentinel-green)"
                                 : "var(--color-sentinel-red)",
                           }}
                         >
-                          {formatPercent(contract.margin_pct)}
+                          {formatPercent(contract.gross_margin_percentage)}
                         </div>
                       </div>
                     </TableCell>
@@ -724,13 +826,12 @@ export function ProfitabilityDashboardPage() {
                         color={
                           contract.status === "profitable"
                             ? "emerald"
-                            : contract.status === "break-even"
+                            : contract.status === "break_even"
                             ? "amber"
                             : "rose"
                         }
                       >
-                        {contract.status.charAt(0).toUpperCase() +
-                          contract.status.slice(1)}
+                        {formatStatusLabel(contract.status)}
                       </Badge>
                     </TableCell>
                   </TableRow>
@@ -740,6 +841,30 @@ export function ProfitabilityDashboardPage() {
           </Table>
         </div>
       </div>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-end gap-2">
+          <Button
+            variant="secondary"
+            size="xs"
+            disabled={currentPage === 1}
+            onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+          >
+            Previous
+          </Button>
+          <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+            Page {currentPage} of {totalPages}
+          </Text>
+          <Button
+            variant="secondary"
+            size="xs"
+            disabled={currentPage === totalPages}
+            onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+          >
+            Next
+          </Button>
+        </div>
+      )}
 
       {/* Section 4: Trend Chart */}
       <div className="glass-panel p-6">
@@ -771,41 +896,43 @@ export function ProfitabilityDashboardPage() {
               : "No trend data available"}
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={trends}>
-              <CartesianGrid
-                strokeDasharray="3 3"
-                stroke="var(--color-sentinel-border)"
-              />
-              <XAxis
-                dataKey="period"
-                stroke="var(--color-sentinel-text-secondary)"
-                fontSize={12}
-              />
-              <YAxis
-                stroke="var(--color-sentinel-text-secondary)"
-                fontSize={12}
-                tickFormatter={(value) => `${value}%`}
-              />
-              <Tooltip
-                contentStyle={{
-                  background: "var(--color-sentinel-bg-panel)",
-                  border: "1px solid var(--color-sentinel-border)",
-                  borderRadius: "4px",
-                }}
-                labelStyle={{ color: "var(--color-sentinel-text-primary)" }}
-                formatter={(value: number) => [`${value.toFixed(1)}%`, "Margin"]}
-              />
-              <Line
-                type="monotone"
-                dataKey="margin_pct"
-                stroke="var(--color-sentinel-blue)"
-                strokeWidth={2}
-                dot={{ fill: "var(--color-sentinel-blue)", r: 4 }}
-                activeDot={{ r: 6 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
+          <div className="h-[300px] min-h-[300px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={trends}>
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="var(--color-sentinel-border)"
+                />
+                <XAxis
+                  dataKey="period"
+                  stroke="var(--color-sentinel-text-secondary)"
+                  fontSize={12}
+                />
+                <YAxis
+                  stroke="var(--color-sentinel-text-secondary)"
+                  fontSize={12}
+                  tickFormatter={(value) => `${value}%`}
+                />
+                <Tooltip
+                  contentStyle={{
+                    background: "var(--color-sentinel-bg-panel)",
+                    border: "1px solid var(--color-sentinel-border)",
+                    borderRadius: "4px",
+                  }}
+                  labelStyle={{ color: "var(--color-sentinel-text-primary)" }}
+                  formatter={(value: number) => [`${value.toFixed(1)}%`, "Margin"]}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="margin_pct"
+                  stroke="var(--color-sentinel-blue)"
+                  strokeWidth={2}
+                  dot={{ fill: "var(--color-sentinel-blue)", r: 4 }}
+                  activeDot={{ r: 6 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
         )}
       </div>
     </div>

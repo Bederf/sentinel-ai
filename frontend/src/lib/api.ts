@@ -16,6 +16,15 @@ interface ApiError {
   status: number;
 }
 
+export type {
+  PortfolioMetrics,
+  ContractProfitabilityDetail,
+  ProfitabilityTrend,
+  LossLeaderAnalysis,
+  AssetROI,
+  ContractListItem,
+} from "./profitabilityApi";
+
 // Equipment breakdown by category (from Supabase view)
 export interface EquipmentBreakdown {
   equipment: number;
@@ -1009,8 +1018,20 @@ export const api = {
    * Get active alerts
    */
   async getAlerts(): Promise<Alert[]> {
-    const response = await fetchApi<{ total: number; alerts: Alert[] }>("/api/alerts");
-    return response.alerts;
+    try {
+      const response = await fetchApi<{ total: number; alerts: Alert[] }>("/api/alerts");
+      return response.alerts;
+    } catch (err) {
+      const apiError = err as ApiError | undefined;
+      const message = apiError?.message?.toLowerCase() || "";
+      if (apiError?.status === 401 && message.includes("authentication required")) {
+        return [];
+      }
+      if (apiError?.status === 403 && message.includes("demo mode is only available from localhost")) {
+        return [];
+      }
+      throw err;
+    }
   },
 
   /**
@@ -2203,10 +2224,15 @@ export const monitoringApi = {
    * @param buildingId - Optional building ID filter
    */
   getIntegrationHealth: async (buildingId?: string): Promise<IntegrationHealthSummary> => {
+    const token = localStorage.getItem("sentinel_token");
     const url = buildingId
       ? `${API_BASE_URL}/api/integration/health?building_id=${buildingId}`
       : `${API_BASE_URL}/api/integration/health`;
-    const res = await fetch(url);
+    const res = await fetch(url, {
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
     if (!res.ok) throw new Error('Failed to fetch integration health');
     return res.json();
   },
@@ -2216,7 +2242,12 @@ export const monitoringApi = {
    * @param buildingId - Building ID (required)
    */
   getDataQualityMetrics: async (buildingId: string): Promise<DataQualityMetrics> => {
-    const res = await fetch(`${API_BASE_URL}/api/integration/quality-metrics/${buildingId}`);
+    const token = localStorage.getItem("sentinel_token");
+    const res = await fetch(`${API_BASE_URL}/api/integration/quality-metrics/${buildingId}`, {
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
     if (!res.ok) throw new Error('Failed to fetch quality metrics');
     return res.json();
   },
@@ -2227,9 +2258,14 @@ export const monitoringApi = {
    * @param days - Number of days of history (default: 7)
    */
   getSyncJobs: async (buildingId?: string, days: number = 7): Promise<SyncJobSummary[]> => {
+    const token = localStorage.getItem("sentinel_token");
     const params = new URLSearchParams({ days: days.toString() });
     if (buildingId) params.set('building_id', buildingId);
-    const res = await fetch(`${API_BASE_URL}/api/integration/sync-jobs?${params}`);
+    const res = await fetch(`${API_BASE_URL}/api/integration/sync-jobs?${params}`, {
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
     if (!res.ok) throw new Error('Failed to fetch sync jobs');
     return res.json();
   },
@@ -2249,12 +2285,17 @@ export const monitoringApi = {
     }>;
     total: number;
   }> => {
+    const token = localStorage.getItem("sentinel_token");
     const params = new URLSearchParams({
       limit: limit.toString(),
       offset: offset.toString(),
     });
     if (buildingId) params.set('building_id', buildingId);
-    const res = await fetch(`${API_BASE_URL}/api/integration/unmatched-points?${params}`);
+    const res = await fetch(`${API_BASE_URL}/api/integration/unmatched-points?${params}`, {
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
     if (!res.ok) throw new Error('Failed to fetch unmatched points');
     return res.json();
   },
@@ -2270,8 +2311,12 @@ export const integrationApi = {
     const formData = new FormData();
     formData.append('file', file);
 
+    const token = localStorage.getItem("sentinel_token");
     const response = await fetch(`${API_BASE_URL}/api/integration/detect-format`, {
       method: 'POST',
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: formData
     });
 
@@ -2289,9 +2334,13 @@ export const integrationApi = {
    * @param mappings - Column mappings to save
    */
   saveColumnMappings: async (buildingId: string, logSourceId: string, mappings: ColumnMapping[]): Promise<void> => {
+    const token = localStorage.getItem("sentinel_token");
     const response = await fetch(`${API_BASE_URL}/api/integration/mappings`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify({ building_id: buildingId, log_source_id: logSourceId, mappings })
     });
 
@@ -2307,9 +2356,13 @@ export const integrationApi = {
    * @param bmsPoints - List of BMS point IDs
    */
   matchPoints: async (buildingId: string, logSourceId: string, bmsPoints: string[]): Promise<PointMatch[]> => {
+    const token = localStorage.getItem("sentinel_token");
     const response = await fetch(`${API_BASE_URL}/api/integration/match-points`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify({ building_id: buildingId, log_source_id: logSourceId, bms_points: bmsPoints })
     });
 
@@ -2327,9 +2380,13 @@ export const integrationApi = {
    * @param dryRun - If true, validate without processing
    */
   ingestLogs: async (buildingId: string, logSourceId: string, dryRun: boolean = false): Promise<void> => {
+    const token = localStorage.getItem("sentinel_token");
     const response = await fetch(`${API_BASE_URL}/api/integration/ingest`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify({ building_id: buildingId, log_source_id: logSourceId, dry_run: dryRun })
     });
 
@@ -2530,9 +2587,7 @@ export const daliApi = {
     const params = new URLSearchParams();
     if (floor) params.set('floor', floor);
     const queryString = params.toString();
-    const response = await fetch(`${API_BASE_URL}/api/dali/controllers${queryString ? `?${queryString}` : ''}`);
-    if (!response.ok) throw new Error('Failed to fetch DALI controllers');
-    return response.json();
+    return fetchApi<DALIController[]>(`/api/dali/controllers${queryString ? `?${queryString}` : ''}`);
   },
 
   /**
@@ -2543,9 +2598,7 @@ export const daliApi = {
     const params = new URLSearchParams();
     if (zoneId) params.set('zone_id', zoneId);
     const queryString = params.toString();
-    const response = await fetch(`${API_BASE_URL}/api/dali/sensors${queryString ? `?${queryString}` : ''}`);
-    if (!response.ok) throw new Error('Failed to fetch DALI sensors');
-    return response.json();
+    return fetchApi<DALISensor[]>(`/api/dali/sensors${queryString ? `?${queryString}` : ''}`);
   },
 
   /**
@@ -2553,9 +2606,7 @@ export const daliApi = {
    * @param deskId - Desk identifier
    */
   getSensorByDesk: async (deskId: string): Promise<DALISensor> => {
-    const response = await fetch(`${API_BASE_URL}/api/dali/sensors/desk/${deskId}`);
-    if (!response.ok) throw new Error('Failed to fetch sensor for desk');
-    return response.json();
+    return fetchApi<DALISensor>(`/api/dali/sensors/desk/${deskId}`);
   },
 
   /**
@@ -2566,18 +2617,14 @@ export const daliApi = {
     const params = new URLSearchParams();
     if (zoneId) params.set('zone_id', zoneId);
     const queryString = params.toString();
-    const response = await fetch(`${API_BASE_URL}/api/dali/luminaires${queryString ? `?${queryString}` : ''}`);
-    if (!response.ok) throw new Error('Failed to fetch DALI luminaires');
-    return response.json();
+    return fetchApi<DALILuminaire[]>(`/api/dali/luminaires${queryString ? `?${queryString}` : ''}`);
   },
 
   /**
    * Get faulty luminaires
    */
   getFaultyLuminaires: async (): Promise<DALILuminaire[]> => {
-    const response = await fetch(`${API_BASE_URL}/api/dali/luminaires/faulty`);
-    if (!response.ok) throw new Error('Failed to fetch faulty luminaires');
-    return response.json();
+    return fetchApi<DALILuminaire[]>("/api/dali/luminaires/faulty");
   },
 
   /**
@@ -2585,9 +2632,7 @@ export const daliApi = {
    * @param zoneId - Zone ID
    */
   getZoneOccupancy: async (zoneId: string): Promise<ZoneOccupancy> => {
-    const response = await fetch(`${API_BASE_URL}/api/dali/zones/${zoneId}/occupancy`);
-    if (!response.ok) throw new Error('Failed to fetch zone occupancy');
-    return response.json();
+    return fetchApi<ZoneOccupancy>(`/api/dali/zones/${zoneId}/occupancy`);
   },
 
   /**
@@ -2595,9 +2640,7 @@ export const daliApi = {
    * @param zoneId - Zone ID
    */
   getZoneLighting: async (zoneId: string): Promise<ZoneLighting> => {
-    const response = await fetch(`${API_BASE_URL}/api/dali/zones/${zoneId}/lighting`);
-    if (!response.ok) throw new Error('Failed to fetch zone lighting');
-    return response.json();
+    return fetchApi<ZoneLighting>(`/api/dali/zones/${zoneId}/lighting`);
   },
 
   /**
@@ -2605,27 +2648,21 @@ export const daliApi = {
    * @param floor - Floor identifier (e.g., "L10", "L11", "L12")
    */
   getFloorSummary: async (floor: string): Promise<FloorSummary> => {
-    const response = await fetch(`${API_BASE_URL}/api/dali/floors/${floor}/summary`);
-    if (!response.ok) throw new Error('Failed to fetch floor summary');
-    return response.json();
+    return fetchApi<FloorSummary>(`/api/dali/floors/${floor}/summary`);
   },
 
   /**
    * Get building occupancy overview
    */
   getBuildingOccupancy: async (): Promise<BuildingOccupancy> => {
-    const response = await fetch(`${API_BASE_URL}/api/dali/building/occupancy`);
-    if (!response.ok) throw new Error('Failed to fetch building occupancy');
-    return response.json();
+    return fetchApi<BuildingOccupancy>("/api/dali/building/occupancy");
   },
 
   /**
    * Get DALI system statistics
    */
   getStats: async (): Promise<DALIStats> => {
-    const response = await fetch(`${API_BASE_URL}/api/dali/stats`);
-    if (!response.ok) throw new Error('Failed to fetch DALI stats');
-    return response.json();
+    return fetchApi<DALIStats>("/api/dali/stats");
   },
 
   /**
@@ -2633,9 +2670,7 @@ export const daliApi = {
    * @param zoneId - Zone ID
    */
   getZoneSummary: async (zoneId: string): Promise<{ occupancy: ZoneOccupancy; lighting: ZoneLighting }> => {
-    const response = await fetch(`${API_BASE_URL}/api/dali/zones/${zoneId}/summary`);
-    if (!response.ok) throw new Error('Failed to fetch zone summary');
-    return response.json();
+    return fetchApi<{ occupancy: ZoneOccupancy; lighting: ZoneLighting }>(`/api/dali/zones/${zoneId}/summary`);
   },
 };
 
@@ -3879,13 +3914,3 @@ const apiWithAuth = {
 };
 
 export default apiWithAuth;
-
-// ============= Profitability Analytics Types =============
-// Re-export from profitabilityApi for convenience
-export type {
-  PortfolioMetrics,
-  ContractProfitabilityDetail,
-  ProfitabilityTrend,
-  LossLeaderAnalysis,
-  AssetROI,
-} from "./profitabilityApi";

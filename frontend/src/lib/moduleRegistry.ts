@@ -6,11 +6,11 @@
  * - Each operates standalone but integrates when multiple active
  */
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:9095';
+const API_BASE = import.meta.env.VITE_API_URL || "";
 
 // ==================== Types ====================
 
-export type ModuleType = 'hvac' | 'energy' | 'security' | 'lighting' | 'fire' | 'access' | 'solar';
+export type ModuleType = 'control' | 'assets' | 'simbiot' | 'integrations' | 'notifications' | 'hvac' | 'energy' | 'security' | 'lighting' | 'fire' | 'access' | 'solar' | 'ml' | 'sustainability' | 'contracts';
 export type ModuleStatus = 'active' | 'inactive' | 'error' | 'maintenance';
 export type RecommendationType = 'optimization' | 'maintenance' | 'alert' | 'cross_system' | 'predictive';
 export type RecommendationPriority = 'low' | 'medium' | 'high' | 'critical';
@@ -104,12 +104,30 @@ export interface UnifiedTelemetry {
 
 // ==================== API Functions ====================
 
+function getAuthHeaders(): Record<string, string> {
+  const token = localStorage.getItem("sentinel_token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+async function fetchWithAuth(input: RequestInfo, init?: RequestInit) {
+  const authHeaders = getAuthHeaders();
+  const headers: Record<string, string> = {
+    ...(init?.headers as Record<string, string> || {}),
+    ...authHeaders,
+  };
+
+  return fetch(input, {
+    ...init,
+    headers,
+  });
+}
+
 export const moduleRegistryApi = {
   /**
    * Get all available module definitions
    */
   async getAvailableModules(): Promise<ModuleDefinition[]> {
-    const response = await fetch(`${API_BASE}/api/modules/available`);
+    const response = await fetchWithAuth(`${API_BASE}/api/modules/available`);
     if (!response.ok) throw new Error('Failed to fetch available modules');
     return response.json();
   },
@@ -118,7 +136,7 @@ export const moduleRegistryApi = {
    * Get definition for a specific module type
    */
   async getModuleDefinition(moduleType: ModuleType): Promise<ModuleDefinition> {
-    const response = await fetch(`${API_BASE}/api/modules/definition/${moduleType}`);
+    const response = await fetchWithAuth(`${API_BASE}/api/modules/definition/${moduleType}`);
     if (!response.ok) throw new Error(`Failed to fetch module definition: ${moduleType}`);
     return response.json();
   },
@@ -127,7 +145,7 @@ export const moduleRegistryApi = {
    * Get active modules for a site
    */
   async getActiveModules(siteId: string): Promise<ModuleInstance[]> {
-    const response = await fetch(`${API_BASE}/api/modules/site/${siteId}/active`);
+    const response = await fetchWithAuth(`${API_BASE}/api/modules/site/${siteId}/active`);
     if (!response.ok) throw new Error('Failed to fetch active modules');
     return response.json();
   },
@@ -141,7 +159,7 @@ export const moduleRegistryApi = {
     moduleType: ModuleType,
     config?: Record<string, unknown>
   ): Promise<ModuleInstance> {
-    const response = await fetch(`${API_BASE}/api/modules/activate`, {
+    const response = await fetchWithAuth(`${API_BASE}/api/modules/activate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -159,7 +177,7 @@ export const moduleRegistryApi = {
    * Deactivate a module for a site
    */
   async deactivateModule(siteId: string, moduleType: ModuleType): Promise<void> {
-    const response = await fetch(
+    const response = await fetchWithAuth(
       `${API_BASE}/api/modules/site/${siteId}/deactivate/${moduleType}`,
       { method: 'POST' }
     );
@@ -170,7 +188,7 @@ export const moduleRegistryApi = {
    * Check if a module is active
    */
   async isModuleActive(siteId: string, moduleType: ModuleType): Promise<boolean> {
-    const response = await fetch(
+    const response = await fetchWithAuth(
       `${API_BASE}/api/modules/site/${siteId}/check/${moduleType}`
     );
     if (!response.ok) return false;
@@ -182,7 +200,7 @@ export const moduleRegistryApi = {
    * Get integration summary for a site
    */
   async getIntegrationSummary(siteId: string): Promise<IntegrationSummary> {
-    const response = await fetch(`${API_BASE}/api/modules/site/${siteId}/integration`);
+    const response = await fetchWithAuth(`${API_BASE}/api/modules/site/${siteId}/integration`);
     if (!response.ok) throw new Error('Failed to fetch integration summary');
     return response.json();
   },
@@ -191,7 +209,7 @@ export const moduleRegistryApi = {
    * Get unified telemetry from all active modules
    */
   async getUnifiedTelemetry(siteId: string): Promise<UnifiedTelemetry> {
-    const response = await fetch(`${API_BASE}/api/modules/site/${siteId}/telemetry`);
+    const response = await fetchWithAuth(`${API_BASE}/api/modules/site/${siteId}/telemetry`);
     if (!response.ok) throw new Error('Failed to fetch unified telemetry');
     return response.json();
   },
@@ -223,7 +241,7 @@ export const moduleRegistryApi = {
     }
 
     const url = `${API_BASE}/api/modules/site/${siteId}/recommendations?${params}`;
-    const response = await fetch(url);
+    const response = await fetchWithAuth(url);
     if (!response.ok) throw new Error('Failed to fetch recommendations');
     return response.json();
   },
@@ -246,7 +264,7 @@ export const moduleRegistryApi = {
       auto_actionable?: boolean;
     }
   ): Promise<{ recommendation_id: string; timestamp: string }> {
-    const response = await fetch(`${API_BASE}/api/modules/site/${siteId}/recommendations`, {
+    const response = await fetchWithAuth(`${API_BASE}/api/modules/site/${siteId}/recommendations`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(recommendation),
@@ -259,7 +277,7 @@ export const moduleRegistryApi = {
    * Acknowledge a recommendation
    */
   async acknowledgeRecommendation(siteId: string, recommendationId: string): Promise<void> {
-    const response = await fetch(
+    const response = await fetchWithAuth(
       `${API_BASE}/api/modules/site/${siteId}/recommendations/${recommendationId}/acknowledge`,
       { method: 'POST' }
     );
@@ -270,7 +288,7 @@ export const moduleRegistryApi = {
    * Resolve a recommendation
    */
   async resolveRecommendation(siteId: string, recommendationId: string): Promise<void> {
-    const response = await fetch(
+    const response = await fetchWithAuth(
       `${API_BASE}/api/modules/site/${siteId}/recommendations/${recommendationId}/resolve`,
       { method: 'POST' }
     );
@@ -285,7 +303,7 @@ export const moduleRegistryApi = {
     moduleType: ModuleType,
     healthScore: number
   ): Promise<void> {
-    const response = await fetch(
+    const response = await fetchWithAuth(
       `${API_BASE}/api/modules/site/${siteId}/health/${moduleType}?health_score=${healthScore}`,
       { method: 'POST' }
     );
@@ -296,16 +314,29 @@ export const moduleRegistryApi = {
 // ==================== Module Metadata ====================
 
 export const MODULE_ICONS: Record<ModuleType, string> = {
+  control: 'shield',
+  assets: 'git-branch',
+  simbiot: 'plug',
+  integrations: 'activity',
+  notifications: 'bell',
   hvac: 'thermometer',
   energy: 'zap',
-  security: 'shield',
+  security: 'shield-check',
   lighting: 'sun',
   fire: 'flame',
   access: 'key',
   solar: 'sun',
+  ml: 'bar-chart',
+  sustainability: 'leaf',
+  contracts: 'file-text',
 };
 
 export const MODULE_COLORS: Record<ModuleType, string> = {
+  control: 'slate',
+  assets: 'indigo',
+  simbiot: 'teal',
+  integrations: 'sky',
+  notifications: 'rose',
   hvac: 'blue',
   energy: 'amber',
   security: 'purple',
@@ -313,6 +344,9 @@ export const MODULE_COLORS: Record<ModuleType, string> = {
   fire: 'red',
   access: 'green',
   solar: 'yellow',
+  ml: 'cyan',
+  sustainability: 'emerald',
+  contracts: 'orange',
 };
 
 export const PRIORITY_COLORS: Record<RecommendationPriority, string> = {
