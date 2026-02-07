@@ -70,10 +70,10 @@ export function HeroPredictionCard({ prediction, onClick }: HeroPredictionCardPr
 
   return (
     <div
-      className="rounded-lg overflow-hidden cursor-pointer transition-all hover:scale-[1.01]"
+      className="rounded-lg overflow-hidden cursor-pointer transition-all hover:scale-[1.01] glass-card"
       style={{
-        background: "linear-gradient(135deg, var(--color-grafana-bg-panel) 0%, rgba(242, 73, 92, 0.1) 100%)",
-        border: `2px solid ${severityColor}40`,
+        background: `linear-gradient(135deg, var(--glass-bg) 0%, ${severityColor}15 100%)`,
+        borderColor: `${severityColor}40`,
         boxShadow: `0 4px 24px ${severityColor}20`,
       }}
       onClick={onClick}

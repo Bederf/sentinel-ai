@@ -53,16 +53,12 @@ export function ROISummaryCard({ predictions }: ROISummaryCardProps) {
 
   return (
     <div
-      className="rounded-lg overflow-hidden"
-      style={{
-        background: "var(--color-grafana-bg-panel)",
-        border: "1px solid var(--color-grafana-border)",
-      }}
+      className="rounded-lg overflow-hidden glass-card"
     >
       {/* Header */}
       <div
         className="px-6 py-4 flex items-center justify-between"
-        style={{ borderBottom: "1px solid var(--color-grafana-border)" }}
+        style={{ borderBottom: "1px solid var(--glass-border)" }}
       >
         <div className="flex items-center gap-3">
           <div

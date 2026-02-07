@@ -171,11 +171,7 @@ export function PredictionCard({ prediction, onClick }: PredictionCardProps) {
 
   return (
     <div
-      className={`relative rounded-md overflow-hidden transition-all duration-150 ${onClick ? "cursor-pointer hover:brightness-110" : ""}`}
-      style={{
-        background: "var(--color-sentinel-bg-panel)",
-        border: "1px solid var(--color-sentinel-border)",
-      }}
+      className={`relative rounded-md overflow-hidden transition-all duration-150 glass-card ${onClick ? "cursor-pointer hover:brightness-110" : ""}`}
       onClick={onClick}
     >
       {/* Top accent based on risk level */}
