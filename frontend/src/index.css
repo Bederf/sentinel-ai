@@ -713,6 +713,18 @@
     pointer-events: none;
   }
 
+  /* Nested glass depth - lighter/thinner glass for cards inside panels */
+  .glass-panel .glass-card {
+    background: rgba(255, 255, 255, 0.04);
+    backdrop-filter: blur(var(--glass-blur-sm));
+    -webkit-backdrop-filter: blur(var(--glass-blur-sm));
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  }
+
+  .glass-panel .glass-card:hover {
+    background: rgba(255, 255, 255, 0.07);
+  }
+
   /* Tremor glass compatibility */
   .glass [data-tremor-card],
   .glass-card [data-tremor-card],
