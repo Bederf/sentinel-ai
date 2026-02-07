@@ -76,6 +76,7 @@ from app.api import fleet_learning  # Phase 45-02 Fleet Learning & Cross-Site In
 from app.api import mlops  # Phase 45-03 MLOps Monitoring & Success Metrics
 from app.api import sustainability  # Phase 29 Sustainability & ESG module
 from app.api import solar  # Phase 34 Solar PV & BESS ingestion
+from app.api import water  # Phase 35 Water Meter Integration & Leak Detection
 from app.api import contracts  # Phase 48 Contract Management
 from app.api import pricing  # Phase 52-01 Risk-Based Pricing Tools
 from app.middleware.audit_middleware import AuditMiddleware
@@ -315,6 +316,7 @@ app.include_router(fleet_learning.router, tags=["fleet-learning"])  # Phase 45-0
 app.include_router(mlops.router, tags=["mlops"])  # Phase 45-03 MLOps Monitoring & Success Metrics
 app.include_router(sustainability.router, prefix="/api", tags=["sustainability"])  # Phase 29 Sustainability & ESG
 app.include_router(solar.router, prefix="/api", tags=["solar"])  # Phase 34 Solar PV & BESS
+app.include_router(water.router, prefix="/api", tags=["water"])  # Phase 35 Water Meter Integration & Leak Detection
 app.include_router(contracts.router, prefix="/api", tags=["contracts"])  # Phase 48 Contract Management
 app.include_router(pricing.router, prefix="/api", tags=["pricing"])  # Phase 52-01 Risk-Based Pricing Tools
 
