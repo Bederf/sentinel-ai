@@ -74,13 +74,10 @@ export function KPICard({
 
   return (
     <div
-      className={`relative overflow-hidden rounded-md ${onClick ? "cursor-pointer hover:brightness-110" : ""}`}
+      className={`relative overflow-hidden glass-card glass-highlight ${onClick ? "cursor-pointer hover:brightness-110" : ""}`}
       style={{
-        background: "var(--color-sentinel-bg-panel)",
-        border: "1px solid var(--color-sentinel-border)",
-        transition: "all 0.15s ease",
-        minHeight: "140px", // Ensure minimum height
-        maxHeight: "180px", // Limit maximum height
+        minHeight: "140px",
+        maxHeight: "180px",
       }}
       onClick={onClick}
     >
