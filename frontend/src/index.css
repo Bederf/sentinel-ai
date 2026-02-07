@@ -105,7 +105,11 @@
   }
 
   body {
-    background-color: var(--color-sentinel-bg-canvas);
+    background: var(--color-sentinel-bg-canvas);
+    background-image:
+      radial-gradient(ellipse at 20% 50%, rgba(59, 130, 246, 0.04) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 20%, rgba(16, 185, 129, 0.03) 0%, transparent 50%),
+      radial-gradient(ellipse at 50% 80%, rgba(245, 158, 11, 0.02) 0%, transparent 50%);
     color: var(--color-sentinel-text-primary);
     @apply m-0 min-h-screen;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
