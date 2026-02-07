@@ -120,29 +120,29 @@
     font-family: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
   }
 
-  /* Custom scrollbar for dark theme */
+  /* Custom scrollbar for glass theme */
   ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
   }
 
   ::-webkit-scrollbar-track {
-    background: var(--color-grafana-bg-primary);
+    background: transparent;
   }
 
   ::-webkit-scrollbar-thumb {
-    background: var(--color-grafana-border-strong);
-    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: #4d5055;
+    background: rgba(255, 255, 255, 0.2);
   }
 
   /* Firefox scrollbar */
   * {
     scrollbar-width: thin;
-    scrollbar-color: var(--color-grafana-border-strong) var(--color-grafana-bg-primary);
+    scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
   }
 }
 
