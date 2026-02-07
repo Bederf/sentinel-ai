@@ -8,6 +8,7 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical } from 'lucide-react';
+import type React from 'react';
 import { useState } from 'react';
 import KPICard, { type KPICardProps } from './KPICard';
 
@@ -27,13 +28,15 @@ export function SortableKPICard({ id, ...props }: SortableKPICardProps) {
 
   const [isHovered, setIsHovered] = useState(false);
 
-  const style = {
+  const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
-    transition: isDragging 
-      ? 'none' 
+    transition: isDragging
+      ? 'none'
       : transition || 'transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1)', // Spring-like snap effect
     opacity: isDragging ? 0.5 : 1,
     cursor: isDragging ? 'grabbing' : 'grab',
+    backdropFilter: isDragging ? 'none' : undefined,
+    WebkitBackdropFilter: isDragging ? 'none' : undefined,
   };
 
   return (
