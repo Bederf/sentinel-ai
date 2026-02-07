@@ -20,6 +20,7 @@ from app.database.repositories.dali_repository import (
     DALISensorRepository,
     DALIGroupRepository,
 )
+from app.database.repositories.sla_repository import SLARepository, get_sla_repository
 
 __all__ = [
     'BuildingRepository',
@@ -40,4 +41,6 @@ __all__ = [
     'DALILuminaireRepository',
     'DALISensorRepository',
     'DALIGroupRepository',
+    'SLARepository',
+    'get_sla_repository',
 ]
