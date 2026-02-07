@@ -725,6 +725,14 @@
     background: rgba(255, 255, 255, 0.07);
   }
 
+  /* Chart containers in glass panels - transparent backgrounds */
+  .glass-panel .recharts-wrapper,
+  .glass-panel [data-tremor-chart],
+  .glass-card .recharts-wrapper,
+  .glass-card [data-tremor-chart] {
+    background: transparent !important;
+  }
+
   /* Tremor glass compatibility */
   .glass [data-tremor-card],
   .glass-card [data-tremor-card],
