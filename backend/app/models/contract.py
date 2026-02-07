@@ -155,6 +155,34 @@ class ProfitabilityStatus(str, Enum):
 
 
 # ============================================================================
+# Phase 50: SLA Monitoring & Alerts - Additional Enums
+# ============================================================================
+
+
+class SLAMetricType(str, Enum):
+    """SLA metric type for compliance tracking (Phase 50)."""
+    RESPONSE_TIME = "response_time"  # Time to acknowledge
+    RESOLUTION_TIME = "resolution_time"  # Time to fix
+    UPTIME_PERCENTAGE = "uptime_percentage"
+    MEAN_TIME_TO_REPAIR = "mean_time_to_repair"
+    PREVENTIVE_MAINTENANCE = "preventive_maintenance"
+
+
+class SLABreachSeverity(str, Enum):
+    """SLA breach severity levels (Phase 50)."""
+    MINOR = "minor"  # 10-20% breach
+    MAJOR = "major"  # 20-50% breach
+    CRITICAL = "critical"  # >50% breach or safety-critical failure
+
+
+class SLAComplianceStatus(str, Enum):
+    """SLA compliance status for real-time monitoring (Phase 50)."""
+    COMPLIANT = "compliant"
+    WARNING = "warning"  # 90-99% compliant
+    BREACH = "breach"  # <90% compliant
+
+
+# ============================================================================
 # Organization Models
 # ============================================================================
 
@@ -548,6 +576,58 @@ class SLAPerformance(BaseModel):
     updated_at: Optional[datetime] = None
 
 
+class SLAPerformanceWithCompliance(BaseModel):
+    """Extended SLA performance with compliance tracking (Phase 50)."""
+    model_config = ConfigDict(from_attributes=True)
+
+    # Base SLAPerformance fields
+    id: str
+    contract_id: str
+    sla_term_id: str
+    period_start: date
+    period_end: date
+    target_value: float
+    actual_value: float
+    met_target: Optional[bool] = None
+    penalty_applied: bool = False
+    penalty_amount_zar: Optional[float] = None
+    penalty_waived: bool = False
+    waiver_reason: Optional[str] = None
+    incidents_count: int = 0
+    total_downtime_hours: Optional[float] = None
+    details: Optional[Dict[str, Any]] = None
+    status: SLAPerformanceStatus = SLAPerformanceStatus.PENDING
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    # Phase 50 additions
+    metric_type: SLAMetricType
+    compliance_percentage: float  # actual/target * 100
+    compliance_status: SLAComplianceStatus
+    breach_count: int = 0
+    breach_details: List[Dict[str, Any]] = Field(default_factory=list)
+    clawback_amount_zar: float = 0.0
+
+
+class SLABreachEvent(BaseModel):
+    """SLA breach event record for real-time tracking (Phase 50)."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: Optional[str] = None
+    contract_id: str
+    sla_term_id: str
+    work_order_id: Optional[str] = None
+    metric_type: SLAMetricType
+    breach_severity: SLABreachSeverity
+    target_value: float
+    actual_value: float
+    breach_percentage: float
+    occurred_at: datetime
+    detected_at: datetime
+    clawback_amount_zar: float = 0.0
+    notes: Optional[str] = None
+
+
 # ============================================================================
 # Contract Profitability Models
 # ============================================================================
@@ -584,3 +664,85 @@ class ContractProfitability(BaseModel):
     finalized_at: Optional[datetime] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+
+
+# ============================================================================
+# Profitability Analytics Models (Phase 51)
+# ============================================================================
+
+
+class PortfolioMetrics(BaseModel):
+    """Portfolio-wide profitability metrics aggregation."""
+    total_contracts: int
+    total_revenue_zar: float
+    total_cost_zar: float
+    gross_margin_zar: float
+    gross_margin_percentage: float
+    profit_contracts: int
+    loss_contracts: int
+    avg_margin_percentage: float
+    period_start: date
+    period_end: date
+
+
+class ContractProfitabilityDetail(BaseModel):
+    """Detailed per-contract profitability breakdown."""
+    contract_id: str
+    contract_name: str
+    building_id: str
+    building_name: Optional[str] = None
+
+    # Revenue components
+    monthly_revenue_zar: float
+    clawbacks_zar: float = 0.0
+    net_revenue_zar: float
+
+    # Cost components
+    labor_cost_zar: float = 0.0
+    parts_cost_zar: float = 0.0
+    subcontractor_cost_zar: float = 0.0
+    callout_cost_zar: float = 0.0
+    consumables_cost_zar: float = 0.0
+    total_cost_zar: float
+
+    # Profitability metrics
+    gross_margin_zar: float
+    gross_margin_percentage: float
+    status: str  # "profitable", "break_even", "loss"
+
+    # Trend analysis
+    mom_change_pct: Optional[float] = None  # Month-over-month change
+    ytd_margin_zar: Optional[float] = None  # Year-to-date margin
+
+    # Asset metrics
+    asset_count: int = 0
+    cost_per_asset_zar: float = 0.0
+
+
+class ProfitabilityTrend(BaseModel):
+    """Monthly profitability trend data point."""
+    contract_id: str
+    period: str  # "2026-01" format
+    revenue_zar: float
+    cost_zar: float
+    margin_zar: float
+    margin_pct: float
+    trend: str  # "improving", "stable", "declining"
+
+
+class LossLeaderAnalysis(BaseModel):
+    """Loss-making contract analysis with root causes."""
+    contract_id: str
+    contract_name: str
+    loss_amount_zar: float
+    loss_percentage: float
+    root_causes: List[str] = Field(
+        default_factory=list,
+        description="Identified root causes, e.g., ['high_labor_costs', 'frequent_breakdowns']"
+    )
+    recommendation: str = Field(
+        ...,
+        description="Actionable recommendation to address losses"
+    )
+    months_in_loss: int = 1
+    cumulative_loss_zar: float = 0.0
