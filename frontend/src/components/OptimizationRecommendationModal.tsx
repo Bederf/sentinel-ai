@@ -246,16 +246,14 @@ export function OptimizationRecommendationModal({
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
       <div
-        className="relative w-full max-w-3xl my-4 rounded-lg shadow-2xl flex flex-col"
+        className="relative w-full max-w-3xl my-4 glass-panel shadow-2xl flex flex-col"
         style={{
-          background: "var(--color-sentinel-bg-panel)",
-          border: "1px solid var(--color-sentinel-border)",
           maxHeight: "calc(100vh - 2rem)",
         }}
       >
         {/* Header */}
         <div className="flex-shrink-0 px-6 py-4 border-b"
-          style={{ borderColor: "var(--color-sentinel-border)", background: "var(--color-sentinel-bg-panel)" }}
+          style={{ borderColor: "var(--glass-border)" }}
         >
           <div className="flex items-start justify-between">
             <div className="flex-1">
@@ -471,7 +469,7 @@ export function OptimizationRecommendationModal({
 
         {/* Action Buttons */}
         <div className="flex-shrink-0 px-6 py-4 border-t flex gap-3"
-          style={{ borderColor: "var(--color-sentinel-border)", background: "var(--color-sentinel-bg-panel)" }}
+          style={{ borderColor: "var(--glass-border)" }}
         >
           <button
             onClick={handleApprove}
