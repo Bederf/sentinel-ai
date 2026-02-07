@@ -128,19 +128,24 @@ export default function CardLibrary({
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/50 z-40 transition-opacity"
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 transition-opacity"
         onClick={onClose}
       />
 
       {/* Panel */}
       <div
         className="fixed right-0 top-0 h-full w-full max-w-md z-50 shadow-2xl overflow-hidden flex flex-col"
-        style={{ background: 'var(--color-sentinel-bg-panel)' }}
+        style={{
+          background: 'var(--glass-bg)',
+          backdropFilter: 'var(--glass-blur-heavy, blur(24px))',
+          WebkitBackdropFilter: 'var(--glass-blur-heavy, blur(24px))',
+          borderLeft: '1px solid var(--glass-border)',
+        }}
       >
         {/* Header */}
         <div
           className="flex items-center justify-between px-4 py-3"
-          style={{ borderBottom: '1px solid var(--color-sentinel-border)' }}
+          style={{ borderBottom: '1px solid var(--glass-border)' }}
         >
           <div className="flex items-center gap-3">
             <LayoutGrid className="w-5 h-5" style={{ color: 'var(--color-sentinel-amber)' }} />
@@ -204,7 +209,7 @@ export default function CardLibrary({
         {/* Footer */}
         <div
           className="px-4 py-3 space-y-3"
-          style={{ borderTop: '1px solid var(--color-sentinel-border)' }}
+          style={{ borderTop: '1px solid var(--glass-border)' }}
         >
           {isSaving && (
             <div
