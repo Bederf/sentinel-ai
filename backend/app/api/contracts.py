@@ -553,3 +553,150 @@ async def get_equipment_assessment(equipment_id: str):
             detail=f"No assessments found for equipment {equipment_id}",
         )
     return assessment
+
+
+# ============================================================================
+# Profitability Analytics Endpoints (Phase 51)
+# ============================================================================
+
+
+@router.get("/profitability/portfolio")
+async def get_portfolio_profitability(
+    period_start: Optional[str] = Query(None, description="Period start (YYYY-MM-DD)"),
+    period_end: Optional[str] = Query(None, description="Period end (YYYY-MM-DD)"),
+):
+    """
+    Get portfolio-wide profitability metrics.
+
+    Returns aggregated revenue, costs, margins, and contract counts
+    across all active contracts for the specified period.
+    """
+    from datetime import datetime
+    from app.services.profitability_service import get_profitability_service
+
+    # Default to current month
+    if not period_start:
+        today = date.today()
+        period_start = today.replace(day=1).isoformat()
+    if not period_end:
+        from datetime import timedelta
+        today = date.today()
+        if today.month == 12:
+            next_month = today.replace(year=today.year + 1, month=1, day=1)
+        else:
+            next_month = today.replace(month=today.month + 1, day=1)
+        period_end = (next_month - timedelta(days=1)).isoformat()
+
+    start_date = date.fromisoformat(period_start)
+    end_date = date.fromisoformat(period_end)
+
+    service = get_profitability_service()
+    metrics = service.calculate_portfolio_metrics(start_date, end_date)
+    return metrics
+
+
+@router.get("/profitability/contract/{contract_id}")
+async def get_contract_profitability(
+    contract_id: str,
+    period_start: Optional[str] = Query(None, description="Period start (YYYY-MM-DD)"),
+    period_end: Optional[str] = Query(None, description="Period end (YYYY-MM-DD)"),
+):
+    """
+    Get detailed profitability for a single contract.
+
+    Returns revenue breakdown, cost components, margin analysis,
+    trend data, and asset metrics for the specified contract.
+    """
+    from app.services.profitability_service import get_profitability_service
+
+    # Default to current month
+    if not period_start:
+        today = date.today()
+        period_start = today.replace(day=1).isoformat()
+    if not period_end:
+        from datetime import timedelta
+        today = date.today()
+        if today.month == 12:
+            next_month = today.replace(year=today.year + 1, month=1, day=1)
+        else:
+            next_month = today.replace(month=today.month + 1, day=1)
+        period_end = (next_month - timedelta(days=1)).isoformat()
+
+    start_date = date.fromisoformat(period_start)
+    end_date = date.fromisoformat(period_end)
+
+    service = get_profitability_service()
+    profitability = service.calculate_contract_profitability(
+        contract_id, start_date, end_date
+    )
+    return profitability
+
+
+@router.get("/profitability/loss-leaders")
+async def get_loss_leaders(
+    period_start: Optional[str] = Query(None, description="Period start (YYYY-MM-DD)"),
+    period_end: Optional[str] = Query(None, description="Period end (YYYY-MM-DD)"),
+):
+    """
+    Get list of loss-making contracts with root cause analysis.
+
+    Returns contracts with negative margins, identified root causes,
+    actionable recommendations, and cumulative loss tracking.
+    """
+    from app.services.profitability_service import get_profitability_service
+
+    # Default to current month
+    if not period_start:
+        today = date.today()
+        period_start = today.replace(day=1).isoformat()
+    if not period_end:
+        from datetime import timedelta
+        today = date.today()
+        if today.month == 12:
+            next_month = today.replace(year=today.year + 1, month=1, day=1)
+        else:
+            next_month = today.replace(month=today.month + 1, day=1)
+        period_end = (next_month - timedelta(days=1)).isoformat()
+
+    start_date = date.fromisoformat(period_start)
+    end_date = date.fromisoformat(period_end)
+
+    service = get_profitability_service()
+    loss_leaders = service.identify_loss_leaders(start_date, end_date)
+    return {"loss_leaders": loss_leaders, "count": len(loss_leaders)}
+
+
+@router.get("/profitability/trends/{contract_id}")
+async def get_profitability_trends(
+    contract_id: str,
+    months: int = Query(12, ge=1, le=24, description="Number of months to analyze"),
+):
+    """
+    Get monthly profitability trends for a contract.
+
+    Returns historical profitability data with trend indicators
+    (improving, stable, declining) for each month.
+    """
+    from app.services.profitability_service import get_profitability_service
+
+    service = get_profitability_service()
+    trends = service.calculate_profitability_trends(contract_id, months)
+    return {"contract_id": contract_id, "trends": trends}
+
+
+@router.get("/profitability/asset-roi/{contract_id}/{equipment_id}")
+async def get_asset_roi(
+    contract_id: str,
+    equipment_id: str,
+):
+    """
+    Get ROI calculation for a specific asset within a contract.
+
+    Returns allocated revenue, costs, margin, and ROI percentage
+    for individual equipment.
+    """
+    from app.services.profitability_service import get_profitability_service
+
+    service = get_profitability_service()
+    roi = service.calculate_asset_roi(contract_id, equipment_id)
+    return roi
