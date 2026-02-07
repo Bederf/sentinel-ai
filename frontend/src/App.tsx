@@ -272,7 +272,7 @@ function App() {
   }
 
   return (
-    <ModuleProvider initialSiteId="sandton" initialSiteName="Sandton Data Centre">
+    <ModuleProvider initialSiteId="site-002" initialSiteName="Sandton City Office Tower">
     <div
       className="h-screen flex"
       style={{ background: "var(--color-sentinel-bg-canvas)" }}
@@ -290,10 +290,13 @@ function App() {
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header - SENTINEL style */}
         <header
-          className="flex-none h-14 px-4 flex items-center justify-between"
+          className="flex-none h-14 px-4 flex items-center justify-between sticky top-0 z-40"
           style={{
-            background: "var(--color-sentinel-bg-primary)",
-            borderBottom: "1px solid var(--color-sentinel-border)",
+            background: "var(--glass-bg)",
+            backdropFilter: "var(--glass-blur)",
+            WebkitBackdropFilter: "var(--glass-blur)",
+            borderBottom: "1px solid var(--glass-border)",
+            borderRadius: 0,
           }}
         >
           {/* Left side - Page title and breadcrumb */}
