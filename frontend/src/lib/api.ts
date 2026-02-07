@@ -25,6 +25,14 @@ export type {
   ContractListItem,
 } from "./profitabilityApi";
 
+export type {
+  WaterMeter,
+  WaterConsumption,
+  WaterAlert,
+  WaterTrending,
+  CurrentFlowResponse,
+} from "./waterApi";
+
 // Equipment breakdown by category (from Supabase view)
 export interface EquipmentBreakdown {
   equipment: number;
@@ -2403,9 +2411,7 @@ export const validationApi = {
    * @param buildingId - Building ID
    */
   getChecklist: async (buildingId: string): Promise<ValidationChecklist> => {
-    const response = await fetch(`${API_BASE_URL}/api/integration/buildings/${buildingId}/validation-checklist`);
-    if (!response.ok) throw new Error('Failed to fetch validation checklist');
-    return response.json();
+    return fetchApi<ValidationChecklist>(`/api/integration/buildings/${buildingId}/validation-checklist`);
   },
 
   /**
@@ -2413,9 +2419,9 @@ export const validationApi = {
    * @param buildingId - Building ID
    */
   getStatus: async (buildingId: string): Promise<{ status: BuildingStatus; last_validated?: string }> => {
-    const response = await fetch(`${API_BASE_URL}/api/integration/buildings/${buildingId}/status`);
-    if (!response.ok) throw new Error('Failed to fetch building status');
-    return response.json();
+    return fetchApi<{ status: BuildingStatus; last_validated?: string }>(
+      `/api/integration/buildings/${buildingId}/status`
+    );
   },
 
   /**
@@ -2423,11 +2429,9 @@ export const validationApi = {
    * @param buildingId - Building ID
    */
   validate: async (buildingId: string): Promise<ValidationChecklist> => {
-    const response = await fetch(`${API_BASE_URL}/api/integration/buildings/${buildingId}/validate`, {
-      method: 'POST',
+    return fetchApi<ValidationChecklist>(`/api/integration/buildings/${buildingId}/validate`, {
+      method: "POST",
     });
-    if (!response.ok) throw new Error('Validation failed');
-    return response.json();
   },
 
   /**
@@ -2435,14 +2439,9 @@ export const validationApi = {
    * @param buildingId - Building ID
    */
   activate: async (buildingId: string): Promise<ActivationResult> => {
-    const response = await fetch(`${API_BASE_URL}/api/integration/buildings/${buildingId}/activate`, {
-      method: 'POST',
+    return fetchApi<ActivationResult>(`/api/integration/buildings/${buildingId}/activate`, {
+      method: "POST",
     });
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || 'Activation failed');
-    }
-    return response.json();
   },
 
   /**
@@ -2450,11 +2449,10 @@ export const validationApi = {
    * @param buildingId - Building ID
    */
   suspend: async (buildingId: string): Promise<{ status: BuildingStatus }> => {
-    const response = await fetch(`${API_BASE_URL}/api/integration/buildings/${buildingId}/suspend`, {
-      method: 'POST',
-    });
-    if (!response.ok) throw new Error('Suspend failed');
-    return response.json();
+    return fetchApi<{ status: BuildingStatus }>(
+      `/api/integration/buildings/${buildingId}/suspend`,
+      { method: "POST" }
+    );
   },
 };
 
