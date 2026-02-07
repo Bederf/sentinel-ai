@@ -77,6 +77,7 @@ from app.api import mlops  # Phase 45-03 MLOps Monitoring & Success Metrics
 from app.api import sustainability  # Phase 29 Sustainability & ESG module
 from app.api import solar  # Phase 34 Solar PV & BESS ingestion
 from app.api import contracts  # Phase 48 Contract Management
+from app.api import pricing  # Phase 52-01 Risk-Based Pricing Tools
 from app.middleware.audit_middleware import AuditMiddleware
 from app.middleware.security_logging import SecurityLoggingMiddleware
 from app.services.background_scheduler import scheduler_service
@@ -315,6 +316,7 @@ app.include_router(mlops.router, tags=["mlops"])  # Phase 45-03 MLOps Monitoring
 app.include_router(sustainability.router, prefix="/api", tags=["sustainability"])  # Phase 29 Sustainability & ESG
 app.include_router(solar.router, prefix="/api", tags=["solar"])  # Phase 34 Solar PV & BESS
 app.include_router(contracts.router, prefix="/api", tags=["contracts"])  # Phase 48 Contract Management
+app.include_router(pricing.router, prefix="/api", tags=["pricing"])  # Phase 52-01 Risk-Based Pricing Tools
 
 
 @app.on_event("startup")
