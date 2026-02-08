@@ -46,8 +46,17 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(true); // Start minimized
   const [addonOrder, setAddonOrder] = useState<View[]>(() => getPersistedAddonOrder());
+  const [isMobile, setIsMobile] = useState(false);
 
   const { isModuleActive, activeModules } = useModules();
+
+  // Detect mobile screen size
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Compute visible addon items, filtered by active modules and sorted by user order
   const visibleAddons = useMemo(() => {
@@ -108,39 +117,76 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
     });
   }, [visibleAddons]);
 
+  // Items to hide on mobile by default (less frequently used)
+  const MOBILE_HIDDEN_ITEMS = ['control-audit', 'integrations', 'simbiot', 'fleet', 'mlops'];
+  const [showMobileMore, setShowMobileMore] = useState(false);
+
   const renderNavItem = (item: NavItem, isActive: boolean, showReorder?: { index: number; total: number }) => {
     const Icon = item.icon;
+    const isHiddenOnMobile = isMobile && MOBILE_HIDDEN_ITEMS.includes(item.id);
 
     return (
-      <div key={item.id} className="relative group">
+      <div key={item.id} className={`relative group ${isHiddenOnMobile && !showMobileMore ? 'hidden' : ''}`}>
         <button
           onClick={() => handleNavClick(item.id)}
           className={`
-            w-full flex items-center gap-3 px-4 py-2.5 mb-1 mx-auto
+            w-full flex items-center gap-3 px-4 py-3 mb-1 mx-auto
             transition-all duration-150 ease-in-out
-            md:justify-center lg:justify-start
+            ${isCollapsed ? "justify-center" : "justify-start"}
             hover:brightness-110
             ${!isActive ? 'hover:bg-white/5' : ''}
           `}
           style={{
-            background: isActive ? "rgba(255, 255, 255, 0.08)" : "transparent",
-            borderLeft: isActive ? "3px solid var(--color-sentinel-amber)" : "3px solid transparent",
-            color: isActive ? "var(--color-sentinel-text-primary)" : "var(--color-sentinel-text-secondary)",
+            background: isActive 
+              ? "rgba(245, 158, 11, 0.15)" 
+              : "transparent",
+            borderLeft: isActive 
+              ? "4px solid var(--color-sentinel-amber)" 
+              : "4px solid transparent",
+            color: isActive 
+              ? "var(--color-sentinel-text-primary)" 
+              : "var(--color-sentinel-text-secondary)",
+            ...(isActive ? {
+              boxShadow: isMobile 
+                ? "0 0 20px rgba(245, 158, 11, 0.3), inset 0 0 12px rgba(245, 158, 11, 0.1)"
+                : "inset 0 0 8px rgba(245, 158, 11, 0.15)",
+            } : {}),
           }}
           aria-current={isActive ? "page" : undefined}
         >
           <Icon
-            className="h-5 w-5 flex-shrink-0"
+            className={`flex-shrink-0 ${isActive ? 'font-bold' : ''}`}
             style={{
-              color: isActive ? "var(--color-sentinel-amber)" : "var(--color-sentinel-text-secondary)",
+              width: isMobile ? '22px' : '20px',
+              height: isMobile ? '22px' : '20px',
+              color: isActive 
+                ? "var(--color-sentinel-amber)" 
+                : "var(--color-sentinel-text-secondary)",
+              filter: isActive 
+                ? "brightness(1.2) drop-shadow(0 0 4px rgba(245, 158, 11, 0.5))" 
+                : "brightness(1.1)",
             }}
           />
-          <div className={`flex flex-col items-start flex-1 md:hidden ${isCollapsed ? 'lg:hidden' : 'lg:flex'}`}>
-            <span className="font-medium text-sm">{item.label}</span>
-            {item.description && (
+          {/* Always show labels on mobile, or when not collapsed on desktop */}
+          <div className={`flex flex-col items-start flex-1 ${(isCollapsed && !isMobile) ? "hidden" : "flex"}`}>
+            <span 
+              className={`font-medium ${isMobile ? 'text-base' : 'text-sm'}`}
+              style={{ 
+                color: isActive 
+                  ? "var(--color-sentinel-text-primary)" 
+                  : "var(--color-sentinel-text-primary)",
+                fontWeight: isActive ? '600' : '500',
+              }}
+            >
+              {item.label}
+            </span>
+            {item.description && !isMobile && (
               <span
                 className="text-xs"
-                style={{ color: "var(--color-grafana-text-disabled)" }}
+                style={{ 
+                  color: "var(--color-sentinel-text-secondary)",
+                  opacity: 0.8,
+                }}
               >
                 {item.description}
               </span>
@@ -209,11 +255,11 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
         )}
       </button>
 
-      {/* Mobile overlay */}
+      {/* Mobile overlay - darker for better contrast */}
       {isMobileOpen && (
         <div
-          className="md:hidden fixed inset-0 z-30"
-          style={{ background: "rgba(0, 0, 0, 0.6)" }}
+          className="md:hidden fixed inset-0 z-30 animate-in fade-in duration-200"
+          style={{ background: "rgba(0, 0, 0, 0.75)" }}
           onClick={() => setIsMobileOpen(false)}
           aria-hidden="true"
         />
@@ -223,7 +269,9 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
       <aside
         className={`
           fixed md:relative inset-y-0 left-0 z-40
-          w-64 md:w-16 ${isCollapsed ? 'lg:w-16' : 'lg:w-56'}
+          ${isMobile ? 'w-[85%] max-w-sm' : isCollapsed ? 'w-16' : 'w-64'}
+          ${!isMobile && isCollapsed ? 'md:w-16' : ''}
+          ${!isMobile && !isCollapsed ? 'md:w-56' : ''}
           transform transition-all duration-200 ease-in-out
           ${isMobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
           flex flex-col
@@ -259,22 +307,27 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
           {/* Toggle button */}
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}
-            className={`hidden lg:flex absolute top-1/2 transform -translate-y-1/2 p-1 rounded hover:brightness-125 hover:scale-110 transition-all duration-200 ${
+            className={`hidden md:flex absolute top-2 transition-all duration-200 ${
               isCollapsed
                 ? 'left-1/2 -translate-x-1/2'
                 : 'right-2'
             }`}
-            style={{
-              background: "rgba(255, 255, 255, 0.08)",
-              border: "1px solid var(--glass-border)",
-            }}
             aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
-            {isCollapsed ? (
-              <ChevronRight className="h-4 w-4" style={{ color: "var(--color-sentinel-text-secondary)" }} />
-            ) : (
-              <ChevronLeft className="h-4 w-4" style={{ color: "var(--color-sentinel-text-secondary)" }} />
-            )}
+            <span
+              className="inline-flex items-center justify-center h-8 w-8 rounded-full
+                border border-white/10
+                bg-gradient-to-br from-cyan-500/20 via-emerald-500/10 to-amber-500/20
+                shadow-[0_0_12px_rgba(34,211,238,0.35)]
+                transition-all duration-200 hover:scale-110 hover:brightness-125"
+              style={{ borderColor: "var(--glass-border)" }}
+            >
+              {isCollapsed ? (
+                <ChevronRight className="h-4 w-4" style={{ color: "var(--color-sentinel-text-primary)" }} />
+              ) : (
+                <ChevronLeft className="h-4 w-4" style={{ color: "var(--color-sentinel-text-primary)" }} />
+              )}
+            </span>
           </button>
         </div>
 
@@ -339,7 +392,36 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
             </>
           )}
 
-          {/* Customize Dashboard Button */}
+          {/* Mobile "More" button */}
+          <div className="md:hidden mt-4 mx-3">
+            <button
+              onClick={() => setShowMobileMore(!showMobileMore)}
+              className="w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-all duration-150"
+              style={{
+                background: showMobileMore 
+                  ? "rgba(255, 255, 255, 0.08)" 
+                  : "rgba(255, 255, 255, 0.05)",
+                border: "1px solid rgba(255, 255, 255, 0.1)",
+                color: "var(--color-sentinel-text-primary)",
+              }}
+            >
+              {showMobileMore ? (
+                <ChevronUp className="h-5 w-5 flex-shrink-0" style={{ color: "var(--color-sentinel-amber)" }} />
+              ) : (
+                <ChevronDown className="h-5 w-5 flex-shrink-0" style={{ color: "var(--color-sentinel-text-secondary)" }} />
+              )}
+              <div className="flex flex-col items-start flex-1">
+                <span className="font-medium text-base">
+                  {showMobileMore ? "Show Less" : "More Options"}
+                </span>
+                <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)", opacity: 0.8 }}>
+                  {showMobileMore ? "Hide secondary items" : "Control audit, integrations, SIMBIOT"}
+                </span>
+              </div>
+            </button>
+          </div>
+
+          {/* Customize Dashboard Button - hidden on mobile */}
           {onCustomizeDashboard && (
             <div className="mt-4 mx-3">
               <button
@@ -370,7 +452,7 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
 
           {/* About Section */}
           <div
-            className="mt-4 pt-4 mx-3"
+            className="mt-4 pt-4 mx-3 relative"
             style={{ borderTop: "1px solid var(--color-grafana-border)" }}
           >
             <button
@@ -388,17 +470,23 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
                   color: isAboutOpen ? "var(--color-sentinel-amber)" : "var(--color-sentinel-text-secondary)",
                 }}
               />
-              <span className={`font-medium text-sm md:hidden ${isCollapsed ? 'lg:hidden' : 'lg:block'} flex-1 text-left`}>About</span>
+              <span className={`font-medium text-sm ${isCollapsed ? "hidden" : "block"} flex-1 text-left`}>About</span>
               {isAboutOpen ? (
-                <ChevronDown className={`h-4 w-4 md:hidden ${isCollapsed ? 'lg:hidden' : 'lg:block'}`} />
+                <ChevronDown className={`h-4 w-4 ${isCollapsed ? "hidden" : "block"}`} />
               ) : (
-                <ChevronRight className={`h-4 w-4 md:hidden ${isCollapsed ? 'lg:hidden' : 'lg:block'}`} />
+                <ChevronRight className={`h-4 w-4 ${isCollapsed ? "hidden" : "block"}`} />
               )}
             </button>
 
             {/* Expandable about section */}
             {isAboutOpen && (
-              <div className={`mt-2 md:hidden ${isCollapsed ? 'lg:hidden' : 'lg:block'}`}>
+              <div
+                className={`mt-2 md:block ${
+                  isCollapsed
+                    ? "absolute left-full top-0 z-50 ml-3 w-72"
+                    : "relative"
+                }`}
+              >
                 <div
                   className="rounded p-3 text-xs space-y-3"
                   style={{
@@ -525,13 +613,13 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
           </div>
         </nav>
 
-        {/* Footer */}
+        {/* Footer - version info hidden on mobile */}
         <div
-          className="flex-none p-4"
+          className="flex-none p-4 hidden md:block"
           style={{ borderTop: "1px solid var(--color-sentinel-border)" }}
         >
           <div
-            className={`text-xs text-center md:hidden ${isCollapsed ? 'lg:hidden' : 'lg:block'}`}
+            className={`text-xs text-center ${isCollapsed ? 'lg:hidden' : 'lg:block'}`}
             style={{ color: "var(--color-sentinel-text-disabled)" }}
           >
             <span style={{ color: "var(--color-sentinel-amber)" }}>SENTINEL</span> v{version || "13.0"}
