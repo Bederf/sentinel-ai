@@ -377,7 +377,7 @@ function GlassThemeControls() {
             >
               Quick Presets
             </label>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {Object.entries(GLASS_PRESETS).map(([name, preset]) => (
                 <button
                   key={name}
@@ -414,7 +414,8 @@ function GlassThemeControls() {
               max="30"
               value={settings.blurIntensity}
               onChange={(e) => updateSettings({ blurIntensity: Number.parseInt(e.target.value, 10) })}
-              className="w-full"
+              className="w-full h-3"
+              style={{ cursor: "pointer" }}
               aria-label="Blur intensity"
               aria-valuemin={0}
               aria-valuemax={30}
@@ -448,7 +449,8 @@ function GlassThemeControls() {
               max="95"
               value={settings.panelOpacity}
               onChange={(e) => updateSettings({ panelOpacity: Number.parseInt(e.target.value, 10) })}
-              className="w-full"
+              className="w-full h-3"
+              style={{ cursor: "pointer" }}
               aria-label="Panel opacity"
               aria-valuemin={20}
               aria-valuemax={95}
@@ -482,7 +484,8 @@ function GlassThemeControls() {
               max="40"
               value={settings.borderStrength}
               onChange={(e) => updateSettings({ borderStrength: Number.parseInt(e.target.value, 10) })}
-              className="w-full"
+              className="w-full h-3"
+              style={{ cursor: "pointer" }}
               aria-label="Border strength"
               aria-valuemin={0}
               aria-valuemax={40}
