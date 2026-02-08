@@ -1,6 +1,17 @@
 """Application settings and configuration."""
 
+from pydantic import field_validator, ConfigDict
 from pydantic_settings import BaseSettings
+
+
+def _parse_csv_list(value):
+    if isinstance(value, list):
+        return value
+    if not value:
+        return []
+    if isinstance(value, str):
+        return [item.strip() for item in value.split(",") if item.strip()]
+    return value
 
 
 class Settings(BaseSettings):
@@ -23,12 +34,19 @@ class Settings(BaseSettings):
 
     # Demo mode for pre-seeded responses
     demo_mode: bool = False
+    demo_allowed_origins: list[str] = []
 
     # JWT secret key (required when not in DEMO_MODE)
     jwt_secret_key: str = ""
 
     # JWT token expiration (Phase 58-04 M-3: reduced from 30 days to 8 hours)
-    jwt_expiration_hours: int = 8
+    jwt_expiration_hours: int = 8  # DEPRECATED: Use jwt_access_token_ttl_minutes instead
+
+    # JWT access token TTL (Phase 65-02: short-lived tokens with refresh)
+    jwt_access_token_ttl_minutes: int = 15  # 15 minutes for access tokens
+
+    # JWT refresh token TTL (Phase 65-02: long-lived refresh tokens)
+    jwt_refresh_token_ttl_days: int = 7  # 7 days for refresh tokens
 
     # Clawd webhook secret (required for Telegram bot integration)
     clawd_webhook_secret: str = ""
@@ -71,10 +89,16 @@ class Settings(BaseSettings):
     niagara_bacnet_port: int = 47808
     niagara_bacnet_local_ip: str = ""  # blank = auto-detect
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        extra = "ignore"  # Ignore extra env vars not defined in Settings
+    model_config = ConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore"
+    )
+
+    @field_validator("cors_origins", "demo_allowed_origins", mode="before")
+    @classmethod
+    def _validate_list_fields(cls, value):
+        return _parse_csv_list(value)
 
 
 settings = Settings()
