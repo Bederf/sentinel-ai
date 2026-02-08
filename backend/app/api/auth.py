@@ -19,6 +19,7 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from app.config.settings import settings
+from app.middleware.auth_middleware import create_jwt_token, validate_jwt_token, _extract_ip_address
 from app.models.auth import (
     AUTH_LEVEL_TO_MIN_ROLE,
     AuthContext,
@@ -26,6 +27,7 @@ from app.models.auth import (
     SentinelRole,
 )
 from app.services.mfa_service import get_mfa_service
+from app.services.token_blacklist_service import token_blacklist
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -101,30 +103,25 @@ _DEMO_USERS = {
 }
 
 
-def _create_jwt_token(user_data: dict) -> str:
+def _create_jwt_token(user_data: dict, token_type: str = "access") -> str:
     """Create a JWT token for the user.
 
     Args:
         user_data: User information dict
+        token_type: Token type - "access" or "refresh"
 
     Returns:
         Encoded JWT token string
     """
-    # Get JWT secret from settings or use demo secret
-    secret = settings.supabase_key or "sentinel-demo-jwt-secret-change-in-production"
-
-    payload = {
-        "sub": user_data["user_id"],
-        "email": user_data["email"],
-        "role": user_data["role"].value,
-        "full_name": user_data["full_name"],
-        "iat": datetime.utcnow(),
-        "exp": datetime.utcnow() + timedelta(hours=settings.jwt_expiration_hours),
-        "iss": "sentinel.bms",
-    }
-
-    token = pyjwt.encode(payload, secret, algorithm="HS256")
-    return token
+    # Use centralized token creation from middleware (Phase 65-02)
+    role_value = user_data["role"].value if isinstance(user_data["role"], SentinelRole) else user_data["role"]
+    return create_jwt_token(
+        user_id=user_data["user_id"],
+        email=user_data["email"],
+        role=role_value,
+        full_name=user_data["full_name"],
+        token_type=token_type,
+    )
 
 
 def _extract_ip_address(request: Request) -> str:
@@ -246,7 +243,9 @@ async def login_with_email(request: Request, email: str):
 
     # If MFA is required but not enrolled, issue token but flag enrollment needed
     # This allows the user to access the MFA enrollment endpoints
-    token = _create_jwt_token(user_info)
+    # Phase 65-02: Issue both access and refresh tokens
+    access_token = _create_jwt_token(user_info, token_type="access")
+    refresh_token = _create_jwt_token(user_info, token_type="refresh")
 
     # Grant default building access for new users
     if is_new_user:
@@ -287,14 +286,16 @@ async def login_with_email(request: Request, email: str):
         logger.warning(f"Failed to audit log login for {email}: {e}")
 
     response = {
-        "token": token,
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
         "user": {
             "id": user_info["user_id"],
             "email": user_info["email"],
             "full_name": user_info["full_name"],
             "role": user_info["role"].value,
         },
-        "expires_at": (datetime.utcnow() + timedelta(hours=settings.jwt_expiration_hours)).isoformat(),
+        "expires_at": (datetime.utcnow() + timedelta(minutes=settings.jwt_access_token_ttl_minutes)).isoformat(),
         "mfa_required": mfa_required,
         "mfa_enrolled": mfa_enrolled,
         "mfa_challenge_pending": False,
@@ -362,8 +363,9 @@ async def complete_mfa_login(request: Request, email: str, mfa_code: str):
         logger.warning(f"MFA verification failed for {email}: {error}")
         raise HTTPException(status_code=400, detail=error)
 
-    # MFA verified - issue token
-    token = _create_jwt_token(user_info)
+    # MFA verified - issue token pair (Phase 65-02)
+    access_token = _create_jwt_token(user_info, token_type="access")
+    refresh_token = _create_jwt_token(user_info, token_type="refresh")
 
     logger.info(f"MFA login completed for {email}")
 
@@ -386,14 +388,16 @@ async def complete_mfa_login(request: Request, email: str, mfa_code: str):
         logger.warning(f"Failed to audit log MFA login for {email}: {e}")
 
     return {
-        "token": token,
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
         "user": {
             "id": user_info["user_id"],
             "email": user_info["email"],
             "full_name": user_info["full_name"],
             "role": user_info["role"].value if isinstance(user_info["role"], SentinelRole) else user_info["role"],
         },
-        "expires_at": (datetime.utcnow() + timedelta(hours=settings.jwt_expiration_hours)).isoformat(),
+        "expires_at": (datetime.utcnow() + timedelta(minutes=settings.jwt_access_token_ttl_minutes)).isoformat(),
         "mfa_verified": True,
     }
 
@@ -403,6 +407,7 @@ async def verify_token(request: Request, token: str):
     """Verify a JWT token and return user info.
 
     Used by frontend to check if a stored token is still valid.
+    Now uses centralized validation with blacklist checking (Phase 65-02).
 
     Args:
         request: FastAPI request
@@ -414,38 +419,26 @@ async def verify_token(request: Request, token: str):
     Raises:
         HTTPException 401 if token is invalid or expired
     """
-    secret = settings.supabase_key or "sentinel-demo-jwt-secret-change-in-production"
+    payload = validate_jwt_token(token)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
 
+    # Extract user info from payload
+    role_str = payload.get("role", "auditor")
     try:
-        payload = pyjwt.decode(
-            token,
-            secret,
-            algorithms=["HS256"],
-            options={"verify_exp": True},
-        )
+        role = SentinelRole(role_str)
+    except ValueError:
+        role = SentinelRole.AUDITOR
 
-        # Extract user info from payload
-        role_str = payload.get("role", "auditor")
-        try:
-            role = SentinelRole(role_str)
-        except ValueError:
-            role = SentinelRole.AUDITOR
-
-        return {
-            "valid": True,
-            "user": {
-                "id": payload.get("sub"),
-                "email": payload.get("email"),
-                "full_name": payload.get("full_name"),
-                "role": role.value,
-            },
-        }
-
-    except pyjwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token expired")
-    except pyjwt.InvalidTokenError as e:
-        logger.warning(f"Token verification failed: {e}")
-        raise HTTPException(status_code=401, detail="Invalid token")
+    return {
+        "valid": True,
+        "user": {
+            "id": payload.get("sub"),
+            "email": payload.get("email"),
+            "full_name": payload.get("full_name"),
+            "role": role.value,
+        },
+    }
 
 
 @router.get("/me")
@@ -467,41 +460,119 @@ async def get_current_user(request: Request):
         raise HTTPException(status_code=401, detail="No token provided")
 
     token = auth_header[7:]
-    secret = settings.supabase_key or "sentinel-demo-jwt-secret-change-in-production"
 
+    # Use centralized validation (Phase 65-02)
+    payload = validate_jwt_token(token)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    role_str = payload.get("role", "auditor")
     try:
-        payload = pyjwt.decode(
-            token,
-            secret,
-            algorithms=["HS256"],
-            options={"verify_exp": True},
-        )
+        role = SentinelRole(role_str)
+    except ValueError:
+        role = SentinelRole.AUDITOR
 
-        role_str = payload.get("role", "auditor")
-        try:
-            role = SentinelRole(role_str)
-        except ValueError:
-            role = SentinelRole.AUDITOR
-
-        return {
-            "id": payload.get("sub"),
-            "email": payload.get("email"),
-            "full_name": payload.get("full_name"),
-            "role": role.value,
-            "authenticated_at": payload.get("iat"),
-        }
-
-    except pyjwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token expired")
-    except pyjwt.InvalidTokenError:
-        raise HTTPException(status_code=401, detail="Invalid token")
+    return {
+        "id": payload.get("sub"),
+        "email": payload.get("email"),
+        "full_name": payload.get("full_name"),
+        "role": role.value,
+        "authenticated_at": payload.get("iat"),
+    }
 
 
 @router.post("/logout")
-async def logout():
-    """Logout endpoint (token validation is stateless, so this is mainly for client-side cleanup).
+async def logout(request: Request, refresh_token: Optional[str] = None):
+    """Logout endpoint - blacklist tokens to invalidate them.
 
-    In a stateless JWT system, logout is handled client-side by deleting the token.
-    This endpoint exists for API completeness and future session tracking.
+    Phase 65-02: Now actually invalidates tokens by blacklisting them in Redis.
+
+    Args:
+        request: FastAPI request
+        refresh_token: Optional refresh token to invalidate
+
+    Returns:
+        Success message
     """
+    # Extract and blacklist access token
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        access_token = auth_header[7:]
+        payload = validate_jwt_token(access_token)
+        if payload:
+            jti = payload.get("jti")
+            if jti:
+                # Calculate remaining TTL
+                exp = payload.get("exp", 0)
+                now = int(datetime.utcnow().timestamp())
+                ttl = max(0, exp - now)
+                token_blacklist.blacklist_token(jti, ttl_seconds=ttl)
+
+    # Blacklist refresh token if provided
+    if refresh_token:
+        payload = validate_jwt_token(refresh_token)
+        if payload and payload.get("token_type") == "refresh":
+            jti = payload.get("jti")
+            if jti:
+                exp = payload.get("exp", 0)
+                now = int(datetime.utcnow().timestamp())
+                ttl = max(0, exp - now)
+                token_blacklist.blacklist_token(jti, ttl_seconds=ttl)
+
     return {"message": "Logged out successfully"}
+
+
+@router.post("/refresh")
+@limiter.limit("10/minute")
+async def refresh_access_token(request: Request, refresh_token: str):
+    """Refresh access token using a valid refresh token.
+
+    Phase 65-02: Implements token rotation - old refresh token is invalidated,
+    new access + refresh token pair is issued.
+
+    Args:
+        request: FastAPI request
+        refresh_token: Valid refresh token
+
+    Returns:
+        New access_token and refresh_token
+
+    Raises:
+        HTTPException 401 if refresh token is invalid
+    """
+    payload = validate_jwt_token(refresh_token)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
+
+    # Verify this is a refresh token
+    if payload.get("token_type") != "refresh":
+        raise HTTPException(status_code=401, detail="Token is not a refresh token")
+
+    # Get user info from payload
+    user_info = {
+        "user_id": payload.get("sub"),
+        "email": payload.get("email"),
+        "full_name": payload.get("full_name"),
+        "role": payload.get("role"),
+    }
+
+    # Blacklist old refresh token (rotation)
+    old_jti = payload.get("jti")
+    if old_jti:
+        exp = payload.get("exp", 0)
+        now = int(datetime.utcnow().timestamp())
+        ttl = max(0, exp - now)
+        token_blacklist.blacklist_token(old_jti, ttl_seconds=ttl)
+
+    # Issue new token pair
+    new_access_token = _create_jwt_token(user_info, token_type="access")
+    new_refresh_token = _create_jwt_token(user_info, token_type="refresh")
+
+    logger.info(f"Token refresh for user {user_info['user_id']}")
+
+    return {
+        "access_token": new_access_token,
+        "refresh_token": new_refresh_token,
+        "token_type": "bearer",
+        "expires_at": (datetime.utcnow() + timedelta(minutes=settings.jwt_access_token_ttl_minutes)).isoformat(),
+    }
