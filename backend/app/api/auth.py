@@ -13,7 +13,6 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import Optional
 
-import jwt as pyjwt
 from fastapi import APIRouter, HTTPException, Request
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -29,7 +28,22 @@ from app.models.auth import (
 from app.services.mfa_service import get_mfa_service
 from app.services.token_blacklist_service import token_blacklist
 
+router = APIRouter(prefix="/api/auth", tags=["Authentication"])
+
+# Default limiter (can be overridden via init_rate_limiter)
 limiter = Limiter(key_func=get_remote_address)
+
+
+def init_rate_limiter(shared_limiter):
+    """Initialize the shared rate limiter from main.py.
+
+    Called during app startup to inject the limiter dependency.
+
+    Args:
+        shared_limiter: Limiter instance from app.state.limiter
+    """
+    global limiter
+    limiter = shared_limiter
 
 logger = logging.getLogger(__name__)
 

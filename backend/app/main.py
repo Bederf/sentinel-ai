@@ -1,6 +1,7 @@
 """BMS Intelligence Backend - FastAPI Application."""
 
 import logging
+import os
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -79,6 +80,7 @@ from app.api import solar  # Phase 34 Solar PV & BESS ingestion
 from app.api import water  # Phase 35 Water Meter Integration & Leak Detection
 from app.api import contracts  # Phase 48 Contract Management
 from app.api import pricing  # Phase 52-01 Risk-Based Pricing Tools
+from app.api import municipal_billing  # Phase 49 Municipal Billing
 from app.middleware.audit_middleware import AuditMiddleware
 from app.middleware.security_logging import SecurityLoggingMiddleware
 from app.services.background_scheduler import scheduler_service
@@ -303,6 +305,9 @@ app.include_router(lifecycle_simulation.router, tags=["lifecycle-simulation"])  
 app.include_router(simulation_analytics.router, tags=["simulation-analytics"])  # Simulation analytics pipeline
 app.include_router(inspection.router, tags=["inspection"])  # Phase 55 Routine Inspection & Maintenance
 app.include_router(auth.router)  # Authentication (email-based login)
+
+# Initialize rate limiters for auth router (Phase 65-02)
+auth.init_rate_limiter(limiter)
 app.include_router(user_access.router)  # User site access management (admin)
 app.include_router(login_audit.router)  # Login audit logs (admin)
 app.include_router(mfa.router)  # Phase 58.1 MFA for privileged access (FSR 4.6)
@@ -319,6 +324,7 @@ app.include_router(solar.router, prefix="/api", tags=["solar"])  # Phase 34 Sola
 app.include_router(water.router, prefix="/api", tags=["water"])  # Phase 35 Water Meter Integration & Leak Detection
 app.include_router(contracts.router, prefix="/api", tags=["contracts"])  # Phase 48 Contract Management
 app.include_router(pricing.router, prefix="/api", tags=["pricing"])  # Phase 52-01 Risk-Based Pricing Tools
+app.include_router(municipal_billing.router)  # Phase 49 Municipal Billing
 
 
 @app.on_event("startup")
@@ -326,6 +332,7 @@ async def startup_event():
     """Initialize background services on startup."""
     import logging
     _logger = logging.getLogger("sentinel.startup")
+    testing_mode = os.getenv("TESTING", "").lower() == "true"
 
     # === Security startup checks ===
 
@@ -367,6 +374,12 @@ async def startup_event():
         )
 
     _logger.info(f"Environment: {settings.environment}, Demo mode: {settings.demo_mode}")
+
+    if testing_mode:
+        _logger.info("TESTING mode: skipping background scheduler initialization")
+        from app.api.devices import startup_event as devices_startup
+        await devices_startup()
+        return
 
     # Initialize Redis cache connection
     from app.services.cache_service import cache

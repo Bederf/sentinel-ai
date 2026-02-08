@@ -3,13 +3,15 @@ MFA API Endpoints - Multi-factor authentication for privileged access.
 
 Provides endpoints for MFA enrollment, verification, and management.
 FSR Domain: 4.6 - Logical Access Control (MFA for ADMIN role)
+Phase 65-02: Rate limiting added to prevent brute force attacks.
 """
 
 import logging
 from typing import Optional
 
-import jwt as pyjwt
 from fastapi import APIRouter, HTTPException, Request
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from pydantic import BaseModel, Field
 
 from app.config.settings import settings
@@ -19,6 +21,9 @@ from app.services.mfa_service import get_mfa_service
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/mfa", tags=["MFA"])
+
+# Rate limiter - use local instance (Phase 65-02)
+limiter = Limiter(key_func=get_remote_address)
 
 
 # =============================================================================
@@ -146,6 +151,15 @@ async def enroll_mfa(request: Request):
     Generates a new TOTP secret and returns a provisioning URI for QR code.
     The user must verify the code before MFA is enabled.
 
+    Phase 65-02: Rate limited to prevent abuse (5/15min).
+
+    Requires authentication.
+    """
+    Start MFA enrollment for the current user.
+
+    Generates a new TOTP secret and returns a provisioning URI for QR code.
+    The user must verify the code before MFA is enabled.
+
     Requires authentication.
 
     Returns:
@@ -179,12 +193,15 @@ async def enroll_mfa(request: Request):
 
 
 @router.post("/verify", response_model=VerifyResponse)
+@limiter.limit("5/15minutes")
 async def verify_and_enable_mfa(request: Request, body: VerifyRequest):
     """
     Verify MFA code and enable MFA for the current user.
 
     Called during enrollment to confirm the authenticator is set up correctly.
     After successful verification, MFA will be required for future logins.
+
+    Phase 65-02: Rate limited to 5 attempts per 15 minutes per IP.
 
     Requires authentication.
 
@@ -218,12 +235,15 @@ async def verify_and_enable_mfa(request: Request, body: VerifyRequest):
 
 
 @router.post("/challenge", response_model=VerifyResponse)
+@limiter.limit("5/15minutes")
 async def challenge_mfa(request: Request, body: VerifyRequest):
     """
     Verify MFA code during login challenge.
 
     Called after password authentication when MFA is required.
     Does not require full authentication (uses pending login state).
+
+    Phase 65-02: Rate limited to 5 attempts per 15 minutes per IP.
 
     Args:
         body: VerifyRequest with 6-digit TOTP code
@@ -290,12 +310,15 @@ async def get_mfa_status(request: Request):
 
 
 @router.delete("/disable", response_model=VerifyResponse)
+@limiter.limit("10/minute")
 async def disable_mfa(request: Request, body: DisableRequest):
     """
     Disable MFA for a user (admin only).
 
     This is a privileged operation that removes MFA protection.
     Should only be used for account recovery with proper verification.
+
+    Phase 65-02: Rate limited to 10 attempts per minute per IP.
 
     Requires ADMIN role.
 
