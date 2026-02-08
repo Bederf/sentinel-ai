@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Settings as SettingsIcon, Bell, Monitor, Shield, Lock, Unlock } from "lucide-react";
 import { useHealthThresholds } from "../hooks/useHealthThresholds";
+import { useGlassTheme } from "../hooks/useGlassTheme";
+import { GLASS_PRESETS } from "../lib/settings";
 import { ThresholdEditor } from "./ThresholdEditor";
 import { SafetyRulesEditor } from "./SafetyRulesEditor";
 import { PasswordModal } from "./PasswordModal";
@@ -275,10 +277,8 @@ export function Settings({ onError }: SettingsProps) {
           </div>
         </div>
 
-        {/* Display Settings - Coming Soon */}
-        <div
-          className="glass-panel overflow-hidden opacity-60"
-        >
+        {/* Display Settings - Glass Theme Customization */}
+        <div className="glass-panel overflow-hidden">
           <div className="p-4 border-b" style={{ borderColor: "var(--color-sentinel-border)" }}>
             <div className="flex items-center gap-3">
               <div
@@ -298,23 +298,14 @@ export function Settings({ onError }: SettingsProps) {
                   Display Settings
                 </h2>
                 <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                  Customize data visualization and chart preferences
+                  Customize Apple Glass theme appearance
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="p-8 text-center">
-            <Monitor className="h-12 w-12 mx-auto mb-3" style={{ color: "var(--color-sentinel-text-disabled)" }} />
-            <p
-              className="text-sm font-medium mb-1"
-              style={{ color: "var(--color-sentinel-text-primary)" }}
-            >
-              Coming Soon
-            </p>
-            <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-              Display settings will be available in a future update
-            </p>
+          <div className="p-6">
+            <GlassThemeControls />
           </div>
         </div>
       </div>
@@ -327,6 +318,222 @@ export function Settings({ onError }: SettingsProps) {
         title="Unlock Safety Rules"
         description="Safety rules control critical device limits. Enter the admin password to modify these settings."
       />
+    </div>
+  );
+}
+
+/**
+ * Glass Theme Customization Controls
+ *
+ * Provides UI controls for customizing the Apple Glass theme:
+ * - Master toggle to enable/disable custom theme
+ * - Quick presets (default, subtle, heavy, minimal)
+ * - Sliders for blur intensity, panel opacity, border strength
+ * - Live preview panel showing glass effects
+ * - Reset button to restore Phase 13 defaults
+ */
+function GlassThemeControls() {
+  const { settings, updateSettings, resetToDefault, applyPreset } = useGlassTheme();
+
+  return (
+    <div className="space-y-6">
+      {/* Master Toggle */}
+      <div className="flex items-center justify-between">
+        <div>
+          <label
+            className="font-medium"
+            style={{ color: "var(--color-sentinel-text-primary)" }}
+          >
+            Enable Custom Glass Theme
+          </label>
+          <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+            Override default Apple Glass appearance
+          </p>
+        </div>
+        <button
+          onClick={() => updateSettings({ useCustomTheme: !settings.useCustomTheme })}
+          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+            settings.useCustomTheme ? "bg-blue-600" : "bg-gray-600"
+          }`}
+          aria-checked={settings.useCustomTheme}
+          role="switch"
+          type="button"
+        >
+          <span
+            className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${
+              settings.useCustomTheme ? "translate-x-6" : "translate-x-1"
+            }`}
+          />
+        </button>
+      </div>
+
+      {settings.useCustomTheme && (
+        <>
+          {/* Preset Selector */}
+          <div>
+            <label
+              className="block text-sm font-medium mb-2"
+              style={{ color: "var(--color-sentinel-text-primary)" }}
+            >
+              Quick Presets
+            </label>
+            <div className="grid grid-cols-4 gap-2">
+              {Object.entries(GLASS_PRESETS).map(([name, preset]) => (
+                <button
+                  key={name}
+                  onClick={() => applyPreset(name)}
+                  className="px-3 py-2 text-sm rounded border capitalize transition-colors hover:bg-opacity-80"
+                  style={{
+                    borderColor: "var(--color-sentinel-border)",
+                    color: "var(--color-sentinel-text-primary)",
+                  }}
+                  type="button"
+                >
+                  {name}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Blur Intensity Slider */}
+          <div>
+            <div className="flex justify-between mb-2">
+              <label
+                className="text-sm font-medium"
+                style={{ color: "var(--color-sentinel-text-primary)" }}
+              >
+                Blur Intensity
+              </label>
+              <span className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                {settings.blurIntensity}px
+              </span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="30"
+              value={settings.blurIntensity}
+              onChange={(e) => updateSettings({ blurIntensity: Number.parseInt(e.target.value, 10) })}
+              className="w-full"
+              aria-label="Blur intensity"
+              aria-valuemin={0}
+              aria-valuemax={30}
+              aria-valuenow={settings.blurIntensity}
+            />
+            <div
+              className="flex justify-between text-xs mt-1"
+              style={{ color: "var(--color-sentinel-text-disabled)" }}
+            >
+              <span>Subtle</span>
+              <span>Sharp</span>
+            </div>
+          </div>
+
+          {/* Panel Opacity Slider */}
+          <div>
+            <div className="flex justify-between mb-2">
+              <label
+                className="text-sm font-medium"
+                style={{ color: "var(--color-sentinel-text-primary)" }}
+              >
+                Panel Opacity
+              </label>
+              <span className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                {settings.panelOpacity}%
+              </span>
+            </div>
+            <input
+              type="range"
+              min="20"
+              max="95"
+              value={settings.panelOpacity}
+              onChange={(e) => updateSettings({ panelOpacity: Number.parseInt(e.target.value, 10) })}
+              className="w-full"
+              aria-label="Panel opacity"
+              aria-valuemin={20}
+              aria-valuemax={95}
+              aria-valuenow={settings.panelOpacity}
+            />
+            <div
+              className="flex justify-between text-xs mt-1"
+              style={{ color: "var(--color-sentinel-text-disabled)" }}
+            >
+              <span>Transparent</span>
+              <span>Solid</span>
+            </div>
+          </div>
+
+          {/* Border Strength Slider */}
+          <div>
+            <div className="flex justify-between mb-2">
+              <label
+                className="text-sm font-medium"
+                style={{ color: "var(--color-sentinel-text-primary)" }}
+              >
+                Border Strength
+              </label>
+              <span className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                {settings.borderStrength}%
+              </span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="40"
+              value={settings.borderStrength}
+              onChange={(e) => updateSettings({ borderStrength: Number.parseInt(e.target.value, 10) })}
+              className="w-full"
+              aria-label="Border strength"
+              aria-valuemin={0}
+              aria-valuemax={40}
+              aria-valuenow={settings.borderStrength}
+            />
+            <div
+              className="flex justify-between text-xs mt-1"
+              style={{ color: "var(--color-sentinel-text-disabled)" }}
+            >
+              <span>Invisible</span>
+              <span>Prominent</span>
+            </div>
+          </div>
+
+          {/* Live Preview Panel */}
+          <div className="glass-card p-4 space-y-3">
+            <p
+              className="text-sm font-medium"
+              style={{ color: "var(--color-sentinel-text-primary)" }}
+            >
+              Live Preview
+            </p>
+            <div className="glass-panel p-4 space-y-2">
+              <div className="glass-card p-3">
+                <p className="text-sm">Nested card example</p>
+              </div>
+              <p className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                Adjust sliders above to see changes in real-time
+              </p>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Reset Button */}
+      <div
+        className="pt-4 border-t"
+        style={{ borderColor: "var(--color-sentinel-border)" }}
+      >
+        <button
+          onClick={resetToDefault}
+          className="px-4 py-2 text-sm rounded transition-colors hover:bg-opacity-80"
+          style={{
+            background: "var(--color-sentinel-bg-hover)",
+            color: "var(--color-sentinel-text-primary)",
+          }}
+          type="button"
+        >
+          Reset to Default Theme
+        </button>
+      </div>
     </div>
   );
 }
