@@ -6,6 +6,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { Leaf, Building2, ChevronDown } from 'lucide-react';
 import {
   Card,
   Title,
@@ -25,6 +26,8 @@ import type {
   EfficiencyMetrics,
   GreenStarAssessment,
 } from '../../lib/sustainabilityApi';
+import type { Site } from '../../lib/api';
+import { api } from '../../lib/api';
 
 interface SustainabilityDashboardProps {
   siteId?: string;
@@ -43,26 +46,50 @@ interface SustainabilityDashboardProps {
 }
 
 export function SustainabilityDashboard({
-  siteId,
+  siteId: _externalSiteId,
   enabledModules: _enabledModules = ['sustainability'],
 }: SustainabilityDashboardProps) {
+  const [sites, setSites] = useState<Site[]>([]);
+  const [selectedSiteId, setSelectedSiteId] = useState<string>('');
   const [summary, setSummary] = useState<SustainabilitySummary | null>(null);
   const [history, setHistory] = useState<EmissionsHistory | null>(null);
   const [efficiency, setEfficiency] = useState<EfficiencyMetrics | null>(null);
   const [greenStar, setGreenStar] = useState<GreenStarAssessment | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sitesLoading, setSitesLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Fetch sites on mount
+  useEffect(() => {
+    api.getSites()
+      .then((fetchedSites) => {
+        setSites(fetchedSites);
+        if (fetchedSites.length > 0) {
+          const initialSite = _externalSiteId || fetchedSites[0].id;
+          setSelectedSiteId(initialSite);
+        }
+      })
+      .catch(() => {
+        // Fallback to site-002 if API fails
+        setSites([{ id: 'site-002', name: 'Sandton City Office Tower', location: 'Sandton', region: 'Gauteng', type: 'commercial', equipment_count: 0, alert_count: 0, status: 'normal' }]);
+        setSelectedSiteId(_externalSiteId || 'site-002');
+      })
+      .finally(() => {
+        setSitesLoading(false);
+      });
+  }, [_externalSiteId]);
+
   const loadData = useCallback(async () => {
+    if (!selectedSiteId) return;
+
     try {
       setLoading(true);
       setError(null);
-      const currentSiteId = siteId || 'site-002'; // Default to site-002 if not provided
       const [s, h, e, g] = await Promise.all([
-        sustainabilityApi.fetchSummary(currentSiteId),
-        sustainabilityApi.fetchEmissions(currentSiteId, 12),
-        sustainabilityApi.fetchEfficiency(currentSiteId),
-        sustainabilityApi.fetchGreenStar(currentSiteId),
+        sustainabilityApi.fetchSummary(selectedSiteId),
+        sustainabilityApi.fetchEmissions(selectedSiteId, 12),
+        sustainabilityApi.fetchEfficiency(selectedSiteId),
+        sustainabilityApi.fetchGreenStar(selectedSiteId),
       ]);
       setSummary(s);
       setHistory(h);
@@ -73,13 +100,24 @@ export function SustainabilityDashboard({
     } finally {
       setLoading(false);
     }
-  }, [siteId]);
+  }, [selectedSiteId]);
 
   useEffect(() => {
     loadData();
     const interval = setInterval(loadData, 60000);
     return () => clearInterval(interval);
   }, [loadData]);
+
+  if (sitesLoading || !selectedSiteId) {
+    return (
+      <Card>
+        <div className="animate-pulse">
+          <div className="h-6 bg-gray-200 rounded w-1/3 mb-4" />
+          <div className="h-64 bg-gray-100 rounded" />
+        </div>
+      </Card>
+    );
+  }
 
   if (loading && !summary) {
     return (
@@ -129,6 +167,64 @@ export function SustainabilityDashboard({
 
   return (
     <div className="space-y-4">
+      {/* Header with Building Selector */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-3">
+          <div
+            className="p-2 rounded"
+            style={{ background: 'rgba(16, 185, 129, 0.15)' }}
+          >
+            <Leaf className="h-5 w-5" style={{ color: 'var(--color-sentinel-emerald)' }} />
+          </div>
+          <div>
+            <h2
+              className="text-lg font-semibold"
+              style={{ color: 'var(--color-sentinel-text-primary)' }}
+            >
+              Sustainability & ESG
+            </h2>
+            <p
+              className="text-xs"
+              style={{ color: 'var(--color-sentinel-text-secondary)' }}
+            >
+              Carbon emissions, efficiency metrics, and Green Star SA tracker
+            </p>
+          </div>
+        </div>
+
+        {/* Building Selector */}
+        {!sitesLoading && sites.length > 0 && (
+          <div className="relative">
+            <Building2
+              className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4"
+              style={{ color: 'var(--color-sentinel-text-secondary)' }}
+            />
+            <ChevronDown
+              className="absolute right-2 top-1/2 transform -translate-y-1/2 h-3 w-3 pointer-events-none"
+              style={{ color: 'var(--color-sentinel-text-secondary)' }}
+            />
+            <select
+              value={selectedSiteId}
+              onChange={(e) => setSelectedSiteId(e.target.value)}
+              className="pl-9 pr-7 py-1.5 text-sm rounded appearance-none cursor-pointer"
+              style={{
+                background: 'var(--color-sentinel-bg-secondary)',
+                border: '1px solid var(--color-sentinel-border)',
+                color: 'var(--color-sentinel-text-primary)',
+                outline: 'none',
+                minWidth: '200px',
+              }}
+            >
+              {sites.map((site) => (
+                <option key={site.id} value={site.id}>
+                  {site.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+
       {/* KPI Row */}
       <Grid numItems={2} numItemsLg={4} className="gap-4">
         <Card decoration="top" decorationColor="emerald">
