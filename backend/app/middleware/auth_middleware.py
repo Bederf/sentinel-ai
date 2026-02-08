@@ -26,9 +26,12 @@ Usage:
 import hashlib
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse
+import uuid
 
+import jwt as pyjwt
 from fastapi import Depends, HTTPException, Request, status
 
 from app.config.settings import settings
@@ -75,6 +78,110 @@ def register_api_key(
         "created_at": datetime.utcnow().isoformat(),
         "is_active": True,
     }
+
+
+# =============================================================================
+# JWT Token Creation (Phase 65-02: Access + Refresh Tokens)
+# =============================================================================
+
+
+def create_jwt_token(
+    user_id: str,
+    email: str,
+    role: str,
+    full_name: str,
+    token_type: str = "access",
+) -> str:
+    """Create a JWT token (access or refresh).
+
+    Args:
+        user_id: User ID
+        email: User email
+        role: User role (SentinelRole value)
+        full_name: User's full name
+        token_type: Token type - "access" or "refresh"
+
+    Returns:
+        Encoded JWT token string
+    """
+    secret = settings.supabase_key or "sentinel-demo-jwt-secret-change-in-production"
+
+    # Determine TTL based on token type
+    if token_type == "refresh":
+        ttl_seconds = settings.jwt_refresh_token_ttl_days * 24 * 60 * 60
+    else:
+        ttl_seconds = settings.jwt_access_token_ttl_minutes * 60
+
+    # Fallback to old setting for backward compatibility
+    if ttl_seconds == 0:
+        ttl_seconds = settings.jwt_expiration_hours * 60 * 60
+
+    payload = {
+        "sub": user_id,
+        "email": email,
+        "role": role,
+        "full_name": full_name,
+        "token_type": token_type,  # "access" or "refresh"
+        "jti": str(uuid.uuid4()),  # Unique token ID for blacklisting
+        "iat": datetime.utcnow(),
+        "exp": datetime.utcnow() + timedelta(seconds=ttl_seconds),
+        "iss": "sentinel.bms",
+    }
+
+    token = pyjwt.encode(payload, secret, algorithm="HS256")
+    return token
+
+
+def validate_jwt_token(token: str) -> Optional[Dict[str, Any]]:
+    """Validate a JWT token and return payload.
+
+    Checks token expiration, token_type claim, and blacklist status.
+
+    Args:
+        token: JWT token string
+
+    Returns:
+        Token payload dict or None if invalid
+    """
+    try:
+        secret = settings.supabase_key or "sentinel-demo-jwt-secret-change-in-production"
+
+        payload = pyjwt.decode(
+            token,
+            secret,
+            algorithms=["HS256"],
+            options={"verify_exp": True},
+        )
+
+        # Check token_type claim (Phase 65-02)
+        token_type = payload.get("token_type", "access")
+        if token_type not in ("access", "refresh"):
+            logger.warning(f"Invalid token_type: {token_type}")
+            return None
+
+        # Check blacklist if Redis available (Phase 65-02)
+        jti = payload.get("jti")
+        if jti:
+            try:
+                from app.services.token_blacklist_service import token_blacklist
+                if token_blacklist.is_blacklisted(jti):
+                    logger.warning(f"Token {jti} is blacklisted")
+                    return None
+            except Exception as e:
+                # Graceful degradation: log warning but don't fail
+                logger.debug(f"Blacklist check failed: {e}")
+
+        return payload
+
+    except pyjwt.ExpiredSignatureError:
+        logger.debug("JWT token expired")
+        return None
+    except pyjwt.InvalidTokenError as e:
+        logger.debug(f"JWT validation failed: {e}")
+        return None
+    except Exception as e:
+        logger.error(f"Unexpected error validating JWT: {e}")
+        return None
 
 
 # =============================================================================
@@ -158,7 +265,7 @@ async def _validate_supabase_token(token: str) -> Optional[Dict[str, Any]]:
     """Validate a Supabase JWT token.
 
     Attempts to decode and verify the token using Supabase's JWT secret
-    or JWKS endpoint.
+    or JWKS endpoint. Now uses validate_jwt_token for consistency.
 
     Args:
         token: JWT token string
@@ -167,34 +274,14 @@ async def _validate_supabase_token(token: str) -> Optional[Dict[str, Any]]:
         Token payload dict or None if invalid
     """
     try:
-        import jwt as pyjwt
-
-        # Try decoding with Supabase JWT secret
         supabase_jwt_secret = settings.supabase_key
         if not supabase_jwt_secret:
             logger.debug("No Supabase key configured for JWT validation")
             return None
 
-        # Decode without full verification for demo
-        # In production, use JWKS endpoint for RS256 verification
-        try:
-            payload = pyjwt.decode(
-                token,
-                supabase_jwt_secret,
-                algorithms=["HS256"],
-                options={"verify_exp": True},
-            )
-            return payload
-        except pyjwt.ExpiredSignatureError:
-            logger.warning("Supabase token expired")
-            return None
-        except pyjwt.InvalidTokenError as e:
-            logger.debug(f"Supabase token validation failed: {e}")
-            return None
+        # Use centralized validation function (Phase 65-02)
+        return validate_jwt_token(token)
 
-    except ImportError:
-        logger.debug("PyJWT not installed, skipping Supabase token validation")
-        return None
     except Exception as e:
         logger.error(f"Error validating Supabase token: {e}")
         return None
@@ -364,17 +451,32 @@ def require_auth(level: AuthLevel = AuthLevel.AUTHENTICATED):
 
             source_ip = _extract_ip_address(request)
 
-            # Restrict demo mode to localhost only (C-4)
+            # Restrict demo mode to localhost or explicitly allowed origins (C-4)
             _LOCALHOST_IPS = {"127.0.0.1", "::1", "localhost", "testclient", "unknown"}
+            origin = request.headers.get("origin")
+            host = request.headers.get("host")
+
+            allowed_hosts = set()
+            for allowed_origin in settings.demo_allowed_origins:
+                try:
+                    parsed = urlparse(allowed_origin)
+                    if parsed.hostname:
+                        allowed_hosts.add(parsed.hostname)
+                except Exception:
+                    continue
+
             if source_ip not in _LOCALHOST_IPS:
-                logger.warning(
-                    f"DEMO_MODE access denied from non-local IP: "
-                    f"ip={source_ip} path={request.url.path}"
-                )
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Demo mode is only available from localhost",
-                )
+                origin_allowed = origin in settings.demo_allowed_origins
+                host_allowed = host in allowed_hosts
+                if not origin_allowed and not host_allowed:
+                    logger.warning(
+                        f"DEMO_MODE access denied from non-local IP: "
+                        f"ip={source_ip} origin={origin} host={host} path={request.url.path}"
+                    )
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Demo mode is only available from localhost",
+                    )
 
             # Still try to authenticate if credentials are provided
             auth_ctx = await _authenticate_request(request)
