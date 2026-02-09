@@ -395,7 +395,7 @@ class BaselineComparisonService:
             )
 
             # 1. Header
-            story.append(Paragraph(f"Baseline Assessment Report", header_style))
+            story.append(Paragraph("Baseline Assessment Report", header_style))
             story.append(Paragraph(f"Equipment: {equipment_id}", styles['Normal']))
             story.append(Paragraph(f"Baseline Date: {baseline.baseline_date.strftime('%Y-%m-%d %H:%M')}", styles['Normal']))
             story.append(Paragraph(f"Captured By: {baseline.captured_by}", styles['Normal']))

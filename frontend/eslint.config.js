@@ -20,22 +20,26 @@ export default defineConfig([
       globals: globals.browser,
     },
     linterOptions: {
-      reportUnusedDisableDirectives: 'off',
+      reportUnusedDisableDirectives: 'warn',  // Warn on unused disable comments
     },
     rules: {
-      // Allow unused vars prefixed with underscore
-      '@typescript-eslint/no-unused-vars': ['off', {
+      // Enforce unused vars are prefixed with underscore
+      '@typescript-eslint/no-unused-vars': ['error', {
         argsIgnorePattern: '^_',
         varsIgnorePattern: '^_',
         caughtErrorsIgnorePattern: '^_',
       }],
-      // Allow any in specific cases (tests, mocks, complex generics)
-      '@typescript-eslint/no-explicit-any': 'off',
-      'react-hooks/exhaustive-deps': 'off',
-      'react-hooks/set-state-in-effect': 'off',
-      'react-hooks/static-components': 'off',
-      'react-refresh/only-export-components': 'off',
-      'no-case-declarations': 'off',
+      // Warn on any types - use sparingly in tests/mocks
+      '@typescript-eslint/no-explicit-any': 'warn',
+      // Enforce react hooks rules
+      'react-hooks/exhaustive-deps': 'error',
+      'react-hooks/set-state-in-effect': 'warn',
+      // Warn on case declarations (usually fixable)
+      'no-case-declarations': 'warn',
+      // Disallow console in production code (except comments)
+      'no-console': ['warn', { allow: ['warn', 'error'] }],
+      // Disallow debugger in production code
+      'no-debugger': 'error',
     },
   },
 ])

@@ -209,31 +209,31 @@ class StatsResponse(BaseModel):
     total_equipment: int
     total_sensors: int
     total_readings: int
-    
+
     # Health
     avg_equipment_health: float
     equipment_warning_count: int
     equipment_critical_count: int
-    
+
     # Alerts
     alerts: AlertSummary
     # Flattened alert counts for frontend compatibility
     active_alerts: int
     critical_alerts: int
-    
+
     # Anomalies
     anomalies: AnomalySummary
-    
+
     # By region
     by_region: list[RegionStats]
-    
+
     # By equipment type
     by_equipment_type: list[EquipmentTypeStats]
-    
+
     # Coverage
     total_sqm: int
     data_range_days: int
-    
+
     # Optional fields for frontend compatibility
     uptime_percent: Optional[float] = None
     pending_anomalies: int = 0

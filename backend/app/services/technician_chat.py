@@ -313,7 +313,7 @@ class DiagnosisFlowEngine:
         if not flow:
             return {
                 "error": True,
-                "message": f"No active diagnosis session found. Please start a new diagnosis.",
+                "message": "No active diagnosis session found. Please start a new diagnosis.",
                 "session_id": session_id
             }
 

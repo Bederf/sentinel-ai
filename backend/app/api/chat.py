@@ -284,7 +284,7 @@ async def chat(request: FastAPIRequest, chat_request: ChatRequest) -> StreamingR
         demo_cache = DemoCache()
         cached_response = demo_cache.get_cached_response(user_message)
         if cached_response:
-            logger.info(f"Using cached demo response for query")
+            logger.info("Using cached demo response for query")
             citations = demo_cache.get_citations(user_message)
 
             async def stream_cached_response() -> AsyncGenerator[str, None]:

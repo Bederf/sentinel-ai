@@ -278,7 +278,7 @@ class SafetyEngine:
             logger.debug(f"Checking rule {rule.id}: enabled={rule.enabled}, rule_device_type={rule.device_type}, rule_point={rule.point_name}")
 
             if not rule.enabled:
-                logger.debug(f"  -> Skipped: rule disabled")
+                logger.debug("  -> Skipped: rule disabled")
                 continue
 
             # Check device type match
@@ -302,7 +302,7 @@ class SafetyEngine:
                 logger.debug(f"  -> SPECIFIC rule for point {point_name}")
 
             applicable_rules.append(rule)
-            logger.debug(f"  -> MATCHED: added to applicable_rules")
+            logger.debug("  -> MATCHED: added to applicable_rules")
 
         logger.debug(f"First pass: {len(applicable_rules)} applicable rules, specific_rule_types={specific_rule_types}")
 

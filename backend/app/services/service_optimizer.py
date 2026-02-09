@@ -584,9 +584,9 @@ class ServiceOptimizer:
             )
         elif savings_pct > -10:
             return (
-                f"Fixed and condition-based approaches are similar in cost. "
-                f"Equipment degradation rate aligns with fixed schedule interval. "
-                f"Either approach acceptable; condition-based adds early warning benefit."
+                "Fixed and condition-based approaches are similar in cost. "
+                "Equipment degradation rate aligns with fixed schedule interval. "
+                "Either approach acceptable; condition-based adds early warning benefit."
             )
         else:
             return (

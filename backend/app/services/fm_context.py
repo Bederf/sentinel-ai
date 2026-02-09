@@ -220,12 +220,12 @@ class FMContextService:
 
             # Evidence summary
             evidence = pred.get("evidence", {})
-            lines.append(f"**Evidence:**")
+            lines.append("**Evidence:**")
             lines.append(f"- Repeat work orders: {evidence.get('repeat_work_orders', 0)} in {evidence.get('repeat_period_months', 0)} months")
             lines.append(f"- Asset age: {evidence.get('asset_age_years', 0)} years (expected life: {evidence.get('expected_life_years', 0)} years)")
 
             # Top contributing factors
-            lines.append(f"**Top Contributing Factors:**")
+            lines.append("**Top Contributing Factors:**")
             factors = pred.get("contributing_factors", [])[:3]
             for factor in factors:
                 weight_pct = int(factor.get("weight", 0) * 100)
@@ -233,7 +233,7 @@ class FMContextService:
 
             # Financial impact
             financial = pred.get("financial_impact", {})
-            lines.append(f"**Financial Impact:**")
+            lines.append("**Financial Impact:**")
             lines.append(f"- Repair cost: R{financial.get('repair_cost_zar', 0):,.0f}")
             lines.append(f"- Potential loss: R{financial.get('potential_loss_zar', 0):,.0f}")
             lines.append(f"- Potential savings: R{financial.get('potential_loss_zar', 0) - financial.get('repair_cost_zar', 0):,.0f}")
@@ -241,14 +241,14 @@ class FMContextService:
             # Cost impact breakdown
             cost_impact = pred.get("costImpact")
             if cost_impact:
-                lines.append(f"**Cost Impact Analysis:**")
+                lines.append("**Cost Impact Analysis:**")
                 lines.append(f"- Failure cost: R{cost_impact.get('estimatedFailureCost', 0):,.0f}")
                 lines.append(f"- Preventive cost: R{cost_impact.get('estimatedPreventiveCost', 0):,.0f}")
                 lines.append(f"- **Potential savings: R{cost_impact.get('potentialSavings', 0):,.0f}**")
 
                 failure_breakdown = cost_impact.get("failureBreakdown", {})
                 if failure_breakdown:
-                    lines.append(f"  - Failure breakdown:")
+                    lines.append("  - Failure breakdown:")
                     lines.append(f"    - Parts: R{failure_breakdown.get('parts', 0):,.0f}")
                     lines.append(f"    - Labor: R{failure_breakdown.get('labor', 0):,.0f}")
                     lines.append(f"    - Downtime: R{failure_breakdown.get('downtime', 0):,.0f}")
@@ -256,7 +256,7 @@ class FMContextService:
 
                 preventive_breakdown = cost_impact.get("preventiveBreakdown", {})
                 if preventive_breakdown:
-                    lines.append(f"  - Preventive breakdown:")
+                    lines.append("  - Preventive breakdown:")
                     lines.append(f"    - Parts: R{preventive_breakdown.get('parts', 0):,.0f}")
                     lines.append(f"    - Labor: R{preventive_breakdown.get('labor', 0):,.0f}")
                     lines.append(f"    - Downtime: R{preventive_breakdown.get('downtime', 0):,.0f}")
@@ -268,7 +268,7 @@ class FMContextService:
             # Similar failures
             similar = pred.get("similar_failures", [])
             if similar:
-                lines.append(f"**Similar Historical Failures:**")
+                lines.append("**Similar Historical Failures:**")
                 for fail in similar[:2]:
                     lines.append(f"- {fail['site']} {fail['equipment']} (failed {fail['failure_date']})")
 

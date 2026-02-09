@@ -1,35 +1,1099 @@
 /**
  * API Client for BMS Intelligence Backend
- *
- * Core utilities have been moved to api/client.ts for better modularity.
- * This file re-exports those utilities and contains all API type definitions and methods.
  */
 
-// Import core utilities from modularized client module
-import {
-  authorizedFetch,
-  fetchApi,
-  clearAuthStorage,
-  isExpectedApiError,
-  AUTH_EXPIRED_EVENT,
-  API_BASE_URL,
-  SITES_CACHE_KEY,
-  getRefreshToken,
-} from './api/client';
+const API_BASE_URL = import.meta.env.VITE_API_URL || "";
+const ACCESS_TOKEN_KEY = "sentinel_token";
+const REFRESH_TOKEN_KEY = "sentinel_refresh_token";
+export const AUTH_EXPIRED_EVENT = "sentinel:auth-expired";
+let refreshInFlight: Promise<string | null> | null = null;
+const MAX_RATE_LIMIT_RETRIES = 0;
+const BASE_RATE_LIMIT_DELAY_MS = 500;
+const MAX_CONCURRENT_API_REQUESTS = 4;
+let activeApiRequests = 0;
+const apiRequestWaiters: Array<() => void> = [];
+const inFlightGetRequests = new Map<string, Promise<Response>>();
+const cachedGetResponses = new Map<string, { response: Response; expiresAt: number }>();
+const rateLimitedUntilByBucket = new Map<string, number>();
+const DEFAULT_RATE_LIMIT_COOLDOWN_MS = 30000;
+const DEFAULT_GET_CACHE_TTL_MS = 30000;
+const SITES_CACHE_KEY = "sentinel_cached_sites";
 
-// Re-export core types and utilities for backward compatibility
-export {
-  authorizedFetch,
-  fetchApi,
-  clearAuthStorage,
-  isExpectedApiError,
-  AUTH_EXPIRED_EVENT,
-  API_BASE_URL,
-  SITES_CACHE_KEY,
-  type HealthResponse,
-  type ApiError,
-} from './api/client';
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
+async function acquireApiRequestSlot(): Promise<void> {
+  if (activeApiRequests < MAX_CONCURRENT_API_REQUESTS) {
+    activeApiRequests += 1;
+    return;
+  }
+
+  await new Promise<void>((resolve) => {
+    apiRequestWaiters.push(resolve);
+  });
+}
+
+function releaseApiRequestSlot(): void {
+  const nextWaiter = apiRequestWaiters.shift();
+  if (nextWaiter) {
+    nextWaiter();
+    return;
+  }
+
+  activeApiRequests = Math.max(0, activeApiRequests - 1);
+}
+
+async function performFetchWithLimits(url: string, options?: RequestInit): Promise<Response> {
+  await acquireApiRequestSlot();
+  try {
+    return await fetch(url, options);
+  } finally {
+    releaseApiRequestSlot();
+  }
+}
+
+function getRetryAfterMs(response: Response): number | null {
+  const retryAfter = response.headers.get("Retry-After");
+  if (!retryAfter) return null;
+
+  const seconds = Number(retryAfter);
+  if (Number.isFinite(seconds) && seconds >= 0) {
+    return seconds * 1000;
+  }
+
+  const retryAt = Date.parse(retryAfter);
+  if (Number.isNaN(retryAt)) return null;
+
+  const delayMs = retryAt - Date.now();
+  return delayMs > 0 ? delayMs : null;
+}
+
+function getRateLimitBucket(url: string): string {
+  if (url.includes("/safety-status")) return "safety-status";
+  if (url.includes("/api/devices") || url.includes("/api/sites") || url.includes("/api/predictions")) {
+    return "dashboard-core";
+  }
+  if (url.includes("/api/integration/")) return "integration";
+  if (url.includes("/api/optimization/")) return "optimization";
+  if (url.includes("/api/dali/")) return "dali";
+  if (url.includes("/api/security/")) return "security";
+  if (url.includes("/api/solar/")) return "solar";
+  if (url.includes("/api/alerts")) return "alerts";
+  if (url.includes("/api/modules/") && url.includes("/recommendations")) return "module-recommendations";
+  return url;
+}
+
+function createClientRateLimitResponse(bucket: string): Response {
+  return new Response(
+    JSON.stringify({ detail: `Client cooldown active for ${bucket} after recent 429` }),
+    {
+      status: 429,
+      statusText: "Too Many Requests",
+      headers: { "Content-Type": "application/json" },
+    }
+  );
+}
+
+function getAccessToken(): string | null {
+  return localStorage.getItem(ACCESS_TOKEN_KEY);
+}
+
+function getRefreshToken(): string | null {
+  return localStorage.getItem(REFRESH_TOKEN_KEY);
+}
+
+function setTokens(accessToken: string, refreshToken?: string): void {
+  localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+  if (refreshToken) {
+    localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+  }
+}
+
+export function clearAuthStorage(): void {
+  localStorage.removeItem(ACCESS_TOKEN_KEY);
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
+  localStorage.removeItem("sentinel_user");
+}
+
+function notifyAuthExpired(): void {
+  window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
+}
+
+async function tryRefreshAccessToken(): Promise<string | null> {
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) return null;
+  if (refreshInFlight) return refreshInFlight;
+
+  refreshInFlight = (async () => {
+    try {
+      const refreshUrl = `${API_BASE_URL}/api/auth/refresh?refresh_token=${encodeURIComponent(refreshToken)}`;
+      const response = await fetch(refreshUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!response.ok) return null;
+      const data = await response.json() as { access_token?: string; refresh_token?: string };
+      if (!data.access_token) return null;
+      setTokens(data.access_token, data.refresh_token);
+      return data.access_token;
+    } catch {
+      return null;
+    } finally {
+      refreshInFlight = null;
+    }
+  })();
+
+  return refreshInFlight;
+}
+
+async function fetchWithAuthRetry(
+  url: string,
+  options?: RequestInit,
+  allowRetry: boolean = true,
+  rateLimitRetryCount: number = 0
+): Promise<Response> {
+  const token = getAccessToken();
+  const response = await performFetchWithLimits(url, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...options?.headers,
+    },
+  });
+
+  const isRefreshEndpoint = url.includes("/api/auth/refresh");
+  if (response.status === 401 && allowRetry && !isRefreshEndpoint) {
+    const refreshedToken = await tryRefreshAccessToken();
+    if (refreshedToken) {
+      return performFetchWithLimits(url, {
+        ...options,
+        headers: {
+          "Content-Type": "application/json",
+          ...(refreshedToken ? { Authorization: `Bearer ${refreshedToken}` } : {}),
+          ...options?.headers,
+        },
+      });
+    }
+
+    clearAuthStorage();
+    notifyAuthExpired();
+  }
+
+  const requestMethod = (options?.method || "GET").toUpperCase();
+  const isSafeMethod = requestMethod === "GET" || requestMethod === "HEAD" || requestMethod === "OPTIONS";
+  if (
+    response.status === 429 &&
+    isSafeMethod &&
+    rateLimitRetryCount < MAX_RATE_LIMIT_RETRIES
+  ) {
+    const retryAfterMs = getRetryAfterMs(response);
+    const fallbackDelayMs = BASE_RATE_LIMIT_DELAY_MS * (2 ** rateLimitRetryCount);
+    const jitterMs = Math.floor(Math.random() * 200);
+    await sleep((retryAfterMs ?? fallbackDelayMs) + jitterMs);
+
+    return fetchWithAuthRetry(url, options, allowRetry, rateLimitRetryCount + 1);
+  }
+
+  return response;
+}
+
+export async function authorizedFetch(
+  endpoint: string,
+  options?: RequestInit,
+  absoluteUrl: boolean = false
+): Promise<Response> {
+  const url = absoluteUrl ? endpoint : `${API_BASE_URL}${endpoint}`;
+  const bucket = getRateLimitBucket(url);
+  const method = (options?.method || "GET").toUpperCase();
+  const canDeduplicateGet = method === "GET" && (!options?.body || options.body === undefined);
+  const dedupeKey = `${method}:${url}`;
+
+  if (canDeduplicateGet) {
+    const cachedEntry = cachedGetResponses.get(dedupeKey);
+    if (cachedEntry && cachedEntry.expiresAt > Date.now()) {
+      return cachedEntry.response.clone();
+    }
+  }
+
+  const rateLimitedUntil = rateLimitedUntilByBucket.get(bucket);
+  if (rateLimitedUntil && rateLimitedUntil > Date.now()) {
+    if (canDeduplicateGet) {
+      const cachedEntry = cachedGetResponses.get(dedupeKey);
+      if (cachedEntry && cachedEntry.expiresAt > Date.now()) {
+        return cachedEntry.response.clone();
+      }
+    }
+    return createClientRateLimitResponse(bucket);
+  }
+
+  if (!canDeduplicateGet) {
+    const response = await fetchWithAuthRetry(url, options, true);
+    if (response.status === 429) {
+      const retryAfterMs = getRetryAfterMs(response) ?? DEFAULT_RATE_LIMIT_COOLDOWN_MS;
+      rateLimitedUntilByBucket.set(bucket, Date.now() + retryAfterMs);
+    }
+    return response;
+  }
+
+  const existing = inFlightGetRequests.get(dedupeKey);
+  if (existing) {
+    return existing.then((response) => response.clone());
+  }
+
+  const requestPromise = fetchWithAuthRetry(url, options, true);
+  inFlightGetRequests.set(dedupeKey, requestPromise);
+
+  try {
+    const response = await requestPromise;
+    if (response.status === 429) {
+      const retryAfterMs = getRetryAfterMs(response) ?? DEFAULT_RATE_LIMIT_COOLDOWN_MS;
+      rateLimitedUntilByBucket.set(bucket, Date.now() + retryAfterMs);
+      const cachedEntry = cachedGetResponses.get(dedupeKey);
+      if (cachedEntry && cachedEntry.expiresAt > Date.now()) {
+        return cachedEntry.response.clone();
+      }
+    }
+    if (response.ok) {
+      cachedGetResponses.set(dedupeKey, {
+        response: response.clone(),
+        expiresAt: Date.now() + DEFAULT_GET_CACHE_TTL_MS,
+      });
+    }
+    return response.clone();
+  } finally {
+    inFlightGetRequests.delete(dedupeKey);
+  }
+}
+
+// ============= Response Interfaces =============
+
+export interface HealthResponse {
+  status: string;
+  version: string;
+}
+
+export interface ApiError {
+  message: string;
+  status: number;
+}
+
+export function isExpectedApiError(error: unknown): error is ApiError {
+  const maybeError = error as { status?: number; message?: string } | null;
+  if (maybeError?.status === 401 || maybeError?.status === 429) return true;
+  const message = (maybeError?.message || "").toLowerCase();
+  return message.includes("status 401") || message.includes("status 429");
+}
+
+export type {
+  PortfolioMetrics,
+  ContractProfitabilityDetail,
+  ProfitabilityTrend,
+  LossLeaderAnalysis,
+  AssetROI,
+  ContractListItem,
+} from "./profitabilityApi";
+
+export type {
+  WaterMeter,
+  WaterConsumption,
+  WaterAlert,
+  WaterTrending,
+  CurrentFlowResponse,
+} from "./waterApi";
+
+// Equipment breakdown by category (from Supabase view)
+export interface EquipmentBreakdown {
+  equipment: number;
+  hvac_zones: number;
+  generators: number;
+  generator_groups: number;
+  diesel_tanks: number;
+  energy_centre: number;
+  dali_controllers: number;
+}
+
+// Equipment summary response (from /api/buildings/{id}/equipment-summary)
+export interface EquipmentSummary {
+  building_id: string;
+  building_name: string;
+  total_assets: number;
+  categories: {
+    equipment: number;
+    hvac_zones: number;
+    generators: number;
+    generator_groups: number;
+    diesel_tanks: number;
+    energy_centres: number;
+    mv_incomers: number;
+    transformers: number;
+    lv_switchboards: number;
+    ats_units: number;
+    power_meters: number;
+    pfc_banks: number;
+    ups_systems: number;
+    feeders: number;
+    dali_controllers: number;
+  };
+  supplementary: {
+    desks: number;
+    luminaires: number;
+    dali_sensors: number;
+  };
+  source: "supabase" | "json";
+}
+
+// Health factor breakdown for equipment
+export interface HealthFactor {
+  score: number;
+  value: string;
+}
+
+// Building equipment item (from /api/buildings/{id}/equipment)
+export interface BuildingEquipmentItem {
+  id: string;
+  name: string;
+  type: string;
+  category: string;
+  status: "normal" | "warning" | "critical" | "unknown";
+  health: number;
+  location: string;
+  building_id: string;
+  building_name: string;
+  site_id: string;
+  details: Record<string, any>;
+  controllable: boolean;
+  health_factors?: {
+    age?: HealthFactor;
+    service?: HealthFactor;
+    runtime?: HealthFactor;
+    fault_history?: HealthFactor;
+  };
+}
+
+// Category status counts
+export interface CategoryStatus {
+  total: number;
+  normal: number;
+  warning: number;
+  critical: number;
+}
+
+// Building equipment response (from /api/buildings/{id}/equipment)
+export interface BuildingEquipmentResponse {
+  building_id: string;
+  building_name: string;
+  total_equipment: number;
+  categories: Record<string, CategoryStatus>;
+  equipment: BuildingEquipmentItem[];
+}
+
+// Equipment metadata (from /api/equipment/{id}/metadata)
+export interface EquipmentNetworkInfo {
+  ip_address?: string;
+  mac_address?: string;
+  gateway_ip?: string;
+  dali_line?: number;
+  dali_address?: number;
+  bacnet_device_id?: number;
+  bacnet_network?: number;
+  modbus_address?: number;
+  modbus_port?: number;
+  protocol?: string;
+}
+
+export interface EquipmentDeviceInfo {
+  gtin?: string;
+  serial_number?: string;
+  manufacturer?: string;
+  model?: string;
+  firmware_version?: string;
+  hardware_version?: string;
+  device_type?: string;
+  vendor_id?: number;
+}
+
+export interface EquipmentOperatingData {
+  lamp_hours?: number;
+  runtime_hours?: number;
+  power_cycles?: number;
+  total_runtime_hours?: number;
+  last_fault?: string;
+  fault_count?: number;
+  energy_kwh?: number;
+  system_status?: string;
+  rated_capacity?: string;
+  battery_cycles?: number;
+  transfer_count?: number;
+}
+
+export interface EquipmentMetadata {
+  id: string;
+  code: string;
+  name: string;
+  type: string;
+  manufacturer?: string;
+  model?: string;
+  serial_number?: string;
+  notes?: string;
+  network_info?: EquipmentNetworkInfo;
+  device_info?: EquipmentDeviceInfo;
+  operating_data?: EquipmentOperatingData;
+  commissioning_date?: string;
+  warranty_expiry?: string;
+  last_discovery?: string;
+  install_date?: string;
+  last_service?: string;
+  status?: string;
+  health_score?: number;
+  location?: string;
+}
+
+export interface EquipmentMetadataResponse {
+  equipment: EquipmentMetadata;
+  has_notes: boolean;
+  has_network_info: boolean;
+  has_device_info: boolean;
+  last_discovery?: string;
+}
+
+export interface NotesHistoryItem {
+  id: string;
+  equipment_id: string;
+  notes_before?: string;
+  notes_after?: string;
+  changed_by: string;
+  changed_at: string;
+  change_reason?: string;
+}
+
+export interface EquipmentDiscoveryResult {
+  equipment_code: string;
+  protocol: string;
+  status: string;
+  network_info?: EquipmentNetworkInfo;
+  device_info?: EquipmentDeviceInfo;
+  operating_data?: EquipmentOperatingData;
+  saved: boolean;
+  error?: string;
+}
+
+// Site/Building interface (summary view)
+export interface Site {
+  id: string;
+  name: string;
+  location: string;
+  address?: string; // Full address from backend
+  region: string;
+  type: string;
+  equipment_count: number; // Total equipment count
+  alert_count: number;
+  status: "normal" | "warning" | "critical";
+  // Extended fields from backend (optional for summary, required for detail)
+  sqm?: number;
+  floors?: number;
+  year_built?: number;
+  operating_hours?: { start: string; end: string };
+  timezone?: string; // IANA timezone (e.g., "Africa/Johannesburg")
+  occupancy_pattern?: string;
+  contact_email?: string;
+  contact_phone?: string;
+  active_alerts?: number;
+  // Equipment breakdown (when available from Supabase or JSON)
+  equipment_breakdown?: EquipmentBreakdown;
+  // Equipment status counts (ok/warning/critical)
+  equipment_status?: {
+    total: number;
+    ok: number;
+    warning: number;
+    critical: number;
+  };
+  // Optimization fields (Phase 8)
+  optimization_enabled?: boolean;
+  optimization_status?: "optimized" | "recommendation_pending" | "warning" | "error" | "unknown";
+  optimization_settings?: {
+    mode: "supervised" | "automatic";
+    last_analysis: string | null;
+    analysis_interval_minutes?: number;
+  };
+  last_optimization?: string;
+  optimization_history?: OptimizationHistoryEntry[];
+}
+
+// Equipment interface
+export interface Equipment {
+  id: string;
+  name: string;
+  type: string;
+  site_id: string;
+  site_name: string;
+  status: "online" | "offline" | "maintenance" | "normal" | "warning" | "critical" | "unknown";
+  location?: string;
+  building_id?: string;
+  building_name?: string;
+  last_reading?: {
+    timestamp: string;
+    value: number;
+    unit: string;
+  };
+}
+
+// Alert interface
+export interface Alert {
+  id: string;
+  site_id: string;
+  site_name: string;
+  equipment_id: string;
+  equipment_name: string;
+  severity: "low" | "medium" | "high" | "critical" | "warning" | "info";
+  message: string;
+  created_at: string;
+  acknowledged: boolean;
+  title?: string;
+  type?: string;
+  status?: string;
+  category?: string;
+  device_id?: string; // Maps to mock_devices.json for control navigation
+}
+
+// Anomaly prediction interface
+export interface Anomaly {
+  id: string;
+  site_id: string;
+  site_name: string;
+  equipment_id: string;
+  equipment_name: string;
+  prediction: string;
+  confidence: number;
+  predicted_date: string;
+  recommendation: string;
+}
+
+// ============= Device Interfaces =============
+
+// Device point interface
+export interface DevicePoint {
+  id?: string; // Point ID
+  device_id?: string; // Device ID this point belongs to
+  name: string;
+  point_type: string;
+  description: string;
+  unit: string;
+  min_value?: number;
+  max_value?: number;
+  default_value: number | boolean;
+  current_value?: number | boolean; // Actual current value from device adapter
+  writable: boolean;
+  priority?: number;
+  metadata?: Record<string, any>;
+}
+
+// Device interface
+export interface Device {
+  id: string;
+  name: string;
+  device_type: string;
+  type?: string; // Alias for device_type for backward compatibility
+  protocol: string;
+  location: string;
+  site_id: string;
+  description: string;
+  manufacturer?: string;
+  model?: string;
+  points: Record<string, DevicePoint>;
+  metadata?: Record<string, any>;
+  // Status properties
+  status?: "online" | "offline" | "maintenance";
+  safety_status?: "safe" | "warning" | "critical" | "unknown";
+  last_communication?: string; // ISO timestamp
+  current_value?: number;
+}
+
+// Device value interface
+export interface DeviceValue {
+  device_id: string;
+  point_name: string;
+  value: number | boolean;
+  unit: string;
+  timestamp: string;
+  quality: string;
+}
+
+// Device control response interface
+export interface DeviceControlResponse {
+  success: boolean;
+  message: string;
+  device_id: string;
+  point: string;
+  value: number | boolean;
+  priority: number;
+}
+
+// Device status interface
+export interface DeviceStatus {
+  device_id: string;
+  device_name: string;
+  status: string;
+  last_seen: string;
+  protocol: string;
+}
+
+// ============= Audit Interfaces =============
+
+// Audit entry interface (for RecentActions component)
+export interface AuditEntry {
+  id: string;
+  timestamp: string;
+  device_id: string;
+  device_name: string;
+  action: string;
+  point: string;
+  old_value: any;
+  new_value: any;
+  user: string;
+  success: boolean;
+  message?: string;
+}
+
+// Audit log entry interface
+export interface AuditLogEntryResponse {
+  id: string;
+  timestamp: string;
+  action: string;
+  user: string;
+  device_id?: string;
+  point_name?: string;
+  old_value?: any;
+  new_value?: any;
+  result: string;
+  safety_validation?: Record<string, any>;
+  error_message?: string;
+  correlation_id?: string;
+  metadata: Record<string, any>;
+}
+
+// Safety status for devices
+export interface DeviceSafetyStatus {
+  device_id: string;
+  device_name: string;
+  overall_status: 'safe' | 'warning' | 'blocked' | 'alarm' | 'unknown';
+  point_statuses: Record<string, {
+    value: any;
+    allowed: boolean;
+    warnings: string[];
+    alarms: string[];
+  }>;
+  active_rule_count: number;
+  last_check: string;
+}
+
+// Audit logs response with pagination
+export interface AuditLogsResponse {
+  entries: AuditLogEntryResponse[];
+  total_count: number;
+  page: number;
+  page_size: number;
+  has_more: boolean;
+}
+
+// Audit statistics response
+export interface AuditStatsResponse {
+  total_entries: number;
+  by_action: Record<string, number>;
+  by_result: Record<string, number>;
+  by_user: Record<string, number>;
+  recent_activity_count: number;
+  last_updated: string;
+}
+
+// Demo audit data generation response
+export interface DemoAuditDataResponse {
+  status: string;
+  entries_created: number;
+  message: string;
+}
+
+// ============= Optimization Interfaces =============
+
+// Load shedding stage interface
+export interface LoadSheddingStage {
+  stage: number;
+  start_time: string;
+  end_time: string;
+}
+
+// Eskom status response interface
+export interface EskomStatusResponse {
+  current_stage: number;
+  updated_at: string;
+  next_stages: LoadSheddingStage[];
+  area_schedules: Record<string, LoadSheddingStage[]>;
+  source: string; // "eskomsepush" | "not_configured" | "unavailable"
+}
+
+// Site-specific schedule response interface
+export interface SiteScheduleResponse {
+  site_id: string;
+  site_name: string;
+  current_stage: number;
+  schedules: LoadSheddingStage[];
+  next_outage: LoadSheddingStage | null;
+  area_name?: string;
+  source: string; // "eskomsepush" | "not_configured" | "unavailable"
+}
+
+// Thermal runway response interface
+export interface ThermalRunwayResponse {
+  site_id: string;
+  site_name: string;
+  current_temperature: number;
+  comfort_limit: number;
+  thermal_runway_minutes: number;
+  comfort_breach_time: string | null;
+  calculation_method: string;
+  building_params: {
+    thermal_mass: number;
+    insulation_factor: number;
+    internal_heat_gain: number;
+  };
+  weather_forecast: {
+    outside_temp: number;
+    solar_load: number;
+    humidity: number;
+  };
+}
+
+// Optimization scenario interface (from optimization_scenarios.json)
+export interface OptimizationScenario {
+  scenario_id: string;
+  site_id: string;
+  site_name: string;
+  description: string;
+  current_conditions: {
+    inside_temp: number;
+    comfort_limit: number;
+    outside_temp: number;
+    humidity: number;
+    solar_load: number;
+    time_of_day: string;
+  };
+  load_shedding: {
+    stage: number;
+    start: string;
+    end: string;
+    duration_minutes: number;
+    area: string;
+    confidence: string;
+  };
+  thermal_runway: {
+    without_precooling: number;
+    with_precooling: number;
+    comfort_breach_time: string;
+    comfort_maintained: boolean;
+    calculation_params: {
+      thermal_mass: number;
+      insulation_factor: number;
+      internal_heat_gain: number;
+    };
+  };
+  pre_cooling_schedule: {
+    start: string;
+    duration_minutes: number;
+    target_temp: number;
+    actions: Array<{
+      time: string;
+      action: string;
+      value: string;
+      description: string;
+    }>;
+    energy_impact_kwh: number;
+    peak_demand_increase_percent: number;
+  };
+  savings: {
+    energy_savings_percent: number;
+    comfort_extension_minutes: number;
+    fuel_savings_percent: number;
+    total_savings_zar: number;
+    breakdown: {
+      reduced_generator_runtime: number;
+      avoided_peak_demand_charges: number;
+      improved_efficiency: number;
+      reduced_restart_energy: number;
+    };
+  };
+  generator_readiness: {
+    test_passed: boolean;
+    last_test: string;
+    fuel_level_percent: number;
+    ups_status: string;
+    estimated_runtime_hours: number;
+    load_capacity_kw: number;
+    critical_loads: string[];
+  };
+  restart_plan: {
+    staged_restart: boolean;
+    sequence: Array<{
+      time_offset: number;
+      action: string;
+      loads?: string[];
+      zones?: string[];
+      description?: string;
+    }>;
+    estimated_restoration_time: string;
+  };
+  visualization_data: {
+    thermal_curve: number[][];
+    precooling_curve: number[][];
+    comfort_limit_line: number;
+    outage_period: number[];
+  };
+  created_at: string;
+  updated_at: string;
+}
+
+// ============= AI Optimization Interfaces (Phase 8) =============
+
+// Optimization action (setpoint change recommendation)
+export interface OptimizationAction {
+  equipment_id: string;
+  equipment_name: string;
+  point_name: string;
+  current_value: number;
+  recommended_value: number;
+  unit: string;
+  reason: string;
+}
+
+// Projected savings from optimization
+export interface ProjectedSavings {
+  energy_kwh: number;
+  cost_zar_per_hour: number;
+  percentage_improvement: number;
+  // Legacy property names (for backwards compatibility)
+  energy_percent?: number;
+  cost_zar?: number;
+  comfort_impact?: string;
+  equipment_impact?: string;
+}
+
+// Optimization recommendation from AI analysis
+export interface OptimizationRecommendation {
+  id?: string; // Optional - may use timestamp as fallback
+  site_id: string;
+  timestamp: string;
+  recommendations: OptimizationAction[];
+  projected_savings: ProjectedSavings;
+  confidence: number; // 0-100
+  reasoning: string;
+}
+
+// Optimization history entry
+export interface OptimizationHistoryEntry {
+  timestamp: string;
+  action: string;
+  result: string;
+  user: string;
+  details?: string;
+}
+
+// Monthly savings summary
+export interface MonthlySavingsSummary {
+  monthly_savings_zar: number;
+  savings_per_hour_zar: number;
+  applied_recommendations: number;
+}
+
+// Full optimization status response
+export interface OptimizationStatusResponse {
+  site_id: string;
+  optimization_enabled: boolean;
+  optimization_status: "optimized" | "recommendation_pending" | "warning" | "error" | "unknown";
+  optimization_settings: {
+    mode: "supervised" | "automatic";
+    last_analysis: string | null;
+    analysis_interval_minutes: number;
+  };
+  last_recommendation: OptimizationRecommendation | null;
+  last_optimization: string | null;
+  optimization_history: OptimizationHistoryEntry[];
+  error_message?: string;
+  monthly_savings?: MonthlySavingsSummary;
+}
+
+// Dashboard stats interface
+export interface DashboardStats {
+  total_sites: number;
+  total_equipment: number;
+  total_sensors: number;
+  active_alerts: number;
+  critical_alerts: number;
+  pending_anomalies: number;
+  uptime_percent: number;
+}
+
+// Health thresholds interface
+export interface HealthThresholds {
+  healthy: number;
+  warning: number;
+  critical: number;
+}
+
+// Safety rule interface
+export interface SafetyRule {
+  id: string;
+  name: string;
+  rule_type: 'temperature_range' | 'pressure_limit' | 'interlock' | 'runtime_limit' | 'brightness_limit' | 'custom';
+  severity: 'block' | 'warning' | 'alarm';
+  description: string;
+  device_type: string | null;
+  device_id: string | null;
+  point_name: string | null;
+  enabled: boolean;
+  created_at?: string;
+  updated_at?: string;
+  // Type-specific parameters
+  min_temp?: number;
+  max_temp?: number;
+  min_pressure?: number;
+  max_pressure?: number;
+  min_brightness?: number;
+  max_brightness?: number;
+  min_runtime_minutes?: number;
+  max_starts_per_hour?: number;
+  trigger_device_id?: string;
+  trigger_device_type?: string;
+  trigger_point?: string;
+  trigger_value?: any;
+  action?: string;
+  action_value?: any;
+  min_value?: number;
+  max_value?: number;
+  validation_logic?: string;
+  unit?: string;
+}
+
+// Safety rules response
+export interface SafetyRulesResponse {
+  rules: SafetyRule[];
+  count: number;
+}
+
+// Settings interface
+export interface Settings {
+  healthThresholds: HealthThresholds;
+  notifications: Record<string, any>;
+  display: Record<string, any>;
+}
+
+// Energy data point interface
+export interface EnergyDataPoint {
+  date: string;
+  site_id: string;
+  site_name: string;
+  hvac_kwh: number;
+  lighting_kwh: number;
+  other_kwh: number;
+  total_kwh: number;
+}
+
+// Energy response interface
+export interface EnergyResponse {
+  days: number;
+  site_id: string | null;
+  data: EnergyDataPoint[];
+}
+
+// Prediction interface
+export interface Prediction {
+  id: string;
+  equipment_id: string;
+  site_id: string;
+  site_name: string;
+  equipment_name: string;
+  equipment_type: string;
+  prediction_type: string;
+  probability_percent: number;
+  confidence: "high" | "medium" | "low";
+  predicted_failure_date: string;
+  timeframe_days: number;
+  severity: "critical" | "warning" | "healthy";
+  evidence: {
+    repeat_work_orders: number;
+    repeat_period_months: number;
+    alarm_frequency: Record<string, number>;
+    asset_age_years: number;
+    expected_life_years: number;
+    technician_notes: string[];
+    latest_reading: {
+      parameter: string;
+      value: number;
+      baseline: number;
+      threshold: number;
+      trend: string;
+    };
+  };
+  contributing_factors: Array<{
+    factor: string;
+    weight: number;
+    description: string;
+  }>;
+  similar_failures: Array<{
+    site: string;
+    equipment: string;
+    failure_date: string;
+    common_factors: string[];
+  }>;
+  financial_impact: {
+    repair_cost_zar: number;
+    replacement_cost_zar: number;
+    downtime_cost_per_hour_zar: number;
+    estimated_repair_hours: number;
+    potential_loss_zar: number;
+  };
+  cost_impact?: {
+    preventive_breakdown: {
+      labor_cost_zar: number;
+      parts_cost_zar: number;
+      downtime_hours: number;
+      total_zar: number;
+    };
+    failure_breakdown: {
+      emergency_repair_zar: number;
+      downtime_loss_zar: number;
+      downtime_hours: number;
+      total_zar: number;
+    };
+    potential_savings_zar: number;
+    savings_percent: number;
+    roi_message: string;
+  };
+  recommended_action: string;
+  parts_required: Array<{
+    part_number: string;
+    name: string;
+    quantity: number;
+    cost_zar: number;
+    lead_time_days: number;
+  }> | string[];
+  urgency: string;
+}
+
+// Predictions response interface
+export interface PredictionsResponse {
+  total: number;
+  avg_probability: number;
+  total_repair_cost_zar: number;
+  total_potential_loss_zar: number;
+  potential_savings_zar: number;
+  by_severity: Record<string, number>;
+  by_equipment_type: Record<string, number>;
+  predictions: Prediction[];
+}
+
+/**
+ * Generic fetch wrapper with error handling
+ */
 async function fetchApi<T>(
   endpoint: string,
   options?: RequestInit

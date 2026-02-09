@@ -344,9 +344,9 @@ def check_query_safety(query: str) -> Tuple[bool, str, List[PromptInjection]]:
         high = [i for i in injections if i.severity == "high"]
 
         if critical:
-            reason = f"Security concern: Query contains content that appears to be attempting to manipulate the AI system or bypass safety controls. This type of request cannot be processed for security reasons."
+            reason = "Security concern: Query contains content that appears to be attempting to manipulate the AI system or bypass safety controls. This type of request cannot be processed for security reasons."
         elif high:
-            reason = f"Security concern: Query contains suspicious patterns that may indicate an attempt to bypass safety systems."
+            reason = "Security concern: Query contains suspicious patterns that may indicate an attempt to bypass safety systems."
         else:
             reason = "Security concern: Query contains patterns that triggered security filters."
 

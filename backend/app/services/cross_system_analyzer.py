@@ -293,9 +293,9 @@ class CrossSystemAnalyzer:
         status = hvac["status"]
 
         if status == "fault":
-            return f"HVAC FAULT detected. FCU may not be operating correctly."
+            return "HVAC FAULT detected. FCU may not be operating correctly."
         elif status == "off":
-            return f"HVAC is OFF. Zone temperature uncontrolled."
+            return "HVAC is OFF. Zone temperature uncontrolled."
 
         diff = temp - setpoint
         if complaint_type == "too_hot":

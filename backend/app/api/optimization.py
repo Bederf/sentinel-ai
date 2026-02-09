@@ -737,7 +737,7 @@ async def approve_optimization(
     """
     try:
         logger.info(f"Approving optimization for site {body.site_id}, recommendation {body.recommendation_id}, setpoints: {len(body.setpoints_to_apply)}")
-        
+
         # Validate setpoints array is not empty
         if not body.setpoints_to_apply:
             raise HTTPException(

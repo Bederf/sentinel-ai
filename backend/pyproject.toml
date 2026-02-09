@@ -1,0 +1,57 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bms-intelligence"
+version = "1.0.0"
+description = "SENTINEL BMS Intelligence Platform"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+timeout = 30
+addopts = "-v --tb=short"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+indent-width = 4
+
+[tool.ruff.lint]
+# Enable comprehensive linting rules
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "B",    # flake8-bugbear
+    "C4",   # flake8-comprehensions
+    "UP",   # pyupgrade
+    "ARG",  # flake8-unused-arguments
+    "SIM",  # flake8-simplify
+    "RUF",  # Ruff-specific rules
+]
+
+# Minimal ignore list - remove overly broad suppressions
+ignore = [
+    "E501",  # Line too long (formatter handles this)
+    "ARG002", # Unused argument in methods (often required by interfaces)
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests are allowed to have unused variables and imports
+"tests/*" = [
+    "ARG001",  # Unused arguments in test fixtures
+    "F841",    # Unused variables in test setup
+]
+
+# MCP server tools can have unused imports (dynamic registration)
+"app/mcp/*" = [
+    "F841",  # Unused variables in tool definitions
+]
+
+[tool.ruff.lint.isort]
+# Enforce import grouping: stdlib, third-party, local
+known-first-party = ["app"]

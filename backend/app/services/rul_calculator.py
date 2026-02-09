@@ -444,7 +444,7 @@ class RULCalculator:
         if days_until_first <= 0:
             return "immediate attention required"
         if days_until_first < 7:
-            return f"immediate attention required"
+            return "immediate attention required"
         if days_until_first < 30:
             return f"within {int(days_until_first)} days - schedule soon"
         if days_until_first < 90:

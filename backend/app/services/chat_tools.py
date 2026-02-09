@@ -248,7 +248,7 @@ async def control_device(
         else:
             return {
                 "success": False,
-                "error": f"Failed to write value to device. The device may be unresponsive."
+                "error": "Failed to write value to device. The device may be unresponsive."
             }
 
     except ValueError as e:
@@ -1265,7 +1265,7 @@ async def diagnose_comfort_complaint(
                 diagnosis["suggested_actions"] = [
                     "Close blinds/shades near the desk",
                     "Temporarily boost zone cooling by 2°C for 2 hours",
-                    f"Offer to relocate user to shaded desk (away from windows)",
+                    "Offer to relocate user to shaded desk (away from windows)",
                 ]
             elif dali.get("high_daylight"):
                 diagnosis["root_cause"] = "High daylight/solar gain detected by DALI sensors"
@@ -1885,13 +1885,13 @@ async def get_security_status() -> dict[str, Any]:
         offline_cams = [c for c in cameras if c.status.value != "online"]
         if offline_cams:
             cam_lines = [f"  - {c.name}: {c.status.value}" for c in offline_cams]
-            sections.append(f"## Camera Alerts\n" + "\n".join(cam_lines))
+            sections.append("## Camera Alerts\n" + "\n".join(cam_lines))
         else:
             sections.append(f"## Cameras\nAll {len(cameras)} cameras online")
 
         # Alarm zones
         alarm_lines = [f"  - {az.name}: {az.status.value} ({az.arm_type.value})" for az in alarm_zones]
-        sections.append(f"## Alarm Zones\n" + "\n".join(alarm_lines))
+        sections.append("## Alarm Zones\n" + "\n".join(alarm_lines))
 
         # Denied access
         if denied:

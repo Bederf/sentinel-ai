@@ -592,7 +592,7 @@ async def dispatch_work_order(alert_id: str, request: DispatchWorkOrderRequest):
     # Get equipment details
     equipment_result = client.table("equipment").select("*").eq("id", alert["equipment_id"]).execute()
     if not equipment_result.data:
-        raise HTTPException(status_code=404, detail=f"Equipment not found")
+        raise HTTPException(status_code=404, detail="Equipment not found")
 
     equipment = equipment_result.data[0]
 

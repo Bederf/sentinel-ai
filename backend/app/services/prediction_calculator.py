@@ -79,7 +79,7 @@ class PredictionCalculator:
             List of prediction dictionaries
         """
         predictions = []
-        
+
         # Load all data
         work_orders = WorkOrderData.load()
         assets = AssetData.load()
@@ -218,13 +218,13 @@ class PredictionCalculator:
         else:
             # Moderately degraded: 50-55% base probability
             base_probability = 55 - ((health_score - thresholds["warning"]) * 0.5)
-        
+
         # Ensure minimum 50% for any degraded equipment
         base_probability = max(50, base_probability)
 
         # Get site info
         site_id = equipment.get("site_id", "")
-        
+
         # Calculate repeat work orders in last 6 months
         six_months_ago = datetime.now() - timedelta(days=180)
         recent_wo = [
@@ -233,7 +233,7 @@ class PredictionCalculator:
         ]
 
         repeat_wo_count = sum(1 for wo in recent_wo if wo.get("repeat_call"))
-        
+
         # Group by fault code to find patterns
         fault_code_counts: Dict[str, int] = defaultdict(int)
         for wo in recent_wo:
@@ -324,7 +324,7 @@ class PredictionCalculator:
         # Determine prediction type from fault codes and equipment type
         eq_type = equipment.get("type", "").lower()
         prediction_type = "general_failure"
-        
+
         if most_common_fault:
             fault_code = most_common_fault[0].lower()
             for key, pred_type in PredictionCalculator.PREDICTION_TYPES.items():

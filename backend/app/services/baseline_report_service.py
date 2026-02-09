@@ -264,7 +264,7 @@ class BaselineReportService:
         from io import BytesIO
 
         buffer = BytesIO()
-        buffer.write(f"Baseline Assessment Report\n".encode())
+        buffer.write("Baseline Assessment Report\n".encode())
         buffer.write(f"Equipment: {json_report['equipment_info']['name']}\n".encode())
         buffer.write(f"Generated: {json_report['report_metadata']['generated_at']}\n\n".encode())
 

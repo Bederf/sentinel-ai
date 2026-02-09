@@ -21,7 +21,7 @@ router = APIRouter(prefix="/preferences", tags=["preferences"])
 # Default card definitions
 DEFAULT_KPI_CARDS = [
     "kpi-protected-sites",
-    "kpi-monitored-assets", 
+    "kpi-monitored-assets",
     "kpi-active-risks",
     "kpi-potential-savings",
     "kpi-risk-predictions"
@@ -79,7 +79,7 @@ async def get_dashboard_preferences(
 
     try:
         supabase = get_supabase_client()
-        
+
         # Try to get existing preferences
         result = supabase.table("dashboard_preferences").select("*").eq("user_id", user_id).execute()
 
@@ -98,7 +98,7 @@ async def get_dashboard_preferences(
                 created_at=row.get("created_at"),
                 updated_at=row.get("updated_at")
             )
-        
+
         # Return defaults if no preferences exist
         return DashboardPreferencesResponse(
             user_id=user_id,

@@ -1373,7 +1373,7 @@ Provide ONLY the JSON response, no additional text."""
                         "humidity_setpoint",
                         current_value,
                         new_humidity,
-                        f"Allow humidity to rise 3% as outdoor humidity drops - reduces dehumidification energy",
+                        "Allow humidity to rise 3% as outdoor humidity drops - reduces dehumidification energy",
                     )
 
         # Rule 3: CHW temperature optimization for ALL chillers
@@ -1394,7 +1394,7 @@ Provide ONLY the JSON response, no additional text."""
                         point_name,
                         current_value,
                         new_chw_temp,
-                        f"Increase CHW temp 1.5°C for higher chiller efficiency with rising outdoor temps",
+                        "Increase CHW temp 1.5°C for higher chiller efficiency with rising outdoor temps",
                     )
 
         # Rule 4: FCU optimization for ALL FCUs (ZONE-AWARE)
@@ -1448,7 +1448,7 @@ Provide ONLY the JSON response, no additional text."""
                             "fan_speed",
                             current_value,
                             new_speed,
-                            f"Reduce fan speed 10% for energy savings - moderate temperature differential allows lower airflow",
+                            "Reduce fan speed 10% for energy savings - moderate temperature differential allows lower airflow",
                         )
 
         # ============================================================
@@ -1799,7 +1799,7 @@ Provide ONLY the JSON response, no additional text."""
             reasoning += f"Zone-aware adjustments applied for: {', '.join(zone_context)} zones. "
         if cross_system_recommendations:
             reasoning += f"Coordinated {len(cross_system_recommendations)} cross-system optimizations. "
-        reasoning += f"All recommendations within safety limits and sorted by zone priority."
+        reasoning += "All recommendations within safety limits and sorted by zone priority."
 
         # Build lighting summary
         lighting_summary = None

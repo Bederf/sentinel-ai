@@ -160,7 +160,7 @@ def cmd_generate_trends(args: argparse.Namespace) -> int:
         days=args.days,
     )
 
-    print(f"\nTrend data generated:")
+    print("\nTrend data generated:")
     for path in paths:
         print(f"  - {path}")
 

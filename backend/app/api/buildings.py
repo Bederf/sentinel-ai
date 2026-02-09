@@ -229,7 +229,7 @@ async def create_building(building: BuildingCreate) -> dict:
         "id": building.id,
         "name": building.name,
         "status": "created",
-        "message": f"Building created. Upload desks/zones, then call /activate.",
+        "message": "Building created. Upload desks/zones, then call /activate.",
         "next_steps": [
             f"POST /api/buildings/{building.id}/desks - Upload desk data",
             f"POST /api/buildings/{building.id}/zones - Upload zone data",
