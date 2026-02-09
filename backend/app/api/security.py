@@ -5,7 +5,8 @@ badge event tracking, per-zone occupancy, and cross-module recommendations
 for HVAC and lighting adjustments based on occupancy levels.
 """
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
+from app.middleware.rate_limiter import limiter
 from pydantic import BaseModel, Field
 from typing import List, Optional
 import logging
@@ -38,8 +39,9 @@ class ArmAlarmRequest(BaseModel):
 
 # --- System status ---
 
+@limiter.limit("30/minute")
 @router.get("/status")
-async def get_security_status():
+async def get_security_status(request: Request):
     """Get overall security system status.
 
     Returns door count, camera count, alarm zone status,
@@ -61,8 +63,9 @@ async def get_security_status():
 
 # --- Access zones ---
 
+@limiter.limit("30/minute")
 @router.get("/zones")
-async def get_access_zones():
+async def get_access_zones(request: Request):
     """Get all access zones with access levels and doors."""
     svc = get_security_service()
     zones = svc.get_access_zones()
@@ -74,8 +77,9 @@ async def get_access_zones():
 
 # --- Doors ---
 
+@limiter.limit("30/minute")
 @router.get("/doors")
-async def get_all_doors():
+async def get_all_doors(request: Request):
     """Get all door status."""
     svc = get_security_service()
     doors = svc.get_doors()
@@ -86,8 +90,9 @@ async def get_all_doors():
     }
 
 
+@limiter.limit("30/minute")
 @router.get("/doors/{door_id}")
-async def get_door_detail(door_id: str):
+async def get_door_detail(request: Request, door_id: str):
     """Get single door status."""
     svc = get_security_service()
     door = svc.get_door_status(door_id)
@@ -113,8 +118,9 @@ async def get_badge_events(
     }
 
 
+@limiter.limit("30/minute")
 @router.get("/events/denied")
-async def get_denied_events():
+async def get_denied_events(request: Request):
     """Get denied access events."""
     svc = get_security_service()
     events = svc.get_denied_access_events()
@@ -124,8 +130,9 @@ async def get_denied_events():
     }
 
 
+@limiter.limit("30/minute")
 @router.get("/events/after-hours")
-async def get_after_hours_events():
+async def get_after_hours_events(request: Request):
     """Get after-hours access events (outside 06:00-20:00)."""
     svc = get_security_service()
     events = svc.get_after_hours_events()
@@ -135,8 +142,9 @@ async def get_after_hours_events():
     }
 
 
+@limiter.limit("15/minute")
 @router.post("/events")
-async def log_badge_event(request: BadgeEventRequest):
+async def log_badge_event(http_request: Request, request: BadgeEventRequest):
     """Log a new badge event (demo/test)."""
     svc = get_security_service()
     event_data = {
@@ -154,8 +162,9 @@ async def log_badge_event(request: BadgeEventRequest):
 
 # --- Cameras ---
 
+@limiter.limit("30/minute")
 @router.get("/cameras")
-async def get_all_cameras():
+async def get_all_cameras(request: Request):
     """Get all cameras with status."""
     svc = get_security_service()
     cameras = svc.get_cameras()
@@ -166,8 +175,9 @@ async def get_all_cameras():
     }
 
 
+@limiter.limit("30/minute")
 @router.get("/cameras/{camera_id}")
-async def get_camera_detail(camera_id: str):
+async def get_camera_detail(request: Request, camera_id: str):
     """Get single camera status."""
     svc = get_security_service()
     camera = svc.get_camera_status(camera_id)
@@ -178,8 +188,9 @@ async def get_camera_detail(camera_id: str):
 
 # --- Alarm zones ---
 
+@limiter.limit("30/minute")
 @router.get("/alarm-zones")
-async def get_alarm_zones():
+async def get_alarm_zones(request: Request):
     """Get all alarm zones with status."""
     svc = get_security_service()
     zones = svc.get_alarm_zones()
@@ -190,8 +201,9 @@ async def get_alarm_zones():
     }
 
 
+@limiter.limit("15/minute")
 @router.post("/alarm-zones/{zone_id}/arm")
-async def arm_alarm_zone(zone_id: str, request: ArmAlarmRequest):
+async def arm_alarm_zone(http_request: Request, zone_id: str, request: ArmAlarmRequest):
     """Arm an alarm zone."""
     if request.arm_type not in ("full", "perimeter", "night"):
         raise HTTPException(status_code=400, detail="arm_type must be full, perimeter, or night")
@@ -200,16 +212,18 @@ async def arm_alarm_zone(zone_id: str, request: ArmAlarmRequest):
     return result
 
 
+@limiter.limit("15/minute")
 @router.post("/alarm-zones/{zone_id}/disarm")
-async def disarm_alarm_zone(zone_id: str):
+async def disarm_alarm_zone(request: Request, zone_id: str):
     """Disarm an alarm zone."""
     svc = get_security_service()
     result = svc.disarm_alarm_zone(zone_id)
     return result
 
 
+@limiter.limit("15/minute")
 @router.post("/alarm-zones/{zone_id}/trigger")
-async def trigger_alarm_zone(zone_id: str):
+async def trigger_alarm_zone(request: Request, zone_id: str):
     """Trigger an alarm zone (demo)."""
     svc = get_security_service()
     result = svc.trigger_alarm(zone_id)
@@ -218,16 +232,18 @@ async def trigger_alarm_zone(zone_id: str):
 
 # --- Occupancy ---
 
+@limiter.limit("30/minute")
 @router.get("/occupancy")
-async def get_building_occupancy():
+async def get_building_occupancy(request: Request):
     """Get building-wide occupancy from badge data."""
     occ_svc = get_security_occupancy_service()
     result = occ_svc.get_building_occupancy()
     return result
 
 
+@limiter.limit("30/minute")
 @router.get("/occupancy/recommendations")
-async def get_occupancy_recommendations(site_id: str = "site-002"):
+async def get_occupancy_recommendations(request: Request, site_id: str = "site-002"):
     """Get cross-module recommendations based on occupancy.
 
     Returns HVAC setpoint relaxation and lighting dimming
@@ -241,8 +257,9 @@ async def get_occupancy_recommendations(site_id: str = "site-002"):
     return result
 
 
+@limiter.limit("30/minute")
 @router.get("/occupancy/{zone_id}")
-async def get_zone_occupancy(zone_id: str):
+async def get_zone_occupancy(request: Request, zone_id: str):
     """Get occupancy for a specific zone."""
     occ_svc = get_security_occupancy_service()
     occ = occ_svc.get_zone_occupancy(zone_id)
