@@ -12,6 +12,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@tremor/react";
 import { Zap, Clock, Thermometer, CheckCircle, Play, Square, Eye, Building2, ChevronDown, ShieldCheck } from "lucide-react";
+import { PageLoading } from "./PageLoading";
 import { ThermalRunwayChart } from "./ThermalRunwayChart";
 import api from "../lib/api";
 import type {
@@ -221,22 +222,7 @@ export function OptimizationPanel({ siteId: initialSiteId = "site-001", scenario
   }, [selectedSiteId, scenarioId]);
 
   if (loading) {
-    return (
-      <div
-        className="rounded-md overflow-hidden mt-6"
-        style={{
-          background: "var(--color-sentinel-bg-panel)",
-          border: "1px solid var(--color-sentinel-border)",
-        }}
-      >
-        <div className="p-4">
-          <div className="animate-pulse space-y-4">
-            <div className="h-4 rounded w-1/4" style={{ background: "var(--color-sentinel-bg-secondary)" }}></div>
-            <div className="h-32 rounded" style={{ background: "var(--color-sentinel-bg-secondary)" }}></div>
-          </div>
-        </div>
-      </div>
-    );
+    return <PageLoading message="Loading load shedding optimization..." />;
   }
 
   const currentStage = eskomStatus?.current_stage ?? 0;

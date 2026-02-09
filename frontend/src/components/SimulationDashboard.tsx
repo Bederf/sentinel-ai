@@ -67,6 +67,7 @@ import type {
 } from "../lib/simulationApi";
 import api from "../lib/api";
 import type { Site } from "../lib/api";
+import { PageLoading } from "./PageLoading";
 
 // ---------- Duration presets ----------
 
@@ -1355,17 +1356,7 @@ function ModelHealthTab({ selectedSiteId: _selectedSiteId }: { selectedSiteId: s
   }, [loadData]);
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Brain
-          className="h-6 w-6 animate-spin mr-3"
-          style={{ color: "var(--color-sentinel-blue)" }}
-        />
-        <span style={{ color: "var(--color-sentinel-text-secondary)" }}>
-          Loading model health...
-        </span>
-      </div>
-    );
+    return <PageLoading message="Loading simulation data..." />;
   }
 
   const summary = health?.summary;

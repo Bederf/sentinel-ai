@@ -14,6 +14,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Sun, Building2, ChevronDown, RefreshCw } from "lucide-react";
 import { fetchSolarSites } from "../../lib/solarApi";
 import type { SolarSite } from "../../lib/solarApi";
+import { PageLoading } from "../PageLoading";
 import { SolarOverviewPanel } from "./SolarOverviewPanel";
 import { BESSStatusPanel } from "./BESSStatusPanel";
 import { InverterStatusMatrix } from "./InverterStatusMatrix";
@@ -31,9 +32,13 @@ export function SolarDashboard() {
   useEffect(() => {
     fetchSolarSites()
       .then((sites) => {
-        setSolarSites(sites);
-        if (sites.length > 0 && !selectedSiteId) {
-          setSelectedSiteId(sites[0].site_id);
+        // Deduplicate sites by site_id
+        const uniqueSites = Array.from(
+          new Map(sites.map((site) => [site.site_id, site])).values()
+        );
+        setSolarSites(uniqueSites);
+        if (uniqueSites.length > 0 && !selectedSiteId) {
+          setSelectedSiteId(uniqueSites[0].site_id);
         }
       })
       .catch(() => {
@@ -43,7 +48,7 @@ export function SolarDashboard() {
         ]);
         if (!selectedSiteId) setSelectedSiteId("site-002");
       });
-  }, []);
+  }, [selectedSiteId]);
 
   const handleRefresh = useCallback(() => {
     setIsRefreshing(true);
@@ -133,9 +138,7 @@ export function SolarDashboard() {
 
       {/* Row 1: Overview + BESS + Energy Flow */}
       {!selectedSiteId ? (
-        <div className="text-center py-12" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-          Loading solar sites...
-        </div>
+        <PageLoading message="Loading solar sites..." />
       ) : (
       <>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4" key={refreshKey}>

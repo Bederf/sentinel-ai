@@ -38,6 +38,7 @@ import type {
 } from "../lib/api";
 import { AccessEventsPanel } from "./AccessEventsPanel";
 import { SecurityOccupancyPanel } from "./SecurityOccupancyPanel";
+import { PageLoading } from "./PageLoading";
 
 export function SecurityDashboard() {
   const [status, setStatus] = useState<SecuritySystemStatus | null>(null);
@@ -202,6 +203,10 @@ export function SecurityDashboard() {
         </div>
       </div>
     );
+  }
+
+  if (loading) {
+    return <PageLoading message="Loading security dashboard..." />;
   }
 
   return (

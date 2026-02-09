@@ -17,6 +17,7 @@ import { useState, useEffect, useCallback } from "react";
 import { RefreshCw, Users, Lightbulb, AlertTriangle, Cpu, Eye, Zap, Building2, ChevronDown, X, Radio, Clock, ThermometerSun, Wrench } from "lucide-react";
 import { OccupancyHeatmap } from "./OccupancyHeatmap";
 import { api, daliApi, isExpectedApiError } from "../lib/api";
+import { PageLoading } from "./PageLoading";
 import type { BuildingOccupancy, DALIStats, ZoneLighting, ZoneOccupancy, DALISensor, DALILuminaire, Site } from "../lib/api";
 
 // Get occupancy color based on percentage
@@ -177,39 +178,7 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
 
   // Loading state
   if (loading) {
-    return (
-      <div
-        className="rounded-md overflow-hidden"
-        style={{
-          background: "var(--color-sentinel-bg-panel)",
-          border: "1px solid var(--color-sentinel-border)",
-        }}
-      >
-        <div className="p-4">
-          <div className="animate-pulse space-y-4">
-            <div className="flex items-center gap-2">
-              <div
-                className="h-5 w-5 rounded"
-                style={{ background: "var(--color-sentinel-bg-secondary)" }}
-              />
-              <div
-                className="h-4 w-32 rounded"
-                style={{ background: "var(--color-sentinel-bg-secondary)" }}
-              />
-            </div>
-            <div className="grid grid-cols-3 gap-4">
-              {[1, 2, 3].map((i) => (
-                <div
-                  key={i}
-                  className="h-20 rounded"
-                  style={{ background: "var(--color-sentinel-bg-secondary)" }}
-                />
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+    return <PageLoading message="Loading occupancy data..." />;
   }
 
   // Error state

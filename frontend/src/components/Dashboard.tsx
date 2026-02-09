@@ -48,6 +48,7 @@ import { SiteDetail } from "./SiteDetail";
 // import { AlertFeed } from "./AlertFeed"; // Moved to header bell button
 import { EnergyChart } from "./EnergyChart";
 import { PredictionCard } from "./PredictionCard";
+import { PageLoading } from "./PageLoading";
 import { PredictionDetail } from "./PredictionDetail";
 import { RiskDetailModal } from "./RiskDetailModal";
 import { ROISummaryCard } from "./ROISummaryCard";
@@ -1051,6 +1052,10 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
 
   // Filter to only visible sections
   const visibleSectionOrder = sectionOrder.filter(id => visibleSections.includes(id));
+
+  if (loading) {
+    return <PageLoading message="Loading dashboard..." />;
+  }
 
   return (
     <DndContext
