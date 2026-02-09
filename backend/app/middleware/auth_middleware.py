@@ -40,6 +40,43 @@ from app.models.auth import AuthContext, AuthLevel, SentinelRole
 logger = logging.getLogger(__name__)
 
 # =============================================================================
+# PII Sanitization (Phase 65-04)
+# =============================================================================
+
+def sanitize_email(email: str) -> str:
+    """Mask email address for logging.
+
+    Example: user@example.com -> u***r@e***.com
+
+    Args:
+        email: Email address to sanitize
+
+    Returns:
+        Masked email address
+    """
+    if not email or "@" not in email:
+        return "***"
+
+    local, domain = email.split("@", 1)
+    if len(local) <= 1:
+        masked_local = "*"
+    else:
+        masked_local = local[0] + "*" * (len(local) - 2) + local[-1]
+
+    if len(domain) <= 1:
+        masked_domain = "*"
+    else:
+        # Mask domain but keep TLD
+        parts = domain.rsplit(".", 1)
+        if len(parts) == 2:
+            masked_domain = parts[0][0] + "*" * (len(parts[0]) - 1) + "." + parts[1]
+        else:
+            masked_domain = parts[0][0] + "*" * (len(parts[0]) - 1)
+
+    return f"{masked_local}@{masked_domain}"
+
+
+# =============================================================================
 # API Key Store (in-memory for MVP, move to Supabase for production)
 # =============================================================================
 
@@ -117,11 +154,12 @@ def create_jwt_token(
         legacy_hours = settings.jwt_expiration_hours or (settings.jwt_expiry_days * 24)
         ttl_seconds = legacy_hours * 60 * 60
 
+    # Minimize JWT payload for security (Phase 65-04: PII reduction)
+    # Keep: sub (user_id), role, exp, iat, jti
+    # Email moved to database lookup; full_name not needed in JWT
     payload = {
         "sub": user_id,
-        "email": email,
         "role": role,
-        "full_name": full_name,
         "token_type": token_type,  # "access" or "refresh"
         "jti": str(uuid.uuid4()),  # Unique token ID for blacklisting
         "iat": datetime.utcnow(),
@@ -130,6 +168,7 @@ def create_jwt_token(
     }
 
     token = pyjwt.encode(payload, secret, algorithm="HS256")
+    logger.debug(f"Created {token_type} token for user {user_id}")
     return token
 
 

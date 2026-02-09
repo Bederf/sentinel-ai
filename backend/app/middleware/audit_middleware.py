@@ -7,6 +7,7 @@ for tracking related actions.
 
 import logging
 import uuid
+import re
 from typing import Callable, Dict, Any
 from datetime import datetime
 
@@ -20,27 +21,71 @@ from app.models.audit_log import AuditActionType, AuditResultType
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Sensitive data sanitisation (Phase 58-04 M-4)
+# Sensitive data sanitisation (Phase 58-04 M-4 + Phase 65-04 PII masking)
 # ---------------------------------------------------------------------------
 _SENSITIVE_KEYS = {
     "password", "token", "secret", "api_key", "apikey",
     "authorization", "access_token", "refresh_token",
-    "jwt", "credential", "credit_card", "ssn",
+    "jwt", "credential", "credit_card", "ssn", "email",
 }
+
+# Email regex for PII masking
+_EMAIL_PATTERN = re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")
+
+
+def _sanitize_email(email: str) -> str:
+    """Mask email address for logging.
+
+    Example: user@example.com -> u***r@e***.com
+
+    Args:
+        email: Email address to sanitize
+
+    Returns:
+        Masked email address
+    """
+    if not email or "@" not in email:
+        return "***"
+
+    local, domain = email.split("@", 1)
+    if len(local) <= 1:
+        masked_local = "*"
+    else:
+        masked_local = local[0] + "*" * (len(local) - 2) + local[-1]
+
+    if len(domain) <= 1:
+        masked_domain = "*"
+    else:
+        # Mask domain but keep TLD
+        parts = domain.rsplit(".", 1)
+        if len(parts) == 2:
+            masked_domain = parts[0][0] + "*" * (len(parts[0]) - 1) + "." + parts[1]
+        else:
+            masked_domain = parts[0][0] + "*" * (len(parts[0]) - 1)
+
+    return f"{masked_local}@{masked_domain}"
 
 
 def _sanitize_log_data(data: dict) -> dict:
     """Recursively redact values whose keys look sensitive.
 
     Keys are matched case-insensitively against _SENSITIVE_KEYS.
+    Email addresses are masked using _sanitize_email.
     Nested dicts are sanitised recursively; other types are left as-is.
     """
     sanitized: dict = {}
     for k, v in data.items():
         if k.lower() in _SENSITIVE_KEYS:
-            sanitized[k] = "***REDACTED***"
+            # Special handling for email fields
+            if k.lower() == "email" and isinstance(v, str):
+                sanitized[k] = _sanitize_email(v)
+            else:
+                sanitized[k] = "***REDACTED***"
         elif isinstance(v, dict):
             sanitized[k] = _sanitize_log_data(v)
+        elif isinstance(v, str):
+            # Mask email addresses found in string values
+            sanitized[k] = _EMAIL_PATTERN.sub(lambda m: _sanitize_email(m.group()), v)
         else:
             sanitized[k] = v
     return sanitized
