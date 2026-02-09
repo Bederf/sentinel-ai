@@ -255,28 +255,25 @@ class BESSContainer:
 
     def to_dict(self) -> Dict[str, Any]:
         return {
-            "container_id": self.container_id,
+            "bess_id": self.container_id,
             "site_id": self.site_id,
             "name": self.name,
             "manufacturer": self.manufacturer,
             "model": self.model,
-            "capacity_kwh": self.capacity_kwh,
-            "rated_power_kw": self.rated_power_kw,
-            "rack_count": self.rack_count,
-            "cell_chemistry": self.cell_chemistry,
-            "protocol": self.protocol,
-            "soc_pct": self.soc_pct,
-            "soh_pct": self.soh_pct,
+            "total_capacity_kwh": self.capacity_kwh,
+            "usable_capacity_kwh": self.capacity_kwh * 0.9,  # Assume 90% usable
+            "soc_percent": self.soc_pct,
+            "soh_percent": self.soh_pct,
+            "mode": self.mode,
             "charge_power_kw": self.charge_power_kw,
             "discharge_power_kw": self.discharge_power_kw,
-            "mode": self.mode,
-            "temp_c": self.temp_c,
-            "cell_min_v": self.cell_min_v,
-            "cell_max_v": self.cell_max_v,
-            "cell_imbalance_mv": self.cell_imbalance_mv,
-            "cycles_count": self.cycles_count,
+            "current_power_kw": self.discharge_power_kw if self.mode == "discharging" else (self.charge_power_kw if self.mode == "charging" else 0.0),
+            "temperature_c": self.temp_c,
+            "cycle_count": self.cycles_count,
+            "estimated_runtime_min": int((self.capacity_kwh * self.soc_pct / 100) / max(self.discharge_power_kw, 1.0) * 60) if self.discharge_power_kw > 0 else 0,
+            "rack_count": self.rack_count,
             "alarms": self.alarms,
-            "last_poll": self.last_poll,
+            "status": "fault" if self.alarms else "normal",
         }
 
 
