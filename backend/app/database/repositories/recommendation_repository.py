@@ -391,6 +391,18 @@ class RecommendationRepository:
 
 
 # Singleton instance
+_recommendation_repository_instance: Optional[RecommendationRepository] = None
+
+
+def get_recommendation_repository() -> RecommendationRepository:
+    """Get singleton RecommendationRepository instance."""
+    global _recommendation_repository_instance
+    if _recommendation_repository_instance is None:
+        _recommendation_repository_instance = RecommendationRepository()
+    return _recommendation_repository_instance
+
+
+# Singleton instance
 _repository: Optional[RecommendationRepository] = None
 
 

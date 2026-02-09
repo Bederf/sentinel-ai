@@ -21,6 +21,10 @@ from app.database.repositories.dali_repository import (
     DALIGroupRepository,
 )
 from app.database.repositories.sla_repository import SLARepository, get_sla_repository
+from app.database.repositories.recommendation_repository import (
+    RecommendationRepository,
+    get_recommendation_repository,
+)
 
 __all__ = [
     'BuildingRepository',
@@ -43,4 +47,6 @@ __all__ = [
     'DALIGroupRepository',
     'SLARepository',
     'get_sla_repository',
+    'RecommendationRepository',
+    'get_recommendation_repository',
 ]
