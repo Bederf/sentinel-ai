@@ -9,7 +9,7 @@ Provides endpoints for managing recommendations through the control tier workflo
 
 import logging
 from typing import Any, Dict, Optional
-from fastapi import APIRouter, Request, HTTPException, Query
+from fastapi import APIRouter, Request, HTTPException, Query, Body
 from pydantic import BaseModel
 
 from app.services.recommendation_service import get_recommendation_service
@@ -75,6 +75,56 @@ async def get_pending_recommendations(
         logger.error(f"Error fetching pending recommendations for {site_id}: {e}")
         raise HTTPException(
             status_code=500, detail=f"Error fetching recommendations: {e}"
+        )
+
+
+@router.post("/history/{site_id}")
+async def get_recommendation_history(
+    site_id: str,
+    filters: Dict[str, Any] = Body(default={"status": None, "risk_level": None}),
+    limit: int = Query(50, ge=1, le=500),
+):
+    """Get historical recommendations for a site with optional filters.
+
+    Returns all non-pending recommendations (executed, rejected, auto_executed, failed),
+    newest first.
+
+    Args:
+        site_id: Building identifier
+        filters: Optional filter dict with status and/or riskLevel keys
+        limit: Maximum number to return (default: 50, max: 500)
+
+    Returns:
+        JSON response with historical recommendations
+    """
+    try:
+        service = get_recommendation_service()
+
+        # Extract filters from request body
+        status_filter = filters.get("status") if filters else None
+        risk_level_filter = filters.get("riskLevel") or filters.get("risk_level")
+
+        recs = await service.get_history(
+            site_id,
+            status_filter=status_filter,
+            risk_level_filter=risk_level_filter,
+            limit=limit,
+        )
+
+        return {
+            "site_id": site_id,
+            "recommendations": [r.to_dict() for r in recs],
+            "count": len(recs),
+            "filters": {
+                "status": status_filter,
+                "risk_level": risk_level_filter,
+            },
+        }
+
+    except Exception as e:
+        logger.error(f"Error fetching recommendation history for {site_id}: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Error fetching recommendation history: {e}"
         )
 
 

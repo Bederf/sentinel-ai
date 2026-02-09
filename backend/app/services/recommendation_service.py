@@ -116,6 +116,41 @@ class RecommendationService:
         # For now, return empty list (repository pattern in Task 4.3)
         return []
 
+    async def get_history(
+        self,
+        site_id: str,
+        status_filter: Optional[str] = None,
+        risk_level_filter: Optional[str] = None,
+        limit: int = 50,
+    ) -> List[Recommendation]:
+        """Get historical recommendations for a site with optional filters.
+
+        Returns all non-pending recommendations (executed, rejected, auto_executed, failed).
+
+        Args:
+            site_id: Building identifier
+            status_filter: Optional status to filter by
+            risk_level_filter: Optional risk level to filter by
+            limit: Maximum number to return
+
+        Returns:
+            List of historical recommendations
+        """
+        from app.database.repositories import get_recommendation_repository
+
+        try:
+            repo = get_recommendation_repository()
+            recs = await repo.get_history(
+                site_id,
+                status_filter=status_filter,
+                risk_level_filter=risk_level_filter,
+                limit=limit,
+            )
+            return recs
+        except Exception as e:
+            logger.error(f"Error fetching recommendation history for {site_id}: {e}")
+            return []
+
     async def approve_recommendation(
         self, rec_id: str, user_id: str, reason: Optional[str] = None
     ) -> Recommendation:

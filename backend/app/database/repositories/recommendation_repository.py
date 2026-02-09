@@ -145,6 +145,70 @@ class RecommendationRepository:
             logger.error(f"Error querying recommendations by status: {e}")
             return []
 
+    async def get_history(
+        self,
+        site_id: str,
+        status_filter: Optional[str] = None,
+        risk_level_filter: Optional[str] = None,
+        limit: int = 50,
+    ) -> List[Recommendation]:
+        """Get historical recommendations for a site with optional filters.
+
+        Returns all non-pending recommendations (executed, rejected, auto_executed, failed).
+
+        Args:
+            site_id: Building identifier
+            status_filter: Optional status to filter by (executed, rejected, auto_executed, failed)
+            risk_level_filter: Optional risk level to filter by (low, medium, high, critical)
+            limit: Maximum number to return (default 50)
+
+        Returns:
+            List of historical recommendations matching filters, newest first
+        """
+        try:
+            if not self._use_json and self.client:
+                # Query Supabase
+                recs = await self._supabase_get_history(
+                    site_id, status_filter, risk_level_filter, limit
+                )
+                return [Recommendation.from_dict(rec) for rec in recs]
+
+            # Fall back to JSON
+            self._load_all()
+            matching = [
+                rec
+                for rec in self._recommendations.values()
+                if rec.get("site_id") == site_id
+                # Exclude pending recommendations from history
+                and rec.get("status") != "pending"
+            ]
+
+            # Apply status filter if provided
+            if status_filter:
+                matching = [
+                    rec for rec in matching
+                    if rec.get("status") == status_filter
+                ]
+
+            # Apply risk level filter if provided
+            if risk_level_filter:
+                matching = [
+                    rec for rec in matching
+                    if rec.get("risk_level") == risk_level_filter
+                ]
+
+            # Sort by timestamp DESC (newest first)
+            matching.sort(
+                key=lambda r: r.get("timestamp", ""), reverse=True
+            )
+            return [
+                Recommendation.from_dict(rec) for rec in matching[:limit]
+            ]
+
+        except Exception as e:
+            logger.error(f"Error querying recommendation history: {e}")
+            return []
+
     async def update(self, rec_id: str, rec: Recommendation) -> Recommendation:
         """Update recommendation.
 
@@ -281,6 +345,49 @@ class RecommendationRepository:
         except Exception as e:
             logger.error(f"Supabase update failed: {e}")
             return None
+
+    async def _supabase_get_history(
+        self,
+        site_id: str,
+        status_filter: Optional[str],
+        risk_level_filter: Optional[str],
+        limit: int,
+    ) -> List[Dict[str, Any]]:
+        """Query historical recommendations from Supabase with filters.
+
+        Args:
+            site_id: Building identifier
+            status_filter: Optional status filter
+            risk_level_filter: Optional risk level filter
+            limit: Maximum number to return
+
+        Returns:
+            List of recommendation dicts matching filters
+        """
+        if not self.client:
+            return []
+
+        try:
+            query = (
+                self.client.table("recommendations")
+                .select("*")
+                .eq("site_id", site_id)
+                .neq("status", "pending")  # Exclude pending from history
+                .order("timestamp", desc=True)
+                .limit(limit)
+            )
+
+            # Apply optional filters
+            if status_filter:
+                query = query.eq("status", status_filter)
+            if risk_level_filter:
+                query = query.eq("risk_level", risk_level_filter)
+
+            result = query.execute()
+            return result.data or []
+        except Exception as e:
+            logger.error(f"Supabase history query failed: {e}")
+            return []
 
 
 # Singleton instance
