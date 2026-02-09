@@ -133,6 +133,7 @@ async def enroll_mfa(request: Request):
     The user must verify the code before MFA is enabled.
 
     Phase 65-02: Rate limited to prevent abuse (5/15min).
+    Phase 65-04: Add audit logging for MFA enrollment initiation
 
     Requires authentication.
     """
@@ -150,6 +151,20 @@ async def enroll_mfa(request: Request):
     )
 
     if not success:
+        # Log failed enrollment attempt
+        try:
+            from app.database.repositories.audit_repository import AuditRepository
+            audit_repo = AuditRepository()
+            audit_repo.log_security_event(
+                event_type='MFA_ENROLLED',
+                user_id=user["id"],
+                ip_address=source_ip,
+                result='FAILED',
+                details={'reason': 'enrollment_generation_failed'}
+            )
+        except Exception as e:
+            logger.warning(f"Failed to audit log failed MFA enrollment: {e}")
+
         return EnrollResponse(
             success=False,
             message="Failed to start MFA enrollment. Please try again.",
@@ -158,6 +173,21 @@ async def enroll_mfa(request: Request):
     backup_codes = mfa_service.generate_backup_codes(user["id"])
     if not backup_codes:
         logger.warning("Failed to generate backup codes during enrollment for %s", user["id"])
+
+    # Log successful enrollment initiation (Phase 65-04)
+    try:
+        from app.database.repositories.audit_repository import AuditRepository
+        audit_repo = AuditRepository()
+        audit_repo.log_security_event(
+            event_type='MFA_ENROLLED',
+            user_id=user["id"],
+            ip_address=source_ip,
+            result='SUCCESS',
+            details={'action': 'enrollment_started', 'backup_codes_generated': bool(backup_codes)}
+        )
+        logger.info(f"User {user['id']} started MFA enrollment")
+    except Exception as e:
+        logger.warning(f"Failed to audit log MFA enrollment initiation: {e}")
 
     return EnrollResponse(
         success=True,
@@ -178,6 +208,7 @@ async def verify_and_enable_mfa(request: Request, body: VerifyRequest):
     After successful verification, MFA will be required for future logins.
 
     Phase 65-02: Rate limited to 5 attempts per 15 minutes per IP.
+    Phase 65-04: Add audit logging for MFA verification
 
     Requires authentication.
 
@@ -202,7 +233,36 @@ async def verify_and_enable_mfa(request: Request, body: VerifyRequest):
     )
 
     if not success:
+        # Log failed verification
+        try:
+            from app.database.repositories.audit_repository import AuditRepository
+            audit_repo = AuditRepository()
+            audit_repo.log_security_event(
+                event_type='MFA_ENROLLED',
+                user_id=user["id"],
+                ip_address=source_ip,
+                result='FAILED',
+                details={'reason': error or 'verification_failed'}
+            )
+        except Exception as e:
+            logger.warning(f"Failed to audit log failed MFA verification: {e}")
+
         return VerifyResponse(success=False, message=error)
+
+    # Log successful MFA enrollment (Phase 65-04)
+    try:
+        from app.database.repositories.audit_repository import AuditRepository
+        audit_repo = AuditRepository()
+        audit_repo.log_security_event(
+            event_type='MFA_ENROLLED',
+            user_id=user["id"],
+            ip_address=source_ip,
+            result='SUCCESS',
+            details={'action': 'mfa_enabled'}
+        )
+        logger.info(f"User {user['id']} successfully enabled MFA")
+    except Exception as e:
+        logger.warning(f"Failed to audit log MFA enablement: {e}")
 
     return VerifyResponse(
         success=True,
@@ -345,6 +405,7 @@ async def disable_mfa(request: Request, body: DisableRequest):
     Should only be used for account recovery with proper verification.
 
     Phase 65-02: Rate limited to 10 attempts per minute per IP.
+    Phase 65-04: Add audit logging for MFA disabling
 
     Requires ADMIN role.
 
@@ -376,10 +437,39 @@ async def disable_mfa(request: Request, body: DisableRequest):
     )
 
     if not success:
+        # Log failed MFA disabling attempt
+        try:
+            from app.database.repositories.audit_repository import AuditRepository
+            audit_repo = AuditRepository()
+            audit_repo.log_security_event(
+                event_type='MFA_DISABLED',
+                user_id=user["id"],
+                ip_address=source_ip,
+                result='FAILED',
+                details={'target_user': body.user_email, 'reason': 'user_mfa_not_enabled'}
+            )
+        except Exception as e:
+            logger.warning(f"Failed to audit log failed MFA disable: {e}")
+
         return VerifyResponse(
             success=False,
             message="Failed to disable MFA. User may not have MFA enabled.",
         )
+
+    # Log successful MFA disabling (Phase 65-04)
+    try:
+        from app.database.repositories.audit_repository import AuditRepository
+        audit_repo = AuditRepository()
+        audit_repo.log_security_event(
+            event_type='MFA_DISABLED',
+            user_id=user["id"],
+            ip_address=source_ip,
+            result='SUCCESS',
+            details={'target_user': body.user_email}
+        )
+        logger.warning(f"Admin {user['id']} disabled MFA for {body.user_email}")
+    except Exception as e:
+        logger.warning(f"Failed to audit log MFA disabling: {e}")
 
     return VerifyResponse(
         success=True,

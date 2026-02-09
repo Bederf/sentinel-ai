@@ -515,6 +515,7 @@ async def logout(request: Request, refresh_token: Optional[str] = None):
     """Logout endpoint - blacklist tokens to invalidate them.
 
     Phase 65-02: Now actually invalidates tokens by blacklisting them in Redis.
+    Phase 65-04: Add audit logging for logout events
 
     Args:
         request: FastAPI request
@@ -524,6 +525,7 @@ async def logout(request: Request, refresh_token: Optional[str] = None):
         Success message
     """
     user_id: Optional[str] = None
+    source_ip = _extract_ip_address(request)
 
     # Extract and blacklist access token
     auth_header = request.headers.get("Authorization", "")
@@ -556,6 +558,21 @@ async def logout(request: Request, refresh_token: Optional[str] = None):
                     if session and session.get("session_id"):
                         session_service.revoke_session(user_id, session["session_id"])
 
+    # Log logout event (Phase 65-04)
+    if user_id:
+        try:
+            from app.database.repositories.audit_repository import AuditRepository
+            audit_repo = AuditRepository()
+            audit_repo.log_security_event(
+                event_type='LOGOUT',
+                user_id=user_id,
+                ip_address=source_ip,
+                result='SUCCESS'
+            )
+            logger.info(f"User {user_id} logged out successfully")
+        except Exception as e:
+            logger.warning(f"Failed to audit log logout for {user_id}: {e}")
+
     return {"message": "Logged out successfully"}
 
 
@@ -566,6 +583,7 @@ async def refresh_access_token(request: Request, refresh_token: str):
 
     Phase 65-02: Implements token rotation - old refresh token is invalidated,
     new access + refresh token pair is issued.
+    Phase 65-04: Add audit logging for token refresh
 
     Args:
         request: FastAPI request
@@ -577,12 +595,38 @@ async def refresh_access_token(request: Request, refresh_token: str):
     Raises:
         HTTPException 401 if refresh token is invalid
     """
+    source_ip = _extract_ip_address(request)
     payload = validate_jwt_token(refresh_token, required_token_type="refresh")
     if not payload:
+        # Log failed refresh attempt
+        try:
+            from app.database.repositories.audit_repository import AuditRepository
+            audit_repo = AuditRepository()
+            audit_repo.log_security_event(
+                event_type='TOKEN_REFRESH',
+                ip_address=source_ip,
+                result='FAILED',
+                details={'reason': 'invalid_or_expired_token'}
+            )
+        except Exception as e:
+            logger.warning(f"Failed to audit log failed token refresh: {e}")
         raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
 
     # Verify this is a refresh token
     if payload.get("token_type") != "refresh":
+        # Log failed refresh attempt
+        try:
+            from app.database.repositories.audit_repository import AuditRepository
+            audit_repo = AuditRepository()
+            audit_repo.log_security_event(
+                event_type='TOKEN_REFRESH',
+                user_id=payload.get("sub"),
+                ip_address=source_ip,
+                result='FAILED',
+                details={'reason': 'not_a_refresh_token'}
+            )
+        except Exception as e:
+            logger.warning(f"Failed to audit log token validation error: {e}")
         raise HTTPException(status_code=401, detail="Token is not a refresh token")
 
     # Get user info from payload
@@ -611,10 +655,24 @@ async def refresh_access_token(request: Request, refresh_token: str):
     new_refresh_jti = new_refresh_payload.get("jti", "")
     session_id = session_service.create_session(
         user_id=user_info["user_id"],
-        ip=_extract_ip_address(request),
+        ip=source_ip,
         user_agent=request.headers.get("User-Agent"),
         token_jti=new_refresh_jti,
     ) if new_refresh_jti else None
+
+    # Log successful token refresh (Phase 65-04)
+    try:
+        from app.database.repositories.audit_repository import AuditRepository
+        audit_repo = AuditRepository()
+        audit_repo.log_security_event(
+            event_type='TOKEN_REFRESH',
+            user_id=user_info['user_id'],
+            ip_address=source_ip,
+            result='SUCCESS',
+            details={'session_id': session_id}
+        )
+    except Exception as e:
+        logger.warning(f"Failed to audit log token refresh for {user_info['user_id']}: {e}")
 
     logger.info(f"Token refresh for user {user_info['user_id']}")
 
@@ -637,28 +695,72 @@ async def list_sessions(request: Request):
 
 @router.delete("/sessions/{session_id}")
 async def revoke_session(request: Request, session_id: str):
-    """Revoke a specific session for current user."""
+    """Revoke a specific session for current user.
+
+    Phase 65-04: Add audit logging for session revocation
+    """
     user = _get_current_user_from_request(request)
+    source_ip = _extract_ip_address(request)
     revoked = session_service.revoke_session(user["id"], session_id)
     if not revoked:
         raise HTTPException(status_code=404, detail="Session not found")
+
+    # Log session revocation (Phase 65-04)
+    try:
+        from app.database.repositories.audit_repository import AuditRepository
+        audit_repo = AuditRepository()
+        audit_repo.log_security_event(
+            event_type='SESSION_REVOKED',
+            user_id=user["id"],
+            ip_address=source_ip,
+            result='SUCCESS',
+            details={'session_id': session_id}
+        )
+        logger.info(f"User {user['id']} revoked session {session_id}")
+    except Exception as e:
+        logger.warning(f"Failed to audit log session revocation: {e}")
+
     return {"message": "Session revoked", "session_id": session_id}
 
 
 @router.delete("/sessions")
 async def revoke_all_sessions(request: Request):
-    """Revoke all sessions for current user."""
+    """Revoke all sessions for current user.
+
+    Phase 65-04: Add audit logging for bulk session revocation
+    """
     user = _get_current_user_from_request(request)
+    source_ip = _extract_ip_address(request)
     revoked_count = session_service.revoke_all_sessions(user["id"])
+
+    # Log all sessions revocation (Phase 65-04)
+    try:
+        from app.database.repositories.audit_repository import AuditRepository
+        audit_repo = AuditRepository()
+        audit_repo.log_security_event(
+            event_type='SESSION_REVOKED',
+            user_id=user["id"],
+            ip_address=source_ip,
+            result='SUCCESS',
+            details={'revoked_count': revoked_count, 'action': 'revoke_all'}
+        )
+        logger.info(f"User {user['id']} revoked all {revoked_count} sessions")
+    except Exception as e:
+        logger.warning(f"Failed to audit log revoke all sessions: {e}")
+
     return {"message": "Sessions revoked", "revoked_count": revoked_count}
 
 
 @router.post("/api-keys")
 @limiter.limit("5/15minutes")
 async def create_api_key(request: Request, body: ApiKeyCreateRequest):
-    """Create an API key and persist its hash in database."""
+    """Create an API key and persist its hash in database.
+
+    Phase 65-04: Add audit logging for API key creation
+    """
     user = _get_current_user_from_request(request)
     owner = body.owner or user["email"] or user["id"]
+    source_ip = _extract_ip_address(request)
 
     # Non-admin users can only create keys for themselves.
     if user["role"] != SentinelRole.ADMIN and owner != (user["email"] or user["id"]):
@@ -692,6 +794,28 @@ async def create_api_key(request: Request, body: ApiKeyCreateRequest):
         if not result.data:
             raise HTTPException(status_code=500, detail="Failed to create API key")
         row = result.data[0]
+
+        # Log API key creation (Phase 65-04)
+        try:
+            from app.database.repositories.audit_repository import AuditRepository
+            audit_repo = AuditRepository()
+            audit_repo.log_security_event(
+                event_type='API_KEY_CREATED',
+                user_id=user["id"],
+                ip_address=source_ip,
+                result='SUCCESS',
+                details={
+                    'key_id': row.get("id"),
+                    'key_prefix': key_prefix,
+                    'owner': owner,
+                    'role': role_value,
+                    'expires_in_days': body.expires_in_days
+                }
+            )
+            logger.info(f"User {user['id']} created API key {key_prefix} for {owner}")
+        except Exception as e:
+            logger.warning(f"Failed to audit log API key creation: {e}")
+
         return {
             "id": row.get("id"),
             "api_key": key_plaintext,  # shown once
@@ -730,9 +854,13 @@ async def list_api_keys(request: Request):
 
 @router.delete("/api-keys/{api_key_id}")
 async def revoke_api_key(request: Request, api_key_id: str):
-    """Revoke API key by id."""
+    """Revoke API key by id.
+
+    Phase 65-04: Add audit logging for API key revocation
+    """
     user = _get_current_user_from_request(request)
     owner = user["email"] or user["id"]
+    source_ip = _extract_ip_address(request)
     try:
         client = get_supabase_client()
         query = client.table("api_keys").update({"revoked": True}).eq("id", api_key_id)
@@ -751,6 +879,26 @@ async def revoke_api_key(request: Request, api_key_id: str):
                 _API_KEY_CACHE.pop(key_hash, None)
             except Exception:
                 pass
+
+        # Log API key revocation (Phase 65-04)
+        try:
+            from app.database.repositories.audit_repository import AuditRepository
+            audit_repo = AuditRepository()
+            audit_repo.log_security_event(
+                event_type='API_KEY_REVOKED',
+                user_id=user["id"],
+                ip_address=source_ip,
+                result='SUCCESS',
+                details={
+                    'key_id': api_key_id,
+                    'key_prefix': row.get("key_prefix"),
+                    'owner': row.get("owner")
+                }
+            )
+            logger.info(f"User {user['id']} revoked API key {api_key_id}")
+        except Exception as e:
+            logger.warning(f"Failed to audit log API key revocation: {e}")
+
         return {"message": "API key revoked", "id": api_key_id}
     except HTTPException:
         raise
