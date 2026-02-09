@@ -44,7 +44,7 @@ export function SolarDashboard() {
       .catch(() => {
         // Fallback if API not available
         setSolarSites([
-          { site_id: "site-002", site_name: "Sandton City Office Tower", plants: 2, connectors: 3, last_poll: null },
+          { site_id: "site-002", site_name: "Solar Campus", building_name: "Sandton City Office Tower", plants: 2, connectors: 3, last_poll: null },
         ]);
         if (!selectedSiteId) setSelectedSiteId("site-002");
       });
@@ -106,12 +106,12 @@ export function SolarDashboard() {
                 border: "1px solid var(--color-sentinel-border)",
                 color: "var(--color-sentinel-text-primary)",
                 outline: "none",
-                minWidth: "200px",
+                minWidth: "250px",
               }}
             >
               {solarSites.map((site) => (
                 <option key={site.site_id} value={site.site_id}>
-                  {site.site_name}
+                  {site.building_name} — {site.site_name}
                 </option>
               ))}
             </select>

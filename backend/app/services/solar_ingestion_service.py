@@ -683,17 +683,27 @@ class SolarIngestionService:
     # === Site listing ===
 
     def get_registered_sites(self) -> List[Dict]:
-        """List all registered solar sites."""
-        return [
-            {
+        """List all registered solar sites with building names."""
+        from app.database.repositories.building_repository import BuildingRepository
+        
+        building_repo = BuildingRepository()
+        results = []
+        
+        for site in self._sites.values():
+            # Fetch building name from repository
+            building = building_repo.get_by_id(site.site_id)
+            building_name = building.get("name", "") if building else ""
+            
+            results.append({
                 "site_id": site.site_id,
                 "site_name": site.site_name,
+                "building_name": building_name,
                 "plants": len(site.plants),
                 "connectors": len(site.connectors),
                 "last_poll": site.last_poll,
-            }
-            for site in self._sites.values()
-        ]
+            })
+        
+        return results
 
 
 # === Singleton ===

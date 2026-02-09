@@ -1,0 +1,1177 @@
+{
+  "building": "site-013",
+  "vendor": "niagara",
+  "total_points": 117,
+  "points": [
+    {
+      "name": "CH-B1-01.ChwSupplyTemp",
+      "description": "Chiller 1 CHW Supply Temperature",
+      "object_type": "analogInput",
+      "instance": 1020,
+      "units": "degC",
+      "present_value": 7.0,
+      "writable": false,
+      "bacnet_class": "sensor"
+    },
+    {
+      "name": "CH-B1-01.ChwReturnTemp",
+      "description": "Chiller 1 CHW Return Temperature",
+      "object_type": "analogInput",
+      "instance": 1021,
+      "units": "degC",
+      "present_value": 12.5,
+      "writable": false,
+      "bacnet_class": "sensor"
+    },
+    {
+      "name": "CH-B1-01.ChwFlowRate",
+      "description": "Chiller 1 CHW Flow Rate",
+      "object_type": "analogInput",
+      "instance": 1022,
+      "units": "L/s",
+      "present_value": 15.0,
+      "writable": false,
+      "bacnet_class": "sensor"
+    },
+    {
+      "name": "CH-B1-01.CompressorStatus",
+      "description": "Chiller 1 Compressor Status",
+      "object_type": "binaryInput",
+      "instance": 1023,
+      "units": "",
+      "present_value": true,
+      "writable": false,
+      "bacnet_class": "status"
+    },
+    {
+      "name": "CH-B1-01.Enable",
+      "description": "Chiller 1 Enable Command",
+      "object_type": "binaryOutput",
+      "instance": 1024,
+      "units": "",
+      "present_value": true,
+      "writable": true,
+      "bacnet_class": "command"
+    },
+    {
+      "name": "CH-B1-01.SetpointTemp",
+      "description": "Chiller 1 CHW Setpoint",
+      "object_type": "analogValue",
+      "instance": 1025,
+      "units": "degC",
+      "present_value": 7.0,
+      "writable": true,
+      "bacnet_class": "setpoint"
+    },
+    {
+      "name": "CH-B1-02.ChwSupplyTemp",
+      "description": "Chiller 2 CHW Supply Temperature",
+      "object_type": "analogInput",
+      "instance": 1040,
+      "units": "degC",
+      "present_value": 7.0,
+      "writable": false,
+      "bacnet_class": "sensor"
+    },
+    {
+      "name": "CH-B1-02.ChwReturnTemp",
+      "description": "Chiller 2 CHW Return Temperature",
+      "object_type": "analogInput",
+      "instance": 1041,
+      "units": "degC",
+      "present_value": 12.5,
+      "writable": false,
+      "bacnet_class": "sensor"
+    },
+    {
+      "name": "CH-B1-02.ChwFlowRate",
+      "description": "Chiller 2 CHW Flow Rate",
+      "object_type": "analogInput",
+      "instance": 1042,
+      "units": "L/s",
+      "present_value": 15.0,
+      "writable": false,
+      "bacnet_class": "sensor"
+    },
+    {
+      "name": "CH-B1-02.CompressorStatus",
+      "description": "Chiller 2 Compressor Status",
+      "object_type": "binaryInput",
+      "instance": 1043,
+      "units": "",
+      "present_value": true,
+      "writable": false,
+      "bacnet_class": "status"
+    },
+    {
+      "name": "CH-B1-02.Enable",
+      "description": "Chiller 2 Enable Command",
+      "object_type": "binaryOutput",
+      "instance": 1044,
+      "units": "",
+      "present_value": true,
+      "writable": true,
+      "bacnet_class": "command"
+    },
+    {
+      "name": "CH-B1-02.SetpointTemp",
+      "description": "Chiller 2 CHW Setpoint",
+      "object_type": "analogValue",
+      "instance": 1045,
+      "units": "degC",
+      "present_value": 7.0,
+      "writable": true,
+      "bacnet_class": "setpoint"
+    },
+    {
+      "name": "AHU-G-01.SupplyAirTemp",
+      "description": "AHU G Supply Air Temperature",
+      "object_type": "analogInput",
+      "instance": 2000,
+      "units": "degC",
+      "present_value": 18.0,
+      "writable": false,
+      "bacnet_class": "sensor"
+    },
+    {
+      "name": "AHU-G-01.ReturnAirTemp",
+      "description": "AHU G Return Air Temperature",
+      "object_type": "analogInput",
+      "instance": 2001,
+      "units": "degC",
+      "present_value": 24.0,
+      "writable": false,
+      "bacnet_class": "sensor"
+    },
+    {
+      "name": "AHU-G-01.FanSpeed",
+      "description": "AHU G Supply Fan Speed",
+      "object_type": "analogInput",
+      "instance": 2002,
+      "units": "%",
+      "present_value": 75.0,
+      "writable": false,
+      "bacnet_class": "sensor"
+    },
+    {
+      "name": "AHU-G-01.FanStatus",
+      "description": "AHU G Fan Status",
+      "object_type": "binaryInput",
+      "instance": 2003,
+      "units": "",
+      "present_value": true,
+      "writable": false,
+      "bacnet_class": "status"
+    },
+    {
+      "name": "AHU-G-01.FanEnable",
+      "description": "AHU G Fan Enable",
+      "object_type": "binaryOutput",
+      "instance": 2004,
+      "units": "",
+      "present_value": true,
+      "writable": true,
+      "bacnet_class": "command"
+    },
+    {
+      "name": "AHU-G-01.ChwValve",
+      "description": "AHU G CHW Valve Position",
+      "object_type": "analogOutput",
+      "instance": 2005,
+      "units": "%",
+      "present_value": 65.0,
+      "writable": true,
+      "bacnet_class": "command"
+    },
+    {
+      "name": "AHU-L1-01.SupplyAirTemp",
+      "description": "AHU L1 Supply Air Temperature",
+      "object_type": "analogInput",
+      "instance": 2020,
+      "units": "degC",
+      "present_value": 18.0,
+      "writable": false,
+      "bacnet_class": "sensor"
+    },
+    {
+      "name": "AHU-L1-01.ReturnAirTemp",
+      "description": "AHU L1 Return Air Temperature",
+      "object_type": "analogInput",
+      "instance": 2021,
+      "units": "degC",
+      "present_value": 24.0,
+      "writable": false,
+      "bacnet_class": "sensor"
+    },
+    {
+      "name": "AHU-L1-01.FanSpeed",
+      "description": "AHU L1 Supply Fan Speed",
+      "object_type": "analogInput",
+      "instance": 2022,
+      "units": "%",
+      "present_value": 75.0,
+      "writable": false,
+      "bacnet_class": "sensor"
+    },
+    {
+      "name": "AHU-L1-01.FanStatus",
+      "description": "AHU L1 Fan Status",
+      "object_type": "binaryInput",
+      "instance": 2023,
+      "units": "",
+      "present_value": true,
+      "writable": false,
+      "bacnet_class": "status"
+    },
+    {
+      "name": "AHU-L1-01.FanEnable",
+      "description": "AHU L1 Fan Enable",
+      "object_type": "binaryOutput",
+      "instance": 2024,
+      "units": "",
+      "present_value": true,
+      "writable": true,
+      "bacnet_class": "command"
+    },
+    {
+      "name": "AHU-L1-01.ChwValve",
+      "description": "AHU L1 CHW Valve Position",
+      "object_type": "analogOutput",
+      "instance": 2025,
+      "units": "%",
+      "present_value": 65.0,
+      "writable": true,
+      "bacnet_class": "command"
+    },
+    {
+      "name": "AHU-L2-01.SupplyAirTemp",
+      "description": "AHU L2 Supply Air Temperature",
+      "object_type": "analogInput",
+      "instance": 2040,
+      "units": "degC",
+      "present_value": 18.0,
+      "writable": false,
+      "bacnet_class": "sensor"
+    },
+    {
+      "name": "AHU-L2-01.ReturnAirTemp",
+      "description": "AHU L2 Return Air Temperature",
+      "object_type": "analogInput",
+      "instance": 2041,
+      "units": "degC",
+      "present_value": 24.0,
+      "writable": false,
+      "bacnet_class": "sensor"
+    },
+    {
+      "name": "AHU-L2-01.FanSpeed",
+      "description": "AHU L2 Supply Fan Speed",
+      "object_type": "analogInput",
+      "instance": 2042,
+      "units": "%",
+      "present_value": 75.0,
+      "writable": false,
+      "bacnet_class": "sensor"
+    },
+    {
+      "name": "AHU-L2-01.FanStatus",
+      "description": "AHU L2 Fan Status",
+      "object_type": "binaryInput",
+      "instance": 2043,
+      "units": "",
+      "present_value": true,
+      "writable": false,
+      "bacnet_class": "status"
+    },
+    {
+      "name": "AHU-L2-01.FanEnable",
+      "description": "AHU L2 Fan Enable",
+      "object_type": "binaryOutput",
+      "instance": 2044,
+      "units": "",
+      "present_value": true,
+      "writable": true,
+      "bacnet_class": "command"
+    },
+    {
+      "name": "AHU-L2-01.ChwValve",
+      "description": "AHU L2 CHW Valve Position",
+      "object_type": "analogOutput",
+      "instance": 2045,
+      "units": "%",
+      "present_value": 65.0,
+      "writable": true,
+      "bacnet_class": "command"
+    },
+    {
+      "name": "AHU-L3-01.SupplyAirTemp",
+      "description": "AHU L3 Supply Air Temperature",
+      "object_type": "analogInput",
+      "instance": 2060,
+      "units": "degC",
+      "present_value": 18.0,
+      "writable": false,
+      "bacnet_class": "sensor"
+    },
+    {
+      "name": "AHU-L3-01.ReturnAirTemp",
+      "description": "AHU L3 Return Air Temperature",
+      "object_type": "analogInput",
+      "instance": 2061,
+      "units": "degC",
+      "present_value": 24.0,
+      "writable": false,
+      "bacnet_class": "sensor"
+    },
+    {
+      "name": "AHU-L3-01.FanSpeed",
+      "description": "AHU L3 Supply Fan Speed",
+      "object_type": "analogInput",
+      "instance": 2062,
+      "units": "%",
+      "present_value": 75.0,
+      "writable": false,
+      "bacnet_class": "sensor"
+    },
+    {
+      "name": "AHU-L3-01.FanStatus",
+      "description": "AHU L3 Fan Status",
+      "object_type": "binaryInput",
+      "instance": 2063,
+      "units": "",
+      "present_value": true,
+      "writable": false,
+      "bacnet_class": "status"
+    },
+    {
+      "name": "AHU-L3-01.FanEnable",
+      "description": "AHU L3 Fan Enable",
+      "object_type": "binaryOutput",
+      "instance": 2064,
+      "units": "",
+      "present_value": true,
+      "writable": true,
+      "bacnet_class": "command"
+    },
+    {
+      "name": "AHU-L3-01.ChwValve",
+      "description": "AHU L3 CHW Valve Position",
+      "object_type": "analogOutput",
+      "instance": 2065,
+      "units": "%",
+      "present_value": 65.0,
+      "writable": true,
+      "bacnet_class": "command"
+    },
+    {
+      "name": "FCU-G-A.RoomTemp",
+      "description": "FCU G Zone A Room Temperature",
+      "object_type": "analogInput",
+      "instance": 3000,
+      "units": "degC",
+      "present_value": 22.0,
+      "writable": false,
+      "bacnet_class": "sensor"
+    },
+    {
+      "name": "FCU-G-A.Setpoint",
+      "description": "FCU G Zone A Setpoint",
+      "object_type": "analogValue",
+      "instance": 3001,
+      "units": "degC",
+      "present_value": 22.0,
+      "writable": true,
+      "bacnet_class": "setpoint"
+    },
+    {
+      "name": "FCU-G-A.FanSpeed",
+      "description": "FCU G Zone A Fan Speed",
+      "object_type": "analogOutput",
+      "instance": 3002,
+      "units": "",
+      "present_value": 2,
+      "writable": true,
+      "bacnet_class": "command"
+    },
+    {
+      "name": "FCU-G-A.FanStatus",
+      "description": "FCU G Zone A Fan Status",
+      "object_type": "binaryInput",
+      "instance": 3003,
+      "units": "",
+      "present_value": true,
+      "writable": false,
+      "bacnet_class": "status"
+    },
+    {
+      "name": "FCU-G-A.ValvePosition",
+      "description": "FCU G Zone A Valve Position",
+      "object_type": "analogInput",
+      "instance": 3004,
+      "units": "%",
+      "present_value": 50.0,
+      "writable": false,
+      "bacnet_class": "sensor"
+    },
+    {
+      "name": "FCU-G-B.RoomTemp",
+      "description": "FCU G Zone B Room Temperature",
+      "object_type": "analogInput",
+      "instance": 3010,
+      "units": "degC",
+      "present_value": 22.0,
+      "writable": false,
+      "bacnet_class": "sensor"
+    },
+    {
+      "name": "FCU-G-B.Setpoint",
+      "description": "FCU G Zone B Setpoint",
+      "object_type": "analogValue",
+      "instance": 3011,
+      "units": "degC",
+      "present_value": 22.0,
+      "writable": true,
+      "bacnet_class": "setpoint"
+    },
+    {
+      "name": "FCU-G-B.FanSpeed",
+      "description": "FCU G Zone B Fan Speed",
+      "object_type": "analogOutput",
+      "instance": 3012,
+      "units": "",
+      "present_value": 2,
+      "writable": true,
+      "bacnet_class": "command"
+    },
+    {
+      "name": "FCU-G-B.FanStatus",
+      "description": "FCU G Zone B Fan Status",
+      "object_type": "binaryInput",
+      "instance": 3013,
+      "units": "",
+      "present_value": true,
+      "writable": false,
+      "bacnet_class": "status"
+    },
+    {
+      "name": "FCU-G-B.ValvePosition",
+      "description": "FCU G Zone B Valve Position",
+      "object_type": "analogInput",
+      "instance": 3014,
+      "units": "%",
+      "present_value": 50.0,
+      "writable": false,
+      "bacnet_class": "sensor"
+    },
+    {
+      "name": "FCU-L1-A.RoomTemp",
+      "description": "FCU L1 Zone A Room Temperature",
+      "object_type": "analogInput",
+      "instance": 3020,
+      "units": "degC",
+      "present_value": 22.0,
+      "writable": false,
+      "bacnet_class": "sensor"
+    },
+    {
+      "name": "FCU-L1-A.Setpoint",
+      "description": "FCU L1 Zone A Setpoint",
+      "object_type": "analogValue",
+      "instance": 3021,
+      "units": "degC",
+      "present_value": 22.0,
+      "writable": true,
+      "bacnet_class": "setpoint"
+    },
+    {
+      "name": "FCU-L1-A.FanSpeed",
+      "description": "FCU L1 Zone A Fan Speed",
+      "object_type": "analogOutput",
+      "instance": 3022,
+      "units": "",
+      "present_value": 2,
+      "writable": true,
+      "bacnet_class": "command"
+    },
+    {
+      "name": "FCU-L1-A.FanStatus",
+      "description": "FCU L1 Zone A Fan Status",
+      "object_type": "binaryInput",
+      "instance": 3023,
+      "units": "",
+      "present_value": true,
+      "writable": false,
+      "bacnet_class": "status"
+    },
+    {
+      "name": "FCU-L1-A.ValvePosition",
+      "description": "FCU L1 Zone A Valve Position",
+      "object_type": "analogInput",
+      "instance": 3024,
+      "units": "%",
+      "present_value": 50.0,
+      "writable": false,
+      "bacnet_class": "sensor"
+    },
+    {
+      "name": "FCU-L1-B.RoomTemp",
+      "description": "FCU L1 Zone B Room Temperature",
+      "object_type": "analogInput",
+      "instance": 3030,
+      "units": "degC",
+      "present_value": 22.0,
+      "writable": false,
+      "bacnet_class": "sensor"
+    },
+    {
+      "name": "FCU-L1-B.Setpoint",
+      "description": "FCU L1 Zone B Setpoint",
+      "object_type": "analogValue",
+      "instance": 3031,
+      "units": "degC",
+      "present_value": 22.0,
+      "writable": true,
+      "bacnet_class": "setpoint"
+    },
+    {
+      "name": "FCU-L1-B.FanSpeed",
+      "description": "FCU L1 Zone B Fan Speed",
+      "object_type": "analogOutput",
+      "instance": 3032,
+      "units": "",
+      "present_value": 2,
+      "writable": true,
+      "bacnet_class": "command"
+    },
+    {
+      "name": "FCU-L1-B.FanStatus",
+      "description": "FCU L1 Zone B Fan Status",
+      "object_type": "binaryInput",
+      "instance": 3033,
+      "units": "",
+      "present_value": true,
+      "writable": false,
+      "bacnet_class": "status"
+    },
+    {
+      "name": "FCU-L1-B.ValvePosition",
+      "description": "FCU L1 Zone B Valve Position",
+      "object_type": "analogInput",
+      "instance": 3034,
+      "units": "%",
+      "present_value": 50.0,
+      "writable": false,
+      "bacnet_class": "sensor"
+    },
+    {
+      "name": "FCU-L1-C.RoomTemp",
+      "description": "FCU L1 Zone C Room Temperature",
+      "object_type": "analogInput",
+      "instance": 3040,
+      "units": "degC",
+      "present_value": 22.0,
+      "writable": false,
+      "bacnet_class": "sensor"
+    },
+    {
+      "name": "FCU-L1-C.Setpoint",
+      "description": "FCU L1 Zone C Setpoint",
+      "object_type": "analogValue",
+      "instance": 3041,
+      "units": "degC",
+      "present_value": 22.0,
+      "writable": true,
+      "bacnet_class": "setpoint"
+    },
+    {
+      "name": "FCU-L1-C.FanSpeed",
+      "description": "FCU L1 Zone C Fan Speed",
+      "object_type": "analogOutput",
+      "instance": 3042,
+      "units": "",
+      "present_value": 2,
+      "writable": true,
+      "bacnet_class": "command"
+    },
+    {
+      "name": "FCU-L1-C.FanStatus",
+      "description": "FCU L1 Zone C Fan Status",
+      "object_type": "binaryInput",
+      "instance": 3043,
+      "units": "",
+      "present_value": true,
+      "writable": false,
+      "bacnet_class": "status"
+    },
+    {
+      "name": "FCU-L1-C.ValvePosition",
+      "description": "FCU L1 Zone C Valve Position",
+      "object_type": "analogInput",
+      "instance": 3044,
+      "units": "%",
+      "present_value": 50.0,
+      "writable": false,
+      "bacnet_class": "sensor"
+    },
+    {
+      "name": "FCU-L2-A.RoomTemp",
+      "description": "FCU L2 Zone A Room Temperature",
+      "object_type": "analogInput",
+      "instance": 3050,
+      "units": "degC",
+      "present_value": 22.0,
+      "writable": false,
+      "bacnet_class": "sensor"
+    },
+    {
+      "name": "FCU-L2-A.Setpoint",
+      "description": "FCU L2 Zone A Setpoint",
+      "object_type": "analogValue",
+      "instance": 3051,
+      "units": "degC",
+      "present_value": 22.0,
+      "writable": true,
+      "bacnet_class": "setpoint"
+    },
+    {
+      "name": "FCU-L2-A.FanSpeed",
+      "description": "FCU L2 Zone A Fan Speed",
+      "object_type": "analogOutput",
+      "instance": 3052,
+      "units": "",
+      "present_value": 2,
+      "writable": true,
+      "bacnet_class": "command"
+    },
+    {
+      "name": "FCU-L2-A.FanStatus",
+      "description": "FCU L2 Zone A Fan Status",
+      "object_type": "binaryInput",
+      "instance": 3053,
+      "units": "",
+      "present_value": true,
+      "writable": false,
+      "bacnet_class": "status"
+    },
+    {
+      "name": "FCU-L2-A.ValvePosition",
+      "description": "FCU L2 Zone A Valve Position",
+      "object_type": "analogInput",
+      "instance": 3054,
+      "units": "%",
+      "present_value": 50.0,
+      "writable": false,
+      "bacnet_class": "sensor"
+    },
+    {
+      "name": "FCU-L2-B.RoomTemp",
+      "description": "FCU L2 Zone B Room Temperature",
+      "object_type": "analogInput",
+      "instance": 3060,
+      "units": "degC",
+      "present_value": 22.0,
+      "writable": false,
+      "bacnet_class": "sensor"
+    },
+    {
+      "name": "FCU-L2-B.Setpoint",
+      "description": "FCU L2 Zone B Setpoint",
+      "object_type": "analogValue",
+      "instance": 3061,
+      "units": "degC",
+      "present_value": 22.0,
+      "writable": true,
+      "bacnet_class": "setpoint"
+    },
+    {
+      "name": "FCU-L2-B.FanSpeed",
+      "description": "FCU L2 Zone B Fan Speed",
+      "object_type": "analogOutput",
+      "instance": 3062,
+      "units": "",
+      "present_value": 2,
+      "writable": true,
+      "bacnet_class": "command"
+    },
+    {
+      "name": "FCU-L2-B.FanStatus",
+      "description": "FCU L2 Zone B Fan Status",
+      "object_type": "binaryInput",
+      "instance": 3063,
+      "units": "",
+      "present_value": true,
+      "writable": false,
+      "bacnet_class": "status"
+    },
+    {
+      "name": "FCU-L2-B.ValvePosition",
+      "description": "FCU L2 Zone B Valve Position",
+      "object_type": "analogInput",
+      "instance": 3064,
+      "units": "%",
+      "present_value": 50.0,
+      "writable": false,
+      "bacnet_class": "sensor"
+    },
+    {
+      "name": "FCU-L2-C.RoomTemp",
+      "description": "FCU L2 Zone C Room Temperature",
+      "object_type": "analogInput",
+      "instance": 3070,
+      "units": "degC",
+      "present_value": 22.0,
+      "writable": false,
+      "bacnet_class": "sensor"
+    },
+    {
+      "name": "FCU-L2-C.Setpoint",
+      "description": "FCU L2 Zone C Setpoint",
+      "object_type": "analogValue",
+      "instance": 3071,
+      "units": "degC",
+      "present_value": 22.0,
+      "writable": true,
+      "bacnet_class": "setpoint"
+    },
+    {
+      "name": "FCU-L2-C.FanSpeed",
+      "description": "FCU L2 Zone C Fan Speed",
+      "object_type": "analogOutput",
+      "instance": 3072,
+      "units": "",
+      "present_value": 2,
+      "writable": true,
+      "bacnet_class": "command"
+    },
+    {
+      "name": "FCU-L2-C.FanStatus",
+      "description": "FCU L2 Zone C Fan Status",
+      "object_type": "binaryInput",
+      "instance": 3073,
+      "units": "",
+      "present_value": true,
+      "writable": false,
+      "bacnet_class": "status"
+    },
+    {
+      "name": "FCU-L2-C.ValvePosition",
+      "description": "FCU L2 Zone C Valve Position",
+      "object_type": "analogInput",
+      "instance": 3074,
+      "units": "%",
+      "present_value": 50.0,
+      "writable": false,
+      "bacnet_class": "sensor"
+    },
+    {
+      "name": "FCU-L3-A.RoomTemp",
+      "description": "FCU L3 Zone A Room Temperature",
+      "object_type": "analogInput",
+      "instance": 3080,
+      "units": "degC",
+      "present_value": 22.0,
+      "writable": false,
+      "bacnet_class": "sensor"
+    },
+    {
+      "name": "FCU-L3-A.Setpoint",
+      "description": "FCU L3 Zone A Setpoint",
+      "object_type": "analogValue",
+      "instance": 3081,
+      "units": "degC",
+      "present_value": 22.0,
+      "writable": true,
+      "bacnet_class": "setpoint"
+    },
+    {
+      "name": "FCU-L3-A.FanSpeed",
+      "description": "FCU L3 Zone A Fan Speed",
+      "object_type": "analogOutput",
+      "instance": 3082,
+      "units": "",
+      "present_value": 2,
+      "writable": true,
+      "bacnet_class": "command"
+    },
+    {
+      "name": "FCU-L3-A.FanStatus",
+      "description": "FCU L3 Zone A Fan Status",
+      "object_type": "binaryInput",
+      "instance": 3083,
+      "units": "",
+      "present_value": true,
+      "writable": false,
+      "bacnet_class": "status"
+    },
+    {
+      "name": "FCU-L3-A.ValvePosition",
+      "description": "FCU L3 Zone A Valve Position",
+      "object_type": "analogInput",
+      "instance": 3084,
+      "units": "%",
+      "present_value": 50.0,
+      "writable": false,
+      "bacnet_class": "sensor"
+    },
+    {
+      "name": "FCU-L3-B.RoomTemp",
+      "description": "FCU L3 Zone B Room Temperature",
+      "object_type": "analogInput",
+      "instance": 3090,
+      "units": "degC",
+      "present_value": 22.0,
+      "writable": false,
+      "bacnet_class": "sensor"
+    },
+    {
+      "name": "FCU-L3-B.Setpoint",
+      "description": "FCU L3 Zone B Setpoint",
+      "object_type": "analogValue",
+      "instance": 3091,
+      "units": "degC",
+      "present_value": 22.0,
+      "writable": true,
+      "bacnet_class": "setpoint"
+    },
+    {
+      "name": "FCU-L3-B.FanSpeed",
+      "description": "FCU L3 Zone B Fan Speed",
+      "object_type": "analogOutput",
+      "instance": 3092,
+      "units": "",
+      "present_value": 2,
+      "writable": true,
+      "bacnet_class": "command"
+    },
+    {
+      "name": "FCU-L3-B.FanStatus",
+      "description": "FCU L3 Zone B Fan Status",
+      "object_type": "binaryInput",
+      "instance": 3093,
+      "units": "",
+      "present_value": true,
+      "writable": false,
+      "bacnet_class": "status"
+    },
+    {
+      "name": "FCU-L3-B.ValvePosition",
+      "description": "FCU L3 Zone B Valve Position",
+      "object_type": "analogInput",
+      "instance": 3094,
+      "units": "%",
+      "present_value": 50.0,
+      "writable": false,
+      "bacnet_class": "sensor"
+    },
+    {
+      "name": "FCU-L3-C.RoomTemp",
+      "description": "FCU L3 Zone C Room Temperature",
+      "object_type": "analogInput",
+      "instance": 3100,
+      "units": "degC",
+      "present_value": 22.0,
+      "writable": false,
+      "bacnet_class": "sensor"
+    },
+    {
+      "name": "FCU-L3-C.Setpoint",
+      "description": "FCU L3 Zone C Setpoint",
+      "object_type": "analogValue",
+      "instance": 3101,
+      "units": "degC",
+      "present_value": 22.0,
+      "writable": true,
+      "bacnet_class": "setpoint"
+    },
+    {
+      "name": "FCU-L3-C.FanSpeed",
+      "description": "FCU L3 Zone C Fan Speed",
+      "object_type": "analogOutput",
+      "instance": 3102,
+      "units": "",
+      "present_value": 2,
+      "writable": true,
+      "bacnet_class": "command"
+    },
+    {
+      "name": "FCU-L3-C.FanStatus",
+      "description": "FCU L3 Zone C Fan Status",
+      "object_type": "binaryInput",
+      "instance": 3103,
+      "units": "",
+      "present_value": true,
+      "writable": false,
+      "bacnet_class": "status"
+    },
+    {
+      "name": "FCU-L3-C.ValvePosition",
+      "description": "FCU L3 Zone C Valve Position",
+      "object_type": "analogInput",
+      "instance": 3104,
+      "units": "%",
+      "present_value": 50.0,
+      "writable": false,
+      "bacnet_class": "sensor"
+    },
+    {
+      "name": "FCU-L3-D.RoomTemp",
+      "description": "FCU L3 Zone D Room Temperature",
+      "object_type": "analogInput",
+      "instance": 3110,
+      "units": "degC",
+      "present_value": 22.0,
+      "writable": false,
+      "bacnet_class": "sensor"
+    },
+    {
+      "name": "FCU-L3-D.Setpoint",
+      "description": "FCU L3 Zone D Setpoint",
+      "object_type": "analogValue",
+      "instance": 3111,
+      "units": "degC",
+      "present_value": 22.0,
+      "writable": true,
+      "bacnet_class": "setpoint"
+    },
+    {
+      "name": "FCU-L3-D.FanSpeed",
+      "description": "FCU L3 Zone D Fan Speed",
+      "object_type": "analogOutput",
+      "instance": 3112,
+      "units": "",
+      "present_value": 2,
+      "writable": true,
+      "bacnet_class": "command"
+    },
+    {
+      "name": "FCU-L3-D.FanStatus",
+      "description": "FCU L3 Zone D Fan Status",
+      "object_type": "binaryInput",
+      "instance": 3113,
+      "units": "",
+      "present_value": true,
+      "writable": false,
+      "bacnet_class": "status"
+    },
+    {
+      "name": "FCU-L3-D.ValvePosition",
+      "description": "FCU L3 Zone D Valve Position",
+      "object_type": "analogInput",
+      "instance": 3114,
+      "units": "%",
+      "present_value": 50.0,
+      "writable": false,
+      "bacnet_class": "sensor"
+    },
+    {
+      "name": "VAV-L1-01.Airflow",
+      "description": "VAV L1 Airflow",
+      "object_type": "analogInput",
+      "instance": 4000,
+      "units": "L/s",
+      "present_value": 120.0,
+      "writable": false,
+      "bacnet_class": "sensor"
+    },
+    {
+      "name": "VAV-L1-01.DamperPosition",
+      "description": "VAV L1 Damper Position",
+      "object_type": "analogInput",
+      "instance": 4001,
+      "units": "%",
+      "present_value": 60.0,
+      "writable": false,
+      "bacnet_class": "sensor"
+    },
+    {
+      "name": "VAV-L1-01.RoomTemp",
+      "description": "VAV L1 Zone Temperature",
+      "object_type": "analogInput",
+      "instance": 4002,
+      "units": "degC",
+      "present_value": 22.5,
+      "writable": false,
+      "bacnet_class": "sensor"
+    },
+    {
+      "name": "VAV-L1-01.Setpoint",
+      "description": "VAV L1 Setpoint",
+      "object_type": "analogValue",
+      "instance": 4003,
+      "units": "degC",
+      "present_value": 22.0,
+      "writable": true,
+      "bacnet_class": "setpoint"
+    },
+    {
+      "name": "VAV-L1-01.DamperCommand",
+      "description": "VAV L1 Damper Command",
+      "object_type": "analogOutput",
+      "instance": 4004,
+      "units": "%",
+      "present_value": 60.0,
+      "writable": true,
+      "bacnet_class": "command"
+    },
+    {
+      "name": "VAV-L1-01.OccupancyStatus",
+      "description": "VAV L1 Occupancy Status",
+      "object_type": "binaryInput",
+      "instance": 4005,
+      "units": "",
+      "present_value": true,
+      "writable": false,
+      "bacnet_class": "status"
+    },
+    {
+      "name": "VAV-L1-01.MaintenanceAlarm",
+      "description": "VAV L1 Maintenance Alarm",
+      "object_type": "binaryInput",
+      "instance": 4006,
+      "units": "",
+      "present_value": false,
+      "writable": false,
+      "bacnet_class": "status"
+    },
+    {
+      "name": "VAV-L2-01.Airflow",
+      "description": "VAV L2 Airflow",
+      "object_type": "analogInput",
+      "instance": 4015,
+      "units": "L/s",
+      "present_value": 120.0,
+      "writable": false,
+      "bacnet_class": "sensor"
+    },
+    {
+      "name": "VAV-L2-01.DamperPosition",
+      "description": "VAV L2 Damper Position",
+      "object_type": "analogInput",
+      "instance": 4016,
+      "units": "%",
+      "present_value": 60.0,
+      "writable": false,
+      "bacnet_class": "sensor"
+    },
+    {
+      "name": "VAV-L2-01.RoomTemp",
+      "description": "VAV L2 Zone Temperature",
+      "object_type": "analogInput",
+      "instance": 4017,
+      "units": "degC",
+      "present_value": 22.5,
+      "writable": false,
+      "bacnet_class": "sensor"
+    },
+    {
+      "name": "VAV-L2-01.Setpoint",
+      "description": "VAV L2 Setpoint",
+      "object_type": "analogValue",
+      "instance": 4018,
+      "units": "degC",
+      "present_value": 22.0,
+      "writable": true,
+      "bacnet_class": "setpoint"
+    },
+    {
+      "name": "VAV-L2-01.DamperCommand",
+      "description": "VAV L2 Damper Command",
+      "object_type": "analogOutput",
+      "instance": 4019,
+      "units": "%",
+      "present_value": 60.0,
+      "writable": true,
+      "bacnet_class": "command"
+    },
+    {
+      "name": "VAV-L2-01.OccupancyStatus",
+      "description": "VAV L2 Occupancy Status",
+      "object_type": "binaryInput",
+      "instance": 4020,
+      "units": "",
+      "present_value": true,
+      "writable": false,
+      "bacnet_class": "status"
+    },
+    {
+      "name": "VAV-L2-01.MaintenanceAlarm",
+      "description": "VAV L2 Maintenance Alarm",
+      "object_type": "binaryInput",
+      "instance": 4021,
+      "units": "",
+      "present_value": false,
+      "writable": false,
+      "bacnet_class": "status"
+    },
+    {
+      "name": "VAV-L3-01.Airflow",
+      "description": "VAV L3 Airflow",
+      "object_type": "analogInput",
+      "instance": 4030,
+      "units": "L/s",
+      "present_value": 120.0,
+      "writable": false,
+      "bacnet_class": "sensor"
+    },
+    {
+      "name": "VAV-L3-01.DamperPosition",
+      "description": "VAV L3 Damper Position",
+      "object_type": "analogInput",
+      "instance": 4031,
+      "units": "%",
+      "present_value": 60.0,
+      "writable": false,
+      "bacnet_class": "sensor"
+    },
+    {
+      "name": "VAV-L3-01.RoomTemp",
+      "description": "VAV L3 Zone Temperature",
+      "object_type": "analogInput",
+      "instance": 4032,
+      "units": "degC",
+      "present_value": 22.5,
+      "writable": false,
+      "bacnet_class": "sensor"
+    },
+    {
+      "name": "VAV-L3-01.Setpoint",
+      "description": "VAV L3 Setpoint",
+      "object_type": "analogValue",
+      "instance": 4033,
+      "units": "degC",
+      "present_value": 22.0,
+      "writable": true,
+      "bacnet_class": "setpoint"
+    },
+    {
+      "name": "VAV-L3-01.DamperCommand",
+      "description": "VAV L3 Damper Command",
+      "object_type": "analogOutput",
+      "instance": 4034,
+      "units": "%",
+      "present_value": 60.0,
+      "writable": true,
+      "bacnet_class": "command"
+    },
+    {
+      "name": "VAV-L3-01.OccupancyStatus",
+      "description": "VAV L3 Occupancy Status",
+      "object_type": "binaryInput",
+      "instance": 4035,
+      "units": "",
+      "present_value": true,
+      "writable": false,
+      "bacnet_class": "status"
+    },
+    {
+      "name": "VAV-L3-01.MaintenanceAlarm",
+      "description": "VAV L3 Maintenance Alarm",
+      "object_type": "binaryInput",
+      "instance": 4036,
+      "units": "",
+      "present_value": false,
+      "writable": false,
+      "bacnet_class": "status"
+    }
+  ]
+}
