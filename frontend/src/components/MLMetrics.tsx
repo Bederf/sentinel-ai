@@ -21,6 +21,8 @@ import {
   XCircle,
   Clock,
   FileText,
+  Building2,
+  ChevronDown,
 } from "lucide-react";
 import {
   mlopsApi,
@@ -30,6 +32,7 @@ import {
   type MLOpsHealth,
   type PerformanceReport,
 } from "../lib/mlopsApi";
+import { sitesApi, type Site } from "../lib/api";
 
 // --- Skeleton ---
 function Skeleton({ className = "" }: { className?: string }) {
@@ -286,6 +289,8 @@ function AlertItem({ alert }: { alert: MLAlert }) {
 
 // --- Main Component ---
 export function MLMetrics() {
+  const [sites, setSites] = useState<Site[]>([]);
+  const [selectedSiteId, setSelectedSiteId] = useState<string>("");
   const [health, setHealth] = useState<MLOpsHealth | null>(null);
   const [metrics, setMetrics] = useState<SuccessMetrics | null>(null);
   const [drift, setDrift] = useState<AllDriftResult | null>(null);
@@ -294,6 +299,32 @@ export function MLMetrics() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Fetch buildings on mount
+  useEffect(() => {
+    sitesApi
+      .getSites()
+      .then((fetchedSites) => {
+        setSites(fetchedSites);
+        if (fetchedSites.length > 0 && !selectedSiteId) {
+          setSelectedSiteId(fetchedSites[0].id);
+        }
+      })
+      .catch(() => {
+        // Fallback if API not available
+        const fallbackSites: Site[] = [
+          {
+            id: "site-002",
+            code: "site-002",
+            name: "Sandton City Office Tower",
+            status: "active",
+            created_at: new Date().toISOString(),
+          },
+        ];
+        setSites(fallbackSites);
+        setSelectedSiteId("site-002");
+      });
+  }, []);
 
   const loadData = async () => {
     try {
@@ -323,7 +354,7 @@ export function MLMetrics() {
     loadData();
     const interval = setInterval(loadData, 60000);
     return () => clearInterval(interval);
-  }, []);
+  }, [selectedSiteId]);
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -364,7 +395,7 @@ export function MLMetrics() {
   return (
     <div className="h-full overflow-y-auto p-4 md:p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <Activity
             className="h-6 w-6"
@@ -385,7 +416,37 @@ export function MLMetrics() {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          {/* Building Selector */}
+          <div className="relative">
+            <Building2
+              className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4"
+              style={{ color: "var(--color-sentinel-text-secondary)" }}
+            />
+            <ChevronDown
+              className="absolute right-2 top-1/2 transform -translate-y-1/2 h-3 w-3 pointer-events-none"
+              style={{ color: "var(--color-sentinel-text-secondary)" }}
+            />
+            <select
+              value={selectedSiteId}
+              onChange={(e) => setSelectedSiteId(e.target.value)}
+              className="pl-9 pr-7 py-1.5 text-sm rounded appearance-none cursor-pointer"
+              style={{
+                background: "var(--color-sentinel-bg-secondary)",
+                border: "1px solid var(--color-sentinel-border)",
+                color: "var(--color-sentinel-text-primary)",
+                outline: "none",
+                minWidth: "250px",
+              }}
+            >
+              {sites.map((site) => (
+                <option key={site.id} value={site.id}>
+                  {site.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Health badge */}
           {health && (
             <span
