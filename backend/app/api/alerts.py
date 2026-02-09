@@ -6,7 +6,8 @@ from pathlib import Path
 from typing import Optional
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
+from app.middleware.rate_limiter import limiter
 from pydantic import BaseModel
 
 # Import simulation service for live alerts
@@ -229,8 +230,10 @@ class AnomalyListResponse(BaseModel):
     anomalies: list[AnomalyResponse]
 
 
+@limiter.limit("30/minute")
 @router.get("/alerts", response_model=AlertListResponse)
 async def list_alerts(
+    request: Request,
     site_id: Optional[str] = Query(None, description="Filter by site ID"),
     severity: Optional[str] = Query(None, description="Filter by severity"),
     status: Optional[str] = Query(None, description="Filter by status (active, acknowledged, resolved)"),
@@ -298,8 +301,9 @@ async def list_alerts(
     )
 
 
+@limiter.limit("20/minute")
 @router.get("/alerts/{alert_id}", response_model=AlertResponse)
-async def get_alert(alert_id: str) -> AlertResponse:
+async def get_alert(request: Request, alert_id: str) -> AlertResponse:
     """
     Get a single alert by ID.
 
@@ -336,8 +340,10 @@ async def get_alert(alert_id: str) -> AlertResponse:
     )
 
 
+@limiter.limit("30/minute")
 @router.get("/sites/{site_id}/alerts", response_model=AlertListResponse)
 async def get_site_alerts(
+    request: Request,
     site_id: str,
     severity: Optional[str] = Query(None, description="Filter by severity"),
     status: Optional[str] = Query(None, description="Filter by status"),
@@ -356,8 +362,10 @@ async def get_site_alerts(
     return await list_alerts(site_id=site_id, severity=severity, status=status, category=None)
 
 
+@limiter.limit("30/minute")
 @router.get("/anomalies", response_model=AnomalyListResponse)
 async def list_anomalies(
+    request: Request,
     site_id: Optional[str] = Query(None, description="Filter by site ID"),
     severity: Optional[str] = Query(None, description="Filter by severity"),
     urgency: Optional[str] = Query(None, description="Filter by urgency (critical, high, medium, low)"),
@@ -453,8 +461,9 @@ class CreateAlertResponse(BaseModel):
     message: str
 
 
+@limiter.limit("15/minute")
 @router.post("/alerts", response_model=CreateAlertResponse)
-async def create_alert(request: CreateAlertRequest) -> CreateAlertResponse:
+async def create_alert(http_request: Request, request: CreateAlertRequest) -> CreateAlertResponse:
     """
     Create a new alert and optionally notify via Clawd Telegram.
 
@@ -518,8 +527,9 @@ async def create_alert(request: CreateAlertRequest) -> CreateAlertResponse:
     )
 
 
+@limiter.limit("20/minute")
 @router.post("/alerts/{alert_id}/acknowledge")
-async def acknowledge_alert(alert_id: str, acknowledged_by: str = "operator"):
+async def acknowledge_alert(request: Request, alert_id: str, acknowledged_by: str = "operator"):
     """Acknowledge an alert."""
 
     # Handle simulation alerts (SIM-ALERT-*)
