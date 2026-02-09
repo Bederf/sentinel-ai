@@ -1,0 +1,185 @@
+"""Middleware registration for FastAPI application.
+
+This module contains all middleware setup and configuration, extracted
+from main.py to improve maintainability and separation of concerns.
+"""
+
+from collections import defaultdict
+from datetime import datetime, timedelta
+import logging
+
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+
+from app.config.settings import settings
+from app.middleware.auth_middleware import _authenticate_request, _extract_ip_address
+from app.middleware.rate_limiter import limiter
+from app.middleware.audit_middleware import AuditMiddleware
+from app.middleware.security_logging import SecurityLoggingMiddleware
+
+_logger = logging.getLogger("sentinel.security")
+
+# Paths that do not require authentication
+_PUBLIC_PATHS = {
+    "/api/auth/login",
+    "/api/auth/login/mfa-complete",
+    "/api/auth/refresh",
+    "/api/auth/register",
+    "/api/auth/mfa/verify",
+    "/api/auth/verify",
+    "/docs",
+    "/openapi.json",
+    "/redoc",
+    "/health",
+    "/api/health",
+}
+_PUBLIC_PREFIXES = (
+    "/api/clawd-webhooks",  # Telegram bot callbacks (authenticated via webhook secret)
+    "/api/mcp-sse",  # MCP SSE transport (authenticated at MCP layer)
+)
+_LOCALHOST_IPS = {"127.0.0.1", "::1", "localhost", "testclient"}
+_ADMIN_RATE_LIMIT_PER_MINUTE = 30
+_admin_requests_by_ip: dict[str, list[datetime]] = defaultdict(list)
+
+
+def _check_admin_rate_limit(source_ip: str) -> JSONResponse | None:
+    """Enforce admin API limit of 30 requests per minute per IP."""
+    now = datetime.utcnow()
+    cutoff = now - timedelta(minutes=1)
+    recent = [t for t in _admin_requests_by_ip[source_ip] if t > cutoff]
+    _admin_requests_by_ip[source_ip] = recent
+
+    if len(recent) >= _ADMIN_RATE_LIMIT_PER_MINUTE:
+        retry_after_seconds = max(1, int((recent[0] + timedelta(minutes=1) - now).total_seconds()))
+        return JSONResponse(
+            status_code=429,
+            content={"detail": "Admin API rate limit exceeded. Please try again later."},
+            headers={"Retry-After": str(retry_after_seconds)},
+        )
+
+    recent.append(now)
+    return None
+
+
+def register_exception_handlers(app: FastAPI) -> None:
+    """Register exception handlers for the application."""
+    @app.exception_handler(RateLimitExceeded)
+    async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
+        """Return 429 with Retry-After header when rate limit exceeded."""
+        return JSONResponse(
+            status_code=429,
+            content={"detail": "Rate limit exceeded. Please try again later."},
+            headers={"Retry-After": str(exc.retry_after)},
+        )
+
+    @app.exception_handler(Exception)
+    async def global_exception_handler(request: Request, exc: Exception):
+        """Catch-all handler that hides internals in production."""
+        if settings.debug:
+            # In debug mode, return full detail for developer convenience
+            return JSONResponse(
+                status_code=500,
+                content={"detail": str(exc)},
+            )
+        # Log the real error server-side, return a generic message to the client
+        _logger.error(f"Unhandled exception on {request.method} {request.url.path}: {exc}", exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "Internal server error"},
+        )
+
+
+def register_middleware(app: FastAPI) -> None:
+    """Register all middleware for the application.
+
+    Order matters - middleware is executed in reverse order of registration.
+    The outermost middleware (registered first) sees the request first.
+    """
+    # Rate limiting (Phase 58-03 H-1)
+    app.state.limiter = limiter
+    app.add_middleware(SlowAPIMiddleware)
+
+    # CORS (Phase 58-03 H-2) — restricted to configured origins
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_origins,
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type"],
+    )
+
+    # Security headers (Phase 58-03 H-6, H-7)
+    @app.middleware("http")
+    async def add_security_headers(request: Request, call_next):
+        """Add standard security headers to every response."""
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        if not settings.debug:
+            response.headers["Strict-Transport-Security"] = (
+                "max-age=31536000; includeSubDomains"
+            )
+        return response
+
+    # Global authentication enforcement (Phase 58-03 C-1)
+    @app.middleware("http")
+    async def enforce_authentication(request: Request, call_next):
+        """Global auth enforcement -- all /api/ routes require auth unless whitelisted."""
+        path = request.url.path
+
+        # Skip non-API routes and public paths
+        if (
+            path in _PUBLIC_PATHS
+            or path.startswith(_PUBLIC_PREFIXES)
+            or not path.startswith("/api/")
+        ):
+            return await call_next(request)
+
+        # In demo mode, allow localhost without credentials
+        if settings.demo_mode:
+            source_ip = _extract_ip_address(request)
+            # Also treat unknown/missing client as local (e.g. test clients)
+            if source_ip in _LOCALHOST_IPS or source_ip == "unknown":
+                # Try real auth first; fall back to demo context
+                auth_ctx = await _authenticate_request(request)
+                request.state.auth = auth_ctx  # may be None (endpoints handle via Depends)
+                return await call_next(request)
+            # Non-localhost in demo mode: require real auth
+            auth_ctx = await _authenticate_request(request)
+            if auth_ctx is None:
+                return JSONResponse(
+                    status_code=403,
+                    content={"detail": "Demo mode is only available from localhost"},
+                )
+            request.state.auth = auth_ctx
+            return await call_next(request)
+
+        # Production / non-demo: require real authentication
+        auth_ctx = await _authenticate_request(request)
+        if auth_ctx is None:
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "Authentication required"},
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        if auth_ctx.role.value == "admin":
+            source_ip = _extract_ip_address(request)
+            admin_limit_response = _check_admin_rate_limit(source_ip)
+            if admin_limit_response is not None:
+                return admin_limit_response
+
+        request.state.auth = auth_ctx
+        return await call_next(request)
+
+    # Security logging middleware (Phase 63 - FSR compliance)
+    # SecurityLoggingMiddleware runs first (outermost), captures all security events
+    app.add_middleware(SecurityLoggingMiddleware)
+
+    # Audit middleware (existing - captures device control actions)
+    app.add_middleware(AuditMiddleware)
