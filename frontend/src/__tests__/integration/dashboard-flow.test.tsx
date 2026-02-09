@@ -24,6 +24,12 @@ vi.mock('../../lib/api', () => ({
       critical: 40,
     }),
   },
+  isExpectedApiError: vi.fn((error: unknown) => {
+    const maybeError = error as { status?: number; message?: string } | null;
+    if (maybeError?.status === 401 || maybeError?.status === 429) return true;
+    const message = (maybeError?.message || "").toLowerCase();
+    return message.includes("status 401") || message.includes("status 429");
+  }),
 }));
 
 describe('Dashboard Integration Flow', () => {
