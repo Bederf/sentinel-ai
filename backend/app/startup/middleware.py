@@ -39,7 +39,7 @@ _PUBLIC_PATHS = {
 }
 _PUBLIC_PREFIXES = (
     "/api/clawd-webhooks",  # Telegram bot callbacks (authenticated via webhook secret)
-    "/api/mcp-sse",  # MCP SSE transport (authenticated at MCP layer)
+    "/api/mcp/sse",  # MCP SSE transport (authenticated at MCP layer)
 )
 _LOCALHOST_IPS = {"127.0.0.1", "::1", "localhost", "testclient"}
 _ADMIN_RATE_LIMIT_PER_MINUTE = 30

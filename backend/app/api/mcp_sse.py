@@ -11,7 +11,7 @@ Features:
 
 Usage:
     # Claude connects via SSE to:
-    GET /api/mcp-sse
+    GET /api/mcp/sse
 
     # MCP messages sent as SSE events:
     event: message
@@ -35,7 +35,7 @@ SSE_COMMENT_INTERVAL_SECONDS = 5     # Send SSE comment every 5 seconds (proxy k
 SSE_CONNECTION_TIMEOUT_SECONDS = 300 # Close connection after 5 min of no traffic from client
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/mcp-sse", tags=["MCP-SSE"])
+router = APIRouter(prefix="/api/mcp/sse", tags=["MCP-SSE"])
 
 
 class MCPServerSSE:
