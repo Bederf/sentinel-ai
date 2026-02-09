@@ -1,0 +1,361 @@
+"""Profile management service for optimization profiles and site-level configuration.
+
+Handles loading, caching, and management of optimization profiles and site-specific
+profile configurations including zone and schedule overrides.
+"""
+
+import json
+import logging
+from pathlib import Path
+from typing import Dict, List, Optional, Any
+from datetime import datetime
+
+from backend.app.models.optimization import (
+    SiteProfileConfig,
+    ZoneProfileOverride,
+    ScheduleProfileOverride,
+    OptimizationProfile,
+)
+
+logger = logging.getLogger(__name__)
+
+
+class ProfileService:
+    """Service for managing optimization profiles and site configurations."""
+
+    def __init__(self):
+        """Initialize ProfileService and load profiles from JSON."""
+        self.profiles: Dict[str, Dict[str, Any]] = self._load_profiles()
+        self.site_configs: Dict[str, SiteProfileConfig] = {}  # Runtime cache
+
+    def _load_profiles(self) -> Dict[str, Dict[str, Any]]:
+        """Load optimization profiles from JSON file.
+
+        Returns:
+            Dictionary mapping profile IDs to profile definitions
+        """
+        profile_path = Path(__file__).parent.parent / "data" / "optimization_profiles.json"
+
+        if not profile_path.exists():
+            logger.warning(f"Optimization profiles file not found: {profile_path}")
+            return {}
+
+        try:
+            with open(profile_path, "r") as f:
+                data = json.load(f)
+                # Map profile names to IDs for consistent access
+                profiles = {}
+                for profile_id, profile_data in data.get("profiles", {}).items():
+                    profiles[profile_id] = profile_data
+                logger.info(f"Loaded {len(profiles)} optimization profiles")
+                return profiles
+        except Exception as e:
+            logger.error(f"Error loading optimization profiles: {e}")
+            return {}
+
+    def get_site_profile(self, site_id: str) -> Optional[Dict[str, Any]]:
+        """Get active profile for a site.
+
+        Returns the profile object that corresponds to the site's active profile setting.
+
+        Args:
+            site_id: Site identifier
+
+        Returns:
+            Profile dictionary or None if not found
+        """
+        config = self.load_site_profile_config(site_id)
+        if not config:
+            return None
+
+        return self.profiles.get(config.active_profile)
+
+    def get_zone_profile(
+        self, site_id: str, zone_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """Get profile for specific zone (handles overrides).
+
+        If a zone has an override, returns the override profile. Otherwise,
+        returns the site's active profile.
+
+        Args:
+            site_id: Site identifier
+            zone_id: Zone identifier
+
+        Returns:
+            Profile dictionary or None if not found
+        """
+        config = self.load_site_profile_config(site_id)
+        if not config:
+            return None
+
+        # Check for zone-specific override
+        for override in config.zone_overrides:
+            if override.zone_id == zone_id:
+                return self.profiles.get(override.profile)
+
+        # Fall back to site profile
+        return self.get_site_profile(site_id)
+
+    def get_profile_params(
+        self, profile: str, module: str
+    ) -> Dict[str, Any]:
+        """Get module-specific parameters for a profile.
+
+        Extracts parameters relevant to a specific module (e.g., hvac, lighting).
+
+        Args:
+            profile: Profile ID ("sweat_assets", "comfort", "cost")
+            module: Module name ("hvac", "lighting", "power")
+
+        Returns:
+            Dictionary of module-specific parameters
+        """
+        profile_data = self.profiles.get(profile, {})
+        if not profile_data:
+            return {}
+
+        # Extract weights that apply to this module
+        weights = profile_data.get("weights", {})
+        thresholds = profile_data.get("thresholds", {})
+
+        module_params = {
+            "weights": weights,
+            "thresholds": thresholds,
+        }
+
+        return module_params
+
+    def save_site_profile_config(
+        self, site_id: str, config: SiteProfileConfig
+    ) -> bool:
+        """Save profile configuration to building.json.
+
+        Persists the profile configuration to the building's JSON file.
+
+        Args:
+            site_id: Site identifier
+            config: SiteProfileConfig to save
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            building_path = (
+                Path(__file__).parent.parent
+                / "data"
+                / "buildings"
+                / site_id
+                / "building.json"
+            )
+
+            if not building_path.exists():
+                logger.warning(f"Building file not found: {building_path}")
+                return False
+
+            with open(building_path, "r") as f:
+                building_data = json.load(f)
+
+            # Update optimization section
+            building_data["optimization"] = config.to_dict()
+
+            with open(building_path, "w") as f:
+                json.dump(building_data, f, indent=2)
+
+            # Update runtime cache
+            self.site_configs[site_id] = config
+
+            logger.info(f"Saved profile config for site {site_id}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error saving profile config for {site_id}: {e}")
+            return False
+
+    def load_site_profile_config(self, site_id: str) -> Optional[SiteProfileConfig]:
+        """Load profile configuration from building.json.
+
+        Loads from cache if available, otherwise reads from file.
+
+        Args:
+            site_id: Site identifier
+
+        Returns:
+            SiteProfileConfig or None if not found
+        """
+        # Check cache first
+        if site_id in self.site_configs:
+            return self.site_configs[site_id]
+
+        try:
+            building_path = (
+                Path(__file__).parent.parent
+                / "data"
+                / "buildings"
+                / site_id
+                / "building.json"
+            )
+
+            if not building_path.exists():
+                logger.warning(f"Building file not found: {building_path}")
+                return None
+
+            with open(building_path, "r") as f:
+                building_data = json.load(f)
+
+            optimization_data = building_data.get("optimization", {})
+            if not optimization_data:
+                # Return default config if not present
+                config = SiteProfileConfig(
+                    site_id=site_id,
+                    active_profile="cost",
+                    control_tier="human_in_loop",
+                )
+                return config
+
+            config = SiteProfileConfig.from_dict(optimization_data)
+            config.site_id = site_id  # Ensure site_id is set
+
+            # Cache it
+            self.site_configs[site_id] = config
+
+            return config
+
+        except Exception as e:
+            logger.error(f"Error loading profile config for {site_id}: {e}")
+            return None
+
+    def list_profiles(self) -> List[Dict[str, Any]]:
+        """List all available optimization profiles.
+
+        Returns:
+            List of profile objects with metadata
+        """
+        profiles_list = []
+        for profile_id, profile_data in self.profiles.items():
+            profiles_list.append(
+                {
+                    "id": profile_id,
+                    "name": profile_data.get("name", profile_id),
+                    "description": profile_data.get("description", ""),
+                    "weights": profile_data.get("weights", {}),
+                }
+            )
+        return profiles_list
+
+    def update_zone_override(
+        self, site_id: str, zone_id: str, profile: str, reason: str
+    ) -> bool:
+        """Add or update a zone profile override.
+
+        Args:
+            site_id: Site identifier
+            zone_id: Zone identifier
+            profile: Profile ID to apply
+            reason: Reason for override
+
+        Returns:
+            True if successful, False otherwise
+        """
+        config = self.load_site_profile_config(site_id)
+        if not config:
+            return False
+
+        # Remove existing override for this zone if present
+        config.zone_overrides = [
+            zo for zo in config.zone_overrides if zo.zone_id != zone_id
+        ]
+
+        # Add new override
+        if profile:  # Only add if profile is not empty
+            config.zone_overrides.append(
+                ZoneProfileOverride(zone_id=zone_id, profile=profile, reason=reason)
+            )
+
+        return self.save_site_profile_config(site_id, config)
+
+    def remove_zone_override(self, site_id: str, zone_id: str) -> bool:
+        """Remove a zone profile override.
+
+        Args:
+            site_id: Site identifier
+            zone_id: Zone identifier
+
+        Returns:
+            True if successful, False otherwise
+        """
+        config = self.load_site_profile_config(site_id)
+        if not config:
+            return False
+
+        config.zone_overrides = [
+            zo for zo in config.zone_overrides if zo.zone_id != zone_id
+        ]
+
+        return self.save_site_profile_config(site_id, config)
+
+    def add_schedule_override(
+        self,
+        site_id: str,
+        day_of_week: str,
+        start_hour: int,
+        end_hour: int,
+        profile: str,
+        reason: str,
+    ) -> bool:
+        """Add a schedule-based profile override.
+
+        Args:
+            site_id: Site identifier
+            day_of_week: Day name ("monday" through "sunday")
+            start_hour: Start hour (0-23)
+            end_hour: End hour (0-23)
+            profile: Profile ID to apply
+            reason: Reason for override
+
+        Returns:
+            True if successful, False otherwise
+        """
+        config = self.load_site_profile_config(site_id)
+        if not config:
+            return False
+
+        config.schedule_overrides.append(
+            ScheduleProfileOverride(
+                day_of_week=day_of_week,
+                start_hour=start_hour,
+                end_hour=end_hour,
+                profile=profile,
+                reason=reason,
+            )
+        )
+
+        return self.save_site_profile_config(site_id, config)
+
+    def clear_cache(self, site_id: Optional[str] = None) -> None:
+        """Clear runtime cache.
+
+        Args:
+            site_id: Specific site to clear, or None to clear all
+        """
+        if site_id:
+            self.site_configs.pop(site_id, None)
+        else:
+            self.site_configs.clear()
+        logger.info(f"Cleared profile cache{f' for {site_id}' if site_id else ''}")
+
+
+# Singleton instance
+_profile_service: Optional[ProfileService] = None
+
+
+def get_profile_service() -> ProfileService:
+    """Get or create ProfileService singleton.
+
+    Returns:
+        ProfileService instance
+    """
+    global _profile_service
+    if _profile_service is None:
+        _profile_service = ProfileService()
+    return _profile_service

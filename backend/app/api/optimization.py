@@ -1312,3 +1312,244 @@ async def get_precooling_status(site_id: str) -> Dict[str, Any]:
             "site_id": site_id,
         }
     return existing
+
+
+# ============================================================================
+# Profile Management Endpoints (Phase 72)
+# ============================================================================
+
+from app.services.profile_service import get_profile_service
+from app.models.optimization import SiteProfileConfig
+
+
+class ProfileUpdateRequest(BaseModel):
+    """Request model for updating site profile configuration."""
+    active_profile: str
+    control_tier: str
+
+
+class ZoneOverrideRequest(BaseModel):
+    """Request model for zone profile override."""
+    zone_id: str
+    profile: str
+    reason: str
+
+
+@router.get("/optimization/profiles")
+async def list_profiles() -> Dict[str, Any]:
+    """
+    List all available optimization profiles.
+
+    Returns:
+        List of profiles with their names, descriptions, and weights
+    """
+    try:
+        profile_service = get_profile_service()
+        profiles = profile_service.list_profiles()
+        
+        return {
+            "success": True,
+            "profiles": profiles,
+            "count": len(profiles),
+        }
+    except Exception as e:
+        logger.error(f"Error listing profiles: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/optimization/settings/{site_id}")
+async def get_profile_settings(site_id: str) -> Dict[str, Any]:
+    """
+    Get site's current profile configuration.
+
+    Returns:
+        Site profile config with active profile, control tier, and overrides
+    """
+    try:
+        profile_service = get_profile_service()
+        config = profile_service.load_site_profile_config(site_id)
+        
+        if not config:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Profile config not found for site {site_id}"
+            )
+        
+        return {
+            "success": True,
+            "site_id": site_id,
+            "config": config.to_dict(),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting profile settings: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/optimization/settings/{site_id}")
+async def update_profile_settings(
+    site_id: str,
+    request: ProfileUpdateRequest
+) -> Dict[str, Any]:
+    """
+    Update site profile configuration.
+
+    Args:
+        site_id: Site identifier
+        request: Update request with active_profile and control_tier
+
+    Returns:
+        Updated configuration
+    """
+    try:
+        profile_service = get_profile_service()
+        
+        # Load current config
+        config = profile_service.load_site_profile_config(site_id)
+        if not config:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Profile config not found for site {site_id}"
+            )
+        
+        # Validate profile exists
+        available_profiles = [p["id"] for p in profile_service.list_profiles()]
+        if request.active_profile not in available_profiles:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid profile: {request.active_profile}. Available: {available_profiles}"
+            )
+        
+        # Validate control tier
+        valid_tiers = ["monitor", "human_in_loop", "auto_execute"]
+        if request.control_tier not in valid_tiers:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid control_tier: {request.control_tier}. Valid: {valid_tiers}"
+            )
+        
+        # Update config
+        config.active_profile = request.active_profile
+        config.control_tier = request.control_tier
+        
+        # Save
+        success = profile_service.save_site_profile_config(site_id, config)
+        if not success:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to save profile configuration"
+            )
+        
+        logger.info(f"Updated profile for site {site_id}: {request.active_profile} / {request.control_tier}")
+        
+        return {
+            "success": True,
+            "site_id": site_id,
+            "config": config.to_dict(),
+            "message": f"Profile updated to {request.active_profile} with {request.control_tier} control",
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating profile settings: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/optimization/settings/{site_id}/zone-override")
+async def add_zone_override(
+    site_id: str,
+    request: ZoneOverrideRequest
+) -> Dict[str, Any]:
+    """
+    Add or update a zone profile override.
+
+    Args:
+        site_id: Site identifier
+        request: Override request with zone_id, profile, reason
+
+    Returns:
+        Updated configuration
+    """
+    try:
+        profile_service = get_profile_service()
+        
+        # Validate profile exists
+        available_profiles = [p["id"] for p in profile_service.list_profiles()]
+        if request.profile not in available_profiles:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid profile: {request.profile}. Available: {available_profiles}"
+            )
+        
+        # Update override
+        success = profile_service.update_zone_override(
+            site_id=site_id,
+            zone_id=request.zone_id,
+            profile=request.profile,
+            reason=request.reason,
+        )
+        
+        if not success:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to save zone override"
+            )
+        
+        config = profile_service.load_site_profile_config(site_id)
+        
+        logger.info(f"Added zone override for {site_id}/{request.zone_id}: {request.profile}")
+        
+        return {
+            "success": True,
+            "site_id": site_id,
+            "config": config.to_dict(),
+            "message": f"Zone {request.zone_id} override set to {request.profile}",
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error adding zone override: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/optimization/settings/{site_id}/zone-override/{zone_id}")
+async def remove_zone_override(site_id: str, zone_id: str) -> Dict[str, Any]:
+    """
+    Remove a zone profile override.
+
+    Args:
+        site_id: Site identifier
+        zone_id: Zone identifier
+
+    Returns:
+        Updated configuration
+    """
+    try:
+        profile_service = get_profile_service()
+        
+        success = profile_service.remove_zone_override(site_id, zone_id)
+        if not success:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to remove zone override"
+            )
+        
+        config = profile_service.load_site_profile_config(site_id)
+        
+        logger.info(f"Removed zone override for {site_id}/{zone_id}")
+        
+        return {
+            "success": True,
+            "site_id": site_id,
+            "config": config.to_dict(),
+            "message": f"Zone {zone_id} override removed",
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error removing zone override: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

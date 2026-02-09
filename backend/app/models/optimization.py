@@ -11,6 +11,118 @@ from typing import List, Dict, Any, Optional
 import json
 
 
+class ControlTier(str, Enum):
+    """Control tier for automation level."""
+
+    MONITOR = "monitor"  # View-only, no recommendations
+    HUMAN_IN_LOOP = "human_in_loop"  # Recommendations require approval
+    AUTO_EXECUTE = "auto_execute"  # Automatic execution of recommendations
+
+
+class OptimizationProfile(str, Enum):
+    """Optimization profile types."""
+
+    SWEAT_ASSETS = "sweat_assets"  # Maximize equipment utilization
+    COMFORT = "comfort"  # Prioritize occupant comfort
+    COST = "cost"  # Minimize operational costs
+
+
+@dataclass
+class ZoneProfileOverride:
+    """Override profile for a specific zone."""
+
+    zone_id: str
+    profile: str  # "sweat_assets" | "comfort" | "cost"
+    reason: str
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "zone_id": self.zone_id,
+            "profile": self.profile,
+            "reason": self.reason,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ZoneProfileOverride":
+        """Create instance from dictionary."""
+        return cls(
+            zone_id=data.get("zone_id", ""),
+            profile=data.get("profile", "cost"),
+            reason=data.get("reason", ""),
+        )
+
+
+@dataclass
+class ScheduleProfileOverride:
+    """Override profile for a specific time schedule."""
+
+    day_of_week: str  # "monday" | "tuesday" | ... | "sunday"
+    start_hour: int  # 0-23
+    end_hour: int  # 0-23
+    profile: str  # "sweat_assets" | "comfort" | "cost"
+    reason: str
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "day_of_week": self.day_of_week,
+            "start_hour": self.start_hour,
+            "end_hour": self.end_hour,
+            "profile": self.profile,
+            "reason": self.reason,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ScheduleProfileOverride":
+        """Create instance from dictionary."""
+        return cls(
+            day_of_week=data.get("day_of_week", ""),
+            start_hour=data.get("start_hour", 0),
+            end_hour=data.get("end_hour", 23),
+            profile=data.get("profile", "cost"),
+            reason=data.get("reason", ""),
+        )
+
+
+@dataclass
+class SiteProfileConfig:
+    """Site-level profile configuration."""
+
+    site_id: str
+    active_profile: str  # "sweat_assets" | "comfort" | "cost"
+    control_tier: str  # "monitor" | "human_in_loop" | "auto_execute"
+    zone_overrides: List[ZoneProfileOverride] = field(default_factory=list)
+    schedule_overrides: List[ScheduleProfileOverride] = field(default_factory=list)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "site_id": self.site_id,
+            "active_profile": self.active_profile,
+            "control_tier": self.control_tier,
+            "zone_overrides": [zo.to_dict() for zo in self.zone_overrides],
+            "schedule_overrides": [so.to_dict() for so in self.schedule_overrides],
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "SiteProfileConfig":
+        """Create instance from dictionary."""
+        return cls(
+            site_id=data.get("site_id", ""),
+            active_profile=data.get("active_profile", "cost"),
+            control_tier=data.get("control_tier", "human_in_loop"),
+            zone_overrides=[
+                ZoneProfileOverride.from_dict(zo)
+                for zo in data.get("zone_overrides", [])
+            ],
+            schedule_overrides=[
+                ScheduleProfileOverride.from_dict(so)
+                for so in data.get("schedule_overrides", [])
+            ],
+        )
+
+
 class OptimizationStatus(str, Enum):
     """Optimization status for a building."""
 
