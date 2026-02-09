@@ -51,6 +51,12 @@ export {
   type ChecklistGenerateResponse,
   type ChecklistOemLookupResponse,
 } from './checklist';
+export {
+  optimizationApi,
+  type SiteProfileConfig,
+  type Recommendation,
+  type Outcome,
+} from './optimization';
 
 // Legacy: import everything from original api.ts for now
 // TODO: Gradually migrate to domain-specific imports as modules are created

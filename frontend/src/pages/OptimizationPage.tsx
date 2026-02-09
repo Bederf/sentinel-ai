@@ -24,11 +24,14 @@ import {
   Building2,
   ChevronDown,
 } from "lucide-react";
-import { Table, TableHead, TableRow, TableHeaderCell, TableBody, TableCell, Button } from "@tremor/react";
+import { Table, TableHead, TableRow, TableHeaderCell, TableBody, TableCell, Button, TabGroup, TabList, Tab, TabPanels, TabPanel } from "@tremor/react";
 import api from "../lib/api";
 import type { OptimizationScenario, OptimizationStatusResponse, Site } from "../lib/api";
 import { OptimizationPanel } from "../components/OptimizationPanel";
 import { PageLoading } from "../components/PageLoading";
+import { ProfileSettings } from "../components/optimization/ProfileSettings";
+import { RecommendationsDashboard } from "../components/optimization/RecommendationsDashboard";
+import { RecommendationHistory } from "../components/optimization/RecommendationHistory";
 
 // Sentinel-styled Badge component
 interface SentinelBadgeProps {
@@ -284,6 +287,14 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
 
   return (
     <div className="h-full overflow-y-auto p-4 md:p-6" style={{ background: "var(--color-sentinel-bg-canvas)" }}>
+      <TabGroup>
+        <TabList className="mb-6">
+          <Tab>Load Shedding</Tab>
+          <Tab>Profile-Based Optimization</Tab>
+        </TabList>
+
+        <TabPanels>
+          <TabPanel>
       {/* Main Optimization Panel - Hero Section */}
       <div className="mb-6">
         <div
@@ -748,6 +759,20 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
           </div>
         </div>
       )}
+          </TabPanel>
+
+          <TabPanel>
+            <div className="space-y-6">
+              <ProfileSettings
+                siteId={selectedSiteId}
+                onProfileChange={() => {}}
+              />
+              <RecommendationsDashboard siteId={selectedSiteId} />
+              <RecommendationHistory siteId={selectedSiteId} />
+            </div>
+          </TabPanel>
+        </TabPanels>
+      </TabGroup>
     </div>
   );
 }
