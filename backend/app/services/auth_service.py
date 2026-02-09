@@ -1,8 +1,9 @@
 """
 Authentication Service - User authentication and authorization
 
-Provides stub authentication for development/demo and an AuthorizationService
-for role-based access control in remote operations (Phase 59).
+Provides JWT-based authentication for production with demo fallback
+and an AuthorizationService for role-based access control in remote
+operations (Phase 59).
 """
 
 import logging
@@ -12,6 +13,7 @@ from fastapi import Header, HTTPException
 
 from app.models.user import User
 from app.models.remote_ops import AuthorizationLevel, COMMAND_AUTHORIZATION
+from app.middleware.auth_middleware import validate_jwt_token
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +24,9 @@ async def get_current_user(
     """
     Get the current authenticated user from request headers.
 
-    TODO: Implement proper JWT validation or API key authentication
+    Validates JWT tokens using the shared validate_jwt_token function
+    from auth_middleware. Supports Bearer token authentication with
+    proper signature verification and expiration checking.
 
     Args:
         authorization: Authorization header from request
@@ -33,10 +37,8 @@ async def get_current_user(
     Raises:
         HTTPException: If no valid authorization provided
     """
-    # For development, return a default user
-    # In production, this would validate JWT tokens or API keys
+    # No authorization header - return demo user for development
     if not authorization:
-        # Allow unauthenticated access for demo mode
         return User(
             id="demo-user",
             username="demo_technician",
@@ -44,21 +46,37 @@ async def get_current_user(
             role="technician"
         )
 
-    # Parse token (stub implementation)
+    # Parse Bearer token
     if authorization.startswith("Bearer "):
         token = authorization.replace("Bearer ", "")
-        # TODO: Validate JWT token
+
+        # Validate JWT token with signature verification and expiration check
+        payload = validate_jwt_token(token, required_token_type="access")
+
+        if payload is None:
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid or expired authentication token"
+            )
+
+        # Extract user information from validated token
+        user_id = payload.get("sub", "unknown")
+        email = payload.get("email", "")
+        role = payload.get("role", "technician")
+        full_name = payload.get("full_name", "")
+        username = full_name or email.split("@")[0] if email else user_id
+
         return User(
-            id="authenticated-user",
-            username="technician",
-            role="technician"
+            id=user_id,
+            username=username,
+            email=email,
+            role=role
         )
 
-    # API key authentication (stub)
-    return User(
-        id="api-key-user",
-        username="api_user",
-        role="technician"
+    # API key authentication (stub - not yet implemented)
+    raise HTTPException(
+        status_code=401,
+        detail="Invalid authorization header format"
     )
 
 
