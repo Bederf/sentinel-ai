@@ -117,7 +117,9 @@ Admin-only views for development and testing.
 
 ## Cross-Module Integrations
 
-When multiple modules are active, SENTINEL automatically creates cross-module intelligence:
+When multiple modules are active, SENTINEL automatically creates cross-module intelligence. For detailed information on integration patterns, emergent behaviors, and coordination examples, see [Module Connectivity & Cross-System Integration](module-connectivity.md).
+
+Summary of integrations:
 
 | Source | Target | Integration |
 |--------|--------|-------------|

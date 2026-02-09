@@ -486,8 +486,23 @@ Stored in `backend/app/data/modules/site_modules.json`:
 2. Verify module is generating recommendations
 3. Check recommendation filters (module, priority)
 
+## Auto-Integration Mechanism
+
+Cross-module links are created **automatically** when both source and target modules are activated:
+
+1. User activates a module via `POST /api/modules/activate`
+2. System scans `INTEGRATION_DEFINITIONS` for all links where this module is source or target
+3. If the other module is already active, creates a `CrossModuleLink` object automatically
+4. Stores link in `site_modules.json` and enables in production
+5. Link can be manually disabled via `POST /api/modules/site/{site}/integration/{link_id}/toggle`
+
+The `_create_integration_links()` method in `module_registry_service.py` handles this logic. For complete integration patterns and business value, see [Module Connectivity & Cross-System Integration](../02-architecture/module-connectivity.md).
+
 ## Related Documentation
 
+- [Module Connectivity & Cross-System Integration](../02-architecture/module-connectivity.md) - Business view of integrations and coordination patterns
+- [Module Integration API Reference](../03-api-reference/module-integration-api.md) - REST API for querying and managing integrations
+- [Adding Module Integrations (Developer Guide)](../12-development/adding-module-integrations.md) - How to implement new cross-module integrations
 - [Energy Centre Integration](../07-integrations/energy-centre.md)
 - [Generator SCADA](../07-integrations/generator-scada.md)
 - [Load Shedding Optimization](../14-south-africa-context/load-shedding-optimization.md)

@@ -4294,7 +4294,7 @@ MCP_TOOLS = [
                 "use_simulated": {
                     "type": "boolean",
                     "description": "Use simulated data if gateway unreachable (for testing)",
-                    "default": false
+                    "default": False
                 }
             },
             "required": ["building_id", "gateway_ip"]

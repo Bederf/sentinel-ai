@@ -1,0 +1,85 @@
+graph TB
+    %% Core modules (top row)
+    control["🎮 Control<br/>Device & Scene Control"]
+    assets["📊 Assets<br/>Lifecycle Management"]
+    simbiot["🔧 SIMBIOT<br/>Onboarding & Integration"]
+    integrations["🔗 Integrations<br/>BMS Connectivity"]
+    notifications["📢 Notifications<br/>Alert Delivery"]
+
+    %% Building systems (middle rows)
+    hvac["❄️ HVAC<br/>Temperature & Comfort"]
+    energy["⚡ Energy<br/>Power & Load Management"]
+    lighting["💡 Lighting<br/>DALI Control"]
+    security["🔐 Security<br/>Access & Occupancy"]
+    solar["☀️ Solar<br/>PV & BESS"]
+    fire["🔥 Fire<br/>Safety Systems"]
+    access["🚪 Access<br/>Door Control"]
+
+    %% Operations (bottom area)
+    sustainability["🌱 Sustainability<br/>ESG & Carbon"]
+    water["💧 Water<br/>Consumption"]
+    contracts["📝 Contracts<br/>Commercial Mgmt"]
+
+    %% Intelligence hub
+    ml["🤖 ML<br/>Fleet Learning"]
+    ai_optimizer["🧠 AI Optimizer<br/>Cross-System Analysis"]
+
+    %% Integration arrows with labels
+    energy -->|loadshed +2°C| hvac
+    energy -->|loadshed 50%| lighting
+    energy -->|demand response| hvac
+    
+    solar -->|generation| energy
+    solar -->|avoid gen| energy
+    
+    security -->|occupancy| hvac
+    security -->|occupancy| lighting
+    
+    ml -->|predictive| hvac
+    ml -->|anomaly| energy
+    
+    sustainability -->|carbon| energy
+    sustainability -->|green| solar
+    
+    water -->|monitoring| sustainability
+
+    %% AI/ML coordination hub (dashed)
+    ai_optimizer -.->|equipment category| hvac
+    ai_optimizer -.->|equipment category| lighting
+    ai_optimizer -.->|equipment category| energy
+    ai_optimizer -.->|equipment category| solar
+    ai_optimizer -.->|equipment category| security
+
+    %% Core dependencies (light)
+    simbiot -->|provides| hvac
+    simbiot -->|provides| energy
+    simbiot -->|provides| lighting
+    integrations -->|powers| simbiot
+    control -->|activates| hvac
+    notifications -->|alerts| security
+
+    %% Styling
+    classDef core fill:#e1f5ff,stroke:#01579b,stroke-width:2px,color:#000
+    classDef building fill:#c8e6c9,stroke:#1b5e20,stroke-width:2px,color:#000
+    classDef operations fill:#fff9c4,stroke:#f57f17,stroke-width:2px,color:#000
+    classDef intelligence fill:#f3e5f5,stroke:#4a148c,stroke-width:2px,color:#000
+    classDef aiHub fill:#ffe0b2,stroke:#e65100,stroke-width:3px,color:#000
+
+    class control,assets,simbiot,integrations,notifications core
+    class hvac,energy,lighting,security,solar,fire,access building
+    class sustainability,water,contracts operations
+    class ml intelligence
+    class ai_optimizer aiHub
+
+    %% Legend
+    subgraph Legend["📋 Legend"]
+        L1["➡️ Cross-Module Integration<br/>(auto-enabled when both modules active)"]
+        L2["⋯➡️ AI/ML Analysis Path<br/>(equipment categorization & coordination)"]
+        L3["Core Modules (Required)"]
+        L4["Building Systems (Paid Add-on)"]
+        L5["Operations (Paid Add-on)"]
+        L6["Intelligence (Paid Add-on)"]
+    end
+
+    classDef legend fill:#f5f5f5,stroke:#999,stroke-width:1px,color:#000
+    class Legend legend

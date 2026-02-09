@@ -27,11 +27,13 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 ### 🏗️ Architecture
 - [System Overview](02-architecture/system-overview.md) - High-level architecture
 - [Module System](02-architecture/module-system.md) - Bolt-on module architecture, activation, cross-module integrations
+- [Module Connectivity & Cross-System Integration](02-architecture/module-connectivity.md) - How modules interconnect, integration patterns, multi-module behaviors, upsell value
 - [Device Abstraction Layer](02-architecture/device-abstraction-layer.md) - Protocol-agnostic interface
 - [Naming Conventions](02-architecture/naming-conventions.md) - Device ID and point naming
 
 ### 📚 API Reference
 - [MCP Tools Reference](03-api-reference/mcp-tools-reference.md) - Model Context Protocol tools
+- [Module Integration API](03-api-reference/module-integration-api.md) - Query, activate, and monitor cross-module integrations
 - [Service Feedback API](03-api-reference/service-feedback-api.md) - Technician feedback collection with health scoring (Phase 41-01)
 - [Condition Monitoring API](03-api-reference/condition-api.md) - Trends, degradation, RUL, fleet risk (Phase 41-03)
 - [Time-Series API](03-api-reference/timeseries-api.md) - Sensor data write/query with InfluxDB (Phase 42-01)
