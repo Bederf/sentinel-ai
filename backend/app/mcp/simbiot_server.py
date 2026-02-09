@@ -2958,6 +2958,246 @@ async def import_controller_list_tool(
     }
 
 
+
+# ============================================================================
+# DALI Discovery Tool (Tridonic Gateway Support)
+# ============================================================================
+
+async def discover_tridonic_gateway_tool(
+    building_id: str,
+    gateway_ip: str,
+    gateway_type: str = "tridonic",
+    username: Optional[str] = None,
+    password: Optional[str] = None,
+    use_simulated: bool = False,
+) -> Dict[str, Any]:
+    """
+    Discover Tridonic DALI gateway and enumerate all devices.
+
+    MCP Tool: discover_tridonic_gateway
+
+    Queries the DALI gateway for system information and discovers all devices
+    across DALI lines. Generates equipment codes following v2.0 naming convention.
+
+    This is a READ-ONLY discovery tool - it does not write to the database.
+    Use the returned equipment_list with bulk_discover_equipment to fetch
+    full metadata and save to database.
+
+    Args:
+        building_id: Building/site ID (e.g., "site-002")
+        gateway_ip: IP address of DALI gateway (e.g., "192.168.10.50")
+        gateway_type: Gateway type - "tridonic", "philips", "helvar", "generic"
+        username: Optional HTTP Basic Auth username for gateway API
+        password: Optional HTTP Basic Auth password for gateway API
+        use_simulated: Use simulated data if gateway unreachable (for testing)
+
+    Returns:
+        Dictionary with:
+        - success: Boolean
+        - gateway: Gateway info (model, firmware, MAC, lines, device counts)
+        - total_devices: Total device count across all lines
+        - devices_by_line: Dict of line_number -> device_count
+        - equipment_list: Array of discovered devices with suggested equipment codes
+        - summary: Device counts by type (controller, luminaire, sensor)
+        - next_steps: Array of recommended next actions
+        - error: Error message (only if success=False)
+    """
+    from app.services.dali_discovery_service import DALIDiscoveryService
+
+    result = {
+        "success": False,
+        "building_id": building_id,
+        "gateway_ip": gateway_ip,
+        "gateway_type": gateway_type,
+        "gateway": None,
+        "total_devices": 0,
+        "devices_by_line": {},
+        "equipment_list": [],
+        "summary": {
+            "controllers": 0,
+            "luminaires": 0,
+            "sensors": 0,
+            "other": 0,
+        },
+        "next_steps": [],
+        "error": None,
+    }
+
+    # Extract site code from building_id (e.g., "site-002" -> "S002")
+    match = re.match(r'^site-(\d+)', building_id, re.IGNORECASE)
+    if match:
+        site_num = match.group(1).zfill(3)
+        site_code = f"S{site_num}"
+    else:
+        site_code = building_id[:3].upper() if len(building_id) >= 3 else building_id.upper()
+
+    try:
+        # Initialize discovery service
+        service = DALIDiscoveryService(
+            gateway_ip=gateway_ip,
+            gateway_type=gateway_type,
+            username=username,
+            password=password,
+            timeout=10.0
+        )
+
+        # Query gateway info
+        gateway_info = await service.get_gateway_info()
+
+        if not gateway_info or not gateway_info.online:
+            if use_simulated:
+                # Fall back to simulated data
+                result["gateway"] = {
+                    "ip_address": gateway_ip,
+                    "manufacturer": "Tridonic (Simulated)",
+                    "model": "Scenecom (Demo)",
+                    "firmware_version": "2.1.0",
+                    "dali_lines": 2,
+                    "total_devices": 24,
+                    "online": True,
+                    "simulated": True,
+                }
+                gateway_info = type('obj', (object,), {
+                    'dali_lines': 2,
+                    'online': True,
+                    'manufacturer': 'Tridonic',
+                    'model': 'Scenecom'
+                })()
+                # Generate simulated device list
+                simulated_devices = []
+                for line in range(1, 3):
+                    for addr in range(1, 13):  # 12 devices per line
+                        device_type = "led_panel" if addr <= 8 else "emergency"
+                        simulated_devices.append({
+                            "line": line,
+                            "address": addr,
+                            "device_type": 6 if device_type == "led_panel" else 1,
+                            "device_type_name": "LED Module" if device_type == "led_panel" else "Emergency",
+                        })
+            else:
+                result["error"] = f"DALI gateway at {gateway_ip} is offline or unreachable"
+                result["next_steps"] = [
+                    "Verify gateway IP address and network connectivity",
+                    "Check gateway power and Ethernet connection",
+                    "Try with use_simulated=true for testing",
+                ]
+                return result
+        else:
+            result["gateway"] = gateway_info.to_dict()
+
+        # Discover devices on each DALI line
+        all_devices = []
+        devices_by_type = {"controllers": 0, "luminaires": 0, "sensors": 0, "other": 0}
+        lum_seq = 0
+        sensor_seq = 0
+
+        for line in range(1, gateway_info.dali_lines + 1):
+            if use_simulated:
+                # Use pre-generated simulated list
+                line_devices = [d for d in simulated_devices if d["line"] == line]
+            else:
+                # Real discovery
+                line_devices = await service.discover_devices(dali_line=line)
+
+            result["devices_by_line"][line] = len(line_devices)
+
+            # Generate equipment codes for each device
+            for device_data in line_devices:
+                if use_simulated:
+                    device_type = device_data["device_type"]
+                    device_type_name = device_data["device_type_name"]
+                    dali_address = device_data["address"]
+                    dali_line = device_data["line"]
+                    gtin = None
+                    serial_number = None
+                    manufacturer = None
+                else:
+                    device_type = device_data.device_type
+                    device_type_name = device_data.device_type_name
+                    dali_address = device_data.dali_address
+                    dali_line = line
+                    gtin = device_data.gtin
+                    serial_number = device_data.serial_number
+                    manufacturer = device_data.manufacturer
+
+                # Classify device and generate equipment code
+                if "controller" in device_type_name.lower() or device_type == 0:
+                    equip_type = "DALI"
+                    category = "controllers"
+                    code = f"{site_code}-DALI-L{dali_line}-{dali_address:02d}"
+                elif "emergency" in device_type_name.lower() or device_type == 1:
+                    equip_type = "LUM"
+                    category = "luminaires"
+                    lum_seq += 1
+                    code = f"{site_code}-LUM-L{dali_line}-{lum_seq:03d}"
+                elif "sensor" in device_type_name.lower() or "pir" in device_type_name.lower():
+                    equip_type = "PIR"
+                    category = "sensors"
+                    sensor_seq += 1
+                    code = f"{site_code}-PIR-L{dali_line}-{sensor_seq:03d}"
+                else:
+                    # Default to luminaire for LED modules and others
+                    equip_type = "LUM"
+                    category = "luminaires"
+                    lum_seq += 1
+                    code = f"{site_code}-LUM-L{dali_line}-{lum_seq:03d}"
+
+                devices_by_type[category] += 1
+
+                equipment_entry = {
+                    "equipment_code": code,
+                    "equipment_type": equip_type,
+                    "device_type": device_type,
+                    "device_type_name": device_type_name,
+                    "dali_line": dali_line,
+                    "dali_address": dali_address,
+                    "category": category,
+                }
+
+                # Add GTIN/serial if available
+                if gtin:
+                    equipment_entry["gtin"] = gtin
+                if serial_number:
+                    equipment_entry["serial_number"] = serial_number
+                if manufacturer:
+                    equipment_entry["manufacturer"] = manufacturer
+
+                all_devices.append(equipment_entry)
+
+        # Update result
+        result["success"] = True
+        result["total_devices"] = len(all_devices)
+        result["equipment_list"] = all_devices
+        result["summary"] = devices_by_type
+
+        # Generate next steps
+        result["next_steps"] = [
+            f"Review {len(all_devices)} discovered devices and equipment codes",
+            f"Update building features: set dali=true in building.json",
+            f"Save gateway IP ({gateway_ip}) to building config",
+            f"Call bulk_discover with equipment_list to fetch full metadata",
+            f"Call add_building_zones with dali_zone mappings for cross-system coordination",
+            f"Register site with DALI service: register_niagara_site('{building_id}', gateway_ip)",
+        ]
+
+        logger.info(
+            f"Discovered DALI gateway at {gateway_ip}: "
+            f"{gateway_info.manufacturer} {gateway_info.model}, "
+            f"{len(all_devices)} devices across {gateway_info.dali_lines} lines"
+        )
+
+    except Exception as e:
+        logger.error(f"Error discovering DALI gateway: {e}")
+        result["error"] = str(e)
+        result["next_steps"] = [
+            "Check gateway IP address and network connectivity",
+            "Verify gateway API credentials if required",
+            "Check server logs for detailed error information",
+        ]
+
+    return result
+
+
 # ============================================================================
 # AI/ML Predictive Maintenance Tools (Asset Metric Configuration)
 # ============================================================================
@@ -4024,6 +4264,43 @@ MCP_TOOLS = [
         }
     },
     {
+        "name": "discover_tridonic_gateway",
+        "description": "Discover Tridonic DALI gateway and enumerate all lighting devices. Queries gateway for system info and discovers all luminaires, sensors, and controllers across DALI lines. Generates equipment codes following v2.0 naming convention. This is a READ-ONLY discovery tool for commissioning engineers to review before bulk import. Use during building onboarding when Tridonic DALI-2 lighting is present.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "building_id": {
+                    "type": "string",
+                    "description": "Building/site ID (e.g., 'site-002')"
+                },
+                "gateway_ip": {
+                    "type": "string",
+                    "description": "IP address of DALI gateway (e.g., '192.168.10.50')"
+                },
+                "gateway_type": {
+                    "type": "string",
+                    "enum": ["tridonic", "philips", "helvar", "generic"],
+                    "description": "DALI gateway manufacturer/type",
+                    "default": "tridonic"
+                },
+                "username": {
+                    "type": "string",
+                    "description": "Optional HTTP Basic Auth username for gateway API"
+                },
+                "password": {
+                    "type": "string",
+                    "description": "Optional HTTP Basic Auth password for gateway API"
+                },
+                "use_simulated": {
+                    "type": "boolean",
+                    "description": "Use simulated data if gateway unreachable (for testing)",
+                    "default": false
+                }
+            },
+            "required": ["building_id", "gateway_ip"]
+        }
+    },
+    {
         "name": "get_asset_metrics_template",
         "description": "Get asset metric templates for AI/ML predictive maintenance during building onboarding. Returns metric templates based on equipment types present in the building. Engineers can review and configure thresholds, weights, and data sources (BMS sensor, mobile phone, manual) before activation.",
         "input_schema": {
@@ -4399,6 +4676,7 @@ class SIMBIOTMCPServer:
             "add_building_devices": add_building_devices_tool,
             "import_point_list": import_point_list_tool,
             "import_controller_list": import_controller_list_tool,
+            "discover_tridonic_gateway": discover_tridonic_gateway_tool,
             # AI/ML Predictive Maintenance tools (asset metric configuration)
             "get_asset_metrics_template": get_asset_metrics_template_tool,
             "configure_asset_metrics": configure_asset_metrics_tool,

@@ -11,7 +11,6 @@ import logging
 import secrets
 import string
 from typing import Optional, Tuple, Dict, Any
-from datetime import datetime
 
 from app.database.repositories.mfa_repository import get_mfa_repository
 from app.models.auth import SentinelRole

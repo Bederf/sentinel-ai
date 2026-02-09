@@ -126,6 +126,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - [DALI-HVAC Integration](07-integrations/dali-hvac-integration.md) - Cross-system comfort diagnosis
 - [CAFM Schema](07-integrations/cafm-schema.md) - CAFM data model
 - [Energy Centre](07-integrations/energy-centre.md) - Generators, ATS, power metering, UPS
+- **[Tridonic DALI Discovery](07-integrations/tridonic-dali-discovery.md)** - Auto-discover DALI gateways and generate v2.0 equipment codes for bulk import (Phase 21-02)
 - **[Tridium Niagara Integration](07-integrations/tridium-niagara-integration.md)** - BACnet/IP, oBIX, AI point discovery for Niagara JACE/Supervisor
 - **[SIMBIOT Concept Connector](07-integrations/simbiot-concept-connector.md)** - MRI Evolution CAFM integration via FSI API (auto work orders, status polling, asset sync)
 - **[Asset Workflow Architecture](05-integrations/asset-workflow-architecture.md)** - SIMBIOT + Baseline + Inspection + ML integration (Phase 53-01)

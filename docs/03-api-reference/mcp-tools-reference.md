@@ -2,9 +2,9 @@
 title: "MCP Tools Reference (SIMBIOT)"
 type: "reference"
 status: "approved"
-version: "2.0.0"
+version: "2.1.0"
 created: "2026-01-30"
-updated: "2026-02-02"
+updated: "2026-02-09"
 author: "Sentinel Development Team"
 tags: ["mcp", "simbiot", "model-context-protocol", "tools"]
 related: ["../02-architecture/system-overview.md", "../08-ai-ml/claude-integration.md"]
@@ -16,18 +16,18 @@ estimated_read_time: 30
 
 # SIMBIOT MCP Server Tools Reference
 
-Complete reference for all 23 SIMBIOT MCP tools for building management.
+Complete reference for all 24 SIMBIOT MCP tools for building management.
 
 ## Overview
 
-SIMBIOT MCP Server provides **23 tools** across 4 categories for building management:
+SIMBIOT MCP Server provides **24 tools** across 4 categories for building management:
 
 ### Tool Categories
 
 | Category | Tools | Purpose |
 |----------|-------|---------|
 | **Core BMS** | 12 | Building data, device control, alarms, trends, work orders |
-| **Building Onboarding** | 9 | Create buildings, add zones/desks/devices, AI-assisted imports |
+| **Building Onboarding** | 10 | Create buildings, add zones/desks/devices, AI-assisted imports, DALI discovery |
 | **AI/ML Predictive Maintenance** | 2 | Asset metrics templates and configuration |
 
 ---
@@ -808,6 +808,141 @@ zone_id = extract_zone(point_name)  # "L12-N"
   "controllers": [...]
 }
 ```
+
+#### `discover_tridonic_gateway`
+**Discover Tridonic DALI lighting gateway and enumerate all devices (READ-ONLY).**
+
+Query Tridonic DALI-2 gateways to auto-discover all luminaires, sensors, and controllers. Generates v2.0-compliant equipment codes for bulk import. This tool does NOT write to the database - it returns data for commissioning engineer review.
+
+**Use Cases:**
+- Automate DALI inventory during onboarding (eliminates manual enumeration)
+- Generate equipment codes matching v2.0 naming convention
+- Capture Tridonic metadata (GTIN, serial numbers, lamp hours)
+- Prepare for cross-system coordination (DALI occupancy → HVAC optimization)
+
+**Parameters:**
+- `building_id` (string, required): Building/site ID (e.g., "site-002")
+- `gateway_ip` (string, required): IP address of DALI gateway (e.g., "192.168.10.50")
+- `gateway_type` (string, optional, default: "tridonic"): Gateway type - "tridonic", "philips", "helvar", "generic"
+- `username` (string, optional): HTTP Basic Auth username (if required)
+- `password` (string, optional): HTTP Basic Auth password (if required)
+- `use_simulated` (boolean, optional, default: false): Use simulated data if gateway offline (testing)
+
+**Equipment Code Generation:**
+
+The tool generates v2.0-compliant equipment codes:
+
+| Device Type | Format | Example |
+|------------|--------|---------|
+| **Controller** | `{site}-DALI-L{line}-{address:02d}` | `S002-DALI-L1-01` |
+| **Luminaire** | `{site}-LUM-L{line}-{seq:03d}` | `S002-LUM-L1-042` |
+| **Sensor/PIR** | `{site}-PIR-L{line}-{seq:03d}` | `S002-PIR-L1-001` |
+
+Site code extracted from building_id: `site-002` → `S002`
+
+**Returns (Success):**
+```json
+{
+  "success": true,
+  "building_id": "site-002",
+  "gateway_ip": "192.168.10.50",
+  "gateway": {
+    "ip_address": "192.168.10.50",
+    "manufacturer": "Tridonic",
+    "model": "Scenecom",
+    "firmware_version": "2.1.0",
+    "dali_lines": 2,
+    "total_devices": 22,
+    "online": true,
+    "last_poll": "2026-02-09T10:30:15.123456"
+  },
+  "total_devices": 22,
+  "devices_by_line": {
+    "1": 12,
+    "2": 10
+  },
+  "equipment_list": [
+    {
+      "equipment_code": "S002-DALI-L1-01",
+      "equipment_type": "DALI",
+      "device_type": 0,
+      "device_type_name": "Fluorescent",
+      "dali_line": 1,
+      "dali_address": 1,
+      "category": "controllers",
+      "manufacturer": "Tridonic",
+      "gtin": "04038382003821",
+      "serial_number": "TR-12345678"
+    },
+    {
+      "equipment_code": "S002-LUM-L1-001",
+      "equipment_type": "LUM",
+      "device_type": 6,
+      "device_type_name": "LED Module",
+      "dali_line": 1,
+      "dali_address": 2,
+      "category": "luminaires",
+      "manufacturer": "Philips",
+      "gtin": "07603186029401",
+      "serial_number": "PH-87654321"
+    }
+  ],
+  "summary": {
+    "controllers": 2,
+    "luminaires": 18,
+    "sensors": 2,
+    "other": 0
+  },
+  "next_steps": [
+    "Review 22 discovered devices and equipment codes",
+    "Update building features: set dali=true in building.json",
+    "Call bulk_discover_equipment with equipment_list to fetch full metadata",
+    "Call add_building_zones with DALI zone mappings for cross-system coordination"
+  ]
+}
+```
+
+**Returns (Error - Gateway Offline):**
+```json
+{
+  "success": false,
+  "building_id": "site-002",
+  "gateway_ip": "192.168.10.99",
+  "error": "DALI gateway at 192.168.10.99 is offline or unreachable",
+  "gateway": null,
+  "total_devices": 0,
+  "equipment_list": [],
+  "next_steps": [
+    "Verify gateway IP address and network connectivity",
+    "Check gateway power and Ethernet connection",
+    "Try with use_simulated=true for testing"
+  ]
+}
+```
+
+**Simulated Mode (Testing):**
+
+When gateway offline, use `use_simulated=true` to generate demo data:
+
+```bash
+curl -X POST http://localhost:9095/api/mcp/call-tool \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tool_name": "discover_tridonic_gateway",
+    "arguments": {
+      "building_id": "site-003",
+      "gateway_ip": "192.168.10.99",
+      "use_simulated": true
+    }
+  }'
+```
+
+Returns: 24 simulated devices (12 per DALI line), properly formatted equipment codes
+
+**Device Classification:**
+- **Controllers** (Type 0, name contains "controller"): Equipment type `DALI`
+- **Luminaires** (Types 1, 6): Equipment type `LUM`
+- **Sensors** (Name contains "sensor" or "pir"): Equipment type `PIR`
 
 ---
 

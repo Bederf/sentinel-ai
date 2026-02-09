@@ -1,12 +1,17 @@
 """Work Orders API endpoints."""
 
-from fastapi import APIRouter, Query, HTTPException
+from fastapi import APIRouter, Query, HTTPException, Depends, Request
 from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional, List
 import uuid
+import logging
 
 from app.services.csv_loader import WorkOrderData, AssetData
+from app.middleware.auth_middleware import require_auth
+from app.models.auth import AuthLevel, AuthContext
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -322,12 +327,19 @@ class TechnicianWorkOrderResponse(BaseModel):
 
 
 @router.post("/work-orders/technician", response_model=TechnicianWorkOrderResponse)
-async def create_technician_work_order(order: TechnicianWorkOrderCreate):
+async def create_technician_work_order(
+    order: TechnicianWorkOrderCreate,
+    auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED))
+):
     """
     Create work order from technician chat.
 
     Creates a draft work order that can be reviewed and submitted.
+    Requires authentication (AUTHENTICATED or higher).
     """
+    from app.database.repositories.work_order_repository import get_work_order_repository
+    from app.database.repositories.audit_repository import AuditRepository
+
     work_order_id = f"TWO-{datetime.now().strftime('%Y%m%d')}-{str(uuid.uuid4())[:8].upper()}"
 
     work_order = {
@@ -347,11 +359,28 @@ async def create_technician_work_order(order: TechnicianWorkOrderCreate):
         "resolution": None,
         "parts_used": [],
         "time_spent": None,
+        "source": "technician",  # Distinguish from other work orders
     }
 
-    _technician_work_orders[work_order_id] = work_order
+    # Store in database
+    try:
+        repo = get_work_order_repository()
+        created = await repo.create_work_order(work_order)
 
-    return work_order
+        # Log audit event
+        audit_repo = AuditRepository()
+        audit_repo.create({
+            'action': 'WORK_ORDER_CREATED',
+            'user_id': auth.user_id,
+            'details': {'work_order_id': work_order_id, 'equipment_id': order.equipment_id},
+            'result': 'SUCCESS'
+        })
+
+        logger.info(f"Created technician work order {work_order_id} by user {auth.user_id}")
+        return work_order
+    except Exception as e:
+        logger.error(f"Failed to create technician work order: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create work order")
 
 
 @router.get("/work-orders/technician", response_model=List[TechnicianWorkOrderResponse])
@@ -359,25 +388,35 @@ async def get_technician_work_orders(
     site_id: Optional[str] = Query(None, description="Filter by site ID"),
     status: Optional[str] = Query(None, description="Filter by status"),
     technician_id: Optional[str] = Query(None, description="Filter by technician"),
+    auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED))
 ):
     """
     Get technician work orders with optional filters.
 
     Returns work orders created from technician chat interface.
+    Requires authentication (AUTHENTICATED or higher).
     """
-    work_orders = list(_technician_work_orders.values())
+    from app.database.repositories.work_order_repository import get_work_order_repository
 
-    if site_id:
-        work_orders = [wo for wo in work_orders if wo["site_id"] == site_id]
-    if status:
-        work_orders = [wo for wo in work_orders if wo["status"] == status]
-    if technician_id:
-        work_orders = [wo for wo in work_orders if wo.get("technician_id") == technician_id]
+    try:
+        repo = get_work_order_repository()
+        # Retrieve only technician-sourced work orders
+        work_orders = await repo.get_work_orders_by_source("technician")
 
-    # Sort by created_at descending
-    work_orders.sort(key=lambda x: x["created_at"], reverse=True)
+        if site_id:
+            work_orders = [wo for wo in work_orders if wo.get("site_id") == site_id]
+        if status:
+            work_orders = [wo for wo in work_orders if wo.get("status") == status]
+        if technician_id:
+            work_orders = [wo for wo in work_orders if wo.get("technician_id") == technician_id]
 
-    return work_orders
+        # Sort by created_at descending
+        work_orders.sort(key=lambda x: x.get("created_at") or datetime.now(), reverse=True)
+
+        return work_orders
+    except Exception as e:
+        logger.error(f"Failed to get technician work orders: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve work orders")
 
 
 @router.get("/work-orders/technician/{work_order_id}", response_model=TechnicianWorkOrderResponse)
@@ -390,31 +429,59 @@ async def get_technician_work_order(work_order_id: str):
 
 
 @router.put("/work-orders/technician/{work_order_id}", response_model=TechnicianWorkOrderResponse)
-async def update_technician_work_order(work_order_id: str, update: TechnicianWorkOrderUpdate):
+async def update_technician_work_order(
+    work_order_id: str,
+    update: TechnicianWorkOrderUpdate,
+    auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED))
+):
     """
     Update technician work order.
 
     Can update diagnosis, notes, parts, status, or duration.
+    Requires authentication (AUTHENTICATED or higher).
     """
-    if work_order_id not in _technician_work_orders:
-        raise HTTPException(status_code=404, detail="Work order not found")
+    from app.database.repositories.work_order_repository import get_work_order_repository
+    from app.database.repositories.audit_repository import AuditRepository
 
-    work_order = _technician_work_orders[work_order_id]
+    try:
+        repo = get_work_order_repository()
+        work_order = await repo.get_work_order_by_id(work_order_id)
 
-    if update.diagnosis is not None:
-        work_order["diagnosis"] = update.diagnosis
-    if update.technician_notes is not None:
-        work_order["technician_notes"] = update.technician_notes
-    if update.parts_needed is not None:
-        work_order["parts_needed"] = update.parts_needed
-    if update.status is not None:
-        work_order["status"] = update.status
-    if update.estimated_duration is not None:
-        work_order["estimated_duration"] = update.estimated_duration
+        if not work_order:
+            raise HTTPException(status_code=404, detail="Work order not found")
 
-    work_order["updated_at"] = datetime.now()
+        # Build update payload
+        update_data = {}
+        if update.diagnosis is not None:
+            update_data["diagnosis"] = update.diagnosis
+        if update.technician_notes is not None:
+            update_data["technician_notes"] = update.technician_notes
+        if update.parts_needed is not None:
+            update_data["parts_needed"] = update.parts_needed
+        if update.status is not None:
+            update_data["status"] = update.status
+        if update.estimated_duration is not None:
+            update_data["estimated_duration"] = update.estimated_duration
 
-    return work_order
+        # Update in database
+        updated = await repo.update_work_order(work_order_id, update_data)
+
+        # Log audit event
+        audit_repo = AuditRepository()
+        audit_repo.create({
+            'action': 'WORK_ORDER_UPDATED',
+            'user_id': auth.user_id,
+            'details': {'work_order_id': work_order_id, 'changes': update_data},
+            'result': 'SUCCESS'
+        })
+
+        logger.info(f"Updated technician work order {work_order_id} by user {auth.user_id}")
+        return updated
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to update technician work order: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to update work order")
 
 
 @router.post("/work-orders/technician/{work_order_id}/complete", response_model=TechnicianWorkOrderResponse)
@@ -534,6 +601,12 @@ async def get_technician_for_equipment(equipment_code: str):
 
     Looks up the site assignment based on equipment type → specialty mapping.
     Used by Clawd bot to determine who to email for a work order.
+
+    UNAUTHENTICATED - Accepted risk: Clawd bot integration requires external
+    webhook access without auth. Technician data exposure is acceptable for
+    operations (names, emails, phones are already in technician_repository).
+    Used only for work order routing, not for administrative actions.
+    See 65-04 for security rationale.
     """
     from app.database.repositories.technician_repository import get_technician_repository
 
@@ -555,72 +628,133 @@ async def get_technician_for_equipment(equipment_code: str):
 
 
 @router.post("/work-orders/supabase", response_model=SupabaseWorkOrderResponse)
-async def create_supabase_work_order(work_order: SupabaseWorkOrderCreate):
+async def create_supabase_work_order(
+    work_order: SupabaseWorkOrderCreate,
+    auth: AuthContext = Depends(require_auth(AuthLevel.OPERATOR))
+):
     """
     Create a work order in Supabase, linked to equipment.
 
     Automatically looks up and assigns the technician for the equipment.
-    Used by Clawd bot when creating work orders.
+    Requires authentication (OPERATOR or higher).
     """
     from app.database.repositories.work_order_repository import get_work_order_repository
     from app.database.repositories.technician_repository import get_technician_repository
+    from app.database.repositories.audit_repository import AuditRepository
 
-    wo_repo = get_work_order_repository()
-    tech_repo = get_technician_repository()
+    try:
+        wo_repo = get_work_order_repository()
+        tech_repo = get_technician_repository()
 
-    # Get technician for this equipment
-    tech = await tech_repo.get_technician_for_equipment_code(work_order.equipment_code)
+        # Get technician for this equipment
+        tech = await tech_repo.get_technician_for_equipment_code(work_order.equipment_code)
 
-    # Create work order payload
-    wo_data = {
-        "equipment_code": work_order.equipment_code,
-        "title": work_order.title,
-        "description": work_order.description,
-        "priority": work_order.priority,
-        "scheduled_date": work_order.scheduled_date,
-        "estimated_duration_hours": work_order.estimated_duration_hours,
-        "created_by": work_order.created_by,
-        "status": "scheduled",
-    }
+        # Create work order payload
+        wo_data = {
+            "equipment_code": work_order.equipment_code,
+            "title": work_order.title,
+            "description": work_order.description,
+            "priority": work_order.priority,
+            "scheduled_date": work_order.scheduled_date,
+            "estimated_duration_hours": work_order.estimated_duration_hours,
+            "created_by": work_order.created_by or auth.user_id,
+            "status": "scheduled",
+        }
 
-    # Assign technician if found
-    if tech:
-        wo_data["assigned_to"] = tech.get("name")
-        wo_data["assigned_team"] = tech.get("specialty")
+        # Assign technician if found
+        if tech:
+            wo_data["assigned_to"] = tech.get("name")
+            wo_data["assigned_team"] = tech.get("specialty")
 
-    # Create in Supabase
-    created = await wo_repo.create_work_order(wo_data)
+        # Create in Supabase
+        created = await wo_repo.create_work_order(wo_data)
 
-    if not created:
-        raise HTTPException(status_code=500, detail="Failed to create work order in Supabase")
+        if not created:
+            raise HTTPException(status_code=500, detail="Failed to create work order in Supabase")
 
-    return SupabaseWorkOrderResponse(
-        id=created.get("id"),
-        code=created.get("code"),
-        equipment_code=work_order.equipment_code,
-        title=created.get("title"),
-        priority=created.get("priority"),
-        status=created.get("status"),
-        assigned_to=created.get("assigned_to"),
-        technician_email=tech.get("email") if tech else None,
-        technician_phone=tech.get("phone") if tech else None,
-        technician_telegram_id=tech.get("telegram_id") if tech else None,
-        created_at=created.get("created_at")
-    )
+        # Log audit event
+        audit_repo = AuditRepository()
+        audit_repo.create({
+            'action': 'WORK_ORDER_CREATED',
+            'user_id': auth.user_id,
+            'details': {'work_order_id': created.get("id"), 'equipment_code': work_order.equipment_code},
+            'result': 'SUCCESS'
+        })
+
+        logger.info(f"Created Supabase work order {created.get('code')} by user {auth.user_id}")
+
+        return SupabaseWorkOrderResponse(
+            id=created.get("id"),
+            code=created.get("code"),
+            equipment_code=work_order.equipment_code,
+            title=created.get("title"),
+            priority=created.get("priority"),
+            status=created.get("status"),
+            assigned_to=created.get("assigned_to"),
+            technician_email=tech.get("email") if tech else None,
+            technician_phone=tech.get("phone") if tech else None,
+            technician_telegram_id=tech.get("telegram_id") if tech else None,
+            created_at=created.get("created_at")
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to create Supabase work order: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create work order")
+
+
+@router.get("/work-orders/supabase", response_model=List[dict])
+async def list_supabase_work_orders(
+    status: Optional[str] = Query(None, description="Filter by status"),
+    priority: Optional[str] = Query(None, description="Filter by priority"),
+    limit: int = Query(50, description="Maximum number of results"),
+    auth: AuthContext = Depends(require_auth(AuthLevel.OPERATOR))
+):
+    """List work orders from Supabase with optional filters.
+
+    Requires authentication (OPERATOR or higher).
+    """
+    from app.database.repositories.work_order_repository import get_work_order_repository
+
+    try:
+        repo = get_work_order_repository()
+        work_orders = await repo.get_all_work_orders(limit=limit)
+
+        if status:
+            work_orders = [wo for wo in work_orders if wo.get("status") == status]
+        if priority:
+            work_orders = [wo for wo in work_orders if wo.get("priority") == priority]
+
+        return work_orders
+    except Exception as e:
+        logger.error(f"Failed to list Supabase work orders: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve work orders")
 
 
 @router.get("/work-orders/supabase/{code}")
-async def get_supabase_work_order(code: str):
-    """Get a work order from Supabase by its code."""
+async def get_supabase_work_order(
+    code: str,
+    auth: AuthContext = Depends(require_auth(AuthLevel.OPERATOR))
+):
+    """Get a work order from Supabase by its code.
+
+    Requires authentication (OPERATOR or higher).
+    """
     from app.database.repositories.work_order_repository import get_work_order_repository
 
-    repo = get_work_order_repository()
-    wo = await repo.get_work_order_by_code(code)
+    try:
+        repo = get_work_order_repository()
+        wo = await repo.get_work_order_by_code(code)
 
-    if not wo:
-        raise HTTPException(status_code=404, detail="Work order not found")
+        if not wo:
+            raise HTTPException(status_code=404, detail="Work order not found")
 
-    return wo
+        return wo
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get Supabase work order: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve work order")
 
 
 @router.get("/work-orders/equipment-info/{equipment_code}")
@@ -644,6 +778,12 @@ async def get_equipment_info_for_technician(equipment_code: str):
 
     Returns:
         Equipment details formatted for technician reference
+
+    UNAUTHENTICATED - Accepted risk: Clawd bot integration requires external
+    webhook access without auth. Equipment metadata is acceptable for operations
+    (manufacturer, model, serial are on the device itself). No sensitive control
+    parameters or credentials exposed. Used only for technician information lookups.
+    See 65-04 for security rationale.
     """
     from app.database.repositories.equipment_metadata_repository import EquipmentMetadataRepository
     from app.database.supabase_client import get_supabase_client
