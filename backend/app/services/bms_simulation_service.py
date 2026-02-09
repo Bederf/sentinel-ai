@@ -57,6 +57,7 @@ class BMSimulationService:
         self.config = {
             "site_id": "site-002",  # Only simulate equipment for Sandton
             "site_name": "Sandton City Office Tower",
+            "demand_sites": ["site-002", "site-004"],
             "use_supabase_equipment": True,  # Load real equipment from Supabase
             "enable_faults": True,
             "enable_sensor_drift": True,
@@ -77,6 +78,10 @@ class BMSimulationService:
                 "flow_sensor": 8
             }
         }
+
+        # Track demand history seeding (one row per day per site)
+        self._demand_seed_dates: Dict[str, str] = {}
+        self._billing_seed_months: Dict[str, str] = {}
 
     async def start_simulation(self):
         """Start the BMS simulation"""
@@ -375,6 +380,10 @@ class BMSimulationService:
                 if self.config["enable_faults"]:
                     await self._apply_faults()
 
+                # Seed municipal demand history (daily) for demo sites
+                await self._seed_municipal_demand_history()
+                await self._seed_municipal_billing_demo()
+
                 # Wait for next update
                 await asyncio.sleep(self.config["update_interval"] / self.simulation_speed)
 
@@ -427,6 +436,204 @@ class BMSimulationService:
 
             # Update timestamp
             equipment.timestamp = current_time
+
+    async def _seed_municipal_demand_history(self):
+        """Seed daily municipal demand history into Supabase for demo sites."""
+        try:
+            from app.database.supabase_client import get_supabase_client
+            client = get_supabase_client()
+        except Exception as exc:
+            logger.info("Supabase unavailable for municipal demand seeding: %s", exc)
+            return
+
+        today = datetime.now().date().isoformat()
+        for site_id in self.config.get("demand_sites", []):
+            last_seeded = self._demand_seed_dates.get(site_id)
+            if last_seeded == today:
+                continue
+
+            base_kw = 450.0 if site_id == "site-002" else 320.0
+            variance = random.uniform(-40, 40) if site_id == "site-002" else random.uniform(-30, 30)
+            peak_kw = round(base_kw + variance, 2)
+            peak_kva = round(peak_kw * 1.05, 2)
+            peak_time = datetime.now().replace(hour=18, minute=0) + timedelta(minutes=random.randint(0, 120))
+            meter_id = "S002-MTR-E-MAIN" if site_id == "site-002" else "S004-MTR-E-MAIN"
+
+            payload = {
+                "site_id": site_id,
+                "meter_id": meter_id,
+                "date": today,
+                "peak_demand_kw": peak_kw,
+                "peak_demand_kva": peak_kva,
+                "peak_timestamp": peak_time.isoformat(),
+            }
+
+            try:
+                client.table("municipal_demand_history").insert(payload).execute()
+                self._demand_seed_dates[site_id] = today
+            except Exception as exc:
+                logger.info("Municipal demand seed failed for %s: %s", site_id, exc)
+
+    async def _seed_municipal_billing_demo(self):
+        """Seed municipal tariff schedules and monthly invoices for demo sites."""
+        try:
+            from app.database.supabase_client import get_supabase_client
+            client = get_supabase_client()
+        except Exception as exc:
+            logger.info("Supabase unavailable for municipal billing seeding: %s", exc)
+            return
+
+        today = datetime.now().date()
+        month_key = today.strftime("%Y-%m")
+
+        municipality_by_region = {
+            "Gauteng": {"municipality": "City Power Johannesburg", "tariff": "TOU Commercial"},
+            "Western Cape": {"municipality": "City of Cape Town", "tariff": "Commercial TOU"},
+            "KwaZulu-Natal": {"municipality": "eThekwini", "tariff": "Commercial TOU"},
+            "Eastern Cape": {"municipality": "Nelson Mandela Bay", "tariff": "Commercial TOU"},
+            "Free State": {"municipality": "Mangaung", "tariff": "Commercial TOU"},
+            "Limpopo": {"municipality": "Polokwane", "tariff": "Commercial TOU"},
+            "Mpumalanga": {"municipality": "Mbombela", "tariff": "Commercial TOU"},
+            "North West": {"municipality": "Rustenburg", "tariff": "Commercial TOU"},
+            "Northern Cape": {"municipality": "Sol Plaatje", "tariff": "Commercial TOU"},
+        }
+
+        tariff_data = {}
+        try:
+            tariff_path = Path(__file__).parent.parent / "data" / "solar" / "tariffs" / "city_power_2026.json"
+            if tariff_path.exists():
+                with open(tariff_path, "r") as f:
+                    tariff_data = json.load(f)
+        except Exception as exc:
+            logger.info("Failed loading tariff JSON: %s", exc)
+
+        # Upsert tariff schedule for current year (City Power demo)
+        try:
+            client.table("municipal_tariff_schedules").upsert({
+                "municipality": "City Power Johannesburg",
+                "tariff_name": "TOU Commercial",
+                "utility_type": "electricity",
+                "effective_date": f"{today.year}-01-01",
+                "tariff_data": tariff_data,
+                "nersa_approved": True,
+                "source_url": "demo",
+                "notes": "Simulated tariff schedule for demo",
+            }).execute()
+        except Exception as exc:
+            logger.info("Tariff schedule seed failed: %s", exc)
+
+        for site_id in self.config.get("demand_sites", []):
+            if self._billing_seed_months.get(site_id) == month_key:
+                continue
+
+            meter_id = "S002-MTR-E-MAIN" if site_id == "site-002" else "S004-MTR-E-MAIN"
+
+            # Resolve region/province from buildings table
+            region = "Gauteng"
+            try:
+                building_resp = (
+                    client.table("buildings")
+                    .select("region")
+                    .eq("code", site_id)
+                    .limit(1)
+                    .execute()
+                )
+                if building_resp.data:
+                    region = building_resp.data[0].get("region") or region
+            except Exception as exc:
+                logger.info("Failed to resolve region for %s: %s", site_id, exc)
+
+            municipality_info = municipality_by_region.get(region, municipality_by_region["Gauteng"])
+            municipality = municipality_info["municipality"]
+            tariff_name = municipality_info["tariff"]
+            account_number = f"{municipality[:2].upper()}-{site_id.replace('site-', '')}-00001"
+
+            # Ensure municipal account exists
+            try:
+                account_result = (
+                    client.table("municipal_accounts")
+                    .select("id")
+                    .eq("site_id", site_id)
+                    .eq("municipality", municipality)
+                    .eq("utility_type", "electricity")
+                    .eq("account_number", account_number)
+                    .limit(1)
+                    .execute()
+                )
+                if account_result.data:
+                    account_id = account_result.data[0]["id"]
+                else:
+                    created = client.table("municipal_accounts").insert({
+                        "site_id": site_id,
+                        "municipality": municipality,
+                        "utility_type": "electricity",
+                        "account_number": account_number,
+                        "tariff_type": tariff_name,
+                        "main_meter_id": meter_id,
+                    }).execute()
+                    account_id = created.data[0]["id"] if created.data else None
+            except Exception as exc:
+                logger.info("Municipal account seed failed for %s: %s", site_id, exc)
+                continue
+
+            if not account_id:
+                continue
+
+            # Avoid duplicate monthly invoices
+            invoice_number = f"SIM-{site_id.upper()}-{today.strftime('%Y%m')}"
+            try:
+                existing = (
+                    client.table("municipal_invoices")
+                    .select("id")
+                    .eq("municipal_account_id", account_id)
+                    .eq("invoice_number", invoice_number)
+                    .limit(1)
+                    .execute()
+                )
+                if existing.data:
+                    self._billing_seed_months[site_id] = month_key
+                    continue
+            except Exception as exc:
+                logger.info("Invoice lookup failed for %s: %s", site_id, exc)
+                continue
+
+            # Simple simulated billing values
+            base_kwh = 15000 if site_id == "site-002" else 9500
+            variance = random.uniform(-800, 800)
+            billed_kwh = round(base_kwh + variance, 2)
+            energy_charge = round(billed_kwh * 2.5, 2)
+            service_charge = 4500.0 if site_id == "site-002" else 3200.0
+            subtotal = energy_charge + service_charge
+            vat = round(subtotal * 0.15, 2)
+            total = round(subtotal + vat, 2)
+
+            payload = {
+                "municipal_account_id": account_id,
+                "site_id": site_id,
+                "municipality": municipality,
+                "utility_type": "electricity",
+                "invoice_number": invoice_number,
+                "invoice_date": today.isoformat(),
+                "due_date": (today + timedelta(days=14)).isoformat(),
+                "billing_period_start": today.replace(day=1).isoformat(),
+                "billing_period_end": today.isoformat(),
+                "consumption_kwh": billed_kwh,
+                "meter_number": meter_id,
+                "energy_charge_zar": energy_charge,
+                "service_charge_zar": service_charge,
+                "vat_zar": vat,
+                "total_amount_zar": total,
+                "ocr_status": "completed",
+                "invoice_confidence_score": 0.7,
+                "invoice_confidence_flags": ["estimated"],
+                "tariff_type": tariff_name,
+            }
+
+            try:
+                client.table("municipal_invoices").insert(payload).execute()
+                self._billing_seed_months[site_id] = month_key
+            except Exception as exc:
+                logger.info("Invoice seed failed for %s: %s", site_id, exc)
 
     def _update_ahu(self, ahu: EquipmentState, current_time: datetime):
         """Update AHU specific parameters"""

@@ -5,6 +5,8 @@ pricing to generate optimal setpoint recommendations for ALL equipment types:
 - HVAC (chillers, AHUs, FCUs, VAVs)
 - Lighting (DALI-2 luminaires, zone control)
 - Power (generators, UPS, ATS, meters)
+- Solar PV (inverters, generation monitoring)
+- BESS (battery dispatch, SOC management)
 - Security (access control integration)
 - Fire Safety (monitoring only)
 
@@ -42,19 +44,36 @@ DATA_DIR = Path(__file__).parent.parent / "data"
 
 
 async def ensure_device_manager_initialized() -> None:
-    """Ensure device manager is initialized with mock devices if not already."""
+    """Ensure device manager is initialized with mock + building devices if not already."""
     if not device_manager._initialized:
-        logger.info("Device manager not initialized, loading mock devices...")
+        logger.info("Device manager not initialized, loading devices...")
         try:
+            # Load mock devices
+            devices_data = []
             mock_devices_path = DATA_DIR / "mock_devices.json"
             if mock_devices_path.exists():
                 with open(mock_devices_path) as f:
                     devices_data = json.load(f)
-                await device_manager.initialize(devices_data)
-                logger.info(f"Device manager initialized with {len(devices_data)} devices")
-            else:
-                logger.warning("mock_devices.json not found, initializing empty device manager")
-                await device_manager.initialize([])
+            mock_count = len(devices_data)
+
+            # Load all building equipment (including monitoring-only solar/meters)
+            from app.api.devices import load_equipment_from_buildings
+            building_devices = await load_equipment_from_buildings()
+
+            # Merge building devices with mock devices (dedup by ID)
+            existing_ids = {d["id"] for d in devices_data}
+            added_count = 0
+            for device in building_devices:
+                if device["id"] not in existing_ids:
+                    devices_data.append(device)
+                    existing_ids.add(device["id"])
+                    added_count += 1
+
+            await device_manager.initialize(devices_data)
+            logger.info(
+                f"Device manager initialized with {mock_count} mock + "
+                f"{added_count} building = {len(devices_data)} total devices"
+            )
         except Exception as e:
             logger.error(f"Failed to initialize device manager: {e}")
             await device_manager.initialize([])
@@ -282,6 +301,86 @@ class AIOptimizerService:
             except Exception as e:
                 logger.warning(f"Failed to get DALI occupancy data: {e}")
 
+            # Gather solar PV telemetry (inverters + meter)
+            try:
+                solar_total_kw = 0.0
+                solar_efficiencies = []
+                grid_solar_kw = None
+
+                for device in devices:
+                    if device.device_type == DeviceType.SOLAR:
+                        # Read inverter AC power
+                        for point_name in ["ac_power", "power", "active_power"]:
+                            if point_name in device.points:
+                                try:
+                                    value = await device_manager.read_device_value(device.id, point_name)
+                                    if value.value is not None:
+                                        solar_total_kw += float(value.value)
+                                except Exception:
+                                    pass
+                                break
+
+                        # Read inverter efficiency
+                        for point_name in ["efficiency", "performance_ratio"]:
+                            if point_name in device.points:
+                                try:
+                                    value = await device_manager.read_device_value(device.id, point_name)
+                                    if value.value is not None:
+                                        solar_efficiencies.append(float(value.value))
+                                except Exception:
+                                    pass
+                                break
+
+                    elif device.device_type == DeviceType.METER:
+                        # Read solar meter (grid-side)
+                        if "solar" in device.id.lower() or "solar" in device.name.lower():
+                            for point_name in ["active_power", "power", "total_power"]:
+                                if point_name in device.points:
+                                    try:
+                                        value = await device_manager.read_device_value(device.id, point_name)
+                                        if value.value is not None:
+                                            grid_solar_kw = float(value.value)
+                                    except Exception:
+                                        pass
+                                    break
+
+                if solar_total_kw > 0 or grid_solar_kw is not None:
+                    conditions["solar_generation_kw"] = round(solar_total_kw, 1)
+                    if solar_efficiencies:
+                        conditions["solar_avg_efficiency_pct"] = round(
+                            sum(solar_efficiencies) / len(solar_efficiencies), 1
+                        )
+                    if grid_solar_kw is not None:
+                        conditions["grid_solar_kw"] = round(grid_solar_kw, 1)
+
+            except Exception as e:
+                logger.warning(f"Failed to get solar telemetry: {e}")
+
+            # Gather BESS telemetry
+            try:
+                for device in devices:
+                    if device.device_type == DeviceType.BESS:
+                        bess_data = {}
+
+                        for point_name in ["soc", "power", "mode", "temperature"]:
+                            if point_name in device.points:
+                                try:
+                                    value = await device_manager.read_device_value(device.id, point_name)
+                                    if value.value is not None:
+                                        bess_data[point_name] = value.value
+                                except Exception:
+                                    pass
+
+                        if bess_data:
+                            conditions["bess_soc_pct"] = bess_data.get("soc")
+                            conditions["bess_power_kw"] = bess_data.get("power")
+                            conditions["bess_mode"] = bess_data.get("mode")
+                            conditions["bess_temperature"] = bess_data.get("temperature")
+                            break  # Only first BESS device
+
+            except Exception as e:
+                logger.warning(f"Failed to get BESS telemetry: {e}")
+
             return conditions
 
         except Exception as e:
@@ -372,6 +471,7 @@ class AIOptimizerService:
 - Occupancy: {current_conditions.get('occupancy', 'unknown')}
 - Equipment status: {current_conditions.get('equipment_status', 'normal')}
 
+{self._format_solar_bess_telemetry(current_conditions)}
 **Weather Forecast (next 4 hours):**
 {json.dumps(weather_forecast, indent=2)}
 
@@ -410,6 +510,18 @@ Power/Generators:
 - UPS: maintain battery charge >50%
 - ATS: automatic transfer, no manual override unless emergency
 
+Solar PV:
+- Inverters: monitor only, no direct setpoint control (cloud-managed)
+- Curtailment: only if grid export limit exceeded or NRS 097 violation
+- Performance ratio target: >80% (investigate if below 75%)
+
+BESS (Battery Storage):
+- SOC limits: maintain 10-90% (never fully discharge or overcharge)
+- Discharge priority: peak TOU periods (07:00-10:00, 18:00-20:00)
+- Charge priority: off-peak (22:00-06:00) or excess solar generation
+- Load shedding: BESS discharge to critical loads before generator start
+- Mode changes: idle→discharge allowed, charging→discharge needs 60s transition
+
 {self._format_lighting_section(lighting_devices, dali_zones)}
 
 **Your Task:**
@@ -421,11 +533,13 @@ Power/Generators:
    - HVAC: temperature setpoints, fan speeds, damper positions
    - Lighting: DALI dim levels (0-254), scene selection
    - Power: generator start/stop (only if load shedding), UPS mode
+   - Solar: performance alerts, curtailment if export limit reached
+   - BESS: dispatch mode (charge/discharge/idle), SOC targets, load shedding response
    - Meters: no direct control, but use readings for context
 6. CRITICAL: Use EXACT point_name from "All Available Control Points" above
 7. Project energy savings in ZAR per hour (breakdown by system)
 8. Ensure all recommendations are within safety limits
-9. Prioritize cross-system coordination (unoccupied zones: raise HVAC AND dim lights)
+9. Prioritize cross-system coordination (unoccupied zones: raise HVAC AND dim lights; peak solar: charge BESS; load shedding: BESS before generator)
 
 **Response Format (JSON):**
 ```json
@@ -460,6 +574,16 @@ Power/Generators:
       "unit": "mode",
       "reason": "No load shedding - maintain standby",
       "system": "power"
+    }},
+    {{
+      "equipment_id": "S002-BESS-B1-001",
+      "equipment_name": "Battery Energy Storage (B1)",
+      "point_name": "mode",
+      "current_value": "idle",
+      "recommended_value": "discharging",
+      "unit": "mode",
+      "reason": "Peak TOU period - discharge BESS to reduce grid import",
+      "system": "bess"
     }}
   ],
   "cross_system_recommendations": [
@@ -477,9 +601,11 @@ Power/Generators:
     "hvac_kwh": 12.5,
     "lighting_kwh": 3.2,
     "power_kwh": 0.0,
-    "total_kwh": 15.7,
-    "cost_zar_per_hour": 39.25,
-    "percentage_improvement": 12.5
+    "solar_kwh": 0.0,
+    "bess_kwh": 8.5,
+    "total_kwh": 24.2,
+    "cost_zar_per_hour": 60.50,
+    "percentage_improvement": 15.2
   }},
   "equipment_not_optimized": ["S002-GEN-1", "S002-UPS-1"],
   "equipment_not_optimized_reason": "Generator and UPS in standby - no optimization needed",
@@ -694,7 +820,7 @@ Provide ONLY the JSON response, no additional text."""
         sections = []
 
         # Order equipment types by optimization priority
-        type_order = ["hvac", "lighting", "power", "meter", "security", "fire_safety", "other"]
+        type_order = ["hvac", "lighting", "power", "solar", "bess", "meter", "security", "fire_safety", "other"]
 
         for device_type in type_order:
             devices = inventory.get(device_type, [])
@@ -919,6 +1045,42 @@ Provide ONLY the JSON response, no additional text."""
 
         return zone_data
 
+    def _format_solar_bess_telemetry(self, conditions: Dict[str, Any]) -> str:
+        """Format solar/BESS telemetry section for the optimization prompt.
+
+        Only included when solar data exists in conditions (backward compatible).
+        """
+        solar_kw = conditions.get("solar_generation_kw")
+        if solar_kw is None and conditions.get("bess_soc_pct") is None:
+            return ""
+
+        lines = ["**Solar & BESS Telemetry:**"]
+
+        if solar_kw is not None:
+            lines.append(f"- Total PV generation: {solar_kw} kW")
+        eff = conditions.get("solar_avg_efficiency_pct")
+        if eff is not None:
+            lines.append(f"- Average inverter efficiency: {eff}%")
+        grid = conditions.get("grid_solar_kw")
+        if grid is not None:
+            lines.append(f"- Grid solar meter reading: {grid} kW")
+
+        soc = conditions.get("bess_soc_pct")
+        if soc is not None:
+            lines.append(f"- BESS SOC: {soc}%")
+        bess_power = conditions.get("bess_power_kw")
+        if bess_power is not None:
+            direction = "discharging" if bess_power > 0 else "charging" if bess_power < 0 else "idle"
+            lines.append(f"- BESS power: {abs(bess_power)} kW ({direction})")
+        bess_mode = conditions.get("bess_mode")
+        if bess_mode is not None:
+            lines.append(f"- BESS mode: {bess_mode}")
+        bess_temp = conditions.get("bess_temperature")
+        if bess_temp is not None:
+            lines.append(f"- BESS temperature: {bess_temp}°C")
+
+        return "\n".join(lines) + "\n"
+
     def _format_lighting_section(
         self,
         lighting_devices: List[Device],
@@ -1099,6 +1261,13 @@ Provide ONLY the JSON response, no additional text."""
         """
         logger.info(f"Using rule-based optimization for site {site_id}")
         dali_zones = dali_zones or {}
+        if not isinstance(equipment_inventory, dict):
+            equipment_inventory = {
+                "hvac": list(equipment_inventory) if equipment_inventory else [],
+                "power": [],
+                "lighting": [],
+                "meter": [],
+            }
 
         # Extract equipment by type from inventory
         hvac_devices = equipment_inventory.get("hvac", [])
@@ -1300,8 +1469,8 @@ Provide ONLY the JSON response, no additional text."""
                 if not lighting:
                     continue
 
-                current_dim = lighting.get("avg_brightness", 0)
-                total_power = lighting.get("total_power_watts", 0)
+                current_dim = lighting.get("avg_brightness", lighting.get("avg_dim_level", 0))
+                total_power = lighting.get("total_power_watts", lighting.get("total_power_w", 0))
                 zone_name = zone.get("zone_name", zone_id)
                 is_emergency = "emergency" in zone_name.lower()
 
@@ -1420,12 +1589,155 @@ Provide ONLY the JSON response, no additional text."""
                     # Just log that it exists for the AI context
                     pass
 
+        # ============================================================
+        # Solar PV Rules (Inverters, Generation Monitoring)
+        # ============================================================
+        solar_recommendations = []
+        solar_devices = equipment_inventory.get("solar", [])
+
+        if solar_devices:
+            logger.info(f"Processing {len(solar_devices)} solar devices for optimization")
+
+            for device in solar_devices:
+                device_name = device.name.lower()
+
+                # Solar inverter monitoring
+                if "inv" in device_name or "inverter" in device_name or "solar" in device_name:
+                    # Check efficiency/performance ratio
+                    efficiency_point = self._find_point_on_device(
+                        device, ["efficiency", "performance_ratio", "pr"]
+                    )
+                    if efficiency_point:
+                        efficiency = efficiency_point.default_value if efficiency_point.default_value is not None else 95.0
+                        if efficiency < 90.0:
+                            solar_recommendations.append({
+                                "equipment_id": device.id,
+                                "equipment_name": device.name,
+                                "point_name": efficiency_point.name,
+                                "current_value": efficiency,
+                                "recommended_value": "investigate",
+                                "unit": "%",
+                                "reason": f"Inverter efficiency {efficiency:.1f}% below 90% threshold - check for shading, soiling, or inverter fault",
+                                "system": "solar",
+                            })
+
+                    # Check status
+                    status_point = self._find_point_on_device(
+                        device, ["status", "operating_status", "state"]
+                    )
+                    if status_point:
+                        status = status_point.default_value if status_point.default_value is not None else "running"
+                        if isinstance(status, str) and status.lower() in ["offline", "fault", "error", "stopped"]:
+                            solar_recommendations.append({
+                                "equipment_id": device.id,
+                                "equipment_name": device.name,
+                                "point_name": status_point.name,
+                                "current_value": status,
+                                "recommended_value": "investigate",
+                                "unit": "status",
+                                "reason": f"Solar inverter {status} - investigate for potential generation loss",
+                                "system": "solar",
+                            })
+
+        # ============================================================
+        # BESS Rules (Battery Dispatch, SOC Management)
+        # ============================================================
+        bess_recommendations = []
+        bess_devices = equipment_inventory.get("bess", [])
+        bess_savings_kw = 0.0
+
+        if bess_devices:
+            logger.info(f"Processing {len(bess_devices)} BESS devices for optimization")
+
+            # Determine current TOU period from energy prices
+            energy_period = energy_prices.get("period", "standard")
+            current_hour = datetime.now().hour
+            is_peak = energy_period == "peak" or current_hour in range(7, 10) or current_hour in range(18, 20)
+            is_off_peak = energy_period == "off_peak" or current_hour in range(22, 24) or current_hour in range(0, 6)
+            is_load_shedding = current_conditions.get("load_shedding", False)
+
+            for device in bess_devices:
+                # Find SOC point
+                soc_point = self._find_point_on_device(
+                    device, ["soc", "state_of_charge", "battery_level", "soc_percent"]
+                )
+                soc = soc_point.default_value if soc_point and soc_point.default_value is not None else 50.0
+
+                # Find mode point
+                mode_point = self._find_point_on_device(
+                    device, ["mode", "dispatch_mode", "operating_mode"]
+                )
+                current_mode = mode_point.default_value if mode_point and mode_point.default_value is not None else "idle"
+                mode_point_name = mode_point.name if mode_point else "mode"
+
+                # BESS dispatch rules (priority order)
+                if is_load_shedding and soc > 15:
+                    # Load shedding: discharge BESS before starting generator
+                    recommended_mode = "discharging"
+                    reason = f"Load shedding active - discharge BESS (SOC {soc:.0f}%) to critical loads before generator start"
+                    bess_savings_kw += 50.0  # Significant savings by avoiding generator
+                elif is_peak and soc > 20:
+                    # Peak TOU: discharge to reduce grid import
+                    recommended_mode = "discharging"
+                    reason = f"Peak TOU period - discharge BESS (SOC {soc:.0f}%) to reduce expensive grid import"
+                    bess_savings_kw += 25.0
+                elif current_conditions.get("solar_generation_kw", 0) > 0 and soc < 90:
+                    # Solar excess: charge BESS from surplus PV generation
+                    solar_kw = current_conditions.get("solar_generation_kw", 0)
+                    recommended_mode = "charging"
+                    reason = (
+                        f"Solar PV generating {solar_kw:.0f} kW - charge BESS from {soc:.0f}% "
+                        f"using excess solar instead of exporting to grid"
+                    )
+                    bess_savings_kw += 15.0  # Store solar for peak use
+                elif is_off_peak and soc < 80:
+                    # Off-peak: charge from cheap grid power
+                    recommended_mode = "charging"
+                    reason = f"Off-peak rates - charge BESS from {soc:.0f}% to 80% target using cheap grid power"
+                    bess_savings_kw += 5.0  # Preparing for peak savings
+                else:
+                    # Standard period or SOC constraints prevent action
+                    recommended_mode = "idle"
+                    reason = f"Standard period with SOC at {soc:.0f}% - maintain idle for battery longevity"
+
+                if str(current_mode).lower() != recommended_mode:
+                    bess_recommendations.append({
+                        "equipment_id": device.id,
+                        "equipment_name": device.name,
+                        "point_name": mode_point_name,
+                        "current_value": current_mode,
+                        "recommended_value": recommended_mode,
+                        "unit": "mode",
+                        "reason": reason,
+                        "system": "bess",
+                    })
+                else:
+                    # Even if mode matches, include as confirmation
+                    bess_recommendations.append({
+                        "equipment_id": device.id,
+                        "equipment_name": device.name,
+                        "point_name": mode_point_name,
+                        "current_value": current_mode,
+                        "recommended_value": recommended_mode,
+                        "unit": "mode",
+                        "reason": reason,
+                        "system": "bess",
+                    })
+
         # Merge lighting recommendations with HVAC recommendations
         for rec in lighting_recommendations:
             recommendations.append(rec)
 
         # Merge power recommendations
         for rec in power_recommendations:
+            recommendations.append(rec)
+
+        # Merge solar recommendations
+        for rec in solar_recommendations:
+            recommendations.append(rec)
+
+        # Merge BESS recommendations
+        for rec in bess_recommendations:
             recommendations.append(rec)
 
         # Sort recommendations by zone priority (critical zones first)
@@ -1435,12 +1747,16 @@ Provide ONLY the JSON response, no additional text."""
         hvac_recs = [r for r in recommendations if r.get("system") == "hvac" or r.get("system") is None]
         lighting_recs = [r for r in recommendations if r.get("system") == "lighting"]
         power_recs = [r for r in recommendations if r.get("system") == "power"]
+        solar_recs = [r for r in recommendations if r.get("system") == "solar"]
+        bess_recs = [r for r in recommendations if r.get("system") == "bess"]
 
         hvac_savings = 5.0 + (len(hvac_recs) * 4.5)  # kWh base for HVAC
         lighting_savings = lighting_savings_kw  # Calculated above for lighting
         power_savings = len(power_recs) * 2.0  # Modest savings from power optimization
+        solar_savings = len(solar_recs) * 1.0  # Alert-based, modest direct savings
+        bess_savings = bess_savings_kw  # Calculated above based on dispatch decisions
 
-        energy_savings = hvac_savings + lighting_savings + power_savings
+        energy_savings = hvac_savings + lighting_savings + power_savings + solar_savings + bess_savings
         energy_rate = energy_prices.get("current_rate", 2.50)
         cost_savings = energy_savings * energy_rate
         percentage = min(8.0 + (len(recommendations) * 1.5), 20.0)  # Higher cap with lighting
@@ -1462,6 +1778,10 @@ Provide ONLY the JSON response, no additional text."""
             reasoning_parts.append("DALI lighting optimization")
         if power_recs:
             reasoning_parts.append("power equipment optimization")
+        if solar_recs:
+            reasoning_parts.append("solar PV monitoring")
+        if bess_recs:
+            reasoning_parts.append("BESS dispatch optimization")
 
         # Add zone-aware context to reasoning
         zone_context = []
@@ -1504,6 +1824,9 @@ Provide ONLY the JSON response, no additional text."""
                 "hvac_kwh": round(hvac_savings, 1),
                 "lighting_kwh": round(lighting_savings, 1),
                 "power_kwh": round(power_savings, 1),
+                "solar_kwh": round(solar_savings, 1),
+                "bess_kwh": round(bess_savings, 1),
+                "energy_kwh": round(energy_savings, 1),
                 "total_kwh": round(energy_savings, 1),
                 "cost_zar_per_hour": round(cost_savings, 2),
                 "percentage_improvement": round(percentage, 1),

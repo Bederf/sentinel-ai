@@ -223,7 +223,7 @@ class SLARepository:
         mock_contracts = [
             {
                 "id": "con-001",
-                "code": "CON-FNB-2026-001",
+                "code": "CON-SITE-002-2026-001",
                 "sla_terms": [
                     {
                         "id": "sla-001",

@@ -29,8 +29,29 @@ def load_sites() -> list[dict]:
     sites_file = DATA_DIR / "sites.json"
     if sites_file.exists():
         with open(sites_file) as f:
-            return json.load(f)
-    return []
+            sites = json.load(f)
+            if sites:
+                return sites
+    # Fallback demo site when no JSON data is available
+    return [
+        {
+            "id": "site-001",
+            "name": "Demo Office Park",
+            "address": "123 Demo St, Johannesburg",
+            "region": "Gauteng",
+            "type": "office",
+            "sqm": 12000,
+            "floors": 8,
+            "year_built": 2015,
+            "operating_hours": {"start": "08:00", "end": "18:00"},
+            "timezone": "Africa/Johannesburg",
+            "occupancy_pattern": "weekday",
+            "latitude": -26.2041,
+            "longitude": 28.0473,
+            "contact_email": "ops@demo.local",
+            "contact_phone": "+27-11-000-0000",
+        }
+    ]
 
 
 def load_equipment() -> list[dict]:
@@ -653,6 +674,13 @@ async def create_site(request: CreateSiteRequest) -> CreateSiteResponse:
     4. Adds to _registry.json
     5. Creates building record in Supabase (if configured)
     """
+    if not request.name or not request.name.strip():
+        raise HTTPException(status_code=400, detail="Site name is required")
+
+    # Validate region/province
+    if not request.region or not request.region.strip():
+        raise HTTPException(status_code=400, detail="Region/province is required")
+
     # 1. Determine next site ID
     next_num = _get_next_site_number()
     site_id = f"site-{next_num:03d}"
@@ -741,6 +769,9 @@ async def create_site(request: CreateSiteRequest) -> CreateSiteResponse:
                     "timezone": "Africa/Johannesburg",
                 }).execute()
                 logger.info(f"Created building in Supabase: {site_id}")
+
+                # Auto-seed municipal tariff schedule + account based on region
+                _seed_municipal_tariff_and_account(client, site_id, request.region)
         except Exception as e:
             # Log but don't fail - JSON is primary storage
             logger.warning(f"Failed to create building in Supabase: {e}")
@@ -752,6 +783,78 @@ async def create_site(request: CreateSiteRequest) -> CreateSiteResponse:
         name=request.name,
         status="created",
     )
+
+
+def _seed_municipal_tariff_and_account(client, site_id: str, region: str) -> None:
+    """Seed default municipal tariff schedule and account for a new site."""
+    municipality_by_region = {
+        "Gauteng": {"municipality": "City Power Johannesburg", "tariff": "TOU Commercial"},
+        "Western Cape": {"municipality": "City of Cape Town", "tariff": "Commercial TOU"},
+        "KwaZulu-Natal": {"municipality": "eThekwini", "tariff": "Commercial TOU"},
+        "Eastern Cape": {"municipality": "Nelson Mandela Bay", "tariff": "Commercial TOU"},
+        "Free State": {"municipality": "Mangaung", "tariff": "Commercial TOU"},
+        "Limpopo": {"municipality": "Polokwane", "tariff": "Commercial TOU"},
+        "Mpumalanga": {"municipality": "Mbombela", "tariff": "Commercial TOU"},
+        "North West": {"municipality": "Rustenburg", "tariff": "Commercial TOU"},
+        "Northern Cape": {"municipality": "Sol Plaatje", "tariff": "Commercial TOU"},
+    }
+
+    info = municipality_by_region.get(region, municipality_by_region["Gauteng"])
+    municipality = info["municipality"]
+    tariff_name = info["tariff"]
+
+    # Load default tariff data if available (City Power JSON)
+    tariff_data = {}
+    try:
+        from pathlib import Path
+        import json
+
+        tariff_path = Path(__file__).parent.parent / "data" / "solar" / "tariffs" / "city_power_2026.json"
+        if tariff_path.exists() and "City Power" in municipality:
+            with open(tariff_path, "r") as f:
+                tariff_data = json.load(f)
+    except Exception as exc:
+        logger.info("Tariff JSON load failed: %s", exc)
+
+    # Upsert tariff schedule
+    try:
+        client.table("municipal_tariff_schedules").upsert({
+            "municipality": municipality,
+            "tariff_name": tariff_name,
+            "utility_type": "electricity",
+            "effective_date": f"{datetime.now().year}-01-01",
+            "tariff_data": tariff_data or {},
+            "nersa_approved": False,
+            "source_url": "auto-seeded",
+            "notes": "Auto-seeded from site creation",
+        }).execute()
+    except Exception as exc:
+        logger.info("Tariff schedule auto-seed failed: %s", exc)
+
+    # Ensure municipal account exists
+    try:
+        account_number = f"{municipality[:2].upper()}-{site_id.replace('site-', '')}-00001"
+        account_result = (
+            client.table("municipal_accounts")
+            .select("id")
+            .eq("site_id", site_id)
+            .eq("municipality", municipality)
+            .eq("utility_type", "electricity")
+            .eq("account_number", account_number)
+            .limit(1)
+            .execute()
+        )
+        if not account_result.data:
+            client.table("municipal_accounts").insert({
+                "site_id": site_id,
+                "municipality": municipality,
+                "utility_type": "electricity",
+                "account_number": account_number,
+                "tariff_type": tariff_name,
+                "main_meter_id": f"{site_id.replace('site-', 'S').upper()}-MTR-E-MAIN",
+            }).execute()
+    except Exception as exc:
+        logger.info("Municipal account auto-seed failed: %s", exc)
 
 
 # ============= Get Single Site Endpoint =============

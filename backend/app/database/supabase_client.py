@@ -1,13 +1,21 @@
 """Supabase client for database operations."""
 
+import os
 from typing import Optional
-from supabase import create_client, Client
 from app.config.settings import settings
 
-_supabase_client: Optional[Client] = None
+
+class _DummySupabaseClient:
+    def __getattr__(self, name):
+        raise RuntimeError(
+            "Supabase client is not available in TESTING mode. "
+            "Provide a stub or disable this code path in tests."
+        )
+
+_supabase_client: Optional[object] = None
 
 
-def get_supabase_client() -> Client:
+def get_supabase_client():
     """Get or create the Supabase client singleton.
 
     Returns:
@@ -19,6 +27,12 @@ def get_supabase_client() -> Client:
     global _supabase_client
 
     if _supabase_client is None:
+        if os.getenv("TESTING", "").lower() == "true":
+            _supabase_client = _DummySupabaseClient()
+            return _supabase_client
+
+        from supabase import create_client
+
         if not settings.supabase_url or not settings.supabase_service_role_key:
             raise ValueError(
                 "Supabase credentials not configured. "

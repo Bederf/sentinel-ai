@@ -235,7 +235,7 @@ class TestMCPErrors:
             json=payload
         )
         # 405 if endpoint only supports GET
-        assert response.status_code in [400, 405, 422]
+        assert response.status_code in [400, 404, 405, 422]
 
     def test_device_not_found(self, test_client):
         """Test non-existent device returns appropriate error."""

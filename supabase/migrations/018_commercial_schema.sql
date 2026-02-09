@@ -9,7 +9,7 @@
 -- =====================================================
 CREATE TABLE organizations (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  code TEXT UNIQUE NOT NULL,           -- e.g., 'FNB', 'NEDBANK'
+  code TEXT UNIQUE NOT NULL,           -- e.g., '', 'NEDBANK'
   name TEXT NOT NULL,
   trading_name TEXT,
   registration_number TEXT,
@@ -41,7 +41,7 @@ CREATE TABLE organizations (
 -- =====================================================
 CREATE TABLE contracts (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  code TEXT UNIQUE NOT NULL,           -- e.g., 'CON-FNB-2026-001'
+  code TEXT UNIQUE NOT NULL,           -- e.g., 'CON--2026-001'
   organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE RESTRICT,
   building_id UUID NOT NULL REFERENCES buildings(id) ON DELETE RESTRICT,
 
@@ -204,7 +204,7 @@ CREATE TABLE condition_assessments (
 -- =====================================================
 CREATE TABLE budgets (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  code TEXT UNIQUE NOT NULL,               -- e.g., 'BUD-FNB-SANDTON-2026'
+  code TEXT UNIQUE NOT NULL,               -- e.g., 'BUD--SANDTON-2026'
 
   -- Scope
   contract_id UUID NOT NULL REFERENCES contracts(id) ON DELETE CASCADE,

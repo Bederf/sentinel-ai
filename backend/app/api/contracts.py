@@ -503,6 +503,150 @@ async def get_budget_variance(
     return variance
 
 
+@router.post("/{contract_id}/budgets/capture-actuals")
+async def capture_budget_actuals(
+    contract_id: str,
+    year: int = Query(..., ge=2000, le=2100, description="Budget year"),
+    month: int = Query(..., ge=1, le=12, description="Budget month (1-12)"),
+):
+    """
+    Capture actual costs from completed work orders for a contract.
+
+    Aggregates labor and parts costs into the monthly budget actuals.
+    """
+    from app.services.cost_capture_service import get_cost_capture_service
+
+    service = get_cost_capture_service()
+    summary = await service.capture_actuals_for_contract(
+        contract_id=contract_id,
+        year=year,
+        month=month
+    )
+
+    return {
+        "contract_id": contract_id,
+        "year": year,
+        "month": month,
+        "summary": summary.__dict__
+    }
+
+
+@router.get("/{contract_id}/budget-variance/alerts")
+async def list_budget_variance_alerts(
+    contract_id: str,
+    year: Optional[int] = Query(None, description="Budget year"),
+    month: Optional[int] = Query(None, description="Budget month"),
+    status: Optional[str] = Query(None, description="Alert status (open, acknowledged, resolved)"),
+    severity: Optional[str] = Query(None, description="Severity (warning, critical)"),
+):
+    """
+    List budget variance alerts for a contract.
+    """
+    from app.services.budget_variance_service import get_budget_variance_service
+
+    service = get_budget_variance_service()
+    alerts = service.list_alerts(
+        contract_id,
+        year=year,
+        month=month,
+        status=status,
+        severity=severity
+    )
+    return {"contract_id": contract_id, "alerts": alerts, "count": len(alerts)}
+
+
+@router.post("/{contract_id}/budget-variance/evaluate")
+async def evaluate_budget_variance(
+    contract_id: str,
+    year: int = Query(..., ge=2000, le=2100, description="Budget year"),
+    month: int = Query(..., ge=1, le=12, description="Budget month (1-12)"),
+):
+    """
+    Evaluate budget variance for a contract month and emit alerts if thresholds breached.
+    """
+    from app.services.budget_variance_service import get_budget_variance_service
+
+    service = get_budget_variance_service()
+    result = service.evaluate_budget(contract_id, year, month)
+    equipment_results = service.evaluate_equipment_type_budgets(
+        contract_id, year, month
+    )
+    return {
+        "contract_id": contract_id,
+        "result": result.__dict__,
+        "equipment_type_results": equipment_results
+    }
+
+
+@router.patch("/budget-variance/alerts/{alert_id}")
+async def update_budget_alert_status(
+    alert_id: str,
+    status: str = Query(..., description="Alert status (open, acknowledged, resolved)")
+):
+    """
+    Update budget alert status.
+    """
+    from app.database.repositories.budget_alert_repository import get_budget_alert_repository
+
+    repo = get_budget_alert_repository()
+    updated = repo.update_status(alert_id, status)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Budget alert not found")
+    return updated
+
+
+@router.get("/{contract_id}/budgets/report")
+async def get_budget_report(
+    contract_id: str,
+    year: int = Query(..., ge=2000, le=2100, description="Budget year"),
+    month: Optional[int] = Query(None, ge=1, le=12, description="Optional month filter"),
+):
+    """
+    Get budget report with monthly breakdown and totals.
+    """
+    from app.services.budget_reporting_service import get_budget_reporting_service
+
+    service = get_budget_reporting_service()
+    report = service.build_report(contract_id, year, month=month)
+    return report
+
+
+@router.get("/{contract_id}/budgets/report/export")
+async def export_budget_report(
+    contract_id: str,
+    year: int = Query(..., ge=2000, le=2100, description="Budget year"),
+    month: Optional[int] = Query(None, ge=1, le=12, description="Optional month filter"),
+    format: str = Query("csv", description="Export format: csv or pdf"),
+):
+    """
+    Export budget report as CSV or PDF.
+    """
+    from fastapi.responses import Response
+    from app.services.budget_reporting_service import get_budget_reporting_service
+    from app.services.budget_export_service import export_budget_report_csv, export_budget_report_pdf
+
+    service = get_budget_reporting_service()
+    report = service.build_report(contract_id, year, month=month)
+
+    fmt = format.lower()
+    if fmt == "pdf":
+        pdf_bytes = export_budget_report_pdf(report)
+        filename = f"budget-report-{contract_id}-{year}.pdf"
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+
+    csv_bytes = export_budget_report_csv(report)
+    filename = f"budget-report-{contract_id}-{year}.csv"
+    return Response(
+        content=csv_bytes,
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
 # ============================================================================
 # Budget Template Endpoints (Phase 49)
 # ============================================================================
@@ -780,6 +924,8 @@ async def get_profitability_trends(
 async def get_asset_roi(
     contract_id: str,
     equipment_id: str,
+    period_start: Optional[str] = Query(None, description="Period start (YYYY-MM-DD)"),
+    period_end: Optional[str] = Query(None, description="Period end (YYYY-MM-DD)"),
 ):
     """
     Get ROI calculation for a specific asset within a contract.
@@ -787,11 +933,157 @@ async def get_asset_roi(
     Returns allocated revenue, costs, margin, and ROI percentage
     for individual equipment.
     """
+    from datetime import date, timedelta
     from app.services.profitability_service import get_profitability_service
 
+    # Default to current month
+    if not period_start:
+        today = date.today()
+        period_start = today.replace(day=1).isoformat()
+    if not period_end:
+        today = date.today()
+        if today.month == 12:
+            next_month = today.replace(year=today.year + 1, month=1, day=1)
+        else:
+            next_month = today.replace(month=today.month + 1, day=1)
+        period_end = (next_month - timedelta(days=1)).isoformat()
+
+    start_date = date.fromisoformat(period_start)
+    end_date = date.fromisoformat(period_end)
+
     service = get_profitability_service()
-    roi = service.calculate_asset_roi(contract_id, equipment_id)
+    roi = service.calculate_asset_roi(contract_id, equipment_id, start_date, end_date)
     return roi
+
+
+@router.get("/profitability/assets/{contract_id}")
+async def get_contract_asset_roi_list(
+    contract_id: str,
+    period_start: Optional[str] = Query(None, description="Period start (YYYY-MM-DD)"),
+    period_end: Optional[str] = Query(None, description="Period end (YYYY-MM-DD)"),
+    limit: Optional[int] = Query(15, ge=1, le=100, description="Max assets to return"),
+):
+    """
+    Get ROI list for all assets in a contract.
+
+    Returns per-asset ROI details, sorted by ROI descending.
+    """
+    from datetime import date, timedelta
+    from app.services.profitability_service import get_profitability_service
+
+    # Default to current month
+    if not period_start:
+        today = date.today()
+        period_start = today.replace(day=1).isoformat()
+    if not period_end:
+        today = date.today()
+        if today.month == 12:
+            next_month = today.replace(year=today.year + 1, month=1, day=1)
+        else:
+            next_month = today.replace(month=today.month + 1, day=1)
+        period_end = (next_month - timedelta(days=1)).isoformat()
+
+    start_date = date.fromisoformat(period_start)
+    end_date = date.fromisoformat(period_end)
+
+    service = get_profitability_service()
+    assets = service.calculate_contract_asset_roi_list(
+        contract_id, start_date, end_date, limit=limit
+    )
+    return {"contract_id": contract_id, "assets": assets, "count": len(assets)}
+
+
+@router.get("/profitability/report/{contract_id}")
+async def get_contract_profitability_report(
+    contract_id: str,
+    period_start: Optional[str] = Query(None, description="Period start (YYYY-MM-DD)"),
+    period_end: Optional[str] = Query(None, description="Period end (YYYY-MM-DD)"),
+    asset_limit: int = Query(15, ge=1, le=100, description="Max assets to include"),
+):
+    """
+    Generate a contract profitability report.
+
+    Includes profitability breakdown, 12-month trends, asset ROI list,
+    and data-quality flags for the period.
+    """
+    from datetime import date, timedelta
+    from app.services.profitability_service import get_profitability_service
+
+    # Default to current month
+    if not period_start:
+        today = date.today()
+        period_start = today.replace(day=1).isoformat()
+    if not period_end:
+        today = date.today()
+        if today.month == 12:
+            next_month = today.replace(year=today.year + 1, month=1, day=1)
+        else:
+            next_month = today.replace(month=today.month + 1, day=1)
+        period_end = (next_month - timedelta(days=1)).isoformat()
+
+    start_date = date.fromisoformat(period_start)
+    end_date = date.fromisoformat(period_end)
+
+    service = get_profitability_service()
+    report = service.generate_contract_report(
+        contract_id, start_date, end_date, asset_limit=asset_limit
+    )
+    return report
+
+
+@router.get("/profitability/report/{contract_id}/export")
+async def export_contract_profitability_report(
+    contract_id: str,
+    format: str = Query("csv", description="Export format: csv or pdf"),
+    period_start: Optional[str] = Query(None, description="Period start (YYYY-MM-DD)"),
+    period_end: Optional[str] = Query(None, description="Period end (YYYY-MM-DD)"),
+    asset_limit: int = Query(15, ge=1, le=100, description="Max assets to include"),
+):
+    """
+    Export a contract profitability report as CSV or PDF.
+    """
+    from datetime import date, timedelta
+    from fastapi.responses import Response
+    from app.services.profitability_service import get_profitability_service
+    from app.services.profitability_export_service import export_report_csv, export_report_pdf
+
+    # Default to current month
+    if not period_start:
+        today = date.today()
+        period_start = today.replace(day=1).isoformat()
+    if not period_end:
+        today = date.today()
+        if today.month == 12:
+            next_month = today.replace(year=today.year + 1, month=1, day=1)
+        else:
+            next_month = today.replace(month=today.month + 1, day=1)
+        period_end = (next_month - timedelta(days=1)).isoformat()
+
+    start_date = date.fromisoformat(period_start)
+    end_date = date.fromisoformat(period_end)
+
+    service = get_profitability_service()
+    report = service.generate_contract_report(
+        contract_id, start_date, end_date, asset_limit=asset_limit
+    )
+
+    fmt = format.lower()
+    if fmt == "pdf":
+        pdf_bytes = export_report_pdf(report)
+        filename = f"profitability-report-{contract_id}.pdf"
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+
+    csv_bytes = export_report_csv(report)
+    filename = f"profitability-report-{contract_id}.csv"
+    return Response(
+        content=csv_bytes,
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 
 
 # ============================================================================
@@ -959,4 +1251,3 @@ async def recalculate_sla(
         "recalculated": True,
         "results": results,
     }
-

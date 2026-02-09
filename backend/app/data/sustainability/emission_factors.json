@@ -1,0 +1,13 @@
+{
+  "year": 2023,
+  "country": "South Africa",
+  "source": "Eskom IRP 2023, DEFRA 2023",
+  "factors": {
+    "grid_kg_co2_per_kwh": 1.06,
+    "diesel_kg_co2_per_litre": 2.68,
+    "water_kg_co2_per_kl": 0.708,
+    "waste_kg_co2_per_ton": 580.0,
+    "commute_kg_co2_per_person_day": 4.2
+  },
+  "notes": "Grid factor based on Eskom's 2023 emission intensity. Diesel factor includes upstream extraction and combustion. Water factor covers treatment and distribution in Gauteng. Waste assumes general commercial waste to landfill."
+}

@@ -36,6 +36,7 @@ from app.database.repositories.prediction_repository import PredictionRepository
 from app.database.repositories.baseline_repository import BaselineRepository
 from app.database.repositories.inspection_repository import InspectionRepository
 from app.database.repositories.work_order_repository import get_work_order_repository
+from app.database.repositories.workflow_event_repository import get_workflow_event_repository
 
 logger = logging.getLogger(__name__)
 
@@ -97,6 +98,12 @@ class TriggerHistoryResponse(BaseModel):
     """Response containing trigger history."""
     count: int
     triggers: List[dict]
+
+
+class WorkflowEventResponse(BaseModel):
+    """Response containing workflow events."""
+    count: int
+    events: List[dict]
 
 
 # ============================================================================
@@ -357,6 +364,28 @@ async def get_effectiveness_result(work_order_id: str):
         )
 
     return result.model_dump()
+
+
+@router.get("/events", response_model=WorkflowEventResponse)
+async def get_workflow_events(
+    equipment_id: Optional[str] = Query(None, description="Filter by equipment ID"),
+    trigger_type: Optional[str] = Query(None, description="Filter by trigger type"),
+    limit: int = Query(100, ge=1, le=500, description="Max number of events to return")
+):
+    """
+    Get workflow event log entries.
+    """
+    repository = get_workflow_event_repository()
+    events = repository.list(
+        equipment_id=equipment_id,
+        trigger_type=trigger_type,
+        limit=limit
+    )
+
+    return WorkflowEventResponse(
+        count=len(events),
+        events=events
+    )
 
 
 # ============================================================================

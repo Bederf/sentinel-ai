@@ -4,7 +4,7 @@ type: "reference"
 status: "approved"
 version: "1.0.0"
 created: "2026-02-07"
-updated: "2026-02-07"
+updated: "2026-02-08"
 author: "Sentinel Development Team"
 tags: ["api", "pricing", "risk", "contracts"]
 domain: "bms"
@@ -63,6 +63,80 @@ Return min/max range based on a variance percentage.
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | variance_pct | float | No | Variance percent (0-50, default 10) |
+
+## POST `/api/pricing/what-if`
+
+Run what-if scenarios against a base quote.
+
+**Request Body:**
+```json
+{
+  "base": {
+    "building_id": "site-002",
+    "equipment_codes": ["S002-CHILLER-B1-001"],
+    "sla_tier": "standard",
+    "contract_months": 12,
+    "include_benchmarks": false
+  },
+  "scenarios": [
+    {
+      "name": "Premium SLA",
+      "sla_tier": "premium"
+    },
+    {
+      "name": "Add 5 assets",
+      "add_equipment_codes": ["S002-AHU-L2-003", "S002-AHU-L2-004"]
+    },
+    {
+      "name": "Worse condition",
+      "condition_score_delta": -1
+    }
+  ]
+}
+```
+
+**Response:**
+```json
+{
+  "base_quote": { "recommended_fee_zar": 4218.75 },
+  "scenarios": [
+    { "name": "Premium SLA", "recommended_fee_zar": 5234.10, "delta_zar": 1015.35, "delta_pct": 24.07 }
+  ]
+}
+```
+
+## POST `/api/pricing/renewal`
+
+Calculate renewal pricing recommendation based on actual costs.
+Includes SLA penalty exposure and margin trend adjustments when data is available.
+
+**Request Body:**
+```json
+{
+  "contract_id": "uuid",
+  "year": 2026,
+  "sla_tier": "standard"
+}
+```
+
+**Response:**
+```json
+{
+  "contract_id": "uuid",
+  "year": 2026,
+  "current_monthly_fee_zar": 145000,
+  "actual_cost_monthly_avg_zar": 121500,
+  "target_margin_pct": 25,
+  "recommended_monthly_fee_zar": 151875,
+  "delta_zar": 6875,
+  "delta_pct": 4.74,
+  "notes": []
+}
+```
+
+## GET `/api/pricing/benchmarks/{contract_id}`
+
+Get benchmark pricing range for similar contracts.
 
 ## GET `/api/pricing/equipment-types`
 

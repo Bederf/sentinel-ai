@@ -1,0 +1,313 @@
+/**
+ * BudgetReportPage - Budget reporting and export
+ */
+
+import { useEffect, useMemo, useState } from "react";
+import {
+  Card,
+  Title,
+  Text,
+  Select,
+  SelectItem,
+  Button,
+} from "@tremor/react";
+import {
+  Table,
+  TableHead,
+  TableRow,
+  TableHeaderCell,
+  TableBody,
+  TableCell,
+} from "@tremor/react";
+import { FileText } from "lucide-react";
+import { PageLoading } from "../components/PageLoading";
+import type { Contract, BudgetReport } from "../lib/contractApi";
+
+export function BudgetReportPage() {
+  const [contracts, setContracts] = useState<Contract[]>([]);
+  const [selectedContractId, setSelectedContractId] = useState<string>("");
+  const [year, setYear] = useState<number>(new Date().getFullYear());
+  const [month, setMonth] = useState<number | null>(null);
+  const [report, setReport] = useState<BudgetReport | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const formatZAR = (amount: number) => {
+    return new Intl.NumberFormat("en-ZA", {
+      style: "currency",
+      currency: "ZAR",
+      maximumFractionDigits: 0,
+    }).format(amount);
+  };
+
+  useEffect(() => {
+    const loadContracts = async () => {
+      setLoading(true);
+      try {
+        const { contractApi } = await import("../lib/contractApi");
+        const data = await contractApi.getContracts({ status: "active" });
+        setContracts(data);
+        if (!selectedContractId && data.length > 0) {
+          setSelectedContractId(data[0].id || data[0].contract_code);
+        }
+      } catch (err) {
+        setError("Failed to load contracts");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadContracts();
+  }, []);
+
+  useEffect(() => {
+    const loadReport = async () => {
+      if (!selectedContractId) {
+        setReport(null);
+        return;
+      }
+      try {
+        const { contractApi } = await import("../lib/contractApi");
+        const data = await contractApi.getBudgetReportByMonth(
+          selectedContractId,
+          year,
+          month || undefined
+        );
+        setReport(data);
+        setError(null);
+      } catch (err) {
+        setError("Failed to load budget report");
+        setReport(null);
+      }
+    };
+
+    loadReport();
+  }, [selectedContractId, year, month]);
+
+  const selectedContract = useMemo(
+    () => contracts.find((c) => (c.id || c.contract_code) === selectedContractId),
+    [contracts, selectedContractId]
+  );
+
+  const handleExport = async (format: "csv" | "pdf" | "json") => {
+    if (!selectedContractId) return;
+    try {
+      const { contractApi } = await import("../lib/contractApi");
+      if (format === "json") {
+        if (!report) return;
+        const blob = new Blob([JSON.stringify(report, null, 2)], {
+          type: "application/json",
+        });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `budget-report-${selectedContractId}-${year}${month ? `-${month}` : ""}.json`;
+        link.click();
+        URL.revokeObjectURL(url);
+        return;
+      }
+
+      const blob = await contractApi.exportBudgetReport(
+        selectedContractId,
+        year,
+        format,
+        month || undefined
+      );
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `budget-report-${selectedContractId}-${year}${month ? `-${month}` : ""}.${format}`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setError(`Failed to export ${format.toUpperCase()}`);
+    }
+  };
+
+  if (loading) {
+    return <PageLoading message="Loading budget reports..." />;
+  }
+
+  return (
+    <div className="space-y-6 p-4 md:p-6">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <Title style={{ color: "var(--color-sentinel-text-primary)" }}>
+            Budget Reports
+          </Title>
+          <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>
+            Contract budget summary with monthly and equipment-type breakdowns.
+          </Text>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button size="xs" variant="secondary" onClick={() => handleExport("csv")}>
+            Export CSV
+          </Button>
+          <Button size="xs" variant="secondary" onClick={() => handleExport("pdf")}>
+            Export PDF
+          </Button>
+          <Button size="xs" variant="secondary" onClick={() => handleExport("json")}>
+            Export JSON
+          </Button>
+        </div>
+      </div>
+
+      <Card className="glass-panel">
+        <div className="flex flex-col md:flex-row md:items-center gap-4">
+          <div className="flex-1">
+            <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+              Contract
+            </Text>
+            <Select value={selectedContractId} onValueChange={setSelectedContractId}>
+              {contracts.map((contract) => (
+                <SelectItem
+                  key={contract.id || contract.contract_code}
+                  value={contract.id || contract.contract_code}
+                >
+                  {contract.contract_code} · {contract.organization.name}
+                </SelectItem>
+              ))}
+            </Select>
+          </div>
+          <div className="w-40">
+            <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+              Year
+            </Text>
+            <Select value={`${year}`} onValueChange={(value) => setYear(Number(value))}>
+              {[year - 1, year, year + 1].map((y) => (
+                <SelectItem key={y} value={`${y}`}>
+                  {y}
+                </SelectItem>
+              ))}
+            </Select>
+          </div>
+          <div className="w-40">
+            <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+              Month
+            </Text>
+            <Select value={month ? `${month}` : "all"} onValueChange={(value) => {
+              if (value === "all") {
+                setMonth(null);
+              } else {
+                setMonth(Number(value));
+              }
+            }}>
+              <SelectItem value="all">All</SelectItem>
+              {Array.from({ length: 12 }, (_, idx) => idx + 1).map((m) => (
+                <SelectItem key={m} value={`${m}`}>
+                  {m}
+                </SelectItem>
+              ))}
+            </Select>
+          </div>
+        </div>
+      </Card>
+
+      {error && (
+        <Card className="glass-panel">
+          <Text style={{ color: "var(--color-sentinel-red)" }}>{error}</Text>
+        </Card>
+      )}
+
+      {report && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <Card className="glass-panel">
+            <div className="flex items-center gap-2">
+              <FileText className="h-4 w-4" style={{ color: "var(--color-sentinel-blue)" }} />
+              <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                Total Budget
+              </Text>
+            </div>
+            <Title style={{ color: "var(--color-sentinel-text-primary)" }}>
+              {formatZAR(report.totals.total_budget_zar)}
+            </Title>
+          </Card>
+          <Card className="glass-panel">
+            <div className="flex items-center gap-2">
+              <FileText className="h-4 w-4" style={{ color: "var(--color-sentinel-amber)" }} />
+              <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                Total Actual
+              </Text>
+            </div>
+            <Title style={{ color: "var(--color-sentinel-text-primary)" }}>
+              {formatZAR(report.totals.total_actual_zar)}
+            </Title>
+          </Card>
+          <Card className="glass-panel">
+            <div className="flex items-center gap-2">
+              <FileText className="h-4 w-4" style={{ color: "var(--color-sentinel-green)" }} />
+              <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                Variance
+              </Text>
+            </div>
+            <Title style={{ color: "var(--color-sentinel-text-primary)" }}>
+              {formatZAR(report.totals.variance_zar)}
+            </Title>
+          </Card>
+        </div>
+      )}
+
+      {report && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card className="glass-panel">
+            <Title className="text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
+              Monthly Breakdown
+            </Title>
+            <Table className="mt-3">
+              <TableHead>
+                <TableRow>
+                  <TableHeaderCell>Month</TableHeaderCell>
+                  <TableHeaderCell className="text-right">Budget</TableHeaderCell>
+                  <TableHeaderCell className="text-right">Actual</TableHeaderCell>
+                  <TableHeaderCell className="text-right">Spend %</TableHeaderCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {report.monthly.map((row) => (
+                  <TableRow key={row.month}>
+                    <TableCell>{row.month}</TableCell>
+                    <TableCell className="text-right">{formatZAR(row.total_budget_zar)}</TableCell>
+                    <TableCell className="text-right">{formatZAR(row.total_actual_zar)}</TableCell>
+                    <TableCell className="text-right">{row.spend_percentage.toFixed(1)}%</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
+
+          <Card className="glass-panel">
+            <Title className="text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
+              Equipment-Type Breakdown
+            </Title>
+            {report.equipment_type_breakdown.length === 0 ? (
+              <Text className="text-xs mt-3" style={{ color: "var(--color-sentinel-text-disabled)" }}>
+                No equipment-type budgets available.
+              </Text>
+            ) : (
+              <Table className="mt-3">
+                <TableHead>
+                  <TableRow>
+                    <TableHeaderCell>Type</TableHeaderCell>
+                    <TableHeaderCell className="text-right">Budget</TableHeaderCell>
+                    <TableHeaderCell className="text-right">Actual</TableHeaderCell>
+                    <TableHeaderCell className="text-right">Spend %</TableHeaderCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {report.equipment_type_breakdown.map((row) => (
+                    <TableRow key={row.equipment_type}>
+                      <TableCell>{row.equipment_type}</TableCell>
+                      <TableCell className="text-right">{formatZAR(row.total_budget_zar)}</TableCell>
+                      <TableCell className="text-right">{formatZAR(row.total_actual_zar)}</TableCell>
+                      <TableCell className="text-right">{row.spend_percentage.toFixed(1)}%</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </Card>
+        </div>
+      )}
+    </div>
+  );
+}

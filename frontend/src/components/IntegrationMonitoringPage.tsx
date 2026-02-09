@@ -24,7 +24,7 @@ import {
   Plus,
   X,
 } from "lucide-react";
-import { monitoringApi } from "../lib/api";
+import { isExpectedApiError, monitoringApi } from "../lib/api";
 import { formatDateTime } from "../lib/timeFormat";
 import { GoLiveChecklist } from "./GoLiveChecklist";
 import { IntegrationWizard } from "./IntegrationWizard";
@@ -340,7 +340,9 @@ export function IntegrationMonitoringPage() {
         setQualityMetrics(null);
       }
     } catch (err) {
-      console.error("Failed to fetch monitoring data:", err);
+      if (!isExpectedApiError(err)) {
+        console.error("Failed to fetch monitoring data:", err);
+      }
       setError("Failed to load integration monitoring data");
     } finally {
       setIsRefreshing(false);

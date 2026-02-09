@@ -159,9 +159,9 @@ class SimulatedHuaweiConnector(SolarConnector):
         # Add per-inverter variance (+-3%)
         inv_variance = 1.0 + random.uniform(-0.03, 0.03)
 
-        # --- Simulated fault: FNB-INV-H07 consistently underperforms by ~12%
+        # --- Simulated fault: S002-INV-H07 consistently underperforms by ~12%
         #     due to string fault on MPPT tracker 4 ---
-        if inverter_id == "FNB-INV-H07":
+        if inverter_id == "S002-INV-H07":
             inv_variance *= 0.88  # 12% reduction
 
         ac_power = rated_kva * solar_factor * inv_variance * 0.97  # 97% avg efficiency
@@ -196,12 +196,12 @@ class SimulatedHuaweiConnector(SolarConnector):
             power_factor=round(0.99 + random.uniform(-0.01, 0.005), 3),
             daily_yield_kwh=round(
                 rated_kva * 5.2 * solar_factor * random.uniform(0.92, 1.0)
-                * (0.88 if inverter_id == "FNB-INV-H07" else 1.0), 1
+                * (0.88 if inverter_id == "S002-INV-H07" else 1.0), 1
             ),
             total_yield_mwh=round(rated_kva * 1460 * random.uniform(0.85, 0.95) / 1000, 1),
             alarms=(
                 ["String fault detected on MPPT tracker 4"]
-                if inverter_id == "FNB-INV-H07" else []
+                if inverter_id == "S002-INV-H07" else []
             ),
             last_poll=now.isoformat(),
         )
@@ -232,7 +232,7 @@ class SimulatedHuaweiConnector(SolarConnector):
                 # --- Simulated fault: H07 MPPT tracker 4 strings degraded
                 #     Reduces current by ~30% (soiling + partial disconnect) ---
                 mppt4_fault = (
-                    inverter_id == "FNB-INV-H07" and mppt == 4
+                    inverter_id == "S002-INV-H07" and mppt == 4
                 )
                 fault_factor = 0.70 if mppt4_fault else 1.0
 

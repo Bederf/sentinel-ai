@@ -7,7 +7,7 @@ The operator shouldn't need to think about it -- SENTINEL handles dispatch silen
 Tariff source: City Power Johannesburg Commercial TOU rates from
   backend/app/data/solar/tariffs/city_power_2026.json
 
-BESS constraints (Fairlands LUNA2000-5015-2S):
+BESS constraints (Site-002 LUNA2000-5015-2S):
   - Capacity: 5,015 kWh usable
   - Max charge/discharge: 2,507 kW (0.5C)
   - Min SOC: 10%  (protect cell longevity)
@@ -223,7 +223,7 @@ class SolarArbitrageEngine:
     Integrates with EskomSePush for load shedding reserve management.
     """
 
-    # BESS constraints (from Fairlands LUNA2000-5015-2S config)
+    # BESS constraints (from Site-002 LUNA2000-5015-2S config)
     BESS_CAPACITY_KWH = 5015.0
     BESS_RATED_POWER_KW = 2507.0  # 0.5C rate
     BESS_MIN_SOC_PCT = 10.0
@@ -757,7 +757,7 @@ class SolarArbitrageEngine:
     ) -> DailySavings:
         """Calculate actual vs no-BESS cost comparison.
 
-        Simulates a typical day profile for the Fairlands campus:
+        Simulates a typical day profile for the Site-002 campus:
           - Building base load: ~1,800 kW
           - Peak demand: ~2,500 kW
           - Solar generation: ~2,800 kWh/day (typical for 3.9 MWp)
@@ -778,7 +778,7 @@ class SolarArbitrageEngine:
         )
         dischargeable_kwh = usable_kwh * self.BESS_ROUND_TRIP_EFF
 
-        # Simulated daily profile for Fairlands
+        # Simulated daily profile for Site-002
         # Peak hours: 5h (07:00-10:00 + 18:00-20:00 summer)
         peak_hours = 5.0
         std_hours = 10.0  # 06:00-07:00, 10:00-18:00, 20:00-22:00

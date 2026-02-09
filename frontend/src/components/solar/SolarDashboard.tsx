@@ -39,10 +39,9 @@ export function SolarDashboard() {
       .catch(() => {
         // Fallback if API not available
         setSolarSites([
-          { site_id: "fairlands", site_name: "Fairlands Office Park", plants: 2, connectors: 3, last_poll: null },
-          { site_id: "sandton", site_name: "Sandton City Office Tower", plants: 1, connectors: 1, last_poll: null },
+          { site_id: "site-002", site_name: "Sandton City Office Tower", plants: 2, connectors: 3, last_poll: null },
         ]);
-        if (!selectedSiteId) setSelectedSiteId("fairlands");
+        if (!selectedSiteId) setSelectedSiteId("site-002");
       });
   }, []);
 

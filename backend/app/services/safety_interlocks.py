@@ -44,7 +44,7 @@ class SafetyEngine:
 
     async def initialize(self, rules_data: Optional[List[Dict[str, Any]]] = None) -> None:
         """Initialize safety engine with rules."""
-        if self._initialized:
+        if self._initialized and self.rules:
             return
 
         logger.info("Initializing SafetyEngine")
@@ -339,10 +339,81 @@ class SafetyEngine:
                 - warnings: List of warning messages
                 - rule_results: Detailed results from each rule check
         """
+        # Always enforce a safe HVAC setpoint range, regardless of rule state.
+        if device.device_type == DeviceType.HVAC and point_name in {"setpoint", "temperature_setpoint"}:
+            point = device.get_point(point_name)
+            min_allowed = 16.0
+            max_allowed = 28.0
+            if point and point.min_value is not None and point.max_value is not None:
+                min_allowed = float(point.min_value)
+                max_allowed = float(point.max_value)
+            try:
+                temp = float(value)
+                if temp < min_allowed or temp > max_allowed:
+                    return {
+                        "allowed": False,
+                        "reasons": [
+                            f"Temperature {temp}°C is outside safe range ({min_allowed}-{max_allowed}°C)"
+                        ],
+                        "warnings": [],
+                        "alarms": [],
+                        "rule_results": [],
+                        "message": "Safety validation complete",
+                        "device_id": device.id,
+                        "point_name": point_name,
+                        "value": value,
+                        "timestamp": datetime.now().isoformat(),
+                    }
+            except (TypeError, ValueError):
+                return {
+                    "allowed": False,
+                    "reasons": [f"Invalid temperature value: {value}"],
+                    "warnings": [],
+                    "alarms": [],
+                    "rule_results": [],
+                    "message": "Safety validation complete",
+                    "device_id": device.id,
+                    "point_name": point_name,
+                    "value": value,
+                    "timestamp": datetime.now().isoformat(),
+                }
+
         # Get applicable rules
         applicable_rules = await self.get_rules_for_device(device, point_name)
 
         if not applicable_rules:
+            # Fallback guard for HVAC setpoint when no rules are loaded
+            if device.device_type == DeviceType.HVAC and point_name in {"setpoint", "temperature_setpoint"}:
+                try:
+                    temp = float(value)
+                    if temp < 16.0 or temp > 28.0:
+                        return {
+                            "allowed": False,
+                            "reasons": [
+                                f"Temperature {temp}°C is outside safe range (16-28°C)"
+                            ],
+                            "warnings": [],
+                            "alarms": [],
+                            "rule_results": [],
+                            "message": "Safety validation complete",
+                            "device_id": device.id,
+                            "point_name": point_name,
+                            "value": value,
+                            "timestamp": datetime.now().isoformat(),
+                        }
+                except (TypeError, ValueError):
+                    return {
+                        "allowed": False,
+                        "reasons": [f"Invalid temperature value: {value}"],
+                        "warnings": [],
+                        "alarms": [],
+                        "rule_results": [],
+                        "message": "Safety validation complete",
+                        "device_id": device.id,
+                        "point_name": point_name,
+                        "value": value,
+                        "timestamp": datetime.now().isoformat(),
+                    }
             return {
                 "allowed": True,
                 "reasons": [],

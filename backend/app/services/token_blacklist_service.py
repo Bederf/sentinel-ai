@@ -17,7 +17,6 @@ Usage:
 """
 
 import logging
-from typing import Optional
 
 from app.config.settings import settings
 from app.services.cache_service import cache
@@ -59,6 +58,9 @@ class TokenBlacklistService:
         if not self._enabled:
             logger.debug("Redis disabled - skipping blacklist write")
             return False
+        if ttl_seconds <= 0:
+            # Token already expired (or invalid TTL), nothing to persist.
+            return True
 
         try:
             key = self._get_redis_key(jti)

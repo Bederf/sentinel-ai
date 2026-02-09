@@ -58,7 +58,7 @@ class TestWorkflowTriggerEngine:
 
     @pytest.mark.asyncio
     async def test_ml_anomaly_skips_duplicate_inspection(self, trigger_engine):
-        """Test that duplicate inspections are not created."""
+        """Test that duplicate anomalies are suppressed."""
         anomaly1 = AnomalyAlert(
             id="anomaly-001",
             equipment_id="chiller-001",
@@ -78,9 +78,9 @@ class TestWorkflowTriggerEngine:
         result1 = await trigger_engine.on_ml_anomaly("chiller-001", anomaly1)
         assert result1.action_taken == "created_inspection_task"
 
-        # Second anomaly finds existing inspection
+        # Second anomaly is suppressed by cooldown/dedupe
         result2 = await trigger_engine.on_ml_anomaly("chiller-001", anomaly2)
-        assert result2.action_taken == "inspection_exists"
+        assert result2.action_taken == "duplicate_suppressed"
 
     @pytest.mark.asyncio
     async def test_ml_anomaly_priority_calculation(self, trigger_engine):

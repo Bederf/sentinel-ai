@@ -230,7 +230,7 @@ class TestToolRegistration:
         assert "approve_point_mapping" in TOOL_HANDLERS
         assert "correct_point_classification" in TOOL_HANDLERS
 
-    def test_tool_count_is_15(self):
-        """Verify total tool count is 15 (11 existing + 4 new)."""
-        assert len(CHAT_TOOLS) == 15
-        assert len(TOOL_HANDLERS) == 15
+    def test_tool_count_matches(self):
+        """Verify CHAT_TOOLS and TOOL_HANDLERS have same count."""
+        assert len(CHAT_TOOLS) == len(TOOL_HANDLERS)
+        assert len(CHAT_TOOLS) >= 15  # At least the original 15 tools

@@ -4,7 +4,7 @@ type: "reference"
 status: "approved"
 version: "1.0.0"
 created: "2026-02-06"
-updated: "2026-02-07"
+updated: "2026-02-08"
 author: "Sentinel Development Team"
 tags: ["api", "contracts", "sla", "budget", "organizations", "commercial"]
 domain: "bms"
@@ -36,13 +36,13 @@ List all FM client organizations with optional tier filter.
   "organizations": [
     {
       "id": "uuid",
-      "code": "FNB",
+      "code": "",
       "name": "First National Bank Ltd",
-      "trading_name": "FNB",
+      "trading_name": "",
       "tier": "platinum",
       "status": "active",
       "primary_contact_name": "John Smith",
-      "primary_contact_email": "john@fnb.co.za",
+      "primary_contact_email": "john@.co.za",
       "industry": "Banking",
       "created_at": "2026-01-15T00:00:00"
     }
@@ -63,15 +63,15 @@ Create a new FM client organization.
 **Request Body:**
 ```json
 {
-  "code": "FNB",
+  "code": "",
   "name": "First National Bank Ltd",
-  "trading_name": "FNB",
+  "trading_name": "",
   "registration_number": "1929/001225/06",
   "vat_number": "4000101186",
   "primary_contact_name": "John Smith",
-  "primary_contact_email": "john@fnb.co.za",
+  "primary_contact_email": "john@.co.za",
   "primary_contact_phone": "+27 11 371 1234",
-  "billing_email": "billing@fnb.co.za",
+  "billing_email": "billing@.co.za",
   "industry": "Banking",
   "tier": "platinum"
 }
@@ -83,7 +83,7 @@ Create a new FM client organization.
 ```bash
 curl -X POST http://localhost:9095/api/contracts/organizations \
   -H "Content-Type: application/json" \
-  -d '{"code": "FNB", "name": "First National Bank Ltd", "tier": "platinum"}'
+  -d '{"code": "", "name": "First National Bank Ltd", "tier": "platinum"}'
 ```
 
 ### GET `/api/contracts/organizations/{org_id}`
@@ -114,7 +114,7 @@ List contracts with optional filters.
   "contracts": [
     {
       "id": "uuid",
-      "code": "CON-FNB-2026-001",
+      "code": "CON--2026-001",
       "organization_id": "uuid",
       "building_id": "uuid",
       "contract_type": "comprehensive",
@@ -140,7 +140,7 @@ Create a new contract linking an organization to a building. Always starts in `d
 **Request Body:**
 ```json
 {
-  "code": "CON-FNB-2026-001",
+  "code": "CON--2026-001",
   "organization_id": "org-uuid",
   "building_id": "building-uuid",
   "contract_type": "comprehensive",
@@ -161,7 +161,7 @@ Create a new contract linking an organization to a building. Always starts in `d
 ```bash
 curl -X POST http://localhost:9095/api/contracts/ \
   -H "Content-Type: application/json" \
-  -d '{"code": "CON-FNB-2026-001", "organization_id": "...", "building_id": "...", "start_date": "2026-01-01", "monthly_fee_zar": 145000}'
+  -d '{"code": "CON--2026-001", "organization_id": "...", "building_id": "...", "start_date": "2026-01-01", "monthly_fee_zar": 145000}'
 ```
 
 ### GET `/api/contracts/{contract_id}`
@@ -354,6 +354,46 @@ Monthly profitability trend series (default 12 months).
 
 Asset-level ROI calculation for a specific equipment item.
 
+**Query Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| period_start | date | No | Start date (YYYY-MM-DD) |
+| period_end | date | No | End date (YYYY-MM-DD) |
+
+### GET `/api/contracts/profitability/assets/{contract_id}`
+
+Asset ROI list for a contract, sorted by ROI descending.
+
+**Query Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| period_start | date | No | Start date (YYYY-MM-DD) |
+| period_end | date | No | End date (YYYY-MM-DD) |
+| limit | int | No | Max assets to return (1-100, default 15) |
+
+### GET `/api/contracts/profitability/report/{contract_id}`
+
+Generate a contract profitability report with trends and asset ROI list.
+
+**Query Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| period_start | date | No | Start date (YYYY-MM-DD) |
+| period_end | date | No | End date (YYYY-MM-DD) |
+| asset_limit | int | No | Max assets to include (1-100, default 15) |
+
+### GET `/api/contracts/profitability/report/{contract_id}/export`
+
+Export a contract profitability report as CSV or PDF.
+
+**Query Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| format | string | No | csv or pdf (default csv) |
+| period_start | date | No | Start date (YYYY-MM-DD) |
+| period_end | date | No | End date (YYYY-MM-DD) |
+| asset_limit | int | No | Max assets to include (1-100, default 15) |
+
 ### POST `/api/contracts/{contract_id}/sla-terms`
 
 Add a single SLA term to a contract.
@@ -465,7 +505,7 @@ List budget entries for a contract, optionally filtered by year.
   "budgets": [
     {
       "id": "uuid",
-      "code": "BUD-FNB-SANDTON-2026",
+      "code": "BUD--SANDTON-2026",
       "contract_id": "uuid",
       "budget_year": 2026,
       "labor_budget_zar": 200000.00,
@@ -487,7 +527,7 @@ Create a budget entry for a contract period. Sets planned amounts by cost catego
 **Request Body:**
 ```json
 {
-  "code": "BUD-FNB-SANDTON-2026",
+  "code": "BUD--SANDTON-2026",
   "contract_id": "uuid",
   "budget_year": 2026,
   "labor_budget_zar": 200000.00,
@@ -528,6 +568,72 @@ Get budget vs actual variance report for a contract year.
 ```bash
 curl "http://localhost:9095/api/contracts/{id}/budget-variance?year=2026"
 ```
+
+### POST `/api/contracts/{contract_id}/budgets/capture-actuals`
+
+Capture actual costs from completed work orders for a contract month.
+
+**Query Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| year | int | Yes | Budget year |
+| month | int | Yes | Budget month (1-12) |
+
+### GET `/api/contracts/{contract_id}/budget-variance/alerts`
+
+List budget variance alerts for a contract.
+
+**Query Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| year | int | No | Budget year |
+| month | int | No | Budget month |
+| status | string | No | open, acknowledged, resolved |
+| severity | string | No | warning, critical |
+
+### PATCH `/api/contracts/budget-variance/alerts/{alert_id}`
+
+Update budget alert status.
+
+**Query Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| status | string | Yes | open, acknowledged, resolved |
+
+### POST `/api/contracts/{contract_id}/budget-variance/evaluate`
+
+Evaluate budget variance for a contract month and emit alerts.
+
+**Query Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| year | int | Yes | Budget year |
+| month | int | Yes | Budget month (1-12) |
+
+**Notes:**
+- Evaluates both contract-wide and equipment-type budgets.
+
+### GET `/api/contracts/{contract_id}/budgets/report`
+
+Budget report with monthly breakdown and totals.
+Includes equipment-type breakdown and alert summary.
+
+**Query Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| year | int | Yes | Budget year |
+| month | int | No | Optional month filter (1-12) |
+
+### GET `/api/contracts/{contract_id}/budgets/report/export`
+
+Export budget report as CSV or PDF.
+
+**Query Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| year | int | Yes | Budget year |
+| month | int | No | Optional month filter (1-12) |
+| format | string | No | csv or pdf (default csv) |
 
 ## Condition Assessments
 

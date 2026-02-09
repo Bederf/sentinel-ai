@@ -641,6 +641,13 @@
     border-color: var(--color-grafana-border) !important;
   }
 
+  .recharts-responsive-container,
+  .recharts-wrapper,
+  [data-tremor-chart] {
+    min-height: 120px;
+    min-width: 0;
+  }
+
   /* Ensure white text on dark backgrounds */
   .dark-text {
     color: var(--color-grafana-text-primary);

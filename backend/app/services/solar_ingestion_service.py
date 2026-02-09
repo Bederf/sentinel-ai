@@ -27,6 +27,7 @@ from app.models.solar import (
 from app.services.solar_connector_base import SolarConnector
 from app.services.solar_connector_huawei import SimulatedHuaweiConnector
 from app.services.solar_connector_schneider import SimulatedSchneiderConnector
+from app.database.supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +48,7 @@ class SolarIngestionService:
     """Manages solar/BESS data ingestion across multiple sites.
 
     Responsibilities:
-      - Load site configs from JSON (auto-registers Fairlands on startup)
+      - Load site configs from JSON (auto-registers Site-002 on startup)
       - Instantiate per-manufacturer connectors (simulated for demo)
       - Poll all connectors and aggregate normalised readings
       - Quality-flag management: fresh (<30s) = good, >60s = stale
@@ -61,22 +62,255 @@ class SolarIngestionService:
     # === Site management ===
 
     def _load_site_configs(self):
-        """Auto-load site configurations from data/solar/ directory."""
+        """Auto-load site configurations from Supabase and JSON fallback."""
+        configs_by_id: Dict[str, Dict] = {}
+
+        # 1) Supabase (preferred)
+        supabase_configs = self._load_site_configs_from_supabase()
+        for cfg in supabase_configs:
+            configs_by_id[cfg.get("site_id")] = cfg
+
+        # 2) JSON fallback
+        json_configs = self._load_site_configs_from_json()
+
+        # If Supabase is empty but JSON exists, seed Supabase
+        if not supabase_configs and json_configs:
+            self._seed_supabase_from_configs(json_configs)
+            supabase_configs = self._load_site_configs_from_supabase()
+            for cfg in supabase_configs:
+                configs_by_id[cfg.get("site_id")] = cfg
+
+        # Fill any gaps with JSON
+        for cfg in json_configs:
+            configs_by_id.setdefault(cfg.get("site_id"), cfg)
+
+        for site_id, config in configs_by_id.items():
+            if not site_id:
+                continue
+            self.register_site(site_id, config)
+            logger.info("Auto-loaded solar site: %s", site_id)
+
+    def _load_site_configs_from_json(self) -> List[Dict]:
+        """Load site configurations from data/solar/ directory."""
         solar_data_dir = Path(__file__).parent.parent / "data" / "solar"
         if not solar_data_dir.exists():
-            logger.warning(f"Solar data directory not found: {solar_data_dir}")
-            return
+            logger.warning("Solar data directory not found: %s", solar_data_dir)
+            return []
 
+        configs: List[Dict] = []
         config_files = list(solar_data_dir.glob("*_config.json"))
         for config_path in config_files:
             try:
                 with open(config_path) as f:
                     config = json.load(f)
-                site_id = config.get("site_id", config_path.stem.replace("_config", ""))
-                self.register_site(site_id, config)
-                logger.info(f"Auto-loaded solar site: {site_id} from {config_path.name}")
+                config["site_id"] = config.get("site_id", config_path.stem.replace("_config", ""))
+                configs.append(config)
+                logger.info("Loaded solar config from JSON: %s", config_path.name)
             except Exception as e:
-                logger.error(f"Failed to load solar config {config_path}: {e}")
+                logger.error("Failed to load solar config %s: %s", config_path, e)
+        return configs
+
+    def _load_site_configs_from_supabase(self) -> List[Dict]:
+        """Load solar site configs from Supabase tables (if available)."""
+        try:
+            client = get_supabase_client()
+        except Exception as e:
+            logger.warning("Supabase client unavailable for solar configs: %s", e)
+            return []
+
+        try:
+            sites = client.table("solar_sites").select("*").execute().data or []
+            if not sites:
+                return []
+
+            plants = client.table("solar_plants").select("*").execute().data or []
+            inverters = client.table("solar_inverters").select("*").execute().data or []
+            bess = client.table("solar_bess").select("*").execute().data or []
+            meters = client.table("solar_meters").select("*").execute().data or []
+
+            plants_by_site: Dict[str, List[Dict]] = {}
+            for plant in plants:
+                plants_by_site.setdefault(plant["site_id"], []).append(plant)
+
+            inverters_by_plant: Dict[str, List[Dict]] = {}
+            for inv in inverters:
+                inverters_by_plant.setdefault(inv["plant_id"], []).append(inv)
+
+            bess_by_site: Dict[str, Dict] = {}
+            for b in bess:
+                bess_by_site[b["site_id"]] = b
+
+            meters_by_site: Dict[str, List[Dict]] = {}
+            for m in meters:
+                meters_by_site.setdefault(m["site_id"], []).append(m)
+
+            configs: List[Dict] = []
+            for site in sites:
+                site_id = site["site_id"]
+                site_plants = []
+                for plant in plants_by_site.get(site_id, []):
+                    plant_inverters = inverters_by_plant.get(plant["plant_id"], [])
+                    site_plants.append({
+                        "plant_id": plant["plant_id"],
+                        "name": plant.get("name", ""),
+                        "capacity_kwp": plant.get("capacity_kwp", 0),
+                        "panel_count": plant.get("panel_count", 0),
+                        "panel_model": plant.get("panel_model", ""),
+                        "panel_rating_w": plant.get("panel_rating_w", 0),
+                        "commissioning_date": plant.get("commissioning_date"),
+                        "orientation": plant.get("orientation", 0),
+                        "tilt": plant.get("tilt", 0),
+                        "inverters": [
+                            {
+                                "id": inv["inverter_id"],
+                                "name": inv.get("name", ""),
+                                "manufacturer": inv.get("manufacturer", ""),
+                                "model": inv.get("model", ""),
+                                "rated_kva": inv.get("rated_kva", 0),
+                                "mppt_count": inv.get("mppt_count", 0),
+                                "protocol": inv.get("protocol", ""),
+                                "ip": inv.get("ip", ""),
+                                "port": inv.get("port", 0),
+                                "unit_id": inv.get("unit_id", 0),
+                                "strings_per_mppt": inv.get("strings_per_mppt", 0),
+                                "panels_per_string": inv.get("panels_per_string", 0),
+                            }
+                            for inv in plant_inverters
+                        ],
+                    })
+
+                config = {
+                    "site_id": site_id,
+                    "site_name": site.get("site_name", site_id),
+                    "latitude": site.get("latitude", -26.2),
+                    "longitude": site.get("longitude", 28.0),
+                    "plants": site_plants,
+                    "bess": None,
+                    "meters": meters_by_site.get(site_id, []),
+                }
+
+                if site_id in bess_by_site:
+                    b = bess_by_site[site_id]
+                    config["bess"] = {
+                        "container_id": b.get("container_id", b.get("bess_id", "")),
+                        "name": b.get("name", ""),
+                        "manufacturer": b.get("manufacturer", ""),
+                        "model": b.get("model", ""),
+                        "capacity_kwh": b.get("capacity_kwh", 0),
+                        "rated_power_kw": b.get("rated_power_kw", 0),
+                        "rack_count": b.get("rack_count", 0),
+                        "cell_chemistry": b.get("cell_chemistry", ""),
+                        "protocol": b.get("protocol", ""),
+                    }
+
+                configs.append(config)
+
+            return configs
+        except Exception as e:
+            logger.error("Failed to load solar configs from Supabase: %s", e)
+            return []
+
+    def _seed_supabase_from_configs(self, configs: List[Dict]) -> None:
+        """Seed Supabase solar tables from JSON config if empty."""
+        try:
+            client = get_supabase_client()
+        except Exception as e:
+            logger.warning("Supabase client unavailable for solar seed: %s", e)
+            return
+
+        try:
+            existing = client.table("solar_sites").select("site_id").execute().data or []
+            if existing:
+                return
+        except Exception as e:
+            logger.warning("Solar seed skipped (tables missing?): %s", e)
+            return
+
+        for config in configs:
+            site_id = config.get("site_id")
+            if not site_id:
+                continue
+
+            try:
+                client.table("solar_sites").insert({
+                    "site_id": site_id,
+                    "site_name": config.get("site_name", site_id),
+                    "latitude": config.get("latitude"),
+                    "longitude": config.get("longitude"),
+                }).execute()
+
+                plants = []
+                inverters = []
+                for plant in config.get("plants", []):
+                    plants.append({
+                        "plant_id": plant.get("plant_id"),
+                        "site_id": site_id,
+                        "name": plant.get("name", ""),
+                        "capacity_kwp": plant.get("capacity_kwp", 0),
+                        "panel_count": plant.get("panel_count", 0),
+                        "panel_model": plant.get("panel_model", ""),
+                        "panel_rating_w": plant.get("panel_rating_w", 0),
+                        "commissioning_date": plant.get("commissioning_date"),
+                        "orientation": plant.get("orientation", 0),
+                        "tilt": plant.get("tilt", 0),
+                    })
+                    for inv in plant.get("inverters", []):
+                        inverters.append({
+                            "inverter_id": inv.get("id"),
+                            "site_id": site_id,
+                            "plant_id": plant.get("plant_id"),
+                            "name": inv.get("name", ""),
+                            "manufacturer": inv.get("manufacturer", ""),
+                            "model": inv.get("model", ""),
+                            "rated_kva": inv.get("rated_kva", 0),
+                            "mppt_count": inv.get("mppt_count", 0),
+                            "protocol": inv.get("protocol", ""),
+                            "ip": inv.get("ip", ""),
+                            "port": inv.get("port", 0),
+                            "unit_id": inv.get("unit_id", 0),
+                            "strings_per_mppt": inv.get("strings_per_mppt", 0),
+                            "panels_per_string": inv.get("panels_per_string", 0),
+                        })
+
+                if plants:
+                    client.table("solar_plants").insert(plants).execute()
+                if inverters:
+                    client.table("solar_inverters").insert(inverters).execute()
+
+                bess = config.get("bess")
+                if bess:
+                    client.table("solar_bess").insert({
+                        "bess_id": bess.get("container_id"),
+                        "site_id": site_id,
+                        "container_id": bess.get("container_id"),
+                        "name": bess.get("name", ""),
+                        "manufacturer": bess.get("manufacturer", ""),
+                        "model": bess.get("model", ""),
+                        "capacity_kwh": bess.get("capacity_kwh", 0),
+                        "rated_power_kw": bess.get("rated_power_kw", 0),
+                        "rack_count": bess.get("rack_count", 0),
+                        "cell_chemistry": bess.get("cell_chemistry", ""),
+                        "protocol": bess.get("protocol", ""),
+                    }).execute()
+
+                meters = []
+                for m in config.get("meters", []):
+                    meters.append({
+                        "meter_id": m.get("meter_id"),
+                        "site_id": site_id,
+                        "name": m.get("name", ""),
+                        "manufacturer": m.get("manufacturer", ""),
+                        "model": m.get("model", ""),
+                        "protocol": m.get("protocol", ""),
+                        "ip": m.get("ip", ""),
+                        "port": m.get("port", 0),
+                    })
+                if meters:
+                    client.table("solar_meters").insert(meters).execute()
+
+                logger.info("Seeded solar site into Supabase: %s", site_id)
+            except Exception as e:
+                logger.error("Failed seeding solar site %s: %s", site_id, e)
 
     def register_site(self, site_id: str, config: Dict) -> None:
         """Register a solar site and instantiate its connectors."""
@@ -118,7 +352,7 @@ class SolarIngestionService:
                 if connector:
                     reg.connectors[connector_key] = connector
 
-        # BESS connector (usually Huawei for Fairlands)
+        # BESS connector (usually Huawei for Site-002)
         bess_cfg = config.get("bess")
         if bess_cfg:
             bess_cfg["site_id"] = site_id

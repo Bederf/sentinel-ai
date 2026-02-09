@@ -11,7 +11,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { RefreshCw, AlertTriangle, DoorOpen, Clock, UserX, Moon } from "lucide-react";
-import { securityApi } from "../lib/api";
+import { isExpectedApiError, securityApi } from "../lib/api";
 import type { BadgeEvent } from "../lib/api";
 
 type EventFilter = "all" | "denied" | "after-hours";
@@ -47,7 +47,9 @@ export function AccessEventsPanel({ refreshKey }: AccessEventsPanelProps) {
       setEvents(result.events);
       setError(null);
     } catch (err) {
-      console.error("Failed to fetch badge events:", err);
+      if (!isExpectedApiError(err)) {
+        console.error("Failed to fetch badge events:", err);
+      }
       setError("Failed to load access events");
     } finally {
       setLoading(false);

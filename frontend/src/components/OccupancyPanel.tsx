@@ -16,7 +16,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { RefreshCw, Users, Lightbulb, AlertTriangle, Cpu, Eye, Zap, Building2, ChevronDown, X, Radio, Clock, ThermometerSun, Wrench } from "lucide-react";
 import { OccupancyHeatmap } from "./OccupancyHeatmap";
-import { api, daliApi } from "../lib/api";
+import { api, daliApi, isExpectedApiError } from "../lib/api";
 import type { BuildingOccupancy, DALIStats, ZoneLighting, ZoneOccupancy, DALISensor, DALILuminaire, Site } from "../lib/api";
 
 // Get occupancy color based on percentage
@@ -92,7 +92,9 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
       setLastUpdated(new Date());
       setError(null);
     } catch (err) {
-      console.error("Failed to fetch occupancy data:", err);
+      if (!isExpectedApiError(err)) {
+        console.error("Failed to fetch occupancy data:", err);
+      }
       setError("Failed to load occupancy data. Check that the backend is running.");
     } finally {
       setLoading(false);
@@ -107,7 +109,9 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
         const sitesData = await api.getSites();
         setSites(sitesData);
       } catch (err) {
-        console.error("Failed to fetch sites:", err);
+        if (!isExpectedApiError(err)) {
+          console.error("Failed to fetch sites:", err);
+        }
       }
     }
     loadSites();
@@ -148,7 +152,9 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
 
       setZoneDetails({ sensors, luminaires, lighting });
     } catch (err) {
-      console.error("Failed to fetch zone details:", err);
+      if (!isExpectedApiError(err)) {
+        console.error("Failed to fetch zone details:", err);
+      }
     } finally {
       setLoadingZoneDetails(false);
     }

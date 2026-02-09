@@ -1,0 +1,1065 @@
+{
+  "discovery_id": "0d5a411d",
+  "site_id": "site-002",
+  "created_at": "2026-02-05T14:17:54.416663",
+  "equipment_count": 19,
+  "total_points": 57,
+  "equipment": {
+    "CH-1": {
+      "equipment_id": "CH-1",
+      "equipment_type": "chiller",
+      "equipment_name": "Chiller (CH-1)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "CH-1_CHW_Supply_Temp",
+          "standardized_name": "CH-1/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        },
+        {
+          "original_name": "CH-1_CHW_Return_Temp",
+          "standardized_name": "CH-1/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        },
+        {
+          "original_name": "CH-1_Condenser_Water_Temp",
+          "standardized_name": "CH-1/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        },
+        {
+          "original_name": "CH-1_Compressor_Status",
+          "standardized_name": "CH-1/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        },
+        {
+          "original_name": "CH-1_Load_Percent",
+          "standardized_name": "CH-1/current_sensor",
+          "point_type": "sensor",
+          "point_category": "current",
+          "unit": "%",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        },
+        {
+          "original_name": "CH-1_CHW_SP",
+          "standardized_name": "CH-1/setpoint_setpoint",
+          "point_type": "setpoint",
+          "point_category": "setpoint",
+          "unit": "degC",
+          "confidence": "high",
+          "object_type": "analogValue",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        },
+        {
+          "original_name": "CH-1_Alarm",
+          "standardized_name": "CH-1/alarm_alarm",
+          "point_type": "alarm",
+          "point_category": "alarm",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "binaryInput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        }
+      ],
+      "point_count": 7,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "chiller": 7
+        },
+        "avg_confidence_score": 2.71
+      },
+      "created_at": "2026-02-05T14:17:54.416012",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "CH-2": {
+      "equipment_id": "CH-2",
+      "equipment_type": "chiller",
+      "equipment_name": "Chiller (CH-2)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "CH-2_CHW_Supply_Temp",
+          "standardized_name": "CH-2/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        },
+        {
+          "original_name": "CH-2_Compressor_Status",
+          "standardized_name": "CH-2/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "kPa",
+          "confidence": "medium",
+          "object_type": "binaryInput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        },
+        {
+          "original_name": "CH-2_Load_Percent",
+          "standardized_name": "CH-2/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "%",
+          "confidence": "low",
+          "object_type": "analogInput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "medium",
+      "metadata": {
+        "type_vote_counts": {
+          "chiller": 3
+        },
+        "avg_confidence_score": 2.0
+      },
+      "created_at": "2026-02-05T14:17:54.416052",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "AHU-1": {
+      "equipment_id": "AHU-1",
+      "equipment_type": "ahu",
+      "equipment_name": "Air Handling Unit (AHU-1)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "AHU-1_Supply_Air_Temp",
+          "standardized_name": "AHU-1/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        },
+        {
+          "original_name": "AHU-1_Return_Air_Temp",
+          "standardized_name": "AHU-1/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        },
+        {
+          "original_name": "AHU-1_Mixed_Air_Temp",
+          "standardized_name": "AHU-1/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        },
+        {
+          "original_name": "AHU-1_Filter_DP",
+          "standardized_name": "AHU-1/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "Pa",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        },
+        {
+          "original_name": "AHU-1_Fan_Status",
+          "standardized_name": "AHU-1/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        },
+        {
+          "original_name": "AHU-1_Fan_Speed",
+          "standardized_name": "AHU-1/speed_sensor",
+          "point_type": "sensor",
+          "point_category": "speed",
+          "unit": "%",
+          "confidence": "high",
+          "object_type": "analogOutput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        },
+        {
+          "original_name": "AHU-1_SA_SP",
+          "standardized_name": "AHU-1/setpoint_setpoint",
+          "point_type": "setpoint",
+          "point_category": "setpoint",
+          "unit": "degC",
+          "confidence": "high",
+          "object_type": "analogValue",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        }
+      ],
+      "point_count": 7,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "ahu": 7
+        },
+        "avg_confidence_score": 3.0
+      },
+      "created_at": "2026-02-05T14:17:54.416080",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "AHU-2": {
+      "equipment_id": "AHU-2",
+      "equipment_type": "ahu",
+      "equipment_name": "Air Handling Unit (AHU-2)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "AHU-2_Supply_Air_Temp",
+          "standardized_name": "AHU-2/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        },
+        {
+          "original_name": "AHU-2_Fan_Status",
+          "standardized_name": "AHU-2/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "binaryInput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        },
+        {
+          "original_name": "AHU-2_Fan_Speed",
+          "standardized_name": "AHU-2/speed_sensor",
+          "point_type": "sensor",
+          "point_category": "speed",
+          "unit": "%",
+          "confidence": "high",
+          "object_type": "analogOutput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "ahu": 3
+        },
+        "avg_confidence_score": 2.67
+      },
+      "created_at": "2026-02-05T14:17:54.416098",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "VAV-L1-A": {
+      "equipment_id": "VAV-L1-A",
+      "equipment_type": "vav",
+      "equipment_name": "Variable Air Volume Box (VAV-L1-A)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "VAV-L1-A_Zone_Temp",
+          "standardized_name": "VAV-L1-A/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        },
+        {
+          "original_name": "VAV-L1-A_Damper_Pos",
+          "standardized_name": "VAV-L1-A/valve_position_sensor",
+          "point_type": "sensor",
+          "point_category": "valve_position",
+          "unit": "%",
+          "confidence": "high",
+          "object_type": "analogOutput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        },
+        {
+          "original_name": "VAV-L1-A_Airflow",
+          "standardized_name": "VAV-L1-A/flow_sensor",
+          "point_type": "sensor",
+          "point_category": "flow",
+          "unit": "L/s",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        },
+        {
+          "original_name": "VAV-L1-A_Zone_SP",
+          "standardized_name": "VAV-L1-A/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "high",
+          "object_type": "analogValue",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        }
+      ],
+      "point_count": 4,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "vav": 4
+        },
+        "avg_confidence_score": 3.0
+      },
+      "created_at": "2026-02-05T14:17:54.416116",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "VAV-L1-B": {
+      "equipment_id": "VAV-L1-B",
+      "equipment_type": "vav",
+      "equipment_name": "Variable Air Volume Box (VAV-L1-B)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "VAV-L1-B_Zone_Temp",
+          "standardized_name": "VAV-L1-B/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        },
+        {
+          "original_name": "VAV-L1-B_Damper_Pos",
+          "standardized_name": "VAV-L1-B/valve_position_sensor",
+          "point_type": "sensor",
+          "point_category": "valve_position",
+          "unit": "%",
+          "confidence": "high",
+          "object_type": "analogOutput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        }
+      ],
+      "point_count": 2,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "vav": 2
+        },
+        "avg_confidence_score": 3.0
+      },
+      "created_at": "2026-02-05T14:17:54.416132",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "VAV-L2-A": {
+      "equipment_id": "VAV-L2-A",
+      "equipment_type": "vav",
+      "equipment_name": "Variable Air Volume Box (VAV-L2-A)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "VAV-L2-A_Zone_Temp",
+          "standardized_name": "VAV-L2-A/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        },
+        {
+          "original_name": "VAV-L2-A_Zone_SP",
+          "standardized_name": "VAV-L2-A/setpoint_setpoint",
+          "point_type": "setpoint",
+          "point_category": "setpoint",
+          "unit": "degC",
+          "confidence": "high",
+          "object_type": "analogValue",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        }
+      ],
+      "point_count": 2,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "vav": 2
+        },
+        "avg_confidence_score": 3.0
+      },
+      "created_at": "2026-02-05T14:17:54.416147",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "FCU-L1-A": {
+      "equipment_id": "FCU-L1-A",
+      "equipment_type": "fcu",
+      "equipment_name": "Fan Coil Unit (FCU-L1-A)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "FCU-L1-A_Room_Temp",
+          "standardized_name": "FCU-L1-A/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        },
+        {
+          "original_name": "FCU-L1-A_Fan_Speed",
+          "standardized_name": "FCU-L1-A/speed_sensor",
+          "point_type": "sensor",
+          "point_category": "speed",
+          "unit": "%",
+          "confidence": "high",
+          "object_type": "analogOutput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        },
+        {
+          "original_name": "FCU-L1-A_Valve_Pos",
+          "standardized_name": "FCU-L1-A/valve_position_sensor",
+          "point_type": "sensor",
+          "point_category": "valve_position",
+          "unit": "%",
+          "confidence": "high",
+          "object_type": "analogOutput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "fcu": 3
+        },
+        "avg_confidence_score": 3.0
+      },
+      "created_at": "2026-02-05T14:17:54.416165",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "PUMP-CW-1": {
+      "equipment_id": "PUMP-CW-1",
+      "equipment_type": "pump",
+      "equipment_name": "Pump (PUMP-CW-1)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "PUMP-CW-1_Status",
+          "standardized_name": "PUMP-CW-1/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "binaryInput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        },
+        {
+          "original_name": "PUMP-CW-1_Speed",
+          "standardized_name": "PUMP-CW-1/setpoint_setpoint",
+          "point_type": "setpoint",
+          "point_category": "setpoint",
+          "unit": "%",
+          "confidence": "medium",
+          "object_type": "analogOutput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        }
+      ],
+      "point_count": 2,
+      "confidence": "medium",
+      "metadata": {
+        "type_vote_counts": {
+          "pump": 2
+        },
+        "avg_confidence_score": 2.0
+      },
+      "created_at": "2026-02-05T14:17:54.416180",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "PUMP-CHW-1": {
+      "equipment_id": "PUMP-CHW-1",
+      "equipment_type": "pump",
+      "equipment_name": "Pump (PUMP-CHW-1)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "PUMP-CHW-1_Status",
+          "standardized_name": "PUMP-CHW-1/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "binaryInput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        },
+        {
+          "original_name": "PUMP-CHW-1_DP",
+          "standardized_name": "PUMP-CHW-1/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "kPa",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        }
+      ],
+      "point_count": 2,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "pump": 2
+        },
+        "avg_confidence_score": 2.5
+      },
+      "created_at": "2026-02-05T14:17:54.416195",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "CT-1": {
+      "equipment_id": "CT-1",
+      "equipment_type": "cooling_tower",
+      "equipment_name": "Cooling Tower (CT-1)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "CT-1_Fan_Speed",
+          "standardized_name": "CT-1/speed_sensor",
+          "point_type": "sensor",
+          "point_category": "speed",
+          "unit": "%",
+          "confidence": "high",
+          "object_type": "analogOutput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        },
+        {
+          "original_name": "CT-1_Basin_Temp",
+          "standardized_name": "CT-1/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        }
+      ],
+      "point_count": 2,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "cooling_tower": 2
+        },
+        "avg_confidence_score": 3.0
+      },
+      "created_at": "2026-02-05T14:17:54.416210",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "MTR-MAIN": {
+      "equipment_id": "MTR-MAIN",
+      "equipment_type": "meter",
+      "equipment_name": "Power Meter (MTR-MAIN)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "MTR-MAIN_kW",
+          "standardized_name": "MTR-MAIN/power_sensor",
+          "point_type": "sensor",
+          "point_category": "power",
+          "unit": "kW",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        },
+        {
+          "original_name": "MTR-MAIN_kWh",
+          "standardized_name": "MTR-MAIN/power_sensor",
+          "point_type": "sensor",
+          "point_category": "power",
+          "unit": "kWh",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        },
+        {
+          "original_name": "MTR-MAIN_PF",
+          "standardized_name": "MTR-MAIN/power_sensor",
+          "point_type": "sensor",
+          "point_category": "power",
+          "unit": "kW",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "meter": 3
+        },
+        "avg_confidence_score": 2.67
+      },
+      "created_at": "2026-02-05T14:17:54.416227",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "GEN-1": {
+      "equipment_id": "GEN-1",
+      "equipment_type": "generator",
+      "equipment_name": "Generator (GEN-1)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "GEN-1_Status",
+          "standardized_name": "GEN-1/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        },
+        {
+          "original_name": "GEN-1_Fuel_Level",
+          "standardized_name": "GEN-1/level_sensor",
+          "point_type": "sensor",
+          "point_category": "level",
+          "unit": "%",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        },
+        {
+          "original_name": "GEN-1_Output_kW",
+          "standardized_name": "GEN-1/power_sensor",
+          "point_type": "sensor",
+          "point_category": "power",
+          "unit": "kW",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "generator": 3
+        },
+        "avg_confidence_score": 3.0
+      },
+      "created_at": "2026-02-05T14:17:54.416244",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "ZONE-L1": {
+      "equipment_id": "ZONE-L1",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (ZONE-L1)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "ZONE-L1_CO2",
+          "standardized_name": "ZONE-L1/co2_sensor",
+          "point_type": "sensor",
+          "point_category": "co2",
+          "unit": "ppm",
+          "confidence": "low",
+          "object_type": "analogInput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        },
+        {
+          "original_name": "ZONE-L1_Humidity",
+          "standardized_name": "ZONE-L1/humidity_sensor",
+          "point_type": "sensor",
+          "point_category": "humidity",
+          "unit": "%",
+          "confidence": "low",
+          "object_type": "analogInput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        }
+      ],
+      "point_count": 2,
+      "confidence": "low",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 1.0
+      },
+      "created_at": "2026-02-05T14:17:54.416258",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "ZONE-L2": {
+      "equipment_id": "ZONE-L2",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (ZONE-L2)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "ZONE-L2_CO2",
+          "standardized_name": "ZONE-L2/co2_sensor",
+          "point_type": "sensor",
+          "point_category": "co2",
+          "unit": "ppm",
+          "confidence": "low",
+          "object_type": "analogInput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "low",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 1.0
+      },
+      "created_at": "2026-02-05T14:17:54.416269",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "UPS-1": {
+      "equipment_id": "UPS-1",
+      "equipment_type": "ups",
+      "equipment_name": "UPS (UPS-1)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "UPS-1_Battery_Level",
+          "standardized_name": "UPS-1/level_sensor",
+          "point_type": "sensor",
+          "point_category": "level",
+          "unit": "%",
+          "confidence": "medium",
+          "object_type": "analogInput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        },
+        {
+          "original_name": "UPS-1_Load_Percent",
+          "standardized_name": "UPS-1/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "%",
+          "confidence": "low",
+          "object_type": "analogInput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        }
+      ],
+      "point_count": 2,
+      "confidence": "medium",
+      "metadata": {
+        "type_vote_counts": {
+          "ups": 2
+        },
+        "avg_confidence_score": 1.5
+      },
+      "created_at": "2026-02-05T14:17:54.416284",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "DALI-L1-A": {
+      "equipment_id": "DALI-L1-A",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (DALI-L1-A)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "DALI-L1-A_Brightness",
+          "standardized_name": "DALI-L1-A/brightness_sensor",
+          "point_type": "sensor",
+          "point_category": "brightness",
+          "unit": "%",
+          "confidence": "low",
+          "object_type": "analogOutput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        },
+        {
+          "original_name": "DALI-L1-A_Occupancy",
+          "standardized_name": "DALI-L1-A/occupancy_sensor",
+          "point_type": "sensor",
+          "point_category": "occupancy",
+          "unit": "",
+          "confidence": "low",
+          "object_type": "binaryInput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        },
+        {
+          "original_name": "DALI-L1-A_Lux",
+          "standardized_name": "DALI-L1-A/lux_sensor",
+          "point_type": "sensor",
+          "point_category": "lux",
+          "unit": "lux",
+          "confidence": "low",
+          "object_type": "analogInput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        },
+        {
+          "original_name": "DALI-L1-A_Lamp_Status",
+          "standardized_name": "DALI-L1-A/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "low",
+          "object_type": "binaryInput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        }
+      ],
+      "point_count": 4,
+      "confidence": "low",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 1.0
+      },
+      "created_at": "2026-02-05T14:17:54.416299",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "DALI-L2-B": {
+      "equipment_id": "DALI-L2-B",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (DALI-L2-B)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "DALI-L2-B_Brightness",
+          "standardized_name": "DALI-L2-B/brightness_sensor",
+          "point_type": "sensor",
+          "point_category": "brightness",
+          "unit": "%",
+          "confidence": "low",
+          "object_type": "analogOutput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        },
+        {
+          "original_name": "DALI-L2-B_Occupancy",
+          "standardized_name": "DALI-L2-B/occupancy_sensor",
+          "point_type": "sensor",
+          "point_category": "occupancy",
+          "unit": "",
+          "confidence": "low",
+          "object_type": "binaryInput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        },
+        {
+          "original_name": "DALI-L2-B_Color_Temp",
+          "standardized_name": "DALI-L2-B/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "K",
+          "confidence": "low",
+          "object_type": "analogOutput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        }
+      ],
+      "point_count": 3,
+      "confidence": "low",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 1.0
+      },
+      "created_at": "2026-02-05T14:17:54.416313",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "DALI-CTRL-L1": {
+      "equipment_id": "DALI-CTRL-L1",
+      "equipment_type": "dali_controller",
+      "equipment_name": "DALI Lighting Controller (DALI-CTRL-L1)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "DALI-CTRL-L1_Status",
+          "standardized_name": "DALI-CTRL-L1/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "binaryInput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        },
+        {
+          "original_name": "DALI-CTRL-L1_Bus_Fault",
+          "standardized_name": "DALI-CTRL-L1/alarm_alarm",
+          "point_type": "alarm",
+          "point_category": "alarm",
+          "unit": "",
+          "confidence": "medium",
+          "object_type": "binaryInput",
+          "instance": 0,
+          "present_value": null,
+          "writable": false
+        }
+      ],
+      "point_count": 2,
+      "confidence": "medium",
+      "metadata": {
+        "type_vote_counts": {
+          "dali_controller": 2
+        },
+        "avg_confidence_score": 2.0
+      },
+      "created_at": "2026-02-05T14:17:54.416330",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    }
+  }
+}

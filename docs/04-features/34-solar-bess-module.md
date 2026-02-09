@@ -18,7 +18,7 @@ phase: "34"
 
 Full solar PV and battery energy storage optimisation — 9 feature modules covering ingestion, performance monitoring, grid compliance, dashboard, arbitrage, demand management, forecasting, generator coordination, health analytics, maintenance intelligence, financial reporting, and conversational queries.
 
-**Demo Site:** Fairlands (3.875 MWp, 33 Huawei SUN2000 inverters, 2 MWh BESS, 500 kVA generator)
+**Demo Site:**  (3.875 MWp, 33 Huawei SUN2000 inverters, 2 MWh BESS, 500 kVA generator)
 
 ## Overview
 
@@ -132,7 +132,7 @@ Condition-based maintenance scheduling, financial reporting, and conversational 
 - Monthly savings breakdown: arbitrage + demand charge + self-consumption + diesel avoidance
 - ROI calculation vs SENTINEL licence fee
 - Carbon offset: kWh × 0.95 kg/kWh (Eskom grid emission factor), diesel × 2.68 kg/L
-- Demo data: 3 months retrospective (R80-150K/month for Fairlands)
+- Demo data: 3 months retrospective (R80-150K/month for )
 
 **Chat Integration:**
 - 5 MCP tools: `get_solar_overview`, `get_bess_status`, `get_solar_savings`, `get_solar_forecast`, `get_solar_diagnostics`
@@ -145,26 +145,26 @@ Condition-based maintenance scheduling, financial reporting, and conversational 
 **Key endpoints:**
 ```bash
 # Overview & Status
-curl localhost:9095/api/solar/sites/fairlands/overview
-curl localhost:9095/api/solar/sites/fairlands/bess
+curl localhost:9095/api/solar/sites//overview
+curl localhost:9095/api/solar/sites//bess
 
 # Performance & Diagnostics
-curl localhost:9095/api/solar/sites/fairlands/performance
-curl localhost:9095/api/solar/sites/fairlands/diagnostics
+curl localhost:9095/api/solar/sites//performance
+curl localhost:9095/api/solar/sites//diagnostics
 
 # Dispatch & Savings
-curl localhost:9095/api/solar/sites/fairlands/dispatch/schedule
-curl localhost:9095/api/solar/sites/fairlands/arbitrage/savings
+curl localhost:9095/api/solar/sites//dispatch/schedule
+curl localhost:9095/api/solar/sites//arbitrage/savings
 
 # Compliance
-curl localhost:9095/api/solar/sites/fairlands/compliance
+curl localhost:9095/api/solar/sites//compliance
 
 # Financial
-curl localhost:9095/api/solar/sites/fairlands/financial/summary?period=ytd
-curl localhost:9095/api/solar/sites/fairlands/financial/carbon?period=month
+curl localhost:9095/api/solar/sites//financial/summary?period=ytd
+curl localhost:9095/api/solar/sites//financial/carbon?period=month
 
 # Maintenance
-curl localhost:9095/api/solar/sites/fairlands/maintenance/recommendations
+curl localhost:9095/api/solar/sites//maintenance/recommendations
 ```
 
 ## Implementation
@@ -210,7 +210,7 @@ curl localhost:9095/api/solar/sites/fairlands/maintenance/recommendations
 
 | Metric | Value |
 |--------|-------|
-| Monthly savings (Fairlands) | R80-150K |
+| Monthly savings () | R80-150K |
 | Diesel avoidance | ~R22/L saved per litre |
 | Carbon offset | 0.95 kg CO2/kWh solar |
 | Manufacturer coverage | 3 (Huawei, Schneider, SMA) |

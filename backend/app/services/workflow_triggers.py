@@ -14,9 +14,13 @@ Phase 53-02: Automated Triggers & Workflow Automation
 import asyncio
 import logging
 from datetime import datetime, timedelta
-from typing import Optional, Dict, List, Any
+from typing import Optional, Dict, List, Any, Tuple
 from pydantic import BaseModel, Field
 from enum import Enum
+
+from app.database.repositories.workflow_event_repository import (
+    get_workflow_event_repository,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -177,6 +181,18 @@ class WorkflowTriggerEngine:
         self._effectiveness_results: Dict[str, EffectivenessResult] = {}
         self._trigger_history: List[TriggerResult] = []
 
+        # Trigger deduplication
+        self._last_triggered: Dict[str, datetime] = {}
+        self._recent_trigger_refs: Dict[str, datetime] = {}
+        self._cooldowns: Dict[TriggerType, timedelta] = {
+            TriggerType.ML_ANOMALY: timedelta(hours=6),
+            TriggerType.BASELINE_DEVIATION: timedelta(hours=6),
+            TriggerType.CRITICAL_DEFICIENCY: timedelta(hours=12),
+        }
+
+        # Workflow events log
+        self._event_repository = get_workflow_event_repository()
+
         # Configuration
         self.baseline_deviation_threshold = 15.0  # Percentage
         self.critical_deviation_threshold = 20.0  # Percentage
@@ -203,17 +219,50 @@ class WorkflowTriggerEngine:
         logger.info(f"ML anomaly trigger: {equipment_id} - {anomaly.anomaly_type}")
 
         try:
+            # 0. Dedupe guard
+            is_duplicate, dedupe_details = self._is_duplicate_trigger(
+                trigger_type=TriggerType.ML_ANOMALY,
+                equipment_id=equipment_id,
+                reference_id=anomaly.id
+            )
+            if is_duplicate:
+                result = TriggerResult(
+                    success=True,
+                    trigger_type=TriggerType.ML_ANOMALY,
+                    equipment_id=equipment_id,
+                    action_taken="duplicate_suppressed",
+                    details={"anomaly_id": anomaly.id, **dedupe_details}
+                )
+                await self._record_event(
+                    trigger_type=TriggerType.ML_ANOMALY,
+                    equipment_id=equipment_id,
+                    action_taken=result.action_taken,
+                    details=result.details,
+                    success=True
+                )
+                self._trigger_history.append(result)
+                return result
+
             # 1. Check if inspection already exists
             existing = self._find_pending_inspection(equipment_id)
             if existing:
                 logger.info(f"Inspection already exists for {equipment_id}")
-                return TriggerResult(
+                result = TriggerResult(
                     success=True,
                     trigger_type=TriggerType.ML_ANOMALY,
                     equipment_id=equipment_id,
                     action_taken="inspection_exists",
                     details={"existing_task_id": existing.id}
                 )
+                await self._record_event(
+                    trigger_type=TriggerType.ML_ANOMALY,
+                    equipment_id=equipment_id,
+                    action_taken=result.action_taken,
+                    details=result.details,
+                    success=True
+                )
+                self._trigger_history.append(result)
+                return result
 
             # 2. Create inspection task with high priority
             task = InspectionTask(
@@ -259,11 +308,33 @@ class WorkflowTriggerEngine:
                 },
                 follow_up_scheduled=True
             )
+            self._mark_trigger(
+                trigger_type=TriggerType.ML_ANOMALY,
+                equipment_id=equipment_id,
+                reference_id=anomaly.id
+            )
+            await self._record_event(
+                trigger_type=TriggerType.ML_ANOMALY,
+                equipment_id=equipment_id,
+                action_taken=result.action_taken,
+                details={
+                    "anomaly_id": anomaly.id,
+                    **result.details,
+                },
+                success=True
+            )
             self._trigger_history.append(result)
             return result
 
         except Exception as e:
             logger.error(f"Error in ML anomaly trigger: {e}")
+            await self._record_event(
+                trigger_type=TriggerType.ML_ANOMALY,
+                equipment_id=equipment_id,
+                action_taken="error",
+                details={"error": str(e), "anomaly_id": anomaly.id},
+                success=False
+            )
             return TriggerResult(
                 success=False,
                 trigger_type=TriggerType.ML_ANOMALY,
@@ -290,15 +361,55 @@ class WorkflowTriggerEngine:
         logger.info(f"Baseline deviation trigger: {equipment_id} - {comparison.max_deviation_percent}%")
 
         try:
+            # 0. Dedupe guard
+            is_duplicate, dedupe_details = self._is_duplicate_trigger(
+                trigger_type=TriggerType.BASELINE_DEVIATION,
+                equipment_id=equipment_id,
+                reference_id=comparison.baseline_id
+            )
+            if is_duplicate:
+                result = TriggerResult(
+                    success=True,
+                    trigger_type=TriggerType.BASELINE_DEVIATION,
+                    equipment_id=equipment_id,
+                    action_taken="duplicate_suppressed",
+                    details={
+                        "baseline_id": comparison.baseline_id,
+                        "deviation": comparison.max_deviation_percent,
+                        **dedupe_details
+                    }
+                )
+                await self._record_event(
+                    trigger_type=TriggerType.BASELINE_DEVIATION,
+                    equipment_id=equipment_id,
+                    action_taken=result.action_taken,
+                    details=result.details,
+                    success=True
+                )
+                self._trigger_history.append(result)
+                return result
+
             # 1. Check severity threshold
             if comparison.max_deviation_percent < self.baseline_deviation_threshold:
-                return TriggerResult(
+                result = TriggerResult(
                     success=True,
                     trigger_type=TriggerType.BASELINE_DEVIATION,
                     equipment_id=equipment_id,
                     action_taken="within_threshold",
                     details={"deviation": comparison.max_deviation_percent}
                 )
+                await self._record_event(
+                    trigger_type=TriggerType.BASELINE_DEVIATION,
+                    equipment_id=equipment_id,
+                    action_taken=result.action_taken,
+                    details={
+                        "baseline_id": comparison.baseline_id,
+                        **result.details
+                    },
+                    success=True
+                )
+                self._trigger_history.append(result)
+                return result
 
             # 2. Generate AI recommendation (simulated for demo)
             recommendation = await self._generate_maintenance_recommendation(
@@ -344,11 +455,33 @@ class WorkflowTriggerEngine:
                 },
                 follow_up_scheduled=inspection_created
             )
+            self._mark_trigger(
+                trigger_type=TriggerType.BASELINE_DEVIATION,
+                equipment_id=equipment_id,
+                reference_id=comparison.baseline_id
+            )
+            await self._record_event(
+                trigger_type=TriggerType.BASELINE_DEVIATION,
+                equipment_id=equipment_id,
+                action_taken=result.action_taken,
+                details={
+                    "baseline_id": comparison.baseline_id,
+                    **result.details
+                },
+                success=True
+            )
             self._trigger_history.append(result)
             return result
 
         except Exception as e:
             logger.error(f"Error in baseline deviation trigger: {e}")
+            await self._record_event(
+                trigger_type=TriggerType.BASELINE_DEVIATION,
+                equipment_id=equipment_id,
+                action_taken="error",
+                details={"error": str(e), "baseline_id": comparison.baseline_id},
+                success=False
+            )
             return TriggerResult(
                 success=False,
                 trigger_type=TriggerType.BASELINE_DEVIATION,
@@ -375,15 +508,57 @@ class WorkflowTriggerEngine:
         logger.info(f"Critical deficiency trigger: {equipment_id} - {deficiency.severity}")
 
         try:
+            # 0. Dedupe guard
+            is_duplicate, dedupe_details = self._is_duplicate_trigger(
+                trigger_type=TriggerType.CRITICAL_DEFICIENCY,
+                equipment_id=equipment_id,
+                reference_id=deficiency.id
+            )
+            if is_duplicate:
+                result = TriggerResult(
+                    success=True,
+                    trigger_type=TriggerType.CRITICAL_DEFICIENCY,
+                    equipment_id=equipment_id,
+                    action_taken="duplicate_suppressed",
+                    details={
+                        "deficiency_id": deficiency.id,
+                        "severity": deficiency.severity,
+                        **dedupe_details
+                    }
+                )
+                await self._record_event(
+                    trigger_type=TriggerType.CRITICAL_DEFICIENCY,
+                    equipment_id=equipment_id,
+                    action_taken=result.action_taken,
+                    details=result.details,
+                    inspection_id=deficiency.inspection_id,
+                    success=True
+                )
+                self._trigger_history.append(result)
+                return result
+
             # 1. Check severity (only auto-create for critical/safety)
             if deficiency.severity not in ["critical", "safety"]:
-                return TriggerResult(
+                result = TriggerResult(
                     success=True,
                     trigger_type=TriggerType.CRITICAL_DEFICIENCY,
                     equipment_id=equipment_id,
                     action_taken="below_threshold",
                     details={"severity": deficiency.severity}
                 )
+                await self._record_event(
+                    trigger_type=TriggerType.CRITICAL_DEFICIENCY,
+                    equipment_id=equipment_id,
+                    action_taken=result.action_taken,
+                    details={
+                        "deficiency_id": deficiency.id,
+                        **result.details
+                    },
+                    inspection_id=deficiency.inspection_id,
+                    success=True
+                )
+                self._trigger_history.append(result)
+                return result
 
             # 2. Generate work order
             work_order = WorkOrderCreate(
@@ -448,11 +623,36 @@ class WorkflowTriggerEngine:
                 },
                 follow_up_scheduled=True
             )
+            self._mark_trigger(
+                trigger_type=TriggerType.CRITICAL_DEFICIENCY,
+                equipment_id=equipment_id,
+                reference_id=deficiency.id
+            )
+            await self._record_event(
+                trigger_type=TriggerType.CRITICAL_DEFICIENCY,
+                equipment_id=equipment_id,
+                action_taken=result.action_taken,
+                details={
+                    "deficiency_id": deficiency.id,
+                    **result.details
+                },
+                inspection_id=deficiency.inspection_id,
+                work_order_id=work_order.id,
+                success=True
+            )
             self._trigger_history.append(result)
             return result
 
         except Exception as e:
             logger.error(f"Error in critical deficiency trigger: {e}")
+            await self._record_event(
+                trigger_type=TriggerType.CRITICAL_DEFICIENCY,
+                equipment_id=deficiency.equipment_id,
+                action_taken="error",
+                details={"error": str(e), "deficiency_id": deficiency.id},
+                inspection_id=deficiency.inspection_id,
+                success=False
+            )
             return TriggerResult(
                 success=False,
                 trigger_type=TriggerType.CRITICAL_DEFICIENCY,
@@ -541,11 +741,27 @@ class WorkflowTriggerEngine:
                 },
                 follow_up_scheduled=True
             )
+            await self._record_event(
+                trigger_type=TriggerType.REPAIR_COMPLETED,
+                equipment_id=equipment_id,
+                action_taken=result.action_taken,
+                details=result.details,
+                work_order_id=work_order_id,
+                success=True
+            )
             self._trigger_history.append(result)
             return result
 
         except Exception as e:
             logger.error(f"Error in repair completed trigger: {e}")
+            await self._record_event(
+                trigger_type=TriggerType.REPAIR_COMPLETED,
+                equipment_id=equipment_id,
+                action_taken="error",
+                details={"error": str(e)},
+                work_order_id=work_order_id,
+                success=False
+            )
             return TriggerResult(
                 success=False,
                 trigger_type=TriggerType.REPAIR_COMPLETED,
@@ -580,13 +796,22 @@ class WorkflowTriggerEngine:
             post_values = post_baseline.get("baseline_values", {})
 
             if not pre_values or not post_values:
-                return TriggerResult(
+                result = TriggerResult(
                     success=False,
                     trigger_type=TriggerType.REPAIR_VALIDATION,
                     equipment_id=equipment_id,
                     action_taken="missing_baselines",
                     details={"error": "Missing pre or post repair baseline values"}
                 )
+                await self._record_event(
+                    trigger_type=TriggerType.REPAIR_VALIDATION,
+                    equipment_id=equipment_id,
+                    action_taken=result.action_taken,
+                    details=result.details,
+                    work_order_id=work_order_id,
+                    success=False
+                )
+                return result
 
             # 2. Calculate improvements for each metric
             improvements = {}
@@ -611,12 +836,16 @@ class WorkflowTriggerEngine:
                 avg_improvement = 0.0
 
             # 4. Determine effectiveness
+            is_successful = avg_improvement > self.effectiveness_success_threshold or any(
+                v.get("improvement_percent", 0.0) > self.effectiveness_success_threshold
+                for v in improvements.values()
+            )
             effectiveness = EffectivenessResult(
                 work_order_id=work_order_id,
                 equipment_id=equipment_id,
                 effectiveness_score=avg_improvement,
                 improvements=improvements,
-                repair_successful=avg_improvement > self.effectiveness_success_threshold,
+                repair_successful=is_successful,
                 back_to_baseline=all(
                     v.get("back_to_baseline", False) for v in improvements.values()
                 )
@@ -707,11 +936,30 @@ class WorkflowTriggerEngine:
                 },
                 follow_up_scheduled=follow_up_created or followup_scheduled
             )
+            await self._record_event(
+                trigger_type=TriggerType.REPAIR_VALIDATION,
+                equipment_id=equipment_id,
+                action_taken=result.action_taken,
+                details={
+                    "work_order_id": work_order_id,
+                    **result.details
+                },
+                work_order_id=work_order_id,
+                success=True
+            )
             self._trigger_history.append(result)
             return result
 
         except Exception as e:
             logger.error(f"Error in effectiveness validation trigger: {e}")
+            await self._record_event(
+                trigger_type=TriggerType.REPAIR_VALIDATION,
+                equipment_id=equipment_id,
+                action_taken="error",
+                details={"error": str(e)},
+                work_order_id=work_order_id,
+                success=False
+            )
             return TriggerResult(
                 success=False,
                 trigger_type=TriggerType.REPAIR_VALIDATION,
@@ -758,6 +1006,67 @@ class WorkflowTriggerEngine:
             if task.scheduled_date > datetime.now():
                 return task
         return None
+
+    def _cooldown_key(self, trigger_type: TriggerType, equipment_id: str) -> str:
+        return f"{trigger_type.value}:{equipment_id}"
+
+    def _reference_key(
+        self,
+        trigger_type: TriggerType,
+        equipment_id: str,
+        reference_id: Optional[str]
+    ) -> Optional[str]:
+        if not reference_id:
+            return None
+        return f"{trigger_type.value}:{equipment_id}:{reference_id}"
+
+    def _is_duplicate_trigger(
+        self,
+        trigger_type: TriggerType,
+        equipment_id: str,
+        reference_id: Optional[str] = None
+    ) -> Tuple[bool, Dict[str, Any]]:
+        now = datetime.now()
+        cooldown = self._cooldowns.get(trigger_type)
+        details: Dict[str, Any] = {}
+
+        if cooldown:
+            last_triggered = self._last_triggered.get(self._cooldown_key(trigger_type, equipment_id))
+            if last_triggered:
+                elapsed = now - last_triggered
+                if elapsed < cooldown:
+                    details["last_triggered_at"] = last_triggered.isoformat()
+                    details["cooldown_seconds_remaining"] = int(
+                        (cooldown - elapsed).total_seconds()
+                    )
+                    return True, details
+
+        ref_key = self._reference_key(trigger_type, equipment_id, reference_id)
+        if ref_key and cooldown:
+            last_reference = self._recent_trigger_refs.get(ref_key)
+            if last_reference:
+                elapsed = now - last_reference
+                if elapsed < cooldown:
+                    details["reference_id"] = reference_id
+                    details["last_reference_at"] = last_reference.isoformat()
+                    details["cooldown_seconds_remaining"] = int(
+                        (cooldown - elapsed).total_seconds()
+                    )
+                    return True, details
+
+        return False, details
+
+    def _mark_trigger(
+        self,
+        trigger_type: TriggerType,
+        equipment_id: str,
+        reference_id: Optional[str] = None
+    ) -> None:
+        now = datetime.now()
+        self._last_triggered[self._cooldown_key(trigger_type, equipment_id)] = now
+        ref_key = self._reference_key(trigger_type, equipment_id, reference_id)
+        if ref_key:
+            self._recent_trigger_refs[ref_key] = now
 
     def _calculate_priority(self, probability: float) -> str:
         """Calculate priority based on anomaly probability."""
@@ -828,6 +1137,32 @@ class WorkflowTriggerEngine:
         """Send alert notification."""
         # Log for demo - in production, this would call notification service
         logger.info(f"ALERT: {message}")
+
+    async def _record_event(
+        self,
+        trigger_type: TriggerType,
+        equipment_id: str,
+        action_taken: str,
+        details: Dict[str, Any],
+        success: bool,
+        work_order_id: Optional[str] = None,
+        inspection_id: Optional[str] = None
+    ) -> None:
+        event_payload = {
+            "equipment_id": equipment_id,
+            "trigger_type": trigger_type.value,
+            "action_taken": action_taken,
+            "source": "workflow_triggers",
+            "work_order_id": work_order_id,
+            "inspection_id": inspection_id,
+            "details": details,
+            "success": success,
+        }
+
+        try:
+            self._event_repository.create(event_payload)
+        except Exception as e:
+            logger.warning(f"Workflow event logging failed (non-critical): {e}")
 
     async def _audit_log(
         self,

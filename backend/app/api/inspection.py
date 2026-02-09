@@ -524,6 +524,30 @@ async def create_inspection_deficiency(
         created_deficiency = await scheduler.repository.create_inspection_deficiency(
             deficiency.dict()
         )
+
+        # Workflow integration: auto-trigger for critical/safety deficiencies
+        try:
+            from app.services.workflow_triggers import get_trigger_engine, InspectionDeficiency as WorkflowDeficiency
+
+            if str(created_deficiency.severity) in ["critical", "safety"]:
+                trigger_engine = get_trigger_engine()
+                workflow_def = WorkflowDeficiency(
+                    id=created_deficiency.id,
+                    inspection_id=created_deficiency.result_id,
+                    equipment_id=created_deficiency.equipment_id,
+                    severity=str(created_deficiency.severity),
+                    deficiency_title=created_deficiency.deficiency_title,
+                    deficiency_description=created_deficiency.deficiency_description or "",
+                    recommended_action=created_deficiency.recommended_action or "",
+                    estimated_repair_cost_min=created_deficiency.estimated_repair_cost_min or 0.0,
+                    estimated_repair_cost_max=created_deficiency.estimated_repair_cost_max or 0.0,
+                    estimated_repair_hours=float(created_deficiency.estimated_repair_hours or 0),
+                )
+                await trigger_engine.on_critical_deficiency(workflow_def)
+        except Exception:
+            # Non-blocking: workflow trigger failures should not break API
+            pass
+
         return created_deficiency
 
     except Exception as e:

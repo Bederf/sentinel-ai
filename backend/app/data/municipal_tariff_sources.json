@@ -1,0 +1,49 @@
+{
+  "sources": [
+    {
+      "key": "city_of_cape_town_2025_26",
+      "municipality": "City of Cape Town",
+      "tariff_name": "Commercial TOU",
+      "utility_type": "electricity",
+      "effective_date": "2025-07-01",
+      "source_url": "https://resource.capetown.gov.za/documentcentre/Documents/Financial%20documents/Budget2526_Ann6_25-ElecGenandDistribution-ConsumptionandGeneration.pdf",
+      "notes": "Official 2025/26 tariff annexure (consumption + generation)"
+    },
+    {
+      "key": "eskom_tariff_booklet_2025_26",
+      "municipality": "Eskom",
+      "tariff_name": "Tariff Booklet 2025/26",
+      "utility_type": "electricity",
+      "effective_date": "2025-04-01",
+      "source_url": "https://www.eskom.co.za/distribution/wp-content/uploads/2025/06/Tariff-booklet.pdf",
+      "notes": "Eskom Tariffs and Charges Booklet 2025/2026"
+    },
+    {
+      "key": "eskom_standard_tariffs_2025_26",
+      "municipality": "Eskom",
+      "tariff_name": "Standard Tariffs FY2026",
+      "utility_type": "electricity",
+      "effective_date": "2025-04-01",
+      "source_url": "https://www.eskom.co.za/distribution/wp-content/uploads/2025/03/Connect-2025_26-1.pdf",
+      "notes": "Eskom Standard Tariffs summary (FY2026)"
+    },
+    {
+      "key": "coj_consolidated_tariffs_2025_26",
+      "municipality": "City of Johannesburg",
+      "tariff_name": "Consolidated Tariffs 2025/26",
+      "utility_type": "electricity",
+      "effective_date": "2025-07-01",
+      "source_url": "https://joburg.org.za/documents_/Documents/Consolidated_Tariffs_2025-26.pdf",
+      "notes": "COJ consolidated tariffs (includes electricity)"
+    },
+    {
+      "key": "ethekwini_tariffs_2025_26",
+      "municipality": "eThekwini",
+      "tariff_name": "Final Tariff Rates 2025/26",
+      "utility_type": "electricity",
+      "effective_date": "2025-07-01",
+      "source_url": "https://durban.gov.za/pages/government/documents?d=Service+Tariffs%2FElectricity+Tariffs%2FTariffs+2025+-+2026",
+      "notes": "Document centre listing (manual download of Final Tariff Rates 2025-2026.pdf may be required)"
+    }
+  ]
+}

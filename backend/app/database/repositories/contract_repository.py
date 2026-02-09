@@ -200,6 +200,94 @@ class ContractRepository:
         """
         return self.update(contract_id, {"status": status})
 
+    def get_contract_assets(self, contract_id: str) -> List[Dict[str, Any]]:
+        """
+        Get assets linked to a contract via asset_contracts.
+
+        Args:
+            contract_id: Contract UUID
+
+        Returns:
+            List of asset contract records with equipment details.
+        """
+        if not self.client:
+            logger.warning("Supabase client not available")
+            return []
+
+        try:
+            result = self.client.table("asset_contracts").select(
+                "*, equipment(code, name, type)"
+            ).eq("contract_id", contract_id).execute()
+
+            return result.data or []
+
+        except Exception as e:
+            logger.error(f"Error getting assets for contract {contract_id}: {e}")
+            return []
+
+    def get_equipment(self, equipment_code: str) -> Optional[Dict[str, Any]]:
+        """Get equipment record by code."""
+        if not self.client:
+            logger.warning("Supabase client not available")
+            return None
+
+        try:
+            result = self.client.table("equipment").select("*").eq(
+                "code", equipment_code
+            ).execute()
+
+            if result.data and len(result.data) > 0:
+                return result.data[0]
+            return None
+
+        except Exception as e:
+            logger.error(f"Error getting equipment {equipment_code}: {e}")
+            return None
+
+    def find_similar_contracts(
+        self,
+        equipment_types: List[str],
+        sla_tier: Any = None,
+        limit: int = 5
+    ) -> List[Dict[str, Any]]:
+        """
+        Find similar contracts based on equipment types.
+
+        SLA tier is not stored in contracts yet, so this is a best-effort
+        lookup by active contracts with matching asset equipment types.
+        """
+        if not self.client:
+            logger.warning("Supabase client not available")
+            return []
+
+        try:
+            if equipment_types:
+                # Best-effort: find contracts with assets of similar equipment types
+                asset_rows = self.client.table("asset_contracts").select(
+                    "contract_id, equipment(type)"
+                ).execute()
+                contract_ids = []
+                for row in asset_rows.data or []:
+                    eq = row.get("equipment") or {}
+                    if eq.get("type") in equipment_types:
+                        contract_ids.append(row.get("contract_id"))
+
+                if contract_ids:
+                    result = self.client.table("contracts").select(
+                        "*"
+                    ).in_("id", list(set(contract_ids))).eq("status", "active").limit(limit).execute()
+                    return result.data or []
+
+            # Fallback to active contracts
+            result = self.client.table("contracts").select(
+                "*"
+            ).eq("status", "active").limit(limit).execute()
+            return result.data or []
+
+        except Exception as e:
+            logger.error(f"Error finding similar contracts: {e}")
+            return []
+
 
 # Singleton instance
 _repository: Optional[ContractRepository] = None

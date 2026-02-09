@@ -350,6 +350,88 @@ class MFARepository:
             logger.error(f"Error getting MFA events: {e}")
             return []
 
+    # =========================================================================
+    # MFA BACKUP CODES OPERATIONS
+    # =========================================================================
+
+    def replace_backup_codes(
+        self,
+        user_id: str,
+        code_hashes: List[str],
+    ) -> bool:
+        """Replace all backup codes for a user with a new set."""
+        if not self.client:
+            return False
+
+        try:
+            self.client.table("mfa_backup_codes").delete().eq("user_id", user_id).execute()
+            if not code_hashes:
+                return True
+
+            payload = [
+                {
+                    "user_id": user_id,
+                    "code_hash": code_hash,
+                    "used": False,
+                }
+                for code_hash in code_hashes
+            ]
+            result = self.client.table("mfa_backup_codes").insert(payload).execute()
+            return bool(result.data)
+        except Exception as e:
+            logger.error(f"Error replacing MFA backup codes for {user_id}: {e}")
+            return False
+
+    def get_backup_codes(
+        self,
+        user_id: str,
+        include_used: bool = False,
+    ) -> List[Dict[str, Any]]:
+        """Get backup code rows for a user."""
+        if not self.client:
+            return []
+
+        try:
+            query = self.client.table("mfa_backup_codes").select("*").eq("user_id", user_id)
+            if not include_used:
+                query = query.eq("used", False)
+            result = query.execute()
+            return result.data or []
+        except Exception as e:
+            logger.error(f"Error getting MFA backup codes for {user_id}: {e}")
+            return []
+
+    def mark_backup_code_used(self, code_id: str) -> bool:
+        """Mark a backup code row as used."""
+        if not self.client:
+            return False
+
+        try:
+            result = self.client.table("mfa_backup_codes").update(
+                {
+                    "used": True,
+                    "used_at": datetime.utcnow().isoformat(),
+                }
+            ).eq("id", code_id).eq("used", False).execute()
+            return bool(result.data)
+        except Exception as e:
+            logger.error(f"Error marking MFA backup code as used ({code_id}): {e}")
+            return False
+
+    def count_unused_backup_codes(self, user_id: str) -> int:
+        """Count remaining unused backup codes for a user."""
+        if not self.client:
+            return 0
+
+        try:
+            result = self.client.table("mfa_backup_codes").select(
+                "id", count="exact"
+            ).eq("user_id", user_id).eq("used", False).execute()
+            return int(result.count or 0)
+        except Exception as e:
+            logger.error(f"Error counting MFA backup codes for {user_id}: {e}")
+            return 0
+
 
 # Singleton instance
 _repository: Optional[MFARepository] = None

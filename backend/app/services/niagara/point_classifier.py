@@ -545,6 +545,11 @@ class PointClassifier:
             return ConfidenceLevel.UNKNOWN
 
         if equipment_type == "unknown" or point_category == "unknown":
+            # If at least one dimension is confidently identified,
+            # treat as medium to reduce excessive "low" classifications.
+            if equip_confidence in [ConfidenceLevel.HIGH, ConfidenceLevel.MEDIUM] \
+                    or cat_confidence in [ConfidenceLevel.HIGH, ConfidenceLevel.MEDIUM]:
+                return ConfidenceLevel.MEDIUM
             return ConfidenceLevel.LOW
 
         # Both identified - use the lower confidence

@@ -989,7 +989,7 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
   const renderSolarBess = () => {
     // Check if any site has the solar module active
     // For now, always show for the demo site (sandton)
-    const solarSiteId = "fairlands-solar-001";
+    const solarSiteId = "site-002";
 
     return (
       <DashboardSection id="solar-bess">
@@ -1016,7 +1016,7 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
                 className="text-xs"
                 style={{ color: "var(--color-sentinel-text-secondary)" }}
               >
-                FNB Fairlands Campus &mdash; 3.875 MWp PV | 5,015 kWh BESS
+                Site-002 Solar &mdash; 3.875 MWp PV | 5,015 kWh BESS
               </span>
             </div>
           </div>

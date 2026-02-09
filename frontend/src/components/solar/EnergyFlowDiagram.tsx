@@ -13,6 +13,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Sun, Battery, Building2, Plug } from "lucide-react";
 import type { SolarOverview } from "../../lib/solarApi";
 import { fetchSolarOverview } from "../../lib/solarApi";
+import { isExpectedApiError } from "../../lib/api";
 
 interface EnergyFlowDiagramProps {
   siteId: string;
@@ -36,7 +37,9 @@ export function EnergyFlowDiagram({ siteId }: EnergyFlowDiagramProps) {
       const data = await fetchSolarOverview(siteId);
       setOverview(data);
     } catch (err) {
-      console.error("Failed to load solar overview for flow diagram:", err);
+      if (!isExpectedApiError(err)) {
+        console.error("Failed to load solar overview for flow diagram:", err);
+      }
     } finally {
       setLoading(false);
     }
@@ -78,12 +81,26 @@ export function EnergyFlowDiagram({ siteId }: EnergyFlowDiagramProps) {
     );
   }
 
+  const safeNumber = (value: number | null | undefined) => (
+    typeof value === "number" && Number.isFinite(value) ? value : 0
+  );
+
+  const currentGenerationKw = safeNumber(overview.current_generation_kw);
+  const gridExportKw = safeNumber(overview.grid_export_kw);
+  const gridImportKw = safeNumber(overview.grid_import_kw);
+  const bessSocPercent = safeNumber(overview.bess_soc_percent);
+  const bessMode = overview.bess_mode || "idle";
+
   // Compute flows
-  const solarToBuilding = Math.max(0, overview.current_generation_kw - overview.grid_export_kw);
-  const solarToBess = overview.bess_mode === "charging" ? Math.min(overview.current_generation_kw * 0.3, overview.current_generation_kw) : 0;
-  const solarToGrid = overview.grid_export_kw;
-  const gridToBuilding = overview.grid_import_kw;
-  const bessToBuilding = overview.bess_mode === "discharging" ? Math.max(0, overview.current_generation_kw * 0.2) : 0;
+  const solarToBuilding = Math.max(0, currentGenerationKw - gridExportKw);
+  const solarToBess = bessMode === "charging"
+    ? Math.min(currentGenerationKw * 0.3, currentGenerationKw)
+    : 0;
+  const solarToGrid = gridExportKw;
+  const gridToBuilding = gridImportKw;
+  const bessToBuilding = bessMode === "discharging"
+    ? Math.max(0, currentGenerationKw * 0.2)
+    : 0;
 
   const flows: FlowPath[] = [
     {
@@ -282,7 +299,7 @@ export function EnergyFlowDiagram({ siteId }: EnergyFlowDiagramProps) {
                   Solar
                 </span>
                 <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                  {overview.current_generation_kw.toFixed(0)} kW
+                  {currentGenerationKw.toFixed(0)} kW
                 </span>
               </div>
 
@@ -291,22 +308,22 @@ export function EnergyFlowDiagram({ siteId }: EnergyFlowDiagramProps) {
                 <div
                   className="w-16 h-16 rounded-full flex items-center justify-center"
                   style={{
-                    background: overview.grid_export_kw > 0 ? "rgba(16, 185, 129, 0.2)" : "rgba(239, 68, 68, 0.2)",
-                    border: `2px solid ${overview.grid_export_kw > 0 ? "#10B981" : "#EF4444"}`,
+                    background: gridExportKw > 0 ? "rgba(16, 185, 129, 0.2)" : "rgba(239, 68, 68, 0.2)",
+                    border: `2px solid ${gridExportKw > 0 ? "#10B981" : "#EF4444"}`,
                   }}
                 >
-                  <Plug className="h-7 w-7" style={{ color: overview.grid_export_kw > 0 ? "#10B981" : "#EF4444" }} />
+                  <Plug className="h-7 w-7" style={{ color: gridExportKw > 0 ? "#10B981" : "#EF4444" }} />
                 </div>
                 <span
                   className="text-xs font-medium mt-1"
-                  style={{ color: overview.grid_export_kw > 0 ? "#10B981" : "#EF4444" }}
+                  style={{ color: gridExportKw > 0 ? "#10B981" : "#EF4444" }}
                 >
                   Grid
                 </span>
                 <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                  {overview.grid_export_kw > 0
-                    ? `Export ${overview.grid_export_kw.toFixed(0)} kW`
-                    : `Import ${overview.grid_import_kw.toFixed(0)} kW`}
+                  {gridExportKw > 0
+                    ? `Export ${gridExportKw.toFixed(0)} kW`
+                    : `Import ${gridImportKw.toFixed(0)} kW`}
                 </span>
               </div>
             </div>
@@ -338,24 +355,24 @@ export function EnergyFlowDiagram({ siteId }: EnergyFlowDiagramProps) {
                 <div
                   className="w-16 h-16 rounded-full flex items-center justify-center"
                   style={{
-                    background: overview.bess_mode === "charging"
+                    background: bessMode === "charging"
                       ? "rgba(59, 130, 246, 0.2)"
-                      : overview.bess_mode === "discharging"
+                      : bessMode === "discharging"
                       ? "rgba(139, 92, 246, 0.2)"
                       : "rgba(107, 114, 128, 0.2)",
                     border: `2px solid ${
-                      overview.bess_mode === "charging"
+                      bessMode === "charging"
                         ? "#3B82F6"
-                        : overview.bess_mode === "discharging"
+                        : bessMode === "discharging"
                         ? "#8B5CF6"
                         : "#6B7280"
                     }`,
                   }}
                 >
                   <Battery className="h-7 w-7" style={{
-                    color: overview.bess_mode === "charging"
+                    color: bessMode === "charging"
                       ? "#3B82F6"
-                      : overview.bess_mode === "discharging"
+                      : bessMode === "discharging"
                       ? "#8B5CF6"
                       : "#6B7280",
                   }} />
@@ -364,7 +381,7 @@ export function EnergyFlowDiagram({ siteId }: EnergyFlowDiagramProps) {
                   BESS
                 </span>
                 <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                  {overview.bess_soc_percent.toFixed(0)}% SOC &mdash; {overview.bess_mode}
+                  {bessSocPercent.toFixed(0)}% SOC &mdash; {bessMode}
                 </span>
               </div>
             </div>

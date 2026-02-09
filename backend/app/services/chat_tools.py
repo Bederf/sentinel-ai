@@ -1938,7 +1938,7 @@ async def get_security_status() -> dict[str, Any]:
 # ============================================================================
 
 
-async def get_solar_overview(site_id: str = "fairlands") -> dict[str, Any]:
+async def get_solar_overview(site_id: str = "site-002") -> dict[str, Any]:
     """Get solar site overview — generation, BESS, grid, savings."""
     try:
         from app.services.solar_ingestion_service import get_solar_ingestion_service
@@ -1952,7 +1952,7 @@ async def get_solar_overview(site_id: str = "fairlands") -> dict[str, Any]:
         return {"error": str(e)}
 
 
-async def get_bess_status_chat(site_id: str = "fairlands") -> dict[str, Any]:
+async def get_bess_status_chat(site_id: str = "site-002") -> dict[str, Any]:
     """Get BESS battery status — SOC, mode, health."""
     try:
         from app.services.solar_ingestion_service import get_solar_ingestion_service
@@ -1967,7 +1967,7 @@ async def get_bess_status_chat(site_id: str = "fairlands") -> dict[str, Any]:
 
 
 async def get_solar_savings(
-    site_id: str = "fairlands",
+    site_id: str = "site-002",
     period: str = "ytd",
 ) -> dict[str, Any]:
     """Get solar savings — monthly/YTD financial summary."""
@@ -1981,7 +1981,7 @@ async def get_solar_savings(
         return {"error": str(e)}
 
 
-async def get_solar_diagnostics(site_id: str = "fairlands") -> dict[str, Any]:
+async def get_solar_diagnostics(site_id: str = "site-002") -> dict[str, Any]:
     """Get solar diagnostics — underperformers, issues, maintenance."""
     try:
         from app.services.solar_performance_service import get_solar_performance_service
@@ -2005,7 +2005,7 @@ async def get_solar_diagnostics(site_id: str = "fairlands") -> dict[str, Any]:
 
 
 async def get_solar_forecast(
-    site_id: str = "fairlands",
+    site_id: str = "site-002",
     hours: int = 24,
 ) -> dict[str, Any]:
     """Get solar generation forecast — next 24h with confidence."""
@@ -2342,8 +2342,8 @@ CHAT_TOOLS = [
             "properties": {
                 "site_id": {
                     "type": "string",
-                    "description": "Solar site ID (default: fairlands)",
-                    "default": "fairlands"
+                    "description": "Solar site ID (default: site-002)",
+                    "default": "site-002"
                 }
             },
             "required": []
@@ -2357,8 +2357,8 @@ CHAT_TOOLS = [
             "properties": {
                 "site_id": {
                     "type": "string",
-                    "description": "Solar site ID (default: fairlands)",
-                    "default": "fairlands"
+                    "description": "Solar site ID (default: site-002)",
+                    "default": "site-002"
                 }
             },
             "required": []
@@ -2372,8 +2372,8 @@ CHAT_TOOLS = [
             "properties": {
                 "site_id": {
                     "type": "string",
-                    "description": "Solar site ID (default: fairlands)",
-                    "default": "fairlands"
+                    "description": "Solar site ID (default: site-002)",
+                    "default": "site-002"
                 },
                 "period": {
                     "type": "string",
@@ -2392,8 +2392,8 @@ CHAT_TOOLS = [
             "properties": {
                 "site_id": {
                     "type": "string",
-                    "description": "Solar site ID (default: fairlands)",
-                    "default": "fairlands"
+                    "description": "Solar site ID (default: site-002)",
+                    "default": "site-002"
                 }
             },
             "required": []
@@ -2407,8 +2407,8 @@ CHAT_TOOLS = [
             "properties": {
                 "site_id": {
                     "type": "string",
-                    "description": "Solar site ID (default: fairlands)",
-                    "default": "fairlands"
+                    "description": "Solar site ID (default: site-002)",
+                    "default": "site-002"
                 },
                 "hours": {
                     "type": "integer",

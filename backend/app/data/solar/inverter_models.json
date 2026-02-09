@@ -44,6 +44,28 @@
       "warranty_years": 5,
       "datasheet_url": "https://www.se.com/conext-cl"
     },
+    "SUN2000-100KTL-M2": {
+      "manufacturer": "Huawei",
+      "type": "string_inverter",
+      "rated_power_kva": 100,
+      "max_dc_power_kw": 110,
+      "max_efficiency_pct": 98.8,
+      "euro_efficiency_pct": 98.5,
+      "mppt_count": 10,
+      "mppt_voltage_range_v": [200, 1000],
+      "max_input_voltage_v": 1100,
+      "max_input_current_a": 22,
+      "ac_voltage_v": 800,
+      "ac_frequency_hz": [45, 55],
+      "weight_kg": 75,
+      "dimensions_mm": [1035, 555, 300],
+      "ip_rating": "IP66",
+      "operating_temp_c": [-25, 60],
+      "communication": ["modbus_tcp", "modbus_rtu", "fusionsolar_cloud"],
+      "certifications": ["IEC 62109-1", "IEC 62109-2", "NRS 097-2-1"],
+      "warranty_years": 10,
+      "datasheet_url": "https://solar.huawei.com/en/products/smart-pv/SUN2000-100KTL-M2"
+    },
     "Sunny Tripower 25000TL": {
       "manufacturer": "SMA",
       "type": "string_inverter",
@@ -68,6 +90,25 @@
     }
   },
   "bess_models": {
+    "LUNA2000-200KWH-2H1": {
+      "manufacturer": "Huawei",
+      "type": "bess_container",
+      "capacity_kwh": 200,
+      "rated_power_kw": 100,
+      "max_power_kw": 110,
+      "cell_chemistry": "LFP",
+      "cycle_life": 6000,
+      "dod_pct": 90,
+      "round_trip_efficiency_pct": 95,
+      "rack_count": 2,
+      "rack_capacity_kwh": 100,
+      "voltage_range_v": [600, 900],
+      "operating_temp_c": [-10, 50],
+      "ip_rating": "IP55",
+      "communication": ["modbus_tcp", "can"],
+      "certifications": ["IEC 62619", "UN 38.3"],
+      "warranty_years": 10
+    },
     "LUNA2000-5015-2S": {
       "manufacturer": "Huawei",
       "type": "bess_container",

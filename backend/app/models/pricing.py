@@ -68,7 +68,7 @@ class PricingCalculation(BaseModel):
 class QuoteRequest(BaseModel):
     """Request for pricing quote calculation."""
     building_id: str
-    equipment_codes: List[str] = Field(..., min_items=1, description="List of equipment codes to quote")
+    equipment_codes: List[str] = Field(..., min_length=1, description="List of equipment codes to quote")
     sla_tier: SLATier
     contract_months: int = Field(default=12, ge=1, le=60, description="Contract duration in months")
     include_benchmarks: bool = Field(default=True, description="Include market benchmark comparison")
@@ -84,6 +84,70 @@ class QuoteResponse(BaseModel):
     assumptions: List[str] = Field(default_factory=list, description="Quote assumptions")
     market_comparison: Optional[Dict[str, Any]] = Field(None, description="Market benchmark data")
     valid_until: date = Field(..., description="Quote validity date")
+
+
+class WhatIfScenario(BaseModel):
+    """Scenario override for pricing what-if analysis."""
+    name: str
+    sla_tier: Optional[SLATier] = None
+    add_equipment_codes: List[str] = Field(default_factory=list)
+    condition_score_delta: int = Field(default=0, ge=-4, le=4, description="Adjust condition score by +/-")
+    risk_buffer_multiplier: Decimal = Field(default=Decimal("1.0"), ge=Decimal("0.5"), le=Decimal("2.0"))
+    target_margin_pct: Optional[Decimal] = Field(
+        default=None, ge=Decimal("0"), le=Decimal("100")
+    )
+
+
+class WhatIfRequest(BaseModel):
+    """Request containing base quote and scenarios."""
+    base: QuoteRequest
+    scenarios: List[WhatIfScenario] = Field(default_factory=list)
+
+
+class WhatIfScenarioResult(BaseModel):
+    """Result for a what-if scenario."""
+    name: str
+    recommended_fee_zar: Decimal
+    delta_zar: Decimal
+    delta_pct: Decimal
+    cost_breakdown: Dict[str, Decimal]
+    risk_factors: List[str]
+    assumptions: List[str]
+
+
+class WhatIfResponse(BaseModel):
+    """Response for what-if analysis."""
+    base_quote: QuoteResponse
+    scenarios: List[WhatIfScenarioResult]
+
+
+class RenewalPricingRequest(BaseModel):
+    """Request for renewal pricing recommendation."""
+    contract_id: str
+    year: int = Field(..., ge=2000, le=2100)
+    sla_tier: Optional[SLATier] = None
+
+
+class RenewalPricingResponse(BaseModel):
+    """Renewal pricing recommendation response."""
+    contract_id: str
+    year: int
+    current_monthly_fee_zar: Decimal
+    actual_cost_monthly_avg_zar: Decimal
+    target_margin_pct: Decimal
+    recommended_monthly_fee_zar: Decimal
+    delta_zar: Decimal
+    delta_pct: Decimal
+    notes: List[str] = Field(default_factory=list)
+
+
+class PricingBenchmarkResponse(BaseModel):
+    """Benchmarking response for similar contracts."""
+    contract_id: str
+    similar_contracts: int
+    average_monthly_fee_zar: Decimal
+    min_monthly_fee_zar: Decimal
+    max_monthly_fee_zar: Decimal
 
 
 class EquipmentTypePricing(BaseModel):

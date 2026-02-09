@@ -6,7 +6,7 @@
  */
 
 import { Badge, Flex, Text } from '@tremor/react';
-import { useModules } from '../../contexts/ModuleContext';
+import { useModules } from '../../contexts/ModuleHooks';
 import { MODULE_COLORS } from '../../lib/moduleRegistry';
 import { useHealthThresholds } from '../../hooks/useHealthThresholds';
 

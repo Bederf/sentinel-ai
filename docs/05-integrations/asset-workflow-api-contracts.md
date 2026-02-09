@@ -1,12 +1,18 @@
 # SENTINEL Workflow Integration - API Contracts
 
-**Date:** 2026-02-01
+**Date:** 2026-02-08
 **Phase:** 53 - SENTINEL Asset Management Workflow Integration
 **Version:** 1.0
 
 ## Overview
 
 This document defines the REST API contracts for cross-system communication in the SENTINEL asset management workflow.
+
+## Phase 53-01 Integration Notes
+
+- Critical/safety inspection deficiencies auto-trigger workflow work orders via `/api/inspection/deficiencies`.
+- Technician work order completion auto-triggers repair-completed workflow via `/api/work-orders/technician/{id}/complete`.
+- Baseline deviation workflow remains wired in `/api/baselines/{equipment_id}/compare`.
 
 ## Conventions
 
@@ -57,9 +63,9 @@ All endpoints return errors in this format:
 **Request Body:**
 ```json
 {
-  "building_id": "sandton-mall",
-  "building_name": "Sandton City Mall",
-  "building_address": "83 5th St, Sandton",
+  "site_id": "sandton-mall",
+  "site_name": "Sandton City Mall",
+  "site_address": "83 5th St, Sandton",
   "equipment": [
     {
       "equipment_id": "chiller-001",
@@ -85,7 +91,7 @@ All endpoints return errors in this format:
 ```json
 {
   "success": true,
-  "building_id": "sandton-mall",
+  "site_id": "sandton-mall",
   "equipment_onboarded": 1,
   "baselines_captured": 1,
   "workflow_state": "baseline_capture",
@@ -232,6 +238,44 @@ All endpoints return errors in this format:
     "to_state": "effectiveness_validated"
   },
   "ml_feedback_recorded": true
+}
+```
+
+---
+
+### 1.5 Workflow Events Log
+
+**Endpoint:** `GET /api/workflow/events`
+
+**Description:** Retrieve workflow event log entries for trigger outcomes (created, suppressed, errors).
+
+**Query Parameters:**
+- `equipment_id` (optional)
+- `trigger_type` (optional)
+- `limit` (optional, default 100, max 500)
+
+**Response (200):**
+```json
+{
+  "count": 2,
+  "events": [
+    {
+      "id": "b4a3e29c-1fcb-4a5a-9f2a-7b3f5b71a91a",
+      "equipment_id": "2d9b5a83-8f9a-45fa-a6f8-fd2f38b0f88f",
+      "trigger_type": "ml_anomaly",
+      "action_taken": "created_inspection_task",
+      "source": "workflow_triggers",
+      "work_order_id": null,
+      "inspection_id": null,
+      "details": {
+        "anomaly_id": "anomaly-20260208093000",
+        "task_id": "insp-20260208093000",
+        "priority": "high"
+      },
+      "success": true,
+      "created_at": "2026-02-08T09:30:00Z"
+    }
+  ]
 }
 ```
 
@@ -487,7 +531,7 @@ All endpoints return errors in this format:
 {
   "tool_name": "create_building",
   "parameters": {
-    "building_id": "sandton-mall",
+  "site_id": "sandton-mall",
     "name": "Sandton City Mall",
     "address": "83 5th St, Sandton",
     "building_type": "commercial"
@@ -500,7 +544,7 @@ All endpoints return errors in this format:
 {
   "success": true,
   "result": {
-    "building_id": "sandton-mall",
+  "site_id": "sandton-mall",
     "status": "created",
     "equipment_count": 0,
     "zones_count": 0
@@ -574,7 +618,7 @@ Authorization: Bearer <token>
 curl -X POST http://localhost:9095/api/workflow/onboard-asset \
   -H "Content-Type: application/json" \
   -d '{
-    "building_id": "sandton-mall",
+  "site_id": "sandton-mall",
     "equipment": [{
       "equipment_id": "chiller-001",
       "equipment_type": "chiller",

@@ -12,12 +12,15 @@ export { IntegrationStatusBar } from './IntegrationStatusBar';
 // Re-export context and hooks
 export {
   ModuleProvider,
+} from '../../contexts/ModuleContext';
+
+export {
   useModules,
   useModuleActive,
   useCriticalRecommendations,
   useCrossSystemRecommendations,
   useModuleRecommendations,
-} from '../../contexts/ModuleContext';
+} from '../../contexts/ModuleHooks';
 
 // Re-export types
 export type {

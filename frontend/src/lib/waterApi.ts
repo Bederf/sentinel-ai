@@ -63,10 +63,10 @@ export interface WaterConsumption {
 export interface WaterAlert {
   alert_id: string;
   site: string;
-  alert_type: "continuous_flow" | "unusual_pattern" | "high_flow" | "no_flow";
-  severity: "critical" | "warning" | "info";
+  alert_type: "continuous_flow" | "unusual_pattern" | "spike" | "night_flow";
+  severity: "low" | "medium" | "high" | "critical";
   timestamp: string; // ISO datetime
-  resolved: boolean;
+  status?: "active" | "acknowledged" | "resolved" | "false_positive";
   resolution?: {
     timestamp: string;
     resolved_by: string;
@@ -84,21 +84,15 @@ export interface WaterAlert {
 /** Trending data for period comparisons */
 export interface WaterTrending {
   site: string;
-  period: "daily" | "weekly" | "monthly";
-  current_period: {
-    start: string;
-    end: string;
-    total_volume_liters: number;
-    average_daily_liters: number;
-  };
-  previous_period: {
-    start: string;
-    end: string;
-    total_volume_liters: number;
-    average_daily_liters: number;
-  };
-  comparison_percent: number; // Positive = increase, negative = decrease
-  trend: "increasing" | "decreasing" | "stable";
+  period: string;
+  start_date: string;
+  end_date: string;
+  total_volume_liters: number;
+  average_flow_rate_lpm: number;
+  peak_flow_rate_lpm: number;
+  baseline_comparison_percent: number;
+  trend_direction: "up" | "down" | "stable";
+  record_count: number;
 }
 
 /** Current flow rate response */
@@ -133,30 +127,32 @@ export async function getConsumption(
   if (end_date) params.set("end_date", end_date);
 
   const query = params.toString() ? `?${params}` : "";
-  return fetchJson<WaterConsumption[]>(`/api/water/sites/${site}/consumption${query}`);
+  const response = await fetchJson<{ site: string; meter_id: string | null; record_count: number; consumption: WaterConsumption[] }>(`/api/water/sites/${site}/consumption${query}`);
+  return response.consumption;
 }
 
 /**
  * Get all alerts for a site (optional severity filter)
- * GET /api/water/sites/{site}/alerts?severity={severity}&resolved={resolved}
+ * GET /api/water/sites/{site}/alerts?severity={severity}&status={status}
  */
 export async function getAlerts(
   site: string,
   options?: {
-    severity?: "critical" | "warning" | "info";
+    severity?: "low" | "medium" | "high" | "critical";
     start_date?: string;
     end_date?: string;
-    resolved?: boolean;
+    status?: string;
   }
 ): Promise<WaterAlert[]> {
   const params = new URLSearchParams();
   if (options?.severity) params.set("severity", options.severity);
   if (options?.start_date) params.set("start_date", options.start_date);
   if (options?.end_date) params.set("end_date", options.end_date);
-  if (options?.resolved !== undefined) params.set("resolved", String(options.resolved));
+  if (options?.status !== undefined) params.set("status", options.status);
 
   const query = params.toString() ? `?${params}` : "";
-  return fetchJson<WaterAlert[]>(`/api/water/sites/${site}/alerts${query}`);
+  const response = await fetchJson<{ site: string; alert_count: number; alerts: WaterAlert[] }>(`/api/water/sites/${site}/alerts${query}`);
+  return response.alerts;
 }
 
 /**
@@ -164,20 +160,24 @@ export async function getAlerts(
  * GET /api/water/sites/{site}/alerts/active
  */
 export async function getActiveAlerts(site: string): Promise<WaterAlert[]> {
-  return fetchJson<WaterAlert[]>(`/api/water/sites/${site}/alerts/active`);
+  const response = await fetchJson<{ site: string; active_alert_count: number; alerts: WaterAlert[] }>(`/api/water/sites/${site}/alerts/active`);
+  return response.alerts;
 }
 
 /**
  * Resolve an alert with resolution notes
- * POST /api/water/alerts/{alertId}/resolve
+ * PATCH /api/water/alerts/{alertId}/resolve?resolved_by={user}&resolution_notes={notes}
  */
 export async function resolveAlert(
   alertId: string,
   resolution: { notes: string; resolved_by: string }
 ): Promise<void> {
-  await fetchJson<void>(`/api/water/alerts/${alertId}/resolve`, {
-    method: "POST",
-    body: JSON.stringify(resolution),
+  const params = new URLSearchParams({
+    resolved_by: resolution.resolved_by,
+    resolution_notes: resolution.notes,
+  });
+  await fetchJson<void>(`/api/water/alerts/${alertId}/resolve?${params}`, {
+    method: "PATCH",
   });
 }
 
@@ -187,7 +187,7 @@ export async function resolveAlert(
  */
 export async function getTrending(
   site: string,
-  period: "daily" | "weekly" | "monthly" = "weekly"
+  period: "day" | "week" | "month" = "week"
 ): Promise<WaterTrending> {
   return fetchJson<WaterTrending>(`/api/water/sites/${site}/trending?period=${period}`);
 }

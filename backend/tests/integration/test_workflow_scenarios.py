@@ -45,9 +45,9 @@ class TestHappyPathScenario:
 
         # Step 1: Onboard new asset
         onboard_request = OnboardAssetRequest(
-            building_id="test-building",
-            building_name="Test Building",
-            building_address="123 Test St",
+            site_id="test-site",
+            site_name="Test Site",
+            site_address="123 Test St",
             equipment=[
                 {
                     "equipment_id": "chiller-happy-001",
@@ -118,9 +118,9 @@ class TestMLAnomalyScenario:
 
         # Step 1: Onboard asset
         onboard_request = OnboardAssetRequest(
-            building_id="test-building",
-            building_name="Test Building",
-            building_address="123 Test St",
+            site_id="test-site",
+            site_name="Test Site",
+            site_address="123 Test St",
             equipment=[
                 {
                     "equipment_id": "chiller-anomaly-001",
@@ -216,9 +216,9 @@ class TestBaselineDeviationScenario:
 
         # Step 1: Onboard asset with baseline
         onboard_request = OnboardAssetRequest(
-            building_id="test-building",
-            building_name="Test Building",
-            building_address="123 Test St",
+            site_id="test-site",
+            site_name="Test Site",
+            site_address="123 Test St",
             equipment=[
                 {
                     "equipment_id": "chiller-deviation-001",
@@ -344,9 +344,9 @@ class TestMultiEquipmentScenario:
 
         # Equipment 1: Healthy
         await orchestrator.onboard_asset(OnboardAssetRequest(
-            building_id="multi-building",
-            building_name="Multi Equipment Building",
-            building_address="456 Multi St",
+            site_id="multi-site",
+            site_name="Multi Equipment Site",
+            site_address="456 Multi St",
             equipment=[{
                 "equipment_id": "chiller-healthy-001",
                 "equipment_type": "chiller",
@@ -358,9 +358,9 @@ class TestMultiEquipmentScenario:
 
         # Equipment 2: Anomaly detected
         await orchestrator.onboard_asset(OnboardAssetRequest(
-            building_id="multi-building",
-            building_name="Multi Equipment Building",
-            building_address="456 Multi St",
+            site_id="multi-site",
+            site_name="Multi Equipment Site",
+            site_address="456 Multi St",
             equipment=[{
                 "equipment_id": "chiller-issue-001",
                 "equipment_type": "chiller",
@@ -382,9 +382,9 @@ class TestMultiEquipmentScenario:
 
         # Equipment 3: Repair in progress
         await orchestrator.onboard_asset(OnboardAssetRequest(
-            building_id="multi-building",
-            building_name="Multi Equipment Building",
-            building_address="456 Multi St",
+            site_id="multi-site",
+            site_name="Multi Equipment Site",
+            site_address="456 Multi St",
             equipment=[{
                 "equipment_id": "chiller-repair-001",
                 "equipment_type": "chiller",
@@ -422,9 +422,9 @@ class TestWorkflowPerformance:
             """Run complete lifecycle for one equipment"""
             # Onboard
             await orchestrator.onboard_asset(OnboardAssetRequest(
-                building_id="perf-test",
-                building_name="Performance Test",
-                building_address="789 Perf St",
+                site_id="perf-test",
+                site_name="Performance Site",
+                site_address="789 Perf St",
                 equipment=[{
                     "equipment_id": equipment_id,
                     "equipment_type": "chiller",

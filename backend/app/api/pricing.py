@@ -9,7 +9,16 @@ from fastapi import APIRouter, HTTPException, Query
 from typing import Dict, Any, Optional
 from decimal import Decimal
 
-from app.models.pricing import QuoteRequest, QuoteResponse, SLATier
+from app.models.pricing import (
+    QuoteRequest,
+    QuoteResponse,
+    SLATier,
+    WhatIfRequest,
+    WhatIfResponse,
+    RenewalPricingRequest,
+    RenewalPricingResponse,
+    PricingBenchmarkResponse,
+)
 from app.services.pricing_engine import PricingEngine, get_pricing_engine
 
 
@@ -39,6 +48,55 @@ async def calculate_quote(request: QuoteRequest) -> QuoteResponse:
         raise HTTPException(
             status_code=500,
             detail=f"Pricing calculation failed: {str(e)}"
+        )
+
+
+@router.post("/what-if", response_model=WhatIfResponse)
+async def pricing_what_if(request: WhatIfRequest) -> WhatIfResponse:
+    """
+    Run what-if analysis for pricing scenarios.
+    """
+    try:
+        engine = get_pricing_engine()
+        response = engine.calculate_what_if(
+            request.base,
+            request.scenarios
+        )
+        return response
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"What-if analysis failed: {str(e)}"
+        )
+
+
+@router.post("/renewal", response_model=RenewalPricingResponse)
+async def calculate_renewal_pricing(request: RenewalPricingRequest) -> RenewalPricingResponse:
+    """
+    Calculate renewal pricing recommendation for an existing contract.
+    """
+    try:
+        engine = get_pricing_engine()
+        return engine.calculate_renewal_pricing(request)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Renewal pricing failed: {str(e)}"
+        )
+
+
+@router.get("/benchmarks/{contract_id}", response_model=PricingBenchmarkResponse)
+async def get_pricing_benchmarks(contract_id: str) -> PricingBenchmarkResponse:
+    """
+    Get benchmark pricing range for similar contracts.
+    """
+    try:
+        engine = get_pricing_engine()
+        return engine.get_benchmarks_for_contract(contract_id)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Benchmarking failed: {str(e)}"
         )
 
 

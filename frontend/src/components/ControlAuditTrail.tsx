@@ -29,7 +29,7 @@ import type {
 } from "../lib/api";
 import { formatDateTime } from "../lib/timeFormat";
 import AuditLogDetail from "./AuditLogDetail";
-import { LoadingCard } from "./LoadingCard";
+import { PageLoading } from "./PageLoading";
 
 interface ControlAuditTrailProps {
   onError?: (error: string) => void;
@@ -300,12 +300,7 @@ export function ControlAuditTrail({ onError, onViewDevice }: ControlAuditTrailPr
   // Loading state
   if (loading && !refreshing) {
     return (
-      <div
-        className="h-full flex items-center justify-center"
-        style={{ background: "var(--color-sentinel-bg-canvas)" }}
-      >
-        <LoadingCard />
-      </div>
+      <PageLoading message="Loading audit trail..." />
     );
   }
 

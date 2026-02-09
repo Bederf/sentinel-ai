@@ -8,6 +8,7 @@ device management.
 import json
 import logging
 import re
+import os
 from pathlib import Path
 from typing import List, Optional, Union
 
@@ -102,13 +103,16 @@ async def load_mock_devices() -> List[dict]:
     return []
 
 
-async def load_controllable_equipment_from_buildings() -> List[dict]:
-    """Load controllable equipment from building directories.
+async def load_equipment_from_buildings() -> List[dict]:
+    """Load all equipment from building directories.
 
-    Scans all building equipment directories and returns equipment
-    that has at least one writable point (controllable).
+    Scans all building equipment directories and returns all equipment,
+    including monitoring-only devices (solar inverters, meters) that have
+    no writable points. The control endpoint already validates point.writable
+    before allowing writes, and the AI optimizer uses _get_controllable_equipment()
+    to filter recommendations to writable devices only.
     """
-    controllable_devices = []
+    all_devices = []
 
     # Get active buildings from registry
     registry_path = BUILDINGS_DIR / "_registry.json"
@@ -131,25 +135,16 @@ async def load_controllable_equipment_from_buildings() -> List[dict]:
                 with open(eq_file) as f:
                     eq_data = json.load(f)
 
-                # Check if equipment has any writable points
-                points = eq_data.get("points", {})
-                has_writable = any(
-                    p.get("writable", False) for p in points.values()
-                )
-
-                if not has_writable:
-                    continue
-
                 # Transform equipment format to device format
                 device_data = _transform_equipment_to_device(eq_data)
                 if device_data:
-                    controllable_devices.append(device_data)
+                    all_devices.append(device_data)
 
             except Exception as e:
                 logger.warning(f"Failed to load equipment {eq_file}: {e}")
 
-    logger.info(f"Loaded {len(controllable_devices)} controllable devices from building directories")
-    return controllable_devices
+    logger.info(f"Loaded {len(all_devices)} devices from building directories")
+    return all_devices
 
 
 def _transform_equipment_to_device(eq_data: dict) -> Optional[dict]:
@@ -223,6 +218,7 @@ async def startup_event():
     Loads mock devices + controllable equipment from building directories.
     """
     try:
+        testing_mode = os.getenv("TESTING", "").lower() == "true"
         print("[DEVICES] Starting device manager initialization...")
 
         # Load mock devices for demo
@@ -230,9 +226,16 @@ async def startup_event():
         mock_count = len(devices_data)
         print(f"[DEVICES] Loaded {mock_count} mock devices")
 
-        # Load controllable equipment from building directories
-        building_devices = await load_controllable_equipment_from_buildings()
-        print(f"[DEVICES] Loaded {len(building_devices)} controllable building equipment")
+        building_devices = []
+        if not testing_mode:
+            # Load all equipment from building directories (including monitoring-only)
+            building_devices = await load_equipment_from_buildings()
+            print(f"[DEVICES] Loaded {len(building_devices)} building equipment")
+        else:
+            print("[DEVICES] TESTING mode: skipping building equipment load")
+            # Keep startup fast by limiting mock devices
+            devices_data = devices_data[:5]
+            mock_count = len(devices_data)
 
         # Get existing device IDs to avoid duplicates
         existing_ids = {d["id"] for d in devices_data}
@@ -262,14 +265,19 @@ async def startup_event():
         await device_manager.initialize([])
 
 
-@router.on_event("shutdown")
-async def shutdown_event():
-    """Shutdown device manager on shutdown."""
-    try:
-        await device_manager.shutdown()
-        logger.info("Device manager shutdown complete")
-    except Exception as e:
-        logger.error(f"Error shutting down device manager: {e}")
+if os.getenv("TESTING", "").lower() != "true":
+    @router.on_event("shutdown")
+    async def shutdown_event():
+        """Shutdown device manager on shutdown."""
+        try:
+            await device_manager.shutdown()
+            logger.info("Device manager shutdown complete")
+        except Exception as e:
+            logger.error(f"Error shutting down device manager: {e}")
+else:
+    async def shutdown_event():
+        """Shutdown device manager on shutdown (testing no-op)."""
+        return None
 
 
 @router.get("/devices", response_model=List[dict])

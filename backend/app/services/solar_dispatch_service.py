@@ -125,7 +125,7 @@ class SolarDispatchService:
         self._simulated_soc: Dict[str, float] = {}
         self._started_at: Dict[str, str] = {}
         self._mode: Dict[str, str] = {}  # autonomous / manual / stopped
-        self._seed_demo_history("fairlands")
+        self._seed_demo_history("site-002")
 
     # === Demo seed ===
 

@@ -31,9 +31,9 @@ def orchestrator():
 def onboard_request():
     """Sample onboarding request"""
     return OnboardAssetRequest(
-        building_id="sandton-mall",
-        building_name="Sandton City Mall",
-        building_address="83 5th St, Sandton",
+        site_id="sandton-mall",
+        site_name="Sandton City Mall",
+        site_address="83 5th St, Sandton",
         equipment=[
             {
                 "equipment_id": "chiller-001",
@@ -92,7 +92,7 @@ class TestAssetOnboarding:
         response = await orchestrator.onboard_asset(onboard_request)
 
         assert response.success is True
-        assert response.building_id == "sandton-mall"
+        assert response.site_id == "sandton-mall"
         assert response.equipment_onboarded == 1
         assert response.baselines_captured == 1
         assert response.workflow_state == WorkflowState.MONITORING
@@ -107,9 +107,9 @@ class TestAssetOnboarding:
     async def test_onboard_multiple_assets(self, orchestrator):
         """Test onboarding multiple assets"""
         request = OnboardAssetRequest(
-            building_id="test-building",
-            building_name="Test Building",
-            building_address="123 Test St",
+            site_id="test-building",
+            site_name="Test Building",
+            site_address="123 Test St",
             equipment=[
                 {
                     "equipment_id": f"chiller-{i:03d}",
@@ -132,9 +132,9 @@ class TestAssetOnboarding:
     async def test_onboard_without_baseline(self, orchestrator):
         """Test onboarding asset without baseline values"""
         request = OnboardAssetRequest(
-            building_id="test-building",
-            building_name="Test Building",
-            building_address="123 Test St",
+            site_id="test-building",
+            site_name="Test Building",
+            site_address="123 Test St",
             equipment=[
                 {
                     "equipment_id": "ahu-001",
@@ -403,9 +403,9 @@ class TestPerformance:
         tasks = []
         for i in range(10):
             request = OnboardAssetRequest(
-                building_id=f"building-{i}",
-                building_name=f"Building {i}",
-                building_address=f"{i} Test St",
+                site_id=f"site-{i}",
+                site_name=f"Site {i}",
+                site_address=f"{i} Test St",
                 equipment=[{
                     "equipment_id": f"equipment-{i}",
                     "equipment_type": "chiller",

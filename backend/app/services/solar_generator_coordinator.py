@@ -8,7 +8,7 @@ Diesel avoidance tracking provides tangible financial evidence of the
 Solar+BESS investment: how many hours of generator runtime were avoided,
 how many litres of diesel saved, and what that's worth in ZAR.
 
-Fairlands generator specifications (from generator_service.py context):
+Site-002 generator specifications (from generator_service.py context):
   - 2x 500 kVA diesel gensets (DeepSea DSE8610 MKII controllers)
   - Fuel consumption: ~30 L/hour at 70% load (~90 L/hour at 100%)
   - Diesel price: ~R22/litre (2026 estimate)
@@ -234,7 +234,7 @@ class SolarGeneratorCoordinator:
 
     def _seed_demo_events(self) -> None:
         """Seed realistic generator event history for demo."""
-        site_id = "fairlands"
+        site_id = "site-002"
         events: List[GeneratorEvent] = []
         now = datetime.now(timezone.utc)
 

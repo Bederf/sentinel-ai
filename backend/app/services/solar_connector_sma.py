@@ -2,7 +2,7 @@
 
 Supports:
   - SMA Modbus TCP register reads (SMA specific register map, different from Huawei/Schneider)
-  - Simulated data for demo (Fairlands Western Canopy — 10 x SMA Sunny Tripower Core1)
+  - Simulated data for demo (Site-002 Western Canopy — 10 x SMA Sunny Tripower Core1)
 
 SMA register map differs significantly from Huawei/Schneider:
   - SMA uses SunSpec-compliant registers starting at 40000
@@ -97,7 +97,7 @@ def _solar_power_factor(hour: float) -> float:
 class SimulatedSMAConnector(SolarConnector):
     """Generates realistic SMA Sunny Tripower Core1 data for demo.
 
-    Models the Fairlands Western Canopy fleet — 10 medium-size (50 kVA)
+    Models the Site-002 Western Canopy fleet — 10 medium-size (50 kVA)
     inverters with SMA-specific characteristics:
       - 6 MPPT inputs per inverter (vs Huawei 10, Schneider 5)
       - Slightly different efficiency curve (SMA uses transformerless topology)

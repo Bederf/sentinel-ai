@@ -4,7 +4,7 @@ type: "feature"
 status: "implemented"
 version: "1.0.0"
 created: "2026-02-07"
-updated: "2026-02-07"
+updated: "2026-02-08"
 author: "SENTINEL Development Team"
 tags: ["sla", "profitability", "pricing", "commercial"]
 domain: "general"
@@ -53,10 +53,13 @@ Phases 50–52 extend Contract Management with operational compliance tracking, 
   - `/api/contracts/profitability/loss-leaders`
   - `/api/contracts/profitability/trends/{contract_id}`
   - `/api/contracts/profitability/asset-roi/{contract_id}/{equipment_id}`
+  - `/api/contracts/profitability/assets/{contract_id}`
+  - `/api/contracts/profitability/report/{contract_id}`
 
 **Frontend**
 - `frontend/src/pages/ProfitabilityDashboardPage.tsx`
   - KPI cards, loss leader panel, contract table, margin trend chart
+  - CSV/PDF export actions
 - `frontend/src/lib/profitabilityApi.ts` API client
 
 ## Phase 52: Risk-Based Pricing
@@ -71,6 +74,9 @@ Phases 50–52 extend Contract Management with operational compliance tracking, 
 - API: `backend/app/api/pricing.py`
   - `/api/pricing/calculate-quote`
   - `/api/pricing/calculate-price-range`
+  - `/api/pricing/what-if`
+  - `/api/pricing/renewal`
+  - `/api/pricing/benchmarks/{contract_id}`
   - `/api/pricing/equipment-types`
   - `/api/pricing/sla-tiers`
   - `/api/pricing/config`
@@ -89,3 +95,9 @@ Phases 50–52 extend Contract Management with operational compliance tracking, 
 - SLA clawbacks are exposed for finance and fed into profitability calculations.
 - Profitability analytics are best-effort when real cost data is incomplete; demo fallbacks exist.
 - Pricing engine uses defaults if templates or ML predictions are unavailable.
+
+## Known Gaps
+
+- Overhead allocation is not yet modeled in budget actuals.
+- Asset ROI uses even cost distribution when fee allocation is missing.
+- Report export is basic PDF/CSV (Excel via CSV). Styled PDF exports pending.

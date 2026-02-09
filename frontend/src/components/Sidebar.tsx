@@ -9,7 +9,7 @@
  * Add-on items can be reordered with up/down arrows (persisted in localStorage).
  */
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import {
   Menu,
   X,
@@ -20,7 +20,7 @@ import {
   Info,
   SlidersHorizontal,
 } from "lucide-react";
-import { useModules } from "../contexts/ModuleContext";
+import { useModules } from "../contexts/ModuleHooks";
 import {
   type View,
   type NavItem,

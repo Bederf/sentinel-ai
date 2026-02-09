@@ -1422,7 +1422,7 @@ async def get_contracts_tool(
 
     Args:
         building_id: Filter by building/site ID
-        organization_code: Filter by organization code (e.g., ORG-FNB)
+        organization_code: Filter by organization code (e.g., ORG-SITE-002)
         status: Filter by status - active, expired, draft
         include_sla: Include SLA terms in response (default false)
 
@@ -1512,7 +1512,7 @@ async def add_building_contract_tool(
     Args:
         building_code: Building/site ID (e.g., site-002)
         organization_name: Client organization name
-        organization_code: Organization code (e.g., ORG-FNB)
+        organization_code: Organization code (e.g., ORG-SITE-002)
         contract_type: Contract type (full_maintenance, preventive_only, ad_hoc, consulting)
         monthly_fee_zar: Monthly fee in ZAR
         start_date: Contract start date (YYYY-MM-DD)
@@ -1703,6 +1703,215 @@ async def get_contract_profitability_tool(
             "at_risk_contracts": at_risk
         }
     }
+
+
+# ============================================================================
+# Municipal Billing Tools (Phase 49)
+# ============================================================================
+
+async def process_municipal_bill_tool(
+    building_id: str,
+    pdf_file_path: str,
+    municipality: str,
+    utility_type: str,
+    account_number: str,
+    tariff_type: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Process South African municipal utility bill PDF.
+
+    Supports: Johannesburg, Ekurhuleni, Cape Town, eThekwini
+
+    MCP Tool: process_municipal_bill
+
+    Args:
+        building_id: Building/site ID (e.g., "site-002")
+        pdf_file_path: Absolute path to PDF file
+        municipality: Municipality name (e.g., "city_of_johannesburg")
+        utility_type: "electricity" or "water"
+        account_number: Municipal account number
+        tariff_type: Optional tariff type
+
+    Returns:
+        Dictionary with extracted data, invoice ID, confidence score
+    """
+    from pathlib import Path
+    from app.services.municipal_pdf_extraction_service import MunicipalPdfExtractionService
+
+    # Validate PDF exists
+    pdf_path = Path(pdf_file_path)
+    if not pdf_path.exists():
+        return {
+            "error": "file_not_found",
+            "message": f"PDF file not found: {pdf_file_path}"
+        }
+
+    try:
+        # Extract data from PDF
+        extraction_service = MunicipalPdfExtractionService()
+        extracted_data = await extraction_service.parse_invoice(pdf_path)
+
+        # Get or create municipal account
+        from app.database.repositories.municipal_invoice_repository import MunicipalInvoiceRepository
+        repo = MunicipalInvoiceRepository()
+
+        account = repo.get_or_create_account(
+            site_id=building_id,
+            municipality=municipality,
+            utility_type=utility_type,
+            account_number=account_number,
+            tariff_type=tariff_type
+        )
+
+        if not account:
+            logger.error(f"Failed to create municipal account for {building_id}")
+            return {
+                "error": "account_creation_failed",
+                "message": f"Failed to create municipal account for {building_id}",
+                "extracted_data": extracted_data
+            }
+
+        # Create invoice record
+        invoice_payload = {
+            "account_id": account.get("id"),
+            "site_id": building_id,
+            "municipality": municipality,
+            "utility_type": utility_type,
+            "invoice_number": extracted_data.get("invoice_number"),
+            "billing_period_start": extracted_data.get("billing_period_start"),
+            "billing_period_end": extracted_data.get("billing_period_end"),
+            "consumption_kwh": extracted_data.get("consumption_kwh") if utility_type == "electricity" else None,
+            "consumption_kl": extracted_data.get("consumption_kl") if utility_type == "water" else None,
+            "total_amount_zar": extracted_data.get("total_amount_zar"),
+            "vat_amount_zar": extracted_data.get("vat_amount_zar"),
+            "base_amount_zar": extracted_data.get("base_amount_zar"),
+            "ocr_confidence": extracted_data.get("confidence", 0.0),
+            "raw_text": extracted_data.get("raw_text", "")[:5000],  # Truncate to 5000 chars
+            "pdf_file_path": str(pdf_path)
+        }
+
+        invoice = repo.create_invoice(invoice_payload)
+
+        return {
+            "building_id": building_id,
+            "municipality": municipality,
+            "utility_type": utility_type,
+            "account_number": account_number,
+            "account_id": account.get("id"),
+            "invoice_id": invoice.get("id") if invoice else None,
+            "extracted_data": extracted_data,
+            "pdf_file": str(pdf_path),
+            "status": "processed",
+            "confidence": extracted_data.get("confidence", 0.0)
+        }
+
+    except Exception as exc:
+        logger.error(f"Error processing municipal bill: {exc}", exc_info=True)
+        return {
+            "error": "processing_failed",
+            "message": f"Failed to process PDF: {str(exc)}",
+            "building_id": building_id,
+            "pdf_file": pdf_file_path
+        }
+
+
+async def get_utility_costs_tool(
+    building_id: str,
+    period_start: Optional[str] = None,
+    period_end: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Get utility cost analysis for a building from municipal bills.
+
+    Returns total costs, averages, and trends for electricity and water.
+
+    MCP Tool: get_utility_costs
+
+    Args:
+        building_id: Building/site ID
+        period_start: Period start ISO date (default: current month start)
+        period_end: Period end ISO date (default: current month end)
+
+    Returns:
+        Cost analysis with totals, averages, and trends
+    """
+    from datetime import date, timedelta
+    from app.database.repositories.municipal_invoice_repository import MunicipalInvoiceRepository
+
+    try:
+        repo = MunicipalInvoiceRepository()
+
+        # Default to current month if not specified
+        if not period_start:
+            today = date.today()
+            period_start = today.replace(day=1).isoformat()
+            # Get last day of month
+            if today.month == 12:
+                next_month = date(today.year + 1, 1, 1)
+            else:
+                next_month = date(today.year, today.month + 1, 1)
+            period_end = (next_month - timedelta(days=1)).isoformat()
+
+        # Get invoices for period
+        start = date.fromisoformat(period_start) if isinstance(period_start, str) else period_start
+        end = date.fromisoformat(period_end) if isinstance(period_end, str) else period_end
+
+        invoices = repo.list_invoices(
+            site_id=building_id,
+            limit=1000  # Large limit to get all invoices for period
+        )
+
+        # Filter by period
+        filtered_invoices = []
+        for inv in invoices:
+            inv_end = inv.get("billing_period_end")
+            if inv_end:
+                try:
+                    inv_date = date.fromisoformat(inv_end.split("T")[0]) if isinstance(inv_end, str) else inv_end
+                    if start <= inv_date <= end:
+                        filtered_invoices.append(inv)
+                except Exception:
+                    continue
+
+        # Calculate totals
+        electricity_total = sum(
+            float(inv.get("total_amount_zar") or 0)
+            for inv in filtered_invoices
+            if inv.get("utility_type") == "electricity"
+        )
+
+        water_total = sum(
+            float(inv.get("total_amount_zar") or 0)
+            for inv in filtered_invoices
+            if inv.get("utility_type") == "water"
+        )
+
+        total_zar = electricity_total + water_total
+
+        # Calculate averages
+        electricity_count = sum(1 for inv in filtered_invoices if inv.get("utility_type") == "electricity")
+        water_count = sum(1 for inv in filtered_invoices if inv.get("utility_type") == "water")
+
+        return {
+            "building_id": building_id,
+            "period": {"start": period_start, "end": period_end},
+            "electricity_cost_zar": round(electricity_total, 2),
+            "water_cost_zar": round(water_total, 2),
+            "total_cost_zar": round(total_zar, 2),
+            "electricity_invoice_count": electricity_count,
+            "water_invoice_count": water_count,
+            "total_invoice_count": len(filtered_invoices),
+            "average_electricity_cost_zar": round(electricity_total / electricity_count, 2) if electricity_count > 0 else 0,
+            "average_water_cost_zar": round(water_total / water_count, 2) if water_count > 0 else 0
+        }
+
+    except Exception as exc:
+        logger.error(f"Error getting utility costs: {exc}", exc_info=True)
+        return {
+            "error": "query_failed",
+            "message": f"Failed to query utility costs: {str(exc)}",
+            "building_id": building_id
+        }
 
 
 # ============================================================================
@@ -3127,7 +3336,7 @@ async def configure_asset_metrics_tool(
 # ============================================================================
 
 
-async def get_solar_overview_tool(site_id: str = "fairlands") -> Dict[str, Any]:
+async def get_solar_overview_tool(site_id: str = "site-002") -> Dict[str, Any]:
     """Get solar site overview — generation, BESS SOC, grid status, PR.
 
     MCP Tool: get_solar_overview
@@ -3144,7 +3353,7 @@ async def get_solar_overview_tool(site_id: str = "fairlands") -> Dict[str, Any]:
         return {"error": str(e)}
 
 
-async def get_bess_status_tool(site_id: str = "fairlands") -> Dict[str, Any]:
+async def get_bess_status_tool(site_id: str = "site-002") -> Dict[str, Any]:
     """Get BESS status — SOC, mode, health, dispatch schedule.
 
     MCP Tool: get_bess_status
@@ -3172,7 +3381,7 @@ async def get_bess_status_tool(site_id: str = "fairlands") -> Dict[str, Any]:
 
 
 async def get_solar_savings_tool(
-    site_id: str = "fairlands",
+    site_id: str = "site-002",
     period: str = "ytd",
 ) -> Dict[str, Any]:
     """Get financial summary — daily/monthly/YTD savings breakdown.
@@ -3190,7 +3399,7 @@ async def get_solar_savings_tool(
 
 
 async def get_solar_forecast_tool(
-    site_id: str = "fairlands",
+    site_id: str = "site-002",
     hours: int = 24,
 ) -> Dict[str, Any]:
     """Get next 24h generation forecast with confidence.
@@ -3207,7 +3416,7 @@ async def get_solar_forecast_tool(
         return {"error": str(e)}
 
 
-async def get_solar_diagnostics_tool(site_id: str = "fairlands") -> Dict[str, Any]:
+async def get_solar_diagnostics_tool(site_id: str = "site-002") -> Dict[str, Any]:
     """Get solar diagnostics — top issues, underperformers, maintenance.
 
     MCP Tool: get_solar_diagnostics
@@ -3898,8 +4107,8 @@ MCP_TOOLS = [
             "properties": {
                 "site_id": {
                     "type": "string",
-                    "description": "Solar site ID (default: fairlands)",
-                    "default": "fairlands"
+                    "description": "Solar site ID (default: site-002)",
+                    "default": "site-002"
                 }
             },
             "required": []
@@ -3913,8 +4122,8 @@ MCP_TOOLS = [
             "properties": {
                 "site_id": {
                     "type": "string",
-                    "description": "Solar site ID (default: fairlands)",
-                    "default": "fairlands"
+                    "description": "Solar site ID (default: site-002)",
+                    "default": "site-002"
                 }
             },
             "required": []
@@ -3928,8 +4137,8 @@ MCP_TOOLS = [
             "properties": {
                 "site_id": {
                     "type": "string",
-                    "description": "Solar site ID (default: fairlands)",
-                    "default": "fairlands"
+                    "description": "Solar site ID (default: site-002)",
+                    "default": "site-002"
                 },
                 "period": {
                     "type": "string",
@@ -3949,8 +4158,8 @@ MCP_TOOLS = [
             "properties": {
                 "site_id": {
                     "type": "string",
-                    "description": "Solar site ID (default: fairlands)",
-                    "default": "fairlands"
+                    "description": "Solar site ID (default: site-002)",
+                    "default": "site-002"
                 },
                 "hours": {
                     "type": "integer",
@@ -3969,8 +4178,8 @@ MCP_TOOLS = [
             "properties": {
                 "site_id": {
                     "type": "string",
-                    "description": "Solar site ID (default: fairlands)",
-                    "default": "fairlands"
+                    "description": "Solar site ID (default: site-002)",
+                    "default": "site-002"
                 }
             },
             "required": []
@@ -3989,7 +4198,7 @@ MCP_TOOLS = [
                 },
                 "organization_code": {
                     "type": "string",
-                    "description": "Filter by organization code (e.g., ORG-FNB)"
+                    "description": "Filter by organization code (e.g., ORG-SITE-002)"
                 },
                 "status": {
                     "type": "string",
@@ -4017,11 +4226,11 @@ MCP_TOOLS = [
                 },
                 "organization_name": {
                     "type": "string",
-                    "description": "Client organization name (e.g., FNB Commercial Property)"
+                    "description": "Client organization name (e.g., SITE-002 Commercial Property)"
                 },
                 "organization_code": {
                     "type": "string",
-                    "description": "Organization code (e.g., ORG-FNB)"
+                    "description": "Organization code (e.g., ORG-SITE-002)"
                 },
                 "contract_type": {
                     "type": "string",
@@ -4077,6 +4286,65 @@ MCP_TOOLS = [
                 }
             },
             "required": []
+        }
+    },
+    # Municipal Billing tools (Phase 49)
+    {
+        "name": "process_municipal_bill",
+        "description": "Process South African municipal utility bill PDF (Johannesburg, Cape Town, Ekurhuleni, eThekwini) for building cost tracking. Extracts invoice data, consumption, and amounts from PDF using PyMuPDF/pdfplumber with OCR fallback. Use this during building onboarding to establish cost baselines or monthly to track utility costs.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "building_id": {
+                    "type": "string",
+                    "description": "Building/site ID (e.g., site-002)"
+                },
+                "pdf_file_path": {
+                    "type": "string",
+                    "description": "Absolute path to PDF file"
+                },
+                "municipality": {
+                    "type": "string",
+                    "description": "Municipality name (e.g., city_of_johannesburg, city_of_cape_town, ekurhuleni, ethekwini)"
+                },
+                "utility_type": {
+                    "type": "string",
+                    "enum": ["electricity", "water"],
+                    "description": "Utility type"
+                },
+                "account_number": {
+                    "type": "string",
+                    "description": "Municipal account number"
+                },
+                "tariff_type": {
+                    "type": "string",
+                    "description": "Optional tariff type (residential/commercial/industrial)",
+                    "enum": ["residential", "commercial", "industrial"]
+                }
+            },
+            "required": ["building_id", "pdf_file_path", "municipality", "utility_type", "account_number"]
+        }
+    },
+    {
+        "name": "get_utility_costs",
+        "description": "Get utility cost analysis for a building from processed municipal bills. Returns electricity and water costs with totals and averages for specified period. Use this when someone asks about utility costs, municipal bills, electricity/water expenses, or 'what are our utility costs for building X'.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "building_id": {
+                    "type": "string",
+                    "description": "Building/site ID (e.g., site-002)"
+                },
+                "period_start": {
+                    "type": "string",
+                    "description": "Period start ISO date (default: current month start)"
+                },
+                "period_end": {
+                    "type": "string",
+                    "description": "Period end ISO date (default: current month end)"
+                }
+            },
+            "required": ["building_id"]
         }
     }
 ]
@@ -4144,6 +4412,9 @@ class SIMBIOTMCPServer:
             "get_contracts": get_contracts_tool,
             "add_building_contract": add_building_contract_tool,
             "get_contract_profitability": get_contract_profitability_tool,
+            # Municipal Billing tools (Phase 49)
+            "process_municipal_bill": process_municipal_bill_tool,
+            "get_utility_costs": get_utility_costs_tool,
         }
         logger.info("SIMBIOTMCPServer initialized with %d tools", len(self.tools))
 

@@ -1,0 +1,52 @@
+{
+  "profiles": {
+    "asset_sweating": {
+      "name": "Asset Sweating",
+      "description": "Maximize equipment utilization and defer replacements. Accepts higher maintenance risk for greater runtime.",
+      "weights": {
+        "runtime": 0.35,
+        "comfort": 0.10,
+        "cost": 0.15,
+        "maintenance": 0.10,
+        "energy": 0.30
+      },
+      "thresholds": {
+        "min_runtime_utilization_pct": 85,
+        "max_idle_hours": 2,
+        "acceptable_mttr_hours": 4
+      }
+    },
+    "comfort_first": {
+      "name": "Comfort First",
+      "description": "Prioritize occupant comfort with tight temperature bands and fast fault response. Accepts higher costs.",
+      "weights": {
+        "runtime": 0.10,
+        "comfort": 0.40,
+        "cost": 0.10,
+        "maintenance": 0.20,
+        "energy": 0.20
+      },
+      "thresholds": {
+        "max_comfort_deviation_c": 1.0,
+        "max_acceptable_mttr_hours": 1,
+        "min_optimization_actions": 3
+      }
+    },
+    "cost_saving": {
+      "name": "Cost Saving",
+      "description": "Minimize operational spend. Favor load shifting, reduced runtime, and energy optimization.",
+      "weights": {
+        "runtime": 0.10,
+        "comfort": 0.15,
+        "cost": 0.35,
+        "maintenance": 0.10,
+        "energy": 0.30
+      },
+      "thresholds": {
+        "max_energy_events": 10,
+        "target_setpoint_changes": 5,
+        "max_runtime_hours_per_equipment": 16
+      }
+    }
+  }
+}

@@ -18,8 +18,16 @@ from app.models.pricing import (
     QuoteRequest,
     QuoteResponse,
     PricingConfig,
-    MarginTarget
+    MarginTarget,
+    WhatIfScenario,
+    WhatIfResponse,
+    WhatIfScenarioResult,
+    RenewalPricingRequest,
+    RenewalPricingResponse,
+    PricingBenchmarkResponse
 )
+from app.database.repositories.sla_repository import get_sla_repository
+from app.services.profitability_service import get_profitability_service
 from app.database.repositories.budget_repository import BudgetRepository
 from app.database.repositories.condition_assessment_repository import ConditionAssessmentRepository
 from app.database.repositories.contract_repository import ContractRepository
@@ -51,7 +59,13 @@ class PricingEngine:
         self.contract_repo = contract_repo or ContractRepository()
         self.config = config or PricingConfig()
 
-    def calculate_price(self, request: QuoteRequest) -> QuoteResponse:
+    def calculate_price(
+        self,
+        request: QuoteRequest,
+        condition_score_delta: int = 0,
+        risk_buffer_multiplier: Decimal = Decimal("1.0"),
+        target_margin_pct_override: Optional[Decimal] = None
+    ) -> QuoteResponse:
         """
         Calculate recommended price for contract quote.
 
@@ -65,7 +79,9 @@ class PricingEngine:
         base_cost = self._calculate_base_cost(request.equipment_codes)
 
         # Step 2: Get condition factors
-        condition_factors = self._get_condition_factors(request.equipment_codes)
+        condition_factors = self._get_condition_factors(
+            request.equipment_codes, score_delta=condition_score_delta
+        )
         condition_adj = self._calculate_condition_adjustment(
             base_cost, condition_factors
         )
@@ -76,7 +92,9 @@ class PricingEngine:
         )
 
         # Step 4: Get ML risk buffers
-        risk_buffers = self._get_risk_buffers(request.equipment_codes)
+        risk_buffers = self._get_risk_buffers(
+            request.equipment_codes, multiplier=risk_buffer_multiplier
+        )
         risk_adj = self._calculate_risk_buffer(base_cost, risk_buffers)
 
         # Step 5: SLA tier adjustment
@@ -94,7 +112,11 @@ class PricingEngine:
         )
 
         # Step 7: Apply target margin
-        target_margin = self._get_target_margin(request.sla_tier)
+        target_margin = (
+            target_margin_pct_override
+            if target_margin_pct_override is not None
+            else self._get_target_margin(request.sla_tier)
+        )
         margin_amount = total_cost * (target_margin / Decimal("100"))
         recommended_fee = total_cost + margin_amount
 
@@ -115,6 +137,182 @@ class PricingEngine:
             assumptions=self._list_assumptions(request),
             market_comparison=self._get_market_comparison(request) if request.include_benchmarks else None,
             valid_until=date.today() + timedelta(days=30)
+        )
+
+    def calculate_what_if(
+        self,
+        request: QuoteRequest,
+        scenarios: List[WhatIfScenario]
+    ) -> WhatIfResponse:
+        """
+        Run what-if analysis for pricing scenarios.
+        """
+        base_quote = self.calculate_price(request)
+        results: List[WhatIfScenarioResult] = []
+
+        for scenario in scenarios:
+            equipment_codes = list(request.equipment_codes)
+            if scenario.add_equipment_codes:
+                equipment_codes.extend(scenario.add_equipment_codes)
+
+            scenario_request = QuoteRequest(
+                building_id=request.building_id,
+                equipment_codes=equipment_codes,
+                sla_tier=scenario.sla_tier or request.sla_tier,
+                contract_months=request.contract_months,
+                include_benchmarks=request.include_benchmarks
+            )
+
+            scenario_quote = self.calculate_price(
+                scenario_request,
+                condition_score_delta=scenario.condition_score_delta,
+                risk_buffer_multiplier=scenario.risk_buffer_multiplier,
+                target_margin_pct_override=scenario.target_margin_pct
+            )
+
+            delta = scenario_quote.recommended_fee_zar - base_quote.recommended_fee_zar
+            delta_pct = (delta / base_quote.recommended_fee_zar * Decimal("100")) if base_quote.recommended_fee_zar > 0 else Decimal("0")
+
+            results.append(WhatIfScenarioResult(
+                name=scenario.name,
+                recommended_fee_zar=scenario_quote.recommended_fee_zar,
+                delta_zar=delta,
+                delta_pct=delta_pct,
+                cost_breakdown=scenario_quote.cost_breakdown,
+                risk_factors=scenario_quote.risk_factors,
+                assumptions=scenario_quote.assumptions
+            ))
+
+        return WhatIfResponse(
+            base_quote=base_quote,
+            scenarios=results
+        )
+
+    def calculate_renewal_pricing(
+        self,
+        request: RenewalPricingRequest
+    ) -> RenewalPricingResponse:
+        """
+        Calculate renewal pricing recommendation based on actual costs.
+        """
+        contract = self.contract_repo.get_by_id(request.contract_id)
+        if not contract:
+            raise ValueError(f"Contract {request.contract_id} not found")
+
+        current_fee = Decimal(str(contract.get("monthly_fee_zar") or 0))
+        sla_tier = request.sla_tier or SLATier.standard
+        target_margin = self._get_target_margin(sla_tier)
+
+        # Use budget actuals for year as cost base
+        summary = self.budget_repo.get_spending_summary(request.contract_id, request.year)
+        total_actual = Decimal(str(summary.get("total_actual_zar", 0))) if summary else Decimal("0")
+        months = 12
+        avg_monthly_cost = (total_actual / Decimal(months)) if total_actual > 0 else Decimal("0")
+
+        notes = []
+        if avg_monthly_cost == 0:
+            avg_monthly_cost = current_fee * Decimal("0.6")
+            notes.append("No actual cost data for year; using 60% of current fee as proxy.")
+
+        # SLA penalties exposure (best-effort)
+        sla_repo = get_sla_repository()
+        performance = sla_repo.get_performance_history(request.contract_id, months=12)
+        penalty_total = Decimal("0")
+        for perf in performance:
+            start = getattr(perf, "period_start", None)
+            if start and getattr(start, "year", None) == request.year:
+                penalty_total += Decimal(str(getattr(perf, "clawback_amount_zar", 0) or 0))
+
+        avg_monthly_penalty = (penalty_total / Decimal(months)) if penalty_total > 0 else Decimal("0")
+        if avg_monthly_penalty > 0:
+            notes.append(f"SLA penalties average {avg_monthly_penalty:.2f} ZAR/month in {request.year}.")
+
+        # Margin trend adjustment (best-effort)
+        trend_buffer = Decimal("0")
+        try:
+            trends = get_profitability_service().calculate_profitability_trends(
+                request.contract_id, months=6
+            )
+            if len(trends) >= 6:
+                last_three = sum(Decimal(str(t.margin_pct)) for t in trends[-3:]) / Decimal("3")
+                prev_three = sum(Decimal(str(t.margin_pct)) for t in trends[:3]) / Decimal("3")
+                if last_three < prev_three - Decimal("2"):
+                    trend_buffer = Decimal("2.0")
+                    notes.append("Margin trend declining; increasing target margin by 2%.")
+        except Exception:
+            pass
+
+        # Penalty buffer based on exposure vs fee
+        penalty_buffer = Decimal("0")
+        if avg_monthly_penalty > 0:
+            base = current_fee if current_fee > 0 else avg_monthly_cost
+            penalty_pct = (avg_monthly_penalty / base * Decimal("100")) if base > 0 else Decimal("0")
+            penalty_buffer = min(Decimal("5"), penalty_pct)
+            notes.append(f"Adding {penalty_buffer:.2f}% buffer for penalty exposure.")
+
+        adjusted_margin = target_margin + trend_buffer + penalty_buffer
+        total_cost_base = avg_monthly_cost + avg_monthly_penalty
+        recommended_fee = total_cost_base * (Decimal("1") + (adjusted_margin / Decimal("100")))
+        delta = recommended_fee - current_fee
+        delta_pct = (delta / current_fee * Decimal("100")) if current_fee > 0 else Decimal("0")
+
+        # Condition trend note (best-effort)
+        assessments = self.condition_repo.get_by_contract(request.contract_id)
+        if assessments:
+            avg_score = sum(a.get("overall_score", 3) for a in assessments) / len(assessments)
+            if avg_score <= 2.5:
+                notes.append("Condition assessments indicate below-average asset health.")
+            elif avg_score >= 4.5:
+                notes.append("Condition assessments indicate strong asset health.")
+
+        return RenewalPricingResponse(
+            contract_id=request.contract_id,
+            year=request.year,
+            current_monthly_fee_zar=current_fee,
+            actual_cost_monthly_avg_zar=avg_monthly_cost,
+            target_margin_pct=adjusted_margin,
+            recommended_monthly_fee_zar=recommended_fee,
+            delta_zar=delta,
+            delta_pct=delta_pct,
+            notes=notes
+        )
+
+    def get_benchmarks_for_contract(
+        self,
+        contract_id: str,
+        limit: int = 5
+    ) -> PricingBenchmarkResponse:
+        """
+        Get benchmarking metrics for similar contracts.
+        """
+        assets = self.contract_repo.get_contract_assets(contract_id)
+        equipment_types = []
+        for asset in assets:
+            eq = asset.get("equipment") or {}
+            if eq.get("type"):
+                equipment_types.append(eq.get("type"))
+
+        similar = self.contract_repo.find_similar_contracts(
+            equipment_types=equipment_types,
+            limit=limit
+        )
+
+        fees = [Decimal(str(c.get("monthly_fee_zar") or 0)) for c in similar] if similar else []
+        if not fees:
+            return PricingBenchmarkResponse(
+                contract_id=contract_id,
+                similar_contracts=0,
+                average_monthly_fee_zar=Decimal("0"),
+                min_monthly_fee_zar=Decimal("0"),
+                max_monthly_fee_zar=Decimal("0")
+            )
+
+        return PricingBenchmarkResponse(
+            contract_id=contract_id,
+            similar_contracts=len(fees),
+            average_monthly_fee_zar=sum(fees) / Decimal(len(fees)),
+            min_monthly_fee_zar=min(fees),
+            max_monthly_fee_zar=max(fees)
         )
 
     def _calculate_base_cost(self, equipment_codes: List[str]) -> Decimal:
@@ -258,7 +456,11 @@ class PricingEngine:
                 return margin_target.margin_pct
         return self.config.default_margin_pct
 
-    def _get_condition_factors(self, equipment_codes: List[str]) -> List[ConditionFactor]:
+    def _get_condition_factors(
+        self,
+        equipment_codes: List[str],
+        score_delta: int = 0
+    ) -> List[ConditionFactor]:
         """
         Get condition assessment data for equipment.
 
@@ -273,12 +475,13 @@ class PricingEngine:
 
                 if assessment and equipment:
                     age_years = self._calculate_equipment_age(
-                        equipment.get("installed_date")
+                        equipment.get("install_date") or equipment.get("installed_date")
                     )
 
+                    adjusted_score = max(1, min(5, int(assessment.get("overall_score", 3)) + score_delta))
                     factor = ConditionFactor(
                         equipment_id=code,
-                        overall_score=assessment.get("overall_score", 3),
+                        overall_score=adjusted_score,
                         age_years=age_years,
                         condition_multiplier=Decimal("1.0"),  # Calculated later
                         age_multiplier=Decimal("1.0")  # Calculated later
@@ -290,7 +493,11 @@ class PricingEngine:
 
         return factors
 
-    def _get_risk_buffers(self, equipment_codes: List[str]) -> List[RiskBuffer]:
+    def _get_risk_buffers(
+        self,
+        equipment_codes: List[str],
+        multiplier: Decimal = Decimal("1.0")
+    ) -> List[RiskBuffer]:
         """
         Get ML prediction risk buffers for equipment.
 
@@ -304,9 +511,11 @@ class PricingEngine:
                 prediction = self._get_ml_prediction(code)
 
                 if prediction:
+                    failure_prob = Decimal(str(prediction.get("probability", 0)))
+                    failure_prob = max(Decimal("0"), min(Decimal("1"), failure_prob * multiplier))
                     buffer = RiskBuffer(
                         equipment_id=code,
-                        failure_probability=Decimal(str(prediction.get("probability", 0))),
+                        failure_probability=failure_prob,
                         health_score=prediction.get("health_score", 80),
                         risk_buffer_pct=Decimal("0")  # Calculated later
                     )

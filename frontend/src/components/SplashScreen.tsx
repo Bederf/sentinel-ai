@@ -16,6 +16,16 @@ export function SplashScreen({ onComplete, minDisplayTime = 2500 }: SplashScreen
   const [fadeOut, setFadeOut] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const startTimeRef = useRef<number>(0);
+  const completedRef = useRef(false);
+
+  const complete = () => {
+    if (completedRef.current) return;
+    completedRef.current = true;
+    setFadeOut(true);
+    setTimeout(() => {
+      onComplete();
+    }, 500);
+  };
 
   // Initialize start time on mount - avoid calling Date.now() during render
   useEffect(() => {
@@ -27,7 +37,8 @@ export function SplashScreen({ onComplete, minDisplayTime = 2500 }: SplashScreen
     const video = videoRef.current;
     if (!video) {
       console.error('SplashScreen: Video ref is null!');
-      return;
+      const timeout = setTimeout(() => complete(), minDisplayTime);
+      return () => clearTimeout(timeout);
     }
 
     const handleVideoEnd = () => {
@@ -39,25 +50,19 @@ export function SplashScreen({ onComplete, minDisplayTime = 2500 }: SplashScreen
       // Wait for minimum display time, then fade out
       setTimeout(() => {
         console.log('SplashScreen: Starting fade out');
-        setFadeOut(true);
-        // After fade animation, call onComplete
-        setTimeout(() => {
-          console.log('SplashScreen: Calling onComplete');
-          onComplete();
-        }, 500);
+        complete();
       }, remainingTime);
     };
 
     // If video fails to load or play, still complete after minDisplayTime
-    const handleError = (error?: Event) => {
-      console.error('SplashScreen: Video error or play failed:', error);
+    const handleError = (error?: unknown) => {
+      const abortError = (error as { name?: string })?.name === "AbortError";
+      if (!abortError) {
+        console.error('SplashScreen: Video error or play failed:', error);
+      }
       setTimeout(() => {
         console.log('SplashScreen: Fallback timeout triggering');
-        setFadeOut(true);
-        setTimeout(() => {
-          console.log('SplashScreen: Calling onComplete from fallback');
-          onComplete();
-        }, 500);
+        complete();
       }, minDisplayTime);
     };
 
@@ -67,13 +72,18 @@ export function SplashScreen({ onComplete, minDisplayTime = 2500 }: SplashScreen
     // Start playing
     console.log('SplashScreen: Attempting to play video');
     video.play().catch((err) => {
-      console.error('SplashScreen: Play failed:', err);
       handleError(err);
     });
+
+    const maxTimeout = window.setTimeout(() => {
+      console.warn('SplashScreen: Max timeout reached, completing');
+      complete();
+    }, minDisplayTime + 1500);
 
     return () => {
       video.removeEventListener("ended", handleVideoEnd);
       video.removeEventListener("error", handleError);
+      clearTimeout(maxTimeout);
     };
   }, [onComplete, minDisplayTime]);
 
@@ -92,6 +102,7 @@ export function SplashScreen({ onComplete, minDisplayTime = 2500 }: SplashScreen
             className="max-w-full max-h-full object-contain"
             muted
             playsInline
+            autoPlay
             preload="auto"
           >
             <source src="/sentinel-logo.mp4" type="video/mp4" />

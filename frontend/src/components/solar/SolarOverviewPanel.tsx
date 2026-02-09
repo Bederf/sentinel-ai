@@ -13,6 +13,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Sun, TrendingUp, TrendingDown, Minus, Zap, DollarSign } from "lucide-react";
 import type { SolarOverview } from "../../lib/solarApi";
 import { fetchSolarOverview } from "../../lib/solarApi";
+import { isExpectedApiError } from "../../lib/api";
 
 interface SolarOverviewPanelProps {
   siteId: string;
@@ -29,7 +30,9 @@ export function SolarOverviewPanel({ siteId }: SolarOverviewPanelProps) {
       setOverview(data);
       setError(null);
     } catch (err) {
-      console.error("Failed to load solar overview:", err);
+      if (!isExpectedApiError(err)) {
+        console.error("Failed to load solar overview:", err);
+      }
       setError(err instanceof Error ? err.message : "Failed to load");
     } finally {
       setLoading(false);
@@ -80,17 +83,27 @@ export function SolarOverviewPanel({ siteId }: SolarOverviewPanelProps) {
     );
   }
 
-  const generationPercent = overview.installed_capacity_kwp > 0
-    ? (overview.current_generation_kw / overview.installed_capacity_kwp) * 100
+  const installedCapacity = overview.installed_capacity_kwp ?? 0;
+  const currentGeneration = overview.current_generation_kw ?? 0;
+  const dailyYield = overview.daily_yield_kwh ?? 0;
+  const expectedDailyYield = overview.expected_daily_yield_kwh ?? 0;
+  const performanceRatio = overview.performance_ratio ?? 0;
+  const selfConsumption = overview.self_consumption_percent ?? 0;
+  const gridImport = overview.grid_import_kw ?? 0;
+  const gridExport = overview.grid_export_kw ?? 0;
+  const savingsToday = overview.estimated_savings_today_zar ?? 0;
+
+  const generationPercent = installedCapacity > 0
+    ? (currentGeneration / installedCapacity) * 100
     : 0;
 
-  const yieldPercent = overview.expected_daily_yield_kwh > 0
-    ? (overview.daily_yield_kwh / overview.expected_daily_yield_kwh) * 100
+  const yieldPercent = expectedDailyYield > 0
+    ? (dailyYield / expectedDailyYield) * 100
     : 0;
 
-  const prColor = overview.performance_ratio >= 0.8
+  const prColor = performanceRatio >= 0.8
     ? "var(--color-sentinel-green)"
-    : overview.performance_ratio >= 0.7
+    : performanceRatio >= 0.7
     ? "var(--color-sentinel-amber)"
     : "var(--color-sentinel-red)";
 
@@ -124,18 +137,18 @@ export function SolarOverviewPanel({ siteId }: SolarOverviewPanelProps) {
               Solar Generation
             </h3>
             <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-              {overview.site_name} &mdash; {overview.installed_capacity_kwp.toLocaleString()} kWp installed
+              {overview.site_name || "Site-002"} &mdash; {installedCapacity.toLocaleString()} kWp installed
             </span>
           </div>
         </div>
         <span
           className="text-xs px-2 py-1 rounded"
           style={{
-            background: overview.current_generation_kw > 0 ? "rgba(16, 185, 129, 0.15)" : "rgba(107, 114, 128, 0.15)",
-            color: overview.current_generation_kw > 0 ? "var(--color-sentinel-green)" : "var(--color-sentinel-text-secondary)",
+            background: currentGeneration > 0 ? "rgba(16, 185, 129, 0.15)" : "rgba(107, 114, 128, 0.15)",
+            color: currentGeneration > 0 ? "var(--color-sentinel-green)" : "var(--color-sentinel-text-secondary)",
           }}
         >
-          {overview.current_generation_kw > 0 ? "Generating" : "Offline"}
+          {currentGeneration > 0 ? "Generating" : "Offline"}
         </span>
       </div>
 
@@ -149,8 +162,8 @@ export function SolarOverviewPanel({ siteId }: SolarOverviewPanelProps) {
               Current Output
             </span>
           </div>
-          <div className="text-2xl font-bold" style={{ color: "var(--color-sentinel-text-primary)" }}>
-            {overview.current_generation_kw.toFixed(0)}
+        <div className="text-2xl font-bold" style={{ color: "var(--color-sentinel-text-primary)" }}>
+            {currentGeneration.toFixed(0)}
             <span className="text-sm font-normal ml-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
               kW
             </span>
@@ -176,7 +189,7 @@ export function SolarOverviewPanel({ siteId }: SolarOverviewPanelProps) {
                 {generationPercent.toFixed(0)}%
               </span>
               <span className="text-[10px]" style={{ color: "var(--color-sentinel-text-disabled)" }}>
-                {overview.installed_capacity_kwp.toLocaleString()} kWp
+                {installedCapacity.toLocaleString()} kWp
               </span>
             </div>
           </div>
@@ -190,8 +203,8 @@ export function SolarOverviewPanel({ siteId }: SolarOverviewPanelProps) {
               Today&apos;s Yield
             </span>
           </div>
-          <div className="text-2xl font-bold" style={{ color: "var(--color-sentinel-text-primary)" }}>
-            {overview.daily_yield_kwh.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+        <div className="text-2xl font-bold" style={{ color: "var(--color-sentinel-text-primary)" }}>
+            {dailyYield.toLocaleString(undefined, { maximumFractionDigits: 0 })}
             <span className="text-sm font-normal ml-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
               kWh
             </span>
@@ -211,7 +224,7 @@ export function SolarOverviewPanel({ siteId }: SolarOverviewPanelProps) {
               />
             </div>
             <div className="text-[10px] mt-1" style={{ color: "var(--color-sentinel-text-disabled)" }}>
-              {yieldPercent.toFixed(0)}% of expected ({overview.expected_daily_yield_kwh.toLocaleString(undefined, { maximumFractionDigits: 0 })} kWh)
+              {yieldPercent.toFixed(0)}% of expected ({expectedDailyYield.toLocaleString(undefined, { maximumFractionDigits: 0 })} kWh)
             </div>
           </div>
         </div>
@@ -219,9 +232,9 @@ export function SolarOverviewPanel({ siteId }: SolarOverviewPanelProps) {
         {/* Performance Ratio */}
         <div className="p-3 rounded" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
           <div className="flex items-center gap-2 mb-2">
-            {overview.performance_ratio >= 0.8 ? (
+            {performanceRatio >= 0.8 ? (
               <TrendingUp className="h-4 w-4" style={{ color: "var(--color-sentinel-green)" }} />
-            ) : overview.performance_ratio >= 0.7 ? (
+            ) : performanceRatio >= 0.7 ? (
               <Minus className="h-4 w-4" style={{ color: "var(--color-sentinel-amber)" }} />
             ) : (
               <TrendingDown className="h-4 w-4" style={{ color: "var(--color-sentinel-red)" }} />
@@ -231,11 +244,11 @@ export function SolarOverviewPanel({ siteId }: SolarOverviewPanelProps) {
             </span>
           </div>
           <div className="text-2xl font-bold" style={{ color: prColor }}>
-            {(overview.performance_ratio * 100).toFixed(1)}
+            {(performanceRatio * 100).toFixed(1)}
             <span className="text-sm font-normal ml-1">%</span>
           </div>
           <div className="text-[10px] mt-2" style={{ color: "var(--color-sentinel-text-disabled)" }}>
-            Target: 80% &mdash; Self-consumption: {overview.self_consumption_percent.toFixed(0)}%
+            Target: 80% &mdash; Self-consumption: {selfConsumption.toFixed(0)}%
           </div>
         </div>
 
@@ -248,10 +261,10 @@ export function SolarOverviewPanel({ siteId }: SolarOverviewPanelProps) {
             </span>
           </div>
           <div className="text-2xl font-bold" style={{ color: "var(--color-sentinel-green)" }}>
-            {formatZAR(overview.estimated_savings_today_zar)}
+            {formatZAR(savingsToday)}
           </div>
           <div className="text-[10px] mt-2" style={{ color: "var(--color-sentinel-text-disabled)" }}>
-            Grid import: {overview.grid_import_kw.toFixed(0)} kW | Export: {overview.grid_export_kw.toFixed(0)} kW
+            Grid import: {gridImport.toFixed(0)} kW | Export: {gridExport.toFixed(0)} kW
           </div>
         </div>
       </div>

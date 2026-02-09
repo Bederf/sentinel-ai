@@ -10,7 +10,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Shield, Mail, AlertCircle, Loader2 } from "lucide-react";
+import { Mail, AlertCircle, Loader2 } from "lucide-react";
 import { authApi, type AuthUser } from "../lib/api";
 
 interface EmailEntryProps {
@@ -42,12 +42,14 @@ export function EmailEntry({ onSuccess }: EmailEntryProps) {
           } else {
             // Token invalid, clear it
             localStorage.removeItem("sentinel_token");
+            localStorage.removeItem("sentinel_refresh_token");
             localStorage.removeItem("sentinel_user");
           }
         })
         .catch(() => {
           // Token verification failed, clear it
           localStorage.removeItem("sentinel_token");
+          localStorage.removeItem("sentinel_refresh_token");
           localStorage.removeItem("sentinel_user");
         });
     }
@@ -76,13 +78,24 @@ export function EmailEntry({ onSuccess }: EmailEntryProps) {
 
     try {
       const response = await authApi.login(trimmedEmail);
+      const accessToken = response.access_token || response.token || "";
+      const refreshToken = response.refresh_token || "";
+
+      if (!accessToken) {
+        throw new Error("Login did not return an access token");
+      }
 
       // Store token and user info
-      localStorage.setItem("sentinel_token", response.token);
+      localStorage.setItem("sentinel_token", accessToken);
+      if (refreshToken) {
+        localStorage.setItem("sentinel_refresh_token", refreshToken);
+      } else {
+        localStorage.removeItem("sentinel_refresh_token");
+      }
       localStorage.setItem("sentinel_user", JSON.stringify(response.user));
 
       console.log("Login successful:", response.user);
-      onSuccess(response.user, response.token);
+      onSuccess(response.user, accessToken);
     } catch (err: any) {
       console.error("Login failed:", err);
       setError(err.message || "Login failed. Please try again.");
@@ -117,7 +130,7 @@ export function EmailEntry({ onSuccess }: EmailEntryProps) {
           <img
             src="/images/sentinel-logo.png"
             alt="Sentinel"
-            className="w-12 h-12 object-contain"
+            className="w-full h-full object-contain rounded-xl"
           />
         </div>
         <h1
@@ -230,7 +243,7 @@ export function EmailEntry({ onSuccess }: EmailEntryProps) {
           alt=""
           className="w-3 h-3 opacity-70"
         />
-        Your email is your login. You'll stay signed in for 30 days.
+        Your email is your login. Session stays active while your token is valid.
       </p>
     </div>
   );

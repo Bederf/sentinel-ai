@@ -94,6 +94,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 #### Contract Management
 - **[Contract Management Module](04-features/48-contract-management.md)** - Portfolio KPIs, SLA compliance tracking, budget variance analysis, profitability dashboard (Phase 48)
 - **[SLA Monitoring & Profitability](04-features/50-52-commercial-analytics.md)** - SLA compliance tracking, profitability dashboards, and risk-based pricing (Phases 50-52)
+- **[Municipal Billing Integration](04-features/49-municipal-billing.md)** - SA municipal invoice processing, cost tracking, tariff validation, variance detection, MCP tools for AI-powered workflows (Phase 49)
 
 #### Additional Features
 - [Technician Chat](04-features/technician-chat.md) - Guided fault diagnosis (Phase 19)

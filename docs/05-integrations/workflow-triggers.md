@@ -4,7 +4,7 @@ type: "feature"
 status: "implemented"
 version: "1.0.0"
 created: "2026-02-03"
-updated: "2026-02-03"
+updated: "2026-02-08"
 author: "SENTINEL Development Team"
 tags: ["workflow", "automation", "triggers", "ml", "baseline", "inspection"]
 domain: "asset-management"
@@ -21,6 +21,10 @@ Automated triggers that connect ML anomalies, baseline deviations, inspection de
 ## Overview
 
 The Workflow Trigger Engine provides 5 automated triggers that orchestrate the complete asset maintenance lifecycle without manual intervention.
+
+**Automation Expansion (Phase 53-02):**
+- Trigger deduplication uses cooldown windows to suppress duplicate actions per equipment.
+- All trigger outcomes (including suppressed, errors, and within-threshold) are logged to `workflow_events`.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -61,6 +65,10 @@ The Workflow Trigger Engine provides 5 automated triggers that orchestrate the c
 
 ## The 5 Triggers
 
+**Integration Notes (Phase 53-01):**
+- Inspection deficiencies (critical/safety) automatically invoke the Critical Deficiency trigger.
+- Technician work orders marked complete invoke the Repair Completed trigger.
+
 ### 1. ML Anomaly → Inspection Task
 
 When ML detects an anomaly, automatically creates an inspection task.
@@ -68,6 +76,7 @@ When ML detects an anomaly, automatically creates an inspection task.
 **Trigger Conditions:**
 - ML anomaly detected with probability > 0.5
 - No pending inspection exists for equipment
+- Duplicate suppression enforced for 6 hours per equipment/anomaly
 
 **Actions:**
 - Creates inspection task with priority based on probability
@@ -105,6 +114,7 @@ When baseline deviation exceeds threshold, generates AI maintenance recommendati
 **Trigger Conditions:**
 - Deviation > 15%: Generates recommendation
 - Deviation > 20%: Also creates inspection task (critical)
+- Duplicate suppression enforced for 6 hours per equipment/baseline
 
 **Actions:**
 - Generates AI maintenance recommendation
@@ -143,6 +153,7 @@ When inspection finds critical/safety deficiency, automatically creates work ord
 **Trigger Conditions:**
 - Deficiency severity is "critical" or "safety"
 - Minor/major deficiencies require manual work order creation
+- Duplicate suppression enforced for 12 hours per equipment/deficiency
 
 **Actions:**
 - Creates work order with deficiency details
@@ -247,6 +258,13 @@ Content-Type: application/json
 
 ## Query Endpoints
 
+### Get Workflow Events Log
+```bash
+GET /api/workflow/events
+GET /api/workflow/events?equipment_id=chiller-001
+GET /api/workflow/events?trigger_type=ml_anomaly&limit=50
+```
+
 ### Get Trigger History
 ```bash
 GET /api/workflow/triggers/history
@@ -348,6 +366,13 @@ The trigger engine uses configurable thresholds:
 | `critical_deviation_threshold` | 20% | Deviation to also create inspection |
 | `effectiveness_success_threshold` | 50% | Min improvement for successful repair |
 | `baseline_tolerance` | 15% | Tolerance for "back to baseline" status |
+
+**Deduplication Cooldowns:**
+| Trigger | Cooldown |
+|---------|----------|
+| ML Anomaly | 6 hours |
+| Baseline Deviation | 6 hours |
+| Critical Deficiency | 12 hours |
 
 ---
 

@@ -185,11 +185,11 @@ class SolarSelfConsumptionService:
     """Self-consumption optimisation: maximise on-site solar use.
 
     Coordinates with BESS dispatch to ensure excess solar charges the
-    battery rather than being exported. For Fairlands (3.9 MWp PV,
+    battery rather than being exported. For Site-002 (3.9 MWp PV,
     5,015 kWh BESS), target is >95% self-consumption.
     """
 
-    # Fairlands reference parameters
+    # Site-002 reference parameters
     PV_CAPACITY_KWP = 3875.0  # Total installed PV
     BESS_CAPACITY_KWH = 5015.0
     BESS_RATED_POWER_KW = 2507.0
@@ -202,7 +202,7 @@ class SolarSelfConsumptionService:
 
     def __init__(self):
         self._energy_balance_cache: Dict[str, EnergyBalance] = {}
-        self._seed_demo_data("fairlands")
+        self._seed_demo_data("site-002")
 
     def _seed_demo_data(self, site_id: str) -> None:
         """Seed a full day energy balance for demo."""
@@ -226,7 +226,7 @@ class SolarSelfConsumptionService:
 
     @staticmethod
     def _building_load_kw(hour: float) -> float:
-        """Simulate Fairlands building load profile."""
+        """Simulate Site-002 building load profile."""
         if hour < 5:
             return 1200 + random.uniform(-30, 30)
         elif hour < 7:

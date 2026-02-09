@@ -28,6 +28,7 @@ import { Table, TableHead, TableRow, TableHeaderCell, TableBody, TableCell, Butt
 import api from "../lib/api";
 import type { OptimizationScenario, OptimizationStatusResponse, Site } from "../lib/api";
 import { OptimizationPanel } from "../components/OptimizationPanel";
+import { PageLoading } from "../components/PageLoading";
 
 // Sentinel-styled Badge component
 interface SentinelBadgeProps {
@@ -253,11 +254,7 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
 
   if (loading) {
     return (
-      <div className="h-full overflow-y-auto p-4 md:p-6" style={{ background: "var(--color-sentinel-bg-canvas)" }}>
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: "var(--color-sentinel-blue)" }} />
-        </div>
-      </div>
+      <PageLoading message="Loading optimization data..." />
     );
   }
 

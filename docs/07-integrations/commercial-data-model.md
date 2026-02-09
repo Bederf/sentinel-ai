@@ -182,7 +182,7 @@ Net Margin = Gross Margin - SLA Penalties
 
 | Table | Purpose | Key Fields |
 |-------|---------|------------|
-| `organizations` | FM clients (FNB, Nedbank) | code, name, tier |
+| `organizations` | FM clients (, Nedbank) | code, name, tier |
 | `contracts` | Building contracts | monthly_fee_zar, start/end_date |
 | `sla_terms` | SLA definitions | uptime %, response hours, penalties |
 | `asset_contracts` | Asset-level fee allocation | allocated_fee_zar, coverage_type |

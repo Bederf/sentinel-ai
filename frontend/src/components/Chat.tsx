@@ -13,7 +13,7 @@ import { useState, useRef, useEffect } from "react";
 import type { FormEvent, KeyboardEvent } from "react";
 import { Send, MessageSquare, Bot, BookOpen, Building2, ChevronDown } from "lucide-react";
 import { ChatMessage } from "./ChatMessage";
-import api, { streamChat } from "../lib/api";
+import api, { isExpectedApiError, streamChat } from "../lib/api";
 import type { Site } from "../lib/api";
 
 interface Message {
@@ -33,10 +33,32 @@ export function Chat() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const hasLoadedSitesRef = useRef(false);
 
   // Fetch sites on mount
   useEffect(() => {
+    if (hasLoadedSitesRef.current) return;
+    hasLoadedSitesRef.current = true;
+
     const loadSites = async () => {
+      const cachedSites = localStorage.getItem("sentinel_cached_sites");
+      if (cachedSites) {
+        try {
+          const parsedSites = JSON.parse(cachedSites) as Site[];
+          if (parsedSites.length > 0) {
+            const sorted = parsedSites.sort((a, b) => a.name.localeCompare(b.name));
+            setSites(sorted);
+            const defaultSite = sorted.find((s) => s.id === "site-002") || sorted[0];
+            if (defaultSite) {
+              setSelectedSiteId(defaultSite.id);
+            }
+            return;
+          }
+        } catch {
+          // Ignore malformed cache and fall back to API fetch
+        }
+      }
+
       try {
         const sitesData = await api.getSites();
         setSites(sitesData.sort((a, b) => a.name.localeCompare(b.name)));
@@ -46,7 +68,9 @@ export function Chat() {
           setSelectedSiteId(defaultSite.id);
         }
       } catch (error) {
-        console.error("Failed to load sites:", error);
+        if (!isExpectedApiError(error)) {
+          console.error("Failed to load sites:", error);
+        }
       }
     };
     loadSites();

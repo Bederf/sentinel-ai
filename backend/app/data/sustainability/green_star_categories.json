@@ -1,0 +1,65 @@
+{
+  "tool": "Green Star SA Office v1.1",
+  "total_max_points": 118,
+  "star_ratings": {
+    "4-Star": {"min_points": 45, "label": "Best Practice"},
+    "5-Star": {"min_points": 60, "label": "South African Excellence"},
+    "6-Star": {"min_points": 75, "label": "World Leadership"}
+  },
+  "categories": [
+    {
+      "category_id": "MAN",
+      "name": "Management",
+      "max_points": 14,
+      "credits": ["Commissioning Agent", "Building Tuning", "Environmental Management", "Green Star Accredited Professional", "Building Users Guide"]
+    },
+    {
+      "category_id": "IEQ",
+      "name": "Indoor Environment Quality",
+      "max_points": 21,
+      "credits": ["Ventilation Rates", "Air Change Effectiveness", "CO2 Monitoring", "Daylight", "Thermal Comfort", "Individual Comfort Control"]
+    },
+    {
+      "category_id": "ENE",
+      "name": "Energy",
+      "max_points": 27,
+      "credits": ["Energy Performance", "Electrical Sub-Metering", "Peak Energy Demand Reduction", "Renewable Energy"]
+    },
+    {
+      "category_id": "TRA",
+      "name": "Transport",
+      "max_points": 12,
+      "credits": ["Provision of Car Parking", "Fuel-Efficient Transport", "Cyclist Facilities", "Proximity to Public Transport"]
+    },
+    {
+      "category_id": "WAT",
+      "name": "Water",
+      "max_points": 12,
+      "credits": ["Potable Water", "Water Meters", "Landscape Irrigation", "Heat Rejection Water", "Fire System Water"]
+    },
+    {
+      "category_id": "MAT",
+      "name": "Materials",
+      "max_points": 14,
+      "credits": ["Recycling Waste Storage", "Building Reuse", "Sustainable Timber", "PVC Minimisation", "Steel"]
+    },
+    {
+      "category_id": "ECO",
+      "name": "Land Use & Ecology",
+      "max_points": 8,
+      "credits": ["Ecological Value", "Reuse of Land", "Reclaimed Contaminated Land", "Change in Ecological Value"]
+    },
+    {
+      "category_id": "EMI",
+      "name": "Emissions",
+      "max_points": 5,
+      "credits": ["Refrigerant ODP", "Refrigerant GWP", "Watercourse Pollution", "Light Pollution"]
+    },
+    {
+      "category_id": "INN",
+      "name": "Innovation",
+      "max_points": 5,
+      "credits": ["Innovative Strategies", "Exceeding Benchmarks", "Environmental Design Initiatives"]
+    }
+  ]
+}

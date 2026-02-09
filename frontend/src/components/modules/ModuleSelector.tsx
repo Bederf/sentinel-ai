@@ -7,7 +7,7 @@
 
 import { useState } from 'react';
 import { Card, Title, Text, Badge, Flex, Grid, Switch } from '@tremor/react';
-import { useModules } from '../../contexts/ModuleContext';
+import { useModules } from '../../contexts/ModuleHooks';
 import { MODULE_COLORS } from '../../lib/moduleRegistry';
 import type { ModuleType, ModuleDefinition } from '../../lib/moduleRegistry';
 

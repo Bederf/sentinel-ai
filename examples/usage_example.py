@@ -33,9 +33,9 @@ async def main():
     # This would come from SENTINEL's AI engine in production
     chiller_anomaly = SentinelAnomaly(
         source=AnomalySource.BMS_ANOMALY,
-        segment_id="SEG-FAIRLANDS-001",
-        building_id="bld-fairlands-main",
-        building_name="Fairlands Campus — Main Building",
+        segment_id="SEG--001",
+        building_id="bld--main",
+        building_name=" Campus — Main Building",
         location_id=5042,
         location_description="Basement Level 2 — Plant Room A",
         asset_id=8891,
@@ -47,7 +47,7 @@ async def main():
                 "potential refrigerant loss or condenser fouling",
         diagnostics=(
             "SENTINEL detected a progressive increase in compressor discharge "
-            "temperature on Chiller #1 (York YCAL, Asset CH-001-FA) at Fairlands "
+            "temperature on Chiller #1 (York YCAL, Asset CH-001-FA) at  "
             "Campus. The discharge temp has risen from a 30-day baseline of 62°C "
             "to 78°C over the past 72 hours, representing a 25.8% deviation. "
             "Simultaneously, the condenser approach temperature has widened from "
@@ -96,9 +96,9 @@ async def main():
     # ── 5. Example: Occupant request via WhatsApp ──
     whatsapp_request = SentinelAnomaly(
         source=AnomalySource.OCCUPANT_REQUEST,
-        segment_id="SEG-FAIRLANDS-001",
-        building_id="bld-fairlands-main",
-        building_name="Fairlands Campus — Main Building",
+        segment_id="SEG--001",
+        building_id="bld--main",
+        building_name=" Campus — Main Building",
         location_id=5108,
         location_description="3rd Floor — Meeting Room 3B",
         asset_type="hvac",

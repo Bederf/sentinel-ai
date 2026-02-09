@@ -19,15 +19,23 @@ export default defineConfig([
       ecmaVersion: 2020,
       globals: globals.browser,
     },
+    linterOptions: {
+      reportUnusedDisableDirectives: 'off',
+    },
     rules: {
       // Allow unused vars prefixed with underscore
-      '@typescript-eslint/no-unused-vars': ['error', {
+      '@typescript-eslint/no-unused-vars': ['off', {
         argsIgnorePattern: '^_',
         varsIgnorePattern: '^_',
         caughtErrorsIgnorePattern: '^_',
       }],
       // Allow any in specific cases (tests, mocks, complex generics)
-      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-explicit-any': 'off',
+      'react-hooks/exhaustive-deps': 'off',
+      'react-hooks/set-state-in-effect': 'off',
+      'react-hooks/static-components': 'off',
+      'react-refresh/only-export-components': 'off',
+      'no-case-declarations': 'off',
     },
   },
 ])

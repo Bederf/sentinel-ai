@@ -19,7 +19,7 @@ Solar geometry for southern hemisphere (Johannesburg):
   - Clear-sky GHI: 1000 * 0.7^(AM^0.678) W/m2 (simplified Ineichen)
   - Panel output: P = capacity * (irradiance/1000) * temp_derate * soiling
 
-Fairlands site (lat -26.13, 3,900.88 kWp installed):
+Site-002 site (lat -26.13, 3,900.88 kWp installed):
   - Summer peak: ~3,200 kW at noon (clear day)
   - Winter peak: ~2,400 kW at noon (lower solar angle)
   - Daily yield: 15-22 MWh summer, 10-16 MWh winter
@@ -254,7 +254,7 @@ class SolarGeometry:
 class SolarForecastService:
     """72-hour rolling generation forecast using statistical + ML models.
 
-    Loads site configuration (lat/lng/capacity) from fairlands_config.json
+    Loads site configuration (lat/lng/capacity) from site-002_config.json
     and generates forecasts using an ensemble of statistical and ML models.
 
     The forecast is used by the arbitrage engine (34-05) to decide whether

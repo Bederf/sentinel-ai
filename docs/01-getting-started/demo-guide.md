@@ -76,7 +76,7 @@ grep DEMO_MODE backend/.env
 3. Point out R185K total potential savings
 
 **Key Numbers:**
-- 15 FNB sites monitored
+- 15  sites monitored
 - 130 equipment items tracked
 - 5 current at-risk assets
 - R185K total potential savings
@@ -205,7 +205,7 @@ grep DEMO_MODE backend/.env
 ## Key Numbers to Reference
 
 ### Portfolio Scale
-- **15 FNB sites** across Gauteng, Western Cape, KZN
+- **15  sites** across Gauteng, Western Cape, KZN
 - **130 equipment items** (HVAC chillers, AHUs, UPS, generators)
 - **5 current at-risk assets** with active predictions
 - **R185K total potential savings** if all preventive actions taken
@@ -333,7 +333,7 @@ curl http://localhost:9095/api/predictions | jq '.predictions | length'
 - **Historical Analysis:** Learn from past work orders
 - **Real-Time Alerts:** Push notifications for critical predictions
 - **Mobile App:** On-site technician access
-- **Multi-Site Rollout:** Scale to all FNB sites
+- **Multi-Site Rollout:** Scale to all  sites
 
 ---
 

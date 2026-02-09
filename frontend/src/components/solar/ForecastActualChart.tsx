@@ -66,7 +66,6 @@ export function ForecastActualChart({ siteId }: ForecastActualChartProps) {
   );
 
   // Split into past (has actual) and future (forecast only)
-  const now = new Date();
   const pastHours = hours.filter((h) => h.actual_kw !== null && h.actual_kw !== undefined);
   const accuracy = data.accuracy;
 

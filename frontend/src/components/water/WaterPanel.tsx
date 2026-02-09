@@ -10,14 +10,13 @@
  * - Site selector for multi-site support
  */
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import {
   Card,
   Title,
   Text,
   Metric,
   Flex,
-  Grid,
   Button,
   Badge,
 } from "@tremor/react";
@@ -40,8 +39,6 @@ export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
   const [consumptionData, setConsumptionData] = useState<WaterConsumption[]>([]);
   const [alerts, setAlerts] = useState<WaterAlert[]>([]);
   const [trending, setTrending] = useState<WaterTrending | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   // Fetch current flow rate (poll every 30 seconds)
   useEffect(() => {
@@ -116,7 +113,7 @@ export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
             alert_type: "continuous_flow",
             severity: "critical",
             timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-            resolved: false,
+            status: "active",
             details: {
               flow_rate_lpm: 45,
               duration_minutes: 120,
@@ -127,9 +124,9 @@ export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
             alert_id: "alert-002",
             site: selectedSiteId,
             alert_type: "unusual_pattern",
-            severity: "warning",
+            severity: "medium",
             timestamp: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
-            resolved: false,
+            status: "active",
             details: {
               flow_rate_lpm: 22.5,
               percent_above_baseline: 180,
@@ -146,28 +143,22 @@ export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
   useEffect(() => {
     const fetchTrending = async () => {
       try {
-        const trendData = await waterApi.getTrending(selectedSiteId, "weekly");
+        const trendData = await waterApi.getTrending(selectedSiteId, "week");
         setTrending(trendData);
       } catch (err) {
         console.error("Failed to fetch trending:", err);
         // Fallback for demo mode
         setTrending({
           site: selectedSiteId,
-          period: "weekly",
-          current_period: {
-            start: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-            end: new Date().toISOString(),
-            total_volume_liters: 45000,
-            average_daily_liters: 6428,
-          },
-          previous_period: {
-            start: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
-            end: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-            total_volume_liters: 42000,
-            average_daily_liters: 6000,
-          },
-          comparison_percent: 7.1,
-          trend: "increasing",
+          period: "week",
+          start_date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+          end_date: new Date().toISOString(),
+          total_volume_liters: 45000,
+          average_flow_rate_lpm: 12.5,
+          peak_flow_rate_lpm: 22.0,
+          baseline_comparison_percent: 7.1,
+          trend_direction: "up",
+          record_count: 7,
         });
       }
     };
@@ -208,19 +199,12 @@ export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
     volume: d.volume_liters,
   }));
 
-  const severityColors = {
+  const severityColors: Record<string, "red" | "yellow" | "blue" | "green"> = {
     critical: "red",
-    warning: "yellow",
-    info: "blue",
-  } as const;
-
-  if (loading && !currentFlow) {
-    return (
-      <div className="flex items-center justify-center h-64" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-        Loading water data...
-      </div>
-    );
-  }
+    high: "red",
+    medium: "yellow",
+    low: "blue",
+  };
 
   return (
     <div
@@ -345,14 +329,14 @@ export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
               {trending && (
                 <div>
                   <Text className="text-sm">
-                    {trending.comparison_percent > 0 ? "+" : ""}
-                    {trending.comparison_percent.toFixed(1)}% vs last week
+                    {trending.baseline_comparison_percent > 0 ? "+" : ""}
+                    {trending.baseline_comparison_percent.toFixed(1)}% vs baseline
                   </Text>
                   <Text className="text-xs mt-2" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                    This week: {(trending.current_period.total_volume_liters / 1000).toFixed(1)}k L
+                    Volume: {(trending.total_volume_liters / 1000).toFixed(1)}k L
                   </Text>
                   <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                    Last week: {(trending.previous_period.total_volume_liters / 1000).toFixed(1)}k L
+                    Avg flow: {trending.average_flow_rate_lpm.toFixed(1)} LPM
                   </Text>
                 </div>
               )}
@@ -366,8 +350,8 @@ export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
         <Flex justifyContent="between" alignItems="center" className="mb-4">
           <Title>Active Leak Alerts ({alerts.length})</Title>
           {alerts.length > 0 && (
-            <Badge color={alerts.some((a) => a.severity === "critical") ? "red" : "yellow"}>
-              {alerts.some((a) => a.severity === "critical") ? "Critical" : "Warning"}
+            <Badge color={alerts.some((a) => a.severity === "critical" || a.severity === "high") ? "red" : "yellow"}>
+              {alerts.some((a) => a.severity === "critical" || a.severity === "high") ? "Critical" : "Warning"}
             </Badge>
           )}
         </Flex>

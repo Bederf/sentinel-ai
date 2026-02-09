@@ -2,36 +2,33 @@
 
 import pytest
 from unittest.mock import Mock, patch, AsyncMock
-from datetime import datetime, timedelta
+from datetime import datetime
 from app.services.maintenance_recommender import (
     MaintenanceRecommender,
     MaintenanceRecommendation,
-    MaintenanceAction,
-    RiskAssessment
+    DEFAULT_MAINTENANCE_ACTIONS,
+    COMMON_SPARE_PARTS,
+    get_maintenance_recommender,
 )
 
 
 @pytest.fixture
-def mock_rag_service():
-    """Mock RAG service."""
-    with patch('app.services.maintenance_recommender.RAGService') as mock:
-        service = AsyncMock()
-        service.search_faults = AsyncMock(return_value={
-            "results": [
-                {
-                    "content": "Fault pattern 1",
-                    "metadata": {
-                        "severity": "high",
-                        "recommended_actions": ["Action 1", "Action 2"]
-                    }
-                }
-            ]
-        })
-        service.search_procedures = AsyncMock(return_value={
-            "results": [
-                {"content": "Procedure 1", "metadata": {"estimated_time": "2h"}}
-            ]
-        })
+def mock_ollama():
+    """Mock Ollama client."""
+    with patch('app.services.maintenance_recommender.get_ollama_client') as mock:
+        client = AsyncMock()
+        client.is_available = AsyncMock(return_value=False)
+        client.generate = AsyncMock(return_value="No LLM response")
+        mock.return_value = client
+        yield client
+
+
+@pytest.fixture
+def mock_vector_db():
+    """Mock vector DB service."""
+    with patch('app.services.maintenance_recommender.get_vector_db_service') as mock:
+        service = Mock()
+        service.search_knowledge = Mock(return_value=[])
         mock.return_value = service
         yield service
 
@@ -39,274 +36,345 @@ def mock_rag_service():
 @pytest.fixture
 def mock_supabase():
     """Mock Supabase client."""
-    with patch('app.services.maintenance_recommender.create_supabase_client') as mock:
-        client = Mock()
-        client.table = Mock()
-        # Mock chain for select().eq().execute()
-        query = Mock()
-        query.eq = Mock(return_value=query)
-        client.table.return_value = query
-
-        mock.return_value = client
-        yield client
+    return Mock()
 
 
 @pytest.fixture
-def maintenance_recommender(mock_rag_service, mock_supabase):
+def recommender(mock_ollama, mock_vector_db, mock_supabase):
     """Create maintenance recommender with mocked dependencies."""
-    recommender = MaintenanceRecommender()
-    yield recommender
+    return MaintenanceRecommender(mock_supabase)
+
+
+class TestMaintenanceRecommendation:
+    """Test cases for MaintenanceRecommendation dataclass."""
+
+    def test_to_dict(self):
+        """Test conversion to dictionary."""
+        rec = MaintenanceRecommendation(
+            equipment_id="chiller-001",
+            equipment_type="chiller",
+            risk_level="high",
+            immediate_actions=["Inspect unit"],
+            priority="urgent",
+            generated_at="2026-01-01T00:00:00",
+        )
+
+        d = rec.to_dict()
+        assert d["equipment_id"] == "chiller-001"
+        assert d["risk_level"] == "high"
+        assert d["priority"] == "urgent"
+        assert d["immediate_actions"] == ["Inspect unit"]
+        assert d["llm_used"] is False
+
+    def test_default_values(self):
+        """Test default field values."""
+        rec = MaintenanceRecommendation(
+            equipment_id="test",
+            equipment_type="chiller",
+            risk_level="low",
+        )
+
+        assert rec.immediate_actions == []
+        assert rec.scheduled_maintenance == []
+        assert rec.preventive_measures == []
+        assert rec.spare_parts == []
+        assert rec.technician_skills == []
+        assert rec.estimated_downtime == ""
+        assert rec.priority == "medium"
+        assert rec.llm_used is False
 
 
 class TestMaintenanceRecommender:
     """Test cases for MaintenanceRecommender."""
 
-    async def test_generate_recommendations_basic(self, maintenance_recommender, mock_rag_service):
-        """Test basic recommendation generation."""
-        # Setup
-        predictions = {"24h": 12.5, "48h": 13.0, "72h": 13.5}
-
-        # Execute
-        result = await maintenance_recommender.generate_recommendations(
-            equipment_id="chiller-001",
-            equipment_type="chiller",
-            predictions=predictions,
-            confidence=0.85
-        )
-
-        # Assert
-        assert "recommendations" in result
-        assert isinstance(result["recommendations"], list)
-        assert result["total_estimated_time"] >= 0
-        assert result["total_estimated_cost"] >= 0
-
-    async def test_generate_recommendations_with_rag(self, maintenance_recommender, mock_rag_service):
-        """Test recommendation generation with RAG context."""
-        # Setup
-        predictions = {"24h": 15.0}
-        mock_rag_service.search_faults.return_value = {
-            "results": [
-                {
-                    "content": "High discharge temperature pattern",
-                    "metadata": {
-                        "severity": "medium",
-                        "recommended_actions": [
-                            "Check refrigerant charge",
-                            "Clean condenser coils"
-                        ],
-                        "estimated_cost": "R 2,500"
-                    }
-                }
-            ]
+    @pytest.mark.asyncio
+    async def test_generate_fallback_chiller_critical(self, recommender):
+        """Test fallback recommendation for critical chiller risk."""
+        predictions = {
+            "overall_risk": {"risk_level": "critical"},
+            "predictions": {"failure_type": {"predicted_failure": "Compressor failure"}}
         }
 
-        # Execute
-        result = await maintenance_recommender.generate_recommendations(
+        result = await recommender.generate_recommendation(
             equipment_id="chiller-001",
             equipment_type="chiller",
             predictions=predictions,
-            confidence=0.8,
-            include_rag_context=True
         )
 
-        # Assert
-        recommendations = result["recommendations"]
-        assert len(recommendations) > 0
-        # Should include actions from RAG
-        descriptions = [r["description"] for r in recommendations]
-        assert any("refrigerant" in d.lower() for d in descriptions)
+        assert isinstance(result, MaintenanceRecommendation)
+        assert result.equipment_id == "chiller-001"
+        assert result.risk_level == "critical"
+        assert result.priority == "emergency"
+        assert result.llm_used is False
+        assert len(result.immediate_actions) > 0
+        assert "Shut down" in result.immediate_actions[0]
 
-    async def test_priority_filtering(self, maintenance_recommender):
-        """Test filtering recommendations by priority."""
-        # Setup
-        predictions = {"24h": 14.0}
+    @pytest.mark.asyncio
+    async def test_generate_fallback_ahu_high(self, recommender):
+        """Test fallback recommendation for high-risk AHU."""
+        predictions = {
+            "overall_risk": {"risk_level": "high"},
+            "predictions": {"failure_type": {"predicted_failure": "Belt failure"}}
+        }
 
-        # Execute - filter for critical only
-        result = await maintenance_recommender.generate_recommendations(
-            equipment_id="chiller-001",
-            equipment_type="chiller",
-            predictions=predictions,
-            urgency_filter="critical"
-        )
-
-        # Assert
-        recommendations = result["recommendations"]
-        # All recommendations should be critical priority
-        for rec in recommendations:
-            assert rec.get("priority") == "critical"
-
-    async def test_recommendation_pricing(self, maintenance_recommender):
-        """Test cost estimation for recommendations."""
-        # Setup
-        predictions = {"24h": 13.5}
-
-        # Execute
-        result = await maintenance_recommender.generate_recommendations(
+        result = await recommender.generate_recommendation(
             equipment_id="ahu-001",
             equipment_type="ahu",
             predictions=predictions,
-            confidence=0.75
         )
 
-        # Assert
-        assert result["total_estimated_cost"] > 0
-        recommendations = result["recommendations"]
-        for rec in recommendations:
-            if rec.get("estimated_cost"):
-                assert rec["estimated_cost"] > 0
-                assert rec["cost_currency"] == "ZAR"
+        assert result.risk_level == "high"
+        assert result.priority == "urgent"
+        assert len(result.immediate_actions) > 0
+        assert any("filter" in a.lower() or "belt" in a.lower() for a in result.immediate_actions)
 
-    async def test_risk_assessment(self, maintenance_recommender):
-        """Test risk assessment calculation."""
-        # Setup
-        predictions = {"24h": 16.0}  # Higher temp = higher risk
+    @pytest.mark.asyncio
+    async def test_generate_fallback_generator_medium(self, recommender):
+        """Test fallback recommendation for medium-risk generator."""
+        predictions = {
+            "overall_risk": {"risk_level": "medium"},
+            "predictions": {"failure_type": {"predicted_failure": "Battery degradation"}}
+        }
 
-        # Execute
-        result = await maintenance_recommender.generate_recommendations(
+        result = await recommender.generate_recommendation(
+            equipment_id="gen-001",
+            equipment_type="generator",
+            predictions=predictions,
+        )
+
+        assert result.risk_level == "medium"
+        assert result.priority == "planned"
+        assert len(result.scheduled_maintenance) > 0
+
+    @pytest.mark.asyncio
+    async def test_generate_fallback_low_risk(self, recommender):
+        """Test fallback recommendation for low risk."""
+        predictions = {
+            "overall_risk": {"risk_level": "low"},
+            "predictions": {"failure_type": {"predicted_failure": "Unknown"}}
+        }
+
+        result = await recommender.generate_recommendation(
+            equipment_id="fcu-001",
+            equipment_type="fcu",
+            predictions=predictions,
+        )
+
+        assert result.risk_level == "low"
+        assert result.priority == "routine"
+
+    @pytest.mark.asyncio
+    async def test_generate_fallback_unknown_equipment(self, recommender):
+        """Test fallback for unknown equipment type uses default actions."""
+        predictions = {
+            "overall_risk": {"risk_level": "high"},
+            "predictions": {"failure_type": {"predicted_failure": "Unknown"}}
+        }
+
+        result = await recommender.generate_recommendation(
+            equipment_id="custom-001",
+            equipment_type="custom_device",
+            predictions=predictions,
+        )
+
+        # Should use default actions
+        assert result.risk_level == "high"
+        assert len(result.immediate_actions) > 0
+        assert "Schedule priority inspection" in result.immediate_actions[0]
+
+    @pytest.mark.asyncio
+    async def test_generate_with_maintenance_history(self, recommender):
+        """Test passing maintenance history (used by LLM path)."""
+        predictions = {
+            "overall_risk": {"risk_level": "medium"},
+            "predictions": {"failure_type": {"predicted_failure": "Filter clog"}}
+        }
+        history = [
+            {"date": "2026-01-01", "description": "Filter replaced"},
+            {"date": "2025-12-01", "description": "Routine PM"},
+        ]
+
+        # With LLM unavailable, falls back to rule-based (ignores history)
+        result = await recommender.generate_recommendation(
+            equipment_id="ahu-001",
+            equipment_type="ahu",
+            predictions=predictions,
+            maintenance_history=history,
+        )
+
+        assert result.llm_used is False
+        assert result.risk_level == "medium"
+
+    @pytest.mark.asyncio
+    async def test_generate_with_llm_available(self, recommender, mock_ollama):
+        """Test recommendation generation when LLM is available."""
+        mock_ollama.is_available = AsyncMock(return_value=True)
+        mock_ollama.generate = AsyncMock(return_value="""
+### IMMEDIATE_ACTIONS
+- Check refrigerant levels immediately
+- Inspect compressor contacts
+
+### SCHEDULED_MAINTENANCE
+- [48 hours] Full inspection
+
+### PREVENTIVE_MEASURES
+- Monthly vibration analysis
+
+### SPARE_PARTS
+- Compressor contactor | CC-100 | 1
+
+### TECHNICIAN_SKILLS
+- HVAC certification
+
+### ESTIMATED_DOWNTIME
+2-4 hours
+""")
+
+        predictions = {
+            "overall_risk": {"risk_level": "high"},
+            "predictions": {"failure_type": {"predicted_failure": "Compressor issue"}}
+        }
+
+        result = await recommender.generate_recommendation(
             equipment_id="chiller-001",
             equipment_type="chiller",
             predictions=predictions,
-            confidence=0.8
         )
 
-        # Assert
-        recommendations = result["recommendations"]
-        for rec in recommendations:
-            risk = rec.get("risk_assessment")
-            if risk:
-                assert risk.get("risk_level") in ["low", "medium", "high", "critical"]
-                assert "probability" in risk
+        assert result.llm_used is True
+        assert result.risk_level == "high"
+        assert len(result.immediate_actions) >= 1
 
-    async def test_generator_recommendations(self, maintenance_recommender):
-        """Test recommendations for generator equipment."""
-        # Setup
-        predictions = {"24h": 85.5}  # Generator load percentage
+    def test_risk_to_priority(self, recommender):
+        """Test risk level to priority mapping."""
+        assert recommender._risk_to_priority("critical") == "emergency"
+        assert recommender._risk_to_priority("high") == "urgent"
+        assert recommender._risk_to_priority("medium") == "planned"
+        assert recommender._risk_to_priority("low") == "routine"
+        assert recommender._risk_to_priority("unknown") == "routine"
 
-        # Execute
-        result = await maintenance_recommender.generate_recommendations(
-            equipment_id="generator-001",
-            equipment_type="generator",
-            predictions=predictions,
-            confidence=0.9
+    def test_estimate_downtime(self, recommender):
+        """Test downtime estimation by risk level."""
+        assert "4-8" in recommender._estimate_downtime("critical")
+        assert "2-4" in recommender._estimate_downtime("high")
+        assert "1-2" in recommender._estimate_downtime("medium")
+        assert "0.5-1" in recommender._estimate_downtime("low")
+
+    @pytest.mark.asyncio
+    async def test_get_fleet_recommendations(self, recommender):
+        """Test generating recommendations for multiple equipment."""
+        equipment_list = [
+            {"id": "ch-001", "equipment_type": "chiller"},
+            {"id": "ahu-001", "equipment_type": "ahu"},
+        ]
+        predictions_map = {
+            "ch-001": {
+                "overall_risk": {"risk_level": "high"},
+                "predictions": {"failure_type": {"predicted_failure": "Refrigerant leak"}}
+            },
+            "ahu-001": {
+                "overall_risk": {"risk_level": "low"},
+                "predictions": {"failure_type": {"predicted_failure": "Normal"}}
+            },
+        }
+
+        results = await recommender.get_fleet_recommendations(
+            equipment_list, predictions_map
         )
 
-        # Assert
-        assert "recommendations" in result
-        recommendations = result["recommendations"]
-        assert len(recommendations) >= 0
+        assert len(results) == 2
+        # Should be sorted by priority (urgent before routine)
+        assert results[0].priority == "urgent"
+        assert results[1].priority == "routine"
 
-    async def test_invalid_equipment_type(self, maintenance_recommender):
-        """Test handling of invalid equipment type."""
-        with pytest.raises(ValueError, match="Unknown equipment type"):
-            await maintenance_recommender.generate_recommendations(
-                equipment_id="unknown-001",
-                equipment_type="invalid_type",
-                predictions={"24h": 10.0}
-            )
+    @pytest.mark.asyncio
+    async def test_get_fleet_skips_missing_predictions(self, recommender):
+        """Test fleet recommendations skip equipment without predictions."""
+        equipment_list = [
+            {"id": "ch-001", "equipment_type": "chiller"},
+            {"id": "ch-002", "equipment_type": "chiller"},
+        ]
+        predictions_map = {
+            "ch-001": {
+                "overall_risk": {"risk_level": "medium"},
+                "predictions": {"failure_type": {"predicted_failure": "Normal"}}
+            },
+            # ch-002 missing from predictions
+        }
 
-    def test_calculate_confidence_boost(self):
-        """Test confidence boost calculation."""
-        recommender = MaintenanceRecommender()
-
-        # Test low anomaly case
-        boost_low = recommender._calculate_confidence_boost(0.1, 12.5, 14.0)
-        assert boost_low > 0  # Should be positive boost (normal operation)
-
-        # Test high anomaly case
-        boost_high = recommender._calculate_confidence_boost(0.8, 16.0, 14.0)
-        assert boost_high < 0  # Should be negative boost (concerning)
-
-    def test_determine_priority(self):
-        """Test priority determination logic."""
-        recommender = MaintenanceRecommender()
-
-        # Test critical priority
-        priority = recommender._determine_priority(
-            anomaly_score=0.9,
-            prediction_value=18.0,
-            threshold_value=14.0,
-            equipment_type="chiller"
-        )
-        assert priority == "critical"
-
-        # Test high priority
-        priority = recommender._determine_priority(
-            anomaly_score=0.7,
-            prediction_value=16.0,
-            threshold_value=14.0,
-            equipment_type="chiller"
-        )
-        assert priority == "high"
-
-        # Test medium priority
-        priority = recommender._determine_priority(
-            anomaly_score=0.3,
-            prediction_value=12.0,
-            threshold_value=14.0,
-            equipment_type="chiller"
-        )
-        assert priority == "medium"
-
-        # Test low priority
-        priority = recommender._determine_priority(
-            anomaly_score=0.05,
-            prediction_value=10.0,
-            threshold_value=14.0,
-            equipment_type="chiller"
-        )
-        assert priority == "low"
-
-    def test_determine_generator_priority(self):
-        """Test priority determination for generators."""
-        recommender = MaintenanceRecommender()
-
-        # High load = higher priority
-        priority = recommender._determine_priority(
-            anomaly_score=0.6,
-            prediction_value=95.0,  # High load
-            threshold_value=85.0,
-            equipment_type="generator"
-        )
-        assert priority in ["high", "critical"]
-
-    async def test_record_feedback(self, maintenance_recommender, mock_supabase):
-        """Test recording maintenance feedback."""
-        # Setup
-        mock_supabase.table.return_value.insert = Mock(
-            return_value=Mock(data=[{"id": "feedback-001"}])
+        results = await recommender.get_fleet_recommendations(
+            equipment_list, predictions_map
         )
 
-        # Execute
-        await maintenance_recommender.record_feedback(
-            equipment_id="chiller-001",
-            recommendation_id="rec-001",
-            action_taken="Replaced filter",
-            outcome="success",
-            actual_time_hours=2.5,
-            actual_cost=1500.0
+        assert len(results) == 1
+        assert results[0].equipment_id == "ch-001"
+
+    def test_fallback_includes_spare_parts(self, recommender):
+        """Test that fallback recommendations include spare parts."""
+        rec = recommender._generate_fallback_recommendation(
+            equipment_id="ch-001",
+            equipment_type="chiller",
+            risk_level="high",
+            predicted_failure="Compressor issue",
         )
 
-        # Assert - should have called insert
-        mock_supabase.table.assert_called_with("maintenance_feedback")
+        assert len(rec.spare_parts) > 0
+        # Should include chiller-specific parts
+        part_names = [p["name"] for p in rec.spare_parts]
+        assert any("Refrigerant" in name or "Compressor" in name for name in part_names)
 
-    async def test_build_optimization_suggestion(self, maintenance_recommender):
-        """Test building optimization suggestions."""
-        efficiency_gain = 15.5  # 15.5% efficiency gain
-
-        suggestion = maintenance_recommender._build_optimization_suggestion(
-            "Clean condenser coils",
-            efficiency_gain
+    def test_fallback_includes_preventive_measures(self, recommender):
+        """Test that fallback recommendations include preventive measures."""
+        rec = recommender._generate_fallback_recommendation(
+            equipment_id="ahu-001",
+            equipment_type="ahu",
+            risk_level="medium",
+            predicted_failure="Filter issue",
         )
 
-        assert suggestion is not None
-        assert "optimization" in suggestion["category"]
-        assert suggestion["expected_outcome"] == "15.5% efficiency improvement"
+        assert len(rec.preventive_measures) > 0
+        assert rec.generated_at != ""
 
-    async def test_empty_predictions_handling(self, maintenance_recommender):
-        """Test handling of empty predictions."""
-        with pytest.raises(ValueError, match="Predictions cannot be empty"):
-            await maintenance_recommender.generate_recommendations(
-                equipment_id="chiller-001",
-                equipment_type="chiller",
-                predictions={}
-            )
+    def test_fallback_includes_technician_skills(self, recommender):
+        """Test that HVAC equipment gets HVAC certification requirement."""
+        rec = recommender._generate_fallback_recommendation(
+            equipment_id="ch-001",
+            equipment_type="chiller",
+            risk_level="medium",
+            predicted_failure="Normal",
+        )
+
+        assert "HVAC certification" in rec.technician_skills
+
+
+class TestDefaultActions:
+    """Test the default maintenance action definitions."""
+
+    def test_chiller_actions_exist(self):
+        """Test chiller has actions for all risk levels."""
+        assert "chiller" in DEFAULT_MAINTENANCE_ACTIONS
+        for level in ["critical", "high", "medium", "low"]:
+            assert level in DEFAULT_MAINTENANCE_ACTIONS["chiller"]
+            assert len(DEFAULT_MAINTENANCE_ACTIONS["chiller"][level]) > 0
+
+    def test_default_actions_exist(self):
+        """Test default actions exist for fallback."""
+        assert "default" in DEFAULT_MAINTENANCE_ACTIONS
+        for level in ["critical", "high", "medium", "low"]:
+            assert level in DEFAULT_MAINTENANCE_ACTIONS["default"]
+
+    def test_common_spare_parts(self):
+        """Test spare parts defined for major equipment types."""
+        for eq_type in ["chiller", "ahu", "generator", "fcu"]:
+            assert eq_type in COMMON_SPARE_PARTS
+            assert len(COMMON_SPARE_PARTS[eq_type]) > 0
+
+
+class TestFactoryFunction:
+    """Test the factory function."""
+
+    def test_get_maintenance_recommender(self, mock_ollama, mock_vector_db):
+        """Test factory creates recommender."""
+        client = Mock()
+        recommender = get_maintenance_recommender(client)
+        assert isinstance(recommender, MaintenanceRecommender)

@@ -8,7 +8,7 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime
 from enum import Enum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 # ============================================================================
@@ -90,8 +90,8 @@ class ComparisonResult(BaseModel):
     deviation_percent: float = Field(..., description="Deviation from baseline as percentage")
     status: DeviationStatus = Field(..., description="Deviation status (normal/warning/critical)")
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "baseline": 7.2,
                 "current": 8.5,
@@ -99,6 +99,7 @@ class ComparisonResult(BaseModel):
                 "status": "warning"
             }
         }
+    )
 
 
 # ============================================================================
@@ -130,8 +131,8 @@ class EquipmentBaseline(EquipmentBaselineBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "id": "123e4567-e89b-12d3-a456-426614174000",
                 "equipment_id": "S002-CHILLER-B1-001",
@@ -155,6 +156,7 @@ class EquipmentBaseline(EquipmentBaselineBase):
                 "attachment_urls": ["https://storage.example.com/photo1.jpg"]
             }
         }
+    )
 
 
 # ============================================================================
@@ -186,8 +188,8 @@ class EquipmentElement(EquipmentElementBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "id": "123e4567-e89b-12d3-a456-426614174001",
                 "equipment_id": "S002-CHILLER-B1-001",
@@ -201,6 +203,7 @@ class EquipmentElement(EquipmentElementBase):
                 "criticality": "high"
             }
         }
+    )
 
 
 # ============================================================================
@@ -233,8 +236,8 @@ class ElementBaseline(ElementBaselineBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "id": "123e4567-e89b-12d3-a456-426614174002",
                 "element_id": "compressor_bearing_1",
@@ -257,6 +260,7 @@ class ElementBaseline(ElementBaselineBase):
                 "notes": "Baseline captured during normal operation conditions"
             }
         }
+    )
 
 
 # ============================================================================
@@ -289,8 +293,8 @@ class BaselineComparison(BaselineComparisonBase):
     id: str = Field(..., description="Comparison record ID")
     created_at: datetime
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "id": "123e4567-e89b-12d3-a456-426614174003",
                 "comparison_type": "equipment_baseline",
@@ -317,6 +321,7 @@ class BaselineComparison(BaselineComparisonBase):
                 "alert_generated": False
             }
         }
+    )
 
 
 # ============================================================================

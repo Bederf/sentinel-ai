@@ -16,7 +16,7 @@ Carbon offset:
   - Diesel CO2 avoided: litres x 2.68 kg/L
 
 For demo: generates 3 months of retrospective financial reports
-with realistic savings (R80-150K/month for Fairlands 3.875 MWp).
+with realistic savings (R80-150K/month for Site-002 3.875 MWp).
 """
 
 import logging
@@ -57,8 +57,8 @@ DEMAND_CHARGE_ZAR_KVA = 155.50
 # Generator consumption rate (litres/hour at 70% load)
 GENERATOR_CONSUMPTION_L_HR = 30.0
 
-# Fairlands installed capacity
-FAIRLANDS_CAPACITY_KWP = 3875.0
+# Site-002 installed capacity
+_CAPACITY_KWP = 3875.0
 
 
 # === Data models ===
@@ -192,7 +192,7 @@ class CarbonReport:
 class SolarFinancialService:
     """Financial reporting for solar installations."""
 
-    # Monthly demo data for Fairlands (3.875 MWp, JHB)
+    # Monthly demo data for Site-002 (3.875 MWp, JHB)
     # Realistic for SA commercial installation
     DEMO_MONTHLY_DATA = {
         # (month, year) -> (generation_kwh, pr, gen_hours_avoided, ls_events)
@@ -245,7 +245,7 @@ class SolarFinancialService:
 
         # --- Calculate SENTINEL optimisation savings (delta vs no-optimisation) ---
         # These represent the incremental value SENTINEL adds, not total solar value.
-        # Target: R80-150K/month for a 3.9 MWp Fairlands campus.
+        # Target: R80-150K/month for a 3.9 MWp Site-002 campus.
 
         # 1. Arbitrage savings (BESS TOU optimisation)
         # SENTINEL shifts ~350 kWh/day from off-peak charge to peak discharge
@@ -415,7 +415,7 @@ class SolarFinancialService:
         factor = seasonal_factor.get(month, 0.85)
 
         # Base generation: capacity * 5.5 peak sun hours * 30 days * PR * factor
-        base_gen = FAIRLANDS_CAPACITY_KWP * 5.5 * 30 * 0.81 * factor
+        base_gen = _CAPACITY_KWP * 5.5 * 30 * 0.81 * factor
         generation = base_gen * random.uniform(0.95, 1.05)
 
         return {

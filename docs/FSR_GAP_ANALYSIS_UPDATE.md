@@ -27,7 +27,7 @@ Since the original gap analysis, the following controls have been implemented:
 | Log Retention Management | Data Quality & Retention | 63-64 | ✅ Complete |
 | Global Auth Enforcement (all API endpoints) | Application Security | 58-03 | ✅ Complete |
 | Strong JWT Secret (configurable, validated at startup) | Cryptography | 58-03 | ✅ Complete |
-| Rate Limiting (slowapi: 5/min auth, 100/min general) | Application Security | 58-03 | ✅ Complete |
+| Rate Limiting (5/15 min auth, 100/min general, 30/min admin API) | Application Security | 58-03 + 65-02 | ✅ Complete |
 | CORS Restriction (configured origins only) | Application Security | 58-03 | ✅ Complete |
 | Security Response Headers (X-Frame-Options, HSTS, etc.) | Application Security | 58-03 | ✅ Complete |
 | Demo Mode Restricted to Localhost | Logical Access Control | 58-03 | ✅ Complete |
@@ -35,7 +35,12 @@ Since the original gap analysis, the following controls have been implemented:
 | Brute Force Protection (5 attempts / 15 min lockout) | Logical Access Control | 58-04 | ✅ Complete |
 | Audit Log Sanitization (sensitive data redacted) | Incident Detection | 58-04 | ✅ Complete |
 | Generic Error Handler (no stack traces in production) | Application Security | 58-04 | ✅ Complete |
-| JWT Expiration Reduced to 8 Hours | Cryptography | 58-04 | ✅ Complete |
+| JWT Expiration Reduced to 15 Minutes (access tokens) | Cryptography | 65-02 | ✅ Complete |
+| Refresh Tokens (7-day TTL) with Rotation | Logical Access Control | 65-02 | ✅ Complete |
+| Token Blacklist by JWT `jti` (Redis) | Logical Access Control | 65-02 | ✅ Complete |
+| Session Tracking + Session Revocation APIs | Logical Access Control | 65-03 | ✅ Complete |
+| MFA Backup Codes (10 one-time codes, hashed) | Logical Access Control | 65-03 | ✅ Complete |
+| API Keys Migrated to DB (hashed, revocable) | Logical Access Control | 65-03 | ✅ Complete |
 | Subprocess Call Sanitization | Application Security | 58-04 | ✅ Complete |
 | MFA for Admin Access (TOTP, pyotp) | Logical Access Control | 58.1 | ✅ Complete |
 | Privacy Impact Assessments (Claude API, Clawd) | Risk & Compliance | 58.1 | ✅ Complete |
@@ -242,7 +247,7 @@ SELECT cleanup_old_login_logs(90);
 |------|----------|--------|
 | Formal Password Security Standard document | Medium | Pending |
 | Privileged Access Management (PAM) solution | Medium | Pending |
-| MFA for administrative access | Medium | Pending |
+| MFA for administrative access | Medium | ✅ Implemented (TOTP + backup codes) |
 | Documented identity verification for password resets | Low | Pending |
 
 ---
@@ -313,7 +318,7 @@ SELECT cleanup_old_login_logs(90);
 | Control | Status | Evidence |
 |---------|--------|----------|
 | Global authentication enforcement | ✅ Complete | `main.py` — all `/api/` routes require auth (58-03) |
-| Rate limiting | ✅ Complete | slowapi: 5/min auth, 10/min device, 20/min chat, 100/min general (58-03) |
+| Rate limiting | ✅ Complete | slowapi: 5/15min auth, 100/min general + 30/min admin API guard (58-03, 65-02) |
 | CORS restriction | ✅ Complete | Configured origins only, no wildcard (58-03) |
 | Security response headers | ✅ Complete | X-Frame-Options, X-Content-Type-Options, HSTS, XSS-Protection (58-03) |
 | Input validation on device control | ✅ Complete | Pydantic `DeviceControlRequest` with field validators (58-04) |
@@ -395,9 +400,13 @@ SELECT cleanup_old_login_logs(90);
 | User site access migration | `supabase/migrations/035_user_site_access.sql` | Logical Access Control |
 | Login audit migration | `supabase/migrations/036_login_audit_log.sql` | Incident Detection |
 | MFA migration | `supabase/migrations/037_mfa_secrets.sql` | Logical Access Control |
+| MFA backup codes migration | `supabase/migrations/054_mfa_backup_codes.sql` | Logical Access Control |
+| API keys migration | `supabase/migrations/055_api_keys.sql` | Logical Access Control |
 | Access control repository | `backend/app/database/repositories/user_site_access_repository.py` | Logical Access Control |
 | Login audit repository | `backend/app/database/repositories/login_audit_repository.py` | Incident Detection |
 | MFA service | `backend/app/services/mfa_service.py` | Logical Access Control |
+| Session service | `backend/app/services/session_service.py` | Logical Access Control |
+| Token blacklist service | `backend/app/services/token_blacklist_service.py` | Logical Access Control |
 | Admin access API | `backend/app/api/user_access.py` | Logical Access Control |
 | Login audit API | `backend/app/api/login_audit.py` | Incident Detection |
 | MFA API | `backend/app/api/mfa.py` | Logical Access Control |

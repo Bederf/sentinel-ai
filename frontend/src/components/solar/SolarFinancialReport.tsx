@@ -12,7 +12,7 @@
  */
 
 import { useState, useEffect, useCallback } from "react";
-import { DollarSign, TrendingUp, Leaf, BarChart3 } from "lucide-react";
+import { DollarSign, TrendingUp, BarChart3 } from "lucide-react";
 import type { FinancialSummary } from "../../lib/solarApi";
 import { fetchFinancialSummary } from "../../lib/solarApi";
 

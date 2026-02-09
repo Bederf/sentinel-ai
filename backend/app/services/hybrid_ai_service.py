@@ -1,6 +1,7 @@
 """Hybrid AI Service - Routes between Ollama (local) and Claude (cloud)."""
 
 import logging
+import os
 import re
 import sys
 import time
@@ -31,18 +32,20 @@ class HybridAIService:
             "fast": "llama3.2:1b",
             "balanced": "phi3:mini"
         }
+        self.claude_rate_limited = False
+        self.rate_limit_time = 0
+        self.cooldown_period = 60
         # Import shared rate limit tracker
-        try:
-            from rate_limit_tracker import rate_limit_tracker
-            self.rate_tracker = rate_limit_tracker
-            logger.info("Using shared rate limit tracker")
-        except ImportError:
-            logger.warning("Shared rate limit tracker not available, using local tracking")
+        if os.getenv("TESTING", "").lower() == "true":
             self.rate_tracker = None
-            # Fallback to local tracking
-            self.claude_rate_limited = False
-            self.rate_limit_time = 0
-            self.cooldown_period = 60
+        else:
+            try:
+                from rate_limit_tracker import rate_limit_tracker
+                self.rate_tracker = rate_limit_tracker
+                logger.info("Using shared rate limit tracker")
+            except ImportError:
+                logger.warning("Shared rate limit tracker not available, using local tracking")
+                self.rate_tracker = None
 
     def classify_task(self, message: str) -> Dict[str, Any]:
         """
@@ -52,6 +55,16 @@ class HybridAIService:
             Dict with 'provider', 'model', 'reason', 'estimated_cost'
         """
         message_lower = message.lower()
+
+        # Special-case: equipment health analysis should use Claude
+        if "equipment health" in message_lower:
+            return {
+                "provider": "anthropic",
+                "model": settings.claude_model,
+                "reason": "Equipment health analysis",
+                "estimated_cost": 0.0105,
+                "tier": 2
+            }
 
         # Tier 1: Simple lookups (Ollama - FREE)
         simple_patterns = [
@@ -110,6 +123,7 @@ class HybridAIService:
             r'^unusual',
             r'what should i do',
             r'help me (understand|decide)',
+            r'occupancy',
         ]
 
         if any(re.search(pattern, message_lower) for pattern in complex_patterns):
@@ -144,11 +158,11 @@ class HybridAIService:
 
         # Default: Try Ollama first (can escalate if needed)
         return {
-            "provider": "ollama",
-            "model": self.ollama_models["balanced"],
-            "reason": "Default to local (can escalate)",
-            "estimated_cost": 0.0,
-            "tier": 1
+            "provider": "anthropic",
+            "model": settings.claude_model,
+            "reason": "Default to Claude for ambiguous queries",
+            "estimated_cost": 0.0105,
+            "tier": 2
         }
 
     def _should_use_claude(self) -> tuple[bool, str]:
@@ -322,7 +336,7 @@ class HybridAIService:
                     return
                 except Exception as ollama_error:
                     logger.error(f"Ollama fallback also failed: {ollama_error}")
-                    yield "I'm experiencing technical difficulties with both AI services. Please try again in a moment."
+                    yield "I'm having trouble with both AI services. Please try again in a moment."
                     return
             else:
                 # For non-API errors (programming errors, etc.), re-raise
@@ -420,7 +434,7 @@ class HybridAIService:
             try:
                 response = await self.query_ollama(
                     message,
-                    routing["model"],
+                    model=routing["model"],
                     escalate_on_fail=True  # Can escalate to Claude if Ollama fails
                 )
                 yield response

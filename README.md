@@ -101,7 +101,7 @@ await connector.initialise()
 # 3. Create work order from SENTINEL anomaly
 anomaly = SentinelAnomaly(
     source=AnomalySource.BMS_ANOMALY,
-    segment_id="SEG-FAIRLANDS-001",
+    segment_id="SEG--001",
     asset_type="chiller",
     severity_score=0.82,
     summary="Chiller compressor discharge temp rising abnormally",

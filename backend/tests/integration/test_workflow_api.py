@@ -8,18 +8,15 @@ Phase 53-02: Automated Triggers & Workflow Automation
 
 import pytest
 from datetime import datetime
-from fastapi.testclient import TestClient
-
-from app.main import app
 
 
 class TestWorkflowAPI:
     """Integration tests for workflow API endpoints."""
 
     @pytest.fixture
-    def client(self):
+    def client(self, test_client):
         """Create test client."""
-        return TestClient(app)
+        return test_client
 
     # ========================================================================
     # Trigger Endpoint Tests
@@ -305,9 +302,9 @@ class TestWorkflowScenarios:
     """End-to-end workflow scenario tests."""
 
     @pytest.fixture
-    def client(self):
+    def client(self, test_client):
         """Create test client."""
-        return TestClient(app)
+        return test_client
 
     def test_scenario_happy_path(self, client):
         """Test happy path: Anomaly → Inspection → Deficiency → Repair → Validation (Success)."""

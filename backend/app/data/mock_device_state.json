@@ -185,7 +185,9 @@
     "damper_position": 70,
     "airflow_setpoint": 350,
     "airflow_actual": 340,
-    "reheat_valve": 0
+    "reheat_valve": 0,
+    "discharge_air_temp": 14.5,
+    "heating_valve": 0
   },
   "S002-FCU-L2-D": {
     "room_temp": 23.0,
@@ -198,7 +200,9 @@
     "damper_position": 70,
     "airflow_setpoint": 350,
     "airflow_actual": 340,
-    "reheat_valve": 0
+    "reheat_valve": 0,
+    "discharge_air_temp": 14.5,
+    "heating_valve": 0
   },
   "S002-FCU-L1-A": {
     "room_temp": 21.5,
@@ -211,7 +215,9 @@
     "damper_position": 70,
     "airflow_setpoint": 350,
     "airflow_actual": 340,
-    "reheat_valve": 0
+    "reheat_valve": 0,
+    "discharge_air_temp": 14.5,
+    "heating_valve": 0
   },
   "S002-FCU-L1-B": {
     "room_temp": 24.0,
@@ -224,7 +230,9 @@
     "damper_position": 70,
     "airflow_setpoint": 350,
     "airflow_actual": 340,
-    "reheat_valve": 0
+    "reheat_valve": 0,
+    "discharge_air_temp": 14.5,
+    "heating_valve": 0
   },
   "S002-FCU-L0-A": {
     "room_temp": 22.0,
@@ -237,7 +245,9 @@
     "damper_position": 70,
     "airflow_setpoint": 350,
     "airflow_actual": 340,
-    "reheat_valve": 0
+    "reheat_valve": 0,
+    "discharge_air_temp": 14.5,
+    "heating_valve": 0
   },
   "S002-AHU-L2-01": {
     "supply_air_temp": 14.0,
@@ -381,5 +391,94 @@
     "motion_detected": false,
     "recording": true,
     "disk_usage": 62
+  },
+  "UMH-SPLIT-L1-002": {
+    "room_temp": 21.0,
+    "setpoint": 21.0,
+    "mode": 1
+  },
+  "UMH-SPLIT-L2-001": {
+    "room_temp": 20.0,
+    "setpoint": 20.0,
+    "mode": 1
+  },
+  "UMH-SPLIT-L3-001": {
+    "room_temp": 22.5,
+    "setpoint": 22.0,
+    "mode": 1
+  },
+  "UMH-AHU-B1-LAUN": {
+    "supply_air_temp": 22.0,
+    "exhaust_air_temp": 28.0,
+    "fan_status": true,
+    "fan_speed": 70,
+    "alarm": false
+  },
+  "UMH-SPLIT-L3-002": {
+    "room_temp": 22.0,
+    "setpoint": 22.0,
+    "mode": 1
+  },
+  "UMH-SPLIT-L1-001": {
+    "room_temp": 22.0,
+    "setpoint": 22.0,
+    "mode": 1,
+    "fan_speed": 2
+  },
+  "UMH-SPLIT-L9-001": {
+    "room_temp": 21.0,
+    "setpoint": 21.0,
+    "mode": 1
+  },
+  "test-device-unit-001": {
+    "setpoint": 22.0
+  },
+  "S002-INV-R-001": {
+    "status": 1,
+    "ac_power": 72.5,
+    "dc_power": 74.8,
+    "efficiency": 96.9,
+    "temperature": 42.3,
+    "daily_energy": 385.2
+  },
+  "S002-INV-R-002": {
+    "status": 1,
+    "ac_power": 71.8,
+    "dc_power": 74.1,
+    "efficiency": 96.9,
+    "temperature": 41.8,
+    "daily_energy": 382.7
+  },
+  "S002-INV-R-003": {
+    "status": 1,
+    "ac_power": 73.1,
+    "dc_power": 75.4,
+    "efficiency": 97.0,
+    "temperature": 43.1,
+    "daily_energy": 388.5
+  },
+  "S002-INV-R-004": {
+    "status": 1,
+    "ac_power": 70.9,
+    "dc_power": 73.2,
+    "efficiency": 96.9,
+    "temperature": 42.0,
+    "daily_energy": 378.1
+  },
+  "S002-BESS-B1-001": {
+    "status": 1,
+    "soc": 68.5,
+    "power": -15.2,
+    "voltage": 748.0,
+    "temperature": 28.5,
+    "mode": 2
+  },
+  "S002-MTR-R-SOLAR": {
+    "active_power": 288.3,
+    "energy_total": 145620.8,
+    "voltage_l1": 233.2,
+    "current_l1": 412.5,
+    "power_factor": 0.99,
+    "frequency": 50.01
   }
 }

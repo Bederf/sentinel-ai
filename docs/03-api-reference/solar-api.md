@@ -19,7 +19,7 @@ REST API endpoints for solar PV monitoring, BESS dispatch, grid compliance, fina
 
 **Base path:** `/api/solar`
 
-**Demo site:** `fairlands` (3.875 MWp, 33 inverters, 2 MWh BESS)
+**Demo site:** `` (3.875 MWp, 33 inverters, 2 MWh BESS)
 
 ## Ingestion & Overview (34-01)
 
@@ -31,8 +31,8 @@ List all registered solar sites.
 ```json
 [
   {
-    "site_id": "fairlands",
-    "name": "Fairlands Office Park",
+    "site_id": "",
+    "name": " Office Park",
     "capacity_kwp": 3875,
     "inverter_count": 33,
     "has_bess": true,
@@ -48,7 +48,7 @@ Get site overview with current generation, BESS SOC, grid flow, and performance 
 **Response:**
 ```json
 {
-  "site_id": "fairlands",
+  "site_id": "",
   "generation_kw": 2847.3,
   "daily_yield_kwh": 14250.0,
   "bess_soc_pct": 72.5,
@@ -75,7 +75,7 @@ Get BESS container status (SOC, mode, power, health, alarms).
 **Response:**
 ```json
 {
-  "site_id": "fairlands",
+  "site_id": "",
   "soc_pct": 72.5,
   "soh_pct": 96.2,
   "mode": "discharging",
@@ -136,7 +136,7 @@ Get full diagnostic report with prioritised issues.
 **Response:**
 ```json
 {
-  "site_id": "fairlands",
+  "site_id": "",
   "health_status": "good",
   "issue_count": 3,
   "total_cost_impact_zar": 12500.0,
@@ -202,7 +202,7 @@ Get 24-hour BESS dispatch schedule (TOU optimised).
 **Response:**
 ```json
 {
-  "site_id": "fairlands",
+  "site_id": "",
   "schedule": [
     {
       "hour": 6,
@@ -299,7 +299,7 @@ Get 72-hour generation forecast with confidence bands.
 **Response:**
 ```json
 {
-  "site_id": "fairlands",
+  "site_id": "",
   "generated_at": "2026-02-06T10:00:00Z",
   "hours": [
     {
@@ -424,7 +424,7 @@ Get monthly financial report.
 **Response:**
 ```json
 {
-  "site_id": "fairlands",
+  "site_id": "",
   "month": 1,
   "year": 2026,
   "savings": {
@@ -471,7 +471,7 @@ Get carbon offset report.
 | `get_solar_forecast` | 24-72h generation forecast with confidence bands |
 | `get_solar_diagnostics` | Top issues, underperformers, maintenance recommendations |
 
-All tools accept `site_id` parameter (default: `"fairlands"`).
+All tools accept `site_id` parameter (default: `""`).
 
 ## Chat Tools
 

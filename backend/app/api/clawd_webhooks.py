@@ -8,13 +8,16 @@ These endpoints are called by the Clawd Telegram bot when:
 Phase 41-02 additions:
 4. OCR processing for service sheet photos
 5. Correction flow for OCR validation issues
+
+Manager control additions:
+6. Remote equipment reset via /reset_ command
 """
 
 import base64
 import logging
 from fastapi import APIRouter, Depends, HTTPException, status, Header
 from pydantic import BaseModel, Field
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 from app.services.clawd_integration.work_order_notifier import work_order_notifier
 from app.services.ocr_service import get_ocr_service
@@ -23,6 +26,16 @@ from app.models.service_record import ServiceStatus
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/clawd", tags=["clawd"])
+
+# Equipment types blocked from remote reset (safety-critical)
+RESET_BLOCKED_TYPES = {"FIRE", "GEN"}
+
+
+class EquipmentResetRequest(BaseModel):
+    """Request to remotely reset equipment fault status."""
+    equipment_code: str = Field(..., description="Equipment code (e.g., S002-FCU-L1-A)")
+    user_id: str = Field(..., description="User initiating the reset")
+    reason: Optional[str] = Field(None, description="Reason for reset")
 
 
 @router.post("/work-order/response", status_code=status.HTTP_200_OK)
@@ -158,6 +171,120 @@ async def mark_service_record_complete(service_record_code: str):
         "service_record_code": service_record_code,
         "ml_processing_initiated": True,
     }
+
+
+# ============================================================================
+# Manager Controls: Remote Equipment Reset
+# ============================================================================
+
+@router.post("/equipment/reset", status_code=status.HTTP_200_OK)
+async def reset_equipment_fault(
+    request: EquipmentResetRequest,
+    x_clawd_secret: Optional[str] = Header(None),
+):
+    """Remote fault reset for equipment via Clawd Telegram bot.
+
+    Resets device fault status, restores health to >=85, and resolves
+    active predictions. Blocks fire and generator equipment for safety.
+
+    Returns:
+        - success: bool
+        - blocked: bool (if equipment type is safety-critical)
+        - reason: str (explanation)
+        - previous_health / new_health: int
+        - equipment_name: str
+        - predictions_resolved: int
+    """
+    # Verify auth
+    if x_clawd_secret and x_clawd_secret != "clawd-bms-phase-41":
+        raise HTTPException(status_code=403, detail="Unauthorized")
+
+    equipment_code = request.equipment_code
+
+    # Extract equipment type from code (second segment: S002-FCU-L1-A → FCU)
+    parts = equipment_code.split("-")
+    eq_type = parts[1].upper() if len(parts) >= 2 else ""
+
+    # Block safety-critical equipment types
+    if eq_type in RESET_BLOCKED_TYPES:
+        return {
+            "success": False,
+            "blocked": True,
+            "reason": f"{eq_type} equipment cannot be remotely reset for safety reasons. "
+                      f"Create a work order instead.",
+            "equipment_code": equipment_code,
+        }
+
+    # Get current equipment info for before/after comparison
+    import requests as http_requests
+    equipment_info = None
+    previous_health = None
+    try:
+        resp = http_requests.get(
+            f"http://localhost:9095/api/work-orders/equipment-info/{equipment_code}",
+            timeout=5
+        )
+        if resp.status_code == 200:
+            equipment_info = resp.json()
+            previous_health = equipment_info.get("health_score") or equipment_info.get("health")
+    except Exception:
+        pass
+
+    # Execute fault reset via RemoteCommandService
+    try:
+        from app.services.remote_command_service import RemoteCommandService
+
+        service = RemoteCommandService()
+        result = await service.execute_remote_command(
+            user_id=request.user_id,
+            user_role="engineer",
+            device_id=equipment_code,
+            command_type="fault_reset",
+            reason=request.reason or "Remote reset via Telegram",
+        )
+
+        if result.get("success"):
+            reset_data = result.get("data", {})
+            # Get updated health
+            new_health = None
+            try:
+                resp = http_requests.get(
+                    f"http://localhost:9095/api/work-orders/equipment-info/{equipment_code}",
+                    timeout=5
+                )
+                if resp.status_code == 200:
+                    new_health = resp.json().get("health_score") or resp.json().get("health")
+            except Exception:
+                pass
+
+            return {
+                "success": True,
+                "blocked": False,
+                "reason": "Fault reset executed successfully",
+                "equipment_code": equipment_code,
+                "equipment_name": reset_data.get("equipment_name") or (equipment_info or {}).get("name", equipment_code),
+                "previous_health": previous_health,
+                "new_health": new_health or 85,
+                "predictions_resolved": reset_data.get("predictions_resolved", 0),
+                "device_reset": reset_data.get("device_reset", False),
+                "equipment_updated": reset_data.get("equipment_updated", False),
+            }
+        else:
+            return {
+                "success": False,
+                "blocked": False,
+                "reason": result.get("error", "Reset failed - unknown error"),
+                "equipment_code": equipment_code,
+            }
+
+    except Exception as e:
+        logger.error(f"Equipment reset error: {e}", exc_info=True)
+        return {
+            "success": False,
+            "blocked": False,
+            "reason": f"Reset failed: {str(e)}",
+            "equipment_code": equipment_code,
+        }
 
 
 # ============================================================================
@@ -305,3 +432,76 @@ async def get_ocr_correction_status(service_record_id: str):
         }
 
     return {"status": "unknown", "message": "No active OCR session"}
+
+
+# ============================================================================
+# Inspection Checklist for Telegram
+# ============================================================================
+
+@router.get("/inspection-checklist/{equipment_type}", status_code=status.HTTP_200_OK)
+async def get_inspection_checklist_for_telegram(equipment_type: str):
+    """Get a Telegram-formatted inspection checklist for an equipment type.
+
+    Called by Clawd when sending WO notification so the technician
+    knows exactly what to check on-site.
+
+    Args:
+        equipment_type: Equipment type (ups, chiller, ahu, generator, pump, etc.)
+
+    Returns:
+        - found: bool
+        - equipment_type: str
+        - template_name: str
+        - estimated_minutes: int
+        - checklist_text: Telegram-formatted checklist string
+        - items: list of checklist items (structured)
+    """
+    from app.services.checklist_service import get_checklist_service
+
+    svc = get_checklist_service()
+    template = svc.get_template_for_inspection(equipment_type.lower(), "routine")
+
+    if not template:
+        return {
+            "found": False,
+            "equipment_type": equipment_type,
+            "checklist_text": f"No inspection checklist available for {equipment_type}.",
+            "items": [],
+        }
+
+    items = template.get("checklist_items", [])
+    name = template.get("template_name", f"{equipment_type} Inspection")
+    duration = template.get("estimated_duration_minutes", 30)
+
+    # Build Telegram-formatted text grouped by category
+    lines = [f"📋 {name}", f"⏱ Estimated: {duration} min", ""]
+    current_category = None
+
+    for item in items:
+        cat = item.get("category", "General")
+        if cat != current_category:
+            current_category = cat
+            lines.append(f"▸ {cat}")
+
+        q = item.get("question", "")
+        item_type = item.get("item_type", "")
+
+        if item_type == "measurement":
+            unit = item.get("unit", "")
+            tmin = item.get("tolerance_min")
+            tmax = item.get("tolerance_max")
+            tol = f" ({tmin}-{tmax} {unit})" if tmin is not None else ""
+            lines.append(f"  ☐ {q}{tol}")
+        elif item_type == "visual_inspection":
+            lines.append(f"  📷 {q}")
+        else:
+            lines.append(f"  ☐ {q}")
+
+    return {
+        "found": True,
+        "equipment_type": equipment_type,
+        "template_name": name,
+        "estimated_minutes": duration,
+        "checklist_text": "\n".join(lines),
+        "items": items,
+    }

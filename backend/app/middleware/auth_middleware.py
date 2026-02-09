@@ -25,23 +25,17 @@ Usage:
 
 import hashlib
 import logging
-import time
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 import uuid
 
 import jwt as pyjwt
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import HTTPException, Request, status
 
 from app.config.settings import settings
-from app.models.auth import (
-    AUTH_LEVEL_TO_MIN_ROLE,
-    AuthContext,
-    AuthLevel,
-    SentinelRole,
-    get_required_auth_level,
-)
+from app.database.supabase_client import get_supabase_client
+from app.models.auth import AuthContext, AuthLevel, SentinelRole
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +46,8 @@ logger = logging.getLogger(__name__)
 # Demo API keys for development/testing
 # In production, these would be stored in Supabase with hashed keys
 _API_KEY_STORE: Dict[str, Dict[str, Any]] = {}
+_API_KEY_CACHE: Dict[str, Tuple[datetime, Dict[str, Any]]] = {}
+_API_KEY_CACHE_TTL_SECONDS = 300
 
 
 def register_api_key(
@@ -104,7 +100,11 @@ def create_jwt_token(
     Returns:
         Encoded JWT token string
     """
-    secret = settings.supabase_key or "sentinel-demo-jwt-secret-change-in-production"
+    secret = (
+        settings.jwt_secret_key
+        or settings.supabase_key
+        or "sentinel-demo-jwt-secret-change-in-production"
+    )
 
     # Determine TTL based on token type
     if token_type == "refresh":
@@ -114,7 +114,8 @@ def create_jwt_token(
 
     # Fallback to old setting for backward compatibility
     if ttl_seconds == 0:
-        ttl_seconds = settings.jwt_expiration_hours * 60 * 60
+        legacy_hours = settings.jwt_expiration_hours or (settings.jwt_expiry_days * 24)
+        ttl_seconds = legacy_hours * 60 * 60
 
     payload = {
         "sub": user_id,
@@ -132,7 +133,18 @@ def create_jwt_token(
     return token
 
 
-def validate_jwt_token(token: str) -> Optional[Dict[str, Any]]:
+def create_refresh_token(user_id: str, email: str, role: str, full_name: str) -> str:
+    """Create a refresh token with refresh TTL and refresh token_type claim."""
+    return create_jwt_token(
+        user_id=user_id,
+        email=email,
+        role=role,
+        full_name=full_name,
+        token_type="refresh",
+    )
+
+
+def validate_jwt_token(token: str, required_token_type: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """Validate a JWT token and return payload.
 
     Checks token expiration, token_type claim, and blacklist status.
@@ -144,7 +156,11 @@ def validate_jwt_token(token: str) -> Optional[Dict[str, Any]]:
         Token payload dict or None if invalid
     """
     try:
-        secret = settings.supabase_key or "sentinel-demo-jwt-secret-change-in-production"
+        secret = (
+            settings.jwt_secret_key
+            or settings.supabase_key
+            or "sentinel-demo-jwt-secret-change-in-production"
+        )
 
         payload = pyjwt.decode(
             token,
@@ -158,18 +174,28 @@ def validate_jwt_token(token: str) -> Optional[Dict[str, Any]]:
         if token_type not in ("access", "refresh"):
             logger.warning(f"Invalid token_type: {token_type}")
             return None
+        if required_token_type and token_type != required_token_type:
+            logger.warning(
+                "Invalid token_type for endpoint: got=%s expected=%s",
+                token_type,
+                required_token_type,
+            )
+            return None
 
         # Check blacklist if Redis available (Phase 65-02)
         jti = payload.get("jti")
-        if jti:
-            try:
-                from app.services.token_blacklist_service import token_blacklist
-                if token_blacklist.is_blacklisted(jti):
-                    logger.warning(f"Token {jti} is blacklisted")
-                    return None
-            except Exception as e:
-                # Graceful degradation: log warning but don't fail
-                logger.debug(f"Blacklist check failed: {e}")
+        if not jti:
+            logger.warning("Token missing jti claim")
+            return None
+
+        try:
+            from app.services.token_blacklist_service import token_blacklist
+            if token_blacklist.is_blacklisted(jti):
+                logger.warning(f"Token {jti} is blacklisted")
+                return None
+        except Exception as e:
+            # Graceful degradation: log warning but don't fail
+            logger.debug(f"Blacklist check failed: {e}")
 
         return payload
 
@@ -274,13 +300,13 @@ async def _validate_supabase_token(token: str) -> Optional[Dict[str, Any]]:
         Token payload dict or None if invalid
     """
     try:
-        supabase_jwt_secret = settings.supabase_key
-        if not supabase_jwt_secret:
-            logger.debug("No Supabase key configured for JWT validation")
+        jwt_secret = settings.jwt_secret_key or settings.supabase_key
+        if not jwt_secret:
+            logger.debug("No JWT secret configured for token validation")
             return None
 
         # Use centralized validation function (Phase 65-02)
-        return validate_jwt_token(token)
+        return validate_jwt_token(token, required_token_type="access")
 
     except Exception as e:
         logger.error(f"Error validating Supabase token: {e}")
@@ -288,7 +314,7 @@ async def _validate_supabase_token(token: str) -> Optional[Dict[str, Any]]:
 
 
 def _validate_api_key(api_key: str) -> Optional[Dict[str, Any]]:
-    """Validate an API key against the key store.
+    """Validate an API key against database (with short in-memory cache).
 
     Args:
         api_key: Plaintext API key
@@ -297,8 +323,64 @@ def _validate_api_key(api_key: str) -> Optional[Dict[str, Any]]:
         Key info dict or None if invalid
     """
     key_hash = hashlib.sha256(api_key.encode()).hexdigest()
-    key_info = _API_KEY_STORE.get(key_hash)
+    now = datetime.utcnow()
 
+    # 5-minute in-memory cache to reduce DB hits
+    cached = _API_KEY_CACHE.get(key_hash)
+    if cached:
+        expires_at, cached_value = cached
+        if now < expires_at:
+            return {**cached_value, "key_hash": key_hash}
+        _API_KEY_CACHE.pop(key_hash, None)
+
+    # Primary source: database
+    try:
+        client = get_supabase_client()
+        result = client.table("api_keys").select("*").eq("key_hash", key_hash).limit(1).execute()
+        rows = result.data or []
+        if rows:
+            record = rows[0]
+            if record.get("revoked"):
+                return None
+
+            expires_at = record.get("expires_at")
+            if expires_at:
+                expires_dt = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
+                if now.replace(tzinfo=expires_dt.tzinfo) > expires_dt:
+                    return None
+
+            role_value = str(record.get("role", "auditor")).lower()
+            try:
+                role = SentinelRole(role_value)
+            except ValueError:
+                role = SentinelRole.AUDITOR
+
+            key_info = {
+                "owner": record.get("owner", "unknown"),
+                "role": role,
+                "scopes": record.get("scopes") or [],
+                "description": f"api_key:{record.get('key_prefix', '')}",
+                "is_active": True,
+            }
+            _API_KEY_CACHE[key_hash] = (
+                now + timedelta(seconds=_API_KEY_CACHE_TTL_SECONDS),
+                key_info,
+            )
+
+            # Non-blocking last_used update
+            try:
+                client.table("api_keys").update(
+                    {"last_used_at": now.isoformat()}
+                ).eq("id", record.get("id")).execute()
+            except Exception:
+                pass
+
+            return {**key_info, "key_hash": key_hash}
+    except Exception as e:
+        logger.debug(f"DB API key validation failed, falling back to in-memory store: {e}")
+
+    # Backward compatibility: fallback to legacy in-memory store
+    key_info = _API_KEY_STORE.get(key_hash)
     if key_info and key_info.get("is_active", False):
         return {**key_info, "key_hash": key_hash}
 

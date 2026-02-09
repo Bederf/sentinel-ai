@@ -7817,7 +7817,7 @@ Manager: "How are all my buildings doing?"
 
 🦞 "Portfolio status (5 buildings):
 
-    🟢 Fairlands Campus - All normal
+    🟢  Campus - All normal
     🟢 Sandton Office - All normal
     🟡 Mall of Africa - 2 FCUs offline
     🟢 The Place - All normal
@@ -7836,13 +7836,13 @@ Manager: "Compare energy across buildings"
 
 🦞 "Energy per m² (January):
 
-    Fairlands:    45 kWh/m² ⬇️ (best)
+    :    45 kWh/m² ⬇️ (best)
     Sandton:      52 kWh/m² ➡️
     The Place:    54 kWh/m² ➡️
     Mall Africa:  58 kWh/m² ⬆️
     Centurion:    61 kWh/m² ⬆️ (investigate)
 
-    Centurion is 35% above Fairlands.
+    Centurion is 35% above .
     Possible causes: Older chillers, poor insulation.
     Recommend: Energy audit"
 ```
@@ -8073,7 +8073,7 @@ USER: "Zone is 23.5°C. Options: A) Boost cooling..."
 
 
 
-### **TESTING (FAIRLANDS PILOT)**
+### **TESTING ( PILOT)**
 
 - [ ] Get Desigo export folder path from BMS team
 - [ ] Get read-only credentials for shared folder
@@ -8183,7 +8183,7 @@ Desk 25 near window → solar gain sensitivity
 CREATE TABLE desks (
   desk_id TEXT PRIMARY KEY,          -- "25" or "L12-25"
   floor TEXT NOT NULL,               -- "Level 12"
-  building TEXT,                     -- "Fairlands Building A"
+  building TEXT,                     -- " Building A"
   zone_id TEXT,                      -- "Zone-12-North"
   coordinates POINT,                 -- (x,y) on floor plan
   near_window BOOLEAN DEFAULT false,
@@ -8386,7 +8386,7 @@ direct airflow - would you like to move temporarily?"
 
 **Priority**: Hardware → Jetson Setup → SIMBIOT → Chat → Pilot Test
 
-**Target**: Working demo on Fairlands Desigo within 2-3 weeks
+**Target**: Working demo on  Desigo within 2-3 weeks
 
 ---
 
@@ -8403,7 +8403,7 @@ This is **excellent**! The Tridonic Scenecom evo DA2 system with BACnet integrat
 │                                                                              │
 │   SENTINEL + TRIDONIC SCENECOM DALI-2 INTEGRATION                          │
 │                                                                              │
-│   FNB Fairlands Lighting System                                            │
+│     Lighting System                                            │
 │   ═════════════════════════════                                             │
 │                                                                              │
 │   Hardware:                                                                 │
@@ -8767,7 +8767,7 @@ This is **excellent**! The Tridonic Scenecom evo DA2 system with BACnet integrat
 │                                                                              │
 │   User: "How busy is the office right now?"                                │
 │                                                                              │
-│   AI: "Current occupancy across Fairlands:                                 │
+│   AI: "Current occupancy across :                                 │
 │        Level 12: 45% occupied (mainly north side)                          │
 │        Level 11: 23% occupied (quiet day)                                  │
 │        Level 10: 67% occupied (busiest floor)                              │
@@ -9085,7 +9085,7 @@ class BACnetPoint:
 # CONTROLLER DISCOVERY
 # ============================================================================
 
-FAIRLANDS_CONTROLLERS: List[ScenecomController] = [
+_CONTROLLERS: List[ScenecomController] = [
     # Level 12
     ScenecomController('DALI-L12-01', 100001, '192.168.10.51', 'Level 12 North', 'DB-L12-N', sensor_count=24, luminaire_count=12),
     ScenecomController('DALI-L12-02', 100002, '192.168.10.52', 'Level 12 South', 'DB-L12-S', sensor_count=22, luminaire_count=11),
@@ -9500,7 +9500,7 @@ class DALIBACnetPoller:
 async def main():
     """Start the DALI poller"""
     poller = DALIBACnetPoller(
-        controllers=FAIRLANDS_CONTROLLERS,
+        controllers=_CONTROLLERS,
         redis_url="redis://localhost:6379",
         supabase_url="https://xxx.supabase.co",
         supabase_key="xxx"
@@ -9575,7 +9575,7 @@ if __name__ == "__main__":
 {
   "name": "sentinel",
   "version": "1.0.0",
-  "description": "Building Intelligence - HVAC & Lighting Management for FNB Fairlands",
+  "description": "Building Intelligence - HVAC & Lighting Management for  ",
   
   "triggers": {
     "keywords": [
@@ -9623,8 +9623,8 @@ if __name__ == "__main__":
       "parameters": {
         "building": {
           "type": "string",
-          "description": "Building name (default: Fairlands)",
-          "default": "Fairlands"
+          "description": "Building name (default: )",
+          "default": ""
         }
       }
     },
@@ -9826,7 +9826,7 @@ export default class SentinelSkill extends Skill {
   // =========================================================================
 
   async building_overview(ctx: SkillContext, params: { building?: string }): Promise<ToolResult> {
-    const building = params.building || 'Fairlands';
+    const building = params.building || '';
     ctx.log.info(`Getting building overview: ${building}`);
 
     try {

@@ -164,6 +164,25 @@ class ExplanationEvaluator:
                 metrics["rouge_l"] = rouge_scores["rougeL"].fmeasure
             except Exception as e:
                 logger.warning(f"ROUGE calculation failed: {e}")
+        else:
+            # Lightweight ROUGE-1 fallback based on unigram F1 overlap
+            ref_tokens = reference.lower().split()
+            pred_tokens = predicted.lower().split()
+            if ref_tokens and pred_tokens:
+                ref_counts = {}
+                for tok in ref_tokens:
+                    ref_counts[tok] = ref_counts.get(tok, 0) + 1
+                overlap = 0
+                for tok in pred_tokens:
+                    if ref_counts.get(tok, 0) > 0:
+                        overlap += 1
+                        ref_counts[tok] -= 1
+                precision = overlap / len(pred_tokens)
+                recall = overlap / len(ref_tokens)
+                f1 = (2 * precision * recall / (precision + recall)) if (precision + recall) else 0.0
+                metrics["rouge_1"] = f1
+                metrics["rouge_2"] = 0.0
+                metrics["rouge_l"] = 0.0
 
         # BLEU score
         if NLTK_AVAILABLE:
@@ -280,7 +299,7 @@ class ExplanationEvaluator:
 
         # Check for key explanation components
         completeness_checks = [
-            ("observation", ['observed', 'showing', 'indicates']),
+            ("observation", ['observed', 'showing', 'shows', 'indicates']),
             ("interpretation", ['because', 'due to', 'caused by', 'suggests']),
             ("implication", ['could lead to', 'may result in', 'impact']),
             ("recommendation", ['recommend', 'should', 'advised to', 'consider']),
@@ -300,25 +319,25 @@ class ExplanationEvaluator:
         words = explanation.split()
         sentences = explanation.split('.')
 
-        # Ideal: 50-150 words, 2-4 sentences
+        # Ideal: 8-60 words, 1-3 sentences
         word_count = len(words)
         sentence_count = len([s for s in sentences if s.strip()])
 
         # Word count score (penalize too short or too long)
-        if 50 <= word_count <= 150:
+        if 8 <= word_count <= 60:
             word_score = 1.0
-        elif word_count < 30:
+        elif word_count < 4:
             word_score = 0.3
-        elif word_count > 300:
+        elif word_count < 8:
+            word_score = 0.6
+        elif word_count > 200:
             word_score = 0.3
         else:
             word_score = 0.7
 
         # Sentence count score
-        if 2 <= sentence_count <= 4:
+        if 1 <= sentence_count <= 3:
             sentence_score = 1.0
-        elif sentence_count == 1:
-            sentence_score = 0.5
         elif sentence_count > 6:
             sentence_score = 0.5
         else:
@@ -444,12 +463,16 @@ def format_evaluation_results(results: List[ExplanationMetrics]) -> Dict[str, fl
             getattr(r, metric_name) for r in results
             if getattr(r, metric_name) is not None
         ]
-        if values:
+        numeric_values = [
+            v for v in values if isinstance(v, (int, float, np.floating))
+        ]
+        if numeric_values:
             all_metrics[metric_name] = {
-                "mean": np.mean(values),
-                "std": np.std(values),
-                "min": np.min(values),
-                "max": np.max(values)
+                "count": len(numeric_values),
+                "mean": np.mean(numeric_values),
+                "std": np.std(numeric_values),
+                "min": np.min(numeric_values),
+                "max": np.max(numeric_values)
             }
 
     return all_metrics

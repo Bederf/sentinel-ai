@@ -304,7 +304,7 @@ class SolarComplianceService:
             timestamp=ls_time.isoformat(),
             event_type=ComplianceEventType.VOLTAGE_LOW.value,
             severity="warning",
-            equipment_id="FNB-MTR-GRID",
+            equipment_id="S002-MTR-GRID",
             description=(
                 "Grid voltage dipped to 204.3V during load shedding Stage 2 "
                 "transition. Below NRS 097 minimum (207V) for 3.2 seconds. "
@@ -322,7 +322,7 @@ class SolarComplianceService:
             timestamp=freq_time.isoformat(),
             event_type=ComplianceEventType.FREQUENCY_LOW.value,
             severity="warning",
-            equipment_id="FNB-MTR-GRID",
+            equipment_id="S002-MTR-GRID",
             description=(
                 "Grid frequency dropped to 48.7 Hz during Eskom generation "
                 "shortfall. Below NRS 097 minimum (49.0 Hz) for 1.8 seconds. "
@@ -339,7 +339,7 @@ class SolarComplianceService:
             timestamp=(freq_time + timedelta(seconds=62)).isoformat(),
             event_type=ComplianceEventType.RECONNECTION.value,
             severity="info",
-            equipment_id="FNB-MTR-GRID",
+            equipment_id="S002-MTR-GRID",
             description=(
                 "Grid frequency recovered to 50.01 Hz. All inverters confirmed "
                 "reconnection after 60-second delay per NRS 097-2-1 requirements."

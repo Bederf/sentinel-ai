@@ -229,7 +229,7 @@ Full matrix documented in `infrastructure/pam/access-matrix.md`, covering:
 | SSH Server Access | Active | SSH Key + TOTP (2FA) |
 | Cloudflare Tunnel | Active | SSO + device posture |
 | Supabase Dashboard | Active | Supabase MFA (if enabled) |
-| SENTINEL API | Planned | Bearer token (Supabase handles MFA) |
+| SENTINEL API | Active | App-level TOTP + backup codes + JWT bearer |
 | Docker Admin | Active | SSH required (inherits SSH 2FA) |
 
 ### SSH 2FA Setup
@@ -244,13 +244,14 @@ google-authenticator -t -d -f -r 3 -R 30 -w 3
 # Save backup codes securely
 ```
 
-### Application MFA (Planned)
+### Application MFA (Implemented)
 
-When Supabase MFA is enabled for a user:
-1. User logs in with email/password via Supabase
-2. Supabase prompts for TOTP verification
-3. Token issued only after MFA verification
-4. SENTINEL middleware validates the MFA-verified token
+SENTINEL now provides app-level MFA flow:
+1. User logs in via `/api/auth/login`
+2. If MFA is required and enabled, challenge is enforced before token issue
+3. TOTP verification completes via `/api/auth/login/mfa-complete` or `/api/mfa/challenge`
+4. Backup codes are supported as one-time fallback (`/api/mfa/verify-backup`)
+5. Access/refresh JWTs are issued only after successful verification
 
 ## Access Provisioning Process
 
@@ -425,7 +426,7 @@ Emergency modes:
 
 | Middleware | File | Purpose | Status |
 |-----------|------|---------|--------|
-| Auth Middleware | `middleware/auth_middleware.py` | Bearer/API key authentication | Created, opt-in |
+| Auth Middleware | `middleware/auth_middleware.py` | Bearer/API key authentication | Active (global enforcement in `main.py`) |
 | Error Sanitization | `middleware/error_sanitization.py` | Prevents info disclosure | Created, opt-in |
 | PII Guard | `middleware/pii_guard.py` | SA ID/phone/email detection | Created, utility |
 | Emergency Controls | `middleware/emergency_controls.py` | Safety lockdown/maintenance | Created, opt-in |
@@ -468,7 +469,7 @@ When `DEMO_MODE=true`:
 |-----------|---------|---------------|
 | 4.7 Logical Access Control | RBAC model | 4 roles, hierarchy, endpoint classification |
 | 4.7 Logical Access Control | PAM controls | Sudo restrictions, SSH hardening |
-| 4.7 Logical Access Control | MFA enforcement | SSH 2FA active, app MFA via Supabase |
+| 4.7 Logical Access Control | MFA enforcement | SSH 2FA active, app MFA (TOTP + backup codes) |
 | 4.7 Logical Access Control | Access reviews | Monthly/quarterly schedule defined |
 | 4.11 Incident Response | Emergency controls | Safety lockdown, maintenance mode |
 | 4.12 Data Privacy | PII protection | SA ID/phone/email redaction guard |

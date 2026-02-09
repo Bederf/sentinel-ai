@@ -6,7 +6,10 @@ FSR Domain: 4.6 - Logical Access Control (MFA for privileged access)
 """
 
 import pyotp
+import bcrypt
 import logging
+import secrets
+import string
 from typing import Optional, Tuple, Dict, Any
 from datetime import datetime
 
@@ -26,6 +29,8 @@ TOTP_DIGITS = 6  # Standard 6-digit codes
 # Rate limiting
 MAX_FAILED_ATTEMPTS = 5
 RATE_LIMIT_WINDOW_MINUTES = 5
+BACKUP_CODES_COUNT = 10
+BACKUP_CODE_LENGTH = 8
 
 
 class MFAService:
@@ -323,6 +328,45 @@ class MFAService:
             return True
 
         return False
+
+    def generate_backup_codes(self, user_id: str) -> list[str]:
+        """Generate and persist one-time MFA backup codes for a user."""
+        alphabet = string.ascii_uppercase + string.digits
+        plaintext_codes = [
+            "".join(secrets.choice(alphabet) for _ in range(BACKUP_CODE_LENGTH))
+            for _ in range(BACKUP_CODES_COUNT)
+        ]
+        code_hashes = [
+            bcrypt.hashpw(code.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+            for code in plaintext_codes
+        ]
+        persisted = self.repository.replace_backup_codes(user_id, code_hashes)
+        if not persisted:
+            logger.error("Failed to persist backup codes for user %s", user_id)
+            return []
+        return plaintext_codes
+
+    def verify_backup_code(self, user_id: str, code: str) -> bool:
+        """Verify and consume a backup code (one-time use)."""
+        normalized = code.strip().upper()
+        if not normalized:
+            return False
+
+        rows = self.repository.get_backup_codes(user_id=user_id, include_used=False)
+        for row in rows:
+            code_hash = row.get("code_hash", "")
+            try:
+                if bcrypt.checkpw(normalized.encode("utf-8"), code_hash.encode("utf-8")):
+                    code_id = row.get("id")
+                    if code_id and self.repository.mark_backup_code_used(code_id):
+                        return True
+            except Exception:
+                continue
+        return False
+
+    def get_backup_codes_remaining(self, user_id: str) -> int:
+        """Get count of unused backup codes for a user."""
+        return self.repository.count_unused_backup_codes(user_id)
 
 
 # Singleton instance

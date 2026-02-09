@@ -7,7 +7,7 @@
 
 import { useState, useEffect, Suspense, lazy } from 'react';
 import { Card, Title, Text, Grid, Tab, TabGroup, TabList, TabPanel, TabPanels, Badge, Flex } from '@tremor/react';
-import { useModules, useCriticalRecommendations } from '../../contexts/ModuleContext';
+import { useModules, useCriticalRecommendations } from '../../contexts/ModuleHooks';
 import { MODULE_COLORS } from '../../lib/moduleRegistry';
 import type { ModuleType } from '../../lib/moduleRegistry';
 import { useHealthThresholds } from '../../hooks/useHealthThresholds';

@@ -203,7 +203,7 @@ class SimulatedSchneiderConnector(SolarConnector):
                 # --- Simulated fault: S15 MPPT3 string 1 has bypass diode
                 #     issue — voltage drops ~15% while current stays normal ---
                 bypass_diode_fault = (
-                    inverter_id == "FNB-INV-S15"
+                    inverter_id == "S002-INV-S15"
                     and mppt == 3
                     and s_idx == 1
                 )

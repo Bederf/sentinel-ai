@@ -6,7 +6,9 @@
  * - Each operates standalone but integrates when multiple active
  */
 
+import { authorizedFetch } from "./api";
 const API_BASE = import.meta.env.VITE_API_URL || "";
+const RECOMMENDATIONS_CACHE_PREFIX = "sentinel_module_recommendations_";
 
 // ==================== Types ====================
 
@@ -104,22 +106,8 @@ export interface UnifiedTelemetry {
 
 // ==================== API Functions ====================
 
-function getAuthHeaders(): Record<string, string> {
-  const token = localStorage.getItem("sentinel_token");
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
 async function fetchWithAuth(input: RequestInfo, init?: RequestInit) {
-  const authHeaders = getAuthHeaders();
-  const headers: Record<string, string> = {
-    ...(init?.headers as Record<string, string> || {}),
-    ...authHeaders,
-  };
-
-  return fetch(input, {
-    ...init,
-    headers,
-  });
+  return authorizedFetch(String(input), init, true);
 }
 
 export const moduleRegistryApi = {
@@ -199,8 +187,11 @@ export const moduleRegistryApi = {
   /**
    * Get integration summary for a site
    */
-  async getIntegrationSummary(siteId: string): Promise<IntegrationSummary> {
+  async getIntegrationSummary(siteId: string): Promise<IntegrationSummary | null> {
     const response = await fetchWithAuth(`${API_BASE}/api/modules/site/${siteId}/integration`);
+    if (response.status === 404) {
+      return null;
+    }
     if (!response.ok) throw new Error('Failed to fetch integration summary');
     return response.json();
   },
@@ -242,8 +233,26 @@ export const moduleRegistryApi = {
 
     const url = `${API_BASE}/api/modules/site/${siteId}/recommendations?${params}`;
     const response = await fetchWithAuth(url);
-    if (!response.ok) throw new Error('Failed to fetch recommendations');
-    return response.json();
+    const cacheKey = `${RECOMMENDATIONS_CACHE_PREFIX}${siteId}`;
+
+    if (!response.ok) {
+      if (response.status === 429) {
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) {
+          try {
+            return JSON.parse(cached) as AIRecommendation[];
+          } catch {
+            // ignore malformed cache
+          }
+        }
+        return [];
+      }
+      throw new Error(`Failed to fetch recommendations (${response.status})`);
+    }
+
+    const recommendations = await response.json() as AIRecommendation[];
+    localStorage.setItem(cacheKey, JSON.stringify(recommendations));
+    return recommendations;
   },
 
   /**

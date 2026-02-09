@@ -18,7 +18,7 @@ phase: "48"
 
 Commercial intelligence for FM contract portfolio management -- organizations, contracts, SLA compliance, budget tracking, condition assessments, and profitability analysis.
 
-**Demo Site:** Sandton City Office Tower (site-002) -- FNB Commercial Property full-maintenance contract
+**Demo Site:** Sandton City Office Tower (site-002) --  Commercial Property full-maintenance contract
 
 ## Overview
 
@@ -37,7 +37,7 @@ Phase 48 delivers a complete contract management system across 4 plans:
 
 Built on the `018_commercial_schema.sql` migration with these core entities:
 
-- **Organization** -- FM client (e.g., FNB Commercial Property) with tier (platinum/gold/silver/bronze)
+- **Organization** -- FM client (e.g.,  Commercial Property) with tier (platinum/gold/silver/bronze)
 - **Contract** -- Service agreement with type (comprehensive/reactive/hybrid/preventive), lifecycle status, monthly fee
 - **SLA Term** -- Performance targets (uptime, response time, resolution time, PPM completion, first-fix rate) with penalty exposure
 - **Asset Contract** -- Equipment-to-contract assignment with coverage type and pricing basis
@@ -127,8 +127,8 @@ Built on the `018_commercial_schema.sql` migration with these core entities:
 
 Demo contract data seeded in `backend/app/data/buildings/site-002/contract.json`:
 
-- **Client:** FNB Commercial Property (enterprise tier)
-- **Contract:** CON-FNB-S002-2024, full maintenance, R285,000/month
+- **Client:**  Commercial Property (enterprise tier)
+- **Contract:** CON--S002-2024, full maintenance, R285,000/month
 - **SLA Terms:** 3 terms (uptime 99.0%, response time 4h, resolution time 24h)
 - **Budget:** R245,000/month across labor, parts, subcontractors, overhead
 - **Condition:** Overall 3.8/5.0 (mechanical 3.5, electrical 4.0, structural 4.2)

@@ -19,6 +19,7 @@ import {
   AlertTriangle,
   CheckCircle,
   Clock,
+  RefreshCw,
   ChevronDown,
   ChevronUp,
   Shield,
@@ -27,6 +28,15 @@ import {
   Building2,
 } from "lucide-react";
 import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
+import {
   Table,
   TableHead,
   TableRow,
@@ -34,19 +44,22 @@ import {
   TableBody,
   TableCell,
 } from "@tremor/react";
-import type { Contract, BudgetVariance } from "../lib/contractApi";
+import type { Contract, BudgetVariance, BudgetAlert } from "../lib/contractApi";
+import type { SLAPerformanceRecord } from "../lib/profitabilityApi";
+import { PageLoading } from "../components/PageLoading";
 
 // ============= Demo Data =============
 
 const DEMO_CONTRACT: Contract = {
-  contract_code: "CON-FNB-S002-2024",
+  id: "demo-contract-001",
+  contract_code: "CON-SITE-002-2024",
   organization: {
-    code: "ORG-FNB",
-    name: "FNB Commercial Property",
+    code: "ORG-SITE-002",
+    name: "Site-002 Operations",
     tier: "enterprise",
-    primary_contact_name: "Sarah van der Merwe",
-    primary_contact_email: "sarah.vdm@fnb.co.za",
-    primary_contact_phone: "+27 11 555 0142",
+    primary_contact_name: "Site Operations",
+    primary_contact_email: "ops@site-002.local",
+    primary_contact_phone: "+27 11 555 0102",
   },
   contract: {
     type: "full_maintenance",
@@ -442,6 +455,39 @@ export function ContractManagementPage() {
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [selectedContract, setSelectedContract] = useState<Contract | null>(null);
   const [budgetVariance, setBudgetVariance] = useState<BudgetVariance[]>([]);
+  const [budgetReport, setBudgetReport] = useState<{
+    equipment_type_breakdown: {
+      equipment_type: string;
+      total_budget_zar: number;
+      total_actual_zar: number;
+      variance_zar: number;
+      spend_percentage: number;
+    }[];
+  } | null>(null);
+  const [budgetAlerts, setBudgetAlerts] = useState<BudgetAlert[]>([]);
+  const [slaPerformance, setSlaPerformance] = useState<SLAPerformanceRecord[]>([]);
+  const [alertSeverityFilter, setAlertSeverityFilter] = useState<string>("all");
+  const [alertStatusFilter, setAlertStatusFilter] = useState<string>("all");
+  const [showAllAlerts, setShowAllAlerts] = useState(false);
+  const [alertPage, setAlertPage] = useState(1);
+  const alertsPerPage = 5;
+  const [renewalPricing, setRenewalPricing] = useState<{
+    current_monthly_fee_zar: number;
+    actual_cost_monthly_avg_zar: number;
+    target_margin_pct: number;
+    recommended_monthly_fee_zar: number;
+    delta_zar: number;
+    delta_pct: number;
+    notes: string[];
+  } | null>(null);
+  const [benchmarks, setBenchmarks] = useState<{
+    similar_contracts: number;
+    average_monthly_fee_zar: number;
+    min_monthly_fee_zar: number;
+    max_monthly_fee_zar: number;
+  } | null>(null);
+  const [pricingLoading, setPricingLoading] = useState(false);
+  const [pricingError, setPricingError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [sortField, setSortField] = useState<string>("client");
@@ -475,27 +521,157 @@ export function ContractManagementPage() {
   useEffect(() => {
     if (!selectedContract) {
       setBudgetVariance([]);
+      setBudgetReport(null);
+      setBudgetAlerts([]);
+      setRenewalPricing(null);
+      setBenchmarks(null);
+      setPricingError(null);
+      setSlaPerformance([]);
       return;
     }
 
     const loadVariance = async () => {
       try {
         const { contractApi } = await import("../lib/contractApi");
-        const data = await contractApi.getBudgetVariance(
-          selectedContract.contract_code,
+        const contractId = selectedContract.id || selectedContract.contract_code;
+        const reportData = await contractApi.getBudgetReport(
+          contractId,
           selectedContract.budget.year
         );
-        if (data && data.length > 0) {
-          setBudgetVariance(data);
-        } else {
-          setBudgetVariance(DEMO_BUDGET_VARIANCE);
-        }
+        const varianceData = await contractApi.getBudgetVariance(
+          contractId,
+          selectedContract.budget.year
+        );
+        const alertData = await contractApi.getBudgetAlerts(
+          contractId,
+          selectedContract.budget.year
+        );
+
+        setBudgetReport(reportData || null);
+        setBudgetVariance(varianceData || []);
+        setBudgetAlerts(alertData || []);
       } catch {
         setBudgetVariance(DEMO_BUDGET_VARIANCE);
+        setBudgetReport(null);
+        setBudgetAlerts([]);
       }
     };
     loadVariance();
   }, [selectedContract]);
+
+  useEffect(() => {
+    if (!selectedContract) return;
+    const contractId = selectedContract.id;
+    if (!contractId || contractId.startsWith("demo")) {
+      setSlaPerformance([]);
+      return;
+    }
+
+    const loadSlaPerformance = async () => {
+      try {
+        const { profitabilityApi } = await import("../lib/profitabilityApi");
+        const response = await profitabilityApi.getSLAPerformance(
+          contractId,
+          12
+        );
+        setSlaPerformance(response.performance || []);
+      } catch (err) {
+        console.error("Failed to load SLA performance:", err);
+        setSlaPerformance([]);
+      }
+    };
+
+    loadSlaPerformance();
+  }, [selectedContract]);
+
+  const handleBudgetExport = async (format: "csv" | "pdf") => {
+    if (!selectedContract) return;
+    const contractId = selectedContract.id || selectedContract.contract_code;
+    try {
+      const { contractApi } = await import("../lib/contractApi");
+      const blob = await contractApi.exportBudgetReport(
+        contractId,
+        selectedContract.budget.year,
+        format
+      );
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `budget-report-${contractId}-${selectedContract.budget.year}.${format}`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Budget export failed:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedContract) {
+      return;
+    }
+
+    const buildDemoRenewalPricing = () => {
+      const currentFee = selectedContract.contract.monthly_fee_zar;
+      const actualCost = currentFee * 0.72;
+      const targetMargin = 25;
+      const recommended = actualCost * (1 + targetMargin / 100);
+      return {
+        current_monthly_fee_zar: currentFee,
+        actual_cost_monthly_avg_zar: Math.round(actualCost),
+        target_margin_pct: targetMargin,
+        recommended_monthly_fee_zar: Math.round(recommended),
+        delta_zar: Math.round(recommended - currentFee),
+        delta_pct: currentFee > 0 ? Math.round(((recommended - currentFee) / currentFee) * 1000) / 10 : 0,
+        notes: ["Demo estimate (no live cost data)."],
+      };
+    };
+
+    const buildDemoBenchmarks = () => {
+      const fees = contracts.map((c) => c.contract.monthly_fee_zar);
+      const avg =
+        fees.length > 0 ? fees.reduce((sum, f) => sum + f, 0) / fees.length : 0;
+      return {
+        similar_contracts: Math.max(1, fees.length),
+        average_monthly_fee_zar: Math.round(avg),
+        min_monthly_fee_zar: Math.round(Math.min(...fees, selectedContract.contract.monthly_fee_zar)),
+        max_monthly_fee_zar: Math.round(Math.max(...fees, selectedContract.contract.monthly_fee_zar)),
+      };
+    };
+
+    const loadPricing = async () => {
+      const contractId = selectedContract.id;
+      if (!contractId || contractId.startsWith("demo")) {
+        setRenewalPricing(buildDemoRenewalPricing());
+        setBenchmarks(buildDemoBenchmarks());
+        return;
+      }
+
+      setPricingLoading(true);
+      setPricingError(null);
+      try {
+        const { pricingApi } = await import("../lib/pricingApi");
+        const [renewal, benchmark] = await Promise.all([
+          pricingApi.getRenewalPricing(
+            contractId,
+            selectedContract.budget.year,
+            "standard"
+          ),
+          pricingApi.getBenchmarks(contractId),
+        ]);
+        setRenewalPricing(renewal);
+        setBenchmarks(benchmark);
+      } catch (err) {
+        console.error("Pricing fetch failed:", err);
+        setPricingError("Pricing data unavailable");
+        setRenewalPricing(buildDemoRenewalPricing());
+        setBenchmarks(buildDemoBenchmarks());
+      } finally {
+        setPricingLoading(false);
+      }
+    };
+
+    loadPricing();
+  }, [selectedContract, contracts]);
 
   // Compute portfolio KPIs
   const totalContracts = contracts.length;
@@ -578,44 +754,7 @@ export function ContractManagementPage() {
   // Loading skeleton
   if (loading) {
     return (
-      <div className="h-full overflow-y-auto p-4 md:p-6">
-        <div className="max-w-7xl mx-auto space-y-6">
-          {/* Skeleton KPI cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {[1, 2, 3, 4].map((i) => (
-              <div
-                key={i}
-                className="glass-card p-4 animate-pulse"
-              >
-                <div
-                  className="h-3 w-24 rounded mb-4"
-                  style={{ background: "var(--color-sentinel-bg-secondary)" }}
-                />
-                <div
-                  className="h-7 w-32 rounded mb-2"
-                  style={{ background: "var(--color-sentinel-bg-secondary)" }}
-                />
-                <div
-                  className="h-3 w-16 rounded"
-                  style={{ background: "var(--color-sentinel-bg-secondary)" }}
-                />
-              </div>
-            ))}
-          </div>
-          {/* Skeleton table */}
-          <div
-            className="glass-panel p-4 animate-pulse"
-          >
-            {[1, 2, 3].map((i) => (
-              <div
-                key={i}
-                className="h-10 rounded mb-2"
-                style={{ background: "var(--color-sentinel-bg-secondary)" }}
-              />
-            ))}
-          </div>
-        </div>
-      </div>
+      <PageLoading message="Loading contract portfolio..." />
     );
   }
 
@@ -1252,6 +1391,86 @@ export function ContractManagementPage() {
                     </span>
                   </div>
                 </div>
+
+                {/* SLA Penalty Trend */}
+                <div className="mt-4">
+                  <h4
+                    className="text-xs font-medium uppercase tracking-wider mb-2"
+                    style={{ color: "var(--color-sentinel-text-secondary)" }}
+                  >
+                    SLA Penalty Trend
+                  </h4>
+                  {slaPerformance.length === 0 ? (
+                    <div
+                      className="text-xs"
+                      style={{ color: "var(--color-sentinel-text-disabled)" }}
+                    >
+                      No penalty data available
+                    </div>
+                  ) : (
+                    <div className="h-[180px] w-full">
+                      {(() => {
+                        const penaltyCap = selectedContract.sla_terms.reduce(
+                          (sum, term) => sum + (term.penalty_cap_monthly_zar || 0),
+                          0
+                        );
+                        const chartData = slaPerformance.map((row) => ({
+                          period:
+                            row.period_start?.toString().slice(0, 7) ||
+                            row.period_end?.toString().slice(0, 7) ||
+                            "N/A",
+                          clawback: row.clawback_amount_zar || 0,
+                          cap: penaltyCap,
+                        }));
+                        return (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={chartData}>
+                          <CartesianGrid
+                            strokeDasharray="3 3"
+                            stroke="var(--color-sentinel-border)"
+                          />
+                          <XAxis
+                            dataKey="period"
+                            stroke="var(--color-sentinel-text-secondary)"
+                            fontSize={11}
+                          />
+                          <YAxis
+                            stroke="var(--color-sentinel-text-secondary)"
+                            fontSize={11}
+                            tickFormatter={(value) => `R${value}`}
+                          />
+                          <Tooltip
+                            contentStyle={{
+                              background: "var(--color-sentinel-bg-panel)",
+                              border: "1px solid var(--color-sentinel-border)",
+                              borderRadius: "4px",
+                            }}
+                            labelStyle={{ color: "var(--color-sentinel-text-primary)" }}
+                            formatter={(value: number) => [`R${value.toFixed(0)}`, "Penalty"]}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="clawback"
+                            stroke="var(--color-sentinel-amber)"
+                            strokeWidth={2}
+                            dot={{ fill: "var(--color-sentinel-amber)", r: 3 }}
+                            activeDot={{ r: 5 }}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="cap"
+                            stroke="var(--color-sentinel-red)"
+                            strokeWidth={1.5}
+                            strokeDasharray="4 4"
+                            dot={false}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                        );
+                      })()}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -1275,8 +1494,30 @@ export function ContractManagementPage() {
                 >
                   Budget Overview
                 </h3>
+                <div className="ml-auto flex items-center gap-2">
+                  <button
+                    className="text-xs px-2 py-1 rounded"
+                    style={{
+                      color: "var(--color-sentinel-text-primary)",
+                      border: "1px solid var(--color-sentinel-border)",
+                    }}
+                    onClick={() => handleBudgetExport("csv")}
+                  >
+                    Export CSV
+                  </button>
+                  <button
+                    className="text-xs px-2 py-1 rounded"
+                    style={{
+                      color: "var(--color-sentinel-text-primary)",
+                      border: "1px solid var(--color-sentinel-border)",
+                    }}
+                    onClick={() => handleBudgetExport("pdf")}
+                  >
+                    Export PDF
+                  </button>
+                </div>
                 <span
-                  className="text-xs ml-auto"
+                  className="text-xs"
                   style={{ color: "var(--color-sentinel-text-disabled)" }}
                 >
                   FY {selectedContract.budget.year}
@@ -1348,6 +1589,43 @@ export function ContractManagementPage() {
                   >
                     Budget vs Actual
                   </h4>
+                  {budgetReport?.equipment_type_breakdown?.length ? (
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      {budgetReport.equipment_type_breakdown.map((row) => {
+                        const variant =
+                          row.spend_percentage >= 100
+                            ? "error"
+                            : row.spend_percentage >= 80
+                              ? "warning"
+                              : "success";
+                        return (
+                          <SentinelBadge
+                            key={row.equipment_type}
+                            variant={variant}
+                            size="sm"
+                          >
+                            {row.equipment_type} {row.spend_percentage.toFixed(0)}%
+                          </SentinelBadge>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                  {budgetReport?.alert_summary && (
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      <SentinelBadge variant="warning" size="sm">
+                        Warnings {budgetReport.alert_summary.warning || 0}
+                      </SentinelBadge>
+                      <SentinelBadge variant="error" size="sm">
+                        Critical {budgetReport.alert_summary.critical || 0}
+                      </SentinelBadge>
+                      <SentinelBadge variant="info" size="sm">
+                        Open {budgetReport.alert_summary.open || 0}
+                      </SentinelBadge>
+                      <SentinelBadge variant="neutral" size="sm">
+                        Resolved {budgetReport.alert_summary.resolved || 0}
+                      </SentinelBadge>
+                    </div>
+                  )}
                   {budgetVariance.map((item) => (
                     <BudgetBar
                       key={item.category}
@@ -1358,6 +1636,227 @@ export function ContractManagementPage() {
                     />
                   ))}
                 </div>
+
+                {budgetReport?.equipment_type_breakdown?.length ? (
+                  <div className="mb-4">
+                    <h4
+                      className="text-xs font-medium uppercase tracking-wider mb-3"
+                      style={{
+                        color: "var(--color-sentinel-text-secondary)",
+                      }}
+                    >
+                      Equipment Type Budget
+                    </h4>
+                    {budgetReport.equipment_type_breakdown.map((row) => (
+                      <BudgetBar
+                        key={row.equipment_type}
+                        category={row.equipment_type}
+                        budgeted={row.total_budget_zar}
+                        actual={row.total_actual_zar}
+                        variancePercent={row.spend_percentage}
+                      />
+                    ))}
+                  </div>
+                ) : null}
+
+                {budgetAlerts.length > 0 && (
+                  <div
+                    className="rounded-lg p-3 mb-4"
+                    style={{
+                      background: "rgba(245, 158, 11, 0.08)",
+                      border: "1px solid rgba(245, 158, 11, 0.2)",
+                    }}
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      <AlertTriangle
+                        className="h-4 w-4"
+                        style={{ color: "var(--color-sentinel-amber)" }}
+                      />
+                      <span
+                        className="text-xs font-medium"
+                        style={{ color: "var(--color-sentinel-text-primary)" }}
+                      >
+                        Budget Alerts
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 mb-3">
+                      <select
+                        className="text-xs rounded px-2 py-1"
+                        style={{
+                          background: "var(--color-sentinel-bg-primary)",
+                          color: "var(--color-sentinel-text-primary)",
+                          border: "1px solid var(--color-sentinel-border)",
+                        }}
+                        value={alertSeverityFilter}
+                        onChange={(e) => {
+                          setAlertSeverityFilter(e.target.value);
+                          setAlertPage(1);
+                        }}
+                      >
+                        <option value="all">All Severities</option>
+                        <option value="warning">Warning</option>
+                        <option value="critical">Critical</option>
+                      </select>
+                      <select
+                        className="text-xs rounded px-2 py-1"
+                        style={{
+                          background: "var(--color-sentinel-bg-primary)",
+                          color: "var(--color-sentinel-text-primary)",
+                          border: "1px solid var(--color-sentinel-border)",
+                        }}
+                        value={alertStatusFilter}
+                        onChange={(e) => {
+                          setAlertStatusFilter(e.target.value);
+                          setAlertPage(1);
+                        }}
+                      >
+                        <option value="all">All Status</option>
+                        <option value="open">Open</option>
+                        <option value="acknowledged">Acknowledged</option>
+                        <option value="resolved">Resolved</option>
+                      </select>
+                      <button
+                        className="text-xs px-2 py-1 rounded"
+                        style={{
+                          border: "1px solid var(--color-sentinel-border)",
+                          color: "var(--color-sentinel-text-primary)",
+                        }}
+                        onClick={() => {
+                          setShowAllAlerts((prev) => !prev);
+                          setAlertPage(1);
+                        }}
+                      >
+                        {showAllAlerts ? "Show Top 5" : "Show All"}
+                      </button>
+                    </div>
+                    {(() => {
+                      const filteredAlerts = budgetAlerts
+                        .filter((alert) =>
+                          alertSeverityFilter === "all"
+                            ? true
+                            : alert.severity === alertSeverityFilter
+                        )
+                        .filter((alert) =>
+                          alertStatusFilter === "all"
+                            ? true
+                            : alert.status === alertStatusFilter
+                        );
+                      const totalPages = Math.max(
+                        1,
+                        Math.ceil(filteredAlerts.length / alertsPerPage)
+                      );
+                      const pageStart = (alertPage - 1) * alertsPerPage;
+                      const pageAlerts = showAllAlerts
+                        ? filteredAlerts
+                        : filteredAlerts.slice(pageStart, pageStart + alertsPerPage);
+
+                      return (
+                        <div className="space-y-2">
+                          {pageAlerts.map((alert) => (
+                        <div
+                          key={alert.id || `${alert.period_month}-${alert.severity}-${alert.equipment_type || "total"}`}
+                          className="flex items-center justify-between text-xs"
+                          style={{ color: "var(--color-sentinel-text-secondary)" }}
+                        >
+                          <span>
+                            {alert.equipment_type
+                              ? `${alert.equipment_type} · `
+                              : ""}
+                            {alert.message || "Budget alert"}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <SentinelBadge
+                              variant={alert.severity === "critical" ? "error" : "warning"}
+                              size="sm"
+                            >
+                              {alert.severity}
+                            </SentinelBadge>
+                            {alert.id && alert.status !== "acknowledged" && (
+                              <button
+                                className="text-xs"
+                                style={{ color: "var(--color-sentinel-blue)" }}
+                                onClick={async () => {
+                                  const { contractApi } = await import("../lib/contractApi");
+                                  const updated = await contractApi.updateBudgetAlertStatus(
+                                    alert.id!,
+                                    "acknowledged"
+                                  );
+                                  setBudgetAlerts((prev) =>
+                                    prev.map((item) =>
+                                      item.id === updated.id ? { ...item, status: updated.status } : item
+                                    )
+                                  );
+                                }}
+                              >
+                                Ack
+                              </button>
+                            )}
+                            {alert.id && alert.status !== "resolved" && (
+                              <button
+                                className="text-xs"
+                                style={{ color: "var(--color-sentinel-green)" }}
+                                onClick={async () => {
+                                  const { contractApi } = await import("../lib/contractApi");
+                                  const updated = await contractApi.updateBudgetAlertStatus(
+                                    alert.id!,
+                                    "resolved"
+                                  );
+                                  setBudgetAlerts((prev) =>
+                                    prev.map((item) =>
+                                      item.id === updated.id ? { ...item, status: updated.status } : item
+                                    )
+                                  );
+                                }}
+                              >
+                                Resolve
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                          ))}
+                          {!showAllAlerts && totalPages > 1 && (
+                            <div className="flex items-center justify-end gap-2 pt-2">
+                              <button
+                                className="text-xs px-2 py-1 rounded"
+                                style={{
+                                  border: "1px solid var(--color-sentinel-border)",
+                                  color: "var(--color-sentinel-text-primary)",
+                                }}
+                                onClick={() =>
+                                  setAlertPage((page) => Math.max(1, page - 1))
+                                }
+                                disabled={alertPage === 1}
+                              >
+                                Prev
+                              </button>
+                              <span
+                                className="text-xs"
+                                style={{ color: "var(--color-sentinel-text-disabled)" }}
+                              >
+                                Page {alertPage} of {totalPages}
+                              </span>
+                              <button
+                                className="text-xs px-2 py-1 rounded"
+                                style={{
+                                  border: "1px solid var(--color-sentinel-border)",
+                                  color: "var(--color-sentinel-text-primary)",
+                                }}
+                                onClick={() =>
+                                  setAlertPage((page) =>
+                                    Math.min(totalPages, page + 1)
+                                  )
+                                }
+                                disabled={alertPage === totalPages}
+                              >
+                                Next
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
 
                 {/* Profitability snapshot */}
                 {selectedContract.profitability_snapshot && (
@@ -1466,6 +1965,162 @@ export function ContractManagementPage() {
                         </div>
                       </div>
                     </div>
+                  </div>
+                )}
+
+                {/* Renewal Pricing */}
+                {renewalPricing && (
+                  <div
+                    className="rounded-lg p-3 mt-3"
+                    style={{
+                      background: "var(--color-sentinel-bg-secondary)",
+                      border: "1px solid var(--color-sentinel-border)",
+                    }}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <TrendingUp
+                          className="h-4 w-4"
+                          style={{ color: "var(--color-sentinel-blue)" }}
+                        />
+                        <h4
+                          className="text-xs font-medium uppercase tracking-wider"
+                          style={{
+                            color: "var(--color-sentinel-text-secondary)",
+                          }}
+                        >
+                          Renewal Pricing
+                        </h4>
+                      </div>
+                      {pricingLoading && (
+                        <RefreshCw
+                          className="h-4 w-4 animate-spin"
+                          style={{ color: "var(--color-sentinel-text-disabled)" }}
+                        />
+                      )}
+                    </div>
+
+                    {pricingError && (
+                      <div
+                        className="text-xs mb-2"
+                        style={{ color: "var(--color-sentinel-red)" }}
+                      >
+                        {pricingError}
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <div
+                          className="text-xs"
+                          style={{
+                            color: "var(--color-sentinel-text-disabled)",
+                          }}
+                        >
+                          Current Fee
+                        </div>
+                        <div
+                          className="text-sm font-bold"
+                          style={{
+                            color: "var(--color-sentinel-text-primary)",
+                          }}
+                        >
+                          {formatZAR(renewalPricing.current_monthly_fee_zar)}
+                        </div>
+                      </div>
+                      <div>
+                        <div
+                          className="text-xs"
+                          style={{
+                            color: "var(--color-sentinel-text-disabled)",
+                          }}
+                        >
+                          Recommended Fee
+                        </div>
+                        <div
+                          className="text-sm font-bold"
+                          style={{
+                            color: "var(--color-sentinel-green)",
+                          }}
+                        >
+                          {formatZAR(renewalPricing.recommended_monthly_fee_zar)}
+                        </div>
+                      </div>
+                      <div>
+                        <div
+                          className="text-xs"
+                          style={{
+                            color: "var(--color-sentinel-text-disabled)",
+                          }}
+                        >
+                          Delta
+                        </div>
+                        <div
+                          className="text-sm font-bold"
+                          style={{
+                            color:
+                              renewalPricing.delta_zar >= 0
+                                ? "var(--color-sentinel-amber)"
+                                : "var(--color-sentinel-green)",
+                          }}
+                        >
+                          {formatZAR(renewalPricing.delta_zar)} (
+                          {renewalPricing.delta_pct.toFixed(1)}%)
+                        </div>
+                      </div>
+                      <div>
+                        <div
+                          className="text-xs"
+                          style={{
+                            color: "var(--color-sentinel-text-disabled)",
+                          }}
+                        >
+                          Target Margin
+                        </div>
+                        <div
+                          className="text-sm font-bold"
+                          style={{
+                            color: "var(--color-sentinel-text-primary)",
+                          }}
+                        >
+                          {renewalPricing.target_margin_pct.toFixed(1)}%
+                        </div>
+                      </div>
+                    </div>
+
+                    {benchmarks && (
+                      <div
+                        className="mt-3 rounded-lg p-2"
+                        style={{
+                          background: "rgba(14, 116, 144, 0.08)",
+                          border: "1px solid rgba(14, 116, 144, 0.2)",
+                        }}
+                      >
+                        <div
+                          className="text-xs"
+                          style={{ color: "var(--color-sentinel-text-secondary)" }}
+                        >
+                          Benchmarks ({benchmarks.similar_contracts} similar)
+                        </div>
+                        <div
+                          className="text-xs mt-1"
+                          style={{ color: "var(--color-sentinel-text-primary)" }}
+                        >
+                          Avg {formatZAR(benchmarks.average_monthly_fee_zar)} · Min{" "}
+                          {formatZAR(benchmarks.min_monthly_fee_zar)} · Max{" "}
+                          {formatZAR(benchmarks.max_monthly_fee_zar)}
+                        </div>
+                      </div>
+                    )}
+
+                    {renewalPricing.notes?.length > 0 && (
+                      <div
+                        className="text-xs mt-2"
+                        style={{ color: "var(--color-sentinel-text-disabled)" }}
+                      >
+                        {renewalPricing.notes.join(" ")}
+                      </div>
+                    )}
                   </div>
                 )}
 

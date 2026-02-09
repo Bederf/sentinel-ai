@@ -7,7 +7,7 @@
 
 import { useState } from 'react';
 import { Card, Title, Text, Badge, Flex, Button, Select, SelectItem } from '@tremor/react';
-import { useModules, useCriticalRecommendations, useCrossSystemRecommendations } from '../../contexts/ModuleContext';
+import { useModules, useCriticalRecommendations, useCrossSystemRecommendations } from '../../contexts/ModuleHooks';
 import { PRIORITY_COLORS, MODULE_COLORS } from '../../lib/moduleRegistry';
 import type { AIRecommendation, ModuleType } from '../../lib/moduleRegistry';
 

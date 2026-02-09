@@ -29,7 +29,7 @@ import {
   Building2,
   ChevronDown,
 } from "lucide-react";
-import api, { securityApi } from "../lib/api";
+import api, { isExpectedApiError, securityApi } from "../lib/api";
 import type {
   SecuritySystemStatus,
   SecurityCamera,
@@ -67,7 +67,9 @@ export function SecurityDashboard() {
       setLastUpdated(new Date());
       setError(null);
     } catch (err) {
-      console.error("Failed to fetch security data:", err);
+      if (!isExpectedApiError(err)) {
+        console.error("Failed to fetch security data:", err);
+      }
       setError("Failed to load security data. Check that the backend is running.");
     } finally {
       setLoading(false);
@@ -87,7 +89,9 @@ export function SecurityDashboard() {
           setSelectedSiteId(defaultSite.id);
         }
       } catch (err) {
-        console.error("Failed to load sites:", err);
+        if (!isExpectedApiError(err)) {
+          console.error("Failed to load sites:", err);
+        }
       }
     };
     loadSites();
@@ -117,7 +121,9 @@ export function SecurityDashboard() {
       await securityApi.armAlarmZone(zoneId, "full");
       fetchData(true);
     } catch (err) {
-      console.error("Failed to arm zone:", err);
+      if (!isExpectedApiError(err)) {
+        console.error("Failed to arm zone:", err);
+      }
     }
   };
 
@@ -126,7 +132,9 @@ export function SecurityDashboard() {
       await securityApi.disarmAlarmZone(zoneId);
       fetchData(true);
     } catch (err) {
-      console.error("Failed to disarm zone:", err);
+      if (!isExpectedApiError(err)) {
+        console.error("Failed to disarm zone:", err);
+      }
     }
   };
 

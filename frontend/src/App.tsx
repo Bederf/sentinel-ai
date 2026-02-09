@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { Clock, Wifi, WifiOff, Bell, X, LogOut } from "lucide-react";
 import { Toaster, toast } from "sonner";
 import { formatTime } from "./lib/timeFormat";
-import api, { type Alert, type AuthUser } from "./lib/api";
+import api, { AUTH_EXPIRED_EVENT, isExpectedApiError, type Alert, type AuthUser } from "./lib/api";
 import { Chat } from "./components/Chat";
 import TechnicianChat from "./components/TechnicianChat";
 import { Dashboard } from "./components/Dashboard";
@@ -27,8 +27,10 @@ import { SustainabilityDashboard } from "./components/sustainability";
 import { SolarDashboard } from "./components/solar/SolarDashboard";
 import { WaterPanel } from "./components/water";
 import { ContractManagementPage } from "./pages/ContractManagementPage";
+import { BudgetReportPage } from "./pages/BudgetReportPage";
 import { ProfitabilityDashboardPage } from "./pages/ProfitabilityDashboardPage";
-import { ModuleProvider, useModules } from "./contexts/ModuleContext";
+import { ModuleProvider } from "./contexts/ModuleContext";
+import { useModules } from "./contexts/ModuleHooks";
 import { type View, VIEW_TITLES, isModuleGatedView, getRequiredModule } from "./lib/navigation";
 
 interface HealthStatus {
@@ -76,7 +78,9 @@ function App() {
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => {
     // Check for stored user on mount
     const storedUser = localStorage.getItem("sentinel_user");
-    return storedUser ? JSON.parse(storedUser) : null;
+    const storedToken = localStorage.getItem("sentinel_token");
+    if (!storedUser || !storedToken) return null;
+    return JSON.parse(storedUser);
   });
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -122,9 +126,16 @@ function App() {
 
   // Fetch and count unread alerts
   useEffect(() => {
+    let failureCount = 0;
+    let timeoutId: number | null = null;
+
     const fetchUnreadCount = async () => {
       const token = localStorage.getItem("sentinel_token");
       if (!token) return;
+      if (document.hidden) {
+        timeoutId = window.setTimeout(fetchUnreadCount, 60000);
+        return;
+      }
       try {
         const alerts = await api.getAlerts();
         // Count unread alerts (not acknowledged or created after last viewed time)
@@ -136,15 +147,25 @@ function App() {
           return false;
         });
         setUnreadAlertCount(unread.length);
+        failureCount = 0;
       } catch (err) {
-        console.error("Failed to fetch alert count:", err);
+        failureCount += 1;
+        if (!isExpectedApiError(err)) {
+          console.error("Failed to fetch alert count:", err);
+        }
       }
+
+      const baseIntervalMs = 60000;
+      const backoffIntervalMs = Math.min(300000, baseIntervalMs * (2 ** failureCount));
+      timeoutId = window.setTimeout(fetchUnreadCount, backoffIntervalMs);
     };
 
     fetchUnreadCount();
-    // Refresh every 30 seconds
-    const interval = setInterval(fetchUnreadCount, 30000);
-    return () => clearInterval(interval);
+    return () => {
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
+    };
   }, [lastViewedAlertTime]);
 
   // Mark alerts as viewed when panel opens
@@ -218,11 +239,22 @@ function App() {
     } finally {
       // Clear local storage
       localStorage.removeItem("sentinel_token");
+      localStorage.removeItem("sentinel_refresh_token");
       localStorage.removeItem("sentinel_user");
       setCurrentUser(null);
       toast.success("Logged out successfully");
     }
   };
+
+  // Force logout when API layer reports auth expiry/invalid refresh.
+  useEffect(() => {
+    const onAuthExpired = () => {
+      setCurrentUser(null);
+      toast.error("Session expired. Please sign in again.");
+    };
+    window.addEventListener(AUTH_EXPIRED_EVENT, onAuthExpired);
+    return () => window.removeEventListener(AUTH_EXPIRED_EVENT, onAuthExpired);
+  }, []);
 
   // Handle view changes - scroll to top and refresh when re-clicking same view
   const handleViewChange = useCallback((view: View) => {
@@ -638,6 +670,8 @@ function App() {
             <ContractManagementPage />
           ) : currentView === "profitability" ? (
             <ProfitabilityDashboardPage />
+          ) : currentView === "budget-report" ? (
+            <BudgetReportPage />
           ) : (
             <div className="h-full p-4 md:p-6">
               <div className="h-full max-w-4xl mx-auto">

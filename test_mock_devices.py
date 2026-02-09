@@ -75,7 +75,7 @@ async def test_device_abstraction():
 
     # Test site filtering
     print("\n=== Testing Site Filtering ===")
-    site_devices = await device_manager.list_devices_by_site("fnb-gateway")
+    site_devices = await device_manager.list_devices_by_site("-gateway")
     print(f"✓ Found {len(site_devices)} devices at Gateway site")
 
     # Test demo scenario setup

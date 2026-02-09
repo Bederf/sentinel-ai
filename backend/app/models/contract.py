@@ -254,7 +254,7 @@ class SLAComplianceStatus(str, Enum):
 
 class OrganizationCreate(BaseModel):
     """Data required to create a new organization."""
-    code: str = Field(..., description="Unique org code, e.g. 'FNB'")
+    code: str = Field(..., description="Unique org code, e.g. 'SITE-002'")
     name: str = Field(..., description="Full legal name")
     trading_name: Optional[str] = None
     registration_number: Optional[str] = None
@@ -317,7 +317,7 @@ class Organization(BaseModel):
 
 class ContractCreate(BaseModel):
     """Data required to create a new contract."""
-    code: str = Field(..., description="Unique contract code, e.g. 'CON-FNB-2026-001'")
+    code: str = Field(..., description="Unique contract code, e.g. 'CON-SITE-002-2026-001'")
     organization_id: str
     building_id: str
     contract_type: Optional[ContractType] = None
@@ -544,7 +544,7 @@ class ConditionAssessment(BaseModel):
 
 class BudgetCreate(BaseModel):
     """Data required to create a budget entry."""
-    code: str = Field(..., description="Unique code, e.g. 'BUD-FNB-SANDTON-2026'")
+    code: str = Field(..., description="Unique code, e.g. 'BUD-SITE-002-SANDTON-2026'")
     contract_id: str
     equipment_type: Optional[str] = None
     budget_year: int

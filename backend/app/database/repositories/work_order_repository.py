@@ -3,7 +3,7 @@ Work Order Repository - Database operations for work orders.
 """
 
 from typing import Optional, List, Dict, Any
-from datetime import datetime
+from datetime import datetime, date
 from ..supabase_client import get_supabase_client
 import logging
 
@@ -164,6 +164,40 @@ class WorkOrderRepository:
         except Exception as e:
             logger.error(f"Error updating work order {work_order_id}: {e}")
             return None
+
+    async def get_work_orders_for_equipment_list(
+        self,
+        equipment_ids: List[str],
+        start_date: Optional[datetime | date] = None,
+        end_date: Optional[datetime | date] = None,
+        status: Optional[str] = None,
+        limit: int = 500
+    ) -> List[Dict[str, Any]]:
+        """Get work orders for a list of equipment IDs with optional date filter."""
+        if not self.client or not equipment_ids:
+            return []
+
+        try:
+            query = self.client.table("work_orders").select("*").in_(
+                "equipment_id", equipment_ids
+            ).order("completed_at", desc=True).limit(limit)
+
+            if status:
+                query = query.eq("status", status)
+
+            if start_date:
+                start_iso = start_date.isoformat()
+                query = query.gte("completed_at", start_iso)
+            if end_date:
+                end_iso = end_date.isoformat()
+                query = query.lte("completed_at", end_iso)
+
+            result = query.execute()
+            return result.data or []
+
+        except Exception as e:
+            logger.error(f"Error getting work orders for equipment list: {e}")
+            return []
 
 
 # Singleton instance

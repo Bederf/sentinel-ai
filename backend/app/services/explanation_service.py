@@ -135,6 +135,17 @@ class ExplanationService:
         Returns:
             Formatted context string
         """
+        # Prefer vector DB helper if available (used in tests/mocks).
+        if hasattr(self.vector_db, "get_rag_context"):
+            result = self.vector_db.get_rag_context(
+                equipment_type=equipment_type,
+                predictions=predictions,
+            )
+            if hasattr(result, "__await__"):
+                result = await result
+            if isinstance(result, str):
+                return result
+
         # Build search query from prediction info
         failure_type = predictions.get("predictions", {}).get(
             "failure_type", {}
@@ -160,12 +171,18 @@ class ExplanationService:
         # Format document context
         context_parts = []
 
+        if not isinstance(doc_results, list):
+            doc_results = []
+
         if doc_results:
             for r in doc_results:
                 source = r.get('document_title', 'Documentation')
                 content = r.get('content', '')[:500]
                 score = r.get('hybrid_score', r.get('similarity', 0))
                 context_parts.append(f"[{source}] (relevance: {score:.2f})\n{content}")
+
+        if not isinstance(knowledge_results, list):
+            knowledge_results = []
 
         if knowledge_results:
             context_parts.append("\n**Knowledge Base Entries:**")

@@ -97,6 +97,92 @@ async def update_all_settings(settings_data: Dict[str, Any]) -> Dict[str, Any]:
     return current_settings
 
 
+# Default notification settings (used when not configured)
+DEFAULT_NOTIFICATION_SETTINGS = {
+    "alertCommands": {
+        "reset": {"enabled": True, "label": "Remote reset"},
+        "info": {"enabled": True, "label": "More info"},
+        "note": {"enabled": True, "label": "Add note"},
+        "wo": {"enabled": True, "label": "Create work order"},
+    },
+    "alertCooldownMinutes": 5,
+    "resetBlockedTypes": ["FIRE", "GEN"],
+}
+
+VALID_ALERT_COMMANDS = {"reset", "info", "note", "wo"}
+
+
+@router.get("/settings/notifications")
+async def get_notification_settings() -> Dict[str, Any]:
+    """Get notification settings including alert command config."""
+    settings_data = load_settings()
+    return settings_data.get("notifications", DEFAULT_NOTIFICATION_SETTINGS)
+
+
+@router.put("/settings/notifications")
+async def update_notification_settings(notifications: Dict[str, Any]) -> Dict[str, Any]:
+    """Update notification settings.
+
+    Validates alertCommands structure: each command must have 'enabled' (bool)
+    and 'label' (str). Only known command keys are accepted.
+    """
+    # Validate alertCommands if provided
+    if "alertCommands" in notifications:
+        commands = notifications["alertCommands"]
+        if not isinstance(commands, dict):
+            raise HTTPException(status_code=400, detail="alertCommands must be an object")
+
+        for key, config in commands.items():
+            if key not in VALID_ALERT_COMMANDS:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Unknown alert command: {key}. Valid: {', '.join(sorted(VALID_ALERT_COMMANDS))}"
+                )
+            if not isinstance(config, dict):
+                raise HTTPException(status_code=400, detail=f"alertCommands.{key} must be an object")
+            if "enabled" in config and not isinstance(config["enabled"], bool):
+                raise HTTPException(status_code=400, detail=f"alertCommands.{key}.enabled must be a boolean")
+            if "label" in config and not isinstance(config["label"], str):
+                raise HTTPException(status_code=400, detail=f"alertCommands.{key}.label must be a string")
+
+    # Validate alertCooldownMinutes if provided
+    if "alertCooldownMinutes" in notifications:
+        cooldown = notifications["alertCooldownMinutes"]
+        if not isinstance(cooldown, (int, float)) or cooldown < 1 or cooldown > 60:
+            raise HTTPException(
+                status_code=400,
+                detail="alertCooldownMinutes must be a number between 1 and 60"
+            )
+
+    # Validate resetBlockedTypes if provided
+    if "resetBlockedTypes" in notifications:
+        blocked = notifications["resetBlockedTypes"]
+        if not isinstance(blocked, list) or not all(isinstance(t, str) for t in blocked):
+            raise HTTPException(
+                status_code=400,
+                detail="resetBlockedTypes must be an array of strings"
+            )
+
+    # Merge with existing settings
+    current_settings = load_settings()
+    current_notifications = current_settings.get("notifications", {})
+
+    # Deep merge alertCommands
+    if "alertCommands" in notifications and "alertCommands" in current_notifications:
+        for key, config in notifications["alertCommands"].items():
+            if key in current_notifications["alertCommands"]:
+                current_notifications["alertCommands"][key].update(config)
+            else:
+                current_notifications["alertCommands"][key] = config
+        notifications["alertCommands"] = current_notifications["alertCommands"]
+
+    current_notifications.update(notifications)
+    current_settings["notifications"] = current_notifications
+    save_settings(current_settings)
+
+    return current_notifications
+
+
 @router.get("/settings/health-thresholds")
 async def get_health_thresholds() -> Dict[str, int]:
     """Get health score thresholds."""

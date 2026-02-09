@@ -433,6 +433,254 @@
         }
       ]
     },
+    "ups_routine": {
+      "template_id": "ups_routine",
+      "equipment_type": "ups",
+      "template_name": "UPS Inspection (Eaton 93PM)",
+      "inspection_type": "routine",
+      "version": 1,
+      "estimated_duration_minutes": 45,
+      "checklist_items": [
+        {
+          "category": "Visual Inspection",
+          "item_id": "cabinet_condition",
+          "question": "Cabinet condition - ventilation clear, no obstructions?",
+          "item_type": "checklist",
+          "options": [
+            {"label": "Clean, vents clear", "value": "ok"},
+            {"label": "Dusty, partially blocked", "value": "warning"},
+            {"label": "Blocked vents / overheating signs", "value": "critical"}
+          ],
+          "required": true,
+          "photos_required": true
+        },
+        {
+          "category": "Visual Inspection",
+          "item_id": "led_status",
+          "question": "Front panel LED indicators - all normal?",
+          "item_type": "checklist",
+          "options": [
+            {"label": "All green / normal", "value": "ok"},
+            {"label": "Amber warning LED active", "value": "warning"},
+            {"label": "Red fault LED / alarm active", "value": "critical"}
+          ],
+          "required": true,
+          "photos_required": true
+        },
+        {
+          "category": "Visual Inspection",
+          "item_id": "overheating_signs",
+          "question": "Signs of overheating, burn marks, or discoloration?",
+          "item_type": "checklist",
+          "options": [
+            {"label": "No signs", "value": "ok"},
+            {"label": "Slight discoloration", "value": "warning"},
+            {"label": "Burn marks / melting", "value": "critical"}
+          ],
+          "required": true,
+          "photos_required": false
+        },
+        {
+          "category": "Visual Inspection",
+          "item_id": "cable_connections",
+          "question": "Cable connections secure, no loose terminals?",
+          "item_type": "checklist",
+          "options": [
+            {"label": "All secure", "value": "ok"},
+            {"label": "Minor looseness found", "value": "warning"},
+            {"label": "Loose / arcing damage", "value": "critical"}
+          ],
+          "required": true,
+          "photos_required": false
+        },
+        {
+          "category": "Battery Bank",
+          "item_id": "battery_voltage_string1",
+          "question": "Battery string 1 total voltage",
+          "item_type": "measurement",
+          "parameter_name": "battery_voltage_string1",
+          "unit": "V",
+          "tolerance_min": 384.0,
+          "tolerance_max": 440.0,
+          "element_id": "battery_string_1",
+          "required": true,
+          "photos_required": false
+        },
+        {
+          "category": "Battery Bank",
+          "item_id": "battery_temperature",
+          "question": "Battery room / cabinet temperature",
+          "item_type": "measurement",
+          "parameter_name": "battery_temperature",
+          "unit": "C",
+          "tolerance_min": 15.0,
+          "tolerance_max": 30.0,
+          "element_id": "battery_cabinet",
+          "required": true,
+          "photos_required": false
+        },
+        {
+          "category": "Battery Bank",
+          "item_id": "battery_swelling",
+          "question": "Battery cell condition - swelling, leakage, corrosion?",
+          "item_type": "checklist",
+          "options": [
+            {"label": "All cells normal", "value": "ok"},
+            {"label": "Minor corrosion on terminals", "value": "warning"},
+            {"label": "Swelling / leaking / heavy corrosion", "value": "critical"}
+          ],
+          "required": true,
+          "photos_required": true
+        },
+        {
+          "category": "Battery Bank",
+          "item_id": "battery_connection_torque",
+          "question": "Battery terminal connections - torque check?",
+          "item_type": "checklist",
+          "options": [
+            {"label": "All within spec", "value": "ok"},
+            {"label": "Some retightened", "value": "warning"},
+            {"label": "Multiple loose / damaged", "value": "critical"}
+          ],
+          "required": true,
+          "photos_required": false
+        },
+        {
+          "category": "Electrical",
+          "item_id": "input_voltage",
+          "question": "Input voltage (L-L)",
+          "item_type": "measurement",
+          "parameter_name": "input_voltage",
+          "unit": "V",
+          "tolerance_min": 380.0,
+          "tolerance_max": 415.0,
+          "required": true,
+          "photos_required": false
+        },
+        {
+          "category": "Electrical",
+          "item_id": "output_voltage",
+          "question": "Output voltage (L-L)",
+          "item_type": "measurement",
+          "parameter_name": "output_voltage",
+          "unit": "V",
+          "tolerance_min": 395.0,
+          "tolerance_max": 405.0,
+          "required": true,
+          "photos_required": false
+        },
+        {
+          "category": "Electrical",
+          "item_id": "load_percent",
+          "question": "Current load percentage",
+          "item_type": "measurement",
+          "parameter_name": "load_percent",
+          "unit": "%",
+          "tolerance_min": 0.0,
+          "tolerance_max": 80.0,
+          "required": true,
+          "photos_required": false
+        },
+        {
+          "category": "Electrical",
+          "item_id": "bypass_status",
+          "question": "Static bypass status",
+          "item_type": "checklist",
+          "options": [
+            {"label": "Normal (online mode)", "value": "ok"},
+            {"label": "On bypass - planned", "value": "warning"},
+            {"label": "Forced bypass / fault", "value": "critical"}
+          ],
+          "required": true,
+          "photos_required": false
+        },
+        {
+          "category": "Electrical",
+          "item_id": "ground_fault",
+          "question": "Ground fault indicators",
+          "item_type": "checklist",
+          "options": [
+            {"label": "No ground faults", "value": "ok"},
+            {"label": "Intermittent ground fault", "value": "warning"},
+            {"label": "Active ground fault alarm", "value": "critical"}
+          ],
+          "required": true,
+          "photos_required": false
+        },
+        {
+          "category": "Cooling",
+          "item_id": "fan_operation",
+          "question": "Internal cooling fans operating?",
+          "item_type": "checklist",
+          "options": [
+            {"label": "All fans running, normal speed", "value": "ok"},
+            {"label": "Fan speed high / one fan noisy", "value": "warning"},
+            {"label": "Fan failed / not running", "value": "critical"}
+          ],
+          "required": true,
+          "photos_required": false
+        },
+        {
+          "category": "Cooling",
+          "item_id": "air_filter",
+          "question": "Air filter condition",
+          "item_type": "checklist",
+          "options": [
+            {"label": "Clean", "value": "ok"},
+            {"label": "Dirty - needs cleaning", "value": "warning"},
+            {"label": "Blocked - replace now", "value": "critical"}
+          ],
+          "required": true,
+          "photos_required": false
+        },
+        {
+          "category": "Cooling",
+          "item_id": "internal_temp",
+          "question": "UPS internal temperature reading (from display)",
+          "item_type": "measurement",
+          "parameter_name": "internal_temperature",
+          "unit": "C",
+          "tolerance_min": 15.0,
+          "tolerance_max": 40.0,
+          "required": true,
+          "photos_required": false
+        },
+        {
+          "category": "Event Logs",
+          "item_id": "alarm_history",
+          "question": "Download/photograph alarm history (last 10 events)",
+          "item_type": "visual_inspection",
+          "required": true,
+          "photos_required": true
+        },
+        {
+          "category": "Event Logs",
+          "item_id": "recurring_faults",
+          "question": "Any recurring fault codes in event log?",
+          "item_type": "checklist",
+          "options": [
+            {"label": "No recurring faults", "value": "ok"},
+            {"label": "Same fault 2-3 times", "value": "warning"},
+            {"label": "Repeated faults (4+ occurrences)", "value": "critical"}
+          ],
+          "required": true,
+          "photos_required": false
+        },
+        {
+          "category": "Capacitors",
+          "item_id": "dc_capacitors",
+          "question": "DC link capacitors - any bulging or leaking?",
+          "item_type": "checklist",
+          "options": [
+            {"label": "All caps normal", "value": "ok"},
+            {"label": "Slight bulging on 1-2 caps", "value": "warning"},
+            {"label": "Bulging / leaking / blown", "value": "critical"}
+          ],
+          "required": true,
+          "photos_required": true
+        }
+      ]
+    },
     "vav_monthly": {
       "template_id": "vav_monthly",
       "equipment_type": "vav",

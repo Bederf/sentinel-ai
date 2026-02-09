@@ -3,9 +3,53 @@ Pytest configuration and fixtures for BMS Intelligence backend tests.
 """
 
 import os
+import warnings
 # Enable demo mode before importing the app so the global auth middleware
 # allows requests without a real JWT token (localhost bypass).
 os.environ.setdefault("DEMO_MODE", "true")
+os.environ.setdefault("TESTING", "true")
+warnings.filterwarnings(
+    "ignore",
+    message="Please use `import python_multipart` instead.",
+    category=PendingDeprecationWarning,
+)
+warnings.filterwarnings(
+    "ignore",
+    message="on_event is deprecated.*",
+    category=DeprecationWarning,
+)
+warnings.filterwarnings(
+    "ignore",
+    category=DeprecationWarning,
+    module="typing_extensions",
+)
+warnings.filterwarnings(
+    "ignore",
+    message="on_event is deprecated.*",
+    category=DeprecationWarning,
+    module="app.api.devices",
+)
+warnings.filterwarnings(
+    "ignore",
+    message=".*enablePackrat.*",
+)
+warnings.filterwarnings(
+    "ignore",
+    message=".*escChar.*",
+)
+warnings.filterwarnings(
+    "ignore",
+    message=".*unquoteResults.*",
+)
+try:
+    import pyparsing
+
+    warnings.filterwarnings(
+        "ignore",
+        category=pyparsing.warnings.PyparsingDeprecationWarning,
+    )
+except Exception:
+    pass
 
 import pytest
 import json
@@ -15,9 +59,45 @@ from typing import AsyncGenerator, Generator
 from unittest.mock import Mock, AsyncMock, patch
 
 from fastapi.testclient import TestClient
-from httpx import AsyncClient
+from httpx import AsyncClient, ASGITransport
+from fastapi import FastAPI
 
-from app.main import app
+if os.getenv("LIGHTWEIGHT_APP", "").lower() == "true":
+    from app.api import devices as devices_api
+    from app.api import health as health_api
+    from app.api import sites as sites_api
+    from app.api import audit as audit_api
+    from app.api import safety as safety_api
+    from app.api import stats as stats_api
+    from app.api import workflow as workflow_api
+    app = FastAPI()
+    app.router.redirect_slashes = False
+    app.include_router(devices_api.router, prefix="/api", tags=["devices"])
+    app.include_router(health_api.router, prefix="/api", tags=["health"])
+    app.include_router(sites_api.router, prefix="/api", tags=["sites"])
+    app.include_router(stats_api.router, prefix="/api", tags=["stats"])
+    app.include_router(safety_api.router, tags=["safety"])
+    app.include_router(audit_api.router, tags=["audit"])
+    app.include_router(workflow_api.router, tags=["workflow"])
+
+    @app.get("/")
+    async def _root():
+        return {"status": "ok"}
+
+    @app.post("/api/chat")
+    async def _chat_stub(payload: dict):
+        return {"status": "ok", "message": payload.get("message", "")}
+
+    @app.post("/api/hybrid-chat")
+    async def _hybrid_chat_stub(payload: dict):
+        return {"status": "ok", "message": payload.get("message", "")}
+else:
+    from app.main import app
+
+# Speed up API tests by skipping app startup/shutdown hooks in testing mode.
+if os.getenv("TESTING", "").lower() == "true":
+    app.router.on_startup.clear()
+    app.router.on_shutdown.clear()
 from app.services.device_abstraction import DeviceManager
 from app.services.safety_interlocks import SafetyEngine
 from app.services.audit_logger import AuditLogger
@@ -29,25 +109,41 @@ TEST_DATA_DIR = Path(__file__).parent.parent / "app" / "data"
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
 
-@pytest.fixture(scope="session")
-def event_loop():
-    """Create an instance of the default event loop for the test session."""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
+class _SyncASGIClient:
+    """Sync wrapper around AsyncClient for tests where TestClient hangs."""
+
+    def __init__(self, app: FastAPI):
+        self._app = app
+
+    def request(self, method: str, url: str, **kwargs):
+        async def _do_request():
+            transport = ASGITransport(app=self._app)
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                return await client.request(method, url, **kwargs)
+
+        return asyncio.run(_do_request())
+
+    def get(self, url: str, **kwargs):
+        return self.request("GET", url, **kwargs)
+
+    def post(self, url: str, **kwargs):
+        return self.request("POST", url, **kwargs)
+
+    def options(self, url: str, **kwargs):
+        return self.request("OPTIONS", url, **kwargs)
 
 
 @pytest.fixture
 def test_client() -> Generator[TestClient, None, None]:
     """FastAPI test client for synchronous tests."""
-    with TestClient(app) as client:
-        yield client
+    yield _SyncASGIClient(app)
 
 
 @pytest.fixture
 async def async_client() -> AsyncGenerator[AsyncClient, None]:
     """Async HTTP client for async tests."""
-    async with AsyncClient(app=app, base_url="http://test") as client:
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
         yield client
 
 

@@ -1,12 +1,18 @@
 # SENTINEL Asset Management Workflow - Integration Architecture
 
-**Date:** 2026-02-01
+**Date:** 2026-02-08
 **Phase:** 53 - SENTINEL Asset Management Workflow Integration
 **Author:** Claude Code
 
 ## Overview
 
 This document describes the integration architecture that connects SIMBIOT, Asset Baseline Assessment, Inspection System, ML Predictions, and AI Recommendations into a cohesive automated workflow.
+
+## Phase 53-01 Integration Wiring
+
+- Baseline comparison API triggers workflow deviations (wired in `/api/baselines/{equipment_id}/compare`).
+- Inspection deficiency creation (critical/safety) triggers auto work order workflow.
+- Technician work order completion triggers post-repair workflow (baseline + verification).
 
 ## System Components
 
@@ -99,6 +105,15 @@ This document describes the integration architecture that connects SIMBIOT, Asse
 - `POST /api/workflow/trigger-inspection` - Trigger inspection from anomaly
 - `GET /api/workflow/status/{equipment_id}` - Get workflow status
 - `POST /api/workflow/validate-repair` - Validate repair effectiveness
+
+### 7. Workflow Events Log (NEW)
+**Purpose:** Persistent log of workflow trigger outcomes for observability
+**Key Operations:**
+- Record trigger outcomes (created, suppressed, errors)
+- Filter by equipment or trigger type
+
+**API Endpoints:**
+- `GET /api/workflow/events` - List workflow events (filters supported)
 
 ## Architecture Diagram
 

@@ -1,7 +1,7 @@
 """Solar Demand Charge Management — peak shaving, NMD tracking, load deferral.
 
 Demand charges are typically 30-40% of a commercial electricity bill in SA.
-For Fairlands (NMD 6,000 kVA), shaving just the top 200 kW of demand with BESS
+For Site-002 (NMD 6,000 kVA), shaving just the top 200 kW of demand with BESS
 saves ~R31,100/month (200 kW x R155.50/kVA).
 
 NMD (Notified Maximum Demand):
@@ -296,7 +296,7 @@ class SolarDemandService:
     demand approaches NMD threshold.
     """
 
-    # Fairlands reference parameters
+    # Site-002 reference parameters
     NMD_LIMIT_KVA = 6000.0  # City Power contractual NMD
     DEMAND_CHARGE_PER_KVA = 155.50  # ZAR/kVA/month (City Power 2026)
     NMD_WARNING_PCT = 85.0  # Alert when demand exceeds 85% of NMD
@@ -307,14 +307,14 @@ class SolarDemandService:
     BESS_RATED_POWER_KW = 2507.0  # 0.5C rate
     BESS_MIN_SOC_PCT = 10.0
 
-    # Building profile (Fairlands campus)
+    # Building profile (Site-002 campus)
     BASE_LOAD_KW = 1800.0
     PEAK_DEMAND_KW = 2500.0
 
     def __init__(self):
         self._demand_history: Dict[str, List[DemandInterval]] = {}
         self._monthly_peaks: Dict[str, List[MonthlyPeak]] = {}
-        self._seed_demo_data("fairlands")
+        self._seed_demo_data("site-002")
 
     def _seed_demo_data(self, site_id: str) -> None:
         """Seed realistic demand profile and monthly peak history."""
@@ -404,7 +404,7 @@ class SolarDemandService:
 
     @staticmethod
     def _simulated_building_load(hour: float) -> float:
-        """Simulate Fairlands building load profile (kW) by hour of day.
+        """Simulate Site-002 building load profile (kW) by hour of day.
 
         Profile: Morning ramp-up 06:00-09:30 peaking at ~5,100 kW,
         sustained high demand 09:30-15:00, afternoon peak 14:00-15:00 at ~5,200 kW,
@@ -449,7 +449,7 @@ class SolarDemandService:
 
     @staticmethod
     def _simulated_solar_generation(hour: float) -> float:
-        """Simulate solar generation (kW) for 3.9 MWp Fairlands installation.
+        """Simulate solar generation (kW) for 3.9 MWp Site-002 installation.
 
         Bell curve peaking at ~3,200 kW at solar noon (12:30 SAST).
         """
@@ -798,7 +798,7 @@ class SolarDemandService:
     def get_deferral_suggestions(self, site_id: str) -> List[DeferralSuggestion]:
         """Identify non-critical loads that could shift to off-peak.
 
-        Based on typical commercial building equipment at Fairlands campus.
+        Based on typical commercial building equipment at Site-002 campus.
         """
         # Standard deferral candidates for a large office complex
         suggestions = [

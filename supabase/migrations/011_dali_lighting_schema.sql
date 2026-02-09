@@ -1,6 +1,6 @@
 -- =====================================================
 -- Migration 011: DALI-2 Lighting Schema
--- Tridonic Scenecom evo DA2 integration for FNB Fairlands
+-- Tridonic Scenecom evo DA2 integration for  
 -- 57 controllers, 1,315 MSensor G3 PIR sensors, 619 luminaires
 -- =====================================================
 
@@ -27,7 +27,7 @@ CREATE INDEX idx_dali_controllers_status ON dali_controllers(status);
 CREATE TRIGGER update_dali_controllers_updated_at BEFORE UPDATE ON dali_controllers
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
--- DALI Luminaires (619 total for FNB Fairlands)
+-- DALI Luminaires (619 total for  )
 CREATE TABLE dali_luminaires (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   controller_id UUID NOT NULL REFERENCES dali_controllers(id) ON DELETE CASCADE,

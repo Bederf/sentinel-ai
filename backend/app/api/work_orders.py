@@ -438,6 +438,24 @@ async def complete_technician_work_order(work_order_id: str, completion: Technic
         work_order["technician_notes"] = f"{existing_notes}\n\nCompletion Notes: {completion.technician_notes}".strip()
     work_order["updated_at"] = datetime.now()
 
+    # Workflow integration: trigger repair completed
+    try:
+        from app.services.workflow_triggers import get_trigger_engine
+
+        trigger_engine = get_trigger_engine()
+        await trigger_engine.on_repair_completed(
+            work_order_id=work_order_id,
+            equipment_id=work_order.get("equipment_id"),
+            completion_data={
+                "completion_notes": completion.resolution,
+                "parts_used": completion.parts_used,
+                "actual_hours": completion.time_spent,
+            }
+        )
+    except Exception:
+        # Non-blocking: workflow trigger failures should not break API
+        pass
+
     return work_order
 
 

@@ -39,7 +39,7 @@ DEGRADATION_NORMAL_MAX = 0.8       # %/year — normal for c-Si
 DEGRADATION_ELEVATED_MAX = 1.0     # %/year — elevated, monitor
 DEGRADATION_ACCELERATED = 1.0      # %/year — above this = accelerated
 
-# PR baseline for new installations (Fairlands commissioning target)
+# PR baseline for new installations (Site-002 commissioning target)
 COMMISSIONING_PR = 0.84
 
 # Economic threshold — below this PR, plant is uneconomic
@@ -357,7 +357,7 @@ class SolarHealthService:
                 for inv_cfg in plant.get("inverters", []):
                     inv_id = inv_cfg["id"]
 
-                    if inv_id == "FNB-INV-H03":
+                    if inv_id == "S002-INV-H03":
                         # Accelerated degradation — warranty investigation
                         self._inverter_degradation[inv_id] = 1.2
                         self._inverter_pr[inv_id] = 0.82  # lower current PR
@@ -548,7 +548,7 @@ class SolarHealthService:
             efficiency = 96.5 + rng.uniform(-1.0, 1.0)
 
             # Fault count — H03 has more faults
-            if inverter_id == "FNB-INV-H03":
+            if inverter_id == "S002-INV-H03":
                 fault_count = rng.choices([0, 1, 2, 3], weights=[0.4, 0.3, 0.2, 0.1])[0]
             else:
                 fault_count = rng.choices([0, 0, 1], weights=[0.7, 0.2, 0.1])[0]

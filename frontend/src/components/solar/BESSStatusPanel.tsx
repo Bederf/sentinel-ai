@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import type { BESSStatus } from "../../lib/solarApi";
 import { fetchBESSStatus } from "../../lib/solarApi";
+import { isExpectedApiError } from "../../lib/api";
 
 interface BESSStatusPanelProps {
   siteId: string;
@@ -88,7 +89,9 @@ export function BESSStatusPanel({ siteId }: BESSStatusPanelProps) {
       setBess(data);
       setError(null);
     } catch (err) {
-      console.error("Failed to load BESS status:", err);
+      if (!isExpectedApiError(err)) {
+        console.error("Failed to load BESS status:", err);
+      }
       setError(err instanceof Error ? err.message : "Failed to load");
     } finally {
       setLoading(false);

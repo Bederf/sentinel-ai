@@ -14,40 +14,20 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Request
-from slowapi import Limiter
-from slowapi.util import get_remote_address
+from pydantic import BaseModel, Field
 
 from app.config.settings import settings
 from app.middleware.auth_middleware import create_jwt_token, validate_jwt_token, _extract_ip_address
-from app.models.auth import (
-    AUTH_LEVEL_TO_MIN_ROLE,
-    AuthContext,
-    AuthLevel,
-    SentinelRole,
-)
+from app.middleware.rate_limiter import limiter
+from app.models.auth import SentinelRole, generate_api_key
+from app.database.supabase_client import get_supabase_client
 from app.services.mfa_service import get_mfa_service
+from app.services.session_service import session_service
 from app.services.token_blacklist_service import token_blacklist
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
-# Default limiter (can be overridden via init_rate_limiter)
-limiter = Limiter(key_func=get_remote_address)
-
-
-def init_rate_limiter(shared_limiter):
-    """Initialize the shared rate limiter from main.py.
-
-    Called during app startup to inject the limiter dependency.
-
-    Args:
-        shared_limiter: Limiter instance from app.state.limiter
-    """
-    global limiter
-    limiter = shared_limiter
-
 logger = logging.getLogger(__name__)
-
-router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
 # ---------------------------------------------------------------------------
 # Brute-force protection (Phase 58-04 M-5)
@@ -56,6 +36,38 @@ router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 _login_attempts: dict[str, list[datetime]] = defaultdict(list)
 _MAX_LOGIN_ATTEMPTS = 5
 _LOCKOUT_MINUTES = 15
+
+
+class ApiKeyCreateRequest(BaseModel):
+    owner: Optional[str] = None
+    scopes: list[str] = Field(default_factory=list)
+    role: str = "auditor"
+    expires_in_days: Optional[int] = Field(default=None, ge=1, le=3650)
+
+
+def _get_current_user_from_request(request: Request) -> dict:
+    """Extract current user payload from access token."""
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="No token provided")
+    token = auth_header[7:]
+    payload = validate_jwt_token(token, required_token_type="access")
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    role_str = payload.get("role", "auditor")
+    try:
+        role = SentinelRole(role_str)
+    except ValueError:
+        role = SentinelRole.AUDITOR
+
+    return {
+        "id": payload.get("sub"),
+        "email": payload.get("email"),
+        "full_name": payload.get("full_name"),
+        "role": role,
+        "jti": payload.get("jti"),
+    }
 
 
 def _check_brute_force(identifier: str) -> None:
@@ -138,28 +150,8 @@ def _create_jwt_token(user_data: dict, token_type: str = "access") -> str:
     )
 
 
-def _extract_ip_address(request: Request) -> str:
-    """Extract client IP from request with proxy support."""
-    # Cloudflare-specific header
-    cf_ip = request.headers.get("CF-Connecting-IP")
-    if cf_ip:
-        return cf_ip.strip()
-
-    # Standard proxy headers
-    forwarded_for = request.headers.get("X-Forwarded-For")
-    if forwarded_for:
-        return forwarded_for.split(",")[0].strip()
-
-    real_ip = request.headers.get("X-Real-IP")
-    if real_ip:
-        return real_ip.strip()
-
-    # Fallback to direct client
-    return request.client.host if request.client else "unknown"
-
-
 @router.post("/login")
-@limiter.limit("5/minute")
+@limiter.limit("5/15minutes")
 async def login_with_email(request: Request, email: str):
     """Login with email address (simple authentication).
 
@@ -260,6 +252,14 @@ async def login_with_email(request: Request, email: str):
     # Phase 65-02: Issue both access and refresh tokens
     access_token = _create_jwt_token(user_info, token_type="access")
     refresh_token = _create_jwt_token(user_info, token_type="refresh")
+    refresh_payload = validate_jwt_token(refresh_token, required_token_type="refresh") or {}
+    refresh_jti = refresh_payload.get("jti", "")
+    session_id = session_service.create_session(
+        user_id=user_info["user_id"],
+        ip=source_ip,
+        user_agent=user_agent,
+        token_jti=refresh_jti,
+    ) if refresh_jti else None
 
     # Grant default building access for new users
     if is_new_user:
@@ -313,6 +313,7 @@ async def login_with_email(request: Request, email: str):
         "mfa_required": mfa_required,
         "mfa_enrolled": mfa_enrolled,
         "mfa_challenge_pending": False,
+        "session_id": session_id,
     }
 
     # Add enrollment prompt for admins who haven't enrolled yet
@@ -323,7 +324,7 @@ async def login_with_email(request: Request, email: str):
 
 
 @router.post("/login/mfa-complete")
-@limiter.limit("5/minute")
+@limiter.limit("5/15minutes")
 async def complete_mfa_login(request: Request, email: str, mfa_code: str):
     """Complete login after MFA verification.
 
@@ -372,14 +373,27 @@ async def complete_mfa_login(request: Request, email: str, mfa_code: str):
         user_agent=user_agent,
     )
 
+    # Fallback to backup code verification (65-03)
     if not success:
-        _record_failed_attempt(email)
-        logger.warning(f"MFA verification failed for {email}: {error}")
-        raise HTTPException(status_code=400, detail=error)
+        if mfa_service.verify_backup_code(user_info["user_id"], mfa_code):
+            success = True
+            error = ""
+        else:
+            _record_failed_attempt(email)
+            logger.warning(f"MFA verification failed for {email}: {error}")
+            raise HTTPException(status_code=400, detail=error)
 
     # MFA verified - issue token pair (Phase 65-02)
     access_token = _create_jwt_token(user_info, token_type="access")
     refresh_token = _create_jwt_token(user_info, token_type="refresh")
+    refresh_payload = validate_jwt_token(refresh_token, required_token_type="refresh") or {}
+    refresh_jti = refresh_payload.get("jti", "")
+    session_id = session_service.create_session(
+        user_id=user_info["user_id"],
+        ip=source_ip,
+        user_agent=user_agent,
+        token_jti=refresh_jti,
+    ) if refresh_jti else None
 
     logger.info(f"MFA login completed for {email}")
 
@@ -413,6 +427,7 @@ async def complete_mfa_login(request: Request, email: str, mfa_code: str):
         },
         "expires_at": (datetime.utcnow() + timedelta(minutes=settings.jwt_access_token_ttl_minutes)).isoformat(),
         "mfa_verified": True,
+        "session_id": session_id,
     }
 
 
@@ -508,12 +523,15 @@ async def logout(request: Request, refresh_token: Optional[str] = None):
     Returns:
         Success message
     """
+    user_id: Optional[str] = None
+
     # Extract and blacklist access token
     auth_header = request.headers.get("Authorization", "")
     if auth_header.startswith("Bearer "):
         access_token = auth_header[7:]
-        payload = validate_jwt_token(access_token)
+        payload = validate_jwt_token(access_token, required_token_type="access")
         if payload:
+            user_id = payload.get("sub")
             jti = payload.get("jti")
             if jti:
                 # Calculate remaining TTL
@@ -524,20 +542,25 @@ async def logout(request: Request, refresh_token: Optional[str] = None):
 
     # Blacklist refresh token if provided
     if refresh_token:
-        payload = validate_jwt_token(refresh_token)
+        payload = validate_jwt_token(refresh_token, required_token_type="refresh")
         if payload and payload.get("token_type") == "refresh":
+            user_id = user_id or payload.get("sub")
             jti = payload.get("jti")
             if jti:
                 exp = payload.get("exp", 0)
                 now = int(datetime.utcnow().timestamp())
                 ttl = max(0, exp - now)
                 token_blacklist.blacklist_token(jti, ttl_seconds=ttl)
+                if user_id:
+                    session = session_service.find_session_by_token_jti(user_id, jti)
+                    if session and session.get("session_id"):
+                        session_service.revoke_session(user_id, session["session_id"])
 
     return {"message": "Logged out successfully"}
 
 
 @router.post("/refresh")
-@limiter.limit("10/minute")
+@limiter.limit("5/15minutes")
 async def refresh_access_token(request: Request, refresh_token: str):
     """Refresh access token using a valid refresh token.
 
@@ -554,7 +577,7 @@ async def refresh_access_token(request: Request, refresh_token: str):
     Raises:
         HTTPException 401 if refresh token is invalid
     """
-    payload = validate_jwt_token(refresh_token)
+    payload = validate_jwt_token(refresh_token, required_token_type="refresh")
     if not payload:
         raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
 
@@ -577,10 +600,21 @@ async def refresh_access_token(request: Request, refresh_token: str):
         now = int(datetime.utcnow().timestamp())
         ttl = max(0, exp - now)
         token_blacklist.blacklist_token(old_jti, ttl_seconds=ttl)
+        existing_session = session_service.find_session_by_token_jti(user_info["user_id"], old_jti)
+        if existing_session and existing_session.get("session_id"):
+            session_service.revoke_session(user_info["user_id"], existing_session["session_id"])
 
     # Issue new token pair
     new_access_token = _create_jwt_token(user_info, token_type="access")
     new_refresh_token = _create_jwt_token(user_info, token_type="refresh")
+    new_refresh_payload = validate_jwt_token(new_refresh_token, required_token_type="refresh") or {}
+    new_refresh_jti = new_refresh_payload.get("jti", "")
+    session_id = session_service.create_session(
+        user_id=user_info["user_id"],
+        ip=_extract_ip_address(request),
+        user_agent=request.headers.get("User-Agent"),
+        token_jti=new_refresh_jti,
+    ) if new_refresh_jti else None
 
     logger.info(f"Token refresh for user {user_info['user_id']}")
 
@@ -589,4 +623,137 @@ async def refresh_access_token(request: Request, refresh_token: str):
         "refresh_token": new_refresh_token,
         "token_type": "bearer",
         "expires_at": (datetime.utcnow() + timedelta(minutes=settings.jwt_access_token_ttl_minutes)).isoformat(),
+        "session_id": session_id,
     }
+
+
+@router.get("/sessions")
+async def list_sessions(request: Request):
+    """List active sessions for current user."""
+    user = _get_current_user_from_request(request)
+    sessions = session_service.get_active_sessions(user["id"])
+    return {"sessions": sessions, "count": len(sessions)}
+
+
+@router.delete("/sessions/{session_id}")
+async def revoke_session(request: Request, session_id: str):
+    """Revoke a specific session for current user."""
+    user = _get_current_user_from_request(request)
+    revoked = session_service.revoke_session(user["id"], session_id)
+    if not revoked:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return {"message": "Session revoked", "session_id": session_id}
+
+
+@router.delete("/sessions")
+async def revoke_all_sessions(request: Request):
+    """Revoke all sessions for current user."""
+    user = _get_current_user_from_request(request)
+    revoked_count = session_service.revoke_all_sessions(user["id"])
+    return {"message": "Sessions revoked", "revoked_count": revoked_count}
+
+
+@router.post("/api-keys")
+@limiter.limit("5/15minutes")
+async def create_api_key(request: Request, body: ApiKeyCreateRequest):
+    """Create an API key and persist its hash in database."""
+    user = _get_current_user_from_request(request)
+    owner = body.owner or user["email"] or user["id"]
+
+    # Non-admin users can only create keys for themselves.
+    if user["role"] != SentinelRole.ADMIN and owner != (user["email"] or user["id"]):
+        raise HTTPException(status_code=403, detail="Cannot create key for another owner")
+
+    key_plaintext, key_hash = generate_api_key()
+    key_prefix = key_plaintext[:8]
+
+    expires_at = None
+    if body.expires_in_days:
+        expires_at = (datetime.utcnow() + timedelta(days=body.expires_in_days)).isoformat()
+
+    role_value = body.role.lower().strip()
+    if role_value not in {r.value for r in SentinelRole}:
+        raise HTTPException(status_code=400, detail="Invalid role value")
+    if user["role"] != SentinelRole.ADMIN and role_value != "auditor":
+        raise HTTPException(status_code=403, detail="Only admin can create elevated API roles")
+
+    try:
+        client = get_supabase_client()
+        insert_payload = {
+            "key_hash": key_hash,
+            "key_prefix": key_prefix,
+            "owner": owner,
+            "role": role_value,
+            "scopes": body.scopes,
+            "expires_at": expires_at,
+            "revoked": False,
+        }
+        result = client.table("api_keys").insert(insert_payload).execute()
+        if not result.data:
+            raise HTTPException(status_code=500, detail="Failed to create API key")
+        row = result.data[0]
+        return {
+            "id": row.get("id"),
+            "api_key": key_plaintext,  # shown once
+            "key_prefix": row.get("key_prefix"),
+            "owner": row.get("owner"),
+            "role": row.get("role"),
+            "scopes": row.get("scopes") or [],
+            "created_at": row.get("created_at"),
+            "expires_at": row.get("expires_at"),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed creating API key: %s", e)
+        raise HTTPException(status_code=503, detail="API key store unavailable")
+
+
+@router.get("/api-keys")
+async def list_api_keys(request: Request):
+    """List API keys for current owner (or all for admin)."""
+    user = _get_current_user_from_request(request)
+    owner = user["email"] or user["id"]
+    try:
+        client = get_supabase_client()
+        query = client.table("api_keys").select(
+            "id,key_prefix,owner,role,scopes,created_at,last_used_at,expires_at,revoked"
+        )
+        if user["role"] != SentinelRole.ADMIN:
+            query = query.eq("owner", owner)
+        rows = query.order("created_at", desc=True).execute().data or []
+        return {"api_keys": rows, "count": len(rows)}
+    except Exception as e:
+        logger.error("Failed listing API keys: %s", e)
+        raise HTTPException(status_code=503, detail="API key store unavailable")
+
+
+@router.delete("/api-keys/{api_key_id}")
+async def revoke_api_key(request: Request, api_key_id: str):
+    """Revoke API key by id."""
+    user = _get_current_user_from_request(request)
+    owner = user["email"] or user["id"]
+    try:
+        client = get_supabase_client()
+        query = client.table("api_keys").update({"revoked": True}).eq("id", api_key_id)
+        if user["role"] != SentinelRole.ADMIN:
+            query = query.eq("owner", owner)
+        result = query.execute()
+        if not result.data:
+            raise HTTPException(status_code=404, detail="API key not found")
+        # Best-effort cache invalidation in auth middleware by hash
+        row = result.data[0]
+        key_hash = row.get("key_hash")
+        if key_hash:
+            try:
+                from app.middleware.auth_middleware import _API_KEY_CACHE
+
+                _API_KEY_CACHE.pop(key_hash, None)
+            except Exception:
+                pass
+        return {"message": "API key revoked", "id": api_key_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed revoking API key: %s", e)
+        raise HTTPException(status_code=503, detail="API key store unavailable")

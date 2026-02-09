@@ -18,7 +18,7 @@ import {
   AlertTriangle,
   Building2,
 } from "lucide-react";
-import { securityApi } from "../lib/api";
+import { isExpectedApiError, securityApi } from "../lib/api";
 import type { SecurityOccupancy, OccupancyRecommendation } from "../lib/api";
 
 /** Maximum capacity per zone for bar chart display */
@@ -49,7 +49,9 @@ export function SecurityOccupancyPanel({ refreshKey }: SecurityOccupancyPanelPro
       setRecommendations(recsResult.recommendations || []);
       setError(null);
     } catch (err) {
-      console.error("Failed to fetch occupancy data:", err);
+      if (!isExpectedApiError(err)) {
+        console.error("Failed to fetch occupancy data:", err);
+      }
       setError("Failed to load occupancy data");
     } finally {
       setLoading(false);

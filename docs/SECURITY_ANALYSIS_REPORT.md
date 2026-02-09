@@ -288,7 +288,11 @@ SENTINEL implements **building-level access control** where users only see build
 ### 4.4 Authentication Status
 
 **Current Implementation:**
-- ✅ Email-based authentication with JWT tokens (30-day expiry)
+- ✅ Email-based authentication with short-lived JWT access tokens (15 minutes)
+- ✅ Refresh tokens with rotation (7-day TTL) and revocation on use
+- ✅ JWT blacklist enforcement using token `jti` (Redis-backed, graceful degradation)
+- ✅ Session tracking and revocation endpoints (`/api/auth/sessions*`)
+- ✅ Persistent API keys stored as hashes in database (`api_keys` table)
 - ✅ Authorization model defined (AuthorizationLevel enum)
 - ✅ Remote command authorization checks in place
 - ✅ Audit logging captures user context
@@ -298,8 +302,7 @@ SENTINEL implements **building-level access control** where users only see build
 **Required for Production:**
 ```
 [ ] Integrate with corporate SSO (Azure AD, Okta)
-[ ] Add MFA for ENGINEER-level actions
-[ ] Implement session management
+[ ] Extend MFA requirement to additional privileged roles (currently admin-focused)
 [ ] Add password policy enforcement
 ```
 

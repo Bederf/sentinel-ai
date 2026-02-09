@@ -40,26 +40,26 @@ def create_firstrand_config() -> ConceptConfig:
         # ── Facilities / Contracts ──
         segments=[
             SegmentConfig(
-                segment_id="SEG-FAIRLANDS-001",
-                site_name="Fairlands Campus",
+                segment_id="SEG--001",
+                site_name=" Campus",
                 cost_center_id=10001,
                 enabled=True,
             ),
             SegmentConfig(
-                segment_id="SEG-FNB-BRANCHES-GP",
-                site_name="FNB Branches — Gauteng",
+                segment_id="SEG--BRANCHES-GP",
+                site_name=" Branches — Gauteng",
                 cost_center_id=10002,
                 enabled=True,
             ),
             SegmentConfig(
-                segment_id="SEG-FNB-BRANCHES-WC",
-                site_name="FNB Branches — Western Cape",
+                segment_id="SEG--BRANCHES-WC",
+                site_name=" Branches — Western Cape",
                 cost_center_id=10003,
                 enabled=True,
             ),
             SegmentConfig(
-                segment_id="SEG-FNB-BRANCHES-KZN",
-                site_name="FNB Branches — KwaZulu-Natal",
+                segment_id="SEG--BRANCHES-KZN",
+                site_name=" Branches — KwaZulu-Natal",
                 cost_center_id=10004,
                 enabled=True,
             ),

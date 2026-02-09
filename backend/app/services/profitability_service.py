@@ -18,6 +18,7 @@ from app.models.contract import (
 )
 from app.database.repositories.contract_repository import ContractRepository
 from app.database.repositories.budget_repository import BudgetRepository
+from app.database.repositories.sla_repository import get_sla_repository
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +55,7 @@ class ProfitabilityService:
     def __init__(self):
         self.contract_repo = ContractRepository()
         self.budget_repo = BudgetRepository()
+        self.sla_repo = get_sla_repository()
 
     def calculate_portfolio_metrics(
         self,
@@ -312,7 +314,9 @@ class ProfitabilityService:
     def calculate_asset_roi(
         self,
         contract_id: str,
-        equipment_id: str
+        equipment_id: str,
+        period_start: Optional[date] = None,
+        period_end: Optional[date] = None
     ) -> Dict[str, Any]:
         """
         Calculate ROI for a specific asset within a contract.
@@ -350,10 +354,11 @@ class ProfitabilityService:
         all_assets = self.contract_repo.get_contract_assets(contract_id)
         total_asset_count = len(all_assets) if all_assets else 1
 
-        # Get total contract costs for current month
-        today = date.today()
-        period_start = today.replace(day=1)
-        period_end = self._get_month_end(period_start)
+        if period_start is None or period_end is None:
+            today = date.today()
+            period_start = today.replace(day=1)
+            period_end = self._get_month_end(period_start)
+
         total_costs = self._get_contract_costs(contract_id, period_start, period_end)
         total_contract_cost = sum(total_costs.values())
 
@@ -373,6 +378,119 @@ class ProfitabilityService:
             "coverage_type": asset_contract.get("coverage_type", "full")
         }
 
+    def calculate_contract_asset_roi_list(
+        self,
+        contract_id: str,
+        period_start: date,
+        period_end: date,
+        limit: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Calculate ROI for all assets in a contract.
+
+        Returns:
+            List of asset ROI dicts (optionally limited)
+        """
+        contract = self.contract_repo.get_by_id(contract_id)
+        if not contract:
+            raise ValueError(f"Contract {contract_id} not found")
+
+        assets = self.contract_repo.get_contract_assets(contract_id)
+        if not assets:
+            return []
+
+        monthly_fee = contract.get("monthly_fee_zar", 0.0) or 0.0
+        total_costs = self._get_contract_costs(contract_id, period_start, period_end)
+        total_contract_cost = sum(total_costs.values())
+        total_asset_count = len(assets) if assets else 1
+
+        results = []
+        for asset in assets:
+            equipment_id = asset.get("equipment_id")
+            allocated_revenue = asset.get("allocated_fee_zar", 0.0) or 0.0
+            fee_pct = asset.get("fee_allocation_pct", 0.0) or 0.0
+
+            if fee_pct > 0 and allocated_revenue == 0:
+                allocated_revenue = monthly_fee * (fee_pct / 100)
+            if allocated_revenue == 0 and total_asset_count > 0:
+                allocated_revenue = monthly_fee / total_asset_count
+
+            allocated_cost = total_contract_cost / total_asset_count if total_asset_count > 0 else 0.0
+            margin = allocated_revenue - allocated_cost
+            roi_pct = round((margin / allocated_cost * 100) if allocated_cost > 0 else 0.0, 2)
+
+            results.append({
+                "equipment_id": equipment_id,
+                "equipment_code": asset.get("equipment", {}).get("code") if asset.get("equipment") else None,
+                "equipment_name": asset.get("equipment", {}).get("name") if asset.get("equipment") else None,
+                "equipment_type": asset.get("equipment", {}).get("type") if asset.get("equipment") else None,
+                "contract_id": contract_id,
+                "allocated_revenue_zar": round(allocated_revenue, 2),
+                "allocated_cost_zar": round(allocated_cost, 2),
+                "margin_zar": round(margin, 2),
+                "roi_percentage": roi_pct,
+                "coverage_type": asset.get("coverage_type", "full"),
+            })
+
+        results.sort(key=lambda r: r["roi_percentage"], reverse=True)
+        if limit is not None:
+            return results[:limit]
+        return results
+
+    def generate_contract_report(
+        self,
+        contract_id: str,
+        period_start: date,
+        period_end: date,
+        asset_limit: int = 15
+    ) -> Dict[str, Any]:
+        """
+        Generate a profitability report for a contract.
+
+        Includes profitability breakdown, trends, asset ROI list, and data-quality flags.
+        """
+        contract = self.contract_repo.get_by_id(contract_id)
+        if not contract:
+            raise ValueError(f"Contract {contract_id} not found")
+
+        profitability = self.calculate_contract_profitability(
+            contract_id, period_start, period_end
+        )
+        trends = self.calculate_profitability_trends(contract_id, months=12)
+        assets = self.calculate_contract_asset_roi_list(
+            contract_id, period_start, period_end, limit=asset_limit
+        )
+
+        data_quality_flags = []
+        if profitability.total_cost_zar == 0:
+            data_quality_flags.append("missing_cost_actuals")
+        if profitability.asset_count == 0:
+            data_quality_flags.append("missing_asset_assignments")
+        if profitability.net_revenue_zar == 0:
+            data_quality_flags.append("missing_revenue")
+
+        return {
+            "contract": {
+                "id": contract.get("id"),
+                "code": contract.get("code"),
+                "status": contract.get("status"),
+                "organization_name": contract.get("organizations", {}).get("name") if contract.get("organizations") else None,
+                "building_name": contract.get("buildings", {}).get("name") if contract.get("buildings") else None,
+            },
+            "period": {
+                "start": period_start.isoformat(),
+                "end": period_end.isoformat(),
+            },
+            "profitability": profitability.model_dump(),
+            "trends": [trend.model_dump() for trend in trends],
+            "assets": assets,
+            "data_quality_flags": data_quality_flags,
+            "assumptions": [
+                "Asset cost allocation uses even distribution when no fee allocation is provided.",
+                "Actual costs are sourced from budget actuals for the period.",
+            ],
+        }
+
     # ========================================================================
     # Private Helper Methods
     # ========================================================================
@@ -386,11 +504,22 @@ class ProfitabilityService:
         """
         Get total SLA clawbacks for a contract in a period.
 
-        TODO: Phase 50 (SLA Monitoring) will provide this data.
-        Returns 0.0 for now.
+        Uses SLA performance records if available, otherwise returns 0.0.
         """
-        # Placeholder - will integrate with SLA performance repository in Phase 50
-        return 0.0
+        try:
+            performance = self.sla_repo.get_performance_history(contract_id, months=12)
+            total = 0.0
+            for perf in performance:
+                start = perf.period_start
+                end = perf.period_end
+                if not start or not end:
+                    continue
+                if start <= period_end and end >= period_start:
+                    total += float(getattr(perf, "clawback_amount_zar", 0.0) or 0.0)
+            return round(total, 2)
+        except Exception as e:
+            logger.warning(f"Error getting clawbacks for contract {contract_id}: {e}")
+            return 0.0
 
     def _get_contract_costs(
         self,
@@ -438,23 +567,29 @@ class ProfitabilityService:
     ) -> Optional[float]:
         """Calculate month-over-month margin percentage change."""
         try:
-            # Get previous month
+            contract = self.contract_repo.get_by_id(contract_id)
+            if not contract:
+                return None
+
             from datetime import timedelta
             prev_month_end = current_start - timedelta(days=1)
             prev_month_start = prev_month_end.replace(day=1)
 
-            # Get current and previous profitability
-            current_profit = self.calculate_contract_profitability(
+            current_net = (contract.get("monthly_fee_zar", 0.0) or 0.0) - self._get_clawbacks_for_period(
                 contract_id, current_start, current_end
             )
-            prev_profit = self.calculate_contract_profitability(
+            prev_net = (contract.get("monthly_fee_zar", 0.0) or 0.0) - self._get_clawbacks_for_period(
                 contract_id, prev_month_start, prev_month_end
             )
 
-            # Calculate percentage change
-            if prev_profit.gross_margin_percentage != 0:
-                change = ((current_profit.gross_margin_percentage - prev_profit.gross_margin_percentage)
-                         / abs(prev_profit.gross_margin_percentage) * 100)
+            current_cost = sum(self._get_contract_costs(contract_id, current_start, current_end).values())
+            prev_cost = sum(self._get_contract_costs(contract_id, prev_month_start, prev_month_end).values())
+
+            current_margin_pct = (current_net - current_cost) / current_net * 100 if current_net > 0 else 0.0
+            prev_margin_pct = (prev_net - prev_cost) / prev_net * 100 if prev_net > 0 else 0.0
+
+            if prev_margin_pct != 0:
+                change = ((current_margin_pct - prev_margin_pct) / abs(prev_margin_pct)) * 100
                 return round(change, 2)
             return None
         except Exception:

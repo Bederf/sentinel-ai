@@ -10,20 +10,16 @@ import logging
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Request
-from slowapi import Limiter
-from slowapi.util import get_remote_address
 from pydantic import BaseModel, Field
 
-from app.config.settings import settings
+from app.middleware.auth_middleware import validate_jwt_token, _extract_ip_address
+from app.middleware.rate_limiter import limiter
 from app.models.auth import SentinelRole
 from app.services.mfa_service import get_mfa_service
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/mfa", tags=["MFA"])
-
-# Rate limiter - use local instance (Phase 65-02)
-limiter = Limiter(key_func=get_remote_address)
 
 
 # =============================================================================
@@ -37,6 +33,7 @@ class EnrollResponse(BaseModel):
     success: bool
     provisioning_uri: Optional[str] = None
     secret: Optional[str] = None  # Only returned for manual entry
+    backup_codes: Optional[list[str]] = None
     message: str
 
 
@@ -69,6 +66,18 @@ class DisableRequest(BaseModel):
     user_email: str
 
 
+class BackupCodeVerifyRequest(BaseModel):
+    """Request to verify MFA backup code."""
+
+    code: str = Field(..., min_length=6, max_length=16)
+
+
+class RegenerateBackupCodesRequest(BaseModel):
+    """Request to rotate backup codes using current TOTP code."""
+
+    totp_code: str = Field(..., min_length=6, max_length=6, pattern=r"^\d{6}$")
+
+
 # =============================================================================
 # HELPER FUNCTIONS
 # =============================================================================
@@ -93,49 +102,21 @@ def _get_current_user(request: Request) -> dict:
         raise HTTPException(status_code=401, detail="No token provided")
 
     token = auth_header[7:]
-    secret = settings.supabase_key or "sentinel-demo-jwt-secret-change-in-production"
+    payload = validate_jwt_token(token, required_token_type="access")
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
 
+    role_str = payload.get("role", "auditor")
     try:
-        payload = pyjwt.decode(
-            token,
-            secret,
-            algorithms=["HS256"],
-            options={"verify_exp": True},
-        )
+        role = SentinelRole(role_str)
+    except ValueError:
+        role = SentinelRole.AUDITOR
 
-        role_str = payload.get("role", "auditor")
-        try:
-            role = SentinelRole(role_str)
-        except ValueError:
-            role = SentinelRole.AUDITOR
-
-        return {
-            "id": payload.get("sub"),
-            "email": payload.get("email"),
-            "role": role,
-        }
-
-    except pyjwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token expired")
-    except pyjwt.InvalidTokenError:
-        raise HTTPException(status_code=401, detail="Invalid token")
-
-
-def _extract_ip_address(request: Request) -> str:
-    """Extract client IP from request with proxy support."""
-    cf_ip = request.headers.get("CF-Connecting-IP")
-    if cf_ip:
-        return cf_ip.strip()
-
-    forwarded_for = request.headers.get("X-Forwarded-For")
-    if forwarded_for:
-        return forwarded_for.split(",")[0].strip()
-
-    real_ip = request.headers.get("X-Real-IP")
-    if real_ip:
-        return real_ip.strip()
-
-    return request.client.host if request.client else "unknown"
+    return {
+        "id": payload.get("sub"),
+        "email": payload.get("email"),
+        "role": role,
+    }
 
 
 # =============================================================================
@@ -154,16 +135,6 @@ async def enroll_mfa(request: Request):
     Phase 65-02: Rate limited to prevent abuse (5/15min).
 
     Requires authentication.
-    """
-    Start MFA enrollment for the current user.
-
-    Generates a new TOTP secret and returns a provisioning URI for QR code.
-    The user must verify the code before MFA is enabled.
-
-    Requires authentication.
-
-    Returns:
-        EnrollResponse with provisioning URI for authenticator app
     """
     user = _get_current_user(request)
     mfa_service = get_mfa_service()
@@ -184,10 +155,15 @@ async def enroll_mfa(request: Request):
             message="Failed to start MFA enrollment. Please try again.",
         )
 
+    backup_codes = mfa_service.generate_backup_codes(user["id"])
+    if not backup_codes:
+        logger.warning("Failed to generate backup codes during enrollment for %s", user["id"])
+
     return EnrollResponse(
         success=True,
         provisioning_uri=uri,
         secret=secret,  # For manual entry if QR scan fails
+        backup_codes=backup_codes,
         message="Scan the QR code with your authenticator app, then verify with a code.",
     )
 
@@ -287,6 +263,56 @@ async def challenge_mfa(request: Request, body: VerifyRequest):
         success=True,
         message="MFA verification successful.",
     )
+
+
+@router.post("/verify-backup", response_model=VerifyResponse)
+@limiter.limit("5/15minutes")
+async def verify_backup_code(request: Request, body: BackupCodeVerifyRequest):
+    """Verify and consume a backup code as MFA alternative."""
+    user = _get_current_user(request)
+    mfa_service = get_mfa_service()
+
+    if not mfa_service.is_mfa_enabled(user["email"]):
+        raise HTTPException(status_code=400, detail="MFA is not enabled for this user")
+
+    if not mfa_service.verify_backup_code(user["id"], body.code):
+        return VerifyResponse(success=False, message="Invalid backup code")
+
+    return VerifyResponse(success=True, message="Backup code verified")
+
+
+@router.get("/backup-codes/remaining")
+async def get_backup_codes_remaining(request: Request):
+    """Get number of remaining unused backup codes."""
+    user = _get_current_user(request)
+    mfa_service = get_mfa_service()
+    remaining = mfa_service.get_backup_codes_remaining(user["id"])
+    return {"remaining": remaining}
+
+
+@router.post("/backup-codes/regenerate")
+@limiter.limit("5/15minutes")
+async def regenerate_backup_codes(request: Request, body: RegenerateBackupCodesRequest):
+    """Regenerate backup codes after verifying current TOTP code."""
+    user = _get_current_user(request)
+    mfa_service = get_mfa_service()
+
+    source_ip = _extract_ip_address(request)
+    user_agent = request.headers.get("User-Agent")
+    success, error = mfa_service.verify_code(
+        user_email=user["email"],
+        code=body.totp_code,
+        source_ip=source_ip,
+        user_agent=user_agent,
+    )
+    if not success:
+        raise HTTPException(status_code=400, detail=error)
+
+    backup_codes = mfa_service.generate_backup_codes(user["id"])
+    if not backup_codes:
+        raise HTTPException(status_code=500, detail="Failed to regenerate backup codes")
+
+    return {"backup_codes": backup_codes}
 
 
 @router.get("/status", response_model=StatusResponse)

@@ -3,73 +3,79 @@ Unit tests for device API endpoints.
 """
 
 import pytest
-from fastapi.testclient import TestClient
+from httpx import AsyncClient
 
 
 @pytest.mark.unit
 class TestDeviceAPI:
     """Test device API endpoints."""
 
-    def test_get_devices(self, test_client: TestClient):
+    @pytest.mark.asyncio
+    async def test_get_devices(self, async_client: AsyncClient):
         """Test GET /api/devices endpoint."""
-        response = test_client.get("/api/devices")
+        response = await async_client.get("/api/devices")
         
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, list)
 
-    def test_get_devices_with_site_filter(self, test_client: TestClient):
+    @pytest.mark.asyncio
+    async def test_get_devices_with_site_filter(self, async_client: AsyncClient):
         """Test GET /api/devices with site_id filter."""
-        response = test_client.get("/api/devices?site_id=test-site-001")
+        response = await async_client.get("/api/devices?site_id=test-site-001")
         
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, list)
 
-    def test_get_devices_with_type_filter(self, test_client: TestClient):
+    @pytest.mark.asyncio
+    async def test_get_devices_with_type_filter(self, async_client: AsyncClient):
         """Test GET /api/devices with device_type filter."""
-        response = test_client.get("/api/devices?device_type=HVAC_CHILLER")
+        response = await async_client.get("/api/devices?device_type=HVAC_CHILLER")
         
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, list)
 
-    def test_get_device_by_id(self, test_client: TestClient):
+    @pytest.mark.asyncio
+    async def test_get_device_by_id(self, async_client: AsyncClient):
         """Test GET /api/devices/{device_id} endpoint."""
         # First get list of devices
-        devices_response = test_client.get("/api/devices")
+        devices_response = await async_client.get("/api/devices")
         if devices_response.status_code == 200:
             devices = devices_response.json()
             if devices:
                 device_id = devices[0]["id"]
-                response = test_client.get(f"/api/devices/{device_id}")
+                response = await async_client.get(f"/api/devices/{device_id}")
                 
                 assert response.status_code == 200
                 data = response.json()
                 assert data["id"] == device_id
 
-    def test_get_device_points(self, test_client: TestClient):
+    @pytest.mark.asyncio
+    async def test_get_device_points(self, async_client: AsyncClient):
         """Test GET /api/devices/{device_id}/points endpoint."""
-        devices_response = test_client.get("/api/devices")
+        devices_response = await async_client.get("/api/devices")
         if devices_response.status_code == 200:
             devices = devices_response.json()
             if devices:
                 device_id = devices[0]["id"]
-                response = test_client.get(f"/api/devices/{device_id}/points")
+                response = await async_client.get(f"/api/devices/{device_id}/points")
                 
                 assert response.status_code == 200
                 data = response.json()
                 assert "points" in data
 
-    def test_control_device(self, test_client: TestClient):
+    @pytest.mark.asyncio
+    async def test_control_device(self, async_client: AsyncClient):
         """Test POST /api/devices/{device_id}/control endpoint."""
-        devices_response = test_client.get("/api/devices")
+        devices_response = await async_client.get("/api/devices")
         if devices_response.status_code == 200:
             devices = devices_response.json()
             if devices:
                 device_id = devices[0]["id"]
                 # Get device to find a writable point
-                device_response = test_client.get(f"/api/devices/{device_id}")
+                device_response = await async_client.get(f"/api/devices/{device_id}")
                 if device_response.status_code == 200:
                     device = device_response.json()
                     if "points" in device:
@@ -86,7 +92,7 @@ class TestDeviceAPI:
                                 "value": 22.0,
                                 "priority": 8
                             }
-                            response = test_client.post(
+                            response = await async_client.post(
                                 f"/api/devices/{device_id}/control",
                                 json=control_data
                             )
@@ -98,14 +104,15 @@ class TestDeviceAPI:
                             # Response should have some structured content
                             assert isinstance(data, dict)
 
-    def test_get_device_status(self, test_client: TestClient):
+    @pytest.mark.asyncio
+    async def test_get_device_status(self, async_client: AsyncClient):
         """Test GET /api/devices/{device_id}/status endpoint."""
-        devices_response = test_client.get("/api/devices")
+        devices_response = await async_client.get("/api/devices")
         if devices_response.status_code == 200:
             devices = devices_response.json()
             if devices:
                 device_id = devices[0]["id"]
-                response = test_client.get(f"/api/devices/{device_id}/status")
+                response = await async_client.get(f"/api/devices/{device_id}/status")
                 
                 assert response.status_code == 200
                 data = response.json()

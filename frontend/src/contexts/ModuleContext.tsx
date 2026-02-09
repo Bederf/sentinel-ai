@@ -8,47 +8,21 @@
  * - Module activation/deactivation
  */
 
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { ReactNode } from 'react';
 import {
   moduleRegistryApi,
 } from '../lib/moduleRegistry';
+import { isExpectedApiError } from "../lib/api";
 import type {
+  AIRecommendation,
   ModuleType,
   ModuleInstance,
   ModuleDefinition,
-  AIRecommendation,
   IntegrationSummary,
 } from '../lib/moduleRegistry';
-
-interface ModuleContextValue {
-  // State
-  siteId: string | null;
-  siteName: string | null;
-  activeModules: ModuleInstance[];
-  availableModules: ModuleDefinition[];
-  recommendations: AIRecommendation[];
-  integrationSummary: IntegrationSummary | null;
-  loading: boolean;
-  error: string | null;
-
-  // Actions
-  setSite: (siteId: string, siteName: string) => void;
-  activateModule: (moduleType: ModuleType, config?: Record<string, unknown>) => Promise<void>;
-  deactivateModule: (moduleType: ModuleType) => Promise<void>;
-  isModuleActive: (moduleType: ModuleType) => boolean;
-  addRecommendation: (recommendation: Omit<AIRecommendation, 'recommendation_id' | 'timestamp' | 'acknowledged' | 'resolved'>) => void;
-  acknowledgeRecommendation: (recommendationId: string) => Promise<void>;
-  resolveRecommendation: (recommendationId: string) => Promise<void>;
-  refreshIntegration: () => Promise<void>;
-  refreshRecommendations: () => Promise<void>;
-
-  // Integration helpers
-  getActiveIntegrations: () => { source: ModuleType; target: ModuleType; name: string }[];
-  canIntegrateWith: (moduleType: ModuleType) => ModuleType[];
-}
-
-const ModuleContext = createContext<ModuleContextValue | undefined>(undefined);
+import type { ModuleContextValue } from "./moduleContextStore";
+import { ModuleContext } from "./moduleContextStore";
 
 interface ModuleProviderProps {
   children: ReactNode;
@@ -70,13 +44,26 @@ export function ModuleProvider({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const isAdminUser = useCallback(() => {
+    try {
+      const raw = localStorage.getItem("sentinel_user");
+      if (!raw) return false;
+      const user = JSON.parse(raw) as { email?: string; role?: string };
+      return user?.role === "admin" || user?.email?.toLowerCase() === "bederf@gmail.com";
+    } catch {
+      return false;
+    }
+  }, []);
+
   // Define loaders as useCallback to satisfy exhaustive-deps
   const loadAvailableModules = useCallback(async () => {
     try {
       const modules = await moduleRegistryApi.getAvailableModules();
       setAvailableModules(modules);
     } catch (err) {
-      console.error('Failed to load available modules:', err);
+      if (!isExpectedApiError(err)) {
+        console.error('Failed to load available modules:', err);
+      }
     }
   }, []);
 
@@ -87,15 +74,13 @@ export function ModuleProvider({
     setError(null);
 
     try {
-      const [modules, summary, recs] = await Promise.all([
+      const [modules, summary] = await Promise.all([
         moduleRegistryApi.getActiveModules(siteId),
-        moduleRegistryApi.getIntegrationSummary(siteId).catch(() => null),
-        moduleRegistryApi.getRecommendations(siteId),
+        moduleRegistryApi.getIntegrationSummary(siteId),
       ]);
 
       setActiveModules(modules);
       setIntegrationSummary(summary);
-      setRecommendations(recs);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load site data');
     } finally {
@@ -110,7 +95,9 @@ export function ModuleProvider({
       const recs = await moduleRegistryApi.getRecommendations(siteId);
       setRecommendations(recs);
     } catch (err) {
-      console.error('Failed to load recommendations:', err);
+      if (!isExpectedApiError(err)) {
+        console.error('Failed to load recommendations:', err);
+      }
     }
   }, [siteId]);
 
@@ -128,12 +115,39 @@ export function ModuleProvider({
 
   // Poll recommendations
   useEffect(() => {
-    if (siteId) {
-      const interval = setInterval(() => {
-        loadRecommendations();
-      }, 15000); // Every 15 seconds
-      return () => clearInterval(interval);
-    }
+    if (!siteId) return;
+
+    let failureCount = 0;
+    let timeoutId: number | null = null;
+    let isCancelled = false;
+
+    const scheduleRecommendationsRefresh = async () => {
+      if (isCancelled) return;
+      if (document.hidden) {
+        timeoutId = window.setTimeout(scheduleRecommendationsRefresh, 60000);
+        return;
+      }
+
+      try {
+        await loadRecommendations();
+        failureCount = 0;
+      } catch {
+        failureCount += 1;
+      }
+
+      const baseIntervalMs = 60000;
+      const backoffIntervalMs = Math.min(300000, baseIntervalMs * (2 ** failureCount));
+      timeoutId = window.setTimeout(scheduleRecommendationsRefresh, backoffIntervalMs);
+    };
+
+    scheduleRecommendationsRefresh();
+
+    return () => {
+      isCancelled = true;
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
+    };
   }, [siteId, loadRecommendations]);
 
   const setSite = useCallback((id: string, name: string) => {
@@ -161,8 +175,8 @@ export function ModuleProvider({
     });
 
     // Refresh integration summary
-    const summary = await moduleRegistryApi.getIntegrationSummary(siteId);
-    setIntegrationSummary(summary);
+      const summary = await moduleRegistryApi.getIntegrationSummary(siteId);
+      setIntegrationSummary(summary);
   }, [siteId, siteName]);
 
   const deactivateModule = useCallback(async (moduleType: ModuleType) => {
@@ -172,13 +186,14 @@ export function ModuleProvider({
     setActiveModules(prev => prev.filter(m => m.module_type !== moduleType));
 
     // Refresh integration summary
-    const summary = await moduleRegistryApi.getIntegrationSummary(siteId).catch(() => null);
+    const summary = await moduleRegistryApi.getIntegrationSummary(siteId);
     setIntegrationSummary(summary);
   }, [siteId]);
 
   const isModuleActive = useCallback((moduleType: ModuleType): boolean => {
+    if (isAdminUser()) return true;
     return activeModules.some(m => m.module_type === moduleType && m.status === 'active');
-  }, [activeModules]);
+  }, [activeModules, isAdminUser]);
 
   const addRecommendation = useCallback((
     recommendation: Omit<AIRecommendation, 'recommendation_id' | 'timestamp' | 'acknowledged' | 'resolved'>
@@ -197,7 +212,9 @@ export function ModuleProvider({
     }).then(() => {
       loadRecommendations();
     }).catch(err => {
-      console.error('Failed to add recommendation:', err);
+      if (!isExpectedApiError(err)) {
+        console.error('Failed to add recommendation:', err);
+      }
     });
   }, [siteId, loadRecommendations]);
 
@@ -279,53 +296,5 @@ export function ModuleProvider({
     <ModuleContext.Provider value={value}>
       {children}
     </ModuleContext.Provider>
-  );
-}
-
-export function useModules() {
-  const context = useContext(ModuleContext);
-  if (!context) {
-    throw new Error('useModules must be used within a ModuleProvider');
-  }
-  return context;
-}
-
-// ==================== Convenience Hooks ====================
-
-/**
- * Check if a specific module is active
- */
-export function useModuleActive(moduleType: ModuleType): boolean {
-  const { isModuleActive } = useModules();
-  return isModuleActive(moduleType);
-}
-
-/**
- * Get recommendations filtered by priority
- */
-export function useCriticalRecommendations(): AIRecommendation[] {
-  const { recommendations } = useModules();
-  return recommendations.filter(
-    r => r.priority === 'critical' && !r.resolved
-  );
-}
-
-/**
- * Get cross-system recommendations
- */
-export function useCrossSystemRecommendations(): AIRecommendation[] {
-  const { recommendations } = useModules();
-  return recommendations.filter(
-    r => r.recommendation_type === 'cross_system' && !r.resolved
-  );
-}
-
-/**
- * Get recommendations for a specific module
- */
-export function useModuleRecommendations(moduleType: ModuleType): AIRecommendation[] {
-  const { recommendations } = useModules();
-  return recommendations.filter(
-    r => (r.source_module === moduleType || r.related_modules.includes(moduleType)) && !r.resolved
   );
 }

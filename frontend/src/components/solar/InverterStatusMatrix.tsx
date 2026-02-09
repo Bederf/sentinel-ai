@@ -13,6 +13,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Cpu, X, Thermometer, Zap, Sun, ChevronDown, ChevronUp } from "lucide-react";
 import type { SolarInverter, InverterListResponse } from "../../lib/solarApi";
 import { fetchInverters } from "../../lib/solarApi";
+import { isExpectedApiError } from "../../lib/api";
 
 interface InverterStatusMatrixProps {
   siteId: string;
@@ -61,7 +62,9 @@ export function InverterStatusMatrix({ siteId }: InverterStatusMatrixProps) {
       setData(result);
       setError(null);
     } catch (err) {
-      console.error("Failed to load inverters:", err);
+      if (!isExpectedApiError(err)) {
+        console.error("Failed to load inverters:", err);
+      }
       setError(err instanceof Error ? err.message : "Failed to load");
     } finally {
       setLoading(false);

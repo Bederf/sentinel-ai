@@ -13,7 +13,13 @@
  *  - Forecast vs actual overlay (48-hour chart data)
  */
 
+import { authorizedFetch } from "./api";
 const API_BASE_URL = import.meta.env.VITE_API_URL || "";
+
+function normalizeSiteId(siteId: string): string {
+  if (siteId === "sandton") return "site-002";
+  return siteId;
+}
 
 function authHeaders(): Record<string, string> {
   const token = localStorage.getItem("sentinel_token");
@@ -24,9 +30,9 @@ function authHeaders(): Record<string, string> {
 }
 
 async function fetchJson<T>(endpoint: string): Promise<T> {
-  const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+  const res = await authorizedFetch(`${API_BASE_URL}${endpoint}`, {
     headers: authHeaders(),
-  });
+  }, true);
   if (!res.ok) {
     let msg = res.statusText;
     try {
@@ -35,7 +41,7 @@ async function fetchJson<T>(endpoint: string): Promise<T> {
     } catch {
       /* ignore */
     }
-    throw new Error(msg);
+    throw { message: msg, status: res.status } as { message: string; status: number };
   }
   return res.json();
 }
@@ -239,48 +245,74 @@ export interface ForecastWithActual {
   accuracy: ForecastAccuracyMetrics | null;
 }
 
+/** Solar site entry from GET /api/solar/sites */
+export interface SolarSite {
+  site_id: string;
+  site_name: string;
+  plants: number;
+  connectors: number;
+  last_poll: string | null;
+}
+
 // ============= API Functions =============
+
+/**
+ * Fetch list of registered solar sites.
+ */
+export async function fetchSolarSites(): Promise<SolarSite[]> {
+  const res = await fetchJson<{ sites: SolarSite[] }>("/api/solar/sites");
+  return res.sites.map((site) => ({
+    ...site,
+    site_id: normalizeSiteId(site.site_id),
+  }));
+}
 
 /**
  * Fetch site overview with generation, BESS SOC, grid flow.
  */
 export async function fetchSolarOverview(siteId: string): Promise<SolarOverview> {
-  return fetchJson<SolarOverview>(`/api/solar/sites/${siteId}/overview`);
+  const normalizedId = normalizeSiteId(siteId);
+  return fetchJson<SolarOverview>(`/api/solar/sites/${normalizedId}/overview`);
 }
 
 /**
  * Fetch all inverters for a site with current readings.
  */
 export async function fetchInverters(siteId: string): Promise<InverterListResponse> {
-  return fetchJson<InverterListResponse>(`/api/solar/sites/${siteId}/inverters`);
+  const normalizedId = normalizeSiteId(siteId);
+  return fetchJson<InverterListResponse>(`/api/solar/sites/${normalizedId}/inverters`);
 }
 
 /**
  * Fetch BESS container status: SOC, mode, power, health.
  */
 export async function fetchBESSStatus(siteId: string): Promise<BESSStatus> {
-  return fetchJson<BESSStatus>(`/api/solar/sites/${siteId}/bess`);
+  const normalizedId = normalizeSiteId(siteId);
+  return fetchJson<BESSStatus>(`/api/solar/sites/${normalizedId}/bess`);
 }
 
 /**
  * Fetch performance metrics (PR, trends).
  */
 export async function fetchPerformance(siteId: string): Promise<PerformanceMetrics> {
-  return fetchJson<PerformanceMetrics>(`/api/solar/sites/${siteId}/performance`);
+  const normalizedId = normalizeSiteId(siteId);
+  return fetchJson<PerformanceMetrics>(`/api/solar/sites/${normalizedId}/performance`);
 }
 
 /**
  * Fetch prioritised diagnostic issues with cost impact.
  */
 export async function fetchDiagnostics(siteId: string): Promise<DiagnosticReport> {
-  return fetchJson<DiagnosticReport>(`/api/solar/sites/${siteId}/diagnostics`);
+  const normalizedId = normalizeSiteId(siteId);
+  return fetchJson<DiagnosticReport>(`/api/solar/sites/${normalizedId}/diagnostics`);
 }
 
 /**
  * Fetch NRS 097-2-1 compliance status.
  */
 export async function fetchCompliance(siteId: string): Promise<ComplianceStatus> {
-  return fetchJson<ComplianceStatus>(`/api/solar/sites/${siteId}/compliance`);
+  const normalizedId = normalizeSiteId(siteId);
+  return fetchJson<ComplianceStatus>(`/api/solar/sites/${normalizedId}/compliance`);
 }
 
 /**
@@ -290,8 +322,9 @@ export async function fetchFinancialSummary(
   siteId: string,
   period: string = "ytd"
 ): Promise<FinancialSummary> {
+  const normalizedId = normalizeSiteId(siteId);
   return fetchJson<FinancialSummary>(
-    `/api/solar/sites/${siteId}/financial/summary?period=${period}`
+    `/api/solar/sites/${normalizedId}/financial/summary?period=${period}`
   );
 }
 
@@ -301,8 +334,9 @@ export async function fetchFinancialSummary(
 export async function fetchMaintenanceSchedule(
   siteId: string
 ): Promise<MaintenanceSchedule> {
+  const normalizedId = normalizeSiteId(siteId);
   return fetchJson<MaintenanceSchedule>(
-    `/api/solar/sites/${siteId}/maintenance/schedule`
+    `/api/solar/sites/${normalizedId}/maintenance/schedule`
   );
 }
 
@@ -315,6 +349,7 @@ export async function fetchMaintenanceSchedule(
 export async function fetchForecastWithActual(
   siteId: string
 ): Promise<ForecastWithActual> {
+  const normalizedId = normalizeSiteId(siteId);
   // Fetch the forecast data
   const forecast = await fetchJson<{
     site_id: string;
@@ -334,7 +369,7 @@ export async function fetchForecastWithActual(
       bias_pct: number;
       rmse_pct_of_peak: number;
     };
-  }>(`/api/solar/sites/${siteId}/forecast?hours=48`);
+  }>(`/api/solar/sites/${normalizedId}/forecast?hours=48`);
 
   const now = new Date();
 

@@ -51,6 +51,7 @@ async def enforce_authentication(request: Request, call_next):
 |-----------------------------|---------------------------------|
 | `/api/auth/login`           | Login endpoint                  |
 | `/api/auth/login/mfa-complete` | MFA completion              |
+| `/api/auth/refresh`         | Refresh token exchange          |
 | `/api/auth/register`        | User registration               |
 | `/api/auth/mfa/verify`      | MFA verification                |
 | `/api/auth/verify`          | Token verification              |
@@ -111,8 +112,10 @@ Powered by `slowapi` (built on `limits` library).
 | Endpoint Category     | Rate Limit    | Rationale                    |
 |-----------------------|---------------|------------------------------|
 | General (all routes)  | 100/minute    | Default protection           |
-| Auth login            | 5/minute      | Brute force prevention       |
-| Auth MFA complete     | 5/minute      | Brute force prevention       |
+| Auth login            | 5/15minutes   | Brute force prevention       |
+| Auth MFA complete     | 5/15minutes   | Brute force prevention       |
+| Auth refresh          | 5/15minutes   | Refresh abuse prevention     |
+| Admin API requests    | 30/minute     | Protect privileged surface   |
 | Device control        | 10/minute     | Prevent control flooding     |
 | Chat                  | 20/minute     | AI cost protection           |
 
@@ -127,7 +130,7 @@ Retry-After: <seconds>
 
 ### Configuration
 
-Rate limits are keyed by remote IP address (`get_remote_address`). In a reverse proxy setup, ensure `X-Forwarded-For` or `X-Real-IP` headers are passed correctly.
+Rate limits are keyed by remote IP address (`CF-Connecting-IP`, `X-Forwarded-For`, `X-Real-IP`, then client host fallback). In a reverse proxy setup, ensure forwarding headers are passed correctly.
 
 ## CORS Configuration (H-2)
 

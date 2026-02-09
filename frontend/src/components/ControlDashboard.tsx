@@ -15,7 +15,7 @@
  * - Existing dashboard theme
  */
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   Cpu,
   Activity,
@@ -35,7 +35,7 @@ import api from "../lib/api";
 import type { Device, Site, Prediction } from "../lib/api";
 import { DeviceList } from "./DeviceList";
 import { ControlPanel } from "./ControlPanel";
-import { LoadingCard } from "./LoadingCard";
+import { PageLoading } from "./PageLoading";
 import { RecentActions } from "./RecentActions";
 import { PredictionDetail } from "./PredictionDetail";
 
@@ -52,6 +52,19 @@ interface AlertContext {
   type?: string;
 }
 
+const SAFETY_STATUS_BATCH_SIZE = 1;
+const SAFETY_STATUS_BATCH_DELAY_MS = 600;
+const SAFETY_STATUS_MAX_PER_SITE = 8;
+
+function mapSafetyStatusToDeviceStatus(
+  status: "safe" | "warning" | "blocked" | "alarm" | "unknown"
+): "safe" | "warning" | "critical" | "unknown" {
+  if (status === "safe") return "safe";
+  if (status === "warning") return "warning";
+  if (status === "blocked" || status === "alarm") return "critical";
+  return "unknown";
+}
+
 export function ControlDashboard({ onError }: ControlDashboardProps) {
   const [devices, setDevices] = useState<Device[]>([]);
   const [sites, setSites] = useState<Site[]>([]);
@@ -66,6 +79,7 @@ export function ControlDashboard({ onError }: ControlDashboardProps) {
   const [auditRefreshTrigger, setAuditRefreshTrigger] = useState(0);
   const [pendingEquipmentSelection, setPendingEquipmentSelection] = useState<string | null>(null);
   const [alertContext, setAlertContext] = useState<AlertContext | null>(null);
+  const safetyLoadedDeviceIdsRef = useRef<Set<string>>(new Set());
 
   // Check for pre-selected equipment from Dashboard/Alert navigation
   useEffect(() => {
@@ -136,55 +150,27 @@ export function ControlDashboard({ onError }: ControlDashboardProps) {
       try {
         setIsLoading(true);
 
-        // Fetch devices, sites, and predictions in parallel
-        const [devicesData, sitesData, predictionsData] = await Promise.all([
+        // Fetch core data first, then predictions to reduce request burst on mount
+        const [devicesData, sitesData] = await Promise.all([
           api.getDevices(),
           api.getSites(),
-          api.getPredictions().catch(() => ({ predictions: [] })),
         ]);
+        const predictionsData = await api.getPredictions().catch(() => ({ predictions: [] }));
 
         setSites(sitesData);
         setPredictions(predictionsData.predictions || []);
 
-        // Process devices first
-        const devices = devicesData;
-
-        // Fetch safety status for each device
-        const devicesWithSafety = await Promise.all(
-          devices.map(async (device) => {
-            try {
-              const safetyStatus = await api.getDeviceSafetyStatus(device.id);
-              // Map API response to device safety_status format
-              // API returns: 'safe' | 'warning' | 'blocked' | 'alarm' | 'unknown'
-              // Device expects: 'safe' | 'warning' | 'critical' | 'unknown'
-              let mappedStatus: "safe" | "warning" | "critical" | "unknown" = "unknown";
-              if (safetyStatus.overall_status === "safe") {
-                mappedStatus = "safe";
-              } else if (safetyStatus.overall_status === "warning") {
-                mappedStatus = "warning";
-              } else if (safetyStatus.overall_status === "blocked" || safetyStatus.overall_status === "alarm") {
-                mappedStatus = "critical";
-              }
-
-              return {
-                ...device,
-                safety_status: mappedStatus,
-              };
-            } catch (error) {
-              console.warn(`Failed to fetch safety status for device ${device.id}:`, error);
-              return {
-                ...device,
-                safety_status: "unknown" as const,
-              };
-            }
-          })
-        );
-
-        setDevices(devicesWithSafety);
+        // Set devices with unknown safety first; safety statuses are lazily loaded per active site
+        const devicesWithUnknownSafety: Device[] = devicesData.map((device) => ({
+          ...device,
+          safety_status: device.safety_status ?? "unknown",
+        }));
+        safetyLoadedDeviceIdsRef.current = new Set();
+        setDevices(devicesWithUnknownSafety);
 
         // Set default selected site to first with devices (after devices are set)
-        if (sitesData.length > 0 && devicesWithSafety.length > 0 && !selectedSiteId) {
-          const siteIdsWithDevices = new Set(devicesWithSafety.map(device => device.site_id));
+        if (sitesData.length > 0 && devicesWithUnknownSafety.length > 0 && !selectedSiteId) {
+          const siteIdsWithDevices = new Set(devicesWithUnknownSafety.map(device => device.site_id));
           const sitesWithDevices = sitesData.filter(site => siteIdsWithDevices.has(site.id));
           if (sitesWithDevices.length > 0) {
             const sortedSitesWithDevices = sitesWithDevices.sort((a, b) => a.name.localeCompare(b.name));
@@ -201,6 +187,61 @@ export function ControlDashboard({ onError }: ControlDashboardProps) {
 
     loadDevices();
   }, [refreshDevices]);
+
+  // Lazily fetch safety statuses only for the currently selected site
+  useEffect(() => {
+    if (!selectedSiteId || filteredDevices.length === 0) return;
+
+    let isCancelled = false;
+    const loadSiteSafetyStatuses = async () => {
+      const prioritizedDevices = [...filteredDevices].sort((a, b) => {
+        if (selectedDevice && a.id === selectedDevice.id) return -1;
+        if (selectedDevice && b.id === selectedDevice.id) return 1;
+        return 0;
+      });
+
+      const devicesToLoad = prioritizedDevices
+        .filter((device) => !safetyLoadedDeviceIdsRef.current.has(device.id))
+        .slice(0, SAFETY_STATUS_MAX_PER_SITE);
+
+      for (let i = 0; i < devicesToLoad.length; i += SAFETY_STATUS_BATCH_SIZE) {
+        if (isCancelled) return;
+        const batch = devicesToLoad.slice(i, i + SAFETY_STATUS_BATCH_SIZE);
+        const updates = await Promise.all(
+          batch.map(async (device) => {
+            try {
+              const safetyStatus = await api.getDeviceSafetyStatus(device.id);
+              return { id: device.id, safety_status: mapSafetyStatusToDeviceStatus(safetyStatus.overall_status) };
+            } catch (error) {
+              console.warn(`Failed to fetch safety status for device ${device.id}:`, error);
+              return { id: device.id, safety_status: "unknown" as const };
+            } finally {
+              safetyLoadedDeviceIdsRef.current.add(device.id);
+            }
+          })
+        );
+
+        if (isCancelled) return;
+        const statusById = new Map(updates.map((update) => [update.id, update.safety_status]));
+        setDevices((prevDevices) =>
+          prevDevices.map((device) =>
+            statusById.has(device.id)
+              ? { ...device, safety_status: statusById.get(device.id) ?? device.safety_status }
+              : device
+          )
+        );
+
+        if (i + SAFETY_STATUS_BATCH_SIZE < devicesToLoad.length) {
+          await new Promise((resolve) => setTimeout(resolve, SAFETY_STATUS_BATCH_DELAY_MS));
+        }
+      }
+    };
+
+    loadSiteSafetyStatuses();
+    return () => {
+      isCancelled = true;
+    };
+  }, [filteredDevices, selectedDevice?.id, selectedSiteId]);
 
   // Auto-select first device when site changes or devices load
   // Also handle pending equipment selection from Dashboard navigation
@@ -240,7 +281,19 @@ export function ControlDashboard({ onError }: ControlDashboardProps) {
       setSelectedDevice(device);
       // Optionally refresh device data when selected
       const refreshedDevice = await api.getDevice(device.id);
-      setSelectedDevice(refreshedDevice);
+      try {
+        const safetyStatus = await api.getDeviceSafetyStatus(device.id);
+        safetyLoadedDeviceIdsRef.current.add(device.id);
+        const mappedStatus = mapSafetyStatusToDeviceStatus(safetyStatus.overall_status);
+        setDevices((prevDevices) =>
+          prevDevices.map((d) =>
+            d.id === device.id ? { ...d, safety_status: mappedStatus } : d
+          )
+        );
+        setSelectedDevice({ ...refreshedDevice, safety_status: mappedStatus });
+      } catch {
+        setSelectedDevice(refreshedDevice);
+      }
     } catch (error) {
       console.error("Failed to refresh device:", error);
       // Keep the device selected even if refresh fails
@@ -304,12 +357,7 @@ export function ControlDashboard({ onError }: ControlDashboardProps) {
 
   if (isLoading) {
     return (
-      <div
-        className="h-full flex items-center justify-center"
-        style={{ background: "var(--color-sentinel-bg-canvas)" }}
-      >
-        <LoadingCard />
-      </div>
+      <PageLoading message="Loading control dashboard..." />
     );
   }
 

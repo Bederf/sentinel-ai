@@ -12,12 +12,8 @@
 
 import { useState, useEffect, useMemo } from "react";
 import {
-  DollarSign,
-  TrendingUp,
-  TrendingDown,
   Minus,
   AlertTriangle,
-  Calendar,
   RefreshCw,
   ArrowUp,
   ArrowDown,
@@ -55,6 +51,9 @@ import type {
   ContractProfitabilityDetail,
   ProfitabilityTrend,
   LossLeaderAnalysis,
+  ContractProfitabilityReport,
+  AssetROIListItem,
+  SLAPerformanceRecord,
 } from "../lib/profitabilityApi";
 import { PageLoading } from "../components/PageLoading";
 
@@ -169,6 +168,12 @@ export function ProfitabilityDashboardPage() {
   const [lossLeaders, setLossLeaders] = useState<LossLeaderAnalysis[]>([]);
   const [contracts, setContracts] = useState<ContractProfitabilityDetail[]>([]);
   const [trends, setTrends] = useState<ProfitabilityTrend[]>([]);
+  const [slaPerformance, setSlaPerformance] = useState<SLAPerformanceRecord[]>([]);
+  const [selectedReport, setSelectedReport] =
+    useState<ContractProfitabilityReport | null>(null);
+  const [selectedAssets, setSelectedAssets] = useState<AssetROIListItem[]>([]);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
 
   // UI state
   const [loading, setLoading] = useState(true);
@@ -381,6 +386,57 @@ export function ProfitabilityDashboardPage() {
     fetchTrends();
   }, [selectedContractId, contracts]);
 
+  useEffect(() => {
+    const fetchSlaPerformance = async () => {
+      if (!selectedContractId) {
+        setSlaPerformance([]);
+        return;
+      }
+      try {
+        const response = await profitabilityApi.getSLAPerformance(
+          selectedContractId,
+          12
+        );
+        setSlaPerformance(response.performance || []);
+      } catch (err) {
+        console.error("Failed to fetch SLA performance:", err);
+        setSlaPerformance([]);
+      }
+    };
+
+    fetchSlaPerformance();
+  }, [selectedContractId]);
+
+  useEffect(() => {
+    const fetchReport = async () => {
+      if (!selectedContractId) {
+        setSelectedReport(null);
+        setSelectedAssets([]);
+        setReportError(null);
+        return;
+      }
+      try {
+        setReportLoading(true);
+        const report = await profitabilityApi.getContractProfitabilityReport(
+          selectedContractId,
+          periodRange.start,
+          periodRange.end,
+          12
+        );
+        setSelectedReport(report);
+        setSelectedAssets(report.assets || []);
+        setReportError(null);
+      } catch (err) {
+        console.error("Failed to fetch report:", err);
+        setReportError("Failed to load contract report");
+      } finally {
+        setReportLoading(false);
+      }
+    };
+
+    fetchReport();
+  }, [selectedContractId, periodRange]);
+
   // Sort contracts
   const sortedContracts = useMemo(() => {
     const sorted = [...contracts];
@@ -460,6 +516,41 @@ export function ProfitabilityDashboardPage() {
     ) : (
       <ArrowDown className="inline h-3 w-3 ml-1" />
     );
+  };
+
+  const handleExportReport = () => {
+    if (!selectedReport) return;
+    const blob = new Blob([JSON.stringify(selectedReport, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `profitability-report-${selectedReport.contract.code || selectedReport.contract.id}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportFile = async (format: "csv" | "pdf") => {
+    if (!selectedContractId) return;
+    try {
+      const blob = await profitabilityApi.exportContractProfitabilityReport(
+        selectedContractId,
+        format,
+        periodRange.start,
+        periodRange.end,
+        12
+      );
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `profitability-report-${selectedContractId}.${format}`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Export failed:", err);
+      setReportError(`Export failed (${format.toUpperCase()})`);
+    }
   };
 
   // Loading state
@@ -866,6 +957,174 @@ export function ProfitabilityDashboardPage() {
         </div>
       )}
 
+      {selectedContractId && (
+        <div className="glass-panel p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3
+                className="text-sm font-medium"
+                style={{ color: "var(--color-sentinel-text-primary)" }}
+              >
+                Contract Drill-Down
+              </h3>
+              <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                Asset ROI and contract profitability summary
+              </Text>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="secondary"
+                size="xs"
+                disabled={!selectedReport || reportLoading}
+                onClick={() => handleExportFile("csv")}
+              >
+                Export CSV
+              </Button>
+              <Button
+                variant="secondary"
+                size="xs"
+                disabled={!selectedReport || reportLoading}
+                onClick={() => handleExportFile("pdf")}
+              >
+                Export PDF
+              </Button>
+              <Button
+                variant="secondary"
+                size="xs"
+                disabled={!selectedReport || reportLoading}
+                onClick={handleExportReport}
+              >
+                Export JSON
+              </Button>
+            </div>
+          </div>
+
+          {reportLoading ? (
+            <div
+              className="h-32 flex items-center justify-center"
+              style={{ color: "var(--color-sentinel-text-disabled)" }}
+            >
+              Loading report...
+            </div>
+          ) : reportError ? (
+            <Callout
+              title="Report unavailable"
+              color="rose"
+              icon={AlertTriangle}
+            >
+              {reportError}
+            </Callout>
+          ) : selectedReport ? (
+            <div className="space-y-4">
+              {selectedReport.data_quality_flags.length > 0 && (
+                <Callout
+                  title="Data quality flags"
+                  color="amber"
+                  icon={AlertTriangle}
+                >
+                  {selectedReport.data_quality_flags.join(", ")}
+                </Callout>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <Card className="glass-panel">
+                  <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                    Net Revenue
+                  </Text>
+                  <Title className="text-xl" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                    {formatZAR(selectedReport.profitability.net_revenue_zar)}
+                  </Title>
+                </Card>
+                <Card className="glass-panel">
+                  <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                    Total Cost
+                  </Text>
+                  <Title className="text-xl" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                    {formatZAR(selectedReport.profitability.total_cost_zar)}
+                  </Title>
+                </Card>
+                <Card className="glass-panel">
+                  <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                    Gross Margin
+                  </Text>
+                  <Title className="text-xl" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                    {formatZAR(selectedReport.profitability.gross_margin_zar)}
+                  </Title>
+                </Card>
+                <Card className="glass-panel">
+                  <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                    Asset Count
+                  </Text>
+                  <Title className="text-xl" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                    {selectedReport.profitability.asset_count}
+                  </Title>
+                </Card>
+              </div>
+
+              <div className="border border-[var(--color-sentinel-border)] rounded-lg overflow-hidden">
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableHeaderCell>Asset</TableHeaderCell>
+                      <TableHeaderCell className="text-right">Revenue</TableHeaderCell>
+                      <TableHeaderCell className="text-right">Cost</TableHeaderCell>
+                      <TableHeaderCell className="text-right">ROI</TableHeaderCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {selectedAssets.length === 0 ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={4}
+                          className="text-center py-6"
+                          style={{ color: "var(--color-sentinel-text-disabled)" }}
+                        >
+                          No asset ROI data available
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      selectedAssets.map((asset) => (
+                        <TableRow key={asset.equipment_id}>
+                          <TableCell>
+                            <div className="text-sm font-medium">
+                              {asset.equipment_name || asset.equipment_code || asset.equipment_id}
+                            </div>
+                            <div
+                              className="text-xs"
+                              style={{ color: "var(--color-sentinel-text-secondary)" }}
+                            >
+                              {asset.equipment_type || "Unknown type"}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {formatZAR(asset.allocated_revenue_zar)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {formatZAR(asset.allocated_cost_zar)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <span
+                              style={{
+                                color:
+                                  asset.roi_percentage >= 0
+                                    ? "var(--color-sentinel-green)"
+                                    : "var(--color-sentinel-red)",
+                              }}
+                            >
+                              {formatPercent(asset.roi_percentage)}
+                            </span>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      )}
+
       {/* Section 4: Trend Chart */}
       <div className="glass-panel p-6">
         <div className="flex items-center justify-between mb-4">
@@ -934,6 +1193,86 @@ export function ProfitabilityDashboardPage() {
             </ResponsiveContainer>
           </div>
         )}
+      </div>
+
+      {/* Section 5: SLA Penalty Trend */}
+      <div className="glass-panel p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3
+            className="text-sm font-medium"
+            style={{ color: "var(--color-sentinel-text-primary)" }}
+          >
+            SLA Penalty Trend
+          </h3>
+        </div>
+
+        {!selectedContractId ? (
+          <div
+            className="h-48 flex items-center justify-center"
+            style={{ color: "var(--color-sentinel-text-disabled)" }}
+          >
+            Select a contract to view SLA penalties
+          </div>
+        ) : slaPerformance.length === 0 ? (
+          <div
+            className="h-48 flex items-center justify-center"
+            style={{ color: "var(--color-sentinel-text-disabled)" }}
+          >
+            No SLA penalty data available
+          </div>
+        ) : (
+          <div className="h-[240px] min-h-[240px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart
+                data={slaPerformance.map((row) => ({
+                  period:
+                    row.period_start?.toString().slice(0, 7) ||
+                    row.period_end?.toString().slice(0, 7) ||
+                    "N/A",
+                  clawback: row.clawback_amount_zar || 0,
+                }))}
+              >
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="var(--color-sentinel-border)"
+                />
+                <XAxis
+                  dataKey="period"
+                  stroke="var(--color-sentinel-text-secondary)"
+                  fontSize={12}
+                />
+                <YAxis
+                  stroke="var(--color-sentinel-text-secondary)"
+                  fontSize={12}
+                  tickFormatter={(value) => `R${value}`}
+                />
+                <Tooltip
+                  contentStyle={{
+                    background: "var(--color-sentinel-bg-panel)",
+                    border: "1px solid var(--color-sentinel-border)",
+                    borderRadius: "4px",
+                  }}
+                  labelStyle={{ color: "var(--color-sentinel-text-primary)" }}
+                  formatter={(value: number) => [`R${value.toFixed(0)}`, "Penalty"]}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="clawback"
+                  stroke="var(--color-sentinel-amber)"
+                  strokeWidth={2}
+                  dot={{ fill: "var(--color-sentinel-amber)", r: 4 }}
+                  activeDot={{ r: 6 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+        <div
+          className="text-xs mt-2"
+          style={{ color: "var(--color-sentinel-text-secondary)" }}
+        >
+          Units: ZAR per month
+        </div>
       </div>
     </div>
   );

@@ -339,6 +339,7 @@ class DeviceManager:
         """Create appropriate adapter for device protocol."""
         from app.services.mock_devices import MockDeviceAdapter
         from app.services.niagara.bacnet_adapter import NiagaraBACnetAdapter
+        from app.config.settings import settings
 
         # Map protocol to adapter class
         adapter_map = {
@@ -350,6 +351,12 @@ class DeviceManager:
         adapter_class = adapter_map.get(device.protocol.value)
         if not adapter_class:
             logger.warning(f"No adapter for protocol {device.protocol.value}, using mock")
+            adapter_class = MockDeviceAdapter
+        elif adapter_class is NiagaraBACnetAdapter and settings.demo_mode:
+            logger.info(
+                "Demo mode enabled: using mock adapter for BACnet device %s",
+                device.id,
+            )
             adapter_class = MockDeviceAdapter
 
         adapter = adapter_class(device)
