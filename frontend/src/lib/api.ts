@@ -3,6 +3,269 @@
  */
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "";
+const ACCESS_TOKEN_KEY = "sentinel_token";
+const REFRESH_TOKEN_KEY = "sentinel_refresh_token";
+export const AUTH_EXPIRED_EVENT = "sentinel:auth-expired";
+let refreshInFlight: Promise<string | null> | null = null;
+const MAX_RATE_LIMIT_RETRIES = 0;
+const BASE_RATE_LIMIT_DELAY_MS = 500;
+const MAX_CONCURRENT_API_REQUESTS = 4;
+let activeApiRequests = 0;
+const apiRequestWaiters: Array<() => void> = [];
+const inFlightGetRequests = new Map<string, Promise<Response>>();
+const cachedGetResponses = new Map<string, { response: Response; expiresAt: number }>();
+const rateLimitedUntilByBucket = new Map<string, number>();
+const DEFAULT_RATE_LIMIT_COOLDOWN_MS = 30000;
+const DEFAULT_GET_CACHE_TTL_MS = 30000;
+const SITES_CACHE_KEY = "sentinel_cached_sites";
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function acquireApiRequestSlot(): Promise<void> {
+  if (activeApiRequests < MAX_CONCURRENT_API_REQUESTS) {
+    activeApiRequests += 1;
+    return;
+  }
+
+  await new Promise<void>((resolve) => {
+    apiRequestWaiters.push(resolve);
+  });
+}
+
+function releaseApiRequestSlot(): void {
+  const nextWaiter = apiRequestWaiters.shift();
+  if (nextWaiter) {
+    nextWaiter();
+    return;
+  }
+
+  activeApiRequests = Math.max(0, activeApiRequests - 1);
+}
+
+async function performFetchWithLimits(url: string, options?: RequestInit): Promise<Response> {
+  await acquireApiRequestSlot();
+  try {
+    return await fetch(url, options);
+  } finally {
+    releaseApiRequestSlot();
+  }
+}
+
+function getRetryAfterMs(response: Response): number | null {
+  const retryAfter = response.headers.get("Retry-After");
+  if (!retryAfter) return null;
+
+  const seconds = Number(retryAfter);
+  if (Number.isFinite(seconds) && seconds >= 0) {
+    return seconds * 1000;
+  }
+
+  const retryAt = Date.parse(retryAfter);
+  if (Number.isNaN(retryAt)) return null;
+
+  const delayMs = retryAt - Date.now();
+  return delayMs > 0 ? delayMs : null;
+}
+
+function getRateLimitBucket(url: string): string {
+  if (url.includes("/safety-status")) return "safety-status";
+  if (url.includes("/api/devices") || url.includes("/api/sites") || url.includes("/api/predictions")) {
+    return "dashboard-core";
+  }
+  if (url.includes("/api/integration/")) return "integration";
+  if (url.includes("/api/optimization/")) return "optimization";
+  if (url.includes("/api/dali/")) return "dali";
+  if (url.includes("/api/security/")) return "security";
+  if (url.includes("/api/solar/")) return "solar";
+  if (url.includes("/api/alerts")) return "alerts";
+  if (url.includes("/api/modules/") && url.includes("/recommendations")) return "module-recommendations";
+  return url;
+}
+
+function createClientRateLimitResponse(bucket: string): Response {
+  return new Response(
+    JSON.stringify({ detail: `Client cooldown active for ${bucket} after recent 429` }),
+    {
+      status: 429,
+      statusText: "Too Many Requests",
+      headers: { "Content-Type": "application/json" },
+    }
+  );
+}
+
+function getAccessToken(): string | null {
+  return localStorage.getItem(ACCESS_TOKEN_KEY);
+}
+
+function getRefreshToken(): string | null {
+  return localStorage.getItem(REFRESH_TOKEN_KEY);
+}
+
+function setTokens(accessToken: string, refreshToken?: string): void {
+  localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+  if (refreshToken) {
+    localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+  }
+}
+
+export function clearAuthStorage(): void {
+  localStorage.removeItem(ACCESS_TOKEN_KEY);
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
+  localStorage.removeItem("sentinel_user");
+}
+
+function notifyAuthExpired(): void {
+  window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
+}
+
+async function tryRefreshAccessToken(): Promise<string | null> {
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) return null;
+  if (refreshInFlight) return refreshInFlight;
+
+  refreshInFlight = (async () => {
+    try {
+      const refreshUrl = `${API_BASE_URL}/api/auth/refresh?refresh_token=${encodeURIComponent(refreshToken)}`;
+      const response = await fetch(refreshUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!response.ok) return null;
+      const data = await response.json() as { access_token?: string; refresh_token?: string };
+      if (!data.access_token) return null;
+      setTokens(data.access_token, data.refresh_token);
+      return data.access_token;
+    } catch {
+      return null;
+    } finally {
+      refreshInFlight = null;
+    }
+  })();
+
+  return refreshInFlight;
+}
+
+async function fetchWithAuthRetry(
+  url: string,
+  options?: RequestInit,
+  allowRetry: boolean = true,
+  rateLimitRetryCount: number = 0
+): Promise<Response> {
+  const token = getAccessToken();
+  const response = await performFetchWithLimits(url, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...options?.headers,
+    },
+  });
+
+  const isRefreshEndpoint = url.includes("/api/auth/refresh");
+  if (response.status === 401 && allowRetry && !isRefreshEndpoint) {
+    const refreshedToken = await tryRefreshAccessToken();
+    if (refreshedToken) {
+      return performFetchWithLimits(url, {
+        ...options,
+        headers: {
+          "Content-Type": "application/json",
+          ...(refreshedToken ? { Authorization: `Bearer ${refreshedToken}` } : {}),
+          ...options?.headers,
+        },
+      });
+    }
+
+    clearAuthStorage();
+    notifyAuthExpired();
+  }
+
+  const requestMethod = (options?.method || "GET").toUpperCase();
+  const isSafeMethod = requestMethod === "GET" || requestMethod === "HEAD" || requestMethod === "OPTIONS";
+  if (
+    response.status === 429 &&
+    isSafeMethod &&
+    rateLimitRetryCount < MAX_RATE_LIMIT_RETRIES
+  ) {
+    const retryAfterMs = getRetryAfterMs(response);
+    const fallbackDelayMs = BASE_RATE_LIMIT_DELAY_MS * (2 ** rateLimitRetryCount);
+    const jitterMs = Math.floor(Math.random() * 200);
+    await sleep((retryAfterMs ?? fallbackDelayMs) + jitterMs);
+
+    return fetchWithAuthRetry(url, options, allowRetry, rateLimitRetryCount + 1);
+  }
+
+  return response;
+}
+
+export async function authorizedFetch(
+  endpoint: string,
+  options?: RequestInit,
+  absoluteUrl: boolean = false
+): Promise<Response> {
+  const url = absoluteUrl ? endpoint : `${API_BASE_URL}${endpoint}`;
+  const bucket = getRateLimitBucket(url);
+  const method = (options?.method || "GET").toUpperCase();
+  const canDeduplicateGet = method === "GET" && (!options?.body || options.body === undefined);
+  const dedupeKey = `${method}:${url}`;
+
+  if (canDeduplicateGet) {
+    const cachedEntry = cachedGetResponses.get(dedupeKey);
+    if (cachedEntry && cachedEntry.expiresAt > Date.now()) {
+      return cachedEntry.response.clone();
+    }
+  }
+
+  const rateLimitedUntil = rateLimitedUntilByBucket.get(bucket);
+  if (rateLimitedUntil && rateLimitedUntil > Date.now()) {
+    if (canDeduplicateGet) {
+      const cachedEntry = cachedGetResponses.get(dedupeKey);
+      if (cachedEntry && cachedEntry.expiresAt > Date.now()) {
+        return cachedEntry.response.clone();
+      }
+    }
+    return createClientRateLimitResponse(bucket);
+  }
+
+  if (!canDeduplicateGet) {
+    const response = await fetchWithAuthRetry(url, options, true);
+    if (response.status === 429) {
+      const retryAfterMs = getRetryAfterMs(response) ?? DEFAULT_RATE_LIMIT_COOLDOWN_MS;
+      rateLimitedUntilByBucket.set(bucket, Date.now() + retryAfterMs);
+    }
+    return response;
+  }
+
+  const existing = inFlightGetRequests.get(dedupeKey);
+  if (existing) {
+    return existing.then((response) => response.clone());
+  }
+
+  const requestPromise = fetchWithAuthRetry(url, options, true);
+  inFlightGetRequests.set(dedupeKey, requestPromise);
+
+  try {
+    const response = await requestPromise;
+    if (response.status === 429) {
+      const retryAfterMs = getRetryAfterMs(response) ?? DEFAULT_RATE_LIMIT_COOLDOWN_MS;
+      rateLimitedUntilByBucket.set(bucket, Date.now() + retryAfterMs);
+      const cachedEntry = cachedGetResponses.get(dedupeKey);
+      if (cachedEntry && cachedEntry.expiresAt > Date.now()) {
+        return cachedEntry.response.clone();
+      }
+    }
+    if (response.ok) {
+      cachedGetResponses.set(dedupeKey, {
+        response: response.clone(),
+        expiresAt: Date.now() + DEFAULT_GET_CACHE_TTL_MS,
+      });
+    }
+    return response.clone();
+  } finally {
+    inFlightGetRequests.delete(dedupeKey);
+  }
+}
 
 // ============= Response Interfaces =============
 
@@ -11,9 +274,16 @@ export interface HealthResponse {
   version: string;
 }
 
-interface ApiError {
+export interface ApiError {
   message: string;
   status: number;
+}
+
+export function isExpectedApiError(error: unknown): error is ApiError {
+  const maybeError = error as { status?: number; message?: string } | null;
+  if (maybeError?.status === 401 || maybeError?.status === 429) return true;
+  const message = (maybeError?.message || "").toLowerCase();
+  return message.includes("status 401") || message.includes("status 429");
 }
 
 export type {
@@ -828,19 +1098,7 @@ async function fetchApi<T>(
   endpoint: string,
   options?: RequestInit
 ): Promise<T> {
-  const url = `${API_BASE_URL}${endpoint}`;
-
-  // Get JWT token from localStorage if available
-  const token = localStorage.getItem("sentinel_token");
-
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options?.headers,
-    },
-  });
+  const response = await authorizedFetch(endpoint, options);
 
   if (!response.ok) {
     let errorMessage = response.statusText;
@@ -987,8 +1245,24 @@ export const api = {
    * Get all sites/buildings
    */
   async getSites(): Promise<Site[]> {
-    const response = await fetchApi<{ total: number; sites: Site[] }>("/api/sites");
-    return response.sites;
+    try {
+      const response = await fetchApi<{ total: number; sites: Site[] }>("/api/sites");
+      localStorage.setItem(SITES_CACHE_KEY, JSON.stringify(response.sites));
+      return response.sites;
+    } catch (error) {
+      const maybeApiError = error as { status?: number };
+      if (maybeApiError?.status === 429) {
+        const cachedSites = localStorage.getItem(SITES_CACHE_KEY);
+        if (cachedSites) {
+          try {
+            return JSON.parse(cachedSites) as Site[];
+          } catch {
+            // ignore malformed cache and rethrow original error
+          }
+        }
+      }
+      throw error;
+    }
   },
 
   /**
@@ -1036,6 +1310,9 @@ export const api = {
         return [];
       }
       if (apiError?.status === 403 && message.includes("demo mode is only available from localhost")) {
+        return [];
+      }
+      if (apiError?.status === 429) {
         return [];
       }
       throw err;
@@ -1265,9 +1542,22 @@ export const api = {
       params.append("site_id", siteId);
     }
     const queryString = params.toString();
-    return fetchApi<EskomStatusResponse>(
-      `/api/optimization/eskom-status${queryString ? `?${queryString}` : ""}`
-    );
+    try {
+      return await fetchApi<EskomStatusResponse>(
+        `/api/optimization/eskom-status${queryString ? `?${queryString}` : ""}`
+      );
+    } catch (error) {
+      if (isExpectedApiError(error)) {
+        return {
+          current_stage: 0,
+          updated_at: new Date().toISOString(),
+          next_stages: [],
+          area_schedules: {},
+          source: "unavailable",
+        };
+      }
+      throw error;
+    }
   },
 
   /**
@@ -1275,7 +1565,21 @@ export const api = {
    * @param siteId - Site ID to get schedule for
    */
   async getSiteEskomStatus(siteId: string): Promise<SiteScheduleResponse> {
-    return fetchApi<SiteScheduleResponse>(`/api/optimization/eskom-status/${siteId}`);
+    try {
+      return await fetchApi<SiteScheduleResponse>(`/api/optimization/eskom-status/${siteId}`);
+    } catch (error) {
+      if (isExpectedApiError(error)) {
+        return {
+          site_id: siteId,
+          site_name: siteId,
+          current_stage: 0,
+          schedules: [],
+          next_outage: null,
+          source: "unavailable",
+        };
+      }
+      throw error;
+    }
   },
 
   /**
@@ -1297,7 +1601,32 @@ export const api = {
     if (comfortLimit !== undefined) {
       params.append("comfort_limit", comfortLimit.toString());
     }
-    return fetchApi<ThermalRunwayResponse>(`/api/optimization/thermal-runway?${params.toString()}`);
+    try {
+      return await fetchApi<ThermalRunwayResponse>(`/api/optimization/thermal-runway?${params.toString()}`);
+    } catch (error) {
+      if (isExpectedApiError(error)) {
+        return {
+          site_id: siteId,
+          site_name: siteId,
+          current_temperature: currentTemp ?? 24,
+          comfort_limit: comfortLimit ?? 27,
+          thermal_runway_minutes: 0,
+          comfort_breach_time: null,
+          calculation_method: "fallback",
+          building_params: {
+            thermal_mass: 0,
+            insulation_factor: 0,
+            internal_heat_gain: 0,
+          },
+          weather_forecast: {
+            outside_temp: 0,
+            solar_load: 0,
+            humidity: 0,
+          },
+        };
+      }
+      throw error;
+    }
   },
 
   /**
@@ -1319,7 +1648,12 @@ export const api = {
    * Get all optimization scenarios
    */
   async getOptimizationScenarios(): Promise<OptimizationScenario[]> {
-    return fetchApi<OptimizationScenario[]>(`/api/optimization/scenarios`);
+    try {
+      return await fetchApi<OptimizationScenario[]>(`/api/optimization/scenarios`);
+    } catch (error) {
+      if (isExpectedApiError(error)) return [];
+      throw error;
+    }
   },
 
   // ============= AI Optimization API Methods (Phase 8) =============
@@ -1329,7 +1663,26 @@ export const api = {
    * @param siteId - Site ID
    */
   async getOptimizationStatus(siteId: string): Promise<OptimizationStatusResponse> {
-    return fetchApi<OptimizationStatusResponse>(`/api/optimization/status/${siteId}`);
+    try {
+      return await fetchApi<OptimizationStatusResponse>(`/api/optimization/status/${siteId}`);
+    } catch (error) {
+      if (isExpectedApiError(error)) {
+        return {
+          site_id: siteId,
+          optimization_enabled: false,
+          optimization_status: "unknown",
+          optimization_settings: {
+            mode: "supervised",
+            last_analysis: null,
+            analysis_interval_minutes: 15,
+          },
+          last_recommendation: null,
+          last_optimization: null,
+          optimization_history: [],
+        };
+      }
+      throw error;
+    }
   },
 
   /**
@@ -1436,7 +1789,14 @@ export const api = {
    * @param siteId - Site ID
    */
   async getPrecoolingStatus(siteId: string): Promise<{ status: string; started_at?: string; actions?: any[] }> {
-    return fetchApi(`/api/optimization/precooling/${siteId}/status`);
+    try {
+      return await fetchApi(`/api/optimization/precooling/${siteId}/status`);
+    } catch (error) {
+      if (isExpectedApiError(error)) {
+        return { status: "unknown", actions: [] };
+      }
+      throw error;
+    }
   },
 
   /**
@@ -1702,7 +2062,10 @@ export const api = {
     params.append("page", "1");
     params.append("page_size", limit.toString());
     if (deviceId) {
-      params.append("device_id", deviceId);
+      const normalizedDeviceId = deviceId.includes(".")
+        ? deviceId.split(".")[0]
+        : deviceId;
+      params.append("device_id", normalizedDeviceId);
     }
 
     const response = await fetchApi<AuditLogsResponse>(`/api/audit/logs?${params.toString()}`);
@@ -2232,17 +2595,26 @@ export const monitoringApi = {
    * @param buildingId - Optional building ID filter
    */
   getIntegrationHealth: async (buildingId?: string): Promise<IntegrationHealthSummary> => {
-    const token = localStorage.getItem("sentinel_token");
-    const url = buildingId
-      ? `${API_BASE_URL}/api/integration/health?building_id=${buildingId}`
-      : `${API_BASE_URL}/api/integration/health`;
-    const res = await fetch(url, {
-      headers: {
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-    });
-    if (!res.ok) throw new Error('Failed to fetch integration health');
-    return res.json();
+    const params = new URLSearchParams();
+    if (buildingId) params.set("building_id", buildingId);
+    const endpoint = `/api/integration/health${params.toString() ? `?${params.toString()}` : ""}`;
+    try {
+      return await fetchApi<IntegrationHealthSummary>(endpoint);
+    } catch (error) {
+      if (isExpectedApiError(error)) {
+        return {
+          sources_count: 0,
+          active_sources: 0,
+          last_sync: null,
+          total_records_ingested: 0,
+          total_points_mapped: 0,
+          unmatched_points: 0,
+          recent_errors_count: 0,
+          alerts: [],
+        };
+      }
+      throw error;
+    }
   },
 
   /**
@@ -2250,14 +2622,21 @@ export const monitoringApi = {
    * @param buildingId - Building ID (required)
    */
   getDataQualityMetrics: async (buildingId: string): Promise<DataQualityMetrics> => {
-    const token = localStorage.getItem("sentinel_token");
-    const res = await fetch(`${API_BASE_URL}/api/integration/quality-metrics/${buildingId}`, {
-      headers: {
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-    });
-    if (!res.ok) throw new Error('Failed to fetch quality metrics');
-    return res.json();
+    try {
+      return await fetchApi<DataQualityMetrics>(`/api/integration/quality-metrics/${buildingId}`);
+    } catch (error) {
+      if (isExpectedApiError(error)) {
+        return {
+          match_coverage: 0,
+          data_freshness_hours: 0,
+          error_rate: 0,
+          duplicate_rate: 0,
+          overall_score: 0,
+          trend: "stable",
+        };
+      }
+      throw error;
+    }
   },
 
   /**
@@ -2266,16 +2645,14 @@ export const monitoringApi = {
    * @param days - Number of days of history (default: 7)
    */
   getSyncJobs: async (buildingId?: string, days: number = 7): Promise<SyncJobSummary[]> => {
-    const token = localStorage.getItem("sentinel_token");
     const params = new URLSearchParams({ days: days.toString() });
     if (buildingId) params.set('building_id', buildingId);
-    const res = await fetch(`${API_BASE_URL}/api/integration/sync-jobs?${params}`, {
-      headers: {
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-    });
-    if (!res.ok) throw new Error('Failed to fetch sync jobs');
-    return res.json();
+    try {
+      return await fetchApi<SyncJobSummary[]>(`/api/integration/sync-jobs?${params.toString()}`);
+    } catch (error) {
+      if (isExpectedApiError(error)) return [];
+      throw error;
+    }
   },
 
   /**
@@ -2293,19 +2670,25 @@ export const monitoringApi = {
     }>;
     total: number;
   }> => {
-    const token = localStorage.getItem("sentinel_token");
     const params = new URLSearchParams({
       limit: limit.toString(),
       offset: offset.toString(),
     });
     if (buildingId) params.set('building_id', buildingId);
-    const res = await fetch(`${API_BASE_URL}/api/integration/unmatched-points?${params}`, {
-      headers: {
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-    });
-    if (!res.ok) throw new Error('Failed to fetch unmatched points');
-    return res.json();
+    try {
+      return await fetchApi<{
+        points: Array<{
+          point_id: string;
+          point_name: string;
+          last_seen: string;
+          occurrence_count: number;
+        }>;
+        total: number;
+      }>(`/api/integration/unmatched-points?${params.toString()}`);
+    } catch (error) {
+      if (isExpectedApiError(error)) return { points: [], total: 0 };
+      throw error;
+    }
   },
 };
 
@@ -2653,14 +3036,54 @@ export const daliApi = {
    * Get building occupancy overview
    */
   getBuildingOccupancy: async (): Promise<BuildingOccupancy> => {
-    return fetchApi<BuildingOccupancy>("/api/dali/building/occupancy");
+    try {
+      return await fetchApi<BuildingOccupancy>("/api/dali/building/occupancy");
+    } catch (error) {
+      if (isExpectedApiError(error)) {
+        return {
+          building_id: "unknown",
+          building_name: "Unknown",
+          total_floors: 0,
+          total_zones: 0,
+          total_sensors: 0,
+          occupied_sensors: 0,
+          occupancy_percent: 0,
+          total_luminaires: 0,
+          faulty_luminaires: 0,
+          total_power_watts: 0,
+          energy_waste_zones: 0,
+          floors: [],
+          last_updated: new Date().toISOString(),
+        };
+      }
+      throw error;
+    }
   },
 
   /**
    * Get DALI system statistics
    */
   getStats: async (): Promise<DALIStats> => {
-    return fetchApi<DALIStats>("/api/dali/stats");
+    try {
+      return await fetchApi<DALIStats>("/api/dali/stats");
+    } catch (error) {
+      if (isExpectedApiError(error)) {
+        return {
+          total_controllers: 0,
+          online_controllers: 0,
+          total_sensors: 0,
+          online_sensors: 0,
+          total_luminaires: 0,
+          faulty_luminaires: 0,
+          current_occupancy_percent: 0,
+          current_power_watts: 0,
+          energy_today_kwh: 0,
+          energy_waste_alerts: 0,
+          last_sync: new Date().toISOString(),
+        };
+      }
+      throw error;
+    }
   },
 
   /**
@@ -3543,8 +3966,25 @@ export interface OccupancyRecommendation {
 
 export const securityApi = {
   /** Get overall security system status */
-  getStatus: () =>
-    fetchApi<SecuritySystemStatus>("/api/security/status"),
+  getStatus: async () => {
+    try {
+      return await fetchApi<SecuritySystemStatus>("/api/security/status");
+    } catch (error) {
+      if (isExpectedApiError(error)) {
+        return {
+          total_doors: 0,
+          doors_secure: 0,
+          cameras_online: 0,
+          cameras_total: 0,
+          alarm_zones_armed: 0,
+          alarm_zones_total: 0,
+          active_alerts: 0,
+          occupancy_total: 0,
+        };
+      }
+      throw error;
+    }
+  },
 
   /** Get all access zones with doors */
   getZones: () =>
@@ -3555,31 +3995,60 @@ export const securityApi = {
     fetchApi<{ doors: Door[]; count: number; secure: number }>("/api/security/doors"),
 
   /** Get badge events with optional filtering */
-  getEvents: (params?: { zone_id?: string; limit?: number }) => {
+  getEvents: async (params?: { zone_id?: string; limit?: number }) => {
     const searchParams = new URLSearchParams();
     if (params?.zone_id) searchParams.set("zone_id", params.zone_id);
     if (params?.limit) searchParams.set("limit", params.limit.toString());
     const qs = searchParams.toString();
-    return fetchApi<{ events: BadgeEvent[]; count: number }>(
-      `/api/security/events${qs ? `?${qs}` : ""}`
-    );
+    try {
+      return await fetchApi<{ events: BadgeEvent[]; count: number }>(
+        `/api/security/events${qs ? `?${qs}` : ""}`
+      );
+    } catch (error) {
+      if (isExpectedApiError(error)) return { events: [], count: 0 };
+      throw error;
+    }
   },
 
   /** Get denied access events */
-  getDeniedEvents: () =>
-    fetchApi<{ events: BadgeEvent[]; count: number }>("/api/security/events/denied"),
+  getDeniedEvents: async () => {
+    try {
+      return await fetchApi<{ events: BadgeEvent[]; count: number }>("/api/security/events/denied");
+    } catch (error) {
+      if (isExpectedApiError(error)) return { events: [], count: 0 };
+      throw error;
+    }
+  },
 
   /** Get after-hours access events */
-  getAfterHoursEvents: () =>
-    fetchApi<{ events: BadgeEvent[]; count: number }>("/api/security/events/after-hours"),
+  getAfterHoursEvents: async () => {
+    try {
+      return await fetchApi<{ events: BadgeEvent[]; count: number }>("/api/security/events/after-hours");
+    } catch (error) {
+      if (isExpectedApiError(error)) return { events: [], count: 0 };
+      throw error;
+    }
+  },
 
   /** Get all cameras with status */
-  getCameras: () =>
-    fetchApi<{ cameras: SecurityCamera[]; count: number; online: number }>("/api/security/cameras"),
+  getCameras: async () => {
+    try {
+      return await fetchApi<{ cameras: SecurityCamera[]; count: number; online: number }>("/api/security/cameras");
+    } catch (error) {
+      if (isExpectedApiError(error)) return { cameras: [], count: 0, online: 0 };
+      throw error;
+    }
+  },
 
   /** Get all alarm zones */
-  getAlarmZones: () =>
-    fetchApi<{ alarm_zones: SecurityAlarmZone[]; count: number; armed: number }>("/api/security/alarm-zones"),
+  getAlarmZones: async () => {
+    try {
+      return await fetchApi<{ alarm_zones: SecurityAlarmZone[]; count: number; armed: number }>("/api/security/alarm-zones");
+    } catch (error) {
+      if (isExpectedApiError(error)) return { alarm_zones: [], count: 0, armed: 0 };
+      throw error;
+    }
+  },
 
   /** Arm an alarm zone */
   armAlarmZone: (zoneId: string, armType: "full" | "perimeter" | "night" = "full") =>
@@ -3596,18 +4065,30 @@ export const securityApi = {
     ),
 
   /** Get building-wide occupancy */
-  getOccupancy: () =>
-    fetchApi<{ total_occupancy: number; zones: SecurityOccupancy[] }>("/api/security/occupancy"),
+  getOccupancy: async () => {
+    try {
+      return await fetchApi<{ total_occupancy: number; zones: SecurityOccupancy[] }>("/api/security/occupancy");
+    } catch (error) {
+      if (isExpectedApiError(error)) return { total_occupancy: 0, zones: [] };
+      throw error;
+    }
+  },
 
   /** Get zone-specific occupancy */
   getZoneOccupancy: (zoneId: string) =>
     fetchApi<SecurityOccupancy>(`/api/security/occupancy/${zoneId}`),
 
   /** Get cross-module occupancy recommendations */
-  getOccupancyRecommendations: () =>
-    fetchApi<{ recommendations: OccupancyRecommendation[]; count: number }>(
-      "/api/security/occupancy/recommendations"
-    ),
+  getOccupancyRecommendations: async () => {
+    try {
+      return await fetchApi<{ recommendations: OccupancyRecommendation[]; count: number }>(
+        "/api/security/occupancy/recommendations"
+      );
+    } catch (error) {
+      if (isExpectedApiError(error)) return { recommendations: [], count: 0 };
+      throw error;
+    }
+  },
 };
 
 // ============= Workflow API =============
@@ -3856,9 +4337,15 @@ export interface AuthUser {
 }
 
 export interface LoginResponse {
-  token: string;
+  access_token?: string;
+  refresh_token?: string;
+  token?: string; // legacy fallback
   user: AuthUser;
   expires_at: string;
+  mfa_required?: boolean;
+  mfa_enrolled?: boolean;
+  mfa_challenge_pending?: boolean;
+  session_id?: string;
 }
 
 export interface VerifyResponse {
@@ -3888,26 +4375,22 @@ export const authApi = {
     }),
 
   /** Logout */
-  logout: () =>
-    fetchApi<{ message: string }>("/api/auth/logout", { method: "POST" }),
+  logout: () => {
+    const refreshToken = getRefreshToken();
+    const endpoint = refreshToken
+      ? `/api/auth/logout?refresh_token=${encodeURIComponent(refreshToken)}`
+      : "/api/auth/logout";
+    return fetchApi<{ message: string }>(endpoint, { method: "POST" });
+  },
 };
 
 // Export API object with logout method for use in components
 const apiWithAuth = {
   ...api,
   logout: async () => {
-    const token = localStorage.getItem("sentinel_token");
-    const response = await fetch(`${API_BASE_URL}/api/auth/logout`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-    });
-    if (!response.ok) {
-      throw new Error(`Logout failed: ${response.statusText}`);
-    }
-    return response.json();
+    const response = await authApi.logout();
+    clearAuthStorage();
+    return response;
   },
 };
 
