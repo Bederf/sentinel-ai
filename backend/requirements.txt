@@ -48,6 +48,10 @@ lxml>=5.0.0
 # Report Generation
 reportlab>=4.0.0
 
+# PDF Extraction (Municipal Billing)
+pymupdf==1.23.22
+pdfplumber==0.10.3
+
 # BACnet/IP Protocol (Niagara Integration)
 BAC0>=24.3.25
 
@@ -56,3 +60,4 @@ pyotp>=2.9.0
 
 # Rate Limiting (Phase 58.3 Security Hardening)
 slowapi>=0.1.9
+bcrypt>=4.2.0
