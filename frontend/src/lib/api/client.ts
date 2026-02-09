@@ -26,6 +26,71 @@ const DEFAULT_RATE_LIMIT_COOLDOWN_MS = 30000;
 const DEFAULT_GET_CACHE_TTL_MS = 30000;
 const SITES_CACHE_KEY = "sentinel_cached_sites";
 
+// ============= Safety Status Batching (Thundering Herd Prevention) =============
+// Multiple components requesting safety-status concurrently cause 429 rate limits.
+// This batching system collects pending requests and executes them intelligently.
+
+interface PendingSafetyRequest {
+  url: string;
+  options?: RequestInit;
+  resolvers: { resolve: (r: Response) => void; reject: (e: unknown) => void }[];
+}
+
+const pendingSafetyStatusRequests = new Map<string, PendingSafetyRequest>();
+let batchFlushTimeout: ReturnType<typeof setTimeout> | null = null;
+const SAFETY_STATUS_BATCH_DELAY_MS = 5; // Collect requests over 5ms window
+const SAFETY_STATUS_BATCH_SIZE = 8; // Execute up to 8 requests per batch
+
+async function flushSafetyStatusBatch(): Promise<void> {
+  if (batchFlushTimeout) {
+    clearTimeout(batchFlushTimeout);
+    batchFlushTimeout = null;
+  }
+
+  // Split pending requests into batches to avoid overwhelming the API
+  const requests = Array.from(pendingSafetyStatusRequests.entries());
+  if (requests.length === 0) return;
+
+  const batchesNeeded = Math.ceil(requests.length / SAFETY_STATUS_BATCH_SIZE);
+  
+  for (let i = 0; i < batchesNeeded; i++) {
+    const batchStart = i * SAFETY_STATUS_BATCH_SIZE;
+    const batchEnd = Math.min((i + 1) * SAFETY_STATUS_BATCH_SIZE, requests.length);
+    const batch = requests.slice(batchStart, batchEnd);
+
+    // Execute batch with slight delay between batches to spread load
+    if (i > 0) {
+      await sleep(50); // 50ms between batches
+    }
+
+    // Execute all requests in this batch in parallel
+    await Promise.allSettled(
+      batch.map(async ([dedupeKey, req]) => {
+        try {
+          const response = await fetchWithAuthRetry(req.url, req.options, true);
+          req.resolvers.forEach((r) => r.resolve(response.clone()));
+        } catch (error) {
+          req.resolvers.forEach((r) => r.reject(error));
+        } finally {
+          // Remove from pending after execution
+          pendingSafetyStatusRequests.delete(dedupeKey);
+        }
+      })
+    );
+  }
+}
+
+function scheduleSafetyStatusBatchFlush(): void {
+  if (batchFlushTimeout) return; // Already scheduled
+
+  batchFlushTimeout = setTimeout(() => {
+    batchFlushTimeout = null;
+    flushSafetyStatusBatch().catch((error) => {
+      console.error("Error flushing safety status batch:", error);
+    });
+  }, SAFETY_STATUS_BATCH_DELAY_MS);
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -216,6 +281,26 @@ export async function authorizedFetch(
   const method = (options?.method || "GET").toUpperCase();
   const canDeduplicateGet = method === "GET" && (!options?.body || options.body === undefined);
   const dedupeKey = `${method}:${url}`;
+
+  // Special handling for safety-status requests: batch them to prevent thundering herd
+  if (canDeduplicateGet && bucket === "safety-status") {
+    return new Promise<Response>((resolve, reject) => {
+      const existing = pendingSafetyStatusRequests.get(dedupeKey);
+      if (existing) {
+        // Request already queued - add our resolver to the list
+        existing.resolvers.push({ resolve, reject });
+      } else {
+        // First request for this URL - create new entry
+        pendingSafetyStatusRequests.set(dedupeKey, {
+          url,
+          options,
+          resolvers: [{ resolve, reject }],
+        });
+        // Schedule batch flush (no-op if already scheduled)
+        scheduleSafetyStatusBatchFlush();
+      }
+    });
+  }
 
   if (canDeduplicateGet) {
     const cachedEntry = cachedGetResponses.get(dedupeKey);
