@@ -44,6 +44,13 @@ export {
   type InspectionScheduleItem,
   type WorkflowDashboardResponse,
 } from './workflow';
+export {
+  checklistApi,
+  type ChecklistTemplate,
+  type ChecklistItem,
+  type ChecklistGenerateResponse,
+  type ChecklistOemLookupResponse,
+} from './checklist';
 
 // Legacy: import everything from original api.ts for now
 // TODO: Gradually migrate to domain-specific imports as modules are created

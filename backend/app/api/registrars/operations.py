@@ -6,7 +6,7 @@ Registers routers for work orders, maintenance, inspection, and workflow operati
 
 from fastapi import FastAPI
 
-from app.api import work_orders, inspection, service_feedback
+from app.api import work_orders, inspection, service_feedback, checklists
 from app.api import workflow, baselines, condition
 from app.api import remote_ops, remote_commands, dispatch
 from app.api import alerts, stats, audit, safety, autonomous, simulation
@@ -22,6 +22,7 @@ def register_operations_routers(app: FastAPI) -> None:
     app.include_router(work_orders.router, prefix="/api", tags=["work-orders"])
     app.include_router(inspection.router, tags=["inspection"])
     app.include_router(service_feedback.router, tags=["service-feedback"])
+    app.include_router(checklists.router, tags=["checklists"])
     app.include_router(complaints.router, tags=["comfort-complaints"])
 
     # Workflow orchestration
