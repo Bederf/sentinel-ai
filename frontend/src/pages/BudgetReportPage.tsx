@@ -155,8 +155,8 @@ export function BudgetReportPage() {
       </div>
 
       <Card className="glass-panel">
-        <div className="flex flex-col md:flex-row md:items-center gap-4">
-          <div className="flex-1">
+        <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+          <div className="flex-1 min-w-0">
             <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
               Contract
             </Text>
@@ -171,7 +171,7 @@ export function BudgetReportPage() {
               ))}
             </Select>
           </div>
-          <div className="w-40">
+          <div className="w-32 lg:w-40">
             <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
               Year
             </Text>
