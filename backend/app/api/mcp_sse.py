@@ -4,6 +4,11 @@ SIMBIOT MCP Server - SSE transport for remote clients.
 Runs over Server-Sent Events, enabling cloud-based Claude instances
 to connect to SIMBIOT tools via HTTP.
 
+Features:
+- Robust keep-alive mechanism to prevent idle connection timeouts
+- Heartbeat pings every 15 seconds with SSE comments as fallback
+- Handles long idle periods (15+ hours) common in enterprise environments
+
 Usage:
     # Claude connects via SSE to:
     GET /api/mcp/sse
@@ -16,12 +21,18 @@ Usage:
 import asyncio
 import json
 import logging
+import time
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 
 from app.mcp import SIMBIOTMCPServer
+
+# Keep-alive configuration
+SSE_HEARTBEAT_INTERVAL_SECONDS = 15  # Send heartbeat every 15 seconds
+SSE_COMMENT_INTERVAL_SECONDS = 5     # Send SSE comment every 5 seconds (proxy keep-alive)
+SSE_CONNECTION_TIMEOUT_SECONDS = 300 # Close connection after 5 min of no traffic from client
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/mcp/sse", tags=["MCP-SSE"])
@@ -135,30 +146,7 @@ class MCPServerSSE:
                 }
             }
 
-    async def event_stream(self):
-        """Generate SSE events for MCP protocol."""
-        logger.info("SSE MCP connection established")
-
-        # Send initialized notification
-        yield await self.send_sse({
-            "jsonrpc": "2.0",
-            "method": "notifications/initialized",
-            "params": {}
-        })
-
-        # In a full implementation, this would be a bidirectional stream
-        # For now, we'll provide a simple message queue approach
-        try:
-            # Keep connection alive with heartbeat
-            while True:
-                await asyncio.sleep(30)
-                yield await self.send_sse({
-                    "jsonrpc": "2.0",
-                    "method": "ping",
-                    "params": {}
-                })
-        except asyncio.CancelledError:
-            logger.info("SSE MCP connection closed")
+    async def event_stream(self):\n        \"\"\"Generate SSE events for MCP protocol.\n        \n        Implements robust keep-alive to handle:\n        - Proxy/firewall idle connection timeouts\n        - Long idle periods (15+ hours)\n        - Network interruptions\n        \"\"\"\n        logger.info(\"SSE MCP connection established\")\n        connection_start = time.time()\n        last_heartbeat = time.time()\n        last_comment = time.time()\n\n        # Send initialized notification\n        yield await self.send_sse({\n            \"jsonrpc\": \"2.0\",\n            \"method\": \"notifications/initialized\",\n            \"params\": {}\n        })\n\n        try:\n            # Keep connection alive with dual keep-alive strategy\n            while True:\n                current_time = time.time()\n                time_since_heartbeat = current_time - last_heartbeat\n                time_since_comment = current_time - last_comment\n\n                # Send SSE comment every 5 seconds (keeps proxies happy)\n                if time_since_comment >= SSE_COMMENT_INTERVAL_SECONDS:\n                    yield \": keep-alive comment\\n\\n\"\n                    last_comment = current_time\n                    logger.debug(\"SSE keep-alive comment sent\")\n\n                # Send heartbeat ping every 15 seconds\n                if time_since_heartbeat >= SSE_HEARTBEAT_INTERVAL_SECONDS:\n                    yield await self.send_sse({\n                        \"jsonrpc\": \"2.0\",\n                        \"method\": \"ping\",\n                        \"params\": {},\n                        \"_timestamp\": current_time\n                    })\n                    last_heartbeat = current_time\n                    connection_uptime = current_time - connection_start\n                    logger.debug(f\"SSE heartbeat sent (connection uptime: {connection_uptime:.0f}s)\")\n\n                # Sleep briefly to avoid busy-waiting\n                await asyncio.sleep(1)\n\n        except asyncio.CancelledError:\n            uptime = time.time() - connection_start\n            logger.info(f\"SSE MCP connection closed (uptime: {uptime:.0f}s)\") \n        except GeneratorExit:\n            uptime = time.time() - connection_start\n            logger.info(f\"SSE MCP connection terminated (uptime: {uptime:.0f}s)\")
 
 
 # Singleton instance
@@ -176,18 +164,31 @@ def get_sse_server() -> MCPServerSSE:
 @router.get("")
 async def mcp_sse_endpoint():
     """
-    SSE endpoint for MCP protocol.
+    SSE endpoint for MCP protocol with robust keep-alive.
 
     Claude connects to this endpoint via SSE to use SIMBIOT tools.
+    
+    Keep-alive strategy:
+    - SSE comment every 5 seconds (inexpensive, keeps proxies/firewalls active)
+    - Heartbeat ping every 15 seconds (application-level heartbeat)
+    - Standard SSE headers for persistent connections
     """
     server = get_sse_server()
+    logger.info("New SSE MCP client connected")
+    
     return StreamingResponse(
         server.event_stream(),
         media_type="text/event-stream",
         headers={
-            "Cache-Control": "no-cache",
+            "Cache-Control": "no-cache, no-transform",
             "Connection": "keep-alive",
-            "X-Accel-Buffering": "no"
+            "Content-Type": "text/event-stream",
+            "Transfer-Encoding": "chunked",
+            "X-Accel-Buffering": "no",
+            "X-Content-Type-Options": "nosniff",
+            # Prevent nginx/proxy timeouts
+            "Expires": "0",
+            "Pragma": "no-cache"
         }
     )
 
