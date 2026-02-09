@@ -871,6 +871,11 @@ async def get_equipment_summary_for_telegram(equipment_code: str):
 
     Returns:
         Text summary formatted for Telegram
+
+    UNAUTHENTICATED - Accepted risk: Clawd bot integration requires external
+    webhook access without auth. Summary is derived from equipment-info endpoint
+    (already unauthenticated). Used only for technician information display.
+    See 65-04 for security rationale.
     """
     # Reuse the detailed endpoint
     try:
