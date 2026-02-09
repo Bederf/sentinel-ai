@@ -13,7 +13,8 @@ import logging
 from datetime import datetime, date, timedelta
 from typing import Optional, List
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
+from app.middleware.rate_limiter import limiter
 
 from app.services.water_ingestion_service import get_water_ingestion_service
 from app.services.water_alert_service import get_water_alert_service
@@ -28,8 +29,9 @@ router = APIRouter()
 # === Consumption endpoints ===
 
 
+@limiter.limit("30/minute")
 @router.get("/water/sites/{site}/flow")
-async def get_current_flow(site: str):
+async def get_current_flow(request: Request, site: str):
     """Get current flow rate for a site.
 
     Args:
@@ -62,8 +64,10 @@ async def get_current_flow(site: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@limiter.limit("30/minute")
 @router.get("/water/sites/{site}/consumption")
 async def get_consumption(
+    request: Request,
     site: str,
     start_date: Optional[str] = Query(None, description="Start date (ISO format)"),
     end_date: Optional[str] = Query(None, description="End date (ISO format)"),
@@ -107,8 +111,9 @@ async def get_consumption(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@limiter.limit("30/minute")
 @router.get("/water/sites/{site}/current")
-async def get_current_consumption(site: str):
+async def get_current_consumption(request: Request, site: str):
     """Get current flow rate and latest consumption reading.
 
     Args:
@@ -136,8 +141,10 @@ async def get_current_consumption(site: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@limiter.limit("30/minute")
 @router.get("/water/sites/{site}/trending")
 async def get_consumption_trends(
+    request: Request,
     site: str,
     period: str = Query("week", description="Period: day, week, month"),
 ):
@@ -236,8 +243,10 @@ async def get_consumption_trends(
 # === Alert endpoints ===
 
 
+@limiter.limit("30/minute")
 @router.get("/water/sites/{site}/alerts")
 async def get_alerts(
+    request: Request,
     site: str,
     severity: Optional[str] = Query(None, description="Filter by severity: low, medium, high, critical"),
     start_date: Optional[str] = Query(None, description="Start date (ISO format)"),
@@ -283,8 +292,9 @@ async def get_alerts(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@limiter.limit("30/minute")
 @router.get("/water/sites/{site}/alerts/active")
-async def get_active_alerts(site: str):
+async def get_active_alerts(request: Request, site: str):
     """Get all active (unresolved) leak alerts.
 
     Args:
@@ -352,8 +362,9 @@ async def resolve_alert(
 # === Ingestion status endpoints ===
 
 
+@limiter.limit("20/minute")
 @router.get("/water/ingestion/status")
-async def get_ingestion_status():
+async def get_ingestion_status(request: Request):
     """Get water ingestion service status.
 
     Returns:
@@ -379,8 +390,9 @@ async def get_ingestion_status():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@limiter.limit("20/minute")
 @router.get("/water/ingestion/{site}/status")
-async def get_site_ingestion_status(site: str):
+async def get_site_ingestion_status(request: Request, site: str):
     """Get ingestion status for a specific site.
 
     Args:
