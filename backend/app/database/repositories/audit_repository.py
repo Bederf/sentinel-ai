@@ -220,3 +220,47 @@ class AuditRepository:
         ).order('timestamp', desc=True).limit(limit).execute()
 
         return response.data
+
+    def log_security_event(
+        self,
+        event_type: str,
+        user_id: Optional[str] = None,
+        details: Optional[Dict[str, Any]] = None,
+        ip_address: Optional[str] = None,
+        result: str = 'SUCCESS'
+    ) -> Dict[str, Any]:
+        """Log a security event (Phase 65-04).
+
+        Supported event types:
+        - PASSWORD_CHANGE: User password changed
+        - PERMISSION_CHANGE: User role/permissions changed
+        - API_KEY_CREATED: New API key created
+        - API_KEY_REVOKED: API key revoked
+        - MFA_ENROLLED: MFA enrollment completed
+        - MFA_DISABLED: MFA disabled
+        - SESSION_REVOKED: User session manually revoked
+        - RATE_LIMIT_EXCEEDED: Rate limit threshold hit
+        - LOGIN_SUCCESS: Successful login
+        - LOGIN_FAILURE: Failed login attempt
+        - LOGOUT: User logout
+        - TOKEN_REFRESH: Token refreshed
+
+        Args:
+            event_type: Type of security event
+            user_id: User ID (optional for some events like rate limit)
+            details: Additional event details
+            ip_address: Client IP address
+            result: Result status (SUCCESS or FAILED)
+
+        Returns:
+            Created audit log entry
+        """
+        audit_data = {
+            'action': event_type,
+            'user_id': user_id,
+            'result': result,
+            'details': details or {},
+            'ip_address': ip_address,
+        }
+
+        return self.create(audit_data)

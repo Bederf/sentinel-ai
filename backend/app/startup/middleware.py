@@ -19,6 +19,7 @@ from app.middleware.auth_middleware import _authenticate_request, _extract_ip_ad
 from app.middleware.rate_limiter import limiter
 from app.middleware.audit_middleware import AuditMiddleware
 from app.middleware.security_logging import SecurityLoggingMiddleware
+from app.middleware.error_sanitization import ErrorSanitizationMiddleware
 
 _logger = logging.getLogger("sentinel.security")
 
@@ -176,6 +177,11 @@ def register_middleware(app: FastAPI) -> None:
 
         request.state.auth = auth_ctx
         return await call_next(request)
+
+    # Error sanitization middleware (Phase 65-04 - prevents information disclosure)
+    # In production, hides stack traces and internals from error responses
+    if not settings.debug:
+        app.add_middleware(ErrorSanitizationMiddleware)
 
     # Security logging middleware (Phase 63 - FSR compliance)
     # SecurityLoggingMiddleware runs first (outermost), captures all security events
