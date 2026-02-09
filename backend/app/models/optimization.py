@@ -154,6 +154,8 @@ class OptimizationRecommendation:
     # Phase 72.2: Profile-aware optimization
     profile: Optional[str] = None  # Active profile name (e.g., "cost", "comfort", "asset_sweating")
     profile_applied: bool = False  # Whether profile was applied to recommendations
+    # Phase 72.3: Multi-objective scoring
+    scoring_summary: Optional[Dict[str, Any]] = None  # Scoring statistics: total_recommendations, top_score, avg_score
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
@@ -171,6 +173,8 @@ class OptimizationRecommendation:
             result["cross_system_recommendations"] = self.cross_system_recommendations
         if self.lighting_summary:
             result["lighting_summary"] = self.lighting_summary
+        if self.scoring_summary:
+            result["scoring_summary"] = self.scoring_summary
         return result
 
     @classmethod
@@ -187,6 +191,7 @@ class OptimizationRecommendation:
             lighting_summary=data.get("lighting_summary"),
             profile=data.get("profile"),
             profile_applied=data.get("profile_applied", False),
+            scoring_summary=data.get("scoring_summary"),
         )
 
 

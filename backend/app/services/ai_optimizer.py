@@ -234,15 +234,23 @@ class AIOptimizerService:
                     equipment_inventory, dali_zones, profile
                 )
 
+            # Apply recommendation scoring and ranking with profile weights
+            if profile:
+                recommendation = self._score_and_rank_recommendations(recommendation, profile)
+
             return recommendation
 
         except Exception as e:
             logger.error(f"Error analyzing building {site_id}: {e}")
             # Fall back to rule-based optimization
-            return self._analyze_with_rules(
+            rec = self._analyze_with_rules(
                 site_id, current_conditions, weather_forecast, energy_prices,
                 equipment_inventory, dali_zones, profile
             )
+            # Apply scoring to fallback recommendations too
+            if profile:
+                rec = self._score_and_rank_recommendations(rec, profile)
+            return rec
 
     async def _gather_current_conditions(self, site_id: str) -> Dict[str, Any]:
         """Gather current building conditions from devices and DALI sensors."""
@@ -754,6 +762,62 @@ Provide ONLY the JSON response, no additional text."""
         except Exception as e:
             logger.error(f"Claude analysis failed: {e}")
             raise
+
+    def _score_and_rank_recommendations(
+        self,
+        recommendation: OptimizationRecommendation,
+        profile: Dict[str, Any]
+    ) -> OptimizationRecommendation:
+        """Score and rank recommendations using profile weights.
+
+        Applies multi-objective scoring to recommendations and ranks them by score.
+        Updates the recommendation object with scores and summary statistics.
+
+        Args:
+            recommendation: OptimizationRecommendation with recommendations list
+            profile: Active optimization profile with weights
+
+        Returns:
+            OptimizationRecommendation with scored and ranked recommendations
+        """
+        try:
+            from app.services.recommendation_scorer import RecommendationScorer
+
+            # Create scorer with profile weights
+            scorer = RecommendationScorer(profile)
+
+            # Score and rank recommendations
+            ranked_recs = scorer.rank_recommendations(recommendation.recommendations)
+
+            # Update recommendation object
+            recommendation.recommendations = ranked_recs
+
+            # Create scoring summary
+            if ranked_recs:
+                scores = [r.get("multi_objective_score", 0) for r in ranked_recs]
+                recommendation.scoring_summary = {
+                    "total_recommendations": len(ranked_recs),
+                    "top_score": scores[0] if scores else 0,
+                    "avg_score": sum(scores) / len(scores) if scores else 0,
+                }
+            else:
+                recommendation.scoring_summary = {
+                    "total_recommendations": 0,
+                    "top_score": 0,
+                    "avg_score": 0,
+                }
+
+            logger.info(
+                f"Scored {len(ranked_recs)} recommendations for site {recommendation.site_id}. "
+                f"Top score: {recommendation.scoring_summary.get('top_score', 0):.3f}, "
+                f"Avg score: {recommendation.scoring_summary.get('avg_score', 0):.3f}"
+            )
+
+            return recommendation
+
+        except Exception as e:
+            logger.warning(f"Failed to score recommendations: {e}. Returning unscored.")
+            return recommendation
 
     def _find_device_by_type(self, hvac_devices: List[Device], hvac_type: str) -> Optional[Device]:
         """Find a device by its hvac_type (zone_controller, chiller, chw_system, etc.)."""
