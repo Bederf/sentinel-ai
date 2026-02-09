@@ -81,27 +81,12 @@ class NotificationService:
         # Demo mode fallback for development
         if not self.smtp_config and not self.slack_webhooks and not self.email_recipients:
             if settings.demo_mode:
-                logger.warning("No notification configuration found - using demo defaults (demo mode)")
-                # Use demo configuration for development
-                self.smtp_config = {
-                    "host": "smtp.example.com",
-                    "port": 587,
-                    "username": "sentinel@example.com",
-                    "password": "demo_password",
-                    "use_tls": True,
-                }
-                self.slack_webhooks = {
-                    "critical": "https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXX",
-                    "emergency": "https://hooks.slack.com/services/T00000000/B00000000/YYYYYYYYYYYYYYYY",
-                }
-                self.email_recipients = [
-                    "operator1@facility.com",
-                    "operator2@facility.com",
-                    "manager@facility.com",
-                ]
+                logger.info("No notification configuration found - notifications disabled in demo mode")
+                logger.info("To enable notifications in demo mode, set NOTIFICATION_* environment variables")
             else:
                 # Production mode - require configuration
                 logger.error("No notification configuration found in production mode")
+                logger.error("Please set NOTIFICATION_* environment variables to enable alerts")
 
         logger.info("Loaded notification configuration")
 
