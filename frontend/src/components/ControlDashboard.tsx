@@ -150,6 +150,8 @@ export function ControlDashboard({ onError }: ControlDashboardProps) {
       try {
         setIsLoading(true);
 
+        // Add delay to prevent concurrent requests hitting rate limiter on initial load
+        await new Promise((resolve) => setTimeout(resolve, 800));
         // Fetch core data first, then predictions to reduce request burst on mount
         const devicesData = await api.getDevices();
         // Stagger subsequent requests by 250ms to avoid 429 rate limiting

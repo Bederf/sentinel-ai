@@ -130,6 +130,9 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
     const fetchSafetyStatus = async () => {
       setLoadingSafety(true);
       try {
+        // Stagger initial request to prevent rate limiting across multiple SiteCards
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        
         // Get devices for this site
         const devices = await api.getSiteDevices(site.id);
 
@@ -152,10 +155,15 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
 
         // Fetch safety status for all devices
         // For performance, we'll check all devices but limit concurrent requests
-        const BATCH_SIZE = 10;
+        const BATCH_SIZE = 5; // Reduced from 10 to 5 to lower concurrent requests
         const allStatuses: SafetyStatus[] = [];
         
         for (let i = 0; i < devices.length; i += BATCH_SIZE) {
+          // Add delay between batches to prevent overwhelming the backend
+          if (i > 0) {
+            await new Promise((resolve) => setTimeout(resolve, 150));
+          }
+          
           const batch = devices.slice(i, i + BATCH_SIZE);
           const batchPromises = batch.map(async (device) => {
             try {

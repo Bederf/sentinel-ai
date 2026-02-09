@@ -44,6 +44,8 @@ export function BudgetReportPage() {
     const loadContracts = async () => {
       setLoading(true);
       try {
+        // Add delay to prevent concurrent requests hitting rate limiter
+        await new Promise((resolve) => setTimeout(resolve, 600));
         const { contractApi } = await import("../lib/contractApi");
         const data = await contractApi.getContracts({ status: "active" });
         setContracts(data);

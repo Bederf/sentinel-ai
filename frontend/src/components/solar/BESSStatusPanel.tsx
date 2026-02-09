@@ -175,7 +175,7 @@ export function BESSStatusPanel({ siteId }: BESSStatusPanelProps) {
               Battery Storage (BESS)
             </h3>
             <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-              {bess.name} &mdash; {bess.total_capacity_kwh.toLocaleString()} kWh
+              {bess.name} &mdash; {(bess.total_capacity_kwh || 0).toLocaleString()} kWh
             </span>
           </div>
         </div>

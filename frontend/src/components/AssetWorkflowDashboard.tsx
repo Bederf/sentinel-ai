@@ -12,11 +12,15 @@ import {
   ChevronRight,
   ArrowLeft,
   RefreshCw,
+  Building2,
+  ChevronDown,
 } from 'lucide-react';
 import {
+  api,
   workflowApi,
   type WorkflowEquipmentItem,
   type WorkflowState,
+  type Site,
 } from '../lib/api';
 import { PageLoading } from "./PageLoading";
 
@@ -67,12 +71,15 @@ export function AssetWorkflowDashboard() {
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sites, setSites] = useState<Site[]>([]);
+  const [selectedSiteId, setSelectedSiteId] = useState<string>('');
+  const [loadingSites, setLoadingSites] = useState(true);
 
   // Fetch equipment list and workflow states from API
   const fetchDashboardData = useCallback(async () => {
     try {
       setError(null);
-      const data = await workflowApi.getDashboardEquipment();
+      const data = await workflowApi.getDashboardEquipment(selectedSiteId || undefined);
       setEquipment(data.equipment);
       setWorkflowStates(data.workflow_states);
     } catch (err) {
@@ -81,12 +88,33 @@ export function AssetWorkflowDashboard() {
     } finally {
       setInitialLoading(false);
     }
+  }, [selectedSiteId]);
+
+  // Fetch sites on mount
+  useEffect(() => {
+    const fetchSites = async () => {
+      try {
+        const sitesData = await api.getSites();
+        setSites(sitesData);
+        // Auto-select first site if available and no site selected yet
+        if (sitesData.length > 0) {
+          setSelectedSiteId(sitesData[0].id);
+        }
+      } catch (err) {
+        console.error('Failed to fetch sites:', err);
+      } finally {
+        setLoadingSites(false);
+      }
+    };
+    fetchSites();
   }, []);
 
-  // Initial fetch
+  // Re-fetch equipment when selected site changes
   useEffect(() => {
-    fetchDashboardData();
-  }, [fetchDashboardData]);
+    if (!loadingSites) {
+      fetchDashboardData();
+    }
+  }, [selectedSiteId, fetchDashboardData, loadingSites]);
 
   // When equipment is selected, get its workflow state from the cached data
   useEffect(() => {
@@ -166,6 +194,67 @@ export function AssetWorkflowDashboard() {
           <span style={{ color: 'var(--color-sentinel-text-primary)' }}>{error}</span>
         </div>
       )}
+
+      {/* Building Selector */}
+      <div
+        className="rounded-md overflow-hidden mb-4"
+        style={{
+          background: 'var(--color-sentinel-bg-panel)',
+          border: '1px solid var(--color-sentinel-border)',
+        }}
+      >
+        <div className="p-4">
+          <div className="flex items-center gap-3">
+            <Building2
+              className="h-5 w-5"
+              style={{ color: 'var(--color-sentinel-text-secondary)' }}
+            />
+            <div className="flex-1">
+              <label
+                className="text-xs uppercase tracking-wider mb-1.5 block"
+                style={{ color: 'var(--color-sentinel-text-secondary)' }}
+              >
+                Filter by Building
+              </label>
+              <div className="relative">
+                <select
+                  value={selectedSiteId}
+                  onChange={(e) => setSelectedSiteId(e.target.value)}
+                  disabled={loadingSites}
+                  className="w-full px-3 py-2 text-sm rounded appearance-none cursor-pointer"
+                  style={{
+                    background: 'var(--color-sentinel-bg-secondary)',
+                    border: '1px solid var(--color-sentinel-border)',
+                    color: 'var(--color-sentinel-text-primary)',
+                  }}
+                >
+                  <option value="">All Buildings</option>
+                  {sites.map((site) => (
+                    <option key={site.id} value={site.id}>
+                      {site.name}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 pointer-events-none"
+                  style={{ color: 'var(--color-sentinel-text-secondary)' }}
+                />
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span
+                className="text-xs px-2 py-1 rounded"
+                style={{
+                  background: 'var(--color-sentinel-bg-secondary)',
+                  color: 'var(--color-sentinel-text-secondary)',
+                }}
+              >
+                {equipment.length} equipment
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Equipment Fleet Panel */}
       <div

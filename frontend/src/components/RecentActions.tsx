@@ -113,9 +113,13 @@ export function RecentActions({
     [limit, deviceId]
   );
 
-  // Initial load
+  // Initial load with stagger delay to prevent rate limiting
   useEffect(() => {
-    fetchActions();
+    const loadData = async () => {
+      await new Promise((resolve) => setTimeout(resolve, 700));
+      fetchActions();
+    };
+    loadData();
   }, [fetchActions]);
 
   // Auto-refresh

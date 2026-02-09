@@ -67,6 +67,7 @@ export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
   useEffect(() => {
     const fetchConsumption = async () => {
       try {
+        await new Promise((resolve) => setTimeout(resolve, 400));
         const endDate = new Date();
         const startDate = new Date();
         startDate.setDate(startDate.getDate() - 7);
@@ -101,6 +102,7 @@ export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
   useEffect(() => {
     const fetchAlerts = async () => {
       try {
+        await new Promise((resolve) => setTimeout(resolve, 500));
         const alertData = await waterApi.getActiveAlerts(selectedSiteId);
         setAlerts(alertData);
       } catch (err) {
@@ -143,6 +145,7 @@ export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
   useEffect(() => {
     const fetchTrending = async () => {
       try {
+        await new Promise((resolve) => setTimeout(resolve, 600));
         const trendData = await waterApi.getTrending(selectedSiteId, "week");
         setTrending(trendData);
       } catch (err) {
@@ -387,22 +390,22 @@ export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
                 </Flex>
 
                 <div className="mb-3">
-                  {alert.details.flow_rate_lpm && (
+                  {alert.details?.flow_rate_lpm && (
                     <Text className="text-sm">
                       Flow: {alert.details.flow_rate_lpm} LPM
                     </Text>
                   )}
-                  {alert.details.duration_minutes && (
+                  {alert.details?.duration_minutes && (
                     <Text className="text-sm ml-3">
                       Duration: {Math.floor(alert.details.duration_minutes / 60)}h {alert.details.duration_minutes % 60}m
                     </Text>
                   )}
-                  {alert.details.percent_above_baseline && (
+                  {alert.details?.percent_above_baseline && (
                     <Text className="text-sm">
                       {alert.details.percent_above_baseline}% above baseline
                     </Text>
                   )}
-                  {alert.details.location && (
+                  {alert.details?.location && (
                     <Text className="text-sm ml-3">
                       Location: {alert.details.location}
                     </Text>

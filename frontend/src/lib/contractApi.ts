@@ -14,11 +14,17 @@
 const RAW_API_BASE_URL = import.meta.env.VITE_API_URL || "";
 
 function resolveApiBaseUrl(): string {
-  if (!RAW_API_BASE_URL) return "";
-  if (window.location.hostname !== "localhost" && RAW_API_BASE_URL.includes("localhost")) {
+  // In production (non-localhost), always use relative paths for API calls
+  // This ensures requests go to the same domain/port as the frontend
+  if (window.location.hostname !== "localhost") {
     return "";
   }
-  return RAW_API_BASE_URL;
+  // In development, use VITE_API_URL if set
+  if (!RAW_API_BASE_URL) return "";
+  if (RAW_API_BASE_URL.includes("localhost")) {
+    return RAW_API_BASE_URL;
+  }
+  return "";
 }
 
 function authHeaders(): Record<string, string> {

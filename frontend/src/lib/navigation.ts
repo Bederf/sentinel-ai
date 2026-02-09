@@ -29,6 +29,8 @@ import {
   FileText,
   TrendingUp,
   Droplets,
+  DollarSign,
+  Brain,
 } from "lucide-react";
 import type { ModuleType } from "./moduleRegistry";
 
@@ -127,10 +129,10 @@ export const ADDON_NAV_ITEMS: NavItem[] = [
   { id: "sustainability", label: "ESG", icon: Leaf, description: "Sustainability & Carbon", category: "addon", requiredModule: "sustainability", defaultOrder: 16 },
   { id: "contracts", label: "Contracts", icon: FileText, description: "Contract & SLA Management", category: "addon", requiredModule: "contracts", defaultOrder: 17 },
   { id: "profitability", label: "Profitability", icon: TrendingUp, description: "Profitability Analytics", category: "addon", requiredModule: "contracts", defaultOrder: 18 },
-  { id: "budget-report", label: "Budget Reports", icon: BarChart3, description: "Budget Reporting", category: "addon", requiredModule: "contracts", defaultOrder: 19 },
+  { id: "budget-report", label: "Budget Reports", icon: DollarSign, description: "Budget Reporting", category: "addon", requiredModule: "contracts", defaultOrder: 19 },
   // Intelligence modules
   { id: "fleet", label: "Fleet ML", icon: BarChart3, description: "Cross-Site Insights", category: "addon", requiredModule: "ml", defaultOrder: 20 },
-  { id: "mlops", label: "ML Metrics", icon: Activity, description: "MLOps Monitoring", category: "addon", requiredModule: "ml", defaultOrder: 21 },
+  { id: "mlops", label: "ML Metrics", icon: Brain, description: "MLOps Monitoring", category: "addon", requiredModule: "ml", defaultOrder: 21 },
 ];
 
 /**
