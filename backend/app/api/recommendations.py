@@ -12,6 +12,7 @@ from typing import Any, Dict, Optional
 from fastapi import APIRouter, Request, HTTPException, Query, Body
 from pydantic import BaseModel
 
+from app.middleware.rate_limiter import limiter
 from app.services.recommendation_service import get_recommendation_service
 from app.models.recommendation import Recommendation, RecommendationStatus
 
@@ -46,9 +47,10 @@ class CreateRecommendationRequest(BaseModel):
     multi_objective_score: float = 0.0
 
 
+@limiter.limit("20/minute")
 @router.get("/{site_id}")
 async def get_pending_recommendations(
-    site_id: str, limit: int = Query(10, ge=1, le=100)
+    request: Request, site_id: str, limit: int = Query(10, ge=1, le=100)
 ):
     """Get pending recommendations for a site (Tier 2 approval queue).
 
@@ -78,8 +80,10 @@ async def get_pending_recommendations(
         )
 
 
+@limiter.limit("20/minute")
 @router.post("/history/{site_id}")
 async def get_recommendation_history(
+    request: Request,
     site_id: str,
     filters: Dict[str, Any] = Body(default={"status": None, "risk_level": None}),
     limit: int = Query(50, ge=1, le=500),
@@ -128,8 +132,9 @@ async def get_recommendation_history(
         )
 
 
+@limiter.limit("15/minute")
 @router.post("")
-async def create_recommendation(request: CreateRecommendationRequest):
+async def create_recommendation(req: Request, request: CreateRecommendationRequest):
     """Create a new recommendation.
 
     The recommendation will be auto-executed or placed in approval queue

@@ -14,9 +14,9 @@ const REFRESH_TOKEN_KEY = "sentinel_refresh_token";
 export const AUTH_EXPIRED_EVENT = "sentinel:auth-expired";
 
 let refreshInFlight: Promise<string | null> | null = null;
-const MAX_RATE_LIMIT_RETRIES = 0;
+const MAX_RATE_LIMIT_RETRIES = 2;
 const BASE_RATE_LIMIT_DELAY_MS = 500;
-const MAX_CONCURRENT_API_REQUESTS = 4;
+const MAX_CONCURRENT_API_REQUESTS = 8;
 let activeApiRequests = 0;
 const apiRequestWaiters: Array<() => void> = [];
 const inFlightGetRequests = new Map<string, Promise<Response>>();
@@ -282,8 +282,10 @@ export async function authorizedFetch(
   const canDeduplicateGet = method === "GET" && (!options?.body || options.body === undefined);
   const dedupeKey = `${method}:${url}`;
 
-  // Special handling for safety-status requests: batch them to prevent thundering herd
-  if (canDeduplicateGet && bucket === "safety-status") {
+  // Special handling for high-traffic endpoints: batch them to prevent thundering herd
+  // Applies to: safety-status, optimization, recommendations, water, solar, security
+  const batchableEndpoints = ["safety-status", "optimization", "recommendations", "water", "solar", "security"];
+  if (canDeduplicateGet && batchableEndpoints.includes(bucket)) {
     return new Promise<Response>((resolve, reject) => {
       const existing = pendingSafetyStatusRequests.get(dedupeKey);
       if (existing) {

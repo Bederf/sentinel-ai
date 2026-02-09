@@ -10,6 +10,7 @@ from typing import Dict, List, Optional, Any
 from fastapi import APIRouter, HTTPException, Body, Request
 from pydantic import BaseModel
 
+from app.middleware.rate_limiter import limiter
 from app.services.ai_optimizer import ai_optimizer_service
 from app.services.device_abstraction import device_manager
 from app.services.audit_logger import AuditLogger
@@ -1357,8 +1358,9 @@ async def list_profiles() -> Dict[str, Any]:
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@limiter.limit("30/minute")
 @router.get("/optimization/settings/{site_id}")
-async def get_profile_settings(site_id: str) -> Dict[str, Any]:
+async def get_profile_settings(request: Request, site_id: str) -> Dict[str, Any]:
     """
     Get site's current profile configuration.
 
@@ -1387,10 +1389,12 @@ async def get_profile_settings(site_id: str) -> Dict[str, Any]:
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@limiter.limit("10/minute")
 @router.put("/optimization/settings/{site_id}")
 async def update_profile_settings(
+    request: Request,
     site_id: str,
-    request: ProfileUpdateRequest
+    config_request: ProfileUpdateRequest
 ) -> Dict[str, Any]:
     """
     Update site profile configuration.
@@ -1415,23 +1419,23 @@ async def update_profile_settings(
         
         # Validate profile exists
         available_profiles = [p["id"] for p in profile_service.list_profiles()]
-        if request.active_profile not in available_profiles:
+        if config_request.active_profile not in available_profiles:
             raise HTTPException(
                 status_code=400,
-                detail=f"Invalid profile: {request.active_profile}. Available: {available_profiles}"
+                detail=f"Invalid profile: {config_request.active_profile}. Available: {available_profiles}"
             )
         
         # Validate control tier
         valid_tiers = ["monitor", "human_in_loop", "auto_execute"]
-        if request.control_tier not in valid_tiers:
+        if config_request.control_tier not in valid_tiers:
             raise HTTPException(
                 status_code=400,
-                detail=f"Invalid control_tier: {request.control_tier}. Valid: {valid_tiers}"
+                detail=f"Invalid control_tier: {config_request.control_tier}. Valid: {valid_tiers}"
             )
         
         # Update config
-        config.active_profile = request.active_profile
-        config.control_tier = request.control_tier
+        config.active_profile = config_request.active_profile
+        config.control_tier = config_request.control_tier
         
         # Save
         success = profile_service.save_site_profile_config(site_id, config)
@@ -1441,13 +1445,13 @@ async def update_profile_settings(
                 detail="Failed to save profile configuration"
             )
         
-        logger.info(f"Updated profile for site {site_id}: {request.active_profile} / {request.control_tier}")
+        logger.info(f"Updated profile for site {site_id}: {config_request.active_profile} / {config_request.control_tier}")
         
         return {
             "success": True,
             "site_id": site_id,
             "config": config.to_dict(),
-            "message": f"Profile updated to {request.active_profile} with {request.control_tier} control",
+            "message": f"Profile updated to {config_request.active_profile} with {config_request.control_tier} control",
         }
     
     except HTTPException:
