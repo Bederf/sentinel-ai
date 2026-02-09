@@ -15,6 +15,7 @@ Manager control additions:
 
 import base64
 import logging
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, status, Header
 from pydantic import BaseModel, Field
 from typing import Dict, Any, Optional, List
@@ -215,18 +216,17 @@ async def reset_equipment_fault(
             "equipment_code": equipment_code,
         }
 
-    # Get current equipment info for before/after comparison
-    import requests as http_requests
+    # Get current equipment info for before/after comparison (async HTTP)
     equipment_info = None
     previous_health = None
     try:
-        resp = http_requests.get(
-            f"http://localhost:9095/api/work-orders/equipment-info/{equipment_code}",
-            timeout=5
-        )
-        if resp.status_code == 200:
-            equipment_info = resp.json()
-            previous_health = equipment_info.get("health_score") or equipment_info.get("health")
+        async with httpx.AsyncClient(timeout=5) as client:
+            resp = await client.get(
+                f"http://localhost:9095/api/work-orders/equipment-info/{equipment_code}"
+            )
+            if resp.status_code == 200:
+                equipment_info = resp.json()
+                previous_health = equipment_info.get("health_score") or equipment_info.get("health")
     except Exception:
         pass
 
@@ -245,15 +245,15 @@ async def reset_equipment_fault(
 
         if result.get("success"):
             reset_data = result.get("data", {})
-            # Get updated health
+            # Get updated health (async HTTP)
             new_health = None
             try:
-                resp = http_requests.get(
-                    f"http://localhost:9095/api/work-orders/equipment-info/{equipment_code}",
-                    timeout=5
-                )
-                if resp.status_code == 200:
-                    new_health = resp.json().get("health_score") or resp.json().get("health")
+                async with httpx.AsyncClient(timeout=5) as client:
+                    resp = await client.get(
+                        f"http://localhost:9095/api/work-orders/equipment-info/{equipment_code}"
+                    )
+                    if resp.status_code == 200:
+                        new_health = resp.json().get("health_score") or resp.json().get("health")
             except Exception:
                 pass
 
