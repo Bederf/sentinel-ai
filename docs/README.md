@@ -28,6 +28,8 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - [System Overview](02-architecture/system-overview.md) - High-level architecture
 - [Module System](02-architecture/module-system.md) - Bolt-on module architecture, activation, cross-module integrations
 - [Module Connectivity & Cross-System Integration](02-architecture/module-connectivity.md) - How modules interconnect, integration patterns, multi-module behaviors, upsell value
+- [Profile-Based Optimization Architecture](02-architecture/profile-based-optimization.md) - Three optimization profiles (SWEAT ASSETS, COMFORT, COST) with multi-objective scoring and feedback loop (Phase 72)
+- [Module Connectivity - Quick Reference](02-architecture/module-connectivity-quick-ref.md) - Executive summary of modules, integrations, and profiles
 - [Device Abstraction Layer](02-architecture/device-abstraction-layer.md) - Protocol-agnostic interface
 - [Naming Conventions](02-architecture/naming-conventions.md) - Device ID and point naming
 
@@ -48,6 +50,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - [Water Meter API](03-api-reference/water-api.md) - Water consumption monitoring, leak detection, trending, alert management (Phase 35)
 - [Contract Management API](03-api-reference/contracts-api.md) - Organizations, contracts, SLA terms, equipment assignments, budgets, condition assessments (Phase 48)
 - [Risk-Based Pricing API](03-api-reference/pricing-api.md) - Quote calculations, SLA tier pricing, risk buffers (Phase 52)
+- [Recommendations API](03-api-reference/recommendations-api.md) - Profile-based recommendations, approval workflow, outcome tracking, rejection learning (Phase 72)
 
 ### ✨ Features
 
@@ -61,6 +64,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 #### AI & Operations
 - **[AI Operations & Monitoring](04-features/ai-operations-monitoring.md)** - Day-to-day AI monitoring & recommendations (control-aware)
 - **[Health Scoring System](04-features/health-scoring-system.md)** - Equipment health calculation with configurable thresholds
+- **[72: Profile-Based Optimization](04-features/72-profile-based-optimization.md)** - Three business-aligned optimization profiles (SWEAT ASSETS, COMFORT, COST) with multi-objective scoring, control tiers, and feedback loop (Phase 72)
 - **[44-02: Explainable AI for ML Predictions](04-features/44-02-explainable-ai.md)** - Natural language explanations for AI predictions (Phase 44-02)
 - **[44-03: Conversational Interface](04-features/44-03-conversational-interface.md)** - Natural language queries over ML predictions via local Ollama LLM (Phase 44-03)
 - **[45-01: Online Learning & Automated Retraining](04-features/45-01-online-learning.md)** - Model freshness monitoring, auto-retraining, A/B testing (Phase 45-01)
