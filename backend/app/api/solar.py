@@ -22,7 +22,8 @@ Provides real-time and historical data for solar installations:
 
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
+from app.middleware.rate_limiter import limiter
 
 from app.models.solar import BESSContainer
 from app.services.solar_ingestion_service import get_solar_ingestion_service
@@ -44,15 +45,17 @@ router = APIRouter()
 # === Ingestion endpoints (from 34-01) ===
 
 
+@limiter.limit("30/minute")
 @router.get("/solar/sites")
-async def list_solar_sites():
+async def list_solar_sites(request: Request):
     """List all registered solar sites."""
     svc = get_solar_ingestion_service()
     return {"sites": svc.get_registered_sites()}
 
 
+@limiter.limit("30/minute")
 @router.get("/solar/sites/{site_id}/overview")
-async def get_site_overview(site_id: str):
+async def get_site_overview(request: Request, site_id: str):
     """Get high-level site overview: total generation, BESS SOC, grid import/export."""
     svc = get_solar_ingestion_service()
     overview = await svc.get_site_overview(site_id)
@@ -61,8 +64,9 @@ async def get_site_overview(site_id: str):
     return overview
 
 
+@limiter.limit("30/minute")
 @router.get("/solar/sites/{site_id}/inverters")
-async def get_inverters(site_id: str):
+async def get_inverters(request: Request, site_id: str):
     """Get all inverters for a site with current readings."""
     svc = get_solar_ingestion_service()
     inverters = await svc.get_inverters(site_id)
@@ -75,8 +79,9 @@ async def get_inverters(site_id: str):
     }
 
 
+@limiter.limit("30/minute")
 @router.get("/solar/sites/{site_id}/inverters/{inverter_id}")
-async def get_inverter_detail(site_id: str, inverter_id: str):
+async def get_inverter_detail(request: Request, site_id: str, inverter_id: str):
     """Get single inverter detail with string-level data."""
     svc = get_solar_ingestion_service()
     detail = await svc.get_inverter_detail(site_id, inverter_id)
@@ -88,8 +93,9 @@ async def get_inverter_detail(site_id: str, inverter_id: str):
     return detail
 
 
+@limiter.limit("30/minute")
 @router.get("/solar/sites/{site_id}/bess")
-async def get_bess_status(site_id: str):
+async def get_bess_status(request: Request, site_id: str):
     """Get BESS container status: SOC, mode, power, health, alarms."""
     svc = get_solar_ingestion_service()
     bess = await svc.get_bess_status(site_id)
@@ -158,8 +164,9 @@ async def get_bess_status(site_id: str):
     return bess.to_dict()
 
 
+@limiter.limit("30/minute")
 @router.get("/solar/sites/{site_id}/meter")
-async def get_meter_readings(site_id: str):
+async def get_meter_readings(request: Request, site_id: str):
     """Get grid meter readings: import/export, voltage, frequency, PF, THD."""
     svc = get_solar_ingestion_service()
     meters = await svc.get_meter_readings(site_id)
@@ -188,8 +195,9 @@ async def get_readings(
     }
 
 
+@limiter.limit("30/minute")
 @router.get("/solar/sites/{site_id}/connectors")
-async def get_connector_status(site_id: str):
+async def get_connector_status(request: Request, site_id: str):
     """Get health status of all manufacturer connectors for a site."""
     svc = get_solar_ingestion_service()
     statuses = svc.get_connector_status(site_id)
@@ -225,8 +233,9 @@ async def get_performance_metrics(
     return metrics.to_dict()
 
 
+@limiter.limit("30/minute")
 @router.get("/solar/sites/{site_id}/performance/inverters")
-async def get_inverter_peer_comparison(site_id: str):
+async def get_inverter_peer_comparison(request: Request, site_id: str):
     """Get inverter peer comparison table with rankings.
 
     Compares inverters within their peer group (same manufacturer/model).
@@ -287,8 +296,9 @@ async def get_string_anomalies(
     }
 
 
+@limiter.limit("30/minute")
 @router.get("/solar/sites/{site_id}/diagnostics")
-async def get_diagnostics(site_id: str):
+async def get_diagnostics(request: Request, site_id: str):
     """Get full diagnostic report with prioritised issues.
 
     Aggregates: PR metrics, underperforming inverters, string anomalies,
@@ -308,8 +318,9 @@ async def get_diagnostics(site_id: str):
 # === Grid compliance endpoints (34-03) ===
 
 
+@limiter.limit("30/minute")
 @router.get("/solar/sites/{site_id}/compliance")
-async def get_compliance_status(site_id: str):
+async def get_compliance_status(request: Request, site_id: str):
     """Get overall grid compliance status (traffic-light) with breakdown per standard.
 
     Returns NRS 097-2-1 compliance summary covering voltage, frequency,
@@ -326,8 +337,9 @@ async def get_compliance_status(site_id: str):
     return result
 
 
+@limiter.limit("30/minute")
 @router.get("/solar/sites/{site_id}/compliance/voltage")
-async def get_voltage_compliance(site_id: str):
+async def get_voltage_compliance(request: Request, site_id: str):
     """Get voltage compliance detail with violation history.
 
     Checks all meter/inverter voltage readings against NRS 097-2-1 limits:
@@ -339,8 +351,9 @@ async def get_voltage_compliance(site_id: str):
     return result.to_dict()
 
 
+@limiter.limit("30/minute")
 @router.get("/solar/sites/{site_id}/compliance/frequency")
-async def get_frequency_compliance(site_id: str):
+async def get_frequency_compliance(request: Request, site_id: str):
     """Get frequency compliance detail with violation history.
 
     Checks grid frequency against NRS 097-2-1 limits:
@@ -352,8 +365,9 @@ async def get_frequency_compliance(site_id: str):
     return result.to_dict()
 
 
+@limiter.limit("30/minute")
 @router.get("/solar/sites/{site_id}/compliance/power-quality")
-async def get_power_quality_compliance(site_id: str):
+async def get_power_quality_compliance(request: Request, site_id: str):
     """Get power quality compliance: THD, power factor, DC injection.
 
     Monitors Total Harmonic Distortion (max 5%), DC injection (max 0.5%),
@@ -364,8 +378,9 @@ async def get_power_quality_compliance(site_id: str):
     return result.to_dict()
 
 
+@limiter.limit("30/minute")
 @router.get("/solar/sites/{site_id}/compliance/export")
-async def get_export_compliance(site_id: str):
+async def get_export_compliance(request: Request, site_id: str):
     """Get export limit compliance status.
 
     Verifies grid export against SSEG Category B limits. Checks zero-export
@@ -377,8 +392,9 @@ async def get_export_compliance(site_id: str):
     return result.to_dict()
 
 
+@limiter.limit("30/minute")
 @router.get("/solar/sites/{site_id}/compliance/certificates")
-async def get_certificate_status(site_id: str):
+async def get_certificate_status(request: Request, site_id: str):
     """Get NRS 097 certificate status for all equipment.
 
     Tracks certificate validity, edition currency (current edition is
@@ -442,8 +458,9 @@ async def get_compliance_events(
 # === Energy arbitrage & dispatch endpoints (34-05) ===
 
 
+@limiter.limit("30/minute")
 @router.get("/solar/sites/{site_id}/dispatch/schedule")
-async def get_dispatch_schedule(site_id: str):
+async def get_dispatch_schedule(request: Request, site_id: str):
     """Get today's 24-hour BESS dispatch schedule optimised for TOU arbitrage.
 
     Returns time slots with charge/discharge/idle/solar_priority actions,
@@ -455,8 +472,9 @@ async def get_dispatch_schedule(site_id: str):
     return schedule.to_dict()
 
 
+@limiter.limit("30/minute")
 @router.get("/solar/sites/{site_id}/dispatch/status")
-async def get_dispatch_status(site_id: str):
+async def get_dispatch_status(request: Request, site_id: str):
     """Get current dispatch state: mode, action, BESS SOC, savings so far.
 
     Returns the autonomous dispatch service status including current action,
@@ -515,8 +533,9 @@ async def get_arbitrage_savings(
     return savings.to_dict()
 
 
+@limiter.limit("30/minute")
 @router.get("/solar/sites/{site_id}/tariff/current")
-async def get_current_tariff(site_id: str):
+async def get_current_tariff(request: Request, site_id: str):
     """Get the current City Power TOU tariff band and rate.
 
     Returns the active tariff band (peak/standard/off_peak), energy charge,
@@ -536,8 +555,9 @@ async def get_current_tariff(site_id: str):
 # === Demand management endpoints (34-06) ===
 
 
+@limiter.limit("30/minute")
 @router.get("/solar/sites/{site_id}/demand/status")
-async def get_demand_status(site_id: str):
+async def get_demand_status(request: Request, site_id: str):
     """Get current demand status with NMD headroom and peak shaving state.
 
     Returns current building demand, monthly peak, NMD limit, headroom,
@@ -564,8 +584,9 @@ async def get_demand_profile(
     return profile.to_dict()
 
 
+@limiter.limit("30/minute")
 @router.get("/solar/sites/{site_id}/demand/nmd")
-async def get_nmd_status(site_id: str):
+async def get_nmd_status(request: Request, site_id: str):
     """Get NMD compliance status with ratchet history and alert level.
 
     Returns NMD limit, current utilisation, alert level (normal/warning/critical),
@@ -685,8 +706,9 @@ async def get_forecast_accuracy(
 # === Generator coordination endpoints (34-07) ===
 
 
+@limiter.limit("30/minute")
 @router.get("/solar/sites/{site_id}/generator/status")
-async def get_generator_status(site_id: str):
+async def get_generator_status(request: Request, site_id: str):
     """Get current dispatch priority stack and generator need assessment.
 
     Returns the active energy source (Solar > BESS > Grid > Generator),
@@ -756,8 +778,9 @@ async def get_generator_events(
 # === Health analytics endpoints (34-08) ===
 
 
+@limiter.limit("30/minute")
 @router.get("/solar/sites/{site_id}/health")
-async def get_fleet_health(site_id: str):
+async def get_fleet_health(request: Request, site_id: str):
     """Get fleet health overview: degradation summary, BESS SoH, alerts.
 
     Returns average fleet degradation rate, worst inverter with degradation
@@ -774,8 +797,9 @@ async def get_fleet_health(site_id: str):
     return health
 
 
+@limiter.limit("30/minute")
 @router.get("/solar/sites/{site_id}/health/inverters/{inverter_id}")
-async def get_inverter_health(site_id: str, inverter_id: str):
+async def get_inverter_health(request: Request, site_id: str, inverter_id: str):
     """Get single inverter health detail with degradation rate.
 
     Returns commissioning date, years in service, baseline vs current PR,
@@ -807,8 +831,9 @@ async def get_inverter_health(site_id: str, inverter_id: str):
     return result
 
 
+@limiter.limit("30/minute")
 @router.get("/solar/sites/{site_id}/health/bess")
-async def get_bess_health(site_id: str):
+async def get_bess_health(request: Request, site_id: str):
     """Get BESS State-of-Health with rack-level detail.
 
     Returns SoH percentage, cycle count vs warranty limit, cell imbalance
@@ -851,8 +876,9 @@ async def get_bess_cycle_history(
     }
 
 
+@limiter.limit("30/minute")
 @router.get("/solar/sites/{site_id}/health/degradation")
-async def get_degradation_ranking(site_id: str):
+async def get_degradation_ranking(request: Request, site_id: str):
     """Get fleet-wide degradation ranking for all inverters.
 
     Returns all inverters sorted by degradation rate (worst first)
@@ -892,8 +918,9 @@ async def generate_warranty_evidence(site_id: str, equipment_id: str):
 # === Maintenance scheduling endpoints (34-09) ===
 
 
+@limiter.limit("30/minute")
 @router.get("/solar/sites/{site_id}/maintenance/schedule")
-async def get_maintenance_schedule(site_id: str):
+async def get_maintenance_schedule(request: Request, site_id: str):
     """Get 90-day maintenance calendar (PPM + condition-based).
 
     Returns scheduled preventive maintenance (panel cleaning, inspections,
@@ -906,8 +933,9 @@ async def get_maintenance_schedule(site_id: str):
     return calendar.to_dict()
 
 
+@limiter.limit("30/minute")
 @router.get("/solar/sites/{site_id}/maintenance/recommendations")
-async def get_maintenance_recommendations(site_id: str):
+async def get_maintenance_recommendations(request: Request, site_id: str):
     """Get current maintenance recommendations from condition evaluation.
 
     Evaluates: panel soiling, inverter service needs (runtime, faults,
