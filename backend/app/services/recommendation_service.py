@@ -94,7 +94,7 @@ class RecommendationService:
                 rec.execution_result = {"error": str(e)}
 
         logger.info(
-            f"Created recommendation {rec.id}: {action_type} on {target_equipment} "
+            f"Created recommendation {rec.id}: {action_type} on {rec.target_equipment} "
             f"({risk_level.value}, requires_approval={requires_approval})"
         )
 
