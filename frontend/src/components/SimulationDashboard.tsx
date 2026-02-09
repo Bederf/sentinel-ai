@@ -913,7 +913,7 @@ function AnalyticsTab({ selectedSiteId: _selectedSiteId }: { selectedSiteId: str
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {/* Events by Hour */}
               <div
-                className="rounded-md p-5"
+                className="rounded-md p-5 w-full min-w-0"
                 style={{
                   background: "var(--color-sentinel-bg-panel)",
                   border: "1px solid var(--color-sentinel-border)",
@@ -926,16 +926,18 @@ function AnalyticsTab({ selectedSiteId: _selectedSiteId }: { selectedSiteId: str
                   Events by Hour
                 </h3>
                 {eventsByHourData.length > 0 ? (
-                  <BarChart
-                    data={eventsByHourData}
-                    index="hour"
-                    categories={["events"]}
-                    colors={["blue"]}
-                    valueFormatter={(v) => String(v)}
-                    showAnimation={true}
-                    showLegend={false}
-                    className="h-48"
-                  />
+                  <div className="w-full h-48 min-w-0">
+                    <BarChart
+                      data={eventsByHourData}
+                      index="hour"
+                      categories={["events"]}
+                      colors={["blue"]}
+                      valueFormatter={(v) => String(v)}
+                      showAnimation={true}
+                      showLegend={false}
+                      className="w-full h-full"
+                    />
+                  </div>
                 ) : (
                   <p
                     className="text-xs text-center py-8"
@@ -948,7 +950,7 @@ function AnalyticsTab({ selectedSiteId: _selectedSiteId }: { selectedSiteId: str
 
               {/* Profile Scores */}
               <div
-                className="rounded-md p-5"
+                className="rounded-md p-5 w-full min-w-0"
                 style={{
                   background: "var(--color-sentinel-bg-panel)",
                   border: "1px solid var(--color-sentinel-border)",
@@ -961,16 +963,18 @@ function AnalyticsTab({ selectedSiteId: _selectedSiteId }: { selectedSiteId: str
                   Profile Scores
                 </h3>
                 {profileScoresData.length > 0 ? (
-                  <BarChart
-                    data={profileScoresData}
-                    index="profile"
-                    categories={["score"]}
-                    colors={["amber"]}
-                    valueFormatter={(v) => v.toFixed(0)}
-                    showAnimation={true}
-                    showLegend={false}
-                    className="h-48"
-                  />
+                  <div className="w-full h-48 min-w-0">
+                    <BarChart
+                      data={profileScoresData}
+                      index="profile"
+                      categories={["score"]}
+                      colors={["amber"]}
+                      valueFormatter={(v) => v.toFixed(0)}
+                      showAnimation={true}
+                      showLegend={false}
+                      className="w-full h-full"
+                    />
+                  </div>
                 ) : (
                   <p
                     className="text-xs text-center py-8"
