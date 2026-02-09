@@ -64,10 +64,10 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
         setIsRefreshing(true);
       }
 
-      const [occupancy, stats] = await Promise.all([
-        daliApi.getBuildingOccupancy(),
-        daliApi.getStats(),
-      ]);
+      const occupancy = await daliApi.getBuildingOccupancy();
+      // Stagger subsequent requests by 250ms to avoid 429 rate limiting
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      const stats = await daliApi.getStats();
 
       // Fetch lighting for energy waste zones (low occupancy)
       const wasteZoneLighting: Record<string, ZoneLighting> = {};
@@ -144,11 +144,12 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
     setZoneDetails(null);
 
     try {
-      const [sensors, luminaires, lighting] = await Promise.all([
-        daliApi.getSensors(zone.zone_id),
-        daliApi.getLuminaires(zone.zone_id),
-        daliApi.getZoneLighting(zone.zone_id),
-      ]);
+      const sensors = await daliApi.getSensors(zone.zone_id);
+      // Stagger subsequent requests by 250ms to avoid 429 rate limiting
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      const luminaires = await daliApi.getLuminaires(zone.zone_id);
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      const lighting = await daliApi.getZoneLighting(zone.zone_id);
 
       setZoneDetails({ sensors, luminaires, lighting });
     } catch (err) {

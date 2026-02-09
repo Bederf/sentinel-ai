@@ -55,11 +55,12 @@ export function SecurityDashboard() {
     try {
       if (showRefreshing) setIsRefreshing(true);
 
-      const [statusResult, camerasResult, alarmsResult] = await Promise.all([
-        securityApi.getStatus(),
-        securityApi.getCameras(),
-        securityApi.getAlarmZones(),
-      ]);
+      const statusResult = await securityApi.getStatus();
+      // Stagger subsequent requests by 250ms to avoid 429 rate limiting
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      const camerasResult = await securityApi.getCameras();
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      const alarmsResult = await securityApi.getAlarmZones();
 
       setStatus(statusResult);
       setCameras(camerasResult.cameras);

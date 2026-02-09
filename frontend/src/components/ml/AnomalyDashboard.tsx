@@ -53,11 +53,12 @@ export function AnomalyDashboard({ refreshInterval = 30000 }: AnomalyDashboardPr
   const fetchData = async () => {
     try {
       setError(null);
-      const [anomalyData, alertData, healthData] = await Promise.all([
-        getAllAnomalies(20),
-        getAnomalyAlerts(),
-        getMLHealth(),
-      ]);
+      // Stagger requests to avoid rate limiting
+      const anomalyData = await getAllAnomalies(20);
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      const alertData = await getAnomalyAlerts();
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      const healthData = await getMLHealth();
       setAnomalies(anomalyData);
       setAlerts(alertData);
       setHealth(healthData);

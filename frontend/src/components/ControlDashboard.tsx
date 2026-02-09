@@ -151,10 +151,10 @@ export function ControlDashboard({ onError }: ControlDashboardProps) {
         setIsLoading(true);
 
         // Fetch core data first, then predictions to reduce request burst on mount
-        const [devicesData, sitesData] = await Promise.all([
-          api.getDevices(),
-          api.getSites(),
-        ]);
+        const devicesData = await api.getDevices();
+        // Stagger subsequent requests by 250ms to avoid 429 rate limiting
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        const sitesData = await api.getSites();
         const predictionsData = await api.getPredictions().catch(() => ({ predictions: [] }));
 
         setSites(sitesData);

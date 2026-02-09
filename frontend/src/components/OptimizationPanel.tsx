@@ -190,13 +190,15 @@ export function OptimizationPanel({ siteId: initialSiteId = "site-001", scenario
     async function fetchData() {
       setLoading(true);
       try {
-        // Fetch eskom status, site schedule, thermal runway, and scenarios in parallel
-        const [eskomData, scheduleData, thermalData, scenarios] = await Promise.all([
-          api.getEskomStatus().catch(() => null),
-          api.getSiteEskomStatus(selectedSiteId).catch(() => null),
-          api.getThermalRunway(selectedSiteId).catch(() => null),
-          api.getOptimizationScenarios().catch(() => [] as OptimizationScenario[]),
-        ]);
+        // Fetch eskom status, site schedule, thermal runway, and scenarios with staggered delays
+        const eskomData = await api.getEskomStatus().catch(() => null);
+        // Stagger subsequent requests by 250ms to avoid 429 rate limiting
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        const scheduleData = await api.getSiteEskomStatus(selectedSiteId).catch(() => null);
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        const thermalData = await api.getThermalRunway(selectedSiteId).catch(() => null);
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        const scenarios = await api.getOptimizationScenarios().catch(() => [] as OptimizationScenario[]);
         if (cancelled) return;
 
         setEskomStatus(eskomData);

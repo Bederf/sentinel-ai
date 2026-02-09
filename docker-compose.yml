@@ -5,6 +5,37 @@
 version: "3.8"
 
 services:
+  # Caddy Reverse Proxy - HTTPS termination and routing
+  caddy:
+    image: caddy:2-alpine
+    container_name: bms-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infrastructure/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - bms-network
+    environment:
+      - ACME_AGREE=true
+    healthcheck:
+      test: ["CMD", "caddy", "version"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+        labels: "service"
+    labels:
+      - "service=sentinel-caddy"
+
   # Backend API
   backend:
     build:
@@ -12,7 +43,9 @@ services:
       dockerfile: Dockerfile
     container_name: bms-backend
     ports:
-      - "8082:8000"
+      - "8082:8000"  # Also exposed for direct API access if needed
+    expose:
+      - "8000"  # Caddy proxy uses internal network
     environment:
       - PYTHONUNBUFFERED=1
     volumes:
@@ -39,11 +72,11 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-      args:
-        - VITE_API_URL=http://localhost:8082
     container_name: bms-frontend
+    expose:
+      - "80"  # Caddy proxy uses internal network
     ports:
-      - "3002:80"
+      - "3002:80"  # Also exposed for development if needed
     depends_on:
       backend:
         condition: service_healthy
@@ -211,6 +244,8 @@ services:
       - "service=sentinel-fail2ban"
 
 volumes:
+  caddy-data:
+  caddy-config:
   influxdb-data:
   influxdb-config:
   loki-data:

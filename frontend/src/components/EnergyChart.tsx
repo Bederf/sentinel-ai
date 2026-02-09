@@ -224,10 +224,11 @@ export function EnergyChart({
       </div>
 
       {/* Chart */}
-      <div className="p-4">
-        <AreaChart
-          className="h-64"
-          data={chartData}
+      <div className="p-4 overflow-hidden flex-1">
+        <div className="h-64 w-full flex">
+          <AreaChart
+            className="h-64 w-full"
+            data={chartData}
           index="date"
           categories={["HVAC", "Lighting", "Other"]}
           colors={["cyan", "amber", "slate"]}
@@ -237,7 +238,8 @@ export function EnergyChart({
           showAnimation={true}
           stack={true}
           curveType="monotone"
-        />
+          />
+        </div>
       </div>
 
       {/* Category breakdown */}

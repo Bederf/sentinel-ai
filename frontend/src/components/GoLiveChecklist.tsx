@@ -210,6 +210,8 @@ export function GoLiveChecklist({ buildingId, onStatusChange }: GoLiveChecklistP
     setError(null);
 
     try {
+      // Add delay to stagger requests and avoid 429 rate limiting
+      await new Promise((resolve) => setTimeout(resolve, 300));
       const data = await validationApi.getChecklist(buildingId);
       setChecklist(data);
     } catch (err) {
@@ -491,13 +493,17 @@ export function GoLiveChecklist({ buildingId, onStatusChange }: GoLiveChecklistP
 
           {/* Blocking issues */}
           {checklist.blocking_issues.length > 0 && (
-            <Callout title="Blocking Issues" color="rose" className="mb-4">
-              <span className="text-sm">
+            <div className="mb-4 p-3 rounded-md border border-red-500/50 bg-red-500/10">
+              <div className="font-medium text-sm text-red-500 mb-2">Blocking Issues</div>
+              <div className="space-y-1">
                 {checklist.blocking_issues.map((issue, index) => (
-                  <span key={index} className="block">• {issue}</span>
+                  <div key={index} className="text-sm text-red-400 flex items-start gap-2">
+                    <span className="text-red-500 flex-shrink-0">•</span>
+                    <span>{issue}</span>
+                  </div>
                 ))}
-              </span>
-            </Callout>
+              </div>
+            </div>
           )}
 
           {/* Activation status message */}

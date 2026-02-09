@@ -148,11 +148,12 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
     const loadDashboardData = async () => {
       try {
         setLoading(true);
-        const [statsData, sitesData, predictionsData] = await Promise.all([
-          api.getStats(),
-          api.getSites(),
-          api.getPredictions(),
-        ]);
+        const statsData = await api.getStats();
+        // Stagger subsequent requests by 250ms to avoid 429 rate limiting
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        const sitesData = await api.getSites();
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        const predictionsData = await api.getPredictions();
         setStats(statsData);
         setSites(sitesData);
         // Filter predictions to show only critical and warning severity (from health thresholds)

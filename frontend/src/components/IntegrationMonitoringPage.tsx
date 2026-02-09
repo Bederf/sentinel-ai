@@ -297,11 +297,12 @@ export function IntegrationMonitoringPage() {
       setLoadingHealth(true);
       setLoadingSyncJobs(true);
 
-      const [healthData, syncJobsData, sitesData] = await Promise.all([
-        monitoringApi.getIntegrationHealth(selectedBuildingId || undefined),
-        monitoringApi.getSyncJobs(selectedBuildingId || undefined),
-        api.getSites(),
-      ]);
+      const healthData = await monitoringApi.getIntegrationHealth(selectedBuildingId || undefined);
+      // Stagger subsequent requests by 500ms to avoid 429 rate limiting
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      const syncJobsData = await monitoringApi.getSyncJobs(selectedBuildingId || undefined);
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      const sitesData = await api.getSites();
 
       setHealth(healthData);
       setSyncJobs(syncJobsData);

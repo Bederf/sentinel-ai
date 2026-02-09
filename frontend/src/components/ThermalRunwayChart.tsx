@@ -122,8 +122,8 @@ export function ThermalRunwayChart({ data, outagePeriod, metrics }: ThermalRunwa
 
   return (
     <div className="space-y-4">
-      <div className="relative h-64 min-h-[256px] w-full">
-        <ResponsiveContainer width="100%" height="100%">
+      <div className="relative h-64 min-h-[256px] w-full overflow-hidden flex">
+        <ResponsiveContainer width="100%" height="100%" debounce={0}>
           <LineChart
             data={chartData}
             onMouseMove={handleMouseMove}

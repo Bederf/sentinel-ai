@@ -1,0 +1,42 @@
+{
+  email bms@aimthelaw.co.za
+}
+
+# Main HTTPS reverse proxy for BMS Intelligence
+bms.aimthelaw.co.za {
+  # Security headers
+  header / X-Frame-Options "SAMEORIGIN"
+  header / X-Content-Type-Options "nosniff"
+  header / X-XSS-Protection "1; mode=block"
+  header / Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+
+  # Frontend app (SPA)
+  handle / {
+    reverse_proxy frontend:80 {
+      header_up X-Real-IP {remote_host}
+    }
+  }
+
+  # API backend - proxy all /api/* requests
+  handle /api/* {
+    reverse_proxy backend:8000 {
+      header_up X-Real-IP {remote_host}
+      # Preserve auth and cookie headers
+      header_up Authorization {request_header.Authorization}
+      header_up Cookie {request_header.Cookie}
+      # Allow CORS headers
+      header_up Access-Control-Request-Headers {request_header.Access-Control-Request-Headers}
+      header_up Access-Control-Request-Method {request_header.Access-Control-Request-Method}
+    }
+  }
+
+  # Health check endpoint
+  handle /health {
+    respond "OK" 200
+  }
+}
+
+# Redirect www to non-www
+www.bms.aimthelaw.co.za {
+  redir https://bms.aimthelaw.co.za{uri} permanent
+}

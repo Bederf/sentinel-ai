@@ -85,12 +85,14 @@ export function SustainabilityDashboard({
     try {
       setLoading(true);
       setError(null);
-      const [s, h, e, g] = await Promise.all([
-        sustainabilityApi.fetchSummary(selectedSiteId),
-        sustainabilityApi.fetchEmissions(selectedSiteId, 12),
-        sustainabilityApi.fetchEfficiency(selectedSiteId),
-        sustainabilityApi.fetchGreenStar(selectedSiteId),
-      ]);
+      // Stagger requests to avoid rate limiting
+      const s = await sustainabilityApi.fetchSummary(selectedSiteId);
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      const h = await sustainabilityApi.fetchEmissions(selectedSiteId, 12);
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      const e = await sustainabilityApi.fetchEfficiency(selectedSiteId);
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      const g = await sustainabilityApi.fetchGreenStar(selectedSiteId);
       setSummary(s);
       setHistory(h);
       setEfficiency(e);

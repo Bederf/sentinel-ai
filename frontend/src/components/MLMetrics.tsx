@@ -298,12 +298,15 @@ export function MLMetrics() {
   const loadData = async () => {
     try {
       setError(null);
-      const [healthData, metricsData, driftData, alertsData] = await Promise.all([
-        mlopsApi.getHealth(),
-        mlopsApi.getMetrics(),
-        mlopsApi.getAllDrift(),
-        mlopsApi.getAlerts({ limit: 10 }),
-      ]);
+      // Stagger requests to avoid 429 rate limiting
+      const healthData = await mlopsApi.getHealth();
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      const metricsData = await mlopsApi.getMetrics();
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      const driftData = await mlopsApi.getAllDrift();
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      const alertsData = await mlopsApi.getAlerts({ limit: 10 });
+      
       setHealth(healthData);
       setMetrics(metricsData);
       setDrift(driftData);
