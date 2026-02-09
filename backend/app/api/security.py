@@ -227,14 +227,17 @@ async def get_building_occupancy():
 
 
 @router.get("/occupancy/recommendations")
-async def get_occupancy_recommendations():
+async def get_occupancy_recommendations(site_id: str = "site-002"):
     """Get cross-module recommendations based on occupancy.
 
     Returns HVAC setpoint relaxation and lighting dimming
-    suggestions for empty or low-occupancy zones.
+    suggestions for empty or low-occupancy zones based on site's active profile.
+
+    Args:
+        site_id: Site identifier (default: site-002 for backward compatibility)
     """
     occ_svc = get_security_occupancy_service()
-    result = occ_svc.get_all_recommendations()
+    result = occ_svc.get_all_recommendations(site_id)
     return result
 
 

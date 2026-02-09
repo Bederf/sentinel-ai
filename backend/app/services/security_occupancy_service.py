@@ -12,12 +12,13 @@ from typing import Any, Dict, List, Optional
 
 from app.database.repositories.security_repository import get_security_repository
 from app.models.security import EventDirection, OccupancySource, SecurityOccupancy
+from app.services.profile_service import get_profile_service
 
 logger = logging.getLogger(__name__)
 
 _instance: Optional["SecurityOccupancyService"] = None
 
-# Thresholds for cross-module recommendations
+# Default thresholds for cross-module recommendations (fallback if profile not available)
 OCCUPANCY_EMPTY_THRESHOLD = 0  # 0 people = empty zone
 OCCUPANCY_LOW_THRESHOLD = 3    # Below this, zone considered low-occupancy
 HVAC_RELAXATION_OFFSET = 2.0   # Degrees to relax setpoint for empty zones
@@ -30,6 +31,32 @@ class SecurityOccupancyService:
 
     def __init__(self):
         self._repo = get_security_repository()
+        self._profile_service = get_profile_service()
+
+    def _get_profile_thresholds(self, site_id: str) -> Dict[str, Any]:
+        """Get occupancy thresholds from site profile, or use defaults.
+
+        Returns a dict with profile-specific thresholds for HVAC and lighting
+        adjustments based on zone occupancy levels.
+        """
+        try:
+            profile = self._profile_service.get_site_profile(site_id)
+            if profile:
+                thresholds = profile.get("thresholds", {})
+                return {
+                    "hvac_setback": thresholds.get("empty_zone_setback", HVAC_RELAXATION_OFFSET),
+                    "lighting_empty": thresholds.get("empty_zone_lighting", LIGHTING_DIM_LEVEL),
+                    "lighting_low": thresholds.get("low_occupancy_lighting", LIGHTING_LOW_LEVEL),
+                }
+        except Exception as e:
+            logger.warning(f"Failed to load profile thresholds for site {site_id}: {e}")
+
+        # Return defaults
+        return {
+            "hvac_setback": HVAC_RELAXATION_OFFSET,
+            "lighting_empty": LIGHTING_DIM_LEVEL,
+            "lighting_low": LIGHTING_LOW_LEVEL,
+        }
 
     def _calculate_zone_occupancy(self, zone_id: str) -> Dict[str, Any]:
         """Calculate occupancy for a zone from badge events."""
@@ -111,12 +138,20 @@ class SecurityOccupancyService:
 
     # --- Cross-module coordination ---
 
-    def check_hvac_adjustment(self, zone_id: str) -> Optional[Dict[str, Any]]:
+    def check_hvac_adjustment(self, zone_id: str, thresholds: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
         """Check if HVAC setpoint should be relaxed based on occupancy.
 
-        If occupancy is below threshold, recommend setpoint relaxation
-        to save energy.
+        Uses profile-driven thresholds if provided, otherwise uses defaults.
+
+        Args:
+            zone_id: Zone identifier
+            thresholds: Profile-driven thresholds (contains hvac_setback)
         """
+        if thresholds is None:
+            thresholds = {"hvac_setback": HVAC_RELAXATION_OFFSET}
+
+        hvac_setback = thresholds.get("hvac_setback", HVAC_RELAXATION_OFFSET)
+
         occ = self._calculate_zone_occupancy(zone_id)
         count = occ["occupancy_count"]
         zone_name = occ["zone_name"]
@@ -127,13 +162,13 @@ class SecurityOccupancyService:
                 "zone_name": zone_name,
                 "occupancy": count,
                 "recommendation": "relax_setpoint",
-                "detail": f"Zone {zone_name} is empty. Recommend relaxing cooling setpoint by +{HVAC_RELAXATION_OFFSET}°C to save energy.",
-                "setpoint_offset": HVAC_RELAXATION_OFFSET,
+                "detail": f"Zone {zone_name} is empty. Recommend relaxing cooling setpoint by +{hvac_setback}°C to save energy.",
+                "setpoint_offset": hvac_setback,
                 "reason": "Zone unoccupied based on badge data",
                 "module": "hvac",
             }
         elif count <= OCCUPANCY_LOW_THRESHOLD:
-            offset = HVAC_RELAXATION_OFFSET / 2
+            offset = hvac_setback / 2
             return {
                 "zone_id": zone_id,
                 "zone_name": zone_name,
@@ -146,12 +181,24 @@ class SecurityOccupancyService:
             }
         return None
 
-    def check_lighting_adjustment(self, zone_id: str) -> Optional[Dict[str, Any]]:
+    def check_lighting_adjustment(self, zone_id: str, thresholds: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
         """Check if lighting should be dimmed based on occupancy.
 
-        If zone is empty, recommend dimming to 20%.
-        If zone has low occupancy, recommend 50%.
+        Uses profile-driven thresholds if provided, otherwise uses defaults.
+
+        Args:
+            zone_id: Zone identifier
+            thresholds: Profile-driven thresholds (contains lighting_empty, lighting_low)
         """
+        if thresholds is None:
+            thresholds = {
+                "lighting_empty": LIGHTING_DIM_LEVEL,
+                "lighting_low": LIGHTING_LOW_LEVEL,
+            }
+
+        lighting_empty = thresholds.get("lighting_empty", LIGHTING_DIM_LEVEL)
+        lighting_low = thresholds.get("lighting_low", LIGHTING_LOW_LEVEL)
+
         occ = self._calculate_zone_occupancy(zone_id)
         count = occ["occupancy_count"]
         zone_name = occ["zone_name"]
@@ -162,8 +209,8 @@ class SecurityOccupancyService:
                 "zone_name": zone_name,
                 "occupancy": count,
                 "recommendation": "dim_to_minimum",
-                "detail": f"Zone {zone_name} is empty. Recommend dimming lights to {LIGHTING_DIM_LEVEL}%.",
-                "brightness_level": LIGHTING_DIM_LEVEL,
+                "detail": f"Zone {zone_name} is empty. Recommend dimming lights to {lighting_empty}%.",
+                "brightness_level": lighting_empty,
                 "reason": "Zone unoccupied based on badge data",
                 "module": "lighting",
             }
@@ -173,27 +220,36 @@ class SecurityOccupancyService:
                 "zone_name": zone_name,
                 "occupancy": count,
                 "recommendation": "dim_partial",
-                "detail": f"Zone {zone_name} has low occupancy ({count} people). Recommend dimming lights to {LIGHTING_LOW_LEVEL}%.",
-                "brightness_level": LIGHTING_LOW_LEVEL,
+                "detail": f"Zone {zone_name} has low occupancy ({count} people). Recommend dimming lights to {lighting_low}%.",
+                "brightness_level": lighting_low,
                 "reason": f"Low occupancy ({count} people)",
                 "module": "lighting",
             }
         return None
 
-    def get_all_recommendations(self) -> Dict[str, Any]:
-        """Get cross-module recommendations for all zones."""
+    def get_all_recommendations(self, site_id: str) -> Dict[str, Any]:
+        """Get cross-module recommendations for all zones.
+
+        Uses profile-driven thresholds from the site's active profile.
+
+        Args:
+            site_id: Site identifier for profile lookup
+        """
         zones = self._repo.get_zones()
         hvac_recommendations = []
         lighting_recommendations = []
 
+        # Load profile thresholds for this site
+        thresholds = self._get_profile_thresholds(site_id)
+
         for zone in zones:
             zone_id = zone.get("zone_id", "")
 
-            hvac_rec = self.check_hvac_adjustment(zone_id)
+            hvac_rec = self.check_hvac_adjustment(zone_id, thresholds)
             if hvac_rec:
                 hvac_recommendations.append(hvac_rec)
 
-            lighting_rec = self.check_lighting_adjustment(zone_id)
+            lighting_rec = self.check_lighting_adjustment(zone_id, thresholds)
             if lighting_rec:
                 lighting_recommendations.append(lighting_rec)
 

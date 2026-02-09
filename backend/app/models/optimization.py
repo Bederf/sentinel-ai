@@ -139,6 +139,7 @@ class OptimizationRecommendation:
 
     Contains specific setpoint changes, projected savings, and confidence score.
     Supports both HVAC and DALI lighting recommendations.
+    Includes profile information for recommendations.
     """
 
     site_id: str
@@ -150,6 +151,9 @@ class OptimizationRecommendation:
     # Phase 3: Cross-system coordination
     cross_system_recommendations: Optional[List[Dict[str, Any]]] = None
     lighting_summary: Optional[Dict[str, Any]] = None
+    # Phase 72.2: Profile-aware optimization
+    profile: Optional[str] = None  # Active profile name (e.g., "cost", "comfort", "asset_sweating")
+    profile_applied: bool = False  # Whether profile was applied to recommendations
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
@@ -160,6 +164,8 @@ class OptimizationRecommendation:
             "projected_savings": self.projected_savings,
             "confidence": self.confidence,
             "reasoning": self.reasoning,
+            "profile": self.profile,
+            "profile_applied": self.profile_applied,
         }
         if self.cross_system_recommendations:
             result["cross_system_recommendations"] = self.cross_system_recommendations
@@ -179,6 +185,8 @@ class OptimizationRecommendation:
             reasoning=data.get("reasoning", ""),
             cross_system_recommendations=data.get("cross_system_recommendations"),
             lighting_summary=data.get("lighting_summary"),
+            profile=data.get("profile"),
+            profile_applied=data.get("profile_applied", False),
         )
 
 

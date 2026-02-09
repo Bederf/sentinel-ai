@@ -202,23 +202,36 @@ class AIOptimizerService:
         dali_service = get_dali_service()
         dali_zones = self._gather_dali_zone_data(dali_service, site_id)
 
+        # Load active profile for this site
+        profile = None
+        try:
+            from app.services.profile_service import get_profile_service
+            profile_service = get_profile_service()
+            profile = profile_service.get_site_profile(site_id)
+            if profile:
+                logger.info(f"Using optimization profile: {profile.get('name', 'Unknown')} for site {site_id}")
+            else:
+                logger.warning(f"No optimization profile found for site {site_id}, using defaults")
+        except Exception as e:
+            logger.warning(f"Failed to load profile for site {site_id}: {e}")
+
         # Build optimization prompt for Claude with ALL available equipment
         prompt = self._build_optimization_prompt(
             site, current_conditions, weather_forecast, energy_prices,
-            equipment_inventory, dali_zones
+            equipment_inventory, dali_zones, profile=profile
         )
 
         try:
             # Try to use Claude for analysis
             if self._claude_service.is_configured():
                 recommendation = await self._analyze_with_claude(
-                    site_id, prompt, current_conditions, equipment_inventory, dali_zones
+                    site_id, prompt, current_conditions, equipment_inventory, dali_zones, profile
                 )
             else:
                 # Fall back to rule-based optimization
                 recommendation = self._analyze_with_rules(
                     site_id, current_conditions, weather_forecast, energy_prices,
-                    equipment_inventory, dali_zones
+                    equipment_inventory, dali_zones, profile
                 )
 
             return recommendation
@@ -228,7 +241,7 @@ class AIOptimizerService:
             # Fall back to rule-based optimization
             return self._analyze_with_rules(
                 site_id, current_conditions, weather_forecast, energy_prices,
-                equipment_inventory, dali_zones
+                equipment_inventory, dali_zones, profile
             )
 
     async def _gather_current_conditions(self, site_id: str) -> Dict[str, Any]:
@@ -427,11 +440,21 @@ class AIOptimizerService:
         energy_prices: Dict[str, Any],
         equipment_inventory: Dict[str, List[Device]],
         dali_zones: Optional[Dict[str, Any]] = None,
+        profile: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Build optimization prompt for Claude with ALL available equipment.
 
         Equipment inventory varies by building - some have generators, others don't.
         The AI should only recommend changes for equipment that exists at this site.
+
+        Args:
+            site: Site configuration
+            current_conditions: Current building conditions
+            weather_forecast: Weather forecast
+            energy_prices: Energy pricing
+            equipment_inventory: Equipment by type
+            dali_zones: DALI zone data
+            profile: Optimization profile with weights and thresholds
         """
         dali_zones = dali_zones or {}
 
@@ -450,6 +473,50 @@ class AIOptimizerService:
             if devices:
                 inventory_summary.append(f"- {device_type.upper()}: {len(devices)} devices")
 
+        # Build profile section if profile is provided
+        profile_section = ""
+        if profile:
+            profile_weights = profile.get("weights", {})
+            profile_thresholds = profile.get("thresholds", {})
+            profile_section = f"""
+**ACTIVE OPTIMIZATION PROFILE: {profile.get('name', 'Default')}**
+{profile.get('description', 'No description available')}
+
+**Optimization Weights (priorities):**
+- Runtime/Equipment Health: {profile_weights.get('runtime', 0.25):.0%}
+- Comfort: {profile_weights.get('comfort', 0.25):.0%}
+- Cost: {profile_weights.get('cost', 0.25):.0%}
+- Maintenance: {profile_weights.get('maintenance', 0.15):.0%}
+- Energy: {profile_weights.get('energy', 0.10):.0%}
+
+**Profile-Specific Decision Guidance:**
+"""
+            # Add profile-specific guidance
+            profile_name = profile.get("name", "").lower()
+            if "asset" in profile_name or "sweat" in profile_name:
+                profile_section += """- MAXIMIZE equipment runtime and utilization
+- Accept higher maintenance risk to extend asset life
+- Reduce idle hours - keep systems running efficiently
+- Use relaxed comfort bands to maximize runtime"""
+            elif "comfort" in profile_name:
+                profile_section += """- PRIORITIZE occupant comfort with tight temperature control
+- Maintain setpoints within ±1°C of target
+- Fast fault response and recovery
+- Accept higher energy costs for comfort"""
+            elif "cost" in profile_name or "saving" in profile_name:
+                profile_section += """- MINIMIZE operational costs and energy consumption
+- Aggressive load shifting and demand response
+- Accept wider comfort bands (±2°C) during off-peak
+- Prioritize peak-shaving and cost reduction"""
+
+            profile_section += f"""
+
+**Profile Thresholds & Constraints:**
+{json.dumps(profile_thresholds, indent=2) if profile_thresholds else "No specific thresholds"}
+
+**Your optimization must respect these profile priorities above all else.**
+"""
+
         prompt = f"""You are an expert building optimization engineer. Analyze this building's equipment and recommend optimal setpoints for energy efficiency and occupant comfort.
 
 **IMPORTANT:** This building has a SPECIFIC equipment inventory. Only recommend changes for equipment that EXISTS at this site. Different buildings have different equipment combinations.
@@ -463,6 +530,7 @@ class AIOptimizerService:
 
 **Equipment Inventory at This Site:**
 {chr(10).join(inventory_summary) if inventory_summary else "No equipment registered"}
+{profile_section}
 
 **Current Conditions:**
 - Indoor temperature: {current_conditions.get('indoor_temp', 22)}°C
@@ -625,8 +693,18 @@ Provide ONLY the JSON response, no additional text."""
         current_conditions: Dict[str, Any],
         equipment_inventory: Dict[str, List[Device]],
         dali_zones: Optional[Dict[str, Any]] = None,
+        profile: Optional[Dict[str, Any]] = None,
     ) -> OptimizationRecommendation:
-        """Analyze using Claude AI with full equipment inventory."""
+        """Analyze using Claude AI with full equipment inventory.
+
+        Args:
+            site_id: Site identifier
+            prompt: Optimization prompt with profile information
+            current_conditions: Current building conditions
+            equipment_inventory: Equipment by type
+            dali_zones: DALI zone data
+            profile: Active optimization profile (if any)
+        """
         try:
             logger.info(f"Using Claude AI for optimization of site {site_id}")
 
@@ -663,6 +741,8 @@ Provide ONLY the JSON response, no additional text."""
                     projected_savings=result.get("projected_savings", {}),
                     confidence=result.get("confidence", 0.7),
                     reasoning=result.get("reasoning", ""),
+                    profile=profile.get("name") if profile else None,
+                    profile_applied=bool(profile),
                 )
 
             except json.JSONDecodeError as e:
@@ -1252,12 +1332,16 @@ Provide ONLY the JSON response, no additional text."""
         energy_prices: Dict[str, Any],
         equipment_inventory: Dict[str, List[Device]],
         dali_zones: Optional[Dict[str, Any]] = None,
+        profile: Optional[Dict[str, Any]] = None,
     ) -> OptimizationRecommendation:
         """Fallback rule-based optimization for ALL equipment types.
 
         Uses equipment inventory to generate recommendations for whatever
         equipment exists at this site. Different buildings have different
         equipment combinations.
+
+        Args:
+            profile: Active optimization profile (if any)
         """
         logger.info(f"Using rule-based optimization for site {site_id}")
         dali_zones = dali_zones or {}
@@ -1835,6 +1919,8 @@ Provide ONLY the JSON response, no additional text."""
             reasoning=reasoning,
             cross_system_recommendations=cross_system_recommendations if cross_system_recommendations else None,
             lighting_summary=lighting_summary,
+            profile=profile.get("name") if profile else None,
+            profile_applied=bool(profile),
         )
 
     async def analyze_building_load_shedding(
