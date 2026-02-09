@@ -4,7 +4,9 @@
  * This file re-exports all API utilities, types, and methods.
  * Domain-specific APIs are organized in separate modules:
  * - client.ts: Core HTTP utilities and auth
- * - Eventually: auth.ts, devices.ts, sites.ts, chat.ts, workflow.ts, etc.
+ * - auth.ts: Authentication APIs
+ * - workflow.ts: Inspection and workflow APIs
+ * - (Future) devices.ts, sites.ts, chat.ts, solar.ts, etc.
  */
 
 // Core utilities and types
@@ -19,6 +21,29 @@ export {
   type HealthResponse,
   type ApiError,
 } from './client';
+
+// Domain-specific modules
+export { authApi, type AuthUser, type LoginResponse, type VerifyResponse } from './auth';
+export {
+  devicesApi,
+  type Device,
+  type DevicePoint,
+  type DeviceStatus,
+  type DeviceSafetyStatus,
+  type DeviceControlResponse,
+} from './devices';
+export {
+  sitesApi,
+  type Site,
+  type Equipment,
+  type BuildingEquipmentResponse,
+} from './sites';
+export {
+  inspectionApi,
+  workflowApi,
+  type InspectionScheduleItem,
+  type WorkflowDashboardResponse,
+} from './workflow';
 
 // Legacy: import everything from original api.ts for now
 // TODO: Gradually migrate to domain-specific imports as modules are created
