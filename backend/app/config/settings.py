@@ -41,6 +41,7 @@ class Settings(BaseSettings):
 
     # JWT token expiration (Phase 58-04 M-3: reduced from 30 days to 8 hours)
     jwt_expiration_hours: int = 8  # DEPRECATED: Use jwt_access_token_ttl_minutes instead
+    jwt_expiry_days: int = 30  # DEPRECATED: legacy compatibility only
 
     # JWT access token TTL (Phase 65-02: short-lived tokens with refresh)
     jwt_access_token_ttl_minutes: int = 15  # 15 minutes for access tokens
@@ -56,6 +57,16 @@ class Settings(BaseSettings):
     simbiot_api_url: str = ""
     simbiot_username: str = ""
     simbiot_password: str = ""
+
+    # Notification service settings (email, Slack)
+    notification_smtp_host: str = ""
+    notification_smtp_port: int = 587
+    notification_smtp_username: str = ""
+    notification_smtp_password: str = ""
+    notification_smtp_use_tls: bool = True
+    notification_slack_webhook_critical: str = ""
+    notification_slack_webhook_emergency: str = ""
+    notification_email_recipients: list[str] = []  # Comma-separated email addresses
 
     # Supabase settings
     supabase_url: str = ""

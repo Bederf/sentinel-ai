@@ -16,6 +16,7 @@ from pathlib import Path
 
 from app.models.autonomous_decision import EscalationEvent, EscalationLevel
 from app.services.claude_service import claude_service
+from app.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -49,27 +50,58 @@ class NotificationService:
         logger.info("NotificationService initialized")
 
     async def _load_configuration(self) -> None:
-        """Load notification configuration from environment/file."""
-        # TODO: Load from environment variables or config file
-        # For now, use mock configuration
-        self.smtp_config = {
-            "host": "smtp.example.com",
-            "port": 587,
-            "username": "sentinel@example.com",
-            "password": "password",  # In production, use environment variable
-            "use_tls": True,
-        }
+        """Load notification configuration from environment variables."""
+        # Load SMTP configuration from environment
+        if settings.notification_smtp_host:
+            self.smtp_config = {
+                "host": settings.notification_smtp_host,
+                "port": settings.notification_smtp_port,
+                "username": settings.notification_smtp_username,
+                "password": settings.notification_smtp_password,
+                "use_tls": settings.notification_smtp_use_tls,
+            }
+            logger.info(f"Loaded SMTP configuration for {settings.notification_smtp_host}")
+        else:
+            logger.debug("No SMTP configuration found in environment")
 
-        self.slack_webhooks = {
-            "critical": "https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXX",
-            "emergency": "https://hooks.slack.com/services/T00000000/B00000000/YYYYYYYYYYYYYYYY",
-        }
+        # Load Slack webhooks from environment
+        if settings.notification_slack_webhook_critical:
+            self.slack_webhooks["critical"] = settings.notification_slack_webhook_critical
+            logger.info("Loaded critical Slack webhook configuration")
 
-        self.email_recipients = [
-            "operator1@facility.com",
-            "operator2@facility.com",
-            "manager@facility.com",
-        ]
+        if settings.notification_slack_webhook_emergency:
+            self.slack_webhooks["emergency"] = settings.notification_slack_webhook_emergency
+            logger.info("Loaded emergency Slack webhook configuration")
+
+        # Load email recipients from environment
+        if settings.notification_email_recipients:
+            self.email_recipients = settings.notification_email_recipients
+            logger.info(f"Loaded {len(self.email_recipients)} email recipients")
+
+        # Demo mode fallback for development
+        if not self.smtp_config and not self.slack_webhooks and not self.email_recipients:
+            if settings.demo_mode:
+                logger.warning("No notification configuration found - using demo defaults (demo mode)")
+                # Use demo configuration for development
+                self.smtp_config = {
+                    "host": "smtp.example.com",
+                    "port": 587,
+                    "username": "sentinel@example.com",
+                    "password": "demo_password",
+                    "use_tls": True,
+                }
+                self.slack_webhooks = {
+                    "critical": "https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXX",
+                    "emergency": "https://hooks.slack.com/services/T00000000/B00000000/YYYYYYYYYYYYYYYY",
+                }
+                self.email_recipients = [
+                    "operator1@facility.com",
+                    "operator2@facility.com",
+                    "manager@facility.com",
+                ]
+            else:
+                # Production mode - require configuration
+                logger.error("No notification configuration found in production mode")
 
         logger.info("Loaded notification configuration")
 
