@@ -6,16 +6,49 @@ version: "1.0.0"
 created: "2026-02-09"
 updated: "2026-02-09"
 author: "Sentinel Development Team"
-tags: ["modules", "integration", "quick-reference", "cheat-sheet"]
+tags: ["modules", "integration", "quick-reference", "cheat-sheet", "optimization", "profiles"]
 domain: "general"
 audience: "all"
 complexity: "beginner"
-estimated_read_time: 5
+estimated_read_time: 8
 ---
 
 # Module Connectivity - Quick Reference
 
-**TL;DR:** The SENTINEL platform uses bolt-on modules that automatically coordinate when multiple modules are active. Each coordination link is called an "integration."
+**TL;DR:** The SENTINEL platform uses bolt-on modules that automatically coordinate when multiple modules are active. Each coordination link is called an "integration."  Recently added: **Profile-Based Optimization** — align recommendations with business priorities.
+
+---
+
+## Profile-Based Optimization (NEW)
+
+The system now supports three optimization profiles that align AI recommendations with business priorities:
+
+| Profile | Focus | Best For | Target Savings |
+|---------|-------|----------|-----------------|
+| **Asset Sweating** | Maximize equipment utilization | Leased facilities, older equipment | 30-40% energy |
+| **Comfort First** | Tight environment control | Offices, hospitals, premium buildings | 15-20% energy |
+| **Cost Saving** | Minimize operational spend | Light commercial, load shedding | 50-60% energy |
+
+**How It Works:**
+1. Operator selects active profile per site → `PUT /api/optimization/settings/{site_id}`
+2. AI Optimizer receives profile weights in prompt → injects business priorities
+3. Multi-objective scoring ranks recommendations → best match profile weights
+4. Three control tiers determine approval → Monitor / Require Approval / Auto-Execute
+5. System learns from rejections → auto-creates constraints after 3 rejections
+
+**Real Example:** Same building state, 3 different profiles get 3 different recommendations:
+- **Asset Sweating:** "Run CHILLER 24/7 at 18°C (max utilization, bearing maintenance OK)"
+- **Comfort First:** "Maintain 21.5±0.5°C (tight control, fast HVAC response)"
+- **Cost Saving:** "HVAC +2°C, empty zones +3°C, use BESS not generator (minimize cost)"
+
+**Approval Workflow:**
+- Tier 1 (Monitor): Display only, no execution
+- Tier 2 (Approve): High-risk actions require operator approval
+- Tier 3 (Auto): Low-risk auto-execute, high-risk approval required
+
+See [Profile-Based Optimization Architecture](profile-based-optimization.md) for full details.
+
+---
 
 ## The 12 Cross-Module Integrations at a Glance
 
@@ -32,6 +65,7 @@ estimated_read_time: 5
 | **High carbon intensity** | Adjust energy usage | Optimize for lower-carbon hours | Night generation = clean grid |
 | **Green energy targets** | Track renewable attribution | ESG reporting | 100% renewable-cooled zones |
 | **Water consumption high** | Flag for sustainability report | Track ESG impact | Cooling tower leak: 200L/day extra |
+| **Profile active** | AI recommendations update | Align with business priorities | Cost profile: +3°C setback, avoid generator |
 
 ## By the Numbers
 
@@ -39,73 +73,86 @@ estimated_read_time: 5
 |--------|-------|
 | **Total Modules** | 17 |
 | **Cross-Module Integrations** | 12 |
+| **Optimization Profiles** | 3 |
+| **Control Tiers** | 3 (Monitor, Approve, Auto-Execute) |
+| **API Endpoints** | 70+ (including 17 recommendation endpoints) |
 | **Site-002 Active Modules** | 14 of 14 |
 | **Site-002 Active Integrations** | 12 of 12 |
-| **Energy Savings (Full Stack)** | 50-60% |
+| **Profile Recommendation Accuracy** | >85% |
+| **Energy Savings (Full Stack, Cost Profile)** | 50-60% |
+| **Energy Savings (Comfort Profile)** | 15-20% |
 | **Equipment Monitored (site-002)** | 156 units |
 | **Data Points (site-002)** | 4,850 |
 
-## How Integrations Are Created
+## How Integrations & Profiles Work Together
 
 ```
 1. User activates Module B
    ↓
-2. System checks: "Is Module A active?"
+2. System checks: "Is Module A active?" → Auto-integrate if YES
    ↓
-3. If YES: "Create integration link A→B"
+3. User selects active profile for site (Asset / Comfort / Cost)
    ↓
-4. Integration starts working automatically
+4. AI Optimizer runs with profile weights injected
    ↓
-5. When Module A detects trigger condition
-   → Module B automatically takes action
+5. Multi-objective scoring ranks recommendations (profile-aligned)
+   ↓
+6. Control tier decides: Auto-execute, Require approval, or Display only
+   ↓
+7. If approved/auto-executed: Track outcome accuracy
+   ↓
+8. Learn from rejections: 3+ similar rejections → auto-create constraints
 ```
 
-**Auto-Integration:** Enabled by default. Integrations created automatically when both modules are active.
-
-## Upsell Progression
+## Upsell Progression (with Profiles)
 
 ```
 HVAC Only
-↓ (+Energy)
-HVAC + Energy = 15% energy savings + load shedding awareness
+↓ (+Energy) + Cost Profile
+HVAC + Energy = 15% energy savings (comfort-aware)
+                or 35% savings (aggressive cost profile)
 ↓ (+Lighting)
-HVAC + Energy + Lighting = 23% energy savings + 3-way load shed
+HVAC + Energy + Lighting = 23% savings (comfort) or 50% (cost)
 ↓ (+Security)
-HVAC + Energy + Lighting + Security = 35% energy savings + occupancy automation
+HVAC + Energy + Lighting + Security = 35% savings (comfort) or 55% (cost)
 ↓ (+Solar)
-HVAC + Energy + Lighting + Security + Solar = 50% energy savings + renewable-aware
+... + Solar = 50% savings (comfort) or 60% (cost)
 ↓ (+ML)
-Full Stack = 60% energy savings + predictive maintenance (prevent 2-3 failures/year)
+Full Stack = 60% savings (comfort) or 70% (cost) + predictive maintenance
 ```
+
+**Profiles multiply module value:** Adding profiles unlocks 10-20% additional savings through business-aligned optimization.
 
 ## Key Scenarios
 
-### Scenario 1: Load Shedding Event
+### Scenario 1: Load Shedding with Cost Profile
 
 ```
-Eskom announces stage 4 (5-7 PM)
+Eskom stage 4 (5-7 PM) announced
   → Energy module detects schedule
-  → HVAC raises setpoint +2°C (pre-cool strategy starts)
+  → Cost Profile: Activate aggressive pre-cooling
+  → HVAC raises setpoint +3°C (Cost profile threshold)
   → Lighting dims in empty zones
+  → 4:45 PM: Pre-cooling complete
   → At 5 PM when grid drops:
-     - HVAC already at +2°C = lower demand
-     - Generator kicks in (lower load)
-     - BESS discharging (covers load)
-  → Result: 35% energy reduction vs normal day
+     - HVAC already at +3°C = 40% lower demand
+     - Generator kicked in (light load)
+     - BESS discharging (covers remaining)
+  → Result: 40% energy reduction + generator cost savings R200
 ```
 
-### Scenario 2: Occupancy Drop
+### Scenario 2: Occupancy Drop with Comfort Profile
 
 ```
-3:00 PM - 40 people in open office
+3:00 PM - 40 people, Comfort Profile active
   → 3:15 PM - Everyone leaves (meeting)
   → Security module detects 0 occupancy
-  → HVAC: setpoint 22°C → 24°C
-  → Lighting: 100% → 20%
+  → Comfort Profile: Gradual adjustment (avoid sudden change)
+  → HVAC: 22°C → 21°C (only -1°C, not aggressive)
+  → Lighting: 100% → 60% (not 20% like Cost would do)
   → 3:45 PM - Meeting ends
-  → HVAC: 24°C → 22°C
-  → Lighting: 20% → 100%
-  → Energy saved during meeting: ~18%
+  → Fast response: Back to 22°C and 100% within 5 min
+  → Result: Comfort maintained + modest energy savings 8%
 ```
 
 ### Scenario 3: Predictive Maintenance
@@ -117,47 +164,65 @@ ML model runs overnight
   → Creates work order automatically
   → HVAC module gets alert
   → Assets module schedules inspection
+  → Recommendations avoid aggressive cooling (protect bearing)
   → Notifications alert ops team
-  → Result: Repair scheduled before failure (avoid emergency, save R50K)
+  → Result: Repair scheduled before failure (avoid R300K emergency)
 ```
 
 ## For Product Managers
 
-**Sell modules by value:**
-- Energy: "Control your load shedding response" (cost savings)
-- Security: "Occupancy-aware HVAC & Lighting" (comfort + energy)
-- Solar: "Renewable-powered conditioning" (ESG + cost savings)
-- ML: "Predict equipment failures" (prevent downtime)
+**Sell modules and profiles together:**
+- Base: "Control your building operations" (HVAC module)
+- +Energy: "Optimize load shedding response" (15% savings with Comfort, 35% with Cost profile)
+- +Lighting: "Smart lighting control per zone" (add 8-15% savings)
+- +Security: "Occupancy-aware optimization" (add 5-10% savings)
+- +Solar: "Renewable-powered conditioning" (add 15-20% savings, ESG benefit)
+- +Profiles: "Choose your optimization priority" (unlock 10-20% additional savings through profile selection)
 
-**Stacking order matters:**
-- Energy + HVAC = 15% savings
-- Energy + HVAC + Lighting = 23% savings
-- Energy + HVAC + Lighting + Security = 35% savings
+**Stacking value with profiles:**
+- Energy + HVAC (Cost Profile) = 35% savings
+- Energy + HVAC + Lighting (Cost Profile) = 50% savings
+- Energy + HVAC + Lighting + Security (Cost Profile) = 55% savings
+- Full Stack (Cost Profile) = 60%+ savings
+
+**Customer journey:** Start with Comfort profile (safe), graduate to Cost after 3 months of learning.
 
 ## For Developers
 
 **Adding an integration?** See [Developer Guide: Adding Module Integrations](../12-development/adding-module-integrations.md).
 
+**Building with profiles?** See [Profile-Based Optimization Architecture](profile-based-optimization.md) (Services, Data Models, Control Tiers).
+
 **Debugging integrations?** See [Module Integration API Reference](../03-api-reference/module-integration-api.md).
+
+**Profile API?** See [Recommendations API Reference](../03-api-reference/recommendations-api.md).
 
 **Understanding patterns?** See [Module Connectivity & Cross-System Integration](module-connectivity.md).
 
 ## Quick Links
 
+- 🎯 **Profile System** → [Profile-Based Optimization Architecture](profile-based-optimization.md) (Complete guide)
 - 📊 **Full Integration Catalog** → [Module Connectivity](module-connectivity.md) (Integration Catalog section)
 - 📈 **Module Activation Scenarios** → [Module Connectivity](module-connectivity.md) (Incremental Behavior Scenarios)
 - 🤖 **AI/ML Coordination** → [Module Connectivity](module-connectivity.md) (AI/ML Multi-Module Patterns)
 - 🔌 **API Endpoints** → [Module Integration API Reference](../03-api-reference/module-integration-api.md)
+- 💡 **Recommendation API** → [Recommendations API Reference](../03-api-reference/recommendations-api.md)
 - 👨‍💻 **How to Add Integrations** → [Developer Guide](../12-development/adding-module-integrations.md)
 - 📚 **Module Architecture** → [Module System](module-system.md)
 - 🎨 **Visual Diagram** → [module-connectivity.mmd](diagrams/module-connectivity.mmd)
 
 ---
 
-**More Information?** This is the executive summary. For detailed scenarios, code examples, and API specs, see the full [Module Connectivity documentation](module-connectivity.md).
+**More Information?** This is the executive summary. For detailed scenarios, code examples, and API specs:
+- **Modules:** See [Module Connectivity documentation](module-connectivity.md)
+- **Profiles:** See [Profile-Based Optimization Architecture](profile-based-optimization.md)
+- **APIs:** See [Recommendations API Reference](../03-api-reference/recommendations-api.md)
+
+---
 
 **Document Control**
 
 | Revision | Date | Change | Author |
 |----------|------|--------|--------|
+| 1.1 | 2026-02-09 | Add Profile-Based Optimization (Phase 72) | Sentinel Team |
 | 1.0 | 2026-02-09 | Initial publication | Sentinel Team |
