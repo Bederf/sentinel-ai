@@ -29,7 +29,12 @@ jobs:
       
       - name: Run linter
         run: npm run lint
-      
+
+      - name: Check for god files (TypeScript)
+        run: |
+          echo "Checking for TypeScript files > 500 lines..."
+          find src -name "*.ts" -o -name "*.tsx" | xargs wc -l | awk '$1 > 500 {print $0; count++} END {if (count > 0) {print "WARNING: Found " count " TypeScript files > 500 lines"; exit 1}}'
+
       - name: Run type check
         run: npm run build --dry-run || npx tsc --noEmit
       
@@ -70,6 +75,11 @@ jobs:
 
       - name: Check for circular imports
         run: pytest tests/test_import_cycles.py -v
+
+      - name: Check for god files (Python)
+        run: |
+          echo "Checking for Python files > 500 lines..."
+          find app -name "*.py" -exec wc -l {} + | awk '$1 > 500 {print $0; count++} END {if (count > 0) {print "WARNING: Found " count " Python files > 500 lines"; exit 1}}'
 
       - name: Run unit tests
         run: pytest tests/ -v --cov=app --cov-report=xml --cov-report=html

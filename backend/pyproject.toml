@@ -55,3 +55,23 @@ ignore = [
 [tool.ruff.lint.isort]
 # Enforce import grouping: stdlib, third-party, local
 known-first-party = ["app"]
+
+# ============================================================================
+# Complexity and Size Checks (God File Prevention)
+# ============================================================================
+
+[tool.pylint.basic]
+# Maximum lines per module - flag god files
+max-module-lines = 800  # Warn on modules > 800 lines
+
+[tool.pylint.design]
+# Max number of arguments per function
+max-args = 8
+# Max number of attributes per class
+max-attributes = 10
+# Max number of branches per function (cyclomatic complexity)
+max-branches = 12
+# Max number of locals per function
+max-locals = 15
+# Max number of public methods per class
+max-public-methods = 25

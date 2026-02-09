@@ -40,6 +40,23 @@ export default defineConfig([
       'no-console': ['warn', { allow: ['warn', 'error'] }],
       // Disallow debugger in production code
       'no-debugger': 'error',
+
+      // ====== God File Prevention (Phase 67-03) ======
+      // Warn on files exceeding 500 lines (skip blank lines and comments)
+      'max-lines': ['warn', {
+        max: 500,
+        skipBlankLines: true,
+        skipComments: true
+      }],
+      // Warn on functions exceeding 50 lines
+      'max-lines-per-function': ['warn', {
+        max: 50,
+        skipBlankLines: true,
+        skipComments: true,
+        IIFEs: true
+      }],
+      // Warn on high cyclomatic complexity
+      'complexity': ['warn', 15],
     },
   },
 ])
