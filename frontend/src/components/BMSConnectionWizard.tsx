@@ -20,7 +20,8 @@ import type {
   BMSVendor,
   DemoBuilding,
 } from '@/lib/api';
-import { niagaraApi, sitesApi } from '@/lib/api';
+import { sitesApi } from '@/lib/api/sites';
+import { niagaraApi } from '@/lib/api';
 import { HelpSection } from "./HelpSection";
 import { Tooltip } from "./Tooltip";
 import { EquipmentVerificationWizard } from "./EquipmentVerificationWizard";
@@ -374,7 +375,7 @@ export function BMSConnectionWizard({
           .map((f) => f.trim())
           .filter((f) => f);
 
-        const siteResult = await sitesApi.createSite({
+        const siteResult = await sitesApi.create({
           name: state.siteName,
           address: state.siteAddress,
           region: state.siteRegion,

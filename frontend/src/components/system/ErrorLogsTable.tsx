@@ -6,7 +6,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { AlertTriangle, Filter, RefreshCw } from 'lucide-react';
-import { systemApi, type ErrorLog } from '@/lib/api';
+import { systemApi, type ErrorLog } from '@/lib/api/system';
 
 export function ErrorLogsTable() {
   const [logs, setLogs] = useState<ErrorLog[]>([]);

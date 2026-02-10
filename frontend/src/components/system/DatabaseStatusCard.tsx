@@ -6,7 +6,7 @@
 
 import React from 'react';
 import { Database, CheckCircle } from 'lucide-react';
-import type { SystemHealthSnapshot } from '@/lib/api';
+import type { SystemHealthSnapshot } from '@/lib/api/system';
 
 interface DatabaseStatusCardProps {
   health: SystemHealthSnapshot;

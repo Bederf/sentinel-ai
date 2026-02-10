@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { sitesApi } from '@/lib/api';
+import { sitesApi } from '@/lib/api/sites';
 
 /**
  * Hook to fetch list of buildings/sites

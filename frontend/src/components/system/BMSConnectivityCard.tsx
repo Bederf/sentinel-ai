@@ -6,7 +6,7 @@
 
 import React from 'react';
 import { Link as LinkIcon, CheckCircle, AlertTriangle, XCircle } from 'lucide-react';
-import type { SystemHealthSnapshot } from '@/lib/api';
+import type { SystemHealthSnapshot } from '@/lib/api/system';
 
 interface BMSConnectivityCardProps {
   health: SystemHealthSnapshot;

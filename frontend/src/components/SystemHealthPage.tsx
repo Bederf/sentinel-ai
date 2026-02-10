@@ -10,8 +10,7 @@
 import React, { useState, useEffect } from 'react';
 import { RefreshCw, AlertCircle } from 'lucide-react';
 import { TabGroup, TabList, Tab, TabPanels, TabPanel } from '@tremor/react';
-import { systemApi } from '@/lib/api';
-import type { SystemHealthSnapshot } from '@/lib/api';
+import { systemApi, type SystemHealthSnapshot } from '@/lib/api/system';
 
 import { HealthOverviewHeader } from './system/HealthOverviewHeader';
 import { BMSConnectivityCard } from './system/BMSConnectivityCard';

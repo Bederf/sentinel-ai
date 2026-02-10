@@ -21,7 +21,7 @@ import { useSiteAlerts } from '../useSiteAlerts';
 import { useSitePredictions } from '../useSitePredictions';
 import { useBuildingsList } from '../useBuildingsList';
 import { useEquipmentByType } from '../useEquipmentByType';
-import * as apiModule from '@/lib/api';
+import * as apiModule from '@/lib/api/batchers';
 import type {
   DeviceSafetyStatus,
   DeviceStatus as BatchDeviceStatus,
@@ -29,8 +29,8 @@ import type {
 } from '@/lib/api/types';
 
 // Mock the batch aggregator module
-vi.mock('@/lib/api', async () => {
-  const actual = await vi.importActual('@/lib/api');
+vi.mock('@/lib/api/batchers', async () => {
+  const actual = await vi.importActual('@/lib/api/batchers');
   return {
     ...actual,
     safetyBatcher: {
