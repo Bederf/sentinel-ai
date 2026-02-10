@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import api from '@/lib/api';
 import type { Device, Site, Prediction } from '@/lib/api';
+import { safetyBatcher } from '@/lib/api/batchers';
 import { DeviceList } from "./DeviceList";
 import { ControlPanel } from "./ControlPanel";
 import { PageLoading } from "./PageLoading";
@@ -206,42 +207,30 @@ export function ControlDashboard({ onError }: ControlDashboardProps) {
         .filter((device) => !safetyLoadedDeviceIdsRef.current.has(device.id))
         .slice(0, SAFETY_STATUS_MAX_PER_SITE);
 
-      let backoffMs = SAFETY_STATUS_BATCH_DELAY_MS;
-      for (let i = 0; i < devicesToLoad.length; i += SAFETY_STATUS_BATCH_SIZE) {
-        if (isCancelled) return;
-        const batch = devicesToLoad.slice(i, i + SAFETY_STATUS_BATCH_SIZE);
-        const updates = await Promise.all(
-          batch.map(async (device) => {
-            try {
-              const safetyStatus = await api.getDeviceSafetyStatus(device.id);
-              return { id: device.id, safety_status: mapSafetyStatusToDeviceStatus(safetyStatus.overall_status) };
-            } catch (error: any) {
-              // If rate limited (429), increase backoff for subsequent requests
-              if (error?.status === 429) {
-                backoffMs = Math.min(backoffMs * 2, 5000); // Cap at 5 seconds
-              }
-              console.warn(`Failed to fetch safety status for device ${device.id}:`, error);
-              return { id: device.id, safety_status: "unknown" as const };
-            } finally {
-              safetyLoadedDeviceIdsRef.current.add(device.id);
-            }
-          })
-        );
+      // Use batch aggregator to collect requests over 50ms window instead of individual calls
+      const updates = await Promise.all(
+        devicesToLoad.map(async (device) => {
+          try {
+            const safetyStatus = await safetyBatcher(device.id);
+            return { id: device.id, safety_status: mapSafetyStatusToDeviceStatus(safetyStatus.status as any) };
+          } catch (error: any) {
+            console.warn(`Failed to fetch safety status for device ${device.id}:`, error);
+            return { id: device.id, safety_status: "unknown" as const };
+          } finally {
+            safetyLoadedDeviceIdsRef.current.add(device.id);
+          }
+        })
+      );
 
-        if (isCancelled) return;
-        const statusById = new Map(updates.map((update) => [update.id, update.safety_status]));
-        setDevices((prevDevices) =>
-          prevDevices.map((device) =>
-            statusById.has(device.id)
-              ? { ...device, safety_status: statusById.get(device.id) ?? device.safety_status }
-              : device
-          )
-        );
-
-        if (i + SAFETY_STATUS_BATCH_SIZE < devicesToLoad.length) {
-          await new Promise((resolve) => setTimeout(resolve, backoffMs));
-        }
-      }
+      if (isCancelled) return;
+      const statusById = new Map(updates.map((update) => [update.id, update.safety_status]));
+      setDevices((prevDevices) =>
+        prevDevices.map((device) =>
+          statusById.has(device.id)
+            ? { ...device, safety_status: statusById.get(device.id) ?? device.safety_status }
+            : device
+        )
+      );
     };
 
     loadSiteSafetyStatuses();

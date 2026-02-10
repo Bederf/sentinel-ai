@@ -18,6 +18,8 @@ from fastapi import APIRouter, HTTPException
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
+from app.database.repositories import BuildingRepository, AlertRepository, PredictionRepository
+
 logger = logging.getLogger(__name__)
 router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
@@ -116,17 +118,76 @@ async def get_site_summary(site_id: str) -> SiteSummary:
         HTTPException: 404 if site not found
     """
     try:
-        # Return minimal valid response for now
-        # In production, would query Supabase with RPC function
+        building_repo = BuildingRepository()
+        alert_repo = AlertRepository()
+        
+        # Get building/site info
+        building = await building_repo.get_by_id(site_id)
+        if not building:
+            raise HTTPException(status_code=404, detail=f"Site {site_id} not found")
+        
+        # Get all equipment for this site
+        equipment_list = await building_repo.get_equipment(site_id)
+        equipment_count = len(equipment_list) if equipment_list else 0
+        
+        # Count equipment by type
+        equipment_by_type: Dict[str, int] = {}
+        safety_counts = {"total": equipment_count, "safe": 0, "warning": 0, "blocked": 0, "alarm": 0}
+        
+        for equipment in (equipment_list or []):
+            eq_type = equipment.get("type", "unknown")
+            equipment_by_type[eq_type] = equipment_by_type.get(eq_type, 0) + 1
+            
+            # Count safety statuses
+            status = equipment.get("status", "unknown")
+            if status == "safe":
+                safety_counts["safe"] += 1
+            elif status == "warning":
+                safety_counts["warning"] += 1
+            elif status == "blocked":
+                safety_counts["blocked"] += 1
+            elif status == "alarm":
+                safety_counts["alarm"] += 1
+        
+        # Get alerts for this site
+        alerts = await alert_repo.get_by_site(site_id)
+        alert_counts = {"critical": 0, "warning": 0, "info": 0}
+        for alert in (alerts or []):
+            severity = alert.get("severity", "info").lower()
+            if severity in alert_counts:
+                alert_counts[severity] += 1
+            else:
+                alert_counts["info"] += 1
+        
+        # Get predictions for this site (if available)
+        try:
+            prediction_repo = PredictionRepository()
+            predictions = await prediction_repo.get_by_site(site_id)
+            prediction_counts = {"high_risk": 0, "medium_risk": 0, "low_risk": 0}
+            for pred in (predictions or []):
+                risk_level = pred.get("risk_level", "low").lower()
+                if risk_level == "high":
+                    prediction_counts["high_risk"] += 1
+                elif risk_level == "medium":
+                    prediction_counts["medium_risk"] += 1
+                else:
+                    prediction_counts["low_risk"] += 1
+        except Exception:
+            prediction_counts = {"high_risk": 0, "medium_risk": 0, "low_risk": 0}
+        
+        # Build response
         return SiteSummary(
             site_id=site_id,
-            site_name=f"Site {site_id}",
-            equipment_count=0,
-            safety=SafetySummary(total=0, safe=0, warning=0, blocked=0, alarm=0),
-            alerts=AlertSummary(),
-            predictions=PredictionSummary(),
+            site_name=building.get("name", f"Site {site_id}"),
+            equipment_count=equipment_count,
+            equipment_by_type=equipment_by_type,
+            safety=SafetySummary(**safety_counts),
+            alerts=AlertSummary(**alert_counts),
+            predictions=PredictionSummary(**prediction_counts),
             last_updated=datetime.now(timezone.utc).isoformat()
         )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting site summary: {e}")
         raise HTTPException(status_code=500, detail=str(e))

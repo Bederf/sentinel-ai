@@ -943,7 +943,8 @@ def calculate_monthly_savings(optimization_history: Optional[List[Dict[str, Any]
 
 
 @router.get("/optimization/status/{site_id}")
-async def get_optimization_status(site_id: str) -> Dict[str, Any]:
+@limiter.limit("60/minute")
+async def get_optimization_status(site_id: str, request: Request) -> Dict[str, Any]:
     """
     Get optimization status for a specific site.
 

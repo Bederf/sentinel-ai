@@ -7,7 +7,7 @@ Registers core API routers for authentication, settings, sites, and health.
 from fastapi import FastAPI
 
 from app.api import health, sites, settings as settings_api, settings_db, system_health
-from app.api import auth, user_access, login_audit, mfa, cache
+from app.api import auth, user_access, login_audit, mfa, cache, sites_aggregation
 
 
 def register_core_routers(app: FastAPI) -> None:
@@ -19,6 +19,7 @@ def register_core_routers(app: FastAPI) -> None:
 
     # Sites (core entity)
     app.include_router(sites.router, prefix="/api", tags=["sites"])
+    app.include_router(sites_aggregation.router, prefix="/api", tags=["sites-aggregation"])
 
     # Settings (JSON-based deprecated + Supabase-based new)
     app.include_router(settings_api.router, prefix="/api", tags=["settings"])
