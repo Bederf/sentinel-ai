@@ -31,6 +31,7 @@ import {
   Droplets,
   DollarSign,
   Brain,
+  Box,
 } from "lucide-react";
 import type { ModuleType } from "./moduleRegistry";
 
@@ -48,6 +49,7 @@ export type View =
   | "security"
   | "simbiot"
   | "simulation"
+  | "digital-twin"
   | "sustainability"
   | "solar"
   | "water"
@@ -85,6 +87,7 @@ export const VIEW_TITLES: Record<View, string> = {
   security: "Security",
   simbiot: "SIMBIOT",
   simulation: "Simulation",
+  "digital-twin": "3D Digital Twin",
   sustainability: "Sustainability & ESG",
   solar: "Solar & BESS",
   water: "Water Consumption",
@@ -119,6 +122,8 @@ export const ADDON_NAV_ITEMS: NavItem[] = [
   { id: "workflow", label: "Asset Workflow", icon: GitBranch, description: "Lifecycle Management", category: "addon", requiredModule: "assets", defaultOrder: 2 },
   { id: "simbiot", label: "SIMBIOT", icon: Plug, description: "BMS Connection Wizard", category: "addon", requiredModule: "simbiot", defaultOrder: 3 },
   { id: "integrations", label: "Integrations", icon: Activity, description: "BMS Integration Health", category: "addon", requiredModule: "integrations", defaultOrder: 4 },
+  // Visualization and analytics
+  { id: "digital-twin", label: "Digital Twin", icon: Box, description: "3D Building Visualization", category: "addon", requiredModule: "control", defaultOrder: 5 },
   // Building system modules
   { id: "technician", label: "Tech Chat", icon: Wrench, description: "Fault Diagnosis", category: "addon", requiredModule: "hvac", defaultOrder: 10 },
   { id: "optimization", label: "Optimization", icon: Zap, description: "Load Shedding AI", category: "addon", requiredModule: "energy", defaultOrder: 11 },

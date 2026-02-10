@@ -29,6 +29,7 @@ import { WaterPanel } from "./components/water";
 import { ContractManagementPage } from "./pages/ContractManagementPage";
 import { BudgetReportPage } from "./pages/BudgetReportPage";
 import { ProfitabilityDashboardPage } from "./pages/ProfitabilityDashboardPage";
+import { DigitalTwin } from "./components/digital-twin/DigitalTwin";
 import { ModuleProvider } from "./contexts/ModuleContext";
 import { useModules } from "./contexts/ModuleHooks";
 import { type View, VIEW_TITLES, isModuleGatedView, getRequiredModule } from "./lib/navigation";
@@ -630,6 +631,8 @@ function App() {
             />
           ) : currentView === "optimization" ? (
             <OptimizationPage onError={(error) => setError(error)} />
+          ) : currentView === "digital-twin" ? (
+            <DigitalTwin />
           ) : currentView === "settings" ? (
             <Settings onError={(error) => setError(error)} />
           ) : currentView === "technician" ? (
