@@ -4,6 +4,7 @@ import { apiFetch, ApiError } from './fetchClient';
 /**
  * Options for batch aggregator factory
  */
+// @ts-ignore - T is part of the generic interface signature
 export interface BatchAggregatorOptions<T> {
   /** API endpoint to POST batched IDs to */
   endpoint?: string;
