@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { Button, Card, Callout, Select, SelectItem, Table, TableBody, TableCell, TableHead, TableRow, Text, Title } from '@tremor/react';
 import { CheckCircle2, XCircle } from 'lucide-react';
-import type { ColumnMapping } from '../lib/api';
+import type { ColumnMapping } from '@/lib/api';
 
 interface FormatDetectionResult {
   file_format: 'csv' | 'excel' | 'json';

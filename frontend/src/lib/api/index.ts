@@ -64,6 +64,30 @@ export {
   type Recommendation,
   type Outcome,
 } from './optimization';
+export {
+  zoneIngestionApi,
+  type ZoneConfig,
+  type DeskConfig,
+  type DeskCoordinates,
+  type IngestionResponse,
+  type ZoneValidationResult,
+} from './zone_ingestion';
+
+// Desk positioning data types
+export {
+  type Desk,
+  type ZoneCentroid,
+  type ZoneCentroidResponse,
+  type AllZoneCentroidsResponse,
+  type DeskStatsResponse,
+} from './sites';
+
+// Document management
+export {
+  documentsApi,
+  type Document,
+  type DocumentUploadResponse,
+} from './documents';
 
 // Legacy: import everything from original api.ts AFTER modular exports for backward compatibility
 // This provides fallback for any APIs not yet migrated to modular structure

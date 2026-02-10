@@ -25,11 +25,11 @@ import {
   ChevronRight,
   Download,
 } from "lucide-react";
-import api from "../lib/api";
+import api from '@/lib/api';
 import type {
   AuditLogEntryResponse,
   AuditStatsResponse,
-} from "../lib/api";
+} from '@/lib/api';
 import AuditLogDetail from "./AuditLogDetail";
 
 interface AuditTrailProps {

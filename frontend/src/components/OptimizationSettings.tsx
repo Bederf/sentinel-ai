@@ -24,7 +24,7 @@ import {
   DollarSign,
   Clock,
 } from "lucide-react";
-import api, { type Site } from "../lib/api";
+import api, { type Site } from '@/lib/api';
 import { formatDateTime } from "../lib/timeFormat";
 import { OptimizationStatusBadge, type OptimizationStatus } from "./OptimizationStatusBadge";
 import { OptimizationToggle } from "./OptimizationToggle";

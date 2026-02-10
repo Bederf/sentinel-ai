@@ -11,8 +11,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { RefreshCw, AlertTriangle, DoorOpen, Clock, UserX, Moon } from "lucide-react";
-import { isExpectedApiError, securityApi } from "../lib/api";
-import type { BadgeEvent } from "../lib/api";
+import { isExpectedApiError, securityApi } from '@/lib/api';
+import type { BadgeEvent } from '@/lib/api';
 
 type EventFilter = "all" | "denied" | "after-hours";
 

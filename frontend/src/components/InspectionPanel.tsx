@@ -24,7 +24,7 @@ import {
   inspectionApi,
   type InspectionScheduleItem,
   type InspectionTaskItem,
-} from '../lib/api';
+} from '@/lib/api';
 
 interface InspectionPanelProps {
   equipmentId?: string;

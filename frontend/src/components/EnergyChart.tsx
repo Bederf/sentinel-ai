@@ -12,7 +12,7 @@
 
 import { AreaChart } from "@tremor/react";
 import { Zap, TrendingUp } from "lucide-react";
-import type { EnergyDataPoint } from "../lib/api";
+import type { EnergyDataPoint } from '@/lib/api';
 
 interface EnergyChartProps {
   data: EnergyDataPoint[];

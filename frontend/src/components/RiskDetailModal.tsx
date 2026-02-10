@@ -28,7 +28,7 @@ import {
   Building2,
 } from "lucide-react";
 import { RecentActions } from "./RecentActions";
-import type { BuildingEquipmentItem } from "../lib/api";
+import type { BuildingEquipmentItem } from '@/lib/api';
 
 interface RiskDetailModalProps {
   isOpen: boolean;

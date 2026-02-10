@@ -384,9 +384,23 @@ class VectorDBService:
         equipment_type: Optional[str] = None,
         document_type: Optional[str] = None,
         manufacturer: Optional[str] = None,
+        building_id: Optional[str] = None,
         similarity_threshold: float = 0.5
     ) -> List[Dict[str, Any]]:
-        """Semantic search for relevant document chunks."""
+        """Semantic search for relevant document chunks.
+
+        Args:
+            query: Search query text
+            n_results: Number of results to return
+            equipment_type: Optional filter by equipment type
+            document_type: Optional filter by document type
+            manufacturer: Optional filter by manufacturer
+            building_id: Optional filter by building (includes system docs if None)
+            similarity_threshold: Minimum similarity score
+
+        Returns:
+            List of matching document chunks
+        """
         # Generate query embedding
         query_embedding = self.embedding_service.embed_text(query)
 
@@ -397,6 +411,7 @@ class VectorDBService:
             'filter_equipment_type': equipment_type,
             'filter_document_type': document_type,
             'filter_manufacturer': manufacturer,
+            'filter_building_id': building_id,
             'similarity_threshold': similarity_threshold
         }).execute()
 
@@ -428,10 +443,23 @@ class VectorDBService:
         query: str,
         n_results: int = 5,
         equipment_type: Optional[str] = None,
+        building_id: Optional[str] = None,
         keyword_weight: float = 0.3,
         semantic_weight: float = 0.7
     ) -> List[Dict[str, Any]]:
-        """Hybrid search combining keyword and semantic matching."""
+        """Hybrid search combining keyword and semantic matching.
+
+        Args:
+            query: Search query text
+            n_results: Number of results to return
+            equipment_type: Optional filter by equipment type
+            building_id: Optional filter by building (includes system docs if None)
+            keyword_weight: Weight for keyword matching (0-1)
+            semantic_weight: Weight for semantic matching (0-1)
+
+        Returns:
+            List of matching document chunks with hybrid scores
+        """
         query_embedding = self.embedding_service.embed_text(query)
 
         result = self.client.rpc('hybrid_search_chunks', {
@@ -439,6 +467,7 @@ class VectorDBService:
             'query_embedding': query_embedding,
             'match_count': n_results,
             'filter_equipment_type': equipment_type,
+            'filter_building_id': building_id,
             'keyword_weight': keyword_weight,
             'semantic_weight': semantic_weight
         }).execute()

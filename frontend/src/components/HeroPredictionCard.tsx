@@ -9,7 +9,7 @@
  */
 
 import { AlertTriangle, TrendingUp, Clock, Zap } from "lucide-react";
-import type { Prediction } from "../lib/api";
+import type { Prediction } from '@/lib/api';
 
 interface HeroPredictionCardProps {
   prediction: Prediction;

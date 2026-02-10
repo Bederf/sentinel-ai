@@ -350,7 +350,7 @@ class PointMappingService:
         }
 
         return {
-            "id": f"{mapping.site_id}-{mapping.equipment_id}",
+            "id": mapping.equipment_id,  # Already v2.0 format (S###-TYPE-FLOOR-ZONE)
             "name": mapping.equipment_name,
             "device_type": device_type_map.get(mapping.equipment_type, "other"),
             "equipment_type": mapping.equipment_type,

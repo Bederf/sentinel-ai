@@ -1,6 +1,8 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
+import type { ZoneCentroid } from '@/lib/api/sites';
+import { sitesApi } from '@/lib/api/sites';
 import { BuildingModel } from './BuildingModel';
 import { EquipmentMarkers } from './EquipmentMarkers';
 import { EquipmentDetailPanel } from './EquipmentDetailPanel';
@@ -18,9 +20,40 @@ const FLOORS = [
 ];
 
 export function DigitalTwin() {
-  const { equipment } = useEquipmentData('site-002');
+  // Use building ID 'site-002' (Sandton City Office Tower)
+  const buildingId = 'site-002';
+  const { equipment, loading, error } = useEquipmentData(buildingId);
   const [selectedEquipment, setSelectedEquipment] = useState<string | null>(null);
   const [selectedFloors, setSelectedFloors] = useState<Set<number>>(new Set([0, 1, 2, 3, 4]));
+  const [zoneCentroids, setZoneCentroids] = useState<Record<string, ZoneCentroid>>({});
+  const [_centroidsLoading, _setCentroidsLoading] = useState(false);
+  const [_centroidsError, _setCentroidsError] = useState<string | null>(null);
+
+  // Load zone centroids for accurate equipment positioning
+  useEffect(() => {
+    async function loadCentroids() {
+      if (!buildingId) return;
+
+      _setCentroidsLoading(true);
+      _setCentroidsError(null);
+
+      try {
+        const response = await sitesApi.getZoneCentroids(buildingId);
+        if (response && response.centroids) {
+          setZoneCentroids(response.centroids);
+        }
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : 'Failed to load zone centroids';
+        _setCentroidsError(errorMsg);
+        console.warn('Failed to load zone centroids, using fallback positioning:', errorMsg);
+        // Don't throw - continue with fallback zone letter offsets
+      } finally {
+        _setCentroidsLoading(false);
+      }
+    }
+
+    loadCentroids();
+  }, [buildingId]);
 
   const toggleFloor = (floor: number) => {
     const newFloors = new Set(selectedFloors);
@@ -41,6 +74,42 @@ export function DigitalTwin() {
     () => equipment.find((e) => e.id === selectedEquipment || (e as any).code === selectedEquipment),
     [equipment, selectedEquipment]
   );
+
+  // Loading state
+  if (loading && equipment.length === 0) {
+    return (
+      <div className="h-full flex items-center justify-center bg-gradient-to-b from-slate-900 to-slate-800">
+        <div className="text-center">
+          <div className="mb-4">
+            <div className="inline-block">
+              <div className="animate-spin rounded-full h-16 w-16 border-4 border-slate-600 border-t-blue-500" />
+            </div>
+          </div>
+          <p className="text-xl font-semibold text-slate-100 mb-2">Loading Building Data</p>
+          <p className="text-sm text-slate-400">Fetching equipment from Supabase...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="h-full flex items-center justify-center bg-gradient-to-b from-slate-900 to-slate-800">
+        <div className="text-center">
+          <div className="mb-4 text-6xl">⚠️</div>
+          <p className="text-xl font-semibold text-red-400 mb-2">Failed to Load Equipment</p>
+          <p className="text-sm text-slate-400 max-w-md">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-6 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex flex-col" style={{ background: 'var(--color-sentinel-bg-canvas)' }}>
@@ -72,6 +141,7 @@ export function DigitalTwin() {
             equipment={equipment}
             selectedFloors={selectedFloors}
             onEquipmentClick={(id) => setSelectedEquipment(id)}
+            zoneCentroids={Object.keys(zoneCentroids).length > 0 ? zoneCentroids : undefined}
           />
 
           {/* Controls */}

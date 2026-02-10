@@ -11,7 +11,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Mail, AlertCircle, Loader2 } from "lucide-react";
-import { authApi, type AuthUser } from "../lib/api";
+import { authApi, type AuthUser } from '@/lib/api';
 
 interface EmailEntryProps {
   onSuccess: (user: AuthUser, token: string) => void;

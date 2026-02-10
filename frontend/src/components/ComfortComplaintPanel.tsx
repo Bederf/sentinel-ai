@@ -25,7 +25,7 @@ import {
   HelpCircle,
   MessageSquare,
 } from "lucide-react";
-import { complaintsApi, type ComplaintDiagnosis, type Desk, type HVACZone } from "../lib/api";
+import { complaintsApi, type ComplaintDiagnosis, type Desk, type HVACZone } from '@/lib/api';
 
 // Complaint type options with emojis
 const COMPLAINT_TYPES = [

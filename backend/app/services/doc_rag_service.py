@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 async def search_documentation(
     query: str,
     n_results: int = 5,
+    building_id: str | None = None,
     similarity_threshold: float = 0.3
 ) -> list[dict[str, Any]]:
     """
@@ -26,9 +27,12 @@ async def search_documentation(
     This ensures custom terms like "SIMBIOT" are found even when the embedding
     model doesn't recognize them semantically.
 
+    Includes both building-specific documents and system documentation.
+
     Args:
         query: User's question or search query
         n_results: Maximum number of results to return
+        building_id: Optional building UUID for building-scoped documents
         similarity_threshold: Minimum similarity score (0-1) - not used in hybrid
 
     Returns:
@@ -45,6 +49,7 @@ async def search_documentation(
             query=query,
             n_results=n_results,
             equipment_type=None,  # Search all documentation
+            building_id=building_id,  # Filter to building or include system docs
             keyword_weight=0.4,   # Give keyword matching significant weight
             semantic_weight=0.6   # Still favor semantic for natural language queries
         )
@@ -52,7 +57,7 @@ async def search_documentation(
         # Filter to only documentation type if needed
         # Note: hybrid_search doesn't filter by document_type, so we include all results
 
-        logger.info(f"Documentation search for '{query[:50]}...' returned {len(results)} results")
+        logger.info(f"Documentation search for '{query[:50]}...' in building {building_id or 'all'} returned {len(results)} results")
         return results
 
     except Exception as e:

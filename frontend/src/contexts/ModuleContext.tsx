@@ -13,7 +13,7 @@ import type { ReactNode } from 'react';
 import {
   moduleRegistryApi,
 } from '../lib/moduleRegistry';
-import { isExpectedApiError } from "../lib/api";
+import { isExpectedApiError } from '@/lib/api';
 import type {
   AIRecommendation,
   ModuleType,

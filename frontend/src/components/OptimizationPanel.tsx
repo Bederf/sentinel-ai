@@ -14,14 +14,14 @@ import { Button } from "@tremor/react";
 import { Zap, Clock, Thermometer, CheckCircle, Play, Square, Eye, Building2, ChevronDown, ShieldCheck } from "lucide-react";
 import { PageLoading } from "./PageLoading";
 import { ThermalRunwayChart } from "./ThermalRunwayChart";
-import api from "../lib/api";
+import api from '@/lib/api';
 import type {
   EskomStatusResponse,
   SiteScheduleResponse,
   ThermalRunwayResponse,
   OptimizationScenario,
   Site,
-} from "../lib/api";
+} from '@/lib/api';
 
 // Sentinel-styled Badge component
 interface SentinelBadgeProps {

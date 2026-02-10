@@ -10,7 +10,7 @@
 
 import { useState, useMemo } from "react";
 import { Search, Filter, Battery, Activity, AlertTriangle, Building2, MapPin } from "lucide-react";
-import type { Device, Site } from "../lib/api";
+import type { Device, Site } from '@/lib/api';
 
 interface DeviceListProps {
   devices: Device[];

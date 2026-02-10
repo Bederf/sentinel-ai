@@ -2,7 +2,7 @@
  * BudgetReportPage - Budget reporting and export
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Card,
   Title,
@@ -85,11 +85,6 @@ export function BudgetReportPage() {
 
     loadReport();
   }, [selectedContractId, year, month]);
-
-  const selectedContract = useMemo(
-    () => contracts.find((c) => (c.id || c.contract_code) === selectedContractId),
-    [contracts, selectedContractId]
-  );
 
   const handleExport = async (format: "csv" | "pdf" | "json") => {
     if (!selectedContractId) return;

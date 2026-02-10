@@ -147,8 +147,20 @@ async def generate_docs_sse_stream(user_message: str, site_id: str | None = None
         SSE-formatted data chunks
     """
     try:
-        # Search documentation RAG for relevant content
-        doc_results = await search_documentation(user_message)
+        # Convert site_id (building code) to building_id (UUID) for RAG filtering
+        building_id = None
+        if site_id:
+            try:
+                from app.database.supabase_client import get_supabase_client
+                client = get_supabase_client()
+                result = client.table("buildings").select("id").eq("code", site_id).single().execute()
+                building_id = result.data["id"] if result.data else None
+            except Exception as e:
+                logger.warning(f"Failed to resolve building code '{site_id}' to UUID: {e}")
+                # Continue without building filter
+
+        # Search documentation RAG for relevant content (with optional building scope)
+        doc_results = await search_documentation(user_message, building_id=building_id)
 
         # Build system prompt with documentation context
         system_prompt = get_doc_rag_system_prompt(doc_results)

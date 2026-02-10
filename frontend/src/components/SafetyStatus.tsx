@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Card, Title, Text, Badge, Button, Grid, Select, SelectItem } from '@tremor/react';
 import { SafetyIndicator } from './SafetyIndicator';
 import type { SafetyStatus } from './SafetyIndicator';
-import api from '../lib/api';
-import type { DeviceSafetyStatus } from '../lib/api';
+import api from '@/lib/api';
+import type { DeviceSafetyStatus } from '@/lib/api';
 
 interface SafetyStatusPanelProps {
   siteId?: string;

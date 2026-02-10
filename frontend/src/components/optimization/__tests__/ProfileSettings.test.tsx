@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '../../../test-utils'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ProfileSettings } from '../ProfileSettings'
 import * as optimization from '@/lib/api/optimization'

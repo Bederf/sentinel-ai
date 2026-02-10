@@ -463,6 +463,12 @@ export function ContractManagementPage() {
       variance_zar: number;
       spend_percentage: number;
     }[];
+    alert_summary?: {
+      warning?: number;
+      critical?: number;
+      open?: number;
+      resolved?: number;
+    };
   } | null>(null);
   const [budgetAlerts, setBudgetAlerts] = useState<BudgetAlert[]>([]);
   const [slaPerformance, setSlaPerformance] = useState<SLAPerformanceRecord[]>([]);

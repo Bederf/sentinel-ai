@@ -17,7 +17,7 @@ import type {
   DeviceControlResponse,
   HealthResponse,
   EnergyResponse,
-} from '../lib/api';
+} from '@/lib/api';
 import {
   createMockSite,
   createMockDevice,

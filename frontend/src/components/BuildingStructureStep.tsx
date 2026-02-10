@@ -1,7 +1,7 @@
-"""Step 5: Building Structure Definition Component."""
+// Step 5: Building Structure Definition Component
 
 import { Plus } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { FloorInput, type FloorDef } from "./FloorInput";
 
 export interface BuildingStructure {
@@ -34,7 +34,9 @@ const AVAILABLE_LEVELS = [
   "PH",
 ];
 
-/**Step 5: Define building structure (floors and dimensions)."""
+/**
+ * Step 5: Define building structure (floors and dimensions)
+ */
 export function BuildingStructureStep({
   initialData,
   onNext,

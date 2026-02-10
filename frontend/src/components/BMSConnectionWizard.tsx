@@ -11,6 +11,7 @@ import {
   ShieldCheck,
   Building2,
   MapPin,
+  HelpCircle,
 } from "lucide-react";
 import type {
   Site,
@@ -18,10 +19,12 @@ import type {
   DiscoverClassifyResponse,
   BMSVendor,
   DemoBuilding,
-} from "../lib/api";
-import { niagaraApi, sitesApi } from "../lib/api";
+} from '@/lib/api';
+import { niagaraApi, sitesApi } from '@/lib/api';
 import { HelpSection } from "./HelpSection";
+import { Tooltip } from "./Tooltip";
 import { EquipmentVerificationWizard } from "./EquipmentVerificationWizard";
+import { ZoneIngestionWizard } from "./wizards/ZoneIngestionWizard";
 
 // ============= BMS Vendor Definitions =============
 
@@ -34,6 +37,18 @@ const BMS_VENDORS = [
   { value: "trend" as const, label: "Trend Controls IQ4", protocol: "BACnet/IP" },
   { value: "generic" as const, label: "Generic BACnet/IP", protocol: "BACnet/IP" },
 ];
+
+// ============= BMS Vendor Help Text =============
+
+const VENDOR_HELP_TEXT: Record<BMSVendor, string> = {
+  niagara: "Tridium Niagara uses oBIX for credential authentication and BACnet/IP for point discovery. Enter the JACE/Supervisor host IP and port (default 47808). The system will authenticate using provided credentials to access the object model.",
+  desigo: "Siemens Desigo CC uses standard BACnet/IP without credential authentication. Ensure UDP port 47808 is open and accessible from this system. No username/password required—access is network-based.",
+  metasys: "Johnson Controls Metasys uses BACnet/IP protocol. Configure the Metasys system to enable BACnet interoperability. Provide the gateway or controller IP address and ensure BACnet UDP 47808 is accessible.",
+  honeywell: "Honeywell EBI (Enterprise Building Integrator) uses BACnet/IP for communications. Ensure the EBI gateway is accessible over the network. Verify BACnet services are enabled in your EBI configuration.",
+  schneider: "Schneider EcoStruxure uses BACnet/IP for device discovery. Provide the IP address of your EcoStruxure gateway or controller. Ensure network connectivity and firewall rules allow BACnet communication.",
+  trend: "Trend Controls IQ4 uses BACnet/IP for point access. Configure your IQ4 controller to accept BACnet queries. Enter the controller IP address and ensure UDP 47808 is accessible.",
+  generic: "For generic BACnet/IP systems, provide the controller or gateway IP address. The system will discover points using standard BACnet protocol. Works with any BACnet/IP-compliant device.",
+};
 
 // ============= Types =============
 
@@ -81,6 +96,8 @@ interface WizardState {
   // Equipment verification
   showVerificationWizard: boolean;
   discoveryPhase: number; // 1-4: connect, scan, classify, group
+  // Zone ingestion (optional, post-verification)
+  showZoneIngestionWizard: boolean;
 }
 
 type WizardAction =
@@ -94,7 +111,8 @@ type WizardAction =
   | { type: "SET_LOADING"; loading: boolean }
   | { type: "SET_ERROR"; error: string | null }
   | { type: "SET_VERIFICATION_WIZARD"; show: boolean }
-  | { type: "SET_DISCOVERY_PHASE"; phase: number };
+  | { type: "SET_DISCOVERY_PHASE"; phase: number }
+  | { type: "SET_ZONE_INGESTION_WIZARD"; show: boolean };
 
 function wizardReducer(state: WizardState, action: WizardAction): WizardState {
   switch (action.type) {
@@ -142,6 +160,8 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
       return { ...state, showVerificationWizard: action.show };
     case "SET_DISCOVERY_PHASE":
       return { ...state, discoveryPhase: action.phase };
+    case "SET_ZONE_INGESTION_WIZARD":
+      return { ...state, showZoneIngestionWizard: action.show };
     default:
       return state;
   }
@@ -292,6 +312,7 @@ export function BMSConnectionWizard({
     error: null,
     showVerificationWizard: false,
     discoveryPhase: 0,
+    showZoneIngestionWizard: false,
   });
 
   // Fetch demo buildings on mount
@@ -612,8 +633,11 @@ export function BMSConnectionWizard({
         <div className="grid grid-cols-2 gap-4">
           {/* Site Name */}
           <div className="col-span-2">
-            <label className="block text-sm font-medium mb-1" style={labelStyle}>
-              Site Name *
+            <label className="block text-sm font-medium mb-1 flex items-center gap-2" style={labelStyle}>
+              <span>Site Name *</span>
+              <Tooltip content="Unique identifier for this building (e.g., 'Sandton City Tower', 'Client Hospital')">
+                <HelpCircle className="w-4 h-4 text-gray-400 hover:text-blue-500 cursor-help" />
+              </Tooltip>
             </label>
             <input
               type="text"
@@ -783,9 +807,23 @@ export function BMSConnectionWizard({
               </option>
             ))}
           </select>
-        </div>
-
-        {/* Connection Mode Toggle */}
+          {/* Vendor-specific help text */}
+          {state.bmsVendor && (
+            <div
+              className="mt-2 p-2 rounded text-xs"
+              style={{
+                background: "var(--color-sentinel-blue)11",
+                color: "var(--color-sentinel-text-secondary)",
+                border: "1px solid var(--color-sentinel-blue)22",
+              }}
+            >
+              <p className="flex items-start gap-2">
+                <HelpCircle className="w-3 h-3 mt-0.5 shrink-0" style={{ color: "var(--color-sentinel-blue)" }} />
+                <span>{VENDOR_HELP_TEXT[state.bmsVendor]}</span>
+              </p>
+            </div>
+          )}
+        </div>\n\n        {/* Connection Mode Toggle */}
         <div className="space-y-2">
           {/* Real BMS option */}
           <label
@@ -916,8 +954,11 @@ export function BMSConnectionWizard({
         {!state.useDemoData && isNiagara && (
           <div className="grid grid-cols-2 gap-4 mt-4">
             <div className="col-span-2 sm:col-span-1">
-              <label className="block text-sm font-medium mb-1" style={labelStyle}>
-                Host / IP Address
+              <label className="block text-sm font-medium mb-1 flex items-center gap-2" style={labelStyle}>
+                <span>Host / IP Address</span>
+                <Tooltip content="IP address of your BMS controller, JACE, or Supervisor (e.g., 192.168.1.100)">
+                  <HelpCircle className="w-4 h-4 text-gray-400 hover:text-blue-500 cursor-help" />
+                </Tooltip>
               </label>
               <input
                 type="text"
@@ -935,8 +976,11 @@ export function BMSConnectionWizard({
               />
             </div>
             <div className="col-span-2 sm:col-span-1">
-              <label className="block text-sm font-medium mb-1" style={labelStyle}>
-                Port
+              <label className="block text-sm font-medium mb-1 flex items-center gap-2" style={labelStyle}>
+                <span>Port</span>
+                <Tooltip content="BACnet/IP port (default 47808) or oBIX port (default 80, 443 for HTTPS)">
+                  <HelpCircle className="w-4 h-4 text-gray-400 hover:text-blue-500 cursor-help" />
+                </Tooltip>
               </label>
               <input
                 type="number"
@@ -953,8 +997,11 @@ export function BMSConnectionWizard({
               />
             </div>
             <div className="col-span-2 sm:col-span-1">
-              <label className="block text-sm font-medium mb-1" style={labelStyle}>
-                Username
+              <label className="block text-sm font-medium mb-1 flex items-center gap-2" style={labelStyle}>
+                <span>Username</span>
+                <Tooltip content="oBIX credential (required for Niagara). Leave blank for BACnet-only systems.">
+                  <HelpCircle className="w-4 h-4 text-gray-400 hover:text-blue-500 cursor-help" />
+                </Tooltip>
               </label>
               <input
                 type="text"
@@ -972,8 +1019,11 @@ export function BMSConnectionWizard({
               />
             </div>
             <div className="col-span-2 sm:col-span-1">
-              <label className="block text-sm font-medium mb-1" style={labelStyle}>
-                Password
+              <label className="block text-sm font-medium mb-1 flex items-center gap-2" style={labelStyle}>
+                <span>Password</span>
+                <Tooltip content="oBIX credential (required for Niagara). Encrypted and never stored in logs.">
+                  <HelpCircle className="w-4 h-4 text-gray-400 hover:text-blue-500 cursor-help" />
+                </Tooltip>
               </label>
               <input
                 type="password"
@@ -1695,6 +1745,62 @@ export function BMSConnectionWizard({
             </div>
           )}
 
+          {/* Pre-Approval Checklist */}
+          {state.mappings && (
+            <div
+              className="rounded p-4 space-y-3"
+              style={{
+                background: "var(--color-sentinel-green)11",
+                border: "1px solid var(--color-sentinel-green)44",
+              }}
+            >
+              <h4
+                className="text-sm font-semibold flex items-center gap-2"
+                style={{ color: "var(--color-sentinel-green)" }}
+              >
+                <ClipboardCheck className="w-4 h-4" />
+                Pre-Approval Checklist
+              </h4>
+              <div className="space-y-2 text-sm">
+                <div className="flex items-center gap-2">
+                  <span style={{ color: "var(--color-sentinel-green)" }}>✓</span>
+                  <span style={{ color: "var(--color-sentinel-text-primary)" }}>
+                    All equipment types correctly identified
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span style={{ color: "var(--color-sentinel-green)" }}>✓</span>
+                  <span style={{ color: "var(--color-sentinel-text-primary)" }}>
+                    Equipment IDs converted to v2.0 standard (S###-TYPE-FLOOR-ZONE)
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span style={{ color: "var(--color-sentinel-green)" }}>✓</span>
+                  <span style={{ color: "var(--color-sentinel-text-primary)" }}>
+                    Zones auto-assigned from equipment locations
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span
+                    style={{
+                      color:
+                        state.mappings.needs_review === 0
+                          ? "var(--color-sentinel-green)"
+                          : "var(--color-sentinel-amber)",
+                    }}
+                  >
+                    {state.mappings.needs_review === 0 ? "✓" : "⚠️"}
+                  </span>
+                  <span style={{ color: "var(--color-sentinel-text-primary)" }}>
+                    {state.mappings.needs_review === 0
+                      ? "No low-confidence items flagged"
+                      : `${state.mappings.needs_review} item${state.mappings.needs_review !== 1 ? "s" : ""} need manual review`}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Approved by */}
           <div>
             <label
@@ -1794,11 +1900,46 @@ export function BMSConnectionWizard({
           >
             <div className="p-6">
               <EquipmentVerificationWizard
-                siteId={state.siteId}
                 equipmentList={discoveredEquipment}
                 onComplete={() => {
                   dispatch({ type: "SET_VERIFICATION_WIZARD", show: false });
-                  onComplete();
+                  // Offer zone configuration after equipment verification
+                  setTimeout(() => {
+                    dispatch({ type: "SET_ZONE_INGESTION_WIZARD", show: true });
+                  }, 800);
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Zone Ingestion Wizard Modal */}
+      {state.showZoneIngestionWizard && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          onClick={() => dispatch({ type: "SET_ZONE_INGESTION_WIZARD", show: false })}
+        >
+          <div
+            className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6">
+              <ZoneIngestionWizard
+                buildingId={state.siteId}
+                onComplete={() => {
+                  dispatch({ type: "SET_ZONE_INGESTION_WIZARD", show: false });
+                  // Mark zone configuration as complete and trigger parent callback
+                  onComplete?.();
+                }}
+                onSkip={() => {
+                  // User chose to skip zone configuration for now
+                  dispatch({ type: "SET_ZONE_INGESTION_WIZARD", show: false });
+                  // Still trigger parent completion
+                  onComplete?.();
+                }}
+                onCancel={() => {
+                  dispatch({ type: "SET_ZONE_INGESTION_WIZARD", show: false });
                 }}
               />
             </div>

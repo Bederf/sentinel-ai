@@ -378,7 +378,7 @@ function GlassThemeControls() {
               Quick Presets
             </label>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {Object.entries(GLASS_PRESETS).map(([name, preset]) => (
+              {Object.entries(GLASS_PRESETS).map(([name]) => (
                 <button
                   key={name}
                   onClick={() => applyPreset(name)}

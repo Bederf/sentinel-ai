@@ -100,6 +100,11 @@ class Settings(BaseSettings):
     niagara_bacnet_port: int = 47808
     niagara_bacnet_local_ip: str = ""  # blank = auto-detect
 
+    # Document upload configuration (Phase X: Building-scoped RAG)
+    max_document_upload_size_mb: int = 10
+    allowed_document_types: list[str] = [".pdf", ".docx", ".txt"]
+    supabase_storage_bucket: str = "building-documents"
+
     model_config = ConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

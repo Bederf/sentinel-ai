@@ -13,8 +13,9 @@ import { useState, useRef, useEffect } from "react";
 import type { FormEvent, KeyboardEvent } from "react";
 import { Send, MessageSquare, Bot, BookOpen, Building2, ChevronDown } from "lucide-react";
 import { ChatMessage } from "./ChatMessage";
-import api, { isExpectedApiError, streamChat } from "../lib/api";
-import type { Site } from "../lib/api";
+import { DocumentUpload } from "./DocumentUpload";
+import api, { isExpectedApiError, streamChat } from '@/lib/api';
+import type { Site } from '@/lib/api';
 
 interface Message {
   id: string;
@@ -356,6 +357,35 @@ export function Chat() {
             }}
             aria-label="Chat message input"
           />
+
+          {/* Document upload button (only in docs mode) */}
+          {searchDocs && (
+            <DocumentUpload
+              buildingId={selectedSiteId}
+              onUploadComplete={() => {
+                // Show success feedback
+                setMessages((prev) => [
+                  ...prev,
+                  {
+                    id: generateId(),
+                    role: "assistant",
+                    content: "Document uploaded and indexed successfully. It's now available for search.",
+                  },
+                ]);
+              }}
+              onError={(error) => {
+                setMessages((prev) => [
+                  ...prev,
+                  {
+                    id: generateId(),
+                    role: "assistant",
+                    content: `Upload failed: ${error}`,
+                  },
+                ]);
+              }}
+            />
+          )}
+
           <button
             type="submit"
             disabled={isLoading || !input.trim()}

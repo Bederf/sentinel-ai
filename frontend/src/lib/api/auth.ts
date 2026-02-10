@@ -4,7 +4,7 @@
  * Handles user login, MFA, token verification, and account management.
  */
 
-import { fetchApi, getRefreshToken, clearAuthStorage, type ApiError } from './client';
+import { fetchApi, getRefreshToken, type ApiError } from './client';
 
 // Re-export shared error types
 export type { ApiError };

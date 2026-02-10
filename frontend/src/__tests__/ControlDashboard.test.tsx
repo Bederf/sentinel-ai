@@ -8,7 +8,7 @@
  * - Error handling
  */
 
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '../test-utils';
 import { ControlDashboard } from '../components/ControlDashboard';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import '@testing-library/jest-dom';
@@ -36,7 +36,7 @@ vi.mock('../lib/api', () => ({
   }),
 }));
 
-import api from '../lib/api';
+import api from '@/lib/api';
 
 describe('ControlDashboard', () => {
   const mockDevices = [

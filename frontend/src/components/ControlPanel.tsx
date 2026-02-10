@@ -24,7 +24,7 @@ import {
   CheckCircle,
   XCircle,
 } from "lucide-react";
-import type { Device, DevicePoint } from "../lib/api";
+import type { Device, DevicePoint } from '@/lib/api';
 import { TemperatureControl } from "./TemperatureControl";
 import { SwitchControl } from "./SwitchControl";
 import { SelectorControl } from "./SelectorControl";

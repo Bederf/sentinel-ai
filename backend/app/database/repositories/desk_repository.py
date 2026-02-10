@@ -316,3 +316,59 @@ class DeskRepository:
         if response.data:
             return response.data[0]
         return None
+
+    def get_by_building_uuid(self, building_id: str) -> List[Dict[str, Any]]:
+        """Get all desks for a building UUID.
+
+        Args:
+            building_id: Building UUID
+
+        Returns:
+            List of desks in the building
+        """
+        response = self.client.table('desks').select("*").eq(
+            'building_id', building_id
+        ).execute()
+
+        return response.data
+
+    def get_by_zone_id(self, building_id: str, zone_id: str) -> List[Dict[str, Any]]:
+        """Get desks by building-level zone ID.
+
+        Args:
+            building_id: Building UUID
+            zone_id: Zone ID (e.g., 'Zone-L1-A')
+
+        Returns:
+            List of desks in the zone
+        """
+        response = self.client.table('desks').select("*").eq(
+            'building_id', building_id
+        ).eq('zone_id', zone_id).execute()
+
+        return response.data
+
+    def get_centroids_for_zones(
+        self, building_id: str, zones: List[str]
+    ) -> Dict[str, Dict[str, float]]:
+        """Get centroids for specific zones from desk positions.
+
+        Args:
+            building_id: Building UUID
+            zones: List of zone IDs
+
+        Returns:
+            Dict mapping zone_id → {x: avg_x, z: avg_z}
+        """
+        all_desks = self.get_by_building_uuid(building_id)
+        centroids = {}
+
+        for zone_id in zones:
+            zone_desks = [d for d in all_desks if d.get('zone_id') == zone_id]
+
+            if zone_desks:
+                avg_x = sum(float(d.get('x_coord', 0)) for d in zone_desks) / len(zone_desks)
+                avg_z = sum(float(d.get('z_coord', 0)) for d in zone_desks) / len(zone_desks)
+                centroids[zone_id] = {'x': round(avg_x, 2), 'z': round(avg_z, 2)}
+
+        return centroids

@@ -10,7 +10,7 @@
  */
 
 import { TrendingUp, Shield, DollarSign, Target, Calendar } from "lucide-react";
-import type { Prediction } from "../lib/api";
+import type { Prediction } from '@/lib/api';
 
 interface ROISummaryCardProps {
   predictions: Prediction[];

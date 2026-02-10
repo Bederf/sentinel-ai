@@ -21,8 +21,8 @@ import {
   RefreshCw,
   ExternalLink,
 } from "lucide-react";
-import api from "../lib/api";
-import type { AuditEntry } from "../lib/api";
+import api from '@/lib/api';
+import type { AuditEntry } from '@/lib/api';
 import { formatDateTime } from "../lib/timeFormat";
 
 interface RecentActionsProps {

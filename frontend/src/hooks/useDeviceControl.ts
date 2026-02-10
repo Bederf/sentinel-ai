@@ -10,8 +10,8 @@
  */
 
 import { useState, useEffect, useCallback } from "react";
-import api from "../lib/api";
-import type { Device, DeviceValue, DeviceControlResponse } from "../lib/api";
+import api from '@/lib/api';
+import type { Device, DeviceValue, DeviceControlResponse } from '@/lib/api';
 
 interface UseDeviceControlOptions {
   deviceId?: string;

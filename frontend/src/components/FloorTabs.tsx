@@ -1,7 +1,7 @@
-"""Floor selector tab component for 2D floor editor."""
+// Floor selector tab component for 2D floor editor
 
 import { ChevronDown, ChevronUp } from "lucide-react";
-import React, { useState } from "react";
+import { useState } from "react";
 
 export interface FloorTab {
   level: string;
@@ -15,7 +15,9 @@ export interface FloorTabsProps {
   equipmentCount?: Record<string, number>;
 }
 
-/**Horizontal tab selector for floors with equipment count badges."""
+/**
+ * Horizontal tab selector for floors with equipment count badges
+ */
 export function FloorTabs({
   floors,
   activeFloor,

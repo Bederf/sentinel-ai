@@ -24,28 +24,11 @@
       "20": "T"
     },
     "floor_aliases": {
+      "Level 1": "L1",
       "Level 12": "L12",
-      "Level 11": "L11",
-      "Level 10": "L10",
       "Basement 1": "B1",
       "Ground": "G",
       "Roof": "R"
-    }
-  },
-  "site-013": {
-    "name": "Rosebank Corporate Park - Block B",
-    "zone_number_to_letter": {
-      "01": "A",
-      "02": "B",
-      "03": "C",
-      "04": "D",
-      "05": "E"
-    },
-    "floor_aliases": {
-      "Ground": "G",
-      "Level 1": "L1",
-      "Level 2": "L2",
-      "Level 3": "L3"
     }
   },
   "default": {
@@ -59,35 +42,7 @@
       "07": "G",
       "08": "H",
       "09": "I",
-      "10": "J",
-      "11": "K",
-      "12": "L",
-      "13": "M",
-      "14": "N",
-      "15": "O",
-      "16": "P",
-      "17": "Q",
-      "18": "R",
-      "19": "S",
-      "20": "T",
-      "21": "U",
-      "22": "V",
-      "23": "W",
-      "24": "X",
-      "25": "Y",
-      "26": "Z"
-    },
-    "floor_aliases": {
-      "basement": "B",
-      "b1": "B1",
-      "b2": "B2",
-      "ground": "G",
-      "ground floor": "G",
-      "gf": "G",
-      "level": "L",
-      "mezzanine": "M",
-      "roof": "R",
-      "penthouse": "PH"
+      "10": "J"
     }
   }
 }

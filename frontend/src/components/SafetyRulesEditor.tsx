@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Shield, AlertTriangle, Ban, Bell, Plus, Trash2, Edit2, Check, X, ChevronDown, ChevronUp } from "lucide-react";
-import { api } from "../lib/api";
-import type { SafetyRule } from "../lib/api";
+import { api } from '@/lib/api';
+import type { SafetyRule } from '@/lib/api';
 
 interface SafetyRulesEditorProps {
   onError?: (error: string) => void;

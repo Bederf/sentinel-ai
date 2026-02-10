@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import api, { type Site } from "../lib/api";
+import api, { type Site } from '@/lib/api';
 import { BMSConnectionWizard } from "./BMSConnectionWizard";
 import { Loader2 } from "lucide-react";
 

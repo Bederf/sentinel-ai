@@ -18,8 +18,8 @@ import {
   AlertTriangle,
   Building2,
 } from "lucide-react";
-import { isExpectedApiError, securityApi } from "../lib/api";
-import type { SecurityOccupancy, OccupancyRecommendation } from "../lib/api";
+import { isExpectedApiError, securityApi } from '@/lib/api';
+import type { SecurityOccupancy, OccupancyRecommendation } from '@/lib/api';
 
 /** Maximum capacity per zone for bar chart display */
 const ZONE_CAPACITY = 30;

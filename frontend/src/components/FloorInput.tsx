@@ -1,7 +1,7 @@
-"""Floor definition input component."""
+// Floor definition input component
 
 import { Trash2 } from "lucide-react";
-import React, { useState } from "react";
+import { useState } from "react";
 
 export interface FloorDef {
   level: string;
@@ -20,7 +20,9 @@ export interface FloorInputProps {
   floorIndex: number;
 }
 
-/**Form inputs for a single floor definition."""
+/**
+ * Form inputs for a single floor definition
+ */
 export function FloorInput({
   floor,
   availableLevels,
@@ -85,10 +87,16 @@ export function FloorInput({
     validateField(field, value);
 
     const updated = { ...floor };
-    if (field === "height" || field === "width" || field === "depth") {
-      updated[field] = Number(value) || 0;
-    } else {
-      updated[field] = value;
+    switch (field) {
+      case "height":
+      case "width":
+      case "depth":
+        updated[field] = Number(value) || 0;
+        break;
+      case "level":
+      case "label":
+        updated[field] = value;
+        break;
     }
     onUpdate(updated);
   };

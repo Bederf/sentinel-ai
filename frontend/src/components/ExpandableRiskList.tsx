@@ -19,8 +19,8 @@ import {
   ChevronRight,
   Loader2,
 } from "lucide-react";
-import api from "../lib/api";
-import type { BuildingEquipmentItem } from "../lib/api";
+import api from '@/lib/api';
+import type { BuildingEquipmentItem } from '@/lib/api';
 
 interface ExpandableRiskListProps {
   siteId: string;

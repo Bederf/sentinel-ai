@@ -16,9 +16,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { RefreshCw, Users, Lightbulb, AlertTriangle, Cpu, Eye, Zap, Building2, ChevronDown, X, Radio, Clock, ThermometerSun, Wrench } from "lucide-react";
 import { OccupancyHeatmap } from "./OccupancyHeatmap";
-import { api, daliApi, isExpectedApiError } from "../lib/api";
+import { api, daliApi, isExpectedApiError } from '@/lib/api';
 import { PageLoading } from "./PageLoading";
-import type { BuildingOccupancy, DALIStats, ZoneLighting, ZoneOccupancy, DALISensor, DALILuminaire, Site } from "../lib/api";
+import type { BuildingOccupancy, DALIStats, ZoneLighting, ZoneOccupancy, DALISensor, DALILuminaire, Site } from '@/lib/api';
 
 // Get occupancy color based on percentage
 function getOccupancyColor(percent: number): string {

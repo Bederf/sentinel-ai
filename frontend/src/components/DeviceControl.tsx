@@ -14,7 +14,7 @@ import { TemperatureControl } from "./TemperatureControl";
 import { SwitchControl } from "./SwitchControl";
 import { SelectorControl } from "./SelectorControl";
 import { ChillerToggleControl } from "./ChillerToggleControl";
-import type { DevicePoint } from "../lib/api";
+import type { DevicePoint } from '@/lib/api';
 
 interface DeviceControlProps {
   point: DevicePoint;

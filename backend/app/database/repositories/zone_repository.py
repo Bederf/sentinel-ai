@@ -1,0 +1,234 @@
+"""Repository for building-level zone operations.
+
+Manages per-building zone configuration for multi-building support.
+Each building can have a unique zone structure.
+"""
+
+from typing import List, Optional, Dict, Any
+import logging
+from app.database.supabase_client import get_supabase_client
+
+logger = logging.getLogger(__name__)
+
+
+class ZoneRepository:
+    """Repository for building-level zone database operations."""
+
+    def __init__(self):
+        """Initialize the repository with a Supabase client."""
+        self.client = get_supabase_client()
+
+    def get_all(self, building_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Get all zones with optional building filter.
+
+        Args:
+            building_id: Filter by building UUID
+
+        Returns:
+            List of zones
+        """
+        query = self.client.table("zones").select("*")
+
+        if building_id:
+            query = query.eq("building_id", building_id)
+
+        response = query.execute()
+        return response.data
+
+    def get_by_building(self, building_id: str) -> List[Dict[str, Any]]:
+        """Get all zones for a specific building.
+
+        Args:
+            building_id: Building UUID
+
+        Returns:
+            List of zones in the building
+        """
+        response = self.client.table("zones").select("*").eq("building_id", building_id).execute()
+        return response.data
+
+    def get_by_zone_id(self, building_id: str, zone_id: str) -> Optional[Dict[str, Any]]:
+        """Get a specific zone by zone_id within a building.
+
+        Args:
+            building_id: Building UUID
+            zone_id: Zone ID (e.g., "Zone-L1-A")
+
+        Returns:
+            Zone data or None if not found
+        """
+        response = (
+            self.client.table("zones")
+            .select("*")
+            .eq("building_id", building_id)
+            .eq("zone_id", zone_id)
+            .execute()
+        )
+
+        if response.data:
+            return response.data[0]
+        return None
+
+    def get_by_uuid(self, uuid: str) -> Optional[Dict[str, Any]]:
+        """Get zone by UUID.
+
+        Args:
+            uuid: Zone UUID
+
+        Returns:
+            Zone data or None if not found
+        """
+        response = self.client.table("zones").select("*").eq("id", uuid).execute()
+
+        if response.data:
+            return response.data[0]
+        return None
+
+    def get_by_floor(self, building_id: str, floor: str) -> List[Dict[str, Any]]:
+        """Get zones by building and floor.
+
+        Args:
+            building_id: Building UUID
+            floor: Floor code (L0, L1, L2, B1, etc.)
+
+        Returns:
+            List of zones on the floor
+        """
+        response = (
+            self.client.table("zones")
+            .select("*")
+            .eq("building_id", building_id)
+            .eq("floor", floor)
+            .execute()
+        )
+        return response.data
+
+    def create(self, zone_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Create a new zone.
+
+        Args:
+            zone_data: Zone data including:
+                - building_id
+                - zone_id
+                - zone_name
+                - floor
+                - zone_type
+
+        Returns:
+            Created zone data
+        """
+        response = self.client.table("zones").insert(zone_data).execute()
+        if response.data:
+            logger.info(f"Created zone {zone_data.get('zone_id')} for building {zone_data.get('building_id')}")
+            return response.data[0]
+        else:
+            raise ValueError(f"Failed to create zone: {zone_data}")
+
+    def update(self, zone_id: str, zone_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Update a zone.
+
+        Args:
+            zone_id: Zone UUID
+            zone_data: Data to update
+
+        Returns:
+            Updated zone or None if not found
+        """
+        response = self.client.table("zones").update(zone_data).eq("id", zone_id).execute()
+
+        if response.data:
+            logger.info(f"Updated zone {zone_id}")
+            return response.data[0]
+        return None
+
+    def upsert(self, zone_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Insert or update a zone.
+
+        Args:
+            zone_data: Zone data with building_id and zone_id as unique key
+
+        Returns:
+            Upserted zone data
+        """
+        response = (
+            self.client.table("zones")
+            .upsert(zone_data, on_conflict="building_id,zone_id")
+            .execute()
+        )
+        return response.data[0] if response.data else {}
+
+    def upsert_many(self, zones: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Insert or update multiple zones.
+
+        Args:
+            zones: List of zone data dicts
+
+        Returns:
+            List of upserted zones
+        """
+        if not zones:
+            return []
+
+        response = (
+            self.client.table("zones")
+            .upsert(zones, on_conflict="building_id,zone_id")
+            .execute()
+        )
+        return response.data
+
+    def delete(self, zone_id: str) -> bool:
+        """Delete a zone.
+
+        Args:
+            zone_id: Zone UUID
+
+        Returns:
+            True if deleted, False if not found
+        """
+        response = self.client.table("zones").delete().eq("id", zone_id).execute()
+
+        if response.data:
+            logger.info(f"Deleted zone {zone_id}")
+            return True
+        return False
+
+    def delete_by_building(self, building_id: str) -> int:
+        """Delete all zones for a building.
+
+        Args:
+            building_id: Building UUID
+
+        Returns:
+            Number of zones deleted
+        """
+        response = self.client.table("zones").delete().eq("building_id", building_id).execute()
+
+        count = len(response.data)
+        logger.info(f"Deleted {count} zones for building {building_id}")
+        return count
+
+    def get_zone_centroids(self, building_id: str) -> Dict[str, Dict[str, float]]:
+        """Get zone centroids for all zones in a building.
+
+        Centroids are calculated from desk positions and used for
+        accurate equipment positioning in 3D visualization.
+
+        Args:
+            building_id: Building UUID
+
+        Returns:
+            Dict mapping zone_id → {x, z} centroid coordinates
+        """
+        # Query the zone_centroids view
+        response = (
+            self.client.table("zone_centroids")
+            .select("*")
+            .eq("building_id", building_id)
+            .execute()
+        )
+
+        centroids = {}
+        for row in response.data:
+            centroids[row["zone_id"]] = {"x": float(row["centroid_x"]), "z": float(row["centroid_z"])}
+
+        return centroids

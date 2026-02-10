@@ -5,7 +5,7 @@
 import React, { useState } from 'react';
 
 interface TooltipProps {
-  content: string;
+  content: React.ReactNode;
   children: React.ReactNode;
   side?: 'top' | 'bottom' | 'left' | 'right';
 }

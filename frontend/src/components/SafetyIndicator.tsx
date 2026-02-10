@@ -148,7 +148,7 @@ export const SafetyIndicator: React.FC<SafetyIndicatorProps> = ({
   // Wrap with tooltip if we have device info
   if (deviceName || deviceId) {
     return (
-      <Tooltip content={tooltipContent} position="top">
+      <Tooltip content={tooltipContent} side="top">
         {indicatorContent}
       </Tooltip>
     );

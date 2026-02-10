@@ -29,7 +29,7 @@ import {
 import { ControlPanel } from "./ControlPanel";
 import { ControlStatus } from "./ControlStatus";
 import { demoDevices, demoScenarios, demoSafetyStatuses, demoNarratives, quickControls } from "../data/demoControls";
-import type { Device } from "../lib/api";
+import type { Device } from '@/lib/api';
 
 interface DemoControlPanelProps {
   onControl?: (deviceId: string, point: string, value: number | boolean) => Promise<void>;

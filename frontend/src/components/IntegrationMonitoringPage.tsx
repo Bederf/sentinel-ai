@@ -24,7 +24,7 @@ import {
   Plus,
   X,
 } from "lucide-react";
-import { isExpectedApiError, monitoringApi } from "../lib/api";
+import { isExpectedApiError, monitoringApi } from '@/lib/api';
 import { formatDateTime } from "../lib/timeFormat";
 import { GoLiveChecklist } from "./GoLiveChecklist";
 import { IntegrationWizard } from "./IntegrationWizard";
@@ -34,8 +34,8 @@ import type {
   DataQualityMetrics,
   SyncJobSummary,
   Site,
-} from "../lib/api";
-import api from "../lib/api";
+} from '@/lib/api';
+import api from '@/lib/api';
 
 // Health summary card component
 interface HealthCardProps {

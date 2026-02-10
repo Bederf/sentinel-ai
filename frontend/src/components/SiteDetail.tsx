@@ -35,7 +35,7 @@ import {
   Wifi,
   Server,
 } from "lucide-react";
-import api from "../lib/api";
+import api from '@/lib/api';
 import type {
   Alert,
   Prediction,
@@ -44,7 +44,7 @@ import type {
   BuildingEquipmentItem,
   CategoryStatus,
   EquipmentMetadata,
-} from "../lib/api";
+} from '@/lib/api';
 import { formatDateTime, getTimezoneAbbreviation, isDifferentTimezone } from "../lib/timeFormat";
 import { KPICard } from "./KPICard";
 import { EnergyChart } from "./EnergyChart";

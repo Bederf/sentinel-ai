@@ -12,8 +12,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Bell, Clock, RefreshCw, CheckCircle, CheckCheck } from "lucide-react";
-import api from "../lib/api";
-import type { Alert } from "../lib/api";
+import api from '@/lib/api';
+import type { Alert } from '@/lib/api';
 
 interface AlertFeedProps {
   /** Maximum number of alerts to display */

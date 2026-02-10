@@ -23,10 +23,10 @@ import {
   Download,
   Zap,
 } from "lucide-react";
-import api from "../lib/api";
+import api from '@/lib/api';
 import type {
   AuditLogEntryResponse,
-} from "../lib/api";
+} from '@/lib/api';
 import { formatDateTime } from "../lib/timeFormat";
 import AuditLogDetail from "./AuditLogDetail";
 import { PageLoading } from "./PageLoading";

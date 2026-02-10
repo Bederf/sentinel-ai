@@ -15,7 +15,7 @@
  */
 
 import { Users, Sun, Zap, AlertTriangle } from "lucide-react";
-import type { ZoneOccupancy, FloorSummary, ZoneLighting } from "../lib/api";
+import type { ZoneOccupancy, FloorSummary, ZoneLighting } from '@/lib/api';
 
 // Sentinel-styled Badge component
 interface SentinelBadgeProps {

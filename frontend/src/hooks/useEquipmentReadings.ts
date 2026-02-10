@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { devicesApi } from '@/lib/api/devices';
 
 export interface SensorReading {
   id: string;
@@ -19,7 +20,10 @@ export interface EquipmentReadings {
   timestamp: string;
 }
 
-// Mock sensor data for demo
+/**
+ * Generate mock sensor data when real device API data unavailable
+ * Used as fallback when device not connected or API returns no data
+ */
 function getMockReadings(equipmentId: string): EquipmentReadings {
   const equipmentMap: Record<string, { name: string; code: string }> = {
     '1': { code: 'S002-CHILLER-B1-001', name: 'Chiller 1' },
@@ -67,6 +71,16 @@ function getMockReadings(equipmentId: string): EquipmentReadings {
   };
 }
 
+/**
+ * Fetch sensor readings for equipment
+ * 
+ * Strategy:
+ * 1. Try to fetch from devicesApi (real device data)
+ * 2. Fall back to mock data if device not available
+ * 3. Refresh every 2 seconds for real-time updates
+ * 
+ * TODO: Integrate with InfluxDB timeseries data for historical trends
+ */
 export function useEquipmentReadings(equipmentId: string) {
   const [readings, setReadings] = useState<EquipmentReadings | null>(null);
   const [loading, setLoading] = useState(true);
@@ -79,19 +93,57 @@ export function useEquipmentReadings(equipmentId: string) {
       return;
     }
 
-    try {
-      setLoading(true);
-      // Use mock data for demo - can be replaced with real API calls later
-      const data = getMockReadings(equipmentId);
-      setReadings(data);
-      setError(null);
-    } catch (err) {
-      console.error('Failed to fetch readings:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch readings');
-      setReadings(null);
-    } finally {
-      setLoading(false);
+    async function fetchReadings() {
+      try {
+        setLoading(true);
+
+        // Attempt to fetch real device data
+        try {
+          const device = await devicesApi.getDevice(equipmentId);
+
+          // Transform device points to sensor readings
+          const sensors: SensorReading[] = (device.points || [])
+            .slice(0, 3) // Limit to first 3 sensors
+            .map((point: any) => ({
+              id: point.id || `sensor-${Math.random()}`,
+              name: point.name || 'Unknown',
+              value: parseFloat(point.value as string) || 0,
+              unit: point.unit || '',
+              timestamp: new Date().toISOString(),
+              history: Array(48).fill(parseFloat(point.value as string) || 0),
+            }));
+
+          if (sensors.length > 0) {
+            setReadings({
+              equipment: {
+                id: device.id,
+                code: device.code,
+                name: device.name,
+              },
+              sensors,
+              timestamp: new Date().toISOString(),
+            });
+            setError(null);
+            return;
+          }
+        } catch (deviceErr) {
+          console.debug('Real device data unavailable, using mock data:', deviceErr);
+        }
+
+        // Fallback to mock data
+        const data = getMockReadings(equipmentId);
+        setReadings(data);
+        setError(null);
+      } catch (err) {
+        console.error('Failed to fetch readings:', err);
+        setError(err instanceof Error ? err.message : 'Failed to fetch readings');
+        setReadings(null);
+      } finally {
+        setLoading(false);
+      }
     }
+
+    fetchReadings();
 
     // Refresh every 2 seconds for real-time updates
     const interval = setInterval(() => {

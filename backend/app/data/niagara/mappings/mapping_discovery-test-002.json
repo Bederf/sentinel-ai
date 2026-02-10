@@ -1,0 +1,177 @@
+{
+  "discovery_id": "discovery-test-002",
+  "site_id": "site-002",
+  "created_at": "2026-02-10T05:38:30.978499",
+  "equipment_count": 3,
+  "total_points": 7,
+  "equipment": {
+    "S002-CHILLER-B1-001": {
+      "equipment_id": "S002-CHILLER-B1-001",
+      "equipment_type": "chiller",
+      "equipment_name": "Chiller (S002-CHILLER-B1-001)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "CH-1.ChwSupplyTemp",
+          "standardized_name": "chw_supply_temp",
+          "point_type": "sensor",
+          "point_category": "chilled_water_temperature",
+          "unit": "\u00b0C",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 1000,
+          "present_value": 7.0,
+          "writable": false
+        },
+        {
+          "original_name": "CH-1.ChwSetpoint",
+          "standardized_name": "chw_setpoint",
+          "point_type": "setpoint",
+          "point_category": "chilled_water_setpoint",
+          "unit": "\u00b0C",
+          "confidence": "high",
+          "object_type": "analogValue",
+          "instance": 1001,
+          "present_value": 7.0,
+          "writable": true
+        }
+      ],
+      "point_count": 2,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "chiller": 2
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "CH-1",
+        "zone": {
+          "zone_id": "Zone-B1-001",
+          "floor": "B1",
+          "zone_letter": "001",
+          "zone_type": "open_office",
+          "building_id": "site-002"
+        }
+      },
+      "created_at": "2026-02-10T05:38:30.977100",
+      "approved": true,
+      "approved_at": "2026-02-10T05:38:30.978429",
+      "approved_by": "test-user"
+    },
+    "S002-VAV-L1-A": {
+      "equipment_id": "S002-VAV-L1-A",
+      "equipment_type": "vav",
+      "equipment_name": "Variable Air Volume Box (S002-VAV-L1-A)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "VAV-L1-A.RoomTemp",
+          "standardized_name": "zone_temp",
+          "point_type": "sensor",
+          "point_category": "room_temperature",
+          "unit": "\u00b0C",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2000,
+          "present_value": 22.5,
+          "writable": false
+        },
+        {
+          "original_name": "VAV-L1-A.DamperPos",
+          "standardized_name": "damper_position",
+          "point_type": "sensor",
+          "point_category": "damper_position",
+          "unit": "%",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 2001,
+          "present_value": 50.0,
+          "writable": false
+        },
+        {
+          "original_name": "VAV-L1-A.Setpoint",
+          "standardized_name": "temperature_setpoint",
+          "point_type": "setpoint",
+          "point_category": "temperature_setpoint",
+          "unit": "\u00b0C",
+          "confidence": "medium",
+          "object_type": "analogValue",
+          "instance": 2002,
+          "present_value": 22.0,
+          "writable": true
+        }
+      ],
+      "point_count": 3,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "vav": 3
+        },
+        "avg_confidence_score": 2.67,
+        "bms_original_id": "VAV-L1-A",
+        "zone": {
+          "zone_id": "Zone-L1-A",
+          "floor": "L1",
+          "zone_letter": "A",
+          "zone_type": "open_office",
+          "building_id": "site-002"
+        }
+      },
+      "created_at": "2026-02-10T05:38:30.977155",
+      "approved": true,
+      "approved_at": "2026-02-10T05:38:30.978429",
+      "approved_by": "test-user"
+    },
+    "S002-FCU-L2-B": {
+      "equipment_id": "S002-FCU-L2-B",
+      "equipment_type": "fcu",
+      "equipment_name": "Fan Coil Unit (S002-FCU-L2-B)",
+      "site_id": "site-002",
+      "points": [
+        {
+          "original_name": "FCU-L2-B.RoomTemp",
+          "standardized_name": "zone_temp",
+          "point_type": "sensor",
+          "point_category": "room_temperature",
+          "unit": "\u00b0C",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 3000,
+          "present_value": 23.0,
+          "writable": false
+        },
+        {
+          "original_name": "FCU-L2-B.FanSpeed",
+          "standardized_name": "fan_speed",
+          "point_type": "command",
+          "point_category": "fan_speed",
+          "unit": "steps",
+          "confidence": "high",
+          "object_type": "analogOutput",
+          "instance": 3001,
+          "present_value": 2,
+          "writable": true
+        }
+      ],
+      "point_count": 2,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "fcu": 2
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "FCU-L2-B",
+        "zone": {
+          "zone_id": "Zone-L2-B",
+          "floor": "L2",
+          "zone_letter": "B",
+          "zone_type": "open_office",
+          "building_id": "site-002"
+        }
+      },
+      "created_at": "2026-02-10T05:38:30.977182",
+      "approved": true,
+      "approved_at": "2026-02-10T05:38:30.978429",
+      "approved_by": "test-user"
+    }
+  }
+}

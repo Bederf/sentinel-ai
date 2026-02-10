@@ -85,42 +85,37 @@ class ZoneMappingService:
     def _generate_default_mappings(self):
         """Generate default mappings based on Sandton City floor layout.
 
-        DALI zones for site-002:
-        - Zone-L12-N: Level 12 North Open Plan
-        - Zone-L12-S: Level 12 South Open Plan
-        - Zone-L12-MR: Level 12 Meeting Rooms
-        - Zone-L12-EX: Level 12 Executive
-        - Zone-L11-N, Zone-L11-S, Zone-L11-MR
-        - Zone-L10-N, Zone-L10-S, Zone-L10-MR
+        DALI zones for site-002 (with standardized L0/L1/L2 floor codes):
+        - Zone-L2-A, Zone-L2-B, etc.: Level 2 Zones
+        - Zone-L1-A, Zone-L1-B, etc.: Level 1 Zones  
+        - Zone-L0-A, Zone-L0-B, etc.: Ground/Base Level Zones
+        
+        Note: Older mappings used L10, L11, L12 which are migrated to L0, L1, L2
         """
         default_mappings = [
-            # Level 12
-            ZoneMapping("Zone-L12-N", "Zone-L12-N", "L12", "North Open Plan", "open_office", 3),
-            ZoneMapping("Zone-L12-N-A", "Zone-L12-N", "L12", "North A", "open_office", 3),
-            ZoneMapping("Zone-L12-N-B", "Zone-L12-N", "L12", "North B", "open_office", 3),
-            ZoneMapping("Zone-L12-S", "Zone-L12-S", "L12", "South Open Plan", "open_office", 3),
-            ZoneMapping("Zone-L12-S-A", "Zone-L12-S", "L12", "South A", "open_office", 3),
-            ZoneMapping("Zone-L12-S-B", "Zone-L12-S", "L12", "South B", "open_office", 3),
-            ZoneMapping("Zone-L12-MR", "Zone-L12-MR", "L12", "Meeting Rooms", "meeting_room", 2),
-            ZoneMapping("Zone-L12-EX", "Zone-L12-EX", "L12", "Executive", "executive", 1),
+            # Level 2 (formerly L12)
+            ZoneMapping("Zone-L2-A", "Zone-L2-A", "L2", "Level 2 Zone A", "open_office", 3),
+            ZoneMapping("Zone-L2-B", "Zone-L2-B", "L2", "Level 2 Zone B", "open_office", 3),
+            ZoneMapping("Zone-L2-C", "Zone-L2-C", "L2", "Level 2 Zone C", "open_office", 3),
+            ZoneMapping("Zone-L2-D", "Zone-L2-D", "L2", "Level 2 Zone D", "open_office", 3),
+            ZoneMapping("Zone-L2-E", "Zone-L2-E", "L2", "Level 2 Zone E", "open_office", 3),
 
-            # Level 11
-            ZoneMapping("Zone-L11-N", "Zone-L11-N", "L11", "North Open Plan", "open_office", 3),
-            ZoneMapping("Zone-L11-N-A", "Zone-L11-N", "L11", "North A", "open_office", 3),
-            ZoneMapping("Zone-L11-N-B", "Zone-L11-N", "L11", "North B", "open_office", 3),
-            ZoneMapping("Zone-L11-S", "Zone-L11-S", "L11", "South Open Plan", "open_office", 4),  # Unoccupied wing
-            ZoneMapping("Zone-L11-S-A", "Zone-L11-S", "L11", "South A", "open_office", 4),
-            ZoneMapping("Zone-L11-S-B", "Zone-L11-S", "L11", "South B", "open_office", 4),
-            ZoneMapping("Zone-L11-MR", "Zone-L11-MR", "L11", "Meeting Rooms", "meeting_room", 2),
+            # Level 1 (formerly L11)
+            ZoneMapping("Zone-L1-A", "Zone-L1-A", "L1", "Level 1 Zone A", "open_office", 3),
+            ZoneMapping("Zone-L1-B", "Zone-L1-B", "L1", "Level 1 Zone B", "open_office", 3),
+            ZoneMapping("Zone-L1-C", "Zone-L1-C", "L1", "Level 1 Zone C", "open_office", 3),
+            ZoneMapping("Zone-L1-D", "Zone-L1-D", "L1", "Level 1 Zone D", "open_office", 3),
+            ZoneMapping("Zone-L1-E", "Zone-L1-E", "L1", "Level 1 Zone E", "open_office", 3),
 
-            # Level 10
-            ZoneMapping("Zone-L10-N", "Zone-L10-N", "L10", "North Open Plan", "open_office", 3),
-            ZoneMapping("Zone-L10-N-A", "Zone-L10-N", "L10", "North A", "open_office", 3),
-            ZoneMapping("Zone-L10-N-B", "Zone-L10-N", "L10", "North B", "open_office", 3),
-            ZoneMapping("Zone-L10-S", "Zone-L10-S", "L10", "South Open Plan", "open_office", 3),
-            ZoneMapping("Zone-L10-S-A", "Zone-L10-S", "L10", "South A", "open_office", 3),
-            ZoneMapping("Zone-L10-S-B", "Zone-L10-S", "L10", "South B", "open_office", 3),
-            ZoneMapping("Zone-L10-MR", "Zone-L10-MR", "L10", "Meeting Rooms", "meeting_room", 2),
+            # Level 0/Ground (formerly L10)
+            ZoneMapping("Zone-L0-A", "Zone-L0-A", "L0", "Ground Level Zone A", "open_office", 3),
+            ZoneMapping("Zone-L0-B", "Zone-L0-B", "L0", "Ground Level Zone B", "open_office", 3),
+            ZoneMapping("Zone-L0-C", "Zone-L0-C", "L0", "Ground Level Zone C", "open_office", 3),
+            ZoneMapping("Zone-L0-D", "Zone-L0-D", "L0", "Ground Level Zone D", "open_office", 3),
+            ZoneMapping("Zone-L0-E", "Zone-L0-E", "L0", "Ground Level Zone E", "open_office", 3),
+            
+            # Basement
+            ZoneMapping("Zone-B1-001", "Zone-B1-001", "B1", "Basement Level 1", "plant_room", 2),
         ]
 
         for mapping in default_mappings:
@@ -218,7 +213,8 @@ class ZoneMappingService:
         import re
 
         # Parse v2.0 format: S###-TYPE-FLOOR-ZONE
-        match = re.match(r"S\d+-[A-Z]+-(B\d|B|G|L\d+|M|R|PH)-([A-Z]|0?\d{1,3})", equipment_id)
+        # Supports floor codes: B# (basement), G/L0 (ground), L#/L## (levels), R (roof), etc.
+        match = re.match(r"S\d+-[A-Z]+-(B\d|G|L\d{1,2}|R|M|PH)-([A-Z0-9]{1,3})", equipment_id)
         if not match:
             logger.warning(f"Could not parse v2.0 equipment ID: {equipment_id}")
             return None

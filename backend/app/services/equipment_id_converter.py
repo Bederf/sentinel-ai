@@ -1,151 +1,112 @@
-"""Equipment ID Converter - Convert legacy BMS IDs to SENTINEL v2.0 standard.
+"""Equipment ID Converter for BMS → SENTINEL v2.0 standard naming.
 
-Converts equipment identifiers from various BMS formats to the standardized
-SENTINEL v2.0 naming convention: {site}-{type}-{floor}-{zone}
+Converts legacy BMS equipment IDs to SENTINEL v2.0 standard format:
+  Legacy: CH-1, VAV-L1-05, 011-stc-ahu-001
+  v2.0:   S002-CHILLER-B1-001, S002-VAV-L1-E, S002-AHU-L0-01
 
-Examples:
-  "CH-1" → "S002-CHILLER-B1-001"
-  "VAV-L1-05" → "S002-VAV-L1-E"
-  "AHU-G-01" → "S002-AHU-G-001"
-  "FCU-L2-A" → "S002-FCU-L2-A"
+This enables:
+- Consistent naming across all equipment
+- Automatic technician specialty assignment (based on equipment type)
+- Zone-based optimization (HVAC zones for cross-system coordination)
+- Fleet-wide analytics and comparisons
 """
 
 import logging
-import json
-from typing import Dict, Optional, Tuple
-from pathlib import Path
 import re
+import json
+from typing import Optional, Dict, Any, Tuple
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-# Equipment type mappings from various BMS formats to SENTINEL types
-EQUIPMENT_TYPE_MAPPINGS = {
-    # Chillers
-    "ch": "CHILLER",
-    "chiller": "CHILLER",
-    "chill": "CHILLER",
-    "chw": "CHILLER",
-    # Air Handling Units
-    "ahu": "AHU",
-    "ah": "AHU",
-    "air_handler": "AHU",
-    # Fan Coil Units
-    "fcu": "FCU",
-    "fc": "FCU",
-    "fan_coil": "FCU",
-    # Variable Air Volume
-    "vav": "VAV",
-    "va": "VAV",
-    # Cooling Tower
-    "ct": "CT",
-    "cooling_tower": "CT",
-    "ctower": "CT",
-    # CRAC / CRAH
-    "crac": "CRAC",
-    "crah": "CRAC",
-    # Generators
-    "gen": "GEN",
-    "generator": "GEN",
-    # Transformers
-    "tx": "TX",
-    "transformer": "TX",
-    "trans": "TX",
-    # UPS
-    "ups": "UPS",
-    # ATS
-    "ats": "ATS",
-    # Main Switchboard
-    "msb": "MSB",
-    "switchboard": "MSB",
-    "main_board": "MSB",
-    # Meter
-    "mtr": "MTR",
-    "meter": "MTR",
-    # Power Factor Correction
-    "pfc": "PFC",
-    # Feeder
-    "fdr": "FDR",
-    "feeder": "FDR",
-    # Medium Voltage
-    "mv": "MV",
-    "medium_voltage": "MV",
-    # Distribution Board
-    "db": "DB",
-    "distribution": "DB",
-    # DALI Lighting
-    "dali": "DALI",
-    # Luminaire
-    "lum": "LUM",
-    "light": "LUM",
-    "luminaire": "LUM",
-    # Fire
-    "fire": "FIRE",
-    "fire_system": "FIRE",
-    # Access Control
-    "acc": "ACC",
-    "access": "ACC",
-    "door": "ACC",
-    # CCTV
-    "cctv": "CCTV",
-    "camera": "CCTV",
-    "video": "CCTV",
-}
-
-# Floor aliases mapping (normalize variations)
-FLOOR_ALIASES = {
-    "basement": "B",
-    "b1": "B1",
-    "b2": "B2",
-    "ground": "G",
-    "ground floor": "G",
-    "gf": "G",
-    "level": "L",
-    "l1": "L1",
-    "l2": "L2",
-    "l3": "L3",
-    "l4": "L4",
-    "l5": "L5",
-    "l10": "L10",
-    "l11": "L11",
-    "l12": "L12",
-    "roof": "R",
-    "r1": "R",
-    "mezzanine": "M",
-    "penthouse": "PH",
-}
-
 
 class EquipmentIDConverter:
-    """Convert legacy BMS equipment IDs to SENTINEL v2.0 standard.
+    """Converts legacy BMS equipment IDs to SENTINEL v2.0 standard."""
 
-    v2.0 Format: {site}-{type}-{floor}-{zone_or_seq}
-    Example: S002-CHILLER-B1-001
+    # Type code mappings: legacy → v2.0 standard uppercase
+    TYPE_MAPPINGS = {
+        # HVAC
+        "ch": "CHILLER",
+        "chiller": "CHILLER",
+        "ahu": "AHU",
+        "fcu": "FCU",
+        "vav": "VAV",
+        "ac": "SPLIT",
+        "split": "SPLIT",
+        "ct": "CT",
+        "cooling_tower": "CT",
+        "crac": "CRAC",
+        # Lighting
+        "dali": "DALI",
+        "lum": "LUM",
+        "lighting": "LUM",
+        # Energy
+        "gen": "GEN",
+        "generator": "GEN",
+        "tx": "TX",
+        "transformer": "TX",
+        "ups": "UPS",
+        "ats": "ATS",
+        "msb": "MSB",
+        "mtr": "MTR",
+        "meter": "MTR",
+        "pfc": "PFC",
+        "fdr": "FDR",
+        "mv": "MV",
+        "db": "DB",
+        # Other
+        "fire": "FIRE",
+        "acc": "ACC",
+        "cctv": "CCTV",
+        "bms": "BMS",
+        "pxc": "PXC",
+    }
 
-    Site codes: S### (3-digit zero-padded)
-    Types: CHILLER, AHU, FCU, VAV, DALI, etc.
-    Floors: B1/B2, G, L1-L12, R, M, PH
-    Zones: A-Z (letters) or 001-999 (numeric)
-    """
+    # Default zone number to letter mappings
+    DEFAULT_ZONE_MAP = {
+        "01": "A",
+        "02": "B",
+        "03": "C",
+        "04": "D",
+        "05": "E",
+        "06": "F",
+        "07": "G",
+        "08": "H",
+        "09": "I",
+        "10": "J",
+        "11": "K",
+        "12": "L",
+        "13": "M",
+        "14": "N",
+        "15": "O",
+        "16": "P",
+        "17": "Q",
+        "18": "R",
+        "19": "S",
+        "20": "T",
+    }
 
     def __init__(self):
-        """Initialize converter with site zone mappings."""
-        self.zone_mappings = self._load_zone_mappings()
+        """Initialize converter with site-specific zone mappings."""
+        self.site_zone_mappings = self._load_site_zone_mappings()
 
-    def _load_zone_mappings(self) -> Dict[str, Dict[str, str]]:
-        """Load site-specific zone mappings from JSON file."""
-        try:
-            config_path = (
-                Path(__file__).parent.parent / "data" / "niagara" / "site_zone_mappings.json"
-            )
-            if config_path.exists():
+    def _load_site_zone_mappings(self) -> Dict[str, Dict[str, Any]]:
+        """Load site-specific zone mappings from config file."""
+        config_path = (
+            Path(__file__).parent.parent
+            / "data"
+            / "niagara"
+            / "site_zone_mappings.json"
+        )
+
+        if config_path.exists():
+            try:
                 with open(config_path) as f:
-                    data = json.load(f)
-                return data
-        except Exception as e:
-            logger.warning(f"Failed to load zone mappings: {e}")
+                    return json.load(f)
+            except Exception as e:
+                logger.warning(f"Failed to load site zone mappings: {e}")
 
-        # Return default empty structure
-        return {"default": {"zone_number_to_letter": {}}}
+        return {"default": {"zone_number_to_letter": self.DEFAULT_ZONE_MAP}}
 
     def convert_bms_to_v2(
         self,
@@ -158,212 +119,240 @@ class EquipmentIDConverter:
 
         Args:
             bms_id: Original BMS equipment ID (e.g., "CH-1", "VAV-L1-05")
-            equipment_type: Equipment type (e.g., "chiller", "vav", "fcu")
+            equipment_type: Equipment type (e.g., "chiller", "vav")
             site_id: Site identifier (e.g., "site-002")
-            zone_mapping: Optional site-specific zone mappings
+            zone_mapping: Optional site-specific zone number→letter mappings
 
         Returns:
-            v2.0 standard equipment ID (e.g., "S002-CHILLER-B1-001")
-        """
-        # Normalize inputs
-        bms_id = bms_id.strip()
-        equipment_type = equipment_type.strip().lower()
+            v2.0 formatted equipment ID (e.g., "S002-CHILLER-B1-001")
 
-        # Extract site prefix (S###)
-        site_prefix = self._extract_site_prefix(site_id)
+        Examples:
+            convert_bms_to_v2("CH-1", "chiller", "site-002")
+            → "S002-CHILLER-B1-001"
+
+            convert_bms_to_v2("VAV-L1-05", "vav", "site-002", zone_mapping={"05": "E"})
+            → "S002-VAV-L1-E"
+
+            convert_bms_to_v2("011-stc-ahu-001", "ahu", "site-002")
+            → "S002-AHU-L0-01"
+        """
+        logger.debug(f"Converting BMS ID '{bms_id}' (type: {equipment_type}, site: {site_id})")
 
         # Normalize equipment type
         normalized_type = self._normalize_equipment_type(equipment_type)
         if not normalized_type:
-            logger.warning(f"Unknown equipment type: {equipment_type}")
-            normalized_type = "UNKNOWN"
+            logger.warning(f"Unknown equipment type: {equipment_type}, using as-is")
+            normalized_type = equipment_type.upper()
+
+        # Extract site prefix (S###)
+        site_prefix = self._extract_site_prefix(site_id)
 
         # Parse floor and zone from BMS ID
-        floor, zone = self.parse_floor_zone(bms_id)
+        floor_zone = self.parse_floor_zone(bms_id)
 
-        # Convert zone number to letter if needed
-        if zone and zone.isdigit():
-            zone = self.map_zone_number_to_letter(zone, site_id, zone_mapping)
-
-        # Build v2.0 ID
-        if not floor or not zone:
-            # Fallback: use sequence number from BMS ID
-            sequence = self._extract_sequence(bms_id)
-            v2_id = f"{site_prefix}-{normalized_type}-B1-{sequence:03d}"
+        # If parsing fails, provide defaults
+        if not floor_zone:
+            floor = "B1"  # Default to basement
+            zone_or_seq = "001"  # Default sequence
+            logger.warning(
+                f"Could not parse floor/zone from '{bms_id}', using defaults: {floor}/{zone_or_seq}"
+            )
         else:
-            # Clean zone: ensure it's a single character (A-Z) or numeric
-            zone = zone.upper() if zone else "001"
-            v2_id = f"{site_prefix}-{normalized_type}-{floor}-{zone}"
+            floor = floor_zone.get("floor", "B1")
+            zone_value = floor_zone.get("zone", "001")
 
-        logger.debug(
-            f"Converted BMS ID '{bms_id}' (type={equipment_type}) "
-            f"→ v2.0 ID '{v2_id}' (site={site_id})"
+            # Convert zone number to letter if needed
+            if zone_value.isdigit() and len(zone_value) <= 2:
+                zone_number = zone_value.zfill(2)
+                zone_mapping_dict = zone_mapping or self._get_zone_mappings_for_site(site_id)
+                zone_or_seq = zone_mapping_dict.get(zone_number, zone_number.lstrip("0") or "A")
+            else:
+                zone_or_seq = zone_value
+
+        # Build v2.0 format
+        v2_id = f"{site_prefix}-{normalized_type}-{floor}-{zone_or_seq}"
+        logger.info(
+            f"Converted '{bms_id}' → '{v2_id}' (type: {normalized_type}, floor: {floor}, zone: {zone_or_seq})"
         )
 
         return v2_id
 
-    def parse_floor_zone(self, bms_id: str) -> Tuple[str, str]:
+    def parse_floor_zone(self, bms_id: str) -> Optional[Dict[str, str]]:
         """Extract floor and zone from BMS equipment ID.
 
-        Examples:
-          "FCU-L2-A" → ("L2", "A")
-          "VAV-L1-05" → ("L1", "05")
-          "AHU-G-01" → ("G", "01")
-          "CH-B1-01" → ("B1", "01")
-          "CHILLER-001" → ("B1", "001")
+        Args:
+            bms_id: BMS equipment ID (e.g., "FCU-L2-A", "VAV-L12-03", "AHU-G-01")
 
         Returns:
-            Tuple of (floor, zone) or ("B1", extracted_sequence) as fallback
+            Dict with 'floor' and 'zone' keys, or None if parsing fails
+
+        Examples:
+            parse_floor_zone("FCU-L2-A") → {"floor": "L2", "zone": "A"}
+            parse_floor_zone("VAV-L12-03") → {"floor": "L12", "zone": "03"}
+            parse_floor_zone("AHU-G-01") → {"floor": "G", "zone": "01"}
+            parse_floor_zone("CHILLER-001") → None (no floor info)
         """
-        bms_id = bms_id.upper().strip()
+        # Normalize input
+        normalized = bms_id.upper().replace("_", "-")
 
-        # Try pattern: EQUIPMENT-FLOOR-ZONE (e.g., FCU-L2-A, VAV-L1-05)
-        match = re.search(r"-(B\d|B|G|L\d+|M|R|PH)[-_]([A-Z]|0?\d{1,3})(?:$|[-_])", bms_id)
-        if match:
-            floor = match.group(1)
-            zone = match.group(2)
-            return (floor, zone)
+        # Try various parsing patterns
+        patterns = [
+            # Pattern 1: TYPE-FLOOR-ZONE (e.g., FCU-L2-A)
+            r"(?:FCU|VAV|AHU|DALI|LUM|TS|CO2|OCC|DLS|ACC|CCTV|SPLIT|CRAC)-([BGL]\d*|G|R)-([A-Z0-9]{1,3})",
+            # Pattern 2: TYPE-FLOOR-ZONE with optional hyphen variations (e.g., CH-B1-01)
+            r"(?:CH|GEN|TX|UPS|ATS|MSB|MTR|PFC|FDR|MV|DB|CT|FIRE|BMS)-([B][0-9]|G|[L][0-9]+|R)-([A-Z0-9]{1,3})",
+            # Pattern 3: Simple floor code (e.g., AHU-G-01 or AHU-L12-1)
+            r"([B][0-9]|G|[L][0-9]+|R)-([A-Z0-9]{1,3})$",
+        ]
 
-        # Try pattern: FLOOR-ZONE separated by anything (e.g., AHU_L1_01)
-        match = re.search(r"([BL]\d{1,2}|[BGR]|M|PH)[_-]([A-Z]|0?\d{1,3})", bms_id)
-        if match:
-            floor = match.group(1)
-            zone = match.group(2)
-            return (floor, zone)
+        for pattern in patterns:
+            match = re.search(pattern, normalized)
+            if match:
+                floor = match.group(1)
+                zone = match.group(2)
 
-        # Try to find just floor without zone
-        match = re.search(r"(B\d|B|G|L\d{1,2}|M|R|PH)", bms_id)
-        if match:
-            floor = match.group(1)
-            sequence = self._extract_sequence(bms_id)
-            return (floor, f"{sequence:03d}")
+                # Normalize floor format
+                floor = self._normalize_floor(floor)
 
-        # Fallback
-        logger.debug(f"Could not parse floor/zone from BMS ID: {bms_id}")
-        sequence = self._extract_sequence(bms_id)
-        return ("B1", f"{sequence:03d}")
+                logger.debug(f"Parsed '{bms_id}': floor='{floor}', zone='{zone}'")
+                return {"floor": floor, "zone": zone}
+
+        logger.debug(f"Could not parse floor/zone from '{bms_id}'")
+        return None
+
+    def _normalize_equipment_type(self, equipment_type: str) -> Optional[str]:
+        """Normalize equipment type to v2.0 standard uppercase.
+
+        Args:
+            equipment_type: Equipment type (e.g., "chiller", "VAV", "ahu")
+
+        Returns:
+            Normalized uppercase type (e.g., "CHILLER") or None if not found
+        """
+        normalized = equipment_type.lower().replace(" ", "_").strip()
+        return self.TYPE_MAPPINGS.get(normalized)
+
+    def _normalize_floor(self, floor: str) -> str:
+        """Normalize floor code to v2.0 format.
+
+        Examples:
+            B1 → B1
+            b1 → B1
+            Ground → G
+            Level 1 → L1
+            L12 → L12
+        """
+        floor = floor.upper().strip()
+
+        # Already normalized
+        if re.match(r"^(B\d+|G|L\d+|M|R|PH)$", floor):
+            return floor
+
+        # Expand aliases
+        aliases = {
+            "BASEMENT": "B",
+            "GROUND": "G",
+            "LEVEL": "L",
+            "L0": "L0",
+            "MEZZANINE": "M",
+            "ROOF": "R",
+            "PENTHOUSE": "PH",
+        }
+
+        for alias, code in aliases.items():
+            if alias in floor:
+                # Extract number if present (e.g., "LEVEL 12" → "L12")
+                numbers = re.findall(r"\d+", floor)
+                if numbers:
+                    return f"{code}{numbers[0]}"
+                return code
+
+        # Default fallback
+        logger.warning(f"Could not normalize floor '{floor}', using 'B1'")
+        return "B1"
+
+    def _extract_site_prefix(self, site_id: str) -> str:
+        """Extract site prefix from site ID.
+
+        Args:
+            site_id: Site identifier (e.g., "site-002")
+
+        Returns:
+            Site prefix in v2.0 format (e.g., "S002")
+
+        Examples:
+            _extract_site_prefix("site-002") → "S002"
+            _extract_site_prefix("S002") → "S002"
+            _extract_site_prefix("02") → "S002"
+        """
+        # Extract numeric part
+        numbers = re.findall(r"\d+", site_id)
+        if not numbers:
+            logger.warning(f"Could not extract site number from '{site_id}', using 'S001'")
+            return "S001"
+
+        site_num = numbers[0]
+        # Zero-pad to 3 digits
+        site_prefix = f"S{site_num.zfill(3)}"
+        return site_prefix
+
+    def _get_zone_mappings_for_site(self, site_id: str) -> Dict[str, str]:
+        """Get zone number→letter mappings for a specific site.
+
+        Args:
+            site_id: Site identifier (e.g., "site-002")
+
+        Returns:
+            Dict mapping zone numbers to letters (e.g., {"01": "A", "02": "B"})
+        """
+        # Extract site number
+        site_num = re.findall(r"\d+", site_id)
+        if site_num:
+            site_code = f"site-{site_num[0]}"
+        else:
+            site_code = site_id
+
+        # Check for site-specific mappings
+        if site_code in self.site_zone_mappings:
+            mappings = self.site_zone_mappings[site_code].get("zone_number_to_letter")
+            if mappings:
+                return mappings
+
+        # Fall back to default
+        return self.site_zone_mappings.get("default", {}).get(
+            "zone_number_to_letter", self.DEFAULT_ZONE_MAP
+        )
 
     def map_zone_number_to_letter(
-        self,
-        zone_num: str,
-        site_id: str,
-        override_mapping: Optional[Dict[str, str]] = None,
+        self, zone_num: str, site_id: str
     ) -> str:
         """Convert numeric zone to letter per site-specific mapping.
 
-        Only converts if explicit mapping exists. Otherwise returns numeric
-        zone in 3-digit format (001, 002, etc).
-
         Args:
-            zone_num: Numeric zone (e.g., "01", "05", "20")
+            zone_num: Zone number (e.g., "01", "05")
             site_id: Site identifier (e.g., "site-002")
-            override_mapping: Optional override mapping dict
 
         Returns:
-            Letter zone (A-Z) if mapping found, else 3-digit numeric (001, 002, etc)
+            Zone letter (e.g., "A", "E")
+
+        Examples:
+            map_zone_number_to_letter("01", "site-002") → "A"
+            map_zone_number_to_letter("05", "site-002") → "E"
         """
-        # Use override if provided
-        if override_mapping and zone_num in override_mapping:
-            return override_mapping[zone_num]
+        zone_num_padded = zone_num.zfill(2)
+        mappings = self._get_zone_mappings_for_site(site_id)
+        result = mappings.get(zone_num_padded, zone_num_padded.lstrip("0") or "A")
+        logger.debug(f"Zone {zone_num} (site {site_id}) → {result}")
+        return result
 
-        # Try site-specific mapping
-        site_code = site_id.replace("site-", "").lstrip("0")  # "site-002" → "2"
-        site_key = f"site-{site_code.zfill(3)}"  # "site-002"
 
-        if site_key in self.zone_mappings:
-            zone_to_letter = self.zone_mappings[site_key].get("zone_number_to_letter", {})
-            if zone_num in zone_to_letter:
-                return zone_to_letter[zone_num]
+# Singleton instance
+_converter: Optional[EquipmentIDConverter] = None
 
-        # Try default mapping
-        default_mapping = self.zone_mappings.get("default", {}).get("zone_number_to_letter", {})
-        if zone_num in default_mapping:
-            return default_mapping[zone_num]
 
-        # Fallback: return as 3-digit numeric sequence
-        try:
-            num = int(zone_num.lstrip("0") or "0")
-            return f"{num:03d}"  # Convert to 3-digit format (001, 002, etc)
-        except ValueError:
-            return zone_num  # Return as-is if not numeric
-
-    def _normalize_equipment_type(self, equipment_type: str) -> str:
-        """Normalize equipment type to SENTINEL standard.
-
-        Args:
-            equipment_type: Equipment type string (any case, variations)
-
-        Returns:
-            Normalized type (e.g., "CHILLER", "AHU", "FCU") or empty string if unknown
-        """
-        equipment_type = equipment_type.strip().lower()
-
-        # Direct mapping
-        if equipment_type in EQUIPMENT_TYPE_MAPPINGS:
-            return EQUIPMENT_TYPE_MAPPINGS[equipment_type]
-
-        # Try partial matches
-        for key, value in EQUIPMENT_TYPE_MAPPINGS.items():
-            if key in equipment_type or equipment_type in key:
-                return value
-
-        return ""
-
-    def _extract_site_prefix(self, site_id: str) -> str:
-        """Extract S### prefix from site ID.
-
-        Args:
-            site_id: Site identifier (e.g., "site-002", "S002", "002")
-
-        Returns:
-            S### format (e.g., "S002")
-        """
-        # Remove "site-" prefix if present
-        site_id = site_id.replace("site-", "").replace("site_", "").strip()
-
-        # Extract digits
-        digits = re.findall(r"\d+", site_id)
-        if digits:
-            site_num = digits[0].zfill(3)  # Ensure 3 digits
-            return f"S{site_num}"
-
-        return "S000"  # Fallback
-
-    def _extract_sequence(self, bms_id: str) -> int:
-        """Extract numeric sequence from BMS ID for fallback naming.
-
-        Args:
-            bms_id: BMS equipment ID
-
-        Returns:
-            Sequence number (001-999)
-        """
-        # Find all numbers in the ID
-        numbers = re.findall(r"\d+", bms_id)
-        if numbers:
-            # Use the last number as sequence
-            seq = int(numbers[-1])
-            return min(seq, 999)  # Cap at 999
-        return 1
-
-    def detect_bms_format(self, bms_id: str) -> str:
-        """Detect the BMS ID format/pattern.
-
-        Returns:
-            Format description (e.g., "EQUIPMENT-FLOOR-ZONE", "LEGACY_SANDTON", etc.)
-        """
-        bms_id = bms_id.upper().strip()
-
-        # Legacy Sandton format: 011-stc-ahu-001
-        if re.match(r"^\d{3}-[a-z]{3}-[a-z]{2,4}-\d{3}$", bms_id, re.IGNORECASE):
-            return "LEGACY_SANDTON"
-
-        # Niagara format: EQUIPMENT-FLOOR-ZONE
-        if re.search(r"-[BL]\d{1,2}[-_][A-Z0-9]{1,3}(?:$|[-_])", bms_id):
-            return "EQUIPMENT-FLOOR-ZONE"
-
-        # Simple equipment-number: CH-1, AHU-01
-        if re.match(r"^[A-Z]{2,4}-\d{1,3}$", bms_id):
-            return "EQUIPMENT-NUMBER"
-
-        return "UNKNOWN"
+def get_equipment_id_converter() -> EquipmentIDConverter:
+    """Get the singleton equipment ID converter instance."""
+    global _converter
+    if _converter is None:
+        _converter = EquipmentIDConverter()
+    return _converter

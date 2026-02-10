@@ -11,7 +11,7 @@
 
 import { Select, SelectItem } from "@tremor/react";
 import { Building2 } from "lucide-react";
-import type { Site } from "../lib/api";
+import type { Site } from '@/lib/api';
 
 interface SiteSelectorProps {
   sites: Site[];

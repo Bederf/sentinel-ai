@@ -14,7 +14,7 @@
 
 import { Building2, Cpu, AlertTriangle, MapPin, Shield, Clock } from "lucide-react";
 import { useState, useEffect } from "react";
-import api, { type Site, type OptimizationRecommendation, type BuildingEquipmentItem, createWorkOrder } from "../lib/api";
+import api, { type Site, type OptimizationRecommendation, type BuildingEquipmentItem, createWorkOrder } from '@/lib/api';
 import { OptimizationStatusBadge } from "./OptimizationStatusBadge";
 import { OptimizationRecommendationModal } from "./OptimizationRecommendationModal";
 import { ExpandableRiskList } from "./ExpandableRiskList";

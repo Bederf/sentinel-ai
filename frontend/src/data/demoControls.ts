@@ -8,7 +8,7 @@
  * - Demo narratives and success/failure stories
  */
 
-import type { Device } from "../lib/api";
+import type { Device } from '@/lib/api';
 
 // Demo device configurations
 export const demoDevices: Device[] = [

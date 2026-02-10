@@ -9,7 +9,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Save, RotateCcw, Info, StickyNote, Wrench, X } from "lucide-react";
-import { authorizedFetch } from "../lib/api";
+import { authorizedFetch } from '@/lib/api';
 
 interface AlertCommandConfig {
   enabled: boolean;

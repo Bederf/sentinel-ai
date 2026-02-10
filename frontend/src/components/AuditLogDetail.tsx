@@ -12,7 +12,7 @@
  */
 
 import { X, Clock, User, Server, Settings, Shield, AlertTriangle, Zap } from "lucide-react";
-import type { AuditLogEntryResponse } from "../lib/api";
+import type { AuditLogEntryResponse } from '@/lib/api';
 
 interface AuditLogDetailProps {
   /** The audit log entry to display */

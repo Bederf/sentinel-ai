@@ -25,7 +25,7 @@ import {
   Settings,
   AlertCircle,
 } from "lucide-react";
-import api, { type OptimizationRecommendation } from "../lib/api";
+import api, { type OptimizationRecommendation } from '@/lib/api';
 import { formatDateTime } from "../lib/timeFormat";
 
 interface OptimizationRecommendationModalProps {

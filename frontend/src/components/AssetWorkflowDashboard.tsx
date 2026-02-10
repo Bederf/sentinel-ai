@@ -21,7 +21,7 @@ import {
   type WorkflowEquipmentItem,
   type WorkflowState,
   type Site,
-} from '../lib/api';
+} from '@/lib/api';
 import { PageLoading } from "./PageLoading";
 
 // Re-export types from API for local use

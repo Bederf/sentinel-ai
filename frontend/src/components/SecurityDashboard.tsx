@@ -29,13 +29,13 @@ import {
   Building2,
   ChevronDown,
 } from "lucide-react";
-import api, { isExpectedApiError, securityApi } from "../lib/api";
+import api, { isExpectedApiError, securityApi } from '@/lib/api';
 import type {
   SecuritySystemStatus,
   SecurityCamera,
   SecurityAlarmZone,
   Site,
-} from "../lib/api";
+} from '@/lib/api';
 import { AccessEventsPanel } from "./AccessEventsPanel";
 import { SecurityOccupancyPanel } from "./SecurityOccupancyPanel";
 import { PageLoading } from "./PageLoading";

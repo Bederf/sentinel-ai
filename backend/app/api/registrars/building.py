@@ -12,12 +12,14 @@ from app.api import generators, energy_centre
 from app.api import hvac, fire, security
 from app.api import niagara, niagara_bacnet, niagara_discovery
 from app.api import buildings_3d, digital_twin
+from app.api import zone_ingestion, desks, documents
 
 
 def register_building_routers(app: FastAPI) -> None:
     """Register building API routers (buildings, equipment, devices, systems)."""
     # Building and equipment management
     app.include_router(buildings.router, tags=["buildings"])
+    app.include_router(documents.router, prefix="/api", tags=["documents"])
     app.include_router(equipment.router, prefix="/api", tags=["equipment"])
     app.include_router(sensors.router, prefix="/api", tags=["sensors"])
     app.include_router(devices.router, prefix="/api", tags=["devices"])
@@ -28,6 +30,12 @@ def register_building_routers(app: FastAPI) -> None:
 
     # Digital Twin Builder (floor plan extraction + AI-powered onboarding)
     app.include_router(digital_twin.router, prefix="/api", tags=["digital-twin"])
+
+    # Zone ingestion system (per-building zone configuration)
+    app.include_router(zone_ingestion.router, tags=["zone-ingestion"])
+
+    # Desk positioning and data (workspace positions for Digital Twin accuracy)
+    app.include_router(desks.router, tags=["desks"])
 
     # Equipment discovery
     app.include_router(dali_discovery.router, prefix="/api", tags=["dali-discovery"])

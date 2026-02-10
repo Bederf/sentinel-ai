@@ -23,8 +23,8 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import { toast } from "sonner";
-import api from "../lib/api";
-import type { DeviceControlResponse } from "../lib/api";
+import api from '@/lib/api';
+import type { DeviceControlResponse } from '@/lib/api';
 
 export interface ControlResult {
   success: boolean;

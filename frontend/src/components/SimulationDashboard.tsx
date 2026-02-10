@@ -65,8 +65,8 @@ import type {
   PerformanceEvaluation,
   ABTest,
 } from "../lib/simulationApi";
-import api from "../lib/api";
-import type { Site } from "../lib/api";
+import api from '@/lib/api';
+import type { Site } from '@/lib/api';
 import { PageLoading } from "./PageLoading";
 
 // ---------- Duration presets ----------

@@ -38,8 +38,8 @@ import {
   verticalListSortingStrategy,
   arrayMove,
 } from '@dnd-kit/sortable';
-import api, { createWorkOrder } from "../lib/api";
-import type { DashboardStats, Site, Prediction, EnergyDataPoint, BuildingEquipmentItem } from "../lib/api";
+import api, { createWorkOrder } from '@/lib/api';
+import type { DashboardStats, Site, Prediction, EnergyDataPoint, BuildingEquipmentItem } from '@/lib/api';
 import { toast } from "sonner";
 import { SortableKPICard } from "./SortableKPICard";
 import { DashboardSection } from "./DashboardSection";

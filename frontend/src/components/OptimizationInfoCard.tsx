@@ -22,12 +22,12 @@ import {
 import { OptimizationToggle } from "./OptimizationToggle";
 import { OptimizationRecommendationModal } from "./OptimizationRecommendationModal";
 import { formatRelativeTime } from "../lib/timeFormat";
-import api from "../lib/api";
+import api from '@/lib/api';
 import type {
   OptimizationStatusResponse,
   OptimizationRecommendation,
   MonthlySavingsSummary,
-} from "../lib/api";
+} from '@/lib/api';
 
 type OptimizationStatusType = OptimizationStatusResponse['optimization_status'];
 

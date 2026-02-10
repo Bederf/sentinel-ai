@@ -40,6 +40,53 @@ export interface BuildingEquipmentResponse {
   equipment: Equipment[];
 }
 
+// ============= Desk & Zone Types =============
+
+export interface DeskCoordinates {
+  x: number;
+  y: number;
+  z: number;
+}
+
+export interface Desk {
+  id: string;
+  desk_id: string;
+  zone_id: string;
+  floor: string;
+  context: 'near_diffuser' | 'near_window' | 'near_printer' | 'corner' | 'open_plan';
+  x_coord: number;
+  y_coord: number;
+  z_coord: number;
+  coordinates?: DeskCoordinates;
+}
+
+export interface ZoneCentroid {
+  x: number;
+  z: number;
+}
+
+export interface ZoneCentroidResponse {
+  zone_id: string;
+  centroid: ZoneCentroid;
+  desk_count?: number;
+}
+
+export interface AllZoneCentroidsResponse {
+  building_id: string;
+  zone_count: number;
+  centroid_count: number;
+  centroids: Record<string, ZoneCentroid>;
+}
+
+export interface DeskStatsResponse {
+  building_id: string;
+  total_desks: number;
+  total_zones: number;
+  desks_per_zone: Record<string, number>;
+  desks_per_floor: Record<string, number>;
+  desks_by_context: Record<string, number>;
+}
+
 export interface CreateSiteRequest {
   code: string;
   name: string;
@@ -91,5 +138,101 @@ export const sitesApi = {
    */
   getEquipmentByCode: (code: string) =>
     fetchApi<Equipment>(`/api/equipment/${code}`),
+
+  // ============= Desk Data Methods =============
+
+  /**
+   * Get all desks for a building
+   * Optionally filtered by floor
+   *
+   * @param buildingId - Building UUID
+   * @param floor - Optional floor code filter (e.g., "L0", "L1", "L2")
+   * @returns List of desk records with positions and context
+   */
+  getDesks: (buildingId: string, floor?: string) => {
+    const url = floor
+      ? `/api/buildings/${buildingId}/desks?floor=${encodeURIComponent(floor)}`
+      : `/api/buildings/${buildingId}/desks`;
+    return fetchApi<Desk[]>(url);
+  },
+
+  /**
+   * Get all desks in a specific zone
+   *
+   * @param buildingId - Building UUID
+   * @param zoneId - Zone ID (e.g., "Zone-L1-A")
+   * @returns List of desks in the zone
+   */
+  getDesksByZone: (buildingId: string, zoneId: string) =>
+    fetchApi<Desk[]>(`/api/buildings/${buildingId}/desks/zones/${encodeURIComponent(zoneId)}`),
+
+  /**
+   * Get centroid for a specific zone
+   *
+   * Used for calculating zone center position from desk positions.
+   *
+   * @param buildingId - Building UUID
+   * @param zoneId - Zone ID (e.g., "Zone-L1-A")
+   * @returns Zone centroid with x, z coordinates and desk count
+   */
+  getZoneCentroid: (buildingId: string, zoneId: string) =>
+    fetchApi<ZoneCentroidResponse>(
+      `/api/buildings/${buildingId}/desks/zones/${encodeURIComponent(zoneId)}/centroid`
+    ),
+
+  /**
+   * Get centroids for all zones in a building
+   *
+   * Efficient operation: returns pre-calculated centroids for all zones.
+   * ~80x smaller payload than loading all desks, ideal for Digital Twin.
+   *
+   * @param buildingId - Building UUID
+   * @returns Map of zone_id → centroid coordinates
+   */
+  getZoneCentroids: (buildingId: string) =>
+    fetchApi<AllZoneCentroidsResponse>(`/api/buildings/${buildingId}/desks/centroids`),
+
+  /**
+   * Get desk statistics for a building
+   *
+   * Provides summary information about desks and zones:
+   * - Total desk count
+   * - Desks per zone
+   * - Desks per floor
+   * - Distribution by context
+   *
+   * @param buildingId - Building UUID
+   * @returns Desk statistics
+   */
+  getDeskStats: (buildingId: string) =>
+    fetchApi<DeskStatsResponse>(`/api/buildings/${buildingId}/desks/stats`),
+
+  // ============= Zone Ingestion Methods =============
+
+  /**
+   * Ingest zone configuration for a building
+   *
+   * @param buildingId - Building UUID
+   * @param request - Object with zones array
+   * @returns Ingestion response
+   */
+  ingestZones: (buildingId: string, request: { zones: (Omit<ZoneCentroidResponse, 'centroid'> & Omit<ZoneCentroid, 'centroid'> & { zone_id: string; zone_name: string; floor: string; zone_type: string; typical_occupancy?: number; area_sqm?: number; zone_letter?: string })[] }) =>
+    fetchApi(`/api/buildings/${buildingId}/zone-ingestion/zones`, {
+      method: 'POST',
+      body: JSON.stringify(request),
+    }),
+
+  /**
+   * Ingest desk configuration for a building
+   *
+   * @param buildingId - Building UUID
+   * @param request - Object with desks array
+   * @returns Ingestion response
+   */
+  ingestDesks: (buildingId: string, request: { desks: (Desk & { coordinates: { x: number; y: number; z: number } })[] }) =>
+    fetchApi(`/api/buildings/${buildingId}/zone-ingestion/desks`, {
+      method: 'POST',
+      body: JSON.stringify(request),
+    }),
 };
 

@@ -31,7 +31,7 @@ import {
   type InspectionSubmissionRequest,
   type InspectionPhotoAttachment,
   type InspectionTaskItem,
-} from '../lib/api';
+} from '@/lib/api';
 
 interface InspectionFormProps {
   equipmentId: string;

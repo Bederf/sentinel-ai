@@ -13,7 +13,7 @@ import type {
   OptimizationStatusResponse,
   DeviceStatus,
   DeviceSafetyStatus,
-} from '../lib/api';
+} from '@/lib/api';
 
 /**
  * Create a mock Site

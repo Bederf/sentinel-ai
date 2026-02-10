@@ -1,38 +1,50 @@
 import { useState, useEffect } from 'react';
+import { sitesApi } from '@/lib/api/sites';
 import type { Equipment } from '@/lib/api/sites';
 
-// Mock equipment data for demo
-const MOCK_EQUIPMENT: Equipment[] = [
-  { id: '1', code: 'S002-CHILLER-B1-001', name: 'Chiller 1', equipment_type: 'CHILLER', health_score: 85, status: 'online', model: 'Trane' },
-  { id: '2', code: 'S002-AHU-R-001', name: 'AHU Rooftop', equipment_type: 'AHU', health_score: 75, status: 'online', model: 'Carrier' },
-  { id: '3', code: 'S002-FCU-L1-A', name: 'FCU Level 1 Zone A', equipment_type: 'FCU', health_score: 90, status: 'online', model: 'Daikin' },
-  { id: '4', code: 'S002-VAV-L2-B', name: 'VAV Level 2 Zone B', equipment_type: 'VAV', health_score: 65, status: 'warning', model: 'Johnson' },
-  { id: '5', code: 'S002-DALI-L1-01', name: 'DALI Controller L1', equipment_type: 'DALI', health_score: 95, status: 'online', model: 'Philips' },
-];
-
-export function useEquipmentData(siteId: string) {
+/**
+ * Fetch real building equipment from Supabase via cached API
+ * 
+ * Uses sitesApi.getEquipment() which:
+ * - Returns equipment array from Supabase
+ * - Caches results in Redis for 300s (SEMI_STATIC TTL)
+ * - Falls back to JSON files if Supabase unavailable
+ * 
+ * Refreshes every 5 seconds to keep equipment status current
+ */
+export function useEquipmentData(buildingId: string) {
   const [equipment, setEquipment] = useState<Equipment[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Use mock data for now - can be replaced with real API calls later
-    setLoading(false);
-    setEquipment(MOCK_EQUIPMENT);
-    setError(null);
+    async function fetchEquipment() {
+      if (!buildingId) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const response = await sitesApi.getEquipment(buildingId);
+        setEquipment(response.equipment || []);
+        setError(null);
+      } catch (err) {
+        console.error('Failed to fetch equipment:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load equipment');
+        setEquipment([]);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchEquipment();
 
     // Refresh every 5 seconds for real-time updates
-    const interval = setInterval(() => {
-      // Simulate health score changes
-      setEquipment((prev) =>
-        prev.map((eq) => ({
-          ...eq,
-          health_score: Math.max(20, Math.min(100, eq.health_score + (Math.random() - 0.5) * 5)),
-        }))
-      );
-    }, 5000);
+    // Redis cache (300s TTL) will serve most requests quickly
+    const interval = setInterval(fetchEquipment, 5000);
     return () => clearInterval(interval);
-  }, [siteId]);
+  }, [buildingId]);
 
   return { equipment, loading, error };
 }
