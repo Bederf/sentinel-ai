@@ -6,14 +6,19 @@
  * - Location and type information
  * - Equipment count metric
  * - Risk alerts with severity coloring
- * - Safety status indicators
+ * - Safety status indicators (via useSiteSummary)
  * - Status-based left border accent
  *
- * Follows SENTINEL dark theme design.
+ * Migrated to use batch hooks (Phase 75-04):
+ * - useSiteSummary replaces per-device API calls
+ * - Single aggregated query returns all site data
+ * - Eliminates 30+ concurrent requests
  */
 
 import { Building2, Cpu, AlertTriangle, MapPin, Shield, Clock } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useSiteSummary } from "@/hooks/useSiteSummary";
+import { useQuery } from "@tanstack/react-query";
 import api, { type Site, type OptimizationRecommendation, type BuildingEquipmentItem, createWorkOrder } from '@/lib/api';
 import { OptimizationStatusBadge } from "./OptimizationStatusBadge";
 import { OptimizationRecommendationModal } from "./OptimizationRecommendationModal";
@@ -104,8 +109,12 @@ function getSafePercentageColor(safe: number, total: number): string {
 export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizationStatus = false, onEquipmentControlNavigate }: SiteCardProps) {
   const statusConfig = getStatusConfig(site.status);
   const hasAlerts = site.alert_count > 0;
-  const [safetySummary, setSafetySummary] = useState<DeviceSafetySummary | null>(null);
-  const [loadingSafety, setLoadingSafety] = useState(false);
+  
+  // Fetch aggregated site summary (replaces per-device API calls)
+  const { data: siteSummary, isLoading: loadingSafety } = useSiteSummary(site.id, {
+    enabled: showSafetyStatus,
+  });
+
   const [optimizationStatus, setOptimizationStatus] = useState<OptimizationStatusType>("unknown");
   const [optimizationMode, setOptimizationMode] = useState<"automatic" | "supervised">("supervised");
   const [hasRecommendation, setHasRecommendation] = useState(false);
@@ -123,194 +132,88 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
     }
   };
 
-  // Fetch safety status for devices at this site
-  useEffect(() => {
-    if (!showSafetyStatus) return;
-
-    const fetchSafetyStatus = async () => {
-      setLoadingSafety(true);
-      try {
-        // Stagger initial request to prevent rate limiting across multiple SiteCards
-        await new Promise((resolve) => setTimeout(resolve, 200));
-        
-        // Get devices for this site
-        const devices = await api.getSiteDevices(site.id);
-
-        // If no devices from API, use equipment_count from site as fallback
-        if (devices.length === 0) {
-          const totalAssets = site.equipment_count || 0;
-          const alertCount = site.alert_count || 0;
-          // Calculate safe assets as total - alert_count
-          // This gives us a reasonable estimate when device API returns no results
-          setSafetySummary({
-            total: totalAssets,
-            safe: Math.max(0, totalAssets - alertCount),
-            warning: 0,
-            blocked: 0,
-            alarm: alertCount,
-            overallStatus: alertCount > 0 ? 'alarm' : 'safe',
-          });
-          return;
-        }
-
-        // Fetch safety status for all devices
-        // For performance, we'll check all devices but limit concurrent requests
-        const BATCH_SIZE = 5; // Reduced from 10 to 5 to lower concurrent requests
-        const allStatuses: SafetyStatus[] = [];
-        
-        for (let i = 0; i < devices.length; i += BATCH_SIZE) {
-          // Add delay between batches to prevent overwhelming the backend
-          if (i > 0) {
-            await new Promise((resolve) => setTimeout(resolve, 150));
-          }
-          
-          const batch = devices.slice(i, i + BATCH_SIZE);
-          const batchPromises = batch.map(async (device) => {
-            try {
-              const status = await api.getDeviceSafetyStatus(device.id);
-              return status.overall_status;
-            } catch {
-              return 'unknown' as SafetyStatus;
-            }
-          });
-          const batchStatuses = await Promise.all(batchPromises);
-          allStatuses.push(...batchStatuses);
-        }
-
-        // Use site.equipment_count as the total, not devices.length
-        // This ensures consistency with the displayed total
-        const totalEquipment = site.equipment_count || devices.length;
-        
-        // Calculate safe count based on equipment_count - alert_count
-        // This gives accurate totals that match the displayed equipment_count
-        const alertCount = site.alert_count || 0;
-        const safeCount = Math.max(0, totalEquipment - alertCount);
-        
-        // Use device statuses to determine overall status, but use equipment_count for totals
-        const summary: DeviceSafetySummary = {
-          total: totalEquipment,
-          safe: safeCount,
-          warning: allStatuses.filter((s) => s === 'warning').length,
-          blocked: allStatuses.filter((s) => s === 'blocked').length,
-          alarm: alertCount > 0 ? alertCount : allStatuses.filter((s) => s === 'alarm').length,
-          overallStatus: 'unknown',
-        };
-
-        // Determine overall status
-        if (summary.blocked > 0) {
-          summary.overallStatus = 'blocked';
-        } else if (summary.alarm > 0) {
-          summary.overallStatus = 'alarm';
-        } else if (summary.warning > 0) {
-          summary.overallStatus = 'warning';
-        } else if (summary.safe > 0) {
-          summary.overallStatus = 'safe';
-        }
-
-        setSafetySummary(summary);
-      } catch (error) {
-        console.error('Failed to fetch safety status:', error);
-        // Fallback to equipment_count if API fails
-        const totalAssets = site.equipment_count || 0;
-        const alertCount = site.alert_count || 0;
-        setSafetySummary({
-          total: totalAssets,
-          safe: Math.max(0, totalAssets - alertCount),
-          warning: 0,
-          blocked: 0,
-          alarm: alertCount,
-          overallStatus: alertCount > 0 ? 'alarm' : 'safe',
-        });
-      } finally {
-        setLoadingSafety(false);
-      }
-    };
-
-    fetchSafetyStatus();
-  }, [site.id, showSafetyStatus]);
+  // Build safety summary from site summary response
+  const safetySummary: DeviceSafetySummary | null = siteSummary ? {
+    total: siteSummary.equipment_count,
+    safe: siteSummary.safety.safe,
+    warning: siteSummary.safety.warning,
+    blocked: siteSummary.safety.blocked,
+    alarm: siteSummary.safety.alarm,
+    overallStatus: 
+      siteSummary.safety.blocked > 0 ? 'blocked' :
+      siteSummary.safety.alarm > 0 ? 'alarm' :
+      siteSummary.safety.warning > 0 ? 'warning' :
+      siteSummary.safety.safe > 0 ? 'safe' :
+      'unknown'
+  } : null;
 
   // Fetch optimization status for this site
-  useEffect(() => {
-    if (!showOptimizationStatus || !site.optimization_enabled) return;
+  const { data: optimizationResponse } = useQuery({
+    queryKey: ['optimization-status', site.id],
+    queryFn: () => (site.optimization_enabled ? api.getOptimizationStatus(site.id) : Promise.resolve(null)),
+    enabled: showOptimizationStatus && site.optimization_enabled,
+    staleTime: 30 * 1000,
+  });
 
-    const fetchOptimizationStatus = async () => {
-      try {
-        const status = await api.getOptimizationStatus(site.id);
-        setOptimizationStatus(status.optimization_status);
-        // Set the optimization mode (automatic or supervised)
-        setOptimizationMode(status.optimization_settings?.mode || "supervised");
-        // Track if there's a recommendation available (for lightbulb icon)
-        // Only show lightbulb if there are actual recommendations to review
-        const hasRecs = !!(status.last_recommendation &&
-                        status.last_recommendation.recommendations &&
-                        status.last_recommendation.recommendations.length > 0);
-        setHasRecommendation(hasRecs);
-      } catch (error) {
-        console.error('Failed to fetch optimization status:', error);
-        setOptimizationStatus('error');
-        setOptimizationMode("supervised");
-        setHasRecommendation(false);
-      }
-    };
+  // Update optimization status when response changes
+  if (optimizationResponse) {
+    if (optimizationResponse.optimization_status !== optimizationStatus) {
+      setOptimizationStatus(optimizationResponse.optimization_status);
+    }
+    const mode = optimizationResponse.optimization_settings?.mode || "supervised";
+    if (mode !== optimizationMode) {
+      setOptimizationMode(mode);
+    }
+    const hasRecs = !!(optimizationResponse.last_recommendation &&
+                    optimizationResponse.last_recommendation.recommendations &&
+                    optimizationResponse.last_recommendation.recommendations.length > 0);
+    if (hasRecs !== hasRecommendation) {
+      setHasRecommendation(hasRecs);
+    }
+  }
 
-    fetchOptimizationStatus();
-    // Refresh every 30 seconds
-    const interval = setInterval(fetchOptimizationStatus, 30000);
-    return () => clearInterval(interval);
-  }, [site.id, showOptimizationStatus, site.optimization_enabled]);
+  // Handle recommendation modal open
+  const handleOpenRecommendationModal = async () => {
+    if (!site.id) return;
 
-  // Fetch latest recommendation when modal opens
-  useEffect(() => {
-    if (!showRecommendationModal || !site.id) return;
-
-    const fetchRecommendation = async () => {
-      try {
-        // For demo purposes, we'll fetch the full status and extract the recommendation
-        const status = await api.getOptimizationStatus(site.id);
-        if (status.last_recommendation &&
-            status.last_recommendation.recommendations &&
-            status.last_recommendation.recommendations.length > 0) {
-          setCurrentRecommendation(status.last_recommendation);
-        } else {
-          // If no pending recommendation or empty recommendations, close modal
-          // and update hasRecommendation to prevent future clicks from opening empty modal
-          setShowRecommendationModal(false);
-          setCurrentRecommendation(null);
-          setHasRecommendation(false);
-        }
-      } catch (error) {
-        console.error('Failed to fetch recommendation:', error);
+    try {
+      const status = await api.getOptimizationStatus(site.id);
+      if (status.last_recommendation &&
+          status.last_recommendation.recommendations &&
+          status.last_recommendation.recommendations.length > 0) {
+        setCurrentRecommendation(status.last_recommendation);
+        setShowRecommendationModal(true);
+      } else {
         setShowRecommendationModal(false);
         setCurrentRecommendation(null);
         setHasRecommendation(false);
       }
-    };
-
-    fetchRecommendation();
-  }, [showRecommendationModal, site.id]);
+    } catch (error) {
+      console.error('Failed to fetch recommendation:', error);
+      setShowRecommendationModal(false);
+      setCurrentRecommendation(null);
+      setHasRecommendation(false);
+    }
+  };
 
   // Handle optimization badge click - show modal if there's a recommendation to review
   const handleOptimizationClick = async (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent card click from firing
+    e.stopPropagation();
 
-    // Refresh status immediately to get latest recommendation state
     try {
       const status = await api.getOptimizationStatus(site.id);
       const hasRecs = !!(status.last_recommendation &&
                       status.last_recommendation.recommendations &&
                       status.last_recommendation.recommendations.length > 0);
 
-      // Update hasRecommendation state to match reality
       setHasRecommendation(hasRecs);
 
-      // Only open modal if there are actual recommendations
       if (hasRecs) {
         setCurrentRecommendation(status.last_recommendation);
         setShowRecommendationModal(true);
       }
     } catch (error) {
       console.error('Failed to refresh optimization status:', error);
-      // Fallback to opening modal if hasRecommendation was already true
       if (hasRecommendation) {
         setShowRecommendationModal(true);
       }
@@ -320,8 +223,6 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
   // Handle approve recommendation
   const handleApproveRecommendation = async (recommendationId: string) => {
     try {
-      // Build setpoints array from recommendation
-      // Map equipment_id to device_id for backend compatibility
       const setpointsToApply = currentRecommendation?.recommendations.map((rec) => ({
         device_id: rec.equipment_id,
         point_name: rec.point_name || "setpoint",
@@ -330,46 +231,39 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
 
       await api.approveOptimization(site.id, recommendationId, setpointsToApply);
 
-      // Refresh optimization status after approve
       const status = await api.getOptimizationStatus(site.id);
       setOptimizationStatus(status.optimization_status);
 
-      // Close modal
       setShowRecommendationModal(false);
       setCurrentRecommendation(null);
     } catch (error) {
       console.error('Failed to approve recommendation:', error);
-      throw error; // Re-throw to show error in modal
+      throw error;
     }
   };
 
   // Handle reject recommendation
   const handleRejectRecommendation = async (_recommendationId: string, _reason?: string) => {
     try {
-      // Note: reject API endpoint doesn't exist yet, so we'll just update status
-      // In production, this would call: api.rejectOptimization(site.id, recommendationId, reason)
-
-      // Refresh optimization status after reject
       const status = await api.getOptimizationStatus(site.id);
       setOptimizationStatus(status.optimization_status);
 
-      // Close modal
       setShowRecommendationModal(false);
       setCurrentRecommendation(null);
     } catch (error) {
       console.error('Failed to reject recommendation:', error);
-      throw error; // Re-throw to show error in modal
+      throw error;
     }
   };
 
-  // Handle equipment click from risk list - navigate to control
+  // Handle equipment click from risk list
   const handleEquipmentClick = (equipment: BuildingEquipmentItem) => {
     if (onEquipmentControlNavigate) {
       onEquipmentControlNavigate(equipment.id, site.id);
     }
   };
 
-  // Handle status badge click from risk list - show risk detail modal
+  // Handle status badge click from risk list
   const handleStatusBadgeClick = (equipment: BuildingEquipmentItem) => {
     setSelectedRiskEquipment(equipment);
     setShowRiskModal(true);
@@ -396,7 +290,6 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
         priority: equipment.status === "critical" ? "high" : "medium",
       });
 
-      // Show success notification (could use a toast library)
       alert(`Work Order ${workOrder.id} created for ${equipment.name}`);
     } catch (error) {
       console.error("Failed to create work order:", error);
@@ -531,7 +424,7 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
           className="flex items-center justify-between pt-3"
           style={{ borderTop: "1px solid var(--color-sentinel-border)" }}
         >
-          {/* Equipment Count with breakdown tooltip */}
+          {/* Equipment Count */}
           <div
             className="flex items-center gap-2 group relative"
             title={
@@ -677,7 +570,7 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
         </div>
       </div>
 
-      {/* Expandable Risk List - only show if there are alerts */}
+      {/* Expandable Risk List */}
       {hasAlerts && (
         <ExpandableRiskList
           siteId={site.id}
