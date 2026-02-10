@@ -28,6 +28,45 @@ interface QueuedRequest<T> {
 }
 
 /**
+ * Process successful batch response and resolve/reject promises
+ */
+function processResponse<T>(
+  current: QueuedRequest<T>[],
+  response: Record<string, T>,
+  onError: ((id: string, error: ApiError) => void) | undefined,
+) {
+  for (const request of current) {
+    const result = response[request.id];
+    if (result !== undefined) {
+      request.resolve(result);
+    } else {
+      // Item not found in response
+      const error = new ApiError(404, `Item not found: ${request.id}`);
+      onError?.(request.id, error);
+      request.reject(error);
+    }
+  }
+}
+
+/**
+ * Handle batch error and reject all requests
+ */
+function handleBatchError<T>(
+  current: QueuedRequest<T>[],
+  error: unknown,
+  onError: ((id: string, error: ApiError) => void) | undefined,
+) {
+  const apiError = error instanceof ApiError
+    ? error
+    : new ApiError(0, error instanceof Error ? error.message : 'Unknown error');
+
+  for (const request of current) {
+    onError?.(request.id, apiError);
+    request.reject(apiError);
+  }
+}
+
+/**
  * Factory function to create a batch aggregator
  *
  * Features:
@@ -50,8 +89,8 @@ interface QueuedRequest<T> {
  * // Later, queue a request
  * const status = await safetyBatcher('device-123');
  */
-export function createBatchAggregator<T>(
-  options: BatchAggregatorOptions<T>,
+export function createBatchAggregator<BatchItem>(
+  options: BatchAggregatorOptions<BatchItem>,
 ) {
   const {
     endpoint = options.batchEndpoint,
@@ -66,7 +105,7 @@ export function createBatchAggregator<T>(
   }
 
   // Queue of pending requests
-  let queue: QueuedRequest<T>[] = [];
+  let queue: QueuedRequest<BatchItem>[] = [];
   // Timer for batch flush
   let flushTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -88,33 +127,14 @@ export function createBatchAggregator<T>(
 
     try {
       // POST to batch endpoint with all IDs
-      const response = await apiFetch<Record<string, T>>(endpoint, {
+      const response = await apiFetch<Record<string, BatchItem>>(endpoint, {
         method: 'POST',
         body: JSON.stringify({ ids: uniqueIds }),
       });
 
-      // Resolve each request with its response
-      for (const request of current) {
-        const result = response[request.id];
-        if (result !== undefined) {
-          request.resolve(result);
-        } else {
-          // Item not found in response
-          const error = new ApiError(404, `Item not found: ${request.id}`);
-          onError?.(request.id, error);
-          request.reject(error);
-        }
-      }
+      processResponse(current, response, onError);
     } catch (error) {
-      // Network error - reject all requests
-      const apiError = error instanceof ApiError
-        ? error
-        : new ApiError(0, error instanceof Error ? error.message : 'Unknown error');
-
-      for (const request of current) {
-        onError?.(request.id, apiError);
-        request.reject(apiError);
-      }
+      handleBatchError(current, error, onError);
     }
 
     // Recursive flush if more requests accumulated while processing
@@ -126,7 +146,7 @@ export function createBatchAggregator<T>(
   /**
    * Add a request to the batch queue
    */
-  function addRequest(id: string): Promise<T> {
+  function addRequest(id: string): Promise<BatchItem> {
     return new Promise((resolve, reject) => {
       queue.push({ id, resolve, reject });
 

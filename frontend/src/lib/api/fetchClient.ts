@@ -14,6 +14,14 @@ export class ApiError extends Error {
 
 const ACCESS_TOKEN_KEY = 'sentinel_token';
 
+async function parseErrorResponse(response: Response): Promise<unknown> {
+  try {
+    return await response.json();
+  } catch {
+    return await response.text();
+  }
+}
+
 /**
  * Single fetch function for all API requests
  * Handles:
@@ -31,64 +39,30 @@ export async function apiFetch<T>(
   url: string,
   options: RequestInit = {},
 ): Promise<T> {
-  // Get auth token from localStorage
   const token = localStorage.getItem(ACCESS_TOKEN_KEY);
-
-  // Build headers
   const headers = new Headers(options.headers || {});
   headers.set('Content-Type', 'application/json');
+  if (token) headers.set('Authorization', `Bearer ${token}`);
 
-  if (token) {
-    headers.set('Authorization', `Bearer ${token}`);
-  }
+  const body = options.body
+    ? typeof options.body === 'string' ? options.body : JSON.stringify(options.body)
+    : undefined;
 
-  // Serialize body if provided
-  let body: string | undefined;
-  if (options.body) {
-    body = typeof options.body === 'string'
-      ? options.body
-      : JSON.stringify(options.body);
-  }
-
-  // Execute fetch
   try {
-    const response = await fetch(url, {
-      ...options,
-      headers,
-      body,
-    });
+    const response = await fetch(url, { ...options, headers, body });
 
-    // Handle non-2xx responses
     if (!response.ok) {
-      let data: unknown;
-      try {
-        data = await response.json();
-      } catch {
-        // If response isn't JSON, use text
-        data = await response.text();
-      }
-
-      throw new ApiError(
-        response.status,
-        `HTTP ${response.status}: ${response.statusText}`,
-        data,
-      );
+      const data = await parseErrorResponse(response);
+      throw new ApiError(response.status, `HTTP ${response.status}`, data);
     }
 
-    // Parse successful response
     try {
       return await response.json() as T;
     } catch {
-      // If response isn't JSON, return empty object
       return {} as T;
     }
   } catch (error) {
-    // Re-throw ApiError as-is
-    if (error instanceof ApiError) {
-      throw error;
-    }
-
-    // Wrap other errors
+    if (error instanceof ApiError) throw error;
     throw new ApiError(
       0,
       error instanceof Error ? error.message : 'Unknown error',
