@@ -122,12 +122,12 @@ async def get_site_summary(site_id: str) -> SiteSummary:
         alert_repo = AlertRepository()
         
         # Get building/site info
-        building = await building_repo.get_by_id(site_id)
+        building = building_repo.get_by_id(site_id)
         if not building:
             raise HTTPException(status_code=404, detail=f"Site {site_id} not found")
         
         # Get all equipment for this site
-        equipment_list = await building_repo.get_equipment(site_id)
+        equipment_list = building_repo.get_equipment(site_id)
         equipment_count = len(equipment_list) if equipment_list else 0
         
         # Count equipment by type
@@ -138,19 +138,36 @@ async def get_site_summary(site_id: str) -> SiteSummary:
             eq_type = equipment.get("type", "unknown")
             equipment_by_type[eq_type] = equipment_by_type.get(eq_type, 0) + 1
             
-            # Count safety statuses
-            status = equipment.get("status", "unknown")
-            if status == "safe":
-                safety_counts["safe"] += 1
+            # Count safety statuses based on status field and health score
+            status = equipment.get("status", "normal").lower()
+            health_score = equipment.get("health_score", 100)
+            
+            # Determine equipment status category
+            if status == "critical":
+                safety_counts["alarm"] += 1
             elif status == "warning":
                 safety_counts["warning"] += 1
-            elif status == "blocked":
+            elif status == "offline" or status == "maintenance":
                 safety_counts["blocked"] += 1
-            elif status == "alarm":
-                safety_counts["alarm"] += 1
+            elif status == "normal":
+                # For normal status, check health score to determine if it's really safe
+                if health_score >= 80:
+                    safety_counts["safe"] += 1
+                elif health_score >= 57:
+                    # Health score 57-79% is warning level
+                    safety_counts["warning"] += 1
+                else:
+                    # Health score < 57% is alarm level
+                    safety_counts["alarm"] += 1
+            else:
+                # Unknown status defaults to safe if health is good
+                if health_score >= 80:
+                    safety_counts["safe"] += 1
+                else:
+                    safety_counts["warning"] += 1
         
         # Get alerts for this site
-        alerts = await alert_repo.get_by_site(site_id)
+        alerts = alert_repo.get_by_site(site_id)
         alert_counts = {"critical": 0, "warning": 0, "info": 0}
         for alert in (alerts or []):
             severity = alert.get("severity", "info").lower()
@@ -162,7 +179,7 @@ async def get_site_summary(site_id: str) -> SiteSummary:
         # Get predictions for this site (if available)
         try:
             prediction_repo = PredictionRepository()
-            predictions = await prediction_repo.get_by_site(site_id)
+            predictions = prediction_repo.get_by_site(site_id)
             prediction_counts = {"high_risk": 0, "medium_risk": 0, "low_risk": 0}
             for pred in (predictions or []):
                 risk_level = pred.get("risk_level", "low").lower()

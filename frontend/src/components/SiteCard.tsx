@@ -513,36 +513,68 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
             </div>
           )}
 
-          {/* Risk Alert Count */}
-          <div className="flex items-center gap-2">
-            <AlertTriangle
-              className="h-4 w-4"
-              style={{
-                color: hasAlerts
-                  ? "var(--color-sentinel-amber)"
-                  : "var(--color-sentinel-text-disabled)",
-              }}
-            />
-            <div className="text-right">
-              <div
-                className="text-lg font-medium"
+          {/* Risk Alert Count - Show warning + alarm equipment from summary */}
+          {showSafetyStatus && safetySummary ? (
+            <div className="flex items-center gap-2">
+              <AlertTriangle
+                className="h-4 w-4"
+                style={{
+                  color: (safetySummary.warning + safetySummary.alarm) > 0
+                    ? "var(--color-sentinel-amber)"
+                    : "var(--color-sentinel-text-disabled)",
+                }}
+              />
+              <div className="text-right">
+                <div
+                  className="text-lg font-medium"
+                  style={{
+                    color: (safetySummary.warning + safetySummary.alarm) > 0
+                      ? "var(--color-sentinel-amber)"
+                      : "var(--color-sentinel-text-primary)",
+                    fontVariantNumeric: "tabular-nums",
+                  }}
+                >
+                  {safetySummary.warning + safetySummary.alarm}
+                </div>
+                <div
+                  className="text-xs"
+                  style={{ color: "var(--color-sentinel-text-disabled)" }}
+                >
+                  Risks
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <AlertTriangle
+                className="h-4 w-4"
                 style={{
                   color: hasAlerts
                     ? "var(--color-sentinel-amber)"
-                    : "var(--color-sentinel-text-primary)",
-                  fontVariantNumeric: "tabular-nums",
+                    : "var(--color-sentinel-text-disabled)",
                 }}
-              >
-                {site.alert_count}
-              </div>
-              <div
-                className="text-xs"
-                style={{ color: "var(--color-sentinel-text-disabled)" }}
-              >
-                Risks
+              />
+              <div className="text-right">
+                <div
+                  className="text-lg font-medium"
+                  style={{
+                    color: hasAlerts
+                      ? "var(--color-sentinel-amber)"
+                      : "var(--color-sentinel-text-primary)",
+                    fontVariantNumeric: "tabular-nums",
+                  }}
+                >
+                  {site.alert_count}
+                </div>
+                <div
+                  className="text-xs"
+                  style={{ color: "var(--color-sentinel-text-disabled)" }}
+                >
+                  Risks
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
 

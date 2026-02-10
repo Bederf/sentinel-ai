@@ -112,6 +112,27 @@ class BuildingRepository:
 
         return response.count or 0
 
+    def get_equipment(self, building_id: str) -> List[Dict[str, Any]]:
+        """Get all equipment for a building.
+
+        Args:
+            building_id: Building code (e.g., "site-001")
+
+        Returns:
+            List of equipment items for the building
+        """
+        # Get building UUID from code
+        building = self.get_by_id(building_id)
+        if not building:
+            return []
+        
+        # Query equipment table by building_id
+        response = self.client.table('equipment').select(
+            "id, code, name, status, health_score, type, building_id"
+        ).eq('building_id', building['id']).execute()
+        
+        return response.data or []
+
     def create(self, building_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new building.
 
