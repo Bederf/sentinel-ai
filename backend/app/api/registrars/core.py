@@ -17,9 +17,9 @@ def register_core_routers(app: FastAPI) -> None:
     app.include_router(system_health.router, tags=["system-health"])
     app.include_router(cache.router, tags=["cache"])
 
-    # Sites (core entity)
-    app.include_router(sites.router, prefix="/api", tags=["sites"])
+    # Sites (core entity) - IMPORTANT: sites_aggregation MUST be first for specific routes to match
     app.include_router(sites_aggregation.router, prefix="/api", tags=["sites-aggregation"])
+    app.include_router(sites.router, prefix="/api", tags=["sites"])
 
     # Settings (JSON-based deprecated + Supabase-based new)
     app.include_router(settings_api.router, prefix="/api", tags=["settings"])
