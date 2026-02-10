@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     # CORS settings (restrict to known frontend origins)
     cors_origins: list[str] = ["http://localhost:9096"]
 
+    # Backend URL (for external service health checks)
+    backend_url: str = ""
+
     # Claude AI settings
     anthropic_api_key: str = ""
     claude_model: str = "claude-sonnet-4-20250514"

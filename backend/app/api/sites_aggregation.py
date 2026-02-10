@@ -15,7 +15,7 @@ from typing import Dict, List, Any, Optional
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -117,7 +117,7 @@ class AlertListResponse(BaseModel):
                 "alerts, predictions, and energy snapshot in a single request."
 )
 @limiter.limit("30/minute")
-async def get_site_summary(site_id: str) -> SiteSummaryResponse:
+async def get_site_summary(site_id: str, request: Request) -> SiteSummaryResponse:
     """Get complete site summary with all aggregated metrics.
 
     Fetches equipment, safety status, alerts, predictions, and energy data
@@ -251,6 +251,7 @@ async def get_site_summary(site_id: str) -> SiteSummaryResponse:
 @limiter.limit("30/minute")
 async def get_site_alerts_aggregated(
     site_id: str,
+    request: Request,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100)
 ) -> AlertListResponse:
