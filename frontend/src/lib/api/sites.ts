@@ -105,6 +105,11 @@ export interface CreateSiteRequest {
   square_meters?: number;
 }
 
+export interface SiteListResponse {
+  total: number;
+  sites: Site[];
+}
+
 // ============= Sites API Methods =============
 
 export const sitesApi = {
@@ -140,9 +145,11 @@ export const sitesApi = {
 
   /**
    * Get all accessible sites
+   * 
+   * Returns { total, sites[] } - extract .sites for array of sites
    */
   getSites: () =>
-    fetchApi<Site[]>("/api/sites"),
+    fetchApi<SiteListResponse>("/api/sites"),
 
   /**
    * Get single site

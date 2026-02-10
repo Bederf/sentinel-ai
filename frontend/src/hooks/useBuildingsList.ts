@@ -8,7 +8,11 @@ import { sitesApi } from '@/lib/api/sites';
 export function useBuildingsList(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ['buildings-list'],
-    queryFn: () => sitesApi.getSites(),
+    queryFn: async () => {
+      const response = await sitesApi.getSites();
+      // Extract sites array from SiteListResponse { total, sites }
+      return (response as any)?.sites || response;
+    },
     staleTime: 5 * 60 * 1000, // 5m
     gcTime: 30 * 60 * 1000, // 30m
     enabled: options?.enabled !== false,
