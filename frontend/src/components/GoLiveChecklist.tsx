@@ -23,14 +23,14 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { Card, Badge, Button, Callout } from "@tremor/react";
-import { validationApi } from "../lib/api";
+import { validationApi } from '@/lib/api';
 import { formatDateTime } from "../lib/timeFormat";
 import type {
   ValidationChecklist,
   ChecklistItem,
   BuildingStatus,
   ActivationResult,
-} from "../lib/api";
+} from '@/lib/api';
 
 interface GoLiveChecklistProps {
   buildingId: string;
@@ -211,12 +211,26 @@ export function GoLiveChecklist({ buildingId, onStatusChange }: GoLiveChecklistP
 
     try {
       // Add delay to stagger requests and avoid 429 rate limiting
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      // Increased to 2s to prevent concurrent request bursts
+      await new Promise((resolve) => setTimeout(resolve, 2000));
       const data = await validationApi.getChecklist(buildingId);
       setChecklist(data);
-    } catch (err) {
-      console.error("Failed to fetch checklist:", err);
-      setError("Failed to load validation checklist");
+    } catch (err: any) {
+      // Retry on rate limit with exponential backoff
+      if (err?.status === 429) {
+        console.warn("Rate limited, retrying in 3 seconds...");
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+        try {
+          const data = await validationApi.getChecklist(buildingId);
+          setChecklist(data);
+        } catch (retryErr) {
+          console.error("Retry failed:", retryErr);
+          setError("System temporarily overloaded. Please try again in a moment.");
+        }
+      } else {
+        console.error("Failed to fetch checklist:", err);
+        setError("Failed to load validation checklist");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -297,7 +311,7 @@ export function GoLiveChecklist({ buildingId, onStatusChange }: GoLiveChecklistP
     return (
       <Card className="p-6">
         <Callout title="Error" color="rose">
-          <p>{error}</p>
+          <div>{error}</div>
           <Button
             variant="secondary"
             size="sm"
