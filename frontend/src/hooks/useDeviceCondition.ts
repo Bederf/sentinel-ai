@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
 import { conditionBatcher } from '@/lib/api';
-import type { DeviceCondition } from '@/lib/api/types';
 
 /**
  * Hook to fetch device condition/health status

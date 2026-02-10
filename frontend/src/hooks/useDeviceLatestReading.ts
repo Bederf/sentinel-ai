@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
 import { readingsBatcher } from '@/lib/api';
-import type { DeviceStatus } from '@/lib/api/types';
 
 /**
  * Hook to fetch latest reading for a device

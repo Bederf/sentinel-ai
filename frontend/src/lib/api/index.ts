@@ -118,5 +118,8 @@ export { apiFetch, type ApiError } from './fetchClient';
 
 // Legacy: import everything from original api.ts AFTER modular exports for backward compatibility
 // This provides fallback for any APIs not yet migrated to modular structure
-// NOTE: Modular exports above will override legacy versions with the same name
+// NOTE: Named modular exports above will override legacy versions
 export * from '../api';
+
+// Explicit re-export of modular versions to ensure they take precedence
+export { sitesApi } from './sites';
