@@ -31,8 +31,8 @@ import {
   X,
   Bell,
 } from "lucide-react";
-import api from "../lib/api";
-import type { Device, Site, Prediction } from "../lib/api";
+import api from '@/lib/api';
+import type { Device, Site, Prediction } from '@/lib/api';
 import { DeviceList } from "./DeviceList";
 import { ControlPanel } from "./ControlPanel";
 import { PageLoading } from "./PageLoading";
@@ -52,9 +52,9 @@ interface AlertContext {
   type?: string;
 }
 
-const SAFETY_STATUS_BATCH_SIZE = 1;
-const SAFETY_STATUS_BATCH_DELAY_MS = 600;
-const SAFETY_STATUS_MAX_PER_SITE = 8;
+const SAFETY_STATUS_BATCH_SIZE = 2;
+const SAFETY_STATUS_BATCH_DELAY_MS = 1000;
+const SAFETY_STATUS_MAX_PER_SITE = 6;
 
 function mapSafetyStatusToDeviceStatus(
   status: "safe" | "warning" | "blocked" | "alarm" | "unknown"
@@ -206,6 +206,7 @@ export function ControlDashboard({ onError }: ControlDashboardProps) {
         .filter((device) => !safetyLoadedDeviceIdsRef.current.has(device.id))
         .slice(0, SAFETY_STATUS_MAX_PER_SITE);
 
+      let backoffMs = SAFETY_STATUS_BATCH_DELAY_MS;
       for (let i = 0; i < devicesToLoad.length; i += SAFETY_STATUS_BATCH_SIZE) {
         if (isCancelled) return;
         const batch = devicesToLoad.slice(i, i + SAFETY_STATUS_BATCH_SIZE);
@@ -214,7 +215,11 @@ export function ControlDashboard({ onError }: ControlDashboardProps) {
             try {
               const safetyStatus = await api.getDeviceSafetyStatus(device.id);
               return { id: device.id, safety_status: mapSafetyStatusToDeviceStatus(safetyStatus.overall_status) };
-            } catch (error) {
+            } catch (error: any) {
+              // If rate limited (429), increase backoff for subsequent requests
+              if (error?.status === 429) {
+                backoffMs = Math.min(backoffMs * 2, 5000); // Cap at 5 seconds
+              }
               console.warn(`Failed to fetch safety status for device ${device.id}:`, error);
               return { id: device.id, safety_status: "unknown" as const };
             } finally {
@@ -234,7 +239,7 @@ export function ControlDashboard({ onError }: ControlDashboardProps) {
         );
 
         if (i + SAFETY_STATUS_BATCH_SIZE < devicesToLoad.length) {
-          await new Promise((resolve) => setTimeout(resolve, SAFETY_STATUS_BATCH_DELAY_MS));
+          await new Promise((resolve) => setTimeout(resolve, backoffMs));
         }
       }
     };
