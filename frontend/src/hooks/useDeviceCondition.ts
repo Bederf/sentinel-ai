@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { conditionBatcher } from '@/lib/api';
+import { conditionBatcher } from '@/lib/api/batchers';
 
 /**
  * Hook to fetch device condition/health status
@@ -13,7 +13,7 @@ export function useDeviceCondition(
   return useQuery({
     queryKey: ['device-condition', deviceId],
     queryFn: async () => {
-      const result = await conditionBatcher.fetch(deviceId);
+      const result = await conditionBatcher(deviceId);
       return result;
     },
     staleTime: 30 * 1000, // 30s

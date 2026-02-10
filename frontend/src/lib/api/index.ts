@@ -102,7 +102,12 @@ export {
   type HealthHistoryData,
 } from './system';
 
-// Batch aggregators and fetch client
+// Legacy: import everything from original api.ts AFTER modular exports for backward compatibility
+// This provides fallback for any APIs not yet migrated to modular structure
+// NOTE: Named modular exports above will override legacy versions
+export * from '../api';
+
+// Batch aggregators and fetch client (AFTER wildcard to ensure they take precedence)
 export {
   safetyBatcher,
   readingsBatcher,
@@ -115,11 +120,3 @@ export {
   type BatchResponse,
 } from './types';
 export { apiFetch, type ApiError } from './fetchClient';
-
-// Legacy: import everything from original api.ts AFTER modular exports for backward compatibility
-// This provides fallback for any APIs not yet migrated to modular structure
-// NOTE: Named modular exports above will override legacy versions
-export * from '../api';
-
-// Explicit re-export of modular versions to ensure they take precedence
-export { sitesApi } from './sites';

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { readingsBatcher } from '@/lib/api';
+import { readingsBatcher } from '@/lib/api/batchers';
 
 /**
  * Hook to fetch latest reading for a device
@@ -13,7 +13,7 @@ export function useDeviceLatestReading(
   return useQuery({
     queryKey: ['device-reading', deviceId],
     queryFn: async () => {
-      const result = await readingsBatcher.fetch(deviceId);
+      const result = await readingsBatcher(deviceId);
       return result;
     },
     staleTime: 15 * 1000, // 15s

@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { safetyBatcher } from '@/lib/api';
-import type { DeviceSafetyStatus } from '@/lib/api/types';
+import { safetyBatcher } from '@/lib/api/batchers';
 
 /**
  * Hook to fetch safety status for a device
@@ -14,7 +13,7 @@ export function useDeviceSafetyStatus(
   return useQuery({
     queryKey: ['device-safety', deviceId],
     queryFn: async () => {
-      return await safetyBatcher.fetch(deviceId);
+      return await safetyBatcher(deviceId);
     },
     staleTime: 30 * 1000, // 30s
     gcTime: 5 * 60 * 1000, // 5m
