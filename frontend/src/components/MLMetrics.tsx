@@ -32,7 +32,8 @@ import {
   type MLOpsHealth,
   type PerformanceReport,
 } from "../lib/mlopsApi";
-import { sitesApi, type Site } from "../lib/api";
+import { sitesApi } from "@/lib/api/sites";
+import type { Site } from "@/lib/api/sites";
 
 // --- Skeleton ---
 function Skeleton({ className = "" }: { className?: string }) {
@@ -304,13 +305,19 @@ export function MLMetrics() {
   useEffect(() => {
     sitesApi
       .getSites()
-      .then((fetchedSites) => {
+      .then((response: any) => {
+        // Handle both direct array and wrapped response
+        const fetchedSites = Array.isArray(response) ? response : response?.sites || response?.data || [];
+        if (!Array.isArray(fetchedSites)) {
+          throw new Error("Invalid sites response format");
+        }
         setSites(fetchedSites);
         if (fetchedSites.length > 0 && !selectedSiteId) {
           setSelectedSiteId(fetchedSites[0].id);
         }
       })
-      .catch(() => {
+      .catch((err: any) => {
+        console.error("Failed to fetch sites:", err);
         // Fallback if API not available
         const fallbackSites: Site[] = [
           {
@@ -324,7 +331,7 @@ export function MLMetrics() {
         setSites(fallbackSites);
         setSelectedSiteId("site-002");
       });
-  }, []);
+  }, [selectedSiteId]);
 
   const loadData = async () => {
     try {
@@ -439,11 +446,15 @@ export function MLMetrics() {
                 minWidth: "250px",
               }}
             >
-              {sites.map((site) => (
-                <option key={site.id} value={site.id}>
-                  {site.name}
-                </option>
-              ))}
+              {Array.isArray(sites) ? (
+                sites.map((site) => (
+                  <option key={site.id} value={site.id}>
+                    {site.name}
+                  </option>
+                ))
+              ) : (
+                <option>Loading sites...</option>
+              )}
             </select>
           </div>
 
