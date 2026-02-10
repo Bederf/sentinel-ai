@@ -22,7 +22,11 @@ import { useSitePredictions } from '../useSitePredictions';
 import { useBuildingsList } from '../useBuildingsList';
 import { useEquipmentByType } from '../useEquipmentByType';
 import * as apiModule from '@/lib/api';
-import type { DeviceSafetyStatus, DeviceStatus, DeviceCondition } from '@/lib/api/types';
+import type {
+  DeviceSafetyStatus,
+  DeviceStatus as BatchDeviceStatus,
+  DeviceCondition,
+} from '@/lib/api/types';
 
 // Mock the batch aggregator module
 vi.mock('@/lib/api', async () => {
@@ -80,12 +84,8 @@ describe('useDeviceSafetyStatus Hook', () => {
     it('should fetch safety status for a device', async () => {
       const mockStatus: DeviceSafetyStatus = {
         device_id: 'device-001',
-        overall_status: 'safe',
-        component_statuses: {
-          temperature: { status: 'safe', value: 22, unit: '°C' },
-          pressure: { status: 'safe', value: 1.2, unit: 'bar' },
-        },
-        last_updated: new Date().toISOString(),
+        status: 'safe',
+        rules_violated: [],
       };
 
       mockSafetyBatcher.mockResolvedValueOnce(mockStatus);
@@ -108,9 +108,8 @@ describe('useDeviceSafetyStatus Hook', () => {
     it('should use correct staleTime (30s) and gcTime (5m)', async () => {
       const mockStatus: DeviceSafetyStatus = {
         device_id: 'device-001',
-        overall_status: 'safe',
-        component_statuses: {},
-        last_updated: new Date().toISOString(),
+        status: 'safe',
+        rules_violated: [],
       };
 
       mockSafetyBatcher.mockResolvedValueOnce(mockStatus);
@@ -162,9 +161,8 @@ describe('useDeviceSafetyStatus Hook', () => {
     it('should fetch when enabled is true', async () => {
       const mockStatus: DeviceSafetyStatus = {
         device_id: 'device-001',
-        overall_status: 'safe',
-        component_statuses: {},
-        last_updated: new Date().toISOString(),
+        status: 'safe',
+        rules_violated: [],
       };
 
       mockSafetyBatcher.mockResolvedValueOnce(mockStatus);
@@ -184,9 +182,8 @@ describe('useDeviceSafetyStatus Hook', () => {
     it('should fetch by default when enabled is not specified', async () => {
       const mockStatus: DeviceSafetyStatus = {
         device_id: 'device-001',
-        overall_status: 'safe',
-        component_statuses: {},
-        last_updated: new Date().toISOString(),
+        status: 'safe',
+        rules_violated: [],
       };
 
       mockSafetyBatcher.mockResolvedValueOnce(mockStatus);
@@ -208,9 +205,8 @@ describe('useDeviceSafetyStatus Hook', () => {
     it('should cache data and return same result on second mount', async () => {
       const mockStatus: DeviceSafetyStatus = {
         device_id: 'device-001',
-        overall_status: 'safe',
-        component_statuses: {},
-        last_updated: new Date().toISOString(),
+        status: 'safe',
+        rules_violated: [],
       };
 
       mockSafetyBatcher.mockResolvedValueOnce(mockStatus);
@@ -238,16 +234,14 @@ describe('useDeviceSafetyStatus Hook', () => {
     it('should use different query keys for different devices', async () => {
       const mockStatus1: DeviceSafetyStatus = {
         device_id: 'device-001',
-        overall_status: 'safe',
-        component_statuses: {},
-        last_updated: new Date().toISOString(),
+        status: 'safe',
+        rules_violated: [],
       };
 
       const mockStatus2: DeviceSafetyStatus = {
         device_id: 'device-002',
-        overall_status: 'warning',
-        component_statuses: {},
-        last_updated: new Date().toISOString(),
+        status: 'warning',
+        rules_violated: [],
       };
 
       mockSafetyBatcher.mockResolvedValueOnce(mockStatus1);
@@ -326,11 +320,11 @@ describe('useDeviceLatestReading Hook', () => {
   });
 
   it('should fetch latest reading with 15s staleTime', async () => {
-    const mockReading: DeviceStatus = {
-      device_id: 'device-001',
+    const mockReading: BatchDeviceStatus = {
+      id: 'device-001',
+      name: 'Test Device',
+      device_type: 'HVAC',
       status: 'online',
-      last_value: 22,
-      last_update: new Date().toISOString(),
     };
 
     mockReadingsBatcher.mockResolvedValueOnce(mockReading);
@@ -348,11 +342,11 @@ describe('useDeviceLatestReading Hook', () => {
   });
 
   it('should refetch at 60s interval', async () => {
-    const mockReading: DeviceStatus = {
-      device_id: 'device-001',
+    const mockReading: BatchDeviceStatus = {
+      id: 'device-001',
+      name: 'Test Device',
+      device_type: 'HVAC',
       status: 'online',
-      last_value: 22,
-      last_update: new Date().toISOString(),
     };
 
     mockReadingsBatcher.mockResolvedValue(mockReading);
@@ -386,11 +380,10 @@ describe('useDeviceCondition Hook', () => {
 
   it('should fetch device condition', async () => {
     const mockCondition: DeviceCondition = {
-      device_id: 'device-001',
-      condition_status: 'healthy',
-      health_score: 85,
-      anomalies: [],
-      last_checked: new Date().toISOString(),
+      id: 'device-001',
+      name: 'Test Device',
+      device_type: 'HVAC',
+      status: 'healthy',
     };
 
     mockConditionBatcher.mockResolvedValueOnce(mockCondition);
@@ -579,16 +572,14 @@ describe('Hook Integration - Batch Aggregation', () => {
   it('should aggregate multiple safety status requests', async () => {
     const mockStatus1: DeviceSafetyStatus = {
       device_id: 'device-001',
-      overall_status: 'safe',
-      component_statuses: {},
-      last_updated: new Date().toISOString(),
+      status: 'safe',
+      rules_violated: [],
     };
 
     const mockStatus2: DeviceSafetyStatus = {
       device_id: 'device-002',
-      overall_status: 'warning',
-      component_statuses: {},
-      last_updated: new Date().toISOString(),
+      status: 'warning',
+      rules_violated: [],
     };
 
     mockSafetyBatcher
@@ -618,9 +609,8 @@ describe('Hook Integration - Batch Aggregation', () => {
   it('should respect cache and not re-fetch within staleTime', async () => {
     const mockStatus: DeviceSafetyStatus = {
       device_id: 'device-001',
-      overall_status: 'safe',
-      component_statuses: {},
-      last_updated: new Date().toISOString(),
+      status: 'safe',
+      rules_violated: [],
     };
 
     mockSafetyBatcher.mockResolvedValueOnce(mockStatus);
