@@ -195,7 +195,7 @@ export function SystemHealthPage() {
       {health && <HealthOverviewHeader health={health} />}
 
       {/* Tabs */}
-      <TabGroup activeTabIndex={selectedTab} onTabChange={setSelectedTab}>
+      <TabGroup activeTabIndex={selectedTab} onTabChange={(index: number) => setSelectedTab(index)}>
         <TabList>
           <Tab>Realtime Status</Tab>
           <Tab>Historical Insights</Tab>

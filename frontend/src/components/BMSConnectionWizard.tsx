@@ -370,19 +370,13 @@ export function BMSConnectionWizard({
 
       // Create the new site first
       try {
-        const floorsArray = state.siteFloors
-          .split(",")
-          .map((f) => f.trim())
-          .filter((f) => f);
-
         const siteResult = await sitesApi.create({
+          code: state.siteName.toLowerCase().replace(/\s+/g, '-'),
           name: state.siteName,
           address: state.siteAddress,
-          region: state.siteRegion,
           type: state.siteType,
-          floors: floorsArray,
-          sqm: state.siteSqm,
-        });
+          square_meters: state.siteSqm ? parseInt(state.siteSqm, 10) : undefined,
+        } as any);
 
         // Store the created site ID
         dispatch({ type: "SET_FIELD", field: "siteId", value: siteResult.id });

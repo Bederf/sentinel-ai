@@ -87,6 +87,14 @@ export interface DeskStatsResponse {
   desks_by_context: Record<string, number>;
 }
 
+export interface DemoBuilding {
+  id: string;
+  name: string;
+  type: string;
+  equipment_count: number;
+  description: string;
+}
+
 export interface CreateSiteRequest {
   code: string;
   name: string;
@@ -100,6 +108,36 @@ export interface CreateSiteRequest {
 // ============= Sites API Methods =============
 
 export const sitesApi = {
+  /**
+   * Get demo/template buildings (for onboarding wizard)
+   */
+  getDemoBuildings: async () => {
+    // Return demo buildings for site configuration
+    return [
+      {
+        id: 'demo-001',
+        name: 'Sandton Office Tower',
+        type: 'Commercial',
+        equipment_count: 156,
+        description: '3-floor office building with HVAC, lighting, and security systems',
+      },
+      {
+        id: 'demo-002',
+        name: 'Retail Mall',
+        type: 'Retail',
+        equipment_count: 89,
+        description: 'Multi-floor shopping center with climate control',
+      },
+      {
+        id: 'demo-003',
+        name: 'Data Center',
+        type: 'Industrial',
+        equipment_count: 234,
+        description: 'Critical infrastructure facility with redundant systems',
+      },
+    ] as DemoBuilding[];
+  },
+
   /**
    * Get all accessible sites
    */
