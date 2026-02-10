@@ -1,5 +1,4 @@
 /**
-/**
  * System Health & Diagnostics API Client
  * 
  * Provides access to unified system health monitoring, historical trends,

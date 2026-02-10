@@ -264,3 +264,107 @@ async def get_zone_occupancy(request: Request, zone_id: str):
     occ_svc = get_security_occupancy_service()
     occ = occ_svc.get_zone_occupancy(zone_id)
     return occ.model_dump(mode="json")
+
+
+# --- C•CURE 9000 Integration (Phase 58.2) ---
+
+
+@limiter.limit("30/minute")
+@router.get("/ccure/status")
+async def get_ccure_status(request: Request):
+    """Get C•CURE system integration status.
+
+    Returns:
+        Integration status: demo_mode, partner_license_required, or connected
+    """
+    # For Phase 58.2, always demo mode
+    return {
+        "mode": "demo",
+        "manufacturer": "Johnson Controls / Software House",
+        "model": "C•CURE 9000 v2.90",
+        "protocol": "victor Web Service API",
+        "license_status": "partner_license_required",
+        "message": (
+            "Demo mode active. Apply to Software House Connected Partner Program "
+            "to enable live integration. See: docs/integrations/ccure-partner-program-roadmap.md"
+        ),
+        "demo_events_count": 5,
+        "demo_doors_count": 2,
+        "demo_controllers_count": 2,
+    }
+
+
+@limiter.limit("30/minute")
+@router.get("/events/anomalies")
+async def get_security_anomalies(
+    request: Request,
+    since: str = Query("24h", description="Time window: 24h, 7d, 30d"),
+    anomaly_type: Optional[str] = Query(None, description="Filter by type"),
+):
+    """Get security anomalies: after-hours, forced door, controller offline.
+
+    Priority 1: After-hours + HVAC/lighting correlation
+    Priority 2: Controller offline + network/UPS correlation
+
+    Args:
+        since: Time window ("24h", "7d", "30d")
+        anomaly_type: Filter by type (after_hours_access, controller_offline, etc.)
+
+    Returns:
+        List of anomaly dicts with severity, description, correlations
+    """
+    occ_svc = get_security_occupancy_service()
+
+    # Get after-hours anomalies (Priority 1)
+    after_hours = occ_svc.detect_after_hours_anomaly()
+
+    # Get equipment health issues (Priority 2)
+    equipment_health = occ_svc.detect_security_equipment_health_issues()
+
+    # Combine all anomalies
+    all_anomalies = after_hours + equipment_health
+
+    # Filter by type if provided
+    if anomaly_type:
+        all_anomalies = [a for a in all_anomalies if a["type"] == anomaly_type]
+
+    return {
+        "anomalies": all_anomalies,
+        "count": len(all_anomalies),
+        "summary": {
+            "after_hours_count": len(after_hours),
+            "equipment_health_count": len(equipment_health),
+        },
+    }
+
+
+@limiter.limit("30/minute")
+@router.get("/occupancy/real-time")
+async def get_real_time_occupancy(
+    request: Request, site_id: str = Query("site-002", description="Site identifier")
+):
+    """Get real-time occupancy from badge events + C•CURE anti-passback zones.
+
+    Combines:
+    - Badge entry/exit counting
+    - C•CURE anti-passback zone occupancy
+    - DALI PIR sensor data (if available)
+
+    Returns:
+        Per-zone occupancy with recommendations for HVAC/lighting
+    """
+    occ_svc = get_security_occupancy_service()
+
+    # Calculate occupancy using badge events
+    occupancy = occ_svc.get_building_occupancy()
+
+    # Get HVAC/lighting recommendations based on occupancy
+    recommendations = occ_svc.get_all_recommendations(site_id)
+
+    return {
+        "site_id": site_id,
+        "zones": occupancy.get("zones", []),
+        "building_total": occupancy.get("total_occupancy", 0),
+        "recommendations": recommendations,
+        "updated_at": occupancy.get("last_updated"),
+    }

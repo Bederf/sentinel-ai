@@ -7,7 +7,7 @@ based on zone occupancy levels.
 """
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from app.database.repositories.security_repository import get_security_repository
@@ -278,6 +278,245 @@ class SecurityOccupancyService:
         except Exception:
             pass
         return None
+
+    # --- C•CURE 9000 Integration: Anomaly Detection (Phase 58.2) ---
+
+    def detect_after_hours_anomaly(self, site_id: str = "site-002") -> List[Dict]:
+        """Detect after-hours badge access + HVAC/lighting activation correlation.
+
+        Priority 1: After-hours anomaly detection
+
+        Args:
+            site_id: Site identifier
+
+        Returns:
+            List of anomaly dicts with:
+            - type: "after_hours_access"
+            - severity: "warning" | "critical"
+            - badge_event: Badge event details
+            - hvac_activation: HVAC zone activation details
+            - lighting_activation: Lighting zone activation details
+            - energy_impact: Estimated kWh excess consumption
+            - recommendation: Action for operator
+        """
+        from app.services.ccure import CCureAdapter
+
+        after_hours_events = []
+
+        # Create CCure adapter in demo mode
+        adapter = CCureAdapter(demo_mode=True)
+
+        # Get badge events from C•CURE
+        import asyncio
+
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+        events = loop.run_until_complete(adapter.get_badge_events(limit=50))
+
+        for event in events:
+            # Check if event is marked as after_hours or timestamp is after 18:00 / before 06:00
+            timestamp_str = event.get("timestamp")
+            if timestamp_str:
+                event_time = datetime.fromisoformat(timestamp_str.replace("Z", "+00:00"))
+                hour = event_time.hour
+
+                # After hours: 18:00 (6 PM) to 06:00 (6 AM)
+                is_after_hours = event.get("after_hours", False) or (hour >= 18 or hour < 6)
+
+                if is_after_hours and event.get("granted", True):
+                    zone_id = event.get("zone_id")
+
+                    # For demo: simulate HVAC/lighting activation
+                    hvac_activation = self._simulate_hvac_activation(zone_id, event_time)
+                    lighting_activation = self._simulate_lighting_activation(
+                        zone_id, event_time
+                    )
+
+                    if hvac_activation or lighting_activation:
+                        anomaly = {
+                            "type": "after_hours_access",
+                            "severity": "warning",
+                            "badge_event": event,
+                            "hvac_correlation": hvac_activation,
+                            "lighting_correlation": lighting_activation,
+                            "energy_impact": self._estimate_energy_impact(
+                                hvac_activation, lighting_activation
+                            ),
+                            "recommendation": self._generate_after_hours_recommendation(
+                                event, hvac_activation, lighting_activation
+                            ),
+                            "detected_at": datetime.now(timezone.utc).isoformat(),
+                        }
+                        after_hours_events.append(anomaly)
+
+        return after_hours_events
+
+    def _simulate_hvac_activation(
+        self, zone_id: str, event_time: datetime
+    ) -> Optional[Dict]:
+        """Simulate HVAC zone activation for demo mode."""
+        # Convert CCURE zone to HVAC zone ID
+        hvac_zone_id = zone_id.replace("CCURE-ZN", "HVAC-ZN")
+
+        # Return mock activation (replace with actual HVAC service query in production)
+        return {
+            "zone_id": hvac_zone_id,
+            "activated_at": (event_time + timedelta(minutes=5)).isoformat(),
+            "setpoint_before": 28,  # Unoccupied setpoint
+            "setpoint_after": 22,  # Occupied setpoint
+            "mode": "cooling",
+        }
+
+    def _simulate_lighting_activation(
+        self, zone_id: str, event_time: datetime
+    ) -> Optional[Dict]:
+        """Simulate lighting zone activation for demo mode."""
+        # Convert CCURE zone to DALI zone ID
+        lighting_zone_id = zone_id.replace("CCURE-ZN", "DALI-ZN")
+
+        # Return mock activation (replace with actual lighting service query in production)
+        return {
+            "zone_id": lighting_zone_id,
+            "activated_at": (event_time + timedelta(minutes=2)).isoformat(),
+            "brightness_before": 0,  # Off
+            "brightness_after": 100,  # Full brightness
+            "occupancy_detected": True,
+        }
+
+    def _estimate_energy_impact(
+        self, hvac_activation: Optional[Dict], lighting_activation: Optional[Dict]
+    ) -> str:
+        """Estimate energy impact of after-hours activation."""
+        total_kwh = 0
+
+        if hvac_activation:
+            # Estimate: 1 hour of HVAC = 2-5 kWh
+            total_kwh += 3.5
+
+        if lighting_activation:
+            # Estimate: 1 hour of lighting = 0.5-1 kWh
+            total_kwh += 0.75
+
+        return f"Estimated {total_kwh:.1f} kWh excess consumption per hour"
+
+    def _generate_after_hours_recommendation(
+        self,
+        badge_event: Dict,
+        hvac_activation: Optional[Dict],
+        lighting_activation: Optional[Dict],
+    ) -> str:
+        """Generate recommendation for after-hours anomaly."""
+        person_name = badge_event.get("person_name", "Unknown")
+
+        actions = []
+        if hvac_activation:
+            actions.append("reduce HVAC setpoint to +2°C unoccupied mode")
+        if lighting_activation:
+            actions.append("dim lights to 50% if low occupancy")
+
+        return (
+            f"After-hours access by {person_name}. "
+            f"Consider: {', '.join(actions)} to save energy. "
+            f"Verify access was authorized."
+        )
+
+    def detect_security_equipment_health_issues(self) -> List[Dict]:
+        """Detect controller offline + network/UPS correlation.
+
+        Priority 2: Security equipment health monitoring
+
+        Returns:
+            List of health issue dicts with:
+            - type: "controller_offline"
+            - controller: Controller details
+            - network_status: Network switch status
+            - ups_status: UPS battery level
+            - recommendation: Action for operator
+        """
+        from app.services.ccure import CCureAdapter
+
+        health_issues = []
+
+        # Create CCure adapter in demo mode
+        adapter = CCureAdapter(demo_mode=True)
+
+        # Get controllers from C•CURE
+        import asyncio
+
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+        controllers = loop.run_until_complete(adapter.get_controllers())
+
+        for controller in controllers:
+            if controller.status == "offline":
+                # Correlate with network health
+                network_status = self._simulate_network_health(controller.ip_address)
+
+                # Correlate with UPS status
+                ups_status = self._simulate_ups_health()
+
+                issue = {
+                    "type": "controller_offline",
+                    "severity": "critical",
+                    "controller": controller.model_dump(),
+                    "network_status": network_status,
+                    "ups_status": ups_status,
+                    "recommendation": self._generate_equipment_health_recommendation(
+                        controller.model_dump(), network_status, ups_status
+                    ),
+                    "detected_at": datetime.now(timezone.utc).isoformat(),
+                }
+                health_issues.append(issue)
+
+        return health_issues
+
+    def _simulate_network_health(self, ip_address: str) -> Dict:
+        """Simulate network switch health for controller IP."""
+        # For demo: Return mock status
+        return {
+            "switch": "SW-01",
+            "port": "GigabitEthernet1/0/24",
+            "status": "down",
+            "last_seen": "2026-02-10T03:20:00Z",
+            "errors": 0,
+        }
+
+    def _simulate_ups_health(self) -> Dict:
+        """Simulate UPS battery level and status."""
+        # For demo: Return mock status
+        return {
+            "ups_id": "UPS-COMMS-01",
+            "battery_level": 95,
+            "status": "online",
+            "estimated_runtime_minutes": 45,
+        }
+
+    def _generate_equipment_health_recommendation(
+        self, controller: Dict, network_status: Dict, ups_status: Dict
+    ) -> str:
+        """Generate recommendation for equipment health issue."""
+        controller_name = controller.get("name", "Unknown")
+
+        if network_status.get("status") == "down":
+            return (
+                f"Controller {controller_name} offline due to network issue. "
+                f"Check switch {network_status.get('switch')} port {network_status.get('port')}. "
+                f"UPS battery at {ups_status.get('battery_level')}% - system stable."
+            )
+        else:
+            return (
+                f"Controller {controller_name} offline despite network OK. "
+                f"Check controller power supply, enclosure tamper status, or firmware fault. "
+                f"May require technician dispatch."
+            )
 
 
 def get_security_occupancy_service() -> SecurityOccupancyService:

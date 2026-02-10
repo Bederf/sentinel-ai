@@ -38,6 +38,7 @@ import type {
 } from '@/lib/api';
 import { AccessEventsPanel } from "./AccessEventsPanel";
 import { SecurityOccupancyPanel } from "./SecurityOccupancyPanel";
+import { SecurityAnomaliesPanel } from "./SecurityAnomaliesPanel";
 import { PageLoading } from "./PageLoading";
 
 export function SecurityDashboard() {
@@ -543,10 +544,116 @@ export function SecurityDashboard() {
           </div>
         )}
 
-        {/* Section 2: Access Events */}
+        {/* C•CURE 9000 Integration Status Card */}
+        <div
+          className="rounded-md p-4 col-span-full"
+          style={{
+            background: "var(--color-sentinel-bg-panel)",
+            border: "1px solid var(--color-sentinel-border)",
+          }}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Shield
+                className="h-5 w-5"
+                style={{ color: "var(--color-sentinel-amber)" }}
+              />
+              <div>
+                <span
+                  className="font-medium text-sm"
+                  style={{ color: "var(--color-sentinel-text-primary)" }}
+                >
+                  C•CURE 9000 Integration
+                </span>
+                <span
+                  className="text-xs block mt-1"
+                  style={{ color: "var(--color-sentinel-text-secondary)" }}
+                >
+                  Johnson Controls / Software House - Demo Mode
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span
+                className="text-xs px-2 py-1 rounded"
+                style={{
+                  background: "rgba(245, 158, 11, 0.15)",
+                  color: "var(--color-sentinel-amber)",
+                  border: "1px solid rgba(245, 158, 11, 0.3)",
+                }}
+              >
+                DEMO MODE
+              </span>
+            </div>
+          </div>
+
+          <div className="mt-3 grid grid-cols-3 gap-4">
+            <div>
+              <span
+                className="text-xs block"
+                style={{ color: "var(--color-sentinel-text-disabled)" }}
+              >
+                Protocol
+              </span>
+              <span
+                className="text-sm font-medium"
+                style={{ color: "var(--color-sentinel-text-primary)" }}
+              >
+                victor Web Service API
+              </span>
+            </div>
+            <div>
+              <span
+                className="text-xs block"
+                style={{ color: "var(--color-sentinel-text-disabled)" }}
+              >
+                Demo Events
+              </span>
+              <span
+                className="text-sm font-medium"
+                style={{ color: "var(--color-sentinel-text-primary)" }}
+              >
+                5 badge events
+              </span>
+            </div>
+            <div>
+              <span
+                className="text-xs block"
+                style={{ color: "var(--color-sentinel-text-disabled)" }}
+              >
+                License Status
+              </span>
+              <span
+                className="text-sm font-medium"
+                style={{ color: "var(--color-sentinel-amber)" }}
+              >
+                Partner Program Required
+              </span>
+            </div>
+          </div>
+
+          <div
+            className="mt-3 text-xs p-2 rounded"
+            style={{
+              background: "rgba(59, 130, 246, 0.1)",
+              color: "var(--color-sentinel-text-secondary)",
+              border: "1px solid rgba(59, 130, 246, 0.2)",
+            }}
+          >
+            💡 <strong>Client Onboarding:</strong> When your client has C•CURE 9000
+            installed, apply to Software House Connected Partner Program for live
+            integration. See{" "}
+            <code>docs/integrations/ccure-partner-program-roadmap.md</code> for steps.
+          </div>
+        </div>
+
+        {/* Section 2: Security Anomalies */}
+        <SecurityAnomaliesPanel refreshKey={refreshKey} />
+
+        {/* Section 3: Access Events */}
         <AccessEventsPanel refreshKey={refreshKey} />
 
-        {/* Section 3: Camera & Alarm Status (2-column grid) */}
+        {/* Section 4: Camera & Alarm Status (2-column grid) */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Camera List */}
           <div
