@@ -172,30 +172,6 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
     }
   }
 
-  // Handle recommendation modal open
-  const handleOpenRecommendationModal = async () => {
-    if (!site.id) return;
-
-    try {
-      const status = await api.getOptimizationStatus(site.id);
-      if (status.last_recommendation &&
-          status.last_recommendation.recommendations &&
-          status.last_recommendation.recommendations.length > 0) {
-        setCurrentRecommendation(status.last_recommendation);
-        setShowRecommendationModal(true);
-      } else {
-        setShowRecommendationModal(false);
-        setCurrentRecommendation(null);
-        setHasRecommendation(false);
-      }
-    } catch (error) {
-      console.error('Failed to fetch recommendation:', error);
-      setShowRecommendationModal(false);
-      setCurrentRecommendation(null);
-      setHasRecommendation(false);
-    }
-  };
-
   // Handle optimization badge click - show modal if there's a recommendation to review
   const handleOptimizationClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
