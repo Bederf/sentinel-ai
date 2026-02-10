@@ -1,4 +1,5 @@
 import { apiFetch, ApiError } from './fetchClient';
+/* eslint-disable @typescript-eslint/no-unused-vars */
 
 /**
  * Options for batch aggregator factory

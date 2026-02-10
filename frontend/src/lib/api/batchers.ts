@@ -1,6 +1,5 @@
 import {
   createBatchAggregator,
-  type BatchAggregatorOptions,
 } from "./batchAggregator";
 import type {
   DeviceSafetyStatus,
