@@ -6,7 +6,7 @@ Registers routers for buildings, equipment, devices, and building systems.
 
 from fastapi import FastAPI
 
-from app.api import buildings, equipment, sensors, devices
+from app.api import buildings, equipment, sensors, devices, devices_batch
 from app.api import dali, dali_discovery, equipment_discovery, equipment_metadata
 from app.api import generators, energy_centre
 from app.api import hvac, fire, security
@@ -23,6 +23,7 @@ def register_building_routers(app: FastAPI) -> None:
     app.include_router(equipment.router, prefix="/api", tags=["equipment"])
     app.include_router(sensors.router, prefix="/api", tags=["sensors"])
     app.include_router(devices.router, prefix="/api", tags=["devices"])
+    app.include_router(devices_batch.router, prefix="/api", tags=["devices-batch"])
     app.include_router(equipment_metadata.router, prefix="/api", tags=["equipment-metadata"])
     
     # Building 3D configuration (structure + equipment placement)
