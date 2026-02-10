@@ -41,6 +41,7 @@ import {
 import api, { createWorkOrder } from '@/lib/api';
 import type { DashboardStats, Site, Prediction, EnergyDataPoint, BuildingEquipmentItem } from '@/lib/api';
 import { toast } from "sonner";
+import { useBuildingsList } from "@/hooks/useBuildingsList";
 import { SortableKPICard } from "./SortableKPICard";
 import { DashboardSection } from "./DashboardSection";
 import { SiteCard } from "./SiteCard";
@@ -90,8 +91,10 @@ interface DashboardProps {
 }
 
 export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }: DashboardProps) {
+  // React Query hooks - replaces old manual API calls (stale-while-revalidate approach via React Query)
+  const { data: buildingsList = [] } = useBuildingsList();
+  
   const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [sites, setSites] = useState<Site[]>([]);
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -150,13 +153,10 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
       try {
         setLoading(true);
         const statsData = await api.getStats();
-        // Stagger subsequent requests by 250ms to avoid 429 rate limiting
-        await new Promise((resolve) => setTimeout(resolve, 250));
-        const sitesData = await api.getSites();
+        // Stagger subsequent request by 250ms to avoid 429 rate limiting
         await new Promise((resolve) => setTimeout(resolve, 250));
         const predictionsData = await api.getPredictions();
         setStats(statsData);
-        setSites(sitesData);
         // Filter predictions to show only critical and warning severity (from health thresholds)
         setPredictions(predictionsData.predictions.filter(p => p.severity === 'critical' || p.severity === 'warning'));
         setError(null);
@@ -226,8 +226,8 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
   }, [energyFilterSiteId, selectedDays]);
 
   // Calculate site status counts for KPI - computed values used in render functions
-  const normalSites = sites.filter((s) => s.status === "normal").length;
-  const warningSites = sites.filter((s) => s.status === "warning").length;
+  const normalSites = buildingsList.filter((s: Site) => s.status === "normal").length;
+  const warningSites = buildingsList.filter((s: Site) => s.status === "warning").length;
 
   // Filter predictions to only show critical/warning severity (from health thresholds)
   const criticalPredictions = predictions.filter(p =>
@@ -437,7 +437,7 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
     return {
       'kpi-protected-sites': {
         title: "Protected Sites",
-        value: stats.total_sites,
+        value: buildingsList.length,
         icon: <Building2 className="h-5 w-5" />,
         subtitle: `${normalSites} protected, ${warningSites} elevated`,
         accentColor: "blue" as const,
@@ -616,7 +616,7 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
                   className="text-xs"
                   style={{ color: "var(--color-sentinel-text-secondary)" }}
                 >
-                  {sites.length} sites under protection
+                  {buildingsList.length} sites under protection
                 </span>
               </div>
             </div>
@@ -633,7 +633,7 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
 
           {/* Sites Grid */}
           <div className="p-4">
-            {sites.length === 0 ? (
+            {buildingsList.length === 0 ? (
               <div className="text-center py-8">
                 <Building2
                   className="h-12 w-12 mx-auto mb-2"
@@ -645,7 +645,7 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {sites.map((site) => (
+                {buildingsList.map((site: Site) => (
                   <SiteCard
                     key={site.id}
                     site={site}
@@ -696,7 +696,7 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
                 }}
               >
                 <option value="">All Sites</option>
-                {sites.map((site) => (
+                {buildingsList.map((site: Site) => (
                   <option key={site.id} value={site.id}>
                     {site.name}
                   </option>
