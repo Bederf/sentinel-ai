@@ -339,7 +339,8 @@ async def get_device(device_id: str) -> dict:
 
 
 @router.get("/devices/{device_id}/points", response_model=dict)
-async def get_device_points(device_id: str) -> dict:
+@limiter.limit("30/minute")
+async def get_device_points(request: Request, device_id: str) -> dict:
     """Get all points for a device."""
     try:
         device = await device_manager.get_device(device_id)
@@ -364,7 +365,9 @@ async def get_device_points(device_id: str) -> dict:
 
 
 @router.get("/devices/{device_id}/points/{point_name}", response_model=dict)
+@limiter.limit("30/minute")
 async def read_device_point(
+    request: Request,
     device_id: str,
     point_name: str
 ) -> dict:
@@ -436,7 +439,8 @@ async def control_device(
 
 
 @router.get("/devices/{device_id}/status", response_model=dict)
-async def get_device_status(device_id: str) -> dict:
+@limiter.limit("30/minute")
+async def get_device_status(request: Request, device_id: str) -> dict:
     """Get device operational status."""
     try:
         device = await device_manager.get_device(device_id)
@@ -459,7 +463,8 @@ async def get_device_status(device_id: str) -> dict:
 
 
 @router.get("/devices/{device_id}/safety-status", response_model=dict)
-async def get_device_safety_status(device_id: str) -> dict:
+@limiter.limit("30/minute")
+async def get_device_safety_status(request: Request, device_id: str) -> dict:
     """Get device safety status."""
     try:
         device = await device_manager.get_device(device_id)

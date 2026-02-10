@@ -24,13 +24,12 @@ import json
 import logging
 from pathlib import Path
 
-from app.services.device_abstraction import DeviceAdapter
 from app.models.security import CCureController, CCurePersonnel
 
 logger = logging.getLogger(__name__)
 
 
-class CCureAdapter(DeviceAdapter):
+class CCureAdapter:
     """C•CURE 9000 integration adapter.
 
     Phase 58.2: Demo mode with mock data
@@ -45,7 +44,6 @@ class CCureAdapter(DeviceAdapter):
         password: Optional[str] = None,
         demo_mode: bool = True,
     ):
-        super().__init__()
         self.api_url = api_url
         self.license_guid = license_guid
         self.username = username
@@ -53,12 +51,14 @@ class CCureAdapter(DeviceAdapter):
         self.demo_mode = demo_mode
         self._demo_data = None
         self._token = None
+        self._connected = False
 
-    async def _protocol_connect(self) -> bool:
+    async def connect(self) -> bool:
         """Establish connection to C•CURE system."""
         if self.demo_mode:
             logger.info("CCureAdapter: Using DEMO MODE (Partner license required for live API)")
             self._demo_data = self._load_demo_data()
+            self._connected = True
             return True
         else:
             # TODO Phase 58.3: Implement victor Web Service API authentication
@@ -66,6 +66,12 @@ class CCureAdapter(DeviceAdapter):
             # Store JWT token in self._token
             logger.warning("CCureAdapter: Live mode not implemented yet - requires Partner Program license")
             return False
+
+    async def disconnect(self) -> None:
+        """Disconnect from C•CURE system."""
+        # No persistent connection needed for C•CURE integration
+        # API calls are stateless
+        self._connected = False
 
     def _load_demo_data(self) -> Dict:
         """Load demo data from ccure_demo_data.json."""

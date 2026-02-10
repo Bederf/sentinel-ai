@@ -133,7 +133,7 @@ export function createBatchAggregator<BatchItem>(
       // POST to batch endpoint with all IDs
       const response = await apiFetch<Record<string, BatchItem>>(resolvedEndpoint, {
         method: 'POST',
-        body: JSON.stringify({ ids: uniqueIds }),
+        body: JSON.stringify({ device_ids: uniqueIds }),
       });
 
       processResponse(current, response, onError);
