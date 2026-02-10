@@ -699,6 +699,102 @@ class BackgroundSchedulerService:
         except Exception as e:
             logger.error(f"Failed to run recommendation generation: {e}")
 
+    def add_ml_retraining_job(self, interval_seconds: int = 86400):
+        """
+        Add a job to auto-retrain stale ML models periodically.
+
+        Monitors model freshness and performance metrics. Triggers retraining
+        when models are stale (>30 days) or underperforming (R² < 0.65).
+
+        Only retrains ONE model per cycle to avoid overload.
+
+        Args:
+            interval_seconds: How often to check for stale models (default: 86400 = 24 hours)
+        """
+        # Remove existing job if it exists
+        if self.scheduler.get_job('auto_retrain_stale_models'):
+            self.scheduler.remove_job('auto_retrain_stale_models')
+            logger.info("Removed existing ML retraining job")
+
+        # Add new job
+        self.scheduler.add_job(
+            func=self._run_ml_retraining,
+            trigger=IntervalTrigger(seconds=interval_seconds),
+            id='auto_retrain_stale_models',
+            name='Auto-Retrain Stale ML Models',
+            replace_existing=True
+        )
+        logger.info(f"Added ML retraining job with {interval_seconds}s interval (checks daily for stale models)")
+
+    def _run_ml_retraining(self):
+        """
+        Check for stale ML models and trigger retraining if needed.
+
+        Runs as background job - only retrains ONE model per cycle to avoid
+        system overload. Models are prioritized by age and performance degradation.
+        """
+        try:
+            from ml.training.retraining_scheduler import get_retraining_scheduler
+
+            logger.info("Running scheduled ML model staleness check...")
+
+            scheduler = get_retraining_scheduler()
+
+            # Check all models for staleness/performance issues
+            checks = scheduler.check_all_models()
+
+            # Filter for models that need retraining
+            stale_models = [c for c in checks if c.get("needs_retrain", False)]
+
+            if not stale_models:
+                logger.info("✅ All ML models are fresh and performing well - no retraining needed")
+                return
+
+            # Get priority model (oldest first, then worst performing)
+            priority_model = sorted(
+                stale_models,
+                key=lambda m: (
+                    -999 if m["status"] == "missing" else m.get("age_days", 0),  # Missing models highest priority
+                    m.get("r2_score", 1.0),  # Then by R² score (lowest first)
+                ),
+            )[0]
+
+            logger.info(
+                f"Found {len(stale_models)} stale/underperforming models. "
+                f"Retraining priority: {priority_model['equipment_type']} ({priority_model['model_type']}) - "
+                f"Status: {priority_model['status']}, Age: {priority_model['age_days']}d, R²: {priority_model.get('r2_score', 'N/A')}"
+            )
+
+            # Trigger retraining for ONE model only (others will be retrained in subsequent cycles)
+            retrain_result = scheduler.trigger_retraining(
+                model_type=priority_model["model_type"],
+                equipment_type=priority_model["equipment_type"],
+                reason=priority_model.get("reason", "scheduled_maintenance"),
+            )
+
+            if retrain_result.success:
+                logger.info(
+                    f"✅ Retraining triggered for {retrain_result.model_type}/{retrain_result.equipment_type}. "
+                    f"New model ID: {retrain_result.new_model_id}"
+                )
+            else:
+                logger.error(
+                    f"❌ Failed to trigger retraining: {retrain_result.error}"
+                )
+
+            # Log summary of remaining stale models (for monitoring)
+            if len(stale_models) > 1:
+                remaining = stale_models[1:]
+                remaining_strs = [
+                    f"{m['equipment_type']} ({m['status']})" for m in remaining
+                ]
+                logger.info(
+                    f"Remaining stale models ({len(remaining)}): {', '.join(remaining_strs)}"
+                )
+
+        except Exception as e:
+            logger.error(f"Failed to run ML model retraining check: {e}", exc_info=True)
+
 
 # Global scheduler instance
 scheduler_service = BackgroundSchedulerService()

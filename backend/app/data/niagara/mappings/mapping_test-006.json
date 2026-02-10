@@ -1,14 +1,14 @@
 {
   "discovery_id": "test-006",
   "site_id": "site-002",
-  "created_at": "2026-02-08T16:48:36.119452",
+  "created_at": "2026-02-10T03:51:42.101734",
   "equipment_count": 3,
   "total_points": 6,
   "equipment": {
-    "CH-1": {
-      "equipment_id": "CH-1",
+    "S002-CHILLER-B1-001": {
+      "equipment_id": "S002-CHILLER-B1-001",
       "equipment_type": "chiller",
-      "equipment_name": "Chiller (CH-1)",
+      "equipment_name": "Chiller (S002-CHILLER-B1-001)",
       "site_id": "site-002",
       "points": [
         {
@@ -54,17 +54,25 @@
         "type_vote_counts": {
           "chiller": 3
         },
-        "avg_confidence_score": 3.0
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "CH-1",
+        "zone": {
+          "zone_id": "Zone-B1-001",
+          "floor": "B1",
+          "zone_letter": "001",
+          "zone_type": "open_office",
+          "building_id": "site-002"
+        }
       },
-      "created_at": "2026-02-08T16:48:36.118563",
+      "created_at": "2026-02-10T03:51:42.100395",
       "approved": true,
-      "approved_at": "2026-02-08T16:48:36.119390",
+      "approved_at": "2026-02-10T03:51:42.101626",
       "approved_by": "admin"
     },
-    "AHU-1": {
-      "equipment_id": "AHU-1",
+    "S002-AHU-B1-001": {
+      "equipment_id": "S002-AHU-B1-001",
       "equipment_type": "ahu",
-      "equipment_name": "Air Handling Unit (AHU-1)",
+      "equipment_name": "Air Handling Unit (S002-AHU-B1-001)",
       "site_id": "site-002",
       "points": [
         {
@@ -98,11 +106,19 @@
         "type_vote_counts": {
           "ahu": 2
         },
-        "avg_confidence_score": 2.5
+        "avg_confidence_score": 2.5,
+        "bms_original_id": "AHU-1",
+        "zone": {
+          "zone_id": "Zone-B1-001",
+          "floor": "B1",
+          "zone_letter": "001",
+          "zone_type": "open_office",
+          "building_id": "site-002"
+        }
       },
-      "created_at": "2026-02-08T16:48:36.118587",
+      "created_at": "2026-02-10T03:51:42.100472",
       "approved": true,
-      "approved_at": "2026-02-08T16:48:36.119390",
+      "approved_at": "2026-02-10T03:51:42.101626",
       "approved_by": "admin"
     },
     "UNASSIGNED": {
@@ -130,7 +146,7 @@
         "type_vote_counts": {},
         "avg_confidence_score": 0.0
       },
-      "created_at": "2026-02-08T16:48:36.118600",
+      "created_at": "2026-02-10T03:51:42.100492",
       "approved": false,
       "approved_at": null,
       "approved_by": null

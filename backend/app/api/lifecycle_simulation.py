@@ -15,6 +15,9 @@ from app.services.lifecycle_orchestrator import (
     SCENARIOS,
     EventType,
 )
+from app.services.simulation_logger import SimulationLogger
+from datetime import datetime
+import uuid
 
 logger = logging.getLogger(__name__)
 
@@ -114,6 +117,22 @@ async def start_simulation(request: StartSimulationRequest):
         )
 
     orchestrator = get_lifecycle_orchestrator()
+    
+    # Set up event logging
+    run_id = f"sim_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{str(uuid.uuid4())[:8]}"
+    logger_service = SimulationLogger()
+    logger_service.start_run(
+        run_id=run_id,
+        scenario=request.scenario,
+        building_code="site-002",
+        config={
+            "duration_minutes": request.duration_minutes,
+            "scenario": request.scenario,
+            "start_hour": request.start_hour,
+        },
+    )
+    orchestrator.add_event_callback(logger_service.on_event)
+    
     result = await orchestrator.start(
         scenario=request.scenario,
         duration_minutes=request.duration_minutes,
@@ -122,6 +141,20 @@ async def start_simulation(request: StartSimulationRequest):
 
     if not result.get("success"):
         raise HTTPException(status_code=400, detail=result.get("error"))
+
+    # Add run_id to response
+    result["run_id"] = run_id
+    
+    # Schedule finalization after simulation completes
+    async def finalize_log():
+        import asyncio
+        # Wait for simulation to complete (estimated based on duration_minutes)
+        await asyncio.sleep((request.duration_minutes * 60) + 5)
+        logger_service.end_run()
+    
+    # Start finalization task in background
+    import asyncio
+    asyncio.create_task(finalize_log())
 
     return result
 

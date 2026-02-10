@@ -32,6 +32,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - [Module Connectivity - Quick Reference](02-architecture/module-connectivity-quick-ref.md) - Executive summary of modules, integrations, and profiles
 - [Device Abstraction Layer](02-architecture/device-abstraction-layer.md) - Protocol-agnostic interface
 - [Naming Conventions](02-architecture/naming-conventions.md) - Device ID and point naming
+- [Background ML Model Retraining](02-architecture/background-ml-retraining.md) - Automated background training, APScheduler integration, production deployment (Phase 45-01)
 
 ### 📚 API Reference
 - [MCP Tools Reference](03-api-reference/mcp-tools-reference.md) - Model Context Protocol tools

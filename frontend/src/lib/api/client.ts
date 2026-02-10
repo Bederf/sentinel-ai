@@ -148,6 +148,7 @@ function getRateLimitBucket(url: string): string {
   }
   if (url.includes("/api/integration/")) return "integration";
   if (url.includes("/api/optimization/")) return "optimization";
+  if (url.includes("/api/lifecycle/")) return "lifecycle";
   if (url.includes("/api/dali/")) return "dali";
   if (url.includes("/api/security/")) return "security";
   if (url.includes("/api/solar/")) return "solar";
@@ -283,8 +284,8 @@ export async function authorizedFetch(
   const dedupeKey = `${method}:${url}`;
 
   // Special handling for high-traffic endpoints: batch them to prevent thundering herd
-  // Applies to: safety-status, optimization, recommendations, water, solar, security
-  const batchableEndpoints = ["safety-status", "optimization", "recommendations", "water", "solar", "security"];
+  // Applies to: safety-status, optimization, recommendations, lifecycle, water, solar, security
+  const batchableEndpoints = ["safety-status", "optimization", "recommendations", "lifecycle", "water", "solar", "security"];
   if (canDeduplicateGet && batchableEndpoints.includes(bucket)) {
     return new Promise<Response>((resolve, reject) => {
       const existing = pendingSafetyStatusRequests.get(dedupeKey);

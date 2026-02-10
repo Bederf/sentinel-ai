@@ -10,6 +10,7 @@ import {
   ClipboardCheck,
   ShieldCheck,
   Building2,
+  MapPin,
 } from "lucide-react";
 import type {
   Site,
@@ -19,6 +20,8 @@ import type {
   DemoBuilding,
 } from "../lib/api";
 import { niagaraApi, sitesApi } from "../lib/api";
+import { HelpSection } from "./HelpSection";
+import { EquipmentVerificationWizard } from "./EquipmentVerificationWizard";
 
 // ============= BMS Vendor Definitions =============
 
@@ -75,6 +78,9 @@ interface WizardState {
   approveResult: { equipment_created: number } | null;
   loading: boolean;
   error: string | null;
+  // Equipment verification
+  showVerificationWizard: boolean;
+  discoveryPhase: number; // 1-4: connect, scan, classify, group
 }
 
 type WizardAction =
@@ -86,7 +92,9 @@ type WizardAction =
   | { type: "TOGGLE_EQUIPMENT"; equipmentId: string }
   | { type: "SET_APPROVE_STATUS"; status: ApproveStatus; message?: string; result?: { equipment_created: number } }
   | { type: "SET_LOADING"; loading: boolean }
-  | { type: "SET_ERROR"; error: string | null };
+  | { type: "SET_ERROR"; error: string | null }
+  | { type: "SET_VERIFICATION_WIZARD"; show: boolean }
+  | { type: "SET_DISCOVERY_PHASE"; phase: number };
 
 function wizardReducer(state: WizardState, action: WizardAction): WizardState {
   switch (action.type) {
@@ -130,6 +138,10 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
       return { ...state, loading: action.loading };
     case "SET_ERROR":
       return { ...state, error: action.error, loading: false };
+    case "SET_VERIFICATION_WIZARD":
+      return { ...state, showVerificationWizard: action.show };
+    case "SET_DISCOVERY_PHASE":
+      return { ...state, discoveryPhase: action.phase };
     default:
       return state;
   }
@@ -278,6 +290,8 @@ export function BMSConnectionWizard({
     approveResult: null,
     loading: false,
     error: null,
+    showVerificationWizard: false,
+    discoveryPhase: 0,
   });
 
   // Fetch demo buildings on mount
@@ -417,8 +431,16 @@ export function BMSConnectionWizard({
   const handleDiscover = useCallback(async () => {
     dispatch({ type: "SET_LOADING", loading: true });
     dispatch({ type: "SET_ERROR", error: null });
+    dispatch({ type: "SET_DISCOVERY_PHASE", phase: 1 }); // Connecting...
 
     try {
+      // Simulate discovery phases with delays
+      await new Promise(r => setTimeout(r, 500));
+      dispatch({ type: "SET_DISCOVERY_PHASE", phase: 2 }); // Scanning points...
+
+      await new Promise(r => setTimeout(r, 800));
+      dispatch({ type: "SET_DISCOVERY_PHASE", phase: 3 }); // Classifying equipment...
+
       const res = await niagaraApi.discoverAndClassify({
         device_ip: state.useDemoData ? "demo" : state.host,
         site_id: state.siteId,
@@ -426,12 +448,17 @@ export function BMSConnectionWizard({
         demo_building_id: state.useDemoData ? state.demoBuildingId : undefined,
         bms_vendor: state.bmsVendor,
       });
+      dispatch({ type: "SET_DISCOVERY_PHASE", phase: 4 }); // Grouping into zones...
+      await new Promise(r => setTimeout(r, 300));
+      
       dispatch({ type: "SET_DISCOVERY", id: res.discovery_id, summary: res });
+      dispatch({ type: "SET_DISCOVERY_PHASE", phase: 0 });
     } catch (err) {
       dispatch({
         type: "SET_ERROR",
         error: err instanceof Error ? err.message : "Discovery failed",
       });
+      dispatch({ type: "SET_DISCOVERY_PHASE", phase: 0 });
     }
   }, [state.host, state.siteId, state.useDemoData, state.demoBuildingId, state.bmsVendor]);
 
@@ -468,6 +495,14 @@ export function BMSConnectionWizard({
         message: res.message,
         result: { equipment_created: res.equipment_created },
       });
+      
+      // Launch verification wizard on success
+      if (res.success) {
+        // Give user a moment to see the success message
+        setTimeout(() => {
+          dispatch({ type: "SET_VERIFICATION_WIZARD", show: true });
+        }, 1000);
+      }
     } catch (err) {
       dispatch({
         type: "SET_APPROVE_STATUS",
@@ -539,7 +574,7 @@ export function BMSConnectionWizard({
           className="text-lg font-semibold mb-1"
           style={{ color: "var(--color-sentinel-text-primary)" }}
         >
-          Ingest New Building
+          Step 1: Ingest New Building
         </h3>
         <p
           className="text-sm"
@@ -548,6 +583,13 @@ export function BMSConnectionWizard({
           Enter details for your new building, then configure the BMS connection or select demo data.
         </p>
       </div>
+
+      {/* Help section */}
+      <HelpSection title="Getting Started" variant="info">
+        Enter your building details and choose how to connect to your BMS. For testing and demos,
+        select <strong>Demo Data</strong> to load pre-configured equipment. For production, enter
+        your BMS connection details to automatically discover equipment.
+      </HelpSection>
 
       {/* New Site Details Section */}
       <div
@@ -1046,7 +1088,7 @@ export function BMSConnectionWizard({
           className="text-lg font-semibold mb-1"
           style={{ color: "var(--color-sentinel-text-primary)" }}
         >
-          Discover &amp; Classify Points
+          Step 2: Discover &amp; Classify Points
         </h3>
         <p
           className="text-sm"
@@ -1057,18 +1099,52 @@ export function BMSConnectionWizard({
         </p>
       </div>
 
+      {/* Help section */}
+      <HelpSection title="What's Happening" variant="info">
+        SENTINEL is discovering BACnet points from your BMS and using AI to classify them into
+        equipment groups. This involves connecting to the BMS, scanning available points, and
+        analyzing their names and characteristics to infer equipment types and zones.
+      </HelpSection>
+
       {state.loading && (
-        <div className="flex flex-col items-center gap-3 py-8">
-          <Loader2
-            className="w-10 h-10 animate-spin"
-            style={{ color: "var(--color-sentinel-blue)" }}
-          />
-          <p
-            className="text-sm"
-            style={{ color: "var(--color-sentinel-text-secondary)" }}
-          >
-            Discovering and classifying BACnet points...
-          </p>
+        <div className="space-y-4 py-6">
+          {/* Discovery progress indicator */}
+          <ol className="space-y-3">
+            {[
+              { phase: 1, label: "Connecting to BMS" },
+              { phase: 2, label: "Scanning BACnet points" },
+              { phase: 3, label: "AI classifying equipment" },
+              { phase: 4, label: "Grouping into zones" },
+            ].map(({ phase, label }) => (
+              <li
+                key={phase}
+                className={`flex items-center gap-3 text-sm transition-colors ${
+                  state.discoveryPhase >= phase
+                    ? "text-green-600 font-medium"
+                    : "text-gray-500"
+                }`}
+              >
+                <div
+                  className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-semibold ${
+                    state.discoveryPhase > phase
+                      ? "bg-green-600 text-white"
+                      : state.discoveryPhase === phase
+                        ? "bg-blue-500 text-white"
+                        : "bg-gray-300 text-white"
+                  }`}
+                >
+                  {state.discoveryPhase > phase ? (
+                    <CheckCircle className="w-3 h-3" />
+                  ) : state.discoveryPhase === phase ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : (
+                    phase
+                  )}
+                </div>
+                <span>{label}</span>
+              </li>
+            ))}
+          </ol>
         </div>
       )}
 
@@ -1236,16 +1312,24 @@ export function BMSConnectionWizard({
           className="text-lg font-semibold mb-1"
           style={{ color: "var(--color-sentinel-text-primary)" }}
         >
-          Review Mappings
+          Step 3: Review Mappings
         </h3>
         <p
           className="text-sm"
           style={{ color: "var(--color-sentinel-text-secondary)" }}
         >
-          Review AI-classified equipment and point mappings. Low-confidence
-          items are highlighted for manual review.
+          Review AI-classified equipment and point mappings. Zone information
+          is auto-inferred from equipment locations.
         </p>
       </div>
+
+      {/* Help section */}
+      <HelpSection title="Reviewing Equipment" variant="info">
+        Each equipment card shows the AI-classified type, confidence level, and auto-inferred zone
+        information. Expand any card to see individual BACnet points. Equipment with low confidence
+        (⚠️) should be reviewed carefully. All equipment IDs have been auto-converted to SENTINEL
+        v2.0 standard format.
+      </HelpSection>
 
       {state.loading && (
         <div className="flex flex-col items-center gap-3 py-8">
@@ -1372,10 +1456,10 @@ export function BMSConnectionWizard({
                           }}
                         />
                       )}
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span
-                            className="text-sm font-semibold truncate"
+                            className="text-sm font-semibold"
                             style={{
                               color: "var(--color-sentinel-text-primary)",
                             }}
@@ -1383,6 +1467,20 @@ export function BMSConnectionWizard({
                             {eq.equipment_name || eq.equipment_id || "Unknown Equipment"}
                           </span>
                           <ConfidenceBadge confidence={eq.confidence || "unknown"} />
+                          {/* Zone badge from metadata if available */}
+                          {(eq as any).metadata?.zone && (
+                            <span
+                              className="text-xs px-2 py-0.5 rounded"
+                              style={{
+                                background: "var(--color-sentinel-blue)22",
+                                color: "var(--color-sentinel-blue)",
+                                border: "1px solid var(--color-sentinel-blue)44",
+                              }}
+                            >
+                              <MapPin className="w-3 h-3 inline mr-1" />
+                              Floor {(eq as any).metadata.zone.floor} · Zone {(eq as any).metadata.zone.zone_letter}
+                            </span>
+                          )}
                         </div>
                         <span
                           className="text-xs"
@@ -1487,7 +1585,7 @@ export function BMSConnectionWizard({
           className="text-lg font-semibold mb-1"
           style={{ color: "var(--color-sentinel-text-primary)" }}
         >
-          Approve &amp; Activate
+          Step 4: Approve &amp; Activate
         </h3>
         <p
           className="text-sm"
@@ -1497,6 +1595,13 @@ export function BMSConnectionWizard({
           activate monitoring.
         </p>
       </div>
+
+      {/* Help section */}
+      <HelpSection title="Final Activation" variant="success">
+        After approval, SENTINEL will create equipment models with v2.0 naming standard and
+        auto-assigned zones. You'll then be offered to verify equipment functionality before going
+        fully live. All discovered equipment will be available for control and monitoring.
+      </HelpSection>
 
       {state.approveStatus === "approved" ? (
         <div className="flex flex-col items-center gap-4 py-6">
@@ -1664,8 +1769,43 @@ export function BMSConnectionWizard({
 
   const stepRenderers = [renderStep1, renderStep2, renderStep3, renderStep4];
 
+  // Extract equipment list for verification wizard
+  const discoveredEquipment = state.mappings?.equipment.map((eq) => ({
+    id: eq.equipment_id,
+    name: eq.equipment_name || eq.equipment_id,
+    equipment_type: eq.equipment_type,
+    zone: (eq as any).metadata?.zone
+      ? `Floor ${(eq as any).metadata.zone.floor} · Zone ${(eq as any).metadata.zone.zone_letter}`
+      : undefined,
+    point_count: eq.points?.length || 0,
+  })) || [];
+
   return (
     <div className="max-w-5xl mx-auto">
+      {/* Verification Wizard Modal */}
+      {state.showVerificationWizard && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          onClick={() => dispatch({ type: "SET_VERIFICATION_WIZARD", show: false })}
+        >
+          <div
+            className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6">
+              <EquipmentVerificationWizard
+                siteId={state.siteId}
+                equipmentList={discoveredEquipment}
+                onComplete={() => {
+                  dispatch({ type: "SET_VERIFICATION_WIZARD", show: false });
+                  onComplete();
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       <h2
         className="text-2xl font-bold mb-2"
         style={{ color: "var(--color-sentinel-text-primary)" }}

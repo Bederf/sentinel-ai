@@ -143,10 +143,11 @@ class TestPointMapping:
             sample_classified_points, "site-002"
         )
 
-        assert "CH-1" in mappings
-        assert "AHU-1" in mappings
-        assert len(mappings["CH-1"].points) == 3  # 3 chiller points
-        assert len(mappings["AHU-1"].points) == 2  # 2 AHU points
+        # Equipment IDs are now in v2.0 format (converted from BMS IDs)
+        assert "S002-CHILLER-B1-001" in mappings
+        assert "S002-AHU-B1-001" in mappings
+        assert len(mappings["S002-CHILLER-B1-001"].points) == 3  # 3 chiller points
+        assert len(mappings["S002-AHU-B1-001"].points) == 2  # 2 AHU points
 
     def test_orphan_points_grouped_as_unassigned(
         self, mapping_service, sample_classified_points
@@ -167,8 +168,9 @@ class TestPointMapping:
             sample_classified_points, "site-002"
         )
 
-        assert mappings["CH-1"].equipment_type == "chiller"
-        assert mappings["AHU-1"].equipment_type == "ahu"
+        # Equipment IDs are now in v2.0 format
+        assert mappings["S002-CHILLER-B1-001"].equipment_type == "chiller"
+        assert mappings["S002-AHU-B1-001"].equipment_type == "ahu"
 
     def test_demo_points_grouping(
         self, mapping_service, demo_classified_points
@@ -190,7 +192,8 @@ class TestPointMapping:
             sample_classified_points, "site-002"
         )
 
-        assert mappings["CH-1"].confidence == "high"  # All high confidence points
+        # Equipment IDs are now in v2.0 format
+        assert mappings["S002-CHILLER-B1-001"].confidence == "high"  # All high confidence points
 
 
 # ---------------------------------------------------------------------------
@@ -206,7 +209,8 @@ class TestEquipmentModelGeneration:
             sample_classified_points, "site-002"
         )
 
-        model = mapping_service.generate_equipment_model(mappings["CH-1"])
+        # Equipment IDs are now in v2.0 format
+        model = mapping_service.generate_equipment_model(mappings["S002-CHILLER-B1-001"])
 
         assert model["equipment_type"] == "chiller"
         assert model["device_type"] == "hvac"
@@ -221,7 +225,8 @@ class TestEquipmentModelGeneration:
             sample_classified_points, "site-002"
         )
 
-        model = mapping_service.generate_equipment_model(mappings["CH-1"])
+        # Equipment IDs are now in v2.0 format
+        model = mapping_service.generate_equipment_model(mappings["S002-CHILLER-B1-001"])
         points = model["points"]
 
         # At least one point should have a bacnet_ref
@@ -340,7 +345,8 @@ class TestMappingStorage:
 
         cached = mapping_service.get_mappings("test-002")
         assert cached is not None
-        assert "CH-1" in cached
+        # Equipment IDs are now in v2.0 format
+        assert "S002-CHILLER-B1-001" in cached
 
     def test_correct_point_type(self, mapping_service, sample_classified_points):
         """Test manual correction of point type."""

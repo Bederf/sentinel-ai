@@ -289,5 +289,40 @@ AUTOENCODER_SENSOR_CONFIGS: Dict[str, Dict[str, Any]] = {
             "load_pct"
         ],
         "description": "Generator operating pattern anomaly detection"
+    },
+    "fcu": {
+        "features": [
+            "supply_temp",
+            "fan_current",
+            "valve_position"
+        ],
+        "description": "FCU operating pattern anomaly detection"
+    },
+    "ups": {
+        "features": [
+            "battery_voltage",
+            "load_pct",
+            "temperature"
+        ],
+        "description": "UPS operating pattern anomaly detection"
+    },
+    "vav": {
+        "features": [
+            "airflow",
+            "damper_position",
+            "zone_temp",
+            "supply_temp"
+        ],
+        "description": "VAV operating pattern anomaly detection"
+    },
+    "pump": {
+        "features": [
+            "flow_rate",
+            "discharge_pressure",
+            "motor_current",
+            "vibration",
+            "temperature"
+        ],
+        "description": "Pump operating pattern anomaly detection"
     }
 }

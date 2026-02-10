@@ -126,19 +126,25 @@ class PointMappingService:
         classified_points: List[ClassifiedPoint],
         site_id: str,
     ) -> Dict[str, EquipmentMapping]:
-        """Group classified points into equipment entities.
+        """Group classified points into equipment entities with v2.0 naming conversion.
 
         Uses equipment_id extracted during classification to group points.
         For each group, infers the equipment type from majority vote of
-        point classifications.
+        point classifications. Converts BMS IDs to v2.0 standard format.
 
         Args:
             classified_points: Points from PointClassifier
             site_id: SENTINEL site ID for the equipment
 
         Returns:
-            Dict mapping equipment_id -> EquipmentMapping
+            Dict mapping v2.0_equipment_id -> EquipmentMapping
         """
+        from app.services.equipment_id_converter import EquipmentIDConverter
+        from app.services.zone_mapping_service import get_zone_mapping_service
+
+        converter = EquipmentIDConverter()
+        zone_service = get_zone_mapping_service()
+
         # Step 1: Group points by equipment ID
         groups: Dict[str, List[ClassifiedPoint]] = {}
         orphans: List[ClassifiedPoint] = []
@@ -156,12 +162,40 @@ class PointMappingService:
             len(classified_points), len(groups), len(orphans),
         )
 
-        # Step 2: Generate equipment mappings
+        # Step 2: Generate equipment mappings with v2.0 naming conversion
         mappings: Dict[str, EquipmentMapping] = {}
 
-        for equip_id, points in groups.items():
-            mapping = self._generate_equipment_mapping(equip_id, points, site_id)
-            mappings[equip_id] = mapping
+        for bms_equip_id, points in groups.items():
+            # Infer equipment type from majority vote
+            type_counts = Counter(
+                p.equipment_type for p in points if p.equipment_type != "unknown"
+            )
+            equipment_type = type_counts.most_common(1)[0][0] if type_counts else "unknown"
+
+            # Convert BMS ID to v2.0 format
+            v2_equipment_id = converter.convert_bms_to_v2(
+                bms_id=bms_equip_id,
+                equipment_type=equipment_type,
+                site_id=site_id,
+            )
+
+            # Infer zone from v2.0 equipment ID
+            zone_info = zone_service.infer_zone_from_equipment_id(v2_equipment_id, site_id)
+
+            # Generate equipment mapping
+            mapping = self._generate_equipment_mapping(v2_equipment_id, points, site_id)
+
+            # Store original BMS ID and zone info in metadata
+            mapping.metadata["bms_original_id"] = bms_equip_id
+            if zone_info:
+                mapping.metadata["zone"] = zone_info
+
+            mappings[v2_equipment_id] = mapping
+
+            logger.debug(
+                f"Converted BMS ID '{bms_equip_id}' → v2.0 '{v2_equipment_id}' "
+                f"with zone {zone_info.get('zone_letter') if zone_info else 'N/A'}"
+            )
 
         # Step 3: Handle orphan points - group under "UNASSIGNED"
         if orphans:
@@ -758,7 +792,10 @@ class PointMappingService:
         """
         mappings = self.get_mappings(discovery_id)
         if mappings is None:
-            return {"success": False, "error": f"Discovery {discovery_id} not found"}
+            return {
+                "success": False,
+                "error": f"Discovery {discovery_id} not found"
+            }
 
         now = datetime.utcnow().isoformat()
         equipment_models = []
@@ -784,12 +821,16 @@ class PointMappingService:
         # Save equipment models to buildings directory
         models_saved = self._save_equipment_models(equipment_models, site_id)
 
+        # NEW: Generate zones file from equipment
+        zones_result = self.generate_zones_file(equipment_models, site_id)
+
         # Record in history
         history_entry = {
             "action": "approve",
             "approved_by": approved_by,
             "timestamp": now,
             "equipment_count": len(equipment_models),
+            "zones_generated": zones_result.get("zones_count", 0),
         }
         if discovery_id not in self._mapping_history:
             self._mapping_history[discovery_id] = []
@@ -800,6 +841,8 @@ class PointMappingService:
             "equipment_created": len(equipment_models),
             "equipment_models": equipment_models,
             "models_saved": models_saved,
+            "zones_generated": zones_result.get("success", False),
+            "zones_count": zones_result.get("zones_count", 0),
         }
 
     def _save_equipment_models(
@@ -829,6 +872,65 @@ class PointMappingService:
         except Exception as e:
             logger.error("Failed to save equipment models: %s", e)
             return False
+
+    def generate_zones_file(
+        self,
+        equipment_models: List[Dict[str, Any]],
+        site_id: str,
+    ) -> Dict[str, Any]:
+        """Auto-generate zones.json from discovered equipment.
+
+        Parses equipment location metadata and creates zone definitions
+        based on floor and zone assignments.
+
+        Args:
+            equipment_models: List of generated equipment models
+            site_id: Site ID for zone file location
+
+        Returns:
+            Dict with zone generation status
+        """
+        try:
+            from app.services.zone_mapping_service import get_zone_mapping_service
+
+            zone_service = get_zone_mapping_service()
+
+            # Extract equipment list from models for zone inference
+            equipment_list = [
+                {"equipment_id": m.get("id", "")} for m in equipment_models
+            ]
+
+            # Auto-generate zones
+            zones = zone_service.create_zones_from_equipment(equipment_list, site_id)
+
+            # Save zones.json
+            zones_dir = BUILDINGS_DIR / site_id
+            zones_dir.mkdir(parents=True, exist_ok=True)
+            zones_file = zones_dir / "zones.json"
+
+            zones_data = {
+                "site_id": site_id,
+                "generated_at": datetime.utcnow().isoformat(),
+                "auto_generated": True,
+                "zones": zones,
+            }
+
+            with open(zones_file, "w") as f:
+                json.dump(zones_data, f, indent=2)
+
+            logger.info(f"Generated {len(zones)} zones for {site_id}")
+            return {
+                "success": True,
+                "zones_count": len(zones),
+                "file_path": str(zones_file),
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to generate zones file: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+            }
 
     def get_mapping_history(self, discovery_id: str) -> List[Dict[str, Any]]:
         """Get the change history for a mapping set."""

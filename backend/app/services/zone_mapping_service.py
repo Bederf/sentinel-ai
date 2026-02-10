@@ -34,6 +34,8 @@ class ZoneMappingService:
     1. Mappings between HVAC and DALI zone IDs
     2. Aggregation of HVAC readings to DALI zone level
     3. Cross-system recommendation generation
+    4. Zone inference from equipment IDs
+    5. Auto-assignment of equipment to zones
     """
 
     def __init__(self):
@@ -188,6 +190,164 @@ class ZoneMappingService:
         """
         hvac_zones = self.get_hvac_zones_for_dali(dali_zone_id)
         return len(hvac_zones) > 0
+
+    def infer_zone_from_equipment_id(
+        self,
+        equipment_id: str,
+        site_id: str,
+    ) -> Optional[Dict[str, str]]:
+        """Parse floor and zone from v2.0 equipment ID.
+
+        Args:
+            equipment_id: v2.0 format equipment ID (e.g., "S002-FCU-L2-A")
+            site_id: Site identifier
+
+        Returns:
+            Dict with zone metadata or None if parsing fails
+
+        Example:
+            equipment_id="S002-FCU-L2-A", site="site-002"
+            → {
+                "zone_id": "Zone-L2-A",
+                "floor": "L2",
+                "zone_letter": "A",
+                "zone_type": "open_office",
+                "building_id": "site-002"
+              }
+        """
+        import re
+
+        # Parse v2.0 format: S###-TYPE-FLOOR-ZONE
+        match = re.match(r"S\d+-[A-Z]+-(B\d|B|G|L\d+|M|R|PH)-([A-Z]|0?\d{1,3})", equipment_id)
+        if not match:
+            logger.warning(f"Could not parse v2.0 equipment ID: {equipment_id}")
+            return None
+
+        floor = match.group(1)
+        zone = match.group(2).upper()
+
+        # Determine zone type based on equipment type and floor
+        zone_type = "open_office"  # Default
+        if "DALI" in equipment_id or "LUM" in equipment_id:
+            zone_type = "lighting"
+        elif "MEETING" in equipment_id:
+            zone_type = "meeting_room"
+        elif "EXEC" in equipment_id:
+            zone_type = "executive"
+
+        return {
+            "zone_id": f"Zone-{floor}-{zone}",
+            "floor": floor,
+            "zone_letter": zone,
+            "zone_type": zone_type,
+            "building_id": site_id,
+        }
+
+    def auto_assign_equipment_to_zones(
+        self,
+        equipment_list: List[Dict[str, Any]],
+        site_id: str,
+    ) -> Dict[str, List[str]]:
+        """Auto-assign equipment to zones based on parsed location.
+
+        Args:
+            equipment_list: List of equipment dicts with 'equipment_id' keys
+            site_id: Site identifier
+
+        Returns:
+            Dict mapping zone_id → [equipment_ids...]
+
+        Example:
+            Input: [
+              {"equipment_id": "S002-FCU-L2-A"},
+              {"equipment_id": "S002-FCU-L2-B"},
+              {"equipment_id": "S002-AHU-L2"}
+            ]
+            Output: {
+              "Zone-L2-A": ["S002-FCU-L2-A"],
+              "Zone-L2-B": ["S002-FCU-L2-B"],
+              "Zone-L2": ["S002-AHU-L2"]
+            }
+        """
+        zone_assignments: Dict[str, List[str]] = {}
+
+        for equipment in equipment_list:
+            eq_id = equipment.get("equipment_id", "")
+            if not eq_id:
+                continue
+
+            zone_info = self.infer_zone_from_equipment_id(eq_id, site_id)
+            if zone_info:
+                zone_id = zone_info["zone_id"]
+                if zone_id not in zone_assignments:
+                    zone_assignments[zone_id] = []
+                zone_assignments[zone_id].append(eq_id)
+
+        logger.info(f"Auto-assigned {len(equipment_list)} equipment to {len(zone_assignments)} zones")
+        return zone_assignments
+
+    def create_zones_from_equipment(
+        self,
+        equipment_list: List[Dict[str, Any]],
+        site_id: str,
+    ) -> List[Dict[str, Any]]:
+        """Auto-generate zone definitions from discovered equipment.
+
+        Args:
+            equipment_list: List of equipment dicts
+            site_id: Site identifier
+
+        Returns:
+            List of zone definition dicts
+
+        Example:
+            Input: FCU-L2-A, FCU-L2-B, FCU-L2-C discovered
+            Output: [
+              {
+                "zone_id": "Zone-L2",
+                "floor": "L2",
+                "zones": [
+                  {"zone_letter": "A", "type": "open_office"},
+                  {"zone_letter": "B", "type": "open_office"},
+                  {"zone_letter": "C", "type": "open_office"}
+                ],
+                "equipment_count": 3
+              }
+            ]
+        """
+        zones_by_floor_letter: Dict[str, Dict[str, Any]] = {}
+
+        for equipment in equipment_list:
+            eq_id = equipment.get("equipment_id", "")
+            if not eq_id:
+                continue
+
+            zone_info = self.infer_zone_from_equipment_id(eq_id, site_id)
+            if not zone_info:
+                continue
+
+            floor = zone_info["floor"]
+            zone_letter = zone_info["zone_letter"]
+            zone_type = zone_info["zone_type"]
+
+            # Group by floor-letter combination
+            key = f"{floor}-{zone_letter}"
+            if key not in zones_by_floor_letter:
+                zones_by_floor_letter[key] = {
+                    "zone_id": f"Zone-{floor}-{zone_letter}",
+                    "floor": floor,
+                    "zone_letter": zone_letter,
+                    "zone_type": zone_type,
+                    "equipment": [],
+                }
+
+            zones_by_floor_letter[key]["equipment"].append(eq_id)
+
+        # Build final zones list
+        zones = list(zones_by_floor_letter.values())
+        logger.info(f"Generated {len(zones)} zones from {len(equipment_list)} equipment")
+
+        return zones
 
 
 # Singleton instance

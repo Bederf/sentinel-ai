@@ -251,13 +251,16 @@ class EquipmentIDConverter:
     ) -> str:
         """Convert numeric zone to letter per site-specific mapping.
 
+        Only converts if explicit mapping exists. Otherwise returns numeric
+        zone in 3-digit format (001, 002, etc).
+
         Args:
             zone_num: Numeric zone (e.g., "01", "05", "20")
             site_id: Site identifier (e.g., "site-002")
             override_mapping: Optional override mapping dict
 
         Returns:
-            Letter zone (A-Z) or original numeric if no mapping found
+            Letter zone (A-Z) if mapping found, else 3-digit numeric (001, 002, etc)
         """
         # Use override if provided
         if override_mapping and zone_num in override_mapping:
@@ -277,17 +280,12 @@ class EquipmentIDConverter:
         if zone_num in default_mapping:
             return default_mapping[zone_num]
 
-        # Fallback: convert to letter using simple alphabet mapping
-        # 01→A, 02→B, 03→C, ..., 26→Z
+        # Fallback: return as 3-digit numeric sequence
         try:
             num = int(zone_num.lstrip("0") or "0")
-            if 1 <= num <= 26:
-                return chr(64 + num)  # 1→A, 2→B, ..., 26→Z
+            return f"{num:03d}"  # Convert to 3-digit format (001, 002, etc)
         except ValueError:
-            pass
-
-        # Return numeric if all else fails
-        return zone_num.zfill(3)
+            return zone_num  # Return as-is if not numeric
 
     def _normalize_equipment_type(self, equipment_type: str) -> str:
         """Normalize equipment type to SENTINEL standard.

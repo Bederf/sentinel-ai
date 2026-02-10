@@ -277,6 +277,27 @@ class EquipmentDataLoader:
             ],
             "target": "temperature",
             "description": "UPS temperature prediction"
+        },
+        "vav": {
+            "features": [
+                "airflow",
+                "damper_position",
+                "zone_temp",
+                "supply_temp"
+            ],
+            "target": "zone_temp",
+            "description": "VAV zone temperature prediction"
+        },
+        "pump": {
+            "features": [
+                "flow_rate",
+                "discharge_pressure",
+                "motor_current",
+                "vibration",
+                "temperature"
+            ],
+            "target": "discharge_pressure",
+            "description": "Pump discharge pressure prediction"
         }
     }
 

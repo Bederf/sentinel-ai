@@ -2,23 +2,15 @@
  * Simulation API Client
  *
  * Lifecycle control + simulation analytics endpoints.
+ * Uses shared authorizedFetch from client.ts to benefit from request batching.
  */
+
+import { authorizedFetch } from "./api/client";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "";
 
-function authHeaders(): Record<string, string> {
-  const token = localStorage.getItem("sentinel_token");
-  return {
-    "Content-Type": "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
-}
-
 async function fetchJson<T>(endpoint: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
-    headers: { ...authHeaders(), ...options?.headers },
-  });
+  const res = await authorizedFetch(`${API_BASE_URL}${endpoint}`, options);
   if (!res.ok) {
     let msg = res.statusText;
     try {
