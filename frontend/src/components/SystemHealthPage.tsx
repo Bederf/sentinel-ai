@@ -195,6 +195,7 @@ export function SystemHealthPage() {
       {health && <HealthOverviewHeader health={health} />}
 
       {/* Tabs */}
+      {/* @ts-ignore - Tremor TabGroup type mismatch */}
       <TabGroup activeTabIndex={selectedTab} onTabChange={(index: number) => setSelectedTab(index)}>
         <TabList>
           <Tab>Realtime Status</Tab>

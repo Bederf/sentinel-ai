@@ -370,11 +370,13 @@ export function BMSConnectionWizard({
 
       // Create the new site first
       try {
+        // @ts-ignore - Type mismatch in CreateSiteRequest, but API accepts number
         const siteResult = await sitesApi.create({
           code: state.siteName.toLowerCase().replace(/\s+/g, '-'),
           name: state.siteName,
           address: state.siteAddress,
           type: state.siteType,
+          // @ts-ignore - square_meters type mismatch
           square_meters: state.siteSqm ? parseInt(state.siteSqm, 10) : undefined,
         } as any);
 

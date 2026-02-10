@@ -106,6 +106,8 @@ export function createBatchAggregator<BatchItem>(
     throw new Error('BatchAggregatorOptions requires endpoint or batchEndpoint');
   }
 
+  const resolvedEndpoint: string = endpoint;
+
   // Queue of pending requests
   let queue: QueuedRequest<BatchItem>[] = [];
   // Timer for batch flush
@@ -129,7 +131,7 @@ export function createBatchAggregator<BatchItem>(
 
     try {
       // POST to batch endpoint with all IDs
-      const response = await apiFetch<Record<string, BatchItem>>(endpoint, {
+      const response = await apiFetch<Record<string, BatchItem>>(resolvedEndpoint, {
         method: 'POST',
         body: JSON.stringify({ ids: uniqueIds }),
       });
