@@ -4395,3 +4395,6 @@ const apiWithAuth = {
 };
 
 export default apiWithAuth;
+
+// Re-export modular APIs for backward compatibility
+export { systemApi, useSystemHealth, useDiagnostics } from './api/system';

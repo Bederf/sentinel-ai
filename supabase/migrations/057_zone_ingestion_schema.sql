@@ -37,12 +37,7 @@ ALTER TABLE desks ADD COLUMN IF NOT EXISTS z_coord DECIMAL(6,2);
 
 -- Desk context enum (more detailed than before)
 -- Tracks specific desk context for positioning and comfort analysis
-ALTER TABLE desks DROP CONSTRAINT IF EXISTS context_check;
-ALTER TABLE desks ADD CONSTRAINT context_check CHECK (
-    -- If context column exists, validate it
-    NOT EXISTS (SELECT 1 FROM desks d WHERE d.id = desks.id AND d.context IS NOT NULL AND 
-               d.context NOT IN ('near_diffuser', 'near_window', 'near_printer', 'corner', 'open_plan'))
-);
+-- Note: Check constraint validation happens at application level
 
 -- Add context column if it doesn't exist
 ALTER TABLE desks ADD COLUMN IF NOT EXISTS context TEXT DEFAULT 'open_plan';
@@ -93,11 +88,11 @@ CREATE TRIGGER trigger_zones_updated_at
     EXECUTE FUNCTION update_zones_updated_at();
 
 -- Trigger to update desks.updated_at when modified
--- (should already exist from migration 014, but ensure it works)
-CREATE TRIGGER IF NOT EXISTS trigger_desks_updated_at
+-- (should already exist from migration 014, ensure it doesn't duplicate)
+DROP TRIGGER IF EXISTS trigger_desks_updated_at ON desks;
+CREATE TRIGGER trigger_desks_updated_at
     BEFORE UPDATE ON desks
     FOR EACH ROW
-    WHEN (OLD.updated_at IS DISTINCT FROM NEW.updated_at)
     EXECUTE FUNCTION update_updated_at_column();
 
 -- Comments for documentation

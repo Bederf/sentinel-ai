@@ -72,3 +72,8 @@ pyotp>=2.9.0
 # Rate Limiting (Phase 58.3 Security Hardening)
 slowapi>=0.1.9
 bcrypt>=4.2.0
+
+# DXF File Parsing (Phase B: Digital Twin Builder)
+# AutoCAD/CAD drawing support for equipment extraction
+ezdxf>=1.3.0                   # Read/write AutoCAD DXF files (all versions R12-2024)
+numpy>=1.24.0                  # Numeric calculations for geometry transformations

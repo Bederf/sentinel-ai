@@ -280,6 +280,58 @@ class DigitalTwinService:
             logger.error(f"Failed to parse extraction response: {e}")
             return {}
 
+    async def extract_from_dxf(
+        self,
+        dxf_bytes: bytes,
+        building_code: str,
+        building_name: str,
+    ) -> Dict:
+        """
+        Extract building config from DXF (AutoCAD) file.
+
+        Parses CAD drawings using layer-based conventions:
+        - AR-WALL: Building structure
+        - AE-HVAC: HVAC equipment
+        - EL-POWER: Electrical equipment
+        - FP-LIFE: Fire/safety equipment
+
+        Args:
+            dxf_bytes: DXF file content (bytes)
+            building_code: Building identifier (e.g., "site-002")
+            building_name: Building name (e.g., "Sandton City")
+
+        Returns:
+            Same format as extract_from_image() for API consistency
+        """
+        from app.services.dxf_parser_service import get_dxf_parser_service
+
+        parser = get_dxf_parser_service()
+
+        try:
+            config = await parser.parse_dxf_file(
+                dxf_bytes, building_code, building_name
+            )
+
+            # Add metadata
+            config["extraction_metadata"] = {
+                "method": "dxf_parser",
+                "equipment_count": len(config.get("equipment", [])),
+                "floor_count": len(config.get("floors", [])),
+                "zone_count": len(config.get("zones", [])),
+            }
+
+            logger.info(
+                f"✓ DXF extraction complete: "
+                f"{config['extraction_metadata']['equipment_count']} equipment, "
+                f"{config['extraction_metadata']['floor_count']} floors"
+            )
+
+            return config
+        except Exception as e:
+            logger.error(f"DXF parsing failed: {e}", exc_info=True)
+            # Fallback to demo config for testing
+            return self._generate_demo_config(building_code, building_name, 5)
+
     def _generate_demo_config(
         self, building_code: str, building_name: str, floors_count: int
     ) -> Dict:

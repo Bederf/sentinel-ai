@@ -25,7 +25,6 @@ export {
   API_BASE_URL,
   SITES_CACHE_KEY,
   type HealthResponse,
-  type ApiError,
 } from './client';
 
 // Domain-specific modules (these take precedence over legacy versions)
@@ -88,6 +87,34 @@ export {
   type Document,
   type DocumentUploadResponse,
 } from './documents';
+
+// System Health & Diagnostics
+export {
+  systemApi,
+  useSystemHealth,
+  useDiagnostics,
+  type SystemHealthSnapshot,
+  type ComponentHealth,
+  type DiagnosticResult,
+  type ErrorLog,
+  type ErrorLogFilters,
+  type ErrorLogResponse,
+  type HealthHistoryData,
+} from './system';
+
+// Batch aggregators and fetch client
+export {
+  safetyBatcher,
+  readingsBatcher,
+  conditionBatcher,
+} from './batchers';
+export {
+  type DeviceSafetyStatus as BatchDeviceSafetyStatus,
+  type DeviceStatus as BatchDeviceStatus,
+  type DeviceCondition,
+  type BatchResponse,
+} from './types';
+export { apiFetch, type ApiError } from './fetchClient';
 
 // Legacy: import everything from original api.ts AFTER modular exports for backward compatibility
 // This provides fallback for any APIs not yet migrated to modular structure

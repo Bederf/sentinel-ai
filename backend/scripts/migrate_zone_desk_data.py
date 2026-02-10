@@ -31,8 +31,18 @@ def migrate_floor_code(old_code: str) -> str:
     L10 → L0 (Ground)
     L11 → L1 (First)
     L12 → L2 (Second)
+    B1 → B1 (Basement)
+    G → G (Ground alternate)
+    R → R (Roof)
     """
-    mapping = {"L10": "L0", "L11": "L1", "L12": "L2"}
+    mapping = {
+        "L10": "L0",
+        "L11": "L1", 
+        "L12": "L2",
+        "B1": "B1",
+        "G": "G",
+        "R": "R",
+    }
     return mapping.get(old_code, old_code)
 
 
@@ -102,13 +112,30 @@ def load_zones_backup(backup_path: Path) -> List[Dict[str, Any]]:
     with open(backup_path, "r") as f:
         data = json.load(f)
     
+    # Handle both array and object formats
+    zone_list = data if isinstance(data, list) else data.get("zones", [])
+    
     zones = []
-    for zone in data.get("zones", []):
+    for zone in zone_list:
+        # Migrate zone_name to reflect correct floor levels
+        old_name = zone.get("zone_name", "")
+        zone_name_mapping = {
+            "Level 10": "Level 0",
+            "Level 11": "Level 1", 
+            "Level 12": "Level 2",
+            "L10": "L0",
+            "L11": "L1",
+            "L12": "L2",
+        }
+        zone_name = old_name
+        for old_level, new_level in zone_name_mapping.items():
+            zone_name = zone_name.replace(old_level, new_level)
+        
         migrated_zone = {
             "zone_id": migrate_zone_id(zone["zone_id"]),
-            "zone_name": zone.get("zone_name", ""),
+            "zone_name": zone_name,
             "floor": migrate_floor_code(zone["floor"]),
-            "zone_letter": zone.get("zone_letter", ""),
+            "zone_letter": zone.get("zone_letter", zone["zone_id"].split("-")[-1] if "-" in zone["zone_id"] else ""),
             "zone_type": zone.get("zone_type", "open_office"),
             "typical_occupancy": zone.get("typical_occupancy"),
             "area_sqm": zone.get("area_sqm"),
@@ -116,6 +143,7 @@ def load_zones_backup(backup_path: Path) -> List[Dict[str, Any]]:
         zones.append(migrated_zone)
     
     print(f"  Loaded {len(zones)} zones")
+    print(f"  Sample: {zones[0] if zones else 'None'}")
     return zones
 
 
@@ -126,30 +154,52 @@ def load_desks_backup(backup_path: Path) -> List[Dict[str, Any]]:
     with open(backup_path, "r") as f:
         data = json.load(f)
     
+    # Handle both array and object formats
+    desk_list = data if isinstance(data, list) else data.get("desks", [])
+    
     desks = []
-    for desk in data.get("desks", []):
-        # Get zone index within zone (0-19 for 20 desks per zone)
-        desk_index_in_zone = (desk.get("id", 1) - 1) % 20
+    desk_counter = 1000  # Start desk IDs at 1000
+    desks_by_zone = {}
+    
+    for desk_idx, desk in enumerate(desk_list):
+        zone_id_old = desk.get("zone_id", "Zone-L10-A")
+        zone_id = migrate_zone_id(zone_id_old)
+        
+        # Track desk count per zone
+        if zone_id not in desks_by_zone:
+            desks_by_zone[zone_id] = 0
+        desk_index_in_zone = desks_by_zone[zone_id]
+        desks_by_zone[zone_id] += 1
+        
+        # Get zone letter from zone_id (e.g., "Zone-L0-A" -> "A")
+        zone_letter = zone_id.split("-")[-1] if "-" in zone_id else "A"
         
         # Calculate 3D coordinates
         coords = calculate_desk_coordinates(
             desk_index_in_zone,
-            desk["zone_letter"],
-            migrate_floor_code(desk["floor"]),
+            zone_letter,
+            migrate_floor_code(desk.get("floor", "L10")),
         )
         
+        # Generate unique desk_id if not present
+        desk_id = desk.get("id")
+        if desk_id is None or desk_id == "":
+            desk_id = str(desk_counter)
+            desk_counter += 1
+        
         migrated_desk = {
-            "desk_id": desk.get("id", ""),  # Just use the numeric ID for now
-            "floor": migrate_floor_code(desk["floor"]),
-            "zone_id": migrate_zone_id(desk["zone_id"]),
+            "desk_id": str(desk_id),
+            "floor": migrate_floor_code(desk.get("floor", "L10")),
+            "zone_id": zone_id,
             "context": desk.get("context", "open_plan"),
-            "x_coord": Decimal(str(coords["x"])),
-            "y_coord": Decimal(str(coords["y"])),
-            "z_coord": Decimal(str(coords["z"])),
+            "x_coord": float(coords["x"]),
+            "y_coord": float(coords["y"]),
+            "z_coord": float(coords["z"]),
         }
         desks.append(migrated_desk)
     
     print(f"  Loaded {len(desks)} desks")
+    print(f"  Sample: {desks[0] if desks else 'None'}")
     return desks
 
 
@@ -220,18 +270,19 @@ def validate_zones_and_desks(zones: List[Dict], desks: List[Dict]) -> Tuple[bool
 
 
 def insert_zones(supabase_client: Any, building_id: str, zones: List[Dict[str, Any]]) -> bool:
-    """Insert zones into Supabase."""
-    print(f"\nInserting {len(zones)} zones...")
+    """Upsert zones into Supabase (insert or update if exists)."""
+    print(f"\nUpserting {len(zones)} zones...")
     
     for zone in zones:
         zone["building_id"] = building_id
     
     try:
-        response = supabase_client.table("zones").insert(zones).execute()
-        print(f"✓ Inserted {len(response.data)} zones")
+        # Use upsert to handle existing zones with updated names
+        response = supabase_client.table("zones").upsert(zones, on_conflict="building_id,zone_id").execute()
+        print(f"✓ Upserted {len(response.data)} zones")
         return True
     except Exception as e:
-        print(f"❌ Failed to insert zones: {e}")
+        print(f"❌ Failed to upsert zones: {e}")
         return False
 
 
@@ -257,20 +308,23 @@ def verify_insertion(supabase_client: Any, building_id: str) -> bool:
     print("\nVerifying insertion...")
     
     # Check zones
-    zones_response = supabase_client.table("zones").select("COUNT(*)").eq("building_id", building_id).execute()
-    zone_count = zones_response.count if hasattr(zones_response, 'count') else len(zones_response.data)
+    zones_response = supabase_client.table("zones").select("*").eq("building_id", building_id).execute()
+    zone_count = len(zones_response.data)
     
     # Check desks
-    desks_response = supabase_client.table("desks").select("COUNT(*)").eq("building_id", building_id).execute()
-    desk_count = desks_response.count if hasattr(desks_response, 'count') else len(desks_response.data)
+    desks_response = supabase_client.table("desks").select("*").eq("building_id", building_id).execute()
+    desk_count = len(desks_response.data)
     
     print(f"✓ Zones in Supabase: {zone_count}")
     print(f"✓ Desks in Supabase: {desk_count}")
     
-    # Check zone centroids
-    centroids_response = supabase_client.rpc("get_zone_centroids", {"building_id": building_id}).execute()
-    if centroids_response.data:
-        print(f"✓ Zone centroids calculated: {len(centroids_response.data)} zones with centroids")
+    # Check zone centroids via the view
+    try:
+        centroids_response = supabase_client.table("zone_centroids").select("*").eq("building_id", building_id).execute()
+        centroid_count = len(centroids_response.data)
+        print(f"✓ Zone centroids available: {centroid_count} zones with centroids")
+    except Exception as e:
+        print(f"⚠ Zone centroids view not accessible: {e}")
     
     return zone_count > 0 and desk_count > 0
 
