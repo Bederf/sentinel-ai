@@ -27,6 +27,14 @@ Complete guide to setting up a SENTINEL development environment.
 - **Git:** Latest ([Download](https://git-scm.com/downloads))
 - **Code Editor:** VS Code recommended ([Download](https://code.visualstudio.com/))
 
+### ⚠️ Required System Binary
+
+- **Tesseract-OCR:** Core infrastructure for floor plan sanitization, technician work orders, and equipment vision
+  - **Ubuntu/Debian:** `sudo apt-get install tesseract-ocr libtesseract-dev`
+  - **macOS:** `brew install tesseract`
+  - **Windows:** See [OCR Setup in docs](#ocr-setup-required)
+  - **Docker:** Already included in Dockerfile
+
 ### Optional Software
 
 - **Ollama:** For local AI testing ([Download](https://ollama.ai/))
@@ -286,6 +294,84 @@ curl -X POST http://localhost:9095/api/hybrid-chat \
   -H "Content-Type: application/json" \
   -d '{"message":"What is the temperature of chiller S001-CHILLER-B1-001?"}'
 ```
+
+## OCR Setup (Required)
+
+OCR (Optical Character Recognition) is used across multiple SENTINEL modules:
+- Floor plan sanitization (Phase A: Digital Twin)
+- Work order technician pipeline (Phase 41)
+- Equipment vision processing
+- Service sheet data entry
+
+### Installation by Platform
+
+**Ubuntu/Debian:**
+```bash
+sudo apt-get update
+sudo apt-get install -y tesseract-ocr libtesseract-dev
+tesseract --version  # Verify installation
+```
+
+**macOS:**
+```bash
+brew install tesseract
+tesseract --version  # Verify installation
+```
+
+**Windows (WSL):**
+```bash
+wsl
+sudo apt-get install -y tesseract-ocr libtesseract-dev
+```
+
+**Windows (Native):**
+- Download from: https://github.com/UB-Mannheim/tesseract/wiki
+- Or: `choco install tesseract` (with Chocolatey)
+- Configure in Python: `pytesseract.pytesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'`
+
+**Docker:** Already included in container image (no action needed)
+
+### Verify OCR Installation
+
+```bash
+cd backend
+source venv/bin/activate
+python3 << 'EOF'
+from app.services.floor_plan_sanitizer import get_floor_plan_sanitizer
+sanitizer = get_floor_plan_sanitizer()
+print(f"✅ OCR Ready: {sanitizer.ocr_installed}")
+EOF
+```
+
+Or run tests:
+```bash
+cd backend
+pytest tests/services/test_floor_plan_sanitizer.py -v
+# Expected: 17 passed, 1 skipped
+```
+
+### Troubleshooting OCR
+
+**Error: "tesseract is not installed"**
+```bash
+# Check if installed
+which tesseract
+# or on Windows
+where tesseract
+
+# If missing, follow installation steps above
+```
+
+**Error: "libtesseract.so.4 not found"**
+```bash
+# Install development headers
+sudo apt-get install -y libtesseract-dev
+```
+
+**Poor OCR accuracy**
+- Ensure floor plan is > 150 DPI
+- Increase image contrast before OCR
+- Specify language: `pytesseract.image_to_string(image, lang='eng+afr')`
 
 ## Troubleshooting
 
