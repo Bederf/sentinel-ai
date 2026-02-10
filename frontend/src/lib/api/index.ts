@@ -23,7 +23,6 @@ export {
   isExpectedApiError,
   AUTH_EXPIRED_EVENT,
   API_BASE_URL,
-  SITES_CACHE_KEY,
   type HealthResponse,
 } from './client';
 

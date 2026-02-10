@@ -2,13 +2,18 @@
  * Standard error class for API errors with status codes
  */
 export class ApiError extends Error {
+  public status: number;
+  public data?: unknown;
+
   constructor(
-    public status: number,
+    status: number,
     message: string,
-    public data?: unknown,
+    data?: unknown,
   ) {
     super(message);
     this.name = 'ApiError';
+    this.status = status;
+    this.data = data;
   }
 }
 
