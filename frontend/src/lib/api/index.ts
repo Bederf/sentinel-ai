@@ -106,26 +106,6 @@ export {
 // This provides fallback for any APIs not yet migrated to modular structure
 export * from '../api';
 
-// CRITICAL: Re-export modular APIs AFTER wildcard import to override legacy versions
-// Legacy api.ts has conflicting exports (e.g., sitesApi with only getDemoBuildings)
-// This ensures the full modular versions take precedence in the bundle
-export { authApi, type AuthUser, type LoginResponse, type VerifyResponse } from './auth';
-export {
-  devicesApi,
-  type Device,
-  type DevicePoint,
-  type DeviceStatus,
-  type DeviceSafetyStatus,
-  type DeviceControlResponse,
-} from './devices';
-export {
-  sitesApi,
-  type Site,
-  type Equipment,
-  type BuildingEquipmentResponse,
-  type CreateSiteRequest,
-} from './sites';
-
 // Batch aggregators and fetch client (AFTER wildcard to ensure they take precedence)
 export {
   safetyBatcher,

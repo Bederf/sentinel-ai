@@ -429,7 +429,9 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
                   onCustomizeDashboard();
                   setIsMobileOpen(false);
                 }}
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 md:justify-center lg:justify-start hover:brightness-125 hover:scale-[1.02]"
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 hover:brightness-125 hover:scale-[1.02] ${
+                  isCollapsed ? 'md:justify-center lg:justify-center' : 'md:justify-center lg:justify-start'
+                }`}
                 style={{
                   background: "rgba(245, 158, 11, 0.1)",
                   border: "1px solid rgba(245, 158, 11, 0.3)",

@@ -100,6 +100,7 @@ export function SplashScreen({ onComplete, minDisplayTime = 2500 }: SplashScreen
           <video
             ref={videoRef}
             className="max-w-full max-h-full object-contain"
+            style={{ border: "none", outline: "none" }}
             muted
             playsInline
             autoPlay

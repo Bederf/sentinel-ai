@@ -3865,22 +3865,9 @@ export interface NextSiteIdResponse {
   next_id: string;
 }
 
-export const sitesApi = {
-  /** Get list of demo buildings available for discovery simulation */
-  getDemoBuildings: () =>
-    fetchApi<DemoBuilding[]>('/api/sites/demo-buildings'),
-
-  /** Get next available site ID (e.g., site-005) */
-  getNextSiteId: () =>
-    fetchApi<NextSiteIdResponse>('/api/sites/next-id'),
-
-  /** Create a new site */
-  createSite: (data: CreateSiteRequest) =>
-    fetchApi<CreateSiteResponse>('/api/sites', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-};
+// NOTE: sitesApi removed (conflicting with modular sites.ts version)
+// Use modular import: import { sitesApi } from '@/lib/api/sites'
+// Modular version has: getSites(), getSite(), getBuildings(), getEquipment(), getDesks(), etc.
 
 // ============= Security Module Interfaces (Phase 58) =============
 

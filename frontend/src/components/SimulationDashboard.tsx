@@ -913,7 +913,7 @@ function AnalyticsTab({ selectedSiteId: _selectedSiteId }: { selectedSiteId: str
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {/* Events by Hour */}
               <div
-                className="rounded-md p-5 w-full min-w-0"
+                className="rounded-md p-5 w-full h-80 min-w-0 flex flex-col"
                 style={{
                   background: "var(--color-sentinel-bg-panel)",
                   border: "1px solid var(--color-sentinel-border)",
@@ -926,7 +926,7 @@ function AnalyticsTab({ selectedSiteId: _selectedSiteId }: { selectedSiteId: str
                   Events by Hour
                 </h3>
                 {eventsByHourData.length > 0 ? (
-                  <div className="w-full h-48 min-w-0">
+                  <div className="flex-1 w-full min-w-0" style={{ minHeight: "200px" }}>
                     <BarChart
                       data={eventsByHourData}
                       index="hour"
@@ -940,7 +940,7 @@ function AnalyticsTab({ selectedSiteId: _selectedSiteId }: { selectedSiteId: str
                   </div>
                 ) : (
                   <p
-                    className="text-xs text-center py-8"
+                    className="text-xs text-center py-8 flex-1 flex items-center justify-center"
                     style={{ color: "var(--color-sentinel-text-disabled)" }}
                   >
                     No event data available
@@ -950,7 +950,7 @@ function AnalyticsTab({ selectedSiteId: _selectedSiteId }: { selectedSiteId: str
 
               {/* Profile Scores */}
               <div
-                className="rounded-md p-5 w-full min-w-0"
+                className="rounded-md p-5 w-full h-80 min-w-0 flex flex-col"
                 style={{
                   background: "var(--color-sentinel-bg-panel)",
                   border: "1px solid var(--color-sentinel-border)",
@@ -963,7 +963,7 @@ function AnalyticsTab({ selectedSiteId: _selectedSiteId }: { selectedSiteId: str
                   Profile Scores
                 </h3>
                 {profileScoresData.length > 0 ? (
-                  <div className="w-full h-48 min-w-0">
+                  <div className="flex-1 w-full min-w-0" style={{ minHeight: "200px" }}>
                     <BarChart
                       data={profileScoresData}
                       index="profile"
@@ -977,7 +977,7 @@ function AnalyticsTab({ selectedSiteId: _selectedSiteId }: { selectedSiteId: str
                   </div>
                 ) : (
                   <p
-                    className="text-xs text-center py-8"
+                    className="text-xs text-center py-8 flex-1 flex items-center justify-center"
                     style={{ color: "var(--color-sentinel-text-disabled)" }}
                   >
                     No profile data available
