@@ -677,9 +677,29 @@ async def get_building_equipment(building_id: str) -> dict:
 
     Each item includes: id, name, type, category, status, health, details
     """
-    # Map building_id to site code for Supabase lookup
+    # Handle both UUID and building code formats
+    site_code = building_id
+    building_uuid = None
+
+    # Try mapping first (for legacy string IDs like "sandton")
     BUILDING_TO_SITE = {"sandton": "site-002"}
-    site_code = BUILDING_TO_SITE.get(building_id, building_id)
+    if building_id in BUILDING_TO_SITE:
+        site_code = BUILDING_TO_SITE[building_id]
+    else:
+        # If building_id looks like a UUID, look it up in buildings table
+        import uuid
+        try:
+            uuid.UUID(building_id)  # Validate UUID format
+            # It's a UUID, so look it up to get the code
+            from app.database.supabase_client import get_supabase_client
+            client = get_supabase_client()
+            building_result = client.table("buildings").select("id, code").eq("id", building_id).execute()
+            if building_result.data:
+                site_code = building_result.data[0]["code"]
+                building_uuid = building_result.data[0]["id"]
+        except (ValueError, Exception):
+            # Not a UUID, use as-is
+            pass
 
     # Try Supabase first
     try:
@@ -691,9 +711,15 @@ async def get_building_equipment(building_id: str) -> dict:
             # Get building info from Supabase (needed in the loop)
             from app.database.supabase_client import get_supabase_client
             client = get_supabase_client()
-            building_result = client.table("buildings").select("id, name").eq("code", site_code).execute()
-            building_name = building_result.data[0]["name"] if building_result.data else building_id
-            building_uuid = building_result.data[0]["id"] if building_result.data else None
+
+            # Only query if we don't already have building_uuid
+            if not building_uuid:
+                building_result = client.table("buildings").select("id, name").eq("code", site_code).execute()
+                building_name = building_result.data[0]["name"] if building_result.data else building_id
+                building_uuid = building_result.data[0]["id"] if building_result.data else None
+            else:
+                building_result = client.table("buildings").select("id, name").eq("id", building_uuid).execute()
+                building_name = building_result.data[0]["name"] if building_result.data else building_id
 
             # Cross-reference active alerts to derive equipment risk status
             alert_severity_map: dict[str, str] = {}  # equipment_uuid -> highest severity
