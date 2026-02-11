@@ -54,18 +54,19 @@ function getEquipmentPosition(
   // Normalize floor code (L0 is ground, G is legacy)
   const normalizedFloor = floorCode === 'G' ? 'L0' : floorCode;
 
-  // Map floor to Y coordinate (height)
-  // Outdoor equipment (Roof, Basement) positioned outside building envelope
+  // Map floor to Y coordinate - MUST match BuildingModel.tsx floor positions
+  // BuildingModel: B1=0, L0=3, L1=6, L2=9, R=12
+  // Outdoor equipment positioned outside/above building
   const floorHeights: Record<string, number> = {
-    'B1': -3,       // Basement: below ground level
-    'B2': -5,       // Deep basement
-    'G': 3.5,
-    'L0': 3.5,      // Ground floor (inside)
-    'L1': 6.5,      // First floor (inside)
-    'L2': 9.5,      // Second floor (inside)
-    'R': 15,        // Roof: above building envelope
+    'B1': 0,        // Basement - at ground level floor
+    'B2': -2,       // Deep basement - below
+    'G': 3,
+    'L0': 3,        // Ground floor - matches building
+    'L1': 6,        // First floor - matches building
+    'L2': 9,        // Second floor - matches building
+    'R': 14,        // Roof - above building (roof is at Y=12)
   };
-  const y = floorHeights[normalizedFloor] || floorHeights[floorCode] || 3.5;
+  const y = floorHeights[normalizedFloor] || floorHeights[floorCode] || 3;
 
   // For outdoor equipment (Basement, Roof), position around building perimeter
   if (normalizedFloor === 'B1' || normalizedFloor === 'B2' || normalizedFloor === 'R') {
@@ -119,11 +120,13 @@ function getFloorIdFromCode(code: string): number {
   const floorMatch = code.match(/-(B\d|G|L\d+|R)-/);
   const floorCode = floorMatch ? floorMatch[1] : 'L0';
 
+  // Floor IDs must match FLOORS array in DigitalTwin.tsx
+  // B1(0), L0(1), L1(2), L2(3), R(4)
   const floorMap: Record<string, number> = {
-    'B1': 0,
-    'B2': -1,
-    'G': 1,     // Legacy support for G (maps to same height as L0)
-    'L0': 1,    // Ground floor (Level 0)
+    'B1': 0,    // Basement
+    'B2': -1,   // Deep basement (not in building)
+    'G': 1,     // Legacy: maps to L0
+    'L0': 1,    // Ground floor
     'L1': 2,    // First floor
     'L2': 3,    // Second floor
     'R': 4,     // Roof
