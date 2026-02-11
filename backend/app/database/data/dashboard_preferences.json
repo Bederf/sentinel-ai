@@ -1,0 +1,311 @@
+{
+  "test-user-update": {
+    "user_id": "test-user-update",
+    "visible_kpi_cards": [
+      "kpi-active-risks",
+      "kpi-protected-sites"
+    ],
+    "visible_sections": [
+      "energy-analytics",
+      "risk-predictions"
+    ],
+    "kpi_card_order": [
+      "kpi-active-risks",
+      "kpi-protected-sites"
+    ],
+    "section_order": [
+      "energy-analytics",
+      "risk-predictions"
+    ],
+    "default_energy_period": 45,
+    "default_energy_site_id": "site-001"
+  },
+  "test-user-update-existing": {
+    "user_id": "test-user-update-existing",
+    "visible_kpi_cards": [
+      "kpi-active-risks",
+      "kpi-protected-sites"
+    ],
+    "visible_sections": [
+      "energy-analytics",
+      "risk-predictions"
+    ],
+    "kpi_card_order": [
+      "kpi-active-risks",
+      "kpi-protected-sites"
+    ],
+    "section_order": [
+      "energy-analytics",
+      "risk-predictions"
+    ],
+    "default_energy_period": 45,
+    "default_energy_site_id": "site-001"
+  },
+  "test-user-preserve": {
+    "user_id": "test-user-preserve",
+    "visible_kpi_cards": [
+      "kpi-active-risks"
+    ],
+    "visible_sections": [
+      "energy-analytics"
+    ],
+    "kpi_card_order": [
+      "kpi-active-risks"
+    ],
+    "section_order": [
+      "energy-analytics"
+    ],
+    "default_energy_period": 60,
+    "default_energy_site_id": "site-002"
+  },
+  "test-user-period-7": {
+    "user_id": "test-user-period-7",
+    "visible_kpi_cards": [
+      "kpi-protected-sites",
+      "kpi-monitored-assets",
+      "kpi-active-risks",
+      "kpi-potential-savings",
+      "kpi-risk-predictions"
+    ],
+    "visible_sections": [
+      "kpi-row",
+      "site-protection",
+      "energy-analytics",
+      "risk-predictions"
+    ],
+    "kpi_card_order": [
+      "kpi-protected-sites",
+      "kpi-monitored-assets",
+      "kpi-active-risks",
+      "kpi-potential-savings",
+      "kpi-risk-predictions"
+    ],
+    "section_order": [
+      "kpi-row",
+      "site-protection",
+      "energy-analytics",
+      "risk-predictions"
+    ],
+    "default_energy_period": 7,
+    "default_energy_site_id": null
+  },
+  "test-user-period-30": {
+    "user_id": "test-user-period-30",
+    "visible_kpi_cards": [
+      "kpi-protected-sites",
+      "kpi-monitored-assets",
+      "kpi-active-risks",
+      "kpi-potential-savings",
+      "kpi-risk-predictions"
+    ],
+    "visible_sections": [
+      "kpi-row",
+      "site-protection",
+      "energy-analytics",
+      "risk-predictions"
+    ],
+    "kpi_card_order": [
+      "kpi-protected-sites",
+      "kpi-monitored-assets",
+      "kpi-active-risks",
+      "kpi-potential-savings",
+      "kpi-risk-predictions"
+    ],
+    "section_order": [
+      "kpi-row",
+      "site-protection",
+      "energy-analytics",
+      "risk-predictions"
+    ],
+    "default_energy_period": 30,
+    "default_energy_site_id": null
+  },
+  "test-user-period-90": {
+    "user_id": "test-user-period-90",
+    "visible_kpi_cards": [
+      "kpi-protected-sites",
+      "kpi-monitored-assets",
+      "kpi-active-risks",
+      "kpi-potential-savings",
+      "kpi-risk-predictions"
+    ],
+    "visible_sections": [
+      "kpi-row",
+      "site-protection",
+      "energy-analytics",
+      "risk-predictions"
+    ],
+    "kpi_card_order": [
+      "kpi-protected-sites",
+      "kpi-monitored-assets",
+      "kpi-active-risks",
+      "kpi-potential-savings",
+      "kpi-risk-predictions"
+    ],
+    "section_order": [
+      "kpi-row",
+      "site-protection",
+      "energy-analytics",
+      "risk-predictions"
+    ],
+    "default_energy_period": 90,
+    "default_energy_site_id": null
+  },
+  "test-user": {
+    "user_id": "test-user",
+    "visible_kpi_cards": [
+      "kpi-protected-sites",
+      "kpi-monitored-assets",
+      "kpi-active-risks",
+      "kpi-potential-savings",
+      "kpi-risk-predictions"
+    ],
+    "visible_sections": [
+      "kpi-row",
+      "site-protection",
+      "energy-analytics",
+      "risk-predictions"
+    ],
+    "kpi_card_order": [
+      "kpi-protected-sites",
+      "kpi-monitored-assets",
+      "kpi-active-risks",
+      "kpi-potential-savings",
+      "kpi-risk-predictions"
+    ],
+    "section_order": [
+      "kpi-row",
+      "site-protection",
+      "energy-analytics",
+      "risk-predictions"
+    ],
+    "default_energy_period": 30,
+    "default_energy_site_id": null
+  },
+  "repo-test-user-2": {
+    "user_id": "repo-test-user-2",
+    "visible_kpi_cards": [
+      "kpi-active-risks"
+    ],
+    "visible_sections": [
+      "kpi-row",
+      "site-protection",
+      "energy-analytics",
+      "risk-predictions"
+    ],
+    "kpi_card_order": [
+      "kpi-protected-sites",
+      "kpi-monitored-assets",
+      "kpi-active-risks",
+      "kpi-potential-savings",
+      "kpi-risk-predictions"
+    ],
+    "section_order": [
+      "kpi-row",
+      "site-protection",
+      "energy-analytics",
+      "risk-predictions"
+    ],
+    "default_energy_period": 50,
+    "default_energy_site_id": null
+  },
+  "repo-test-cycle": {
+    "user_id": "repo-test-cycle",
+    "visible_kpi_cards": [
+      "kpi-protected-sites",
+      "kpi-active-risks"
+    ],
+    "visible_sections": [
+      "kpi-row",
+      "site-protection",
+      "energy-analytics",
+      "risk-predictions"
+    ],
+    "kpi_card_order": [
+      "kpi-protected-sites",
+      "kpi-monitored-assets",
+      "kpi-active-risks",
+      "kpi-potential-savings",
+      "kpi-risk-predictions"
+    ],
+    "section_order": [
+      "kpi-row",
+      "site-protection",
+      "energy-analytics",
+      "risk-predictions"
+    ],
+    "default_energy_period": 75,
+    "default_energy_site_id": null
+  },
+  "user-1": {
+    "user_id": "user-1",
+    "visible_kpi_cards": [
+      "kpi-protected-sites"
+    ],
+    "visible_sections": [
+      "kpi-row",
+      "site-protection",
+      "energy-analytics",
+      "risk-predictions"
+    ],
+    "kpi_card_order": [
+      "kpi-protected-sites"
+    ],
+    "section_order": [
+      "kpi-row",
+      "site-protection",
+      "energy-analytics",
+      "risk-predictions"
+    ],
+    "default_energy_period": 30,
+    "default_energy_site_id": null
+  },
+  "user-2": {
+    "user_id": "user-2",
+    "visible_kpi_cards": [
+      "kpi-active-risks"
+    ],
+    "visible_sections": [
+      "energy-analytics"
+    ],
+    "kpi_card_order": [
+      "kpi-active-risks"
+    ],
+    "section_order": [
+      "energy-analytics"
+    ],
+    "default_energy_period": 60,
+    "default_energy_site_id": null
+  },
+  "test-user-missing": {
+    "user_id": "test-user-missing",
+    "visible_kpi_cards": [
+      "kpi-protected-sites",
+      "kpi-monitored-assets",
+      "kpi-active-risks",
+      "kpi-potential-savings",
+      "kpi-risk-predictions"
+    ],
+    "visible_sections": [
+      "kpi-row",
+      "site-protection",
+      "energy-analytics",
+      "risk-predictions"
+    ],
+    "kpi_card_order": [
+      "kpi-protected-sites",
+      "kpi-monitored-assets",
+      "kpi-active-risks",
+      "kpi-potential-savings",
+      "kpi-risk-predictions"
+    ],
+    "section_order": [
+      "kpi-row",
+      "site-protection",
+      "energy-analytics",
+      "risk-predictions"
+    ],
+    "default_energy_period": 30,
+    "default_energy_site_id": null
+  }
+}

@@ -6,11 +6,13 @@ Implements Supabase + JSON fallback pattern for user preferences persistence.
 import json
 import logging
 import os
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, TYPE_CHECKING
 from pathlib import Path
 
 from app.database.supabase_client import get_supabase_client
-from app.api.preferences import DashboardPreferences
+
+if TYPE_CHECKING:
+    from app.api.preferences import DashboardPreferences
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +30,10 @@ class PreferencesRepository:
         self.use_json = os.getenv("USE_JSON_STORAGE", "false").lower() == "true"
         self.json_file = Path(__file__).parent.parent / "data" / "dashboard_preferences.json"
         self.client = None
+
+        # Force JSON in TESTING mode
+        if os.getenv("TESTING", "").lower() == "true":
+            self.use_json = True
 
         if not self.use_json:
             try:
@@ -87,7 +93,7 @@ class PreferencesRepository:
             logger.error(f"Error retrieving preferences for user {user_id}: {e}")
             return None
 
-    async def upsert(self, user_id: str, preferences: DashboardPreferences) -> Dict[str, Any]:
+    async def upsert(self, user_id: str, preferences: "DashboardPreferences") -> Dict[str, Any]:
         """Create or update preferences for a user.
 
         Args:
@@ -164,13 +170,15 @@ class PreferencesRepository:
         Returns:
             Dictionary with default preferences
         """
-        defaults = DashboardPreferences()
+        # Import here to avoid circular imports
+        from app.api.preferences import DEFAULT_KPI_CARDS, DEFAULT_SECTIONS
+
         return {
             "user_id": "default-user",
-            "visible_kpi_cards": defaults.visible_kpi_cards,
-            "visible_sections": defaults.visible_sections,
-            "kpi_card_order": defaults.kpi_card_order,
-            "section_order": defaults.section_order,
-            "default_energy_period": defaults.default_energy_period,
-            "default_energy_site_id": defaults.default_energy_site_id,
+            "visible_kpi_cards": DEFAULT_KPI_CARDS,
+            "visible_sections": DEFAULT_SECTIONS,
+            "kpi_card_order": DEFAULT_KPI_CARDS,
+            "section_order": DEFAULT_SECTIONS,
+            "default_energy_period": 30,
+            "default_energy_site_id": None,
         }
