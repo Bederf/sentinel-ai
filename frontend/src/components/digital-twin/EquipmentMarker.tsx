@@ -1,5 +1,6 @@
-import { Html } from '@react-three/drei';
-import { useRef } from 'react';
+import { useRef, useMemo, useState } from 'react';
+import { useFrame } from '@react-three/fiber';
+import * as THREE from 'three';
 import type { Equipment } from '@/lib/api/sites';
 
 interface EquipmentMarkerProps {
@@ -8,157 +9,179 @@ interface EquipmentMarkerProps {
   onClick: () => void;
 }
 
-// Equipment type labels (no icons/emojis)
-const EQUIPMENT_LABELS: Record<string, string> = {
-  'chiller': 'CHILLER',
-  'ahu': 'AHU',
-  'fcu': 'FCU',
-  'vav': 'VAV',
-  'cooling_tower': 'COOLING TOWER',
-  'ct': 'COOLING TOWER',
-  'generator': 'GENERATOR',
-  'gen': 'GENERATOR',
-  'ups': 'UPS',
-  'transformer': 'TRANSFORMER',
-  'tx': 'TRANSFORMER',
-  'ats': 'ATS',
-  'dali': 'DALI',
-  'luminaire': 'LUMINAIRE',
-  'lum': 'LUMINAIRE',
-  'meter': 'METER',
-  'mtr': 'METER',
-  'fire': 'FIRE',
-  'sprinkler': 'SPRINKLER',
-  'cctv': 'CCTV',
-  'access': 'ACCESS',
-  'acc': 'ACCESS',
-  'sensor': 'SENSOR',
-  'pump': 'PUMP',
-  'boiler': 'BOILER',
-  'hvac_zone': 'HVAC ZONE',
+// ─── Landing page TYPE_COLORS (exact match) ──────────────────────────
+const TYPE_COLORS: Record<string, string> = {
+  ahu: '#2E86AB', vav: '#3AAFDE', fcu: '#6366F1', fcuventilation: '#6366F1',
+  mcc: '#E8913A', db: '#F59E0B', distribution_board: '#F59E0B',
+  ups: '#D97706', dali: '#FBBF24', luminaire: '#FBBF24', lum: '#FBBF24',
+  sensor: '#10B981', solar: '#F97316', bess: '#22C55E',
+  chiller: '#0EA5E9', cooling_tower: '#0EA5E9', ct: '#0EA5E9',
+  pump: '#06B6D4', fire_panel: '#DC2626', fire: '#DC2626', sprinkler: '#DC2626',
+  cctv: '#6B7280', access: '#7C3AED', acc: '#7C3AED',
+  generator: '#E8913A', gen: '#E8913A',
+  transformer: '#D97706', tx: '#D97706', ats: '#D97706',
+  meter: '#78909C', mtr: '#78909C', switch: '#F59E0B',
+  boiler: '#FF5722', hvac_zone: '#26C6DA',
 };
 
-// Equipment type to size mapping for visual differentiation
-const EQUIPMENT_SIZES: Record<string, number> = {
-  'chiller': 0.8,      // Large - critical equipment
-  'ahu': 0.7,
-  'generator': 0.7,
-  'gen': 0.7,
-  'transformer': 0.6,
-  'tx': 0.6,
-  'ups': 0.6,
-  'fcu': 0.4,          // Small
-  'vav': 0.35,
-  'dali': 0.3,
-  'luminaire': 0.25,
-  'lum': 0.25,
-  'meter': 0.35,
-  'default': 0.5,
+const STATUS_COLORS: Record<string, string> = {
+  online: '#22C55E', normal: '#22C55E', running: '#22C55E',
+  warning: '#F59E0B', offline: '#6B7280',
+  standby: '#6366F1', idle: '#6366F1',
+  fault: '#EF4444', critical: '#EF4444',
 };
 
-export function EquipmentMarker({ equipment, position, onClick }: EquipmentMarkerProps) {
-  const meshRef = useRef<any>(null);
-  const equipmentType = ((equipment as any).equipment_type || (equipment as any).type || '').toLowerCase();
-
-  // Determine status color based on health or status field
-  const getStatusColor = (equipment: Equipment) => {
-    const status = equipment.status?.toLowerCase() || 'offline';
-    const health = (equipment as any).health_score || 0;
-
-    if (status === 'fault' || health < 30) return '#ef4444';  // red
-    if (status === 'warning' || health < 60) return '#f59e0b'; // yellow
-    if (status === 'online' || health >= 60) return '#10b981';  // green
-    return '#6b7280';  // gray
-  };
-
-  const getEquipmentLabel = (type: string): string => {
-    return EQUIPMENT_LABELS[type] || type.toUpperCase();
-  };
-
-  const getEquipmentSize = (type: string): number => {
-    return EQUIPMENT_SIZES[type] || EQUIPMENT_SIZES['default'];
-  };
-
-  const color = getStatusColor(equipment);
-  const label = getEquipmentLabel(equipmentType);
-  const size = getEquipmentSize(equipmentType);
-
-  const handleClick = () => {
-    if (meshRef.current) {
-      meshRef.current.scale.set(1.3, 1.3, 1.3);
-      setTimeout(() => {
-        if (meshRef.current) {
-          meshRef.current.scale.set(1, 1, 1);
-        }
-      }, 100);
+// ─── Type-specific geometry (matches landing page switch statement) ───
+function useEquipmentGeometry(type: string) {
+  return useMemo(() => {
+    switch (type) {
+      // Panels: tall box (MCC, DB, UPS)
+      case 'mcc': case 'db': case 'distribution_board':
+      case 'ups': case 'ats':
+        return new THREE.BoxGeometry(0.5, 1.0, 0.35);
+      // Large HVAC: wide box (AHU, Chiller)
+      case 'ahu': case 'chiller': case 'cooling_tower': case 'ct':
+        return new THREE.BoxGeometry(1.2, 0.7, 0.8);
+      // Small HVAC: cylinder (VAV, FCU)
+      case 'vav': case 'fcu': case 'fcuventilation':
+        return new THREE.CylinderGeometry(0.25, 0.25, 0.4, 8);
+      // Lighting: flat slab
+      case 'dali': case 'luminaire': case 'lum':
+        return new THREE.BoxGeometry(0.6, 0.06, 0.6);
+      // Sensor: tiny sphere
+      case 'sensor':
+        return new THREE.SphereGeometry(0.12, 10, 7);
+      // Solar: large flat panel
+      case 'solar':
+        return new THREE.BoxGeometry(2.5, 0.06, 1.8);
+      // Battery: medium box
+      case 'bess':
+        return new THREE.BoxGeometry(1.0, 0.7, 0.5);
+      // Pump: cylinder
+      case 'pump':
+        return new THREE.CylinderGeometry(0.3, 0.3, 0.5, 8);
+      // Wall-mount panels: small flat box (Fire, Access, CCTV)
+      case 'fire_panel': case 'fire': case 'sprinkler':
+      case 'access': case 'acc': case 'cctv':
+        return new THREE.BoxGeometry(0.3, 0.4, 0.15);
+      // Generators: large box
+      case 'generator': case 'gen':
+        return new THREE.BoxGeometry(1.0, 0.8, 0.6);
+      // Transformer
+      case 'transformer': case 'tx':
+        return new THREE.BoxGeometry(0.8, 0.7, 0.5);
+      // Meter: small box
+      case 'meter': case 'mtr':
+        return new THREE.BoxGeometry(0.3, 0.4, 0.2);
+      // Boiler
+      case 'boiler':
+        return new THREE.CylinderGeometry(0.35, 0.35, 0.6, 8);
+      default:
+        return new THREE.BoxGeometry(0.3, 0.3, 0.3);
     }
-    onClick();
-  };
+  }, [type]);
+}
+
+// ─── Status helpers ──────────────────────────────────────────────────
+function getStatusColor(equipment: Equipment): string {
+  const status = (equipment.status || '').toLowerCase();
+  const health = (equipment as any).health_score ?? 100;
+  if (status === 'fault' || status === 'critical' || health < 30) return STATUS_COLORS.fault;
+  if (status === 'warning' || health < 60) return STATUS_COLORS.warning;
+  if (status === 'offline') return STATUS_COLORS.offline;
+  if (status === 'standby' || status === 'idle') return STATUS_COLORS.standby;
+  return STATUS_COLORS.online;
+}
+
+// ─── Component ───────────────────────────────────────────────────────
+export function EquipmentMarker({ equipment, position, onClick }: EquipmentMarkerProps) {
+  const meshRef = useRef<THREE.Mesh>(null);
+  const pulseRef = useRef<THREE.Mesh>(null);
+  const [hovered, setHovered] = useState(false);
+
+  const eqType = ((equipment as any).equipment_type || (equipment as any).type || '').toLowerCase();
+  const typeColor = TYPE_COLORS[eqType] || '#666666';
+  const statusColor = getStatusColor(equipment);
+  const isFault = statusColor === STATUS_COLORS.fault;
+  const isWarning = statusColor === STATUS_COLORS.warning;
+  const isOnline = statusColor === STATUS_COLORS.online;
+
+  const geometry = useEquipmentGeometry(eqType);
+
+  // Material (matches landing page: MeshPhongMaterial with emissive)
+  const material = useMemo(() => {
+    return new THREE.MeshPhongMaterial({
+      color: new THREE.Color(typeColor),
+      emissive: new THREE.Color(statusColor),
+      emissiveIntensity: isFault ? 0.5 : 0.12,
+      transparent: true,
+      opacity: 0.85,
+    });
+  }, [typeColor, statusColor, isFault]);
+
+  // Animate: pulse for fault/warning, subtle bob for online
+  useFrame((_, delta) => {
+    if (!meshRef.current) return;
+    const time = performance.now() * 0.001;
+
+    // Fault/warning pulse on child sphere
+    if (pulseRef.current) {
+      const s = 1 + Math.sin(time * 4) * 0.3;
+      pulseRef.current.scale.set(s, s, s);
+      (pulseRef.current.material as THREE.MeshBasicMaterial).opacity =
+        0.08 + Math.sin(time * 4) * 0.06;
+    }
+
+    // Subtle bob for online equipment (matches landing page)
+    if (isOnline && !isFault) {
+      meshRef.current.position.y = Math.sin(time * 1.5) * 0.02;
+    }
+
+    // Hover scale
+    const target = hovered ? 1.15 : 1;
+    const curr = meshRef.current.scale.x;
+    const lerped = curr + (target - curr) * delta * 8;
+    meshRef.current.scale.setScalar(lerped);
+  });
 
   return (
-    <group position={position} onClick={handleClick}>
-      {/* Type-specific base shape - size varies by equipment type */}
-      <mesh ref={meshRef}>
-        <cylinderGeometry args={[size, size, size * 0.6, 16]} />
-        <meshStandardMaterial
-          color={color}
-          emissive={color}
-          emissiveIntensity={0.3}
-          metalness={0.4}
-          roughness={0.6}
-        />
-      </mesh>
+    <group
+      position={position}
+      onClick={(e) => { e.stopPropagation(); onClick(); }}
+      onPointerEnter={(e) => { e.stopPropagation(); setHovered(true); document.body.style.cursor = 'pointer'; }}
+      onPointerLeave={() => { setHovered(false); document.body.style.cursor = 'auto'; }}
+    >
+      {/* Main equipment mesh */}
+      <mesh ref={meshRef} geometry={geometry} material={material} castShadow />
 
-      {/* Status ring with size proportional to equipment */}
-      <mesh position={[0, size * 0.4, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <torusGeometry args={[size * 1.2, size * 0.1, 8, 32]} />
-        <meshBasicMaterial color={color} />
-      </mesh>
-
-      {/* Pulsing effect for faults */}
-      {color === '#ef4444' && (
-        <mesh position={[0, size * 0.3, 0]}>
-          <sphereGeometry args={[size * 1.4, 8, 8]} />
-          <meshBasicMaterial color={color} transparent opacity={0.2} />
+      {/* Online status ring (flat ring below equipment) */}
+      {isOnline && !isFault && !isWarning && (
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.25, 0]}>
+          <ringGeometry args={[0.2, 0.28, 16]} />
+          <meshBasicMaterial
+            color={statusColor}
+            transparent
+            opacity={0.2}
+            side={THREE.DoubleSide}
+          />
         </mesh>
       )}
 
-      {/* Equipment name and type label */}
-      <Html distanceFactor={10} position={[0, size + 0.8, 0]}>
-        <div
-          className="flex flex-col items-center gap-1 pointer-events-none select-none"
-          style={{
-            filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))',
-          }}
-        >
-          {/* Equipment name */}
-          <div
-            className="text-xs px-2 py-1 rounded font-medium whitespace-nowrap"
-            style={{
-              background: 'rgba(0, 0, 0, 0.85)',
-              color: color,
-              border: `1px solid ${color}`,
-              fontSize: '0.7rem',
-              fontWeight: '600',
-            }}
-          >
-            {equipment.name || (equipment as any).code || 'Unknown'}
-          </div>
-          {/* Equipment type label */}
-          <div
-            className="text-xs px-2 py-0.5 rounded font-medium whitespace-nowrap"
-            style={{
-              background: color,
-              color: 'white',
-              opacity: 0.85,
-              fontSize: '0.6rem',
-              fontWeight: '500',
-            }}
-          >
-            {label}
-          </div>
-        </div>
-      </Html>
+      {/* Fault pulse sphere */}
+      {isFault && (
+        <mesh ref={pulseRef}>
+          <sphereGeometry args={[0.5, 8, 6]} />
+          <meshBasicMaterial color={0xef4444} transparent opacity={0.12} />
+        </mesh>
+      )}
+
+      {/* Warning pulse sphere */}
+      {isWarning && (
+        <mesh ref={!isFault ? pulseRef : undefined}>
+          <sphereGeometry args={[0.35, 8, 6]} />
+          <meshBasicMaterial color={0xf59e0b} transparent opacity={0.08} />
+        </mesh>
+      )}
     </group>
   );
 }
