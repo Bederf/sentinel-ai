@@ -10,7 +10,7 @@ import { EquipmentDetailPanel } from './EquipmentDetailPanel';
 import { FloorSelector } from './FloorSelector';
 import { StatsBar } from './StatsBar';
 import { AlertBanner } from './AlertBanner';
-import { Compass } from './Compass';
+import { Compass } from '../3d/Compass';
 import { useEquipmentData } from '@/hooks/useEquipmentData';
 import { useSitesList } from '@/hooks/useSitesList';
 import { useZoneCentroids } from '@/hooks/useZoneCentroids';
