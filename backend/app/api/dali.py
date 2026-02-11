@@ -44,10 +44,20 @@ async def list_sensors(
     controller_id: Optional[str] = None,
     limit: int = Query(100, le=1000)
 ) -> List[dict]:
-    """List sensors with optional filters."""
+    """List sensors with optional filters, enriched with zone and desk information."""
+    from app.utils.sensor_formatter import format_sensor_with_zone_and_desks
+    
     service = get_dali_service()
     sensors = service.get_sensors(zone_id=zone_id, controller_id=controller_id)
-    return [s.to_dict() for s in sensors[:limit]]
+    
+    # Enrich sensors with zone and desk information from Equipment table
+    enriched = []
+    for sensor in sensors[:limit]:
+        sensor_dict = sensor.to_dict()
+        enriched_dict = await format_sensor_with_zone_and_desks(sensor_dict)
+        enriched.append(enriched_dict)
+    
+    return enriched
 
 
 @router.get("/sensors/{sensor_id}")

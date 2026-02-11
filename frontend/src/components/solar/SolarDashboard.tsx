@@ -11,6 +11,7 @@
  */
 
 import { useState, useEffect, useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Sun, Building2, ChevronDown, RefreshCw } from "lucide-react";
 import { fetchSolarSites } from "../../lib/solarApi";
 import type { SolarSite } from "../../lib/solarApi";
@@ -22,10 +23,21 @@ import { EnergyFlowDiagram } from "./EnergyFlowDiagram";
 import { SolarFinancialReport } from "./SolarFinancialReport";
 import { ForecastActualChart } from "./ForecastActualChart";
 
+/**
+ * SolarDashboard - Main solar & BESS monitoring view
+ *
+ * Components use React Query hooks for automatic caching, deduplication, and
+ * request management. The refresh button invalidates all solar queries.
+ *
+ * Layout:
+ * - Row 1: Overview (generation, performance) | BESS (SOC, mode) | Energy Flow
+ * - Row 2: Inverter Status Matrix (full width)
+ * - Row 3: Financial Report | Forecast vs Actual Chart
+ */
 export function SolarDashboard() {
+  const queryClient = useQueryClient();
   const [solarSites, setSolarSites] = useState<SolarSite[]>([]);
   const [selectedSiteId, setSelectedSiteId] = useState<string>("");
-  const [refreshKey, setRefreshKey] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Fetch solar sites on mount
@@ -50,11 +62,23 @@ export function SolarDashboard() {
       });
   }, [selectedSiteId]);
 
+  /**
+   * Refresh all solar queries via React Query
+   *
+   * Invalidates all solar queries (overview, BESS, inverters, performance, financial)
+   * which triggers refetch of stale data. This respects React Query's stale time,
+   * so in-cache data is immediately refetched while fresh data is used as-is.
+   */
   const handleRefresh = useCallback(() => {
     setIsRefreshing(true);
-    setRefreshKey((k) => k + 1);
+    // Invalidate all solar-related queries
+    queryClient.invalidateQueries({ queryKey: ['solar-overview'] });
+    queryClient.invalidateQueries({ queryKey: ['solar-bess'] });
+    queryClient.invalidateQueries({ queryKey: ['solar-inverters'] });
+    queryClient.invalidateQueries({ queryKey: ['solar-performance'] });
+    queryClient.invalidateQueries({ queryKey: ['solar-financial'] });
     setTimeout(() => setIsRefreshing(false), 1000);
-  }, []);
+  }, [queryClient]);
 
   return (
     <div
@@ -141,7 +165,7 @@ export function SolarDashboard() {
         <PageLoading message="Loading solar sites..." />
       ) : (
       <>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4" key={refreshKey}>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
         <div
           className="glass-panel overflow-hidden"
         >
