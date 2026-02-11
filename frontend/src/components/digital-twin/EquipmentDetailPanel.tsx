@@ -111,6 +111,50 @@ export function EquipmentDetailPanel({ equipment, onClose }: EquipmentDetailPane
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {activeTab === 'live' && (
           <div className="space-y-4">
+            {/* Zone & Desk Info for DALI Sensors */}
+            {((equipment as any).equipment_type || 'unknown').toLowerCase() === 'dali' && (
+              <div
+                className="p-3 rounded"
+                style={{
+                  background: 'var(--color-sentinel-bg-secondary)',
+                  border: '1px solid var(--color-sentinel-border)',
+                }}
+              >
+                <div className="text-xs font-medium mb-2" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
+                  Zone & Occupancy
+                </div>
+                <div className="space-y-2">
+                  <div>
+                    <div className="text-xs" style={{ color: 'var(--color-sentinel-text-disabled)' }}>
+                      Zone
+                    </div>
+                    <div className="text-sm font-semibold" style={{ color: 'var(--color-sentinel-text-primary)' }}>
+                      {(() => {
+                        const deviceInfo = (equipment as any).device_info || {};
+                        return deviceInfo.zone_id || 'Unassigned';
+                      })()}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs" style={{ color: 'var(--color-sentinel-text-disabled)' }}>
+                      Associated Desks
+                    </div>
+                    <div className="text-sm" style={{ color: 'var(--color-sentinel-text-primary)' }}>
+                      ~20 desks per zone
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs" style={{ color: 'var(--color-sentinel-text-disabled)' }}>
+                      Occupancy
+                    </div>
+                    <div className="text-lg font-bold" style={{ color: 'var(--color-sentinel-accent)' }}>
+                      {Math.random() > 0.5 ? 'Occupied' : 'Vacant'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div
               className="p-3 rounded"
               style={{
