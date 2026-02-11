@@ -10,13 +10,14 @@ import { EquipmentDetailPanel } from './EquipmentDetailPanel';
 import { FloorSelector } from './FloorSelector';
 import { StatsBar } from './StatsBar';
 import { AlertBanner } from './AlertBanner';
+import { Compass } from './Compass';
 import { useEquipmentData } from '@/hooks/useEquipmentData';
 import { useSitesList } from '@/hooks/useSitesList';
 import { useZoneCentroids } from '@/hooks/useZoneCentroids';
 
 const FLOORS = [
   { id: 0, label: 'B1 - Basement', code: 'B1' },
-  { id: 1, label: 'G - Ground', code: 'G' },
+  { id: 1, label: 'L0 - Ground', code: 'L0' },
   { id: 2, label: 'L1 - First Floor', code: 'L1' },
   { id: 3, label: 'L2 - Second Floor', code: 'L2' },
   { id: 4, label: 'R - Roof', code: 'R' },
@@ -254,6 +255,9 @@ export function DigitalTwin() {
           {/* Lighting */}
           <ambientLight intensity={0.5} />
           <directionalLight position={[10, 10, 5]} intensity={0.8} />
+
+          {/* Compass for orientation */}
+          <Compass />
 
           {/* Camera */}
           <PerspectiveCamera makeDefault position={[15, 12, 15]} fov={50} />

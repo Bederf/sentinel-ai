@@ -49,9 +49,9 @@ function getEquipmentPosition(
 
   // Extract floor from code (e.g., "S002-CHILLER-B1-001" → B1)
   const floorMatch = code.match(/-(B\d|G|L\d+|R)-/);
-  const floorCode = floorMatch ? floorMatch[1] : 'G';
+  const floorCode = floorMatch ? floorMatch[1] : 'L0';
 
-  // Normalize floor code (L0 instead of G for consistency)
+  // Normalize floor code (L0 is ground, G is legacy)
   const normalizedFloor = floorCode === 'G' ? 'L0' : floorCode;
 
   // Map floor to Y coordinate (height)
@@ -99,15 +99,16 @@ function getEquipmentPosition(
 
 function getFloorIdFromCode(code: string): number {
   const floorMatch = code.match(/-(B\d|G|L\d+|R)-/);
-  const floorCode = floorMatch ? floorMatch[1] : 'G';
+  const floorCode = floorMatch ? floorMatch[1] : 'L0';
 
   const floorMap: Record<string, number> = {
     'B1': 0,
     'B2': -1,
-    'G': 1,
-    'L1': 2,
-    'L2': 3,
-    'R': 4,
+    'G': 1,     // Legacy support for G (maps to same height as L0)
+    'L0': 1,    // Ground floor (Level 0)
+    'L1': 2,    // First floor
+    'L2': 3,    // Second floor
+    'R': 4,     // Roof
   };
 
   return floorMap[floorCode] ?? 1;
