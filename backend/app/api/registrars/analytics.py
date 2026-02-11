@@ -14,7 +14,7 @@ from app.api import survival, classification, ml_feedback, repair_effectiveness
 from app.api import rag, ml_retraining, fleet_learning, mlops
 from app.api import mcp, mcp_sse, mcp_openai
 from app.api import recommendations, simulation_analytics
-from app.api import system_health
+from app.api import system_health, solar
 
 
 def register_analytics_routers(app: FastAPI) -> None:
@@ -58,6 +58,9 @@ def register_analytics_routers(app: FastAPI) -> None:
 
     # System Health & Diagnostics
     app.include_router(system_health.router, tags=["system-health"])
+
+    # Solar & BESS
+    app.include_router(solar.router, prefix="/api", tags=["solar"])
 
     # MCP (Model Context Protocol) for AI tool integration
     app.include_router(mcp.router, tags=["mcp"])
