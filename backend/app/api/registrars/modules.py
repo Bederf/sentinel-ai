@@ -8,7 +8,7 @@ from fastapi import FastAPI
 
 from app.api import security, fire, hvac, modules, health_config
 from app.api import sustainability, contracts, pricing, municipal_billing
-from app.api import complaints, preferences, equipment_lookup
+from app.api import complaints, equipment_lookup
 
 
 def register_modules_routers(app: FastAPI) -> None:
@@ -36,7 +36,6 @@ def register_modules_routers(app: FastAPI) -> None:
 
     # Comfort and preferences
     app.include_router(complaints.router, tags=["comfort-complaints"])
-    app.include_router(preferences.router, prefix="/api", tags=["preferences"])
 
     # Equipment lookup
     app.include_router(equipment_lookup.router, prefix="/api", tags=["equipment-lookup"])
