@@ -106,11 +106,13 @@ function getEquipmentPosition(
     }
   }
 
-  // Fallback: Use simple zone letter offset
-  // Old format: A=0, B=6, C=12, D=18, E=24 (6m per zone × 5 zones = 30m)
-  const zoneOffset = (zoneLetter.charCodeAt(0) - 65) * 6;
-  const baseX = zoneOffset + 3;    // Center of zone
-  const baseZ = 10;                // Mid-depth of zone
+  // Fallback: Use zone letter offset within building bounds
+  // Building is 30m × 20m centered at (0, 0)
+  // X: -15 to +15, Z: -10 to +10
+  // 5 zones (A-E) each 6m wide
+  const zoneIndex = zoneLetter.charCodeAt(0) - 65; // A=0, B=1, C=2, D=3, E=4
+  const baseX = -12 + (zoneIndex * 6);    // A=-12, B=-6, C=0, D=6, E=12 (zone centers)
+  const baseZ = 0;                         // Center depth of zone
 
   // Apply type offset to baseline position
   return [baseX + typeOffsetX, y, baseZ + typeOffsetZ];
