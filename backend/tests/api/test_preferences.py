@@ -272,8 +272,8 @@ class TestValidation:
             data = response.json()
             assert data["preferences"]["default_energy_period"] == period
 
-    def test_missing_required_fields(self):
-        """Test that missing required fields are rejected."""
+    def test_missing_fields_use_defaults(self):
+        """Test that missing fields use default values."""
         response = client.put(
             "/api/preferences/dashboard",
             json={
@@ -281,11 +281,15 @@ class TestValidation:
                 # Missing visible_sections, kpi_card_order, section_order
                 "default_energy_period": 30,
             },
-            headers={"X-User-ID": "test-user"}
+            headers={"X-User-ID": "test-user-missing"}
         )
 
-        # Should fail validation (422 Unprocessable Entity)
-        assert response.status_code == 422
+        # Should succeed with defaults for missing fields
+        assert response.status_code == 200
+        data = response.json()
+        # The missing fields should use defaults
+        assert data["preferences"]["visible_sections"] == DEFAULT_SECTIONS
+        assert data["preferences"]["section_order"] == DEFAULT_SECTIONS
 
 
 # ============================================================================
