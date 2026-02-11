@@ -1,5 +1,6 @@
 import { useRef, useMemo, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
+import { Html } from '@react-three/drei';
 import * as THREE from 'three';
 import type { Equipment } from '@/lib/api/sites';
 
@@ -153,6 +154,16 @@ export function EquipmentMarker({ equipment, position, onClick }: EquipmentMarke
     >
       {/* Main equipment mesh */}
       <mesh ref={meshRef} geometry={geometry} material={material} castShadow />
+
+      {/* Equipment ID Label */}
+      <Html position={[0, 0.6, 0]} scale={0.3} distanceFactor={8}>
+        <div
+          className="bg-black/70 text-white px-2 py-1 rounded text-xs whitespace-nowrap font-mono"
+          style={{ pointerEvents: 'none', textShadow: '0 0 2px rgba(0,0,0,0.8)' }}
+        >
+          {(equipment as any).code || equipment.id}
+        </div>
+      </Html>
 
       {/* Online status ring (flat ring below equipment) */}
       {isOnline && !isFault && !isWarning && (

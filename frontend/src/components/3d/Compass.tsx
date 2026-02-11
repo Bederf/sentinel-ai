@@ -10,7 +10,7 @@ export function Compass() {
   const ringRadius = 1.2;
 
   return (
-    <group position={[0, 0.1, 0]}>
+    <group position={[18, 3, 0]}>
       {/* Compass ring outline */}
       <mesh>
         <cylinderGeometry args={[ringRadius, ringRadius, 0.1, 64]} />
@@ -77,7 +77,7 @@ export function Compass() {
         const z2 = Math.cos(angle) * outerR;
 
         return (
-          <line key={`tick-${i}`} geometry={undefined} material={undefined}>
+          <line key={`tick-${i}`}>
             <bufferGeometry>
               <bufferAttribute
                 attach="attributes-position"
