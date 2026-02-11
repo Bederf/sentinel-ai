@@ -341,13 +341,13 @@ describe('useSiteAlerts', () => {
       expect(result.current.data?.total_count).toBe(3);
 
       // Refetch to get updates
-      result.current.refetch();
+      const refetchPromise = result.current.refetch();
 
       await waitFor(() => {
-        expect(apiFetch).toHaveBeenCalledTimes(2);
+        expect(result.current.data?.total_count).toBe(4);
       });
 
-      expect(result.current.data?.total_count).toBe(4);
+      await refetchPromise;
     });
 
     it('should have 30s refetchInterval', async () => {
