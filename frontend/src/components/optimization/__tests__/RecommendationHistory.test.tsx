@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '../../../test-utils'
+import { render, screen, fireEvent, waitFor } from '@/test-utils'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { RecommendationHistory } from '../RecommendationHistory'
 import * as optimization from '@/lib/api/optimization'

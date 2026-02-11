@@ -3,14 +3,14 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '../../../test-utils';
+import { render, screen, waitFor } from '@/test-utils';
 import { Dashboard } from '../../components/Dashboard';
 import api from '../../lib/api';
 import {
   createMockSite,
   createMockDashboardStats,
   createMockPredictions,
-} from '../../test-utils/factories';
+} from '@/test-utils/factories';
 
 // Mock the API client
 vi.mock('../../lib/api', () => ({

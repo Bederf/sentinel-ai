@@ -10,7 +10,7 @@
  * - Optimistic updates
  */
 
-import { render, screen, fireEvent, waitFor } from '../../test-utils';
+import { render, screen, fireEvent, waitFor } from '@/test-utils';
 import { SwitchControl } from '../SwitchControl';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 

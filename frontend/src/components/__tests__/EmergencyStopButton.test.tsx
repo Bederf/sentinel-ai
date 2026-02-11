@@ -9,7 +9,7 @@
  * - Disabled state handling
  */
 
-import { render, screen, fireEvent, waitFor } from '../../test-utils';
+import { render, screen, fireEvent, waitFor } from '@/test-utils';
 import { vi } from 'vitest';
 import { EmergencyStopButton } from '../EmergencyStopButton';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';

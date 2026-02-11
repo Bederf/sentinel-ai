@@ -8,7 +8,7 @@
  * - Error handling
  */
 
-import { render, screen, fireEvent, waitFor } from '../test-utils';
+import { render, screen, fireEvent, waitFor } from '@/test-utils';
 import { ControlDashboard } from '../components/ControlDashboard';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import '@testing-library/jest-dom';

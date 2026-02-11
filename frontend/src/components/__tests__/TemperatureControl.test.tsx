@@ -11,7 +11,7 @@
  * - Error display
  */
 
-import { render, screen, fireEvent, waitFor } from '../../test-utils';
+import { render, screen, fireEvent, waitFor } from '@/test-utils';
 import { TemperatureControl } from '../TemperatureControl';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 

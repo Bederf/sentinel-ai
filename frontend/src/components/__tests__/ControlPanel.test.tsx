@@ -3,9 +3,9 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '../../../test-utils';
+import { render, screen } from '@/test-utils';
 import ControlPanel from '../ControlPanel';
-import { createMockDevice } from '../../test-utils/factories';
+import { createMockDevice } from '@/test-utils/factories';
 
 describe('ControlPanel', () => {
   const mockDevice = createMockDevice({
