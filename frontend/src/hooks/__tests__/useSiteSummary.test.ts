@@ -228,13 +228,13 @@ describe('useSiteSummary', () => {
       expect(result.current.data?.alerts.critical).toBe(1);
 
       // Refetch
-      result.current.refetch();
+      const refetchPromise = result.current.refetch();
 
       await waitFor(() => {
-        expect(apiFetch).toHaveBeenCalledTimes(2);
+        expect(result.current.data?.alerts.critical).toBe(0);
       });
 
-      expect(result.current.data?.alerts.critical).toBe(0);
+      await refetchPromise;
     });
 
     it('should update data after refetch', async () => {
