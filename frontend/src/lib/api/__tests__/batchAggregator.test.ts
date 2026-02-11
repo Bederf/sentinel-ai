@@ -159,7 +159,7 @@ describe('BatchAggregator - Batch Window Aggregation', () => {
   });
 
   it('should respect custom window size', async () => {
-    (apiFetch as any).mockResolvedValueOnce({
+    (apiFetch as any).mockResolvedValue({
       'id-1': { id: 'id-1', value: 'test' },
     });
 
@@ -225,7 +225,7 @@ describe('BatchAggregator - ID Deduplication', () => {
   });
 
   it('should include only unique IDs in batch request', async () => {
-    (apiFetch as any).mockResolvedValueOnce({
+    (apiFetch as any).mockResolvedValue({
       'id-1': { id: 'id-1', value: 'test-1' },
       'id-2': { id: 'id-2', value: 'test-2' },
     });
@@ -368,7 +368,7 @@ describe('BatchAggregator - Request Payload', () => {
   });
 
   it('should send device_ids array in request body', async () => {
-    (apiFetch as any).mockResolvedValueOnce({
+    (apiFetch as any).mockResolvedValue({
       'id-1': { id: 'id-1', value: 'test-1' },
       'id-2': { id: 'id-2', value: 'test-2' },
     });

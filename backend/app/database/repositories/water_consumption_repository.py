@@ -52,6 +52,7 @@ class WaterConsumptionRepository:
         pulse_count: int = 0,
         temperature: Optional[float] = None,
         pressure: Optional[float] = None,
+        zone_id: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
         """Create a new water consumption record.
 
@@ -64,6 +65,7 @@ class WaterConsumptionRepository:
             pulse_count: Raw pulse count
             temperature: Water temperature
             pressure: Water pressure
+            zone_id: Zone identifier for zone-aware tracking
 
         Returns:
             Created record or None if failed
@@ -77,6 +79,7 @@ class WaterConsumptionRepository:
             "pulse_count": pulse_count,
             "temperature": temperature,
             "pressure": pressure,
+            "zone_id": zone_id,
         }
 
         # Try Supabase first

@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 class SiteRegistration:
-    """Halls meter and config for a single site."""
+    """Holds meter and config for a single site."""
 
     def __init__(self, site_id: str, config: Dict):
         self.site_id = site_id
@@ -29,6 +29,7 @@ class SiteRegistration:
         self.adapters: Dict[str, any] = {}  # device_id -> adapter
         self.last_poll: Optional[datetime] = None
         self.previous_pulse_counts: Dict[str, int] = {}  # For flow rate calculation
+        self.meter_zone_map: Dict[str, Optional[str]] = {}  # meter_id -> zone_id mapping
 
 
 class WaterIngestionService:
@@ -78,6 +79,7 @@ class WaterIngestionService:
 
             # Find water meter equipment files
             water_meters = []
+            meter_zone_map = {}
             for equipment_file in equipment_dir.glob("S*-*-W-*.json"):
                 try:
                     with open(equipment_file) as f:
@@ -99,7 +101,14 @@ class WaterIngestionService:
                             "baseline_flow_lpm": equipment_data.get("properties", {}).get("baseline_flow_lpm", 2.0),
                         })
                         water_meters.append(meter)
-                        logger.info(f"Loaded water meter: {meter.meter_id} from {equipment_file.name}")
+
+                        # Extract zone_id from metadata
+                        zone_id = equipment_data.get("metadata", {}).get("zone_id") or equipment_data.get("zone")
+                        meter_zone_map[meter.meter_id] = zone_id
+                        if zone_id:
+                            logger.info(f"Loaded water meter: {meter.meter_id} (zone: {zone_id}) from {equipment_file.name}")
+                        else:
+                            logger.info(f"Loaded water meter: {meter.meter_id} (no zone assigned) from {equipment_file.name}")
                 except Exception as e:
                     logger.error(f"Failed to load water meter from {equipment_file}: {e}")
 
@@ -108,15 +117,29 @@ class WaterIngestionService:
                     "site_id": site_id,
                     "polling_interval_seconds": 60,
                 }
-                self.register_site(site_id, config, water_meters)
+                self.register_site(site_id, config, water_meters, meter_zone_map)
                 logger.info(f"Registered {len(water_meters)} water meter(s) for {site_id}")
 
-    def register_site(self, site_id: str, config: Dict, meters: List[WaterMeter]):
-        """Register a site with its water meters."""
+    def register_site(self, site_id: str, config: Dict, meters: List[WaterMeter], meter_zone_map: Optional[Dict[str, Optional[str]]] = None):
+        """Register a site with its water meters.
+
+        Args:
+            site_id: Site identifier
+            config: Site configuration
+            meters: List of water meters
+            meter_zone_map: Optional mapping of meter_id to zone_id
+        """
         registration = SiteRegistration(site_id, config)
 
         for meter in meters:
             registration.meters[meter.meter_id] = meter
+            # Store zone assignment for this meter
+            if meter_zone_map:
+                zone_id = meter_zone_map.get(meter.meter_id)
+                registration.meter_zone_map[meter.meter_id] = zone_id
+            else:
+                registration.meter_zone_map[meter.meter_id] = None
+
             # Create adapter for each meter
             adapter_config = {
                 "pulse_weight": meter.pulse_weight,
@@ -199,6 +222,9 @@ class WaterIngestionService:
 
                     registration.previous_pulse_counts[meter_id] = pulse_count
 
+                # Get zone_id for this meter
+                zone_id = registration.meter_zone_map.get(meter_id)
+
                 # Save to repository
                 self._repository.create_consumption(
                     meter_id=meter_id,
@@ -209,6 +235,7 @@ class WaterIngestionService:
                     pulse_count=pulse_count,
                     temperature=points.get("temperature"),
                     pressure=points.get("pressure"),
+                    zone_id=zone_id,
                 )
 
                 logger.debug(f"Polled {meter_id}: {flow_rate} LPM, {volume_liters} L")

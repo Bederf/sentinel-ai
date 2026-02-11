@@ -17,6 +17,20 @@ from app.database.repositories.water_consumption_repository import WaterConsumpt
 
 logger = logging.getLogger(__name__)
 
+# Lazy import to avoid circular dependencies
+_occupancy_service = None
+
+def _get_occupancy_service():
+    """Get occupancy service lazily to avoid circular imports."""
+    global _occupancy_service
+    if _occupancy_service is None:
+        try:
+            from app.services.security_occupancy_service import get_security_occupancy_service
+            _occupancy_service = get_security_occupancy_service()
+        except Exception:
+            _occupancy_service = False  # Mark as tried but unavailable
+    return _occupancy_service if _occupancy_service else None
+
 
 class WaterAlertService:
     """Water leak detection and alerting service.
@@ -37,6 +51,7 @@ class WaterAlertService:
         night_flow_threshold_lpm: float = 5.0,
         night_flow_hours_start: int = 2,
         night_flow_hours_end: int = 4,
+        night_occupancy_max: int = 0,  # Building should be empty at night
     ):
         """Initialize alert service with detection thresholds."""
         self.continuous_flow_threshold_lpm = continuous_flow_threshold_lpm
@@ -50,8 +65,10 @@ class WaterAlertService:
         self.night_flow_threshold_lpm = night_flow_threshold_lpm
         self.night_flow_hours_start = night_flow_hours_start
         self.night_flow_hours_end = night_flow_hours_end
+        self.night_occupancy_max = night_occupancy_max
 
         self._repository = WaterConsumptionRepository()
+        self.occupancy_service = _get_occupancy_service()
 
     # === Detection algorithms ===
 
@@ -268,6 +285,84 @@ class WaterAlertService:
             )
 
         return None
+
+    async def get_zone_occupancy(self, zone_id: str) -> int:
+        """Get occupancy count for a zone.
+
+        Args:
+            zone_id: Zone identifier
+
+        Returns:
+            Occupancy count (0 if service unavailable or zone empty)
+        """
+        if not self.occupancy_service:
+            return 0
+
+        try:
+            occupancy_data = self.occupancy_service.get_zone_occupancy(zone_id)
+            return occupancy_data.occupancy_count if occupancy_data else 0
+        except Exception as e:
+            logger.warning(f"Could not get occupancy for zone {zone_id}: {e}")
+            return 0
+
+    async def check_night_flow_with_occupancy(
+        self,
+        site: str,
+        zone_id: str,
+        current_flow: float,
+        timestamp: datetime,
+    ) -> Optional[WaterAlert]:
+        """Check for unauthorized water usage at night using occupancy context.
+
+        Detects flow during night hours when the zone occupancy is below threshold.
+        This indicates potential unauthorized water usage or leaks in unoccupied areas.
+
+        Args:
+            site: Building site code
+            zone_id: Zone identifier
+            current_flow: Current flow rate in LPM
+            timestamp: Reading timestamp
+
+        Returns:
+            WaterAlert if unauthorized usage detected, None otherwise
+        """
+        hour = timestamp.hour
+
+        # Check if time is within night hours (22:00-06:00)
+        is_night = (
+            hour >= self.continuous_flow_off_hours_start or
+            hour < self.continuous_flow_off_hours_end
+        )
+
+        if not is_night:
+            return None
+
+        # Check if flow exceeds night threshold
+        if current_flow < self.night_flow_threshold_lpm:
+            return None
+
+        # Get zone occupancy
+        occupancy = await self.get_zone_occupancy(zone_id)
+
+        # If occupancy is above threshold, water usage may be authorized (night shift workers)
+        if occupancy > self.night_occupancy_max:
+            return None
+
+        # Unauthorized water usage during night when zone is empty
+        return self._generate_alert(
+            meter_id=f"{zone_id}-meter",
+            site=site,
+            alert_type=AlertType.CONTINUOUS_FLOW,
+            severity=AlertSeverity.CRITICAL,
+            flow_rate=current_flow,
+            threshold=self.night_flow_threshold_lpm,
+            duration_minutes=0,
+            description=(
+                f"Unauthorized water usage in zone {zone_id} during night hours ({timestamp.hour}:00). "
+                f"Flow rate {current_flow:.1f} LPM exceeds threshold {self.night_flow_threshold_lpm} LPM "
+                f"with zero occupancy. Possible leak or equipment malfunction in unoccupied area."
+            ),
+        )
 
     def check_all_alerts(
         self,
