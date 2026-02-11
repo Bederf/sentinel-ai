@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 
 from fastapi import APIRouter, HTTPException, Header
 
-from app.database import get_supabase_client
+from app.database.repositories.preferences_repository import PreferencesRepository
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/preferences", tags=["preferences"])
@@ -78,13 +78,12 @@ async def get_dashboard_preferences(
     user_id = get_user_id(x_user_id)
 
     try:
-        supabase = get_supabase_client()
+        prefs_repo = PreferencesRepository()
 
         # Try to get existing preferences
-        result = supabase.table("dashboard_preferences").select("*").eq("user_id", user_id).execute()
+        row = await prefs_repo.get_by_user_id(user_id)
 
-        if result.data and len(result.data) > 0:
-            row = result.data[0]
+        if row:
             return DashboardPreferencesResponse(
                 user_id=user_id,
                 preferences=DashboardPreferences(
@@ -136,36 +135,16 @@ async def update_dashboard_preferences(
     user_id = get_user_id(x_user_id)
 
     try:
-        supabase = get_supabase_client()
+        prefs_repo = PreferencesRepository()
 
         # Upsert preferences
-        data = {
-            "user_id": user_id,
-            "visible_kpi_cards": preferences.visible_kpi_cards,
-            "visible_sections": preferences.visible_sections,
-            "kpi_card_order": preferences.kpi_card_order,
-            "section_order": preferences.section_order,
-            "default_energy_period": preferences.default_energy_period,
-            "default_energy_site_id": preferences.default_energy_site_id
-        }
-
-        result = supabase.table("dashboard_preferences").upsert(
-            data,
-            on_conflict="user_id"
-        ).execute()
-
-        if result.data and len(result.data) > 0:
-            row = result.data[0]
-            return DashboardPreferencesResponse(
-                user_id=user_id,
-                preferences=preferences,
-                created_at=row.get("created_at"),
-                updated_at=row.get("updated_at")
-            )
+        row = await prefs_repo.upsert(user_id, preferences)
 
         return DashboardPreferencesResponse(
             user_id=user_id,
-            preferences=preferences
+            preferences=preferences,
+            created_at=row.get("created_at"),
+            updated_at=row.get("updated_at")
         )
 
     except Exception as e:
@@ -192,10 +171,10 @@ async def reset_dashboard_preferences(
     user_id = get_user_id(x_user_id)
 
     try:
-        supabase = get_supabase_client()
+        prefs_repo = PreferencesRepository()
 
         # Delete existing preferences
-        supabase.table("dashboard_preferences").delete().eq("user_id", user_id).execute()
+        await prefs_repo.delete(user_id)
 
         return {
             "success": True,
