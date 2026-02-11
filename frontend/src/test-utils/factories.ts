@@ -166,6 +166,9 @@ export function createMockSite(overrides?: Partial<Site>): Site {
     code: 'SCT',
     type: 'office',
     status: 'normal',
+    location: 'Johannesburg, South Africa',
+    equipment_count: 175,
+    alert_count: 3,
     ...overrides,
   };
 }

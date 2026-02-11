@@ -7,10 +7,10 @@ import { render, screen, waitFor } from '@/test-utils';
 import userEvent from '@testing-library/user-event';
 import SiteCard from '../SiteCard';
 import { createMockSite, createMockDevice } from '@/test-utils/factories';
-import api from '../../lib/api';
+import * as api from '@/lib/api';
 
 // Mock the API client
-vi.mock('../../lib/api', () => ({
+vi.mock('@/lib/api', () => ({
   default: {
     getSiteDevices: vi.fn(),
     getDeviceSafetyStatus: vi.fn(),
