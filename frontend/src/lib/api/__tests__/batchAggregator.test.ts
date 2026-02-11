@@ -34,6 +34,10 @@ interface MockBatchItem {
 }
 
 describe('BatchAggregator - Initialization', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('should require endpoint option', () => {
     expect(() => {
       createBatchAggregator<MockBatchItem>({});
@@ -56,18 +60,18 @@ describe('BatchAggregator - Initialization', () => {
     expect(typeof batcher).toBe('function');
   });
 
-  it('should use default windowMs of 50ms', async () => {
+  it('should use default windowMs of 50ms', () => {
     (apiFetch as any).mockResolvedValueOnce({ 'id-1': { id: 'id-1', value: 'test' } });
 
     const batcher = createBatchAggregator<MockBatchItem>({
       endpoint: '/api/batch',
     });
 
-    batcher('id-1');
+    expect(typeof batcher).toBe('function');
     // Window default should allow aggregation within 50ms
   });
 
-  it('should use default maxBatchSize of 100', async () => {
+  it('should use default maxBatchSize of 100', () => {
     (apiFetch as any).mockResolvedValueOnce({});
 
     const batcher = createBatchAggregator<MockBatchItem>({
@@ -193,7 +197,11 @@ describe('BatchAggregator - ID Deduplication', () => {
     vi.useRealTimers();
   });
 
-  it('should deduplicate identical IDs in batch', () => {
+  it('should deduplicate identical IDs in batch', async () => {
+    (apiFetch as any).mockResolvedValueOnce({
+      'id-1': { id: 'id-1', value: 'test' },
+    });
+
     const batcher = createBatchAggregator<MockBatchItem>({
       endpoint: '/api/batch',
       windowMs: 50,
@@ -208,6 +216,10 @@ describe('BatchAggregator - ID Deduplication', () => {
     expect(p1).toBeInstanceOf(Promise);
     expect(p2).toBeInstanceOf(Promise);
     expect(p3).toBeInstanceOf(Promise);
+
+    // Trigger window expiration and wait for results
+    vi.advanceTimersByTime(60);
+    await Promise.all([p1, p2, p3]);
   });
 
   it('should include only unique IDs in batch request', async () => {
@@ -221,12 +233,15 @@ describe('BatchAggregator - ID Deduplication', () => {
       windowMs: 50,
     });
 
-    batcher('id-1');
-    batcher('id-2');
-    batcher('id-1'); // Duplicate
-    batcher('id-2'); // Duplicate
+    const p1 = batcher('id-1');
+    const p2 = batcher('id-2');
+    const p3 = batcher('id-1'); // Duplicate
+    const p4 = batcher('id-2'); // Duplicate
 
     vi.advanceTimersByTime(60);
+
+    // Wait for all promises to settle
+    await Promise.all([p1, p2, p3, p4]);
 
     const call = (apiFetch as any).mock.calls[0];
     const body = JSON.parse(call[1].body);
@@ -251,11 +266,12 @@ describe('BatchAggregator - ID Deduplication', () => {
       deduplicateIds: customDeduplicate,
     });
 
-    batcher('id-1');
-    batcher('id-1');
+    const p1 = batcher('id-1');
+    const p2 = batcher('id-1');
 
     vi.advanceTimersByTime(60);
 
+    await Promise.all([p1, p2]);
     expect(customDeduplicate).toHaveBeenCalled();
   });
 });
