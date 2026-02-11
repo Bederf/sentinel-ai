@@ -5,12 +5,15 @@
  * - Authentication token management (access/refresh)
  * - Auth retry logic with token refresh
  * - Basic fetch utilities
+ * - Security: Prevents accidental logging of tokens/sensitive data (Phase 75-07)
  *
  * Rate limiting and request batching are now handled by:
  * - React Query (automatic request deduplication)
  * - Batch aggregators in batchers.ts (50ms window, ID deduplication)
  * - Backend batch endpoints (POST /api/devices/batch/*)
  */
+
+import { secureConsoleLog, sanitizeUrl } from './security-utils';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "";
 const ACCESS_TOKEN_KEY = "sentinel_token";
@@ -55,12 +58,12 @@ async function tryRefreshAccessToken(): Promise<string | null> {
 
   refreshInFlight = (async () => {
     try {
-      const refreshUrl = `${API_BASE_URL}/api/auth/refresh?refresh_token=${encodeURIComponent(
-        refreshToken
-      )}`;
-      const response = await fetch(refreshUrl, {
+      // SECURITY: Send refresh token in request body, NOT in URL (Phase 75-07)
+      // Never log this function or expose refreshToken variable
+      const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh_token: refreshToken }),
       });
       if (!response.ok) return null;
       const data = (await response.json()) as {
@@ -70,7 +73,11 @@ async function tryRefreshAccessToken(): Promise<string | null> {
       if (!data.access_token) return null;
       setTokens(data.access_token, data.refresh_token);
       return data.access_token;
-    } catch {
+    } catch (error) {
+      // Log error safely without exposing tokens
+      if (import.meta.env.DEV) {
+        secureConsoleLog.error('Token refresh failed');
+      }
       return null;
     } finally {
       refreshInFlight = null;
@@ -191,6 +198,20 @@ export async function fetchApi<T>(
   }
 
   return response.json();
+}
+
+// ============= Simplified Authenticated Fetch =============
+
+/**
+ * Simple authenticated fetch for API files
+ * Automatically adds auth token and handles 401 retries
+ * Returns raw Response object for flexible handling
+ */
+export async function authenticatedFetch(
+  endpoint: string,
+  options?: RequestInit
+): Promise<Response> {
+  return authorizedFetch(endpoint, options);
 }
 
 // ============= Exports =============

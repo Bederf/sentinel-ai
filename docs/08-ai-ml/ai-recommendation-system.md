@@ -4,12 +4,12 @@ type: "technical"
 status: "approved"
 version: "1.0.0"
 created: "2026-02-02"
-updated: "2026-02-02"
+updated: "2026-02-11"
 author: "Sentinel Development Team"
-tags: ["ai", "optimization", "recommendations", "claude", "zone-aware"]
-related: ["../14-south-africa-context/load-shedding-optimization.md", "../06-safety-compliance/safety-interlocks-engine.md", "../08-ai-ml/hybrid-ai-routing.md"]
+tags: ["ai", "optimization", "recommendations", "claude", "zone-aware", "background-jobs"]
+related: ["./background-recommendation-generation.md", "../14-south-africa-context/load-shedding-optimization.md", "../06-safety-compliance/safety-interlocks-engine.md", "../08-ai-ml/hybrid-ai-routing.md", "../03-api-reference/recommendations-api.md"]
 domain: "bms"
-audience: "developers"
+audience: "developers|operators"
 complexity: "advanced"
 estimated_read_time: 25
 ---
@@ -17,6 +17,8 @@ estimated_read_time: 25
 # AI Recommendation System
 
 SENTINEL's AI Recommendation System analyzes building telemetry, weather forecasts, and energy pricing to generate optimal HVAC setpoint recommendations. The system combines Claude AI analysis with rule-based fallbacks and zone-aware optimization for intelligent, context-aware recommendations.
+
+**🎯 Key Feature:** Recommendations are generated **automatically every 10 minutes** without manual intervention. See [Background Recommendation Generation](./background-recommendation-generation.md) for the autonomous scheduling system.
 
 ## Overview
 

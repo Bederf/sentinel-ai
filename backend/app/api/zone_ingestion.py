@@ -291,7 +291,7 @@ async def get_all_zone_centroids(
     service = ZoneIngestionService()
 
     try:
-        centroids = await service.get_all_zone_centroids(building_id)
+        centroids = service.get_all_zone_centroids(building_id)
 
         return AllCentroidsResponse(
             building_id=building_id,

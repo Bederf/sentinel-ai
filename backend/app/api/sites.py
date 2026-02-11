@@ -269,11 +269,8 @@ def db_to_site_dict(
         except (json.JSONDecodeError, TypeError):
             operating_hours = {"start": "08:00", "end": "18:00"}
 
-    # Use total_assets from summary if available, otherwise fall back to equipment_count
-    if asset_summary:
-        total_assets = asset_summary.get("total_assets", 0)
-    else:
-        total_assets = equipment_count or db_building.get("equipment_count", 0)
+    # ⚠️  IMPORTANT: Always use equipment_count from Supabase, never from asset_summary or JSON
+    total_assets = equipment_count or 0
 
     result = {
         "id": db_building.get("code") or db_building.get("id", "unknown"),
@@ -295,32 +292,10 @@ def db_to_site_dict(
         "optimization_status": db_building.get("optimization_status") or "unknown",
         "control_enabled": db_building.get("control_enabled") or False,
         "control_note": db_building.get("control_note"),
-        "equipment_count": total_assets,  # Total assets (renamed from equipment_count for API compat)
+        "equipment_count": total_assets,  # Total assets from Supabase only
         "alert_count": alert_count,
         "active_alerts": alert_count,
     }
-
-    # Include asset breakdown if available
-    if asset_summary:
-        result["asset_breakdown"] = {
-            "equipment": asset_summary.get("equipment_count", 0),
-            "hvac_zones": asset_summary.get("hvac_zone_count", 0),
-            "generators": asset_summary.get("generator_count", 0),
-            "generator_groups": asset_summary.get("generator_group_count", 0),
-            "diesel_tanks": asset_summary.get("diesel_tank_count", 0),
-            "energy_centre": (
-                asset_summary.get("energy_centre_count", 0) +
-                asset_summary.get("mv_incomer_count", 0) +
-                asset_summary.get("transformer_count", 0) +
-                asset_summary.get("lv_switchboard_count", 0) +
-                asset_summary.get("ats_count", 0) +
-                asset_summary.get("power_meter_count", 0) +
-                asset_summary.get("pfc_bank_count", 0) +
-                asset_summary.get("ups_count", 0) +
-                asset_summary.get("feeder_count", 0)
-            ),
-            "dali_controllers": asset_summary.get("dali_controller_count", 0),
-        }
 
     # Include equipment status breakdown if available
     if equipment_status:
@@ -419,20 +394,27 @@ def get_sites_from_supabase(
             building_uuid = b.get("id")
             building_code = b.get("code")
 
-            # Try to get asset summary from view
-            asset_summary = None
-            if building_code:
-                asset_summary = repo.get_asset_summary_by_code(building_code)
-
-            # Fallback to legacy equipment count
-            eq_count = repo.get_equipment_count(building_uuid) if building_uuid else 0
+            # ⚠️  IMPORTANT: Read ONLY from Supabase, NOT from JSON fallback
+            # Get actual equipment count from equipment table (not from buildings.equipment_count column)
+            try:
+                from app.database.supabase_client import get_supabase_client
+                client = get_supabase_client()
+                eq_result = client.table('equipment').select('id', count='exact').eq(
+                    'building_id', building_uuid
+                ).execute()
+                eq_count = eq_result.count or 0
+            except Exception as e:
+                logger.warning(f"Failed to get equipment count from Supabase for {building_code}: {e}")
+                eq_count = 0
+            
             # Count active risks from predictions (consolidated risk system)
             alert_count = get_prediction_risk_count(building_uuid) if building_uuid else 0
 
             # Get equipment status breakdown
             equipment_status = get_equipment_status_breakdown(building_uuid) if building_uuid else None
 
-            sites.append(db_to_site_dict(b, eq_count, alert_count, asset_summary, equipment_status))
+            # Don't use asset_summary - only use actual Supabase equipment count
+            sites.append(db_to_site_dict(b, eq_count, alert_count, None, equipment_status))
 
         return sites, True
     except Exception as e:
@@ -454,18 +436,27 @@ def get_site_from_supabase(site_id: str) -> tuple[Optional[dict], bool]:
 
         building_uuid = building.get("id")
 
-        # Try to get asset summary from view
-        asset_summary = repo.get_asset_summary_by_code(site_id)
-
-        # Fallback to legacy equipment count
-        eq_count = repo.get_equipment_count(building_uuid) if building_uuid else 0
+        # ⚠️  IMPORTANT: Read ONLY from Supabase, NOT from JSON fallback
+        # Get actual equipment count from equipment table (not from buildings.equipment_count column)
+        try:
+            from app.database.supabase_client import get_supabase_client
+            client = get_supabase_client()
+            eq_result = client.table('equipment').select('id', count='exact').eq(
+                'building_id', building_uuid
+            ).execute()
+            eq_count = eq_result.count or 0
+        except Exception as e:
+            logger.warning(f"Failed to get equipment count from Supabase for {site_id}: {e}")
+            eq_count = 0
+        
         # Count active risks from predictions (consolidated risk system)
         alert_count = get_prediction_risk_count(building_uuid) if building_uuid else 0
 
         # Get equipment status breakdown
         equipment_status = get_equipment_status_breakdown(building_uuid) if building_uuid else None
 
-        return db_to_site_dict(building, eq_count, alert_count, asset_summary, equipment_status), True
+        # Don't use asset_summary - only use actual Supabase equipment count
+        return db_to_site_dict(building, eq_count, alert_count, None, equipment_status), True
     except Exception as e:
         logger.warning(f"Supabase query failed, falling back to JSON: {e}")
         return None, False

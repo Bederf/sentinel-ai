@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { AlertTriangle, Clock, Activity } from "lucide-react";
+import { authorizedFetch } from "../lib/api/client";
 
 export interface SecurityAnomaly {
   type: string;
@@ -30,7 +31,7 @@ export function SecurityAnomaliesPanel({
 
   const fetchAnomalies = async () => {
     try {
-      const response = await fetch(
+      const response = await authorizedFetch(
         "/api/security/events/anomalies?since=24h"
       );
       const data = await response.json();

@@ -147,12 +147,8 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
         // Fetch equipment for this building using new building equipment endpoint
         try {
           const buildingEquipment = await api.getBuildingEquipment(buildingId);
-          // Map to Equipment interface (add health_score alias)
-          const mappedEquipment: Equipment[] = buildingEquipment.equipment.map((eq) => ({
-            ...eq,
-            health_score: eq.health,
-          }));
-          setEquipment(mappedEquipment);
+          // API returns Equipment[] with health_score field
+          setEquipment(buildingEquipment.equipment);
           setEquipmentCategories(buildingEquipment.categories);
         } catch (eqErr) {
           console.warn("Building equipment endpoint failed, falling back to legacy:", eqErr);

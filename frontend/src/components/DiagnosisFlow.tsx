@@ -19,6 +19,7 @@ import {
   Clipboard,
   ArrowRight
 } from 'lucide-react';
+import { authorizedFetch } from '../lib/api/client';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
@@ -97,7 +98,7 @@ export default function DiagnosisFlow({
     setError(null);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/diagnosis/start`, {
+      const response = await authorizedFetch(`${API_BASE_URL}/api/diagnosis/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -166,7 +167,7 @@ export default function DiagnosisFlow({
     setError(null);
 
     try {
-      const apiResponse = await fetch(`${API_BASE_URL}/api/diagnosis/respond`, {
+      const apiResponse = await authorizedFetch(`${API_BASE_URL}/api/diagnosis/respond`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -208,7 +209,7 @@ export default function DiagnosisFlow({
       // Handle next state
       if (newState === 'complete') {
         // Diagnosis complete - get summary
-        const summaryResponse = await fetch(
+        const summaryResponse = await authorizedFetch(
           `${API_BASE_URL}/api/diagnosis/${session.session_id}`,
           { method: 'DELETE' }
         );

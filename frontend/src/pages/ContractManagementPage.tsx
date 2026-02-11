@@ -11,7 +11,7 @@
  * Follows SENTINEL dark theme design patterns.
  */
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   FileText,
   DollarSign,
@@ -43,6 +43,8 @@ import {
   TableHeaderCell,
   TableBody,
   TableCell,
+  Select,
+  SelectItem,
 } from "@tremor/react";
 import type { Contract, BudgetVariance, BudgetAlert } from "../lib/contractApi";
 import type { SLAPerformanceRecord } from "../lib/profitabilityApi";
@@ -496,6 +498,7 @@ export function ContractManagementPage() {
   const [pricingError, setPricingError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [buildingFilter, setBuildingFilter] = useState<string | null>(null);
   const [sortField, setSortField] = useState<string>("client");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
@@ -679,6 +682,17 @@ export function ContractManagementPage() {
     loadPricing();
   }, [selectedContract, contracts]);
 
+  // Extract unique buildings for dropdown
+  const buildings = useMemo(() => {
+    const buildingSet = new Set<string>();
+    contracts.forEach((c) => {
+      // Extract building from organization name or use a default
+      const building = c.organization.name || "Unknown";
+      buildingSet.add(building);
+    });
+    return Array.from(buildingSet).sort();
+  }, [contracts]);
+
   // Compute portfolio KPIs
   const totalContracts = contracts.length;
   const activeContracts = contracts.filter(
@@ -698,6 +712,11 @@ export function ContractManagementPage() {
 
   // Filter and sort contracts
   const filteredContracts = contracts.filter((c) => {
+    // Filter by building
+    if (buildingFilter && c.organization.name !== buildingFilter) {
+      return false;
+    }
+    // Filter by status
     if (statusFilter === "all") return true;
     return c.contract.status === statusFilter;
   });
@@ -904,31 +923,50 @@ export function ContractManagementPage() {
             >
               Contracts
             </h3>
-            {/* Status filter */}
-            <div className="flex items-center gap-2">
-              {["all", "active", "draft", "expired"].map((status) => (
-                <button
-                  key={status}
-                  onClick={() => setStatusFilter(status)}
-                  className="text-xs px-3 py-1 rounded transition-colors"
-                  style={{
-                    background:
-                      statusFilter === status
-                        ? "var(--color-sentinel-bg-secondary)"
-                        : "transparent",
-                    color:
-                      statusFilter === status
-                        ? "var(--color-sentinel-text-primary)"
-                        : "var(--color-sentinel-text-disabled)",
-                    border:
-                      statusFilter === status
-                        ? "1px solid var(--color-sentinel-border)"
-                        : "1px solid transparent",
-                  }}
-                >
-                  {status.charAt(0).toUpperCase() + status.slice(1)}
-                </button>
-              ))}
+            {/* Building filter + Status filter */}
+            <div className="flex items-center gap-3">
+              {/* Building selector */}
+              <Select
+                value={buildingFilter || "all"}
+                onValueChange={(v) =>
+                  setBuildingFilter(v === "all" ? null : v)
+                }
+                className="w-48"
+              >
+                <SelectItem value="all">All Buildings</SelectItem>
+                {buildings.map((building) => (
+                  <SelectItem key={building} value={building}>
+                    {building}
+                  </SelectItem>
+                ))}
+              </Select>
+
+              {/* Status filter buttons */}
+              <div className="flex items-center gap-2">
+                {["all", "active", "draft", "expired"].map((status) => (
+                  <button
+                    key={status}
+                    onClick={() => setStatusFilter(status)}
+                    className="text-xs px-3 py-1 rounded transition-colors"
+                    style={{
+                      background:
+                        statusFilter === status
+                          ? "var(--color-sentinel-bg-secondary)"
+                          : "transparent",
+                      color:
+                        statusFilter === status
+                          ? "var(--color-sentinel-text-primary)"
+                          : "var(--color-sentinel-text-disabled)",
+                      border:
+                        statusFilter === status
+                          ? "1px solid var(--color-sentinel-border)"
+                          : "1px solid transparent",
+                    }}
+                  >
+                    {status.charAt(0).toUpperCase() + status.slice(1)}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 

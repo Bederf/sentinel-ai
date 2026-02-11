@@ -12,6 +12,7 @@
 import { useRef, useState, useCallback } from 'react';
 import type { ChangeEvent } from 'react';
 import { Camera, X, Loader2 } from 'lucide-react';
+import { authorizedFetch } from '../lib/api/client';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
@@ -161,7 +162,7 @@ export default function PhotoCapture({
         }
       }
 
-      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      const response = await authorizedFetch(`${API_BASE_URL}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)

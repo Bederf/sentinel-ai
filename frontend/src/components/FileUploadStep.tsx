@@ -2,6 +2,7 @@
 import { useState, useCallback } from 'react';
 import { Button, Callout, Title, Text } from '@tremor/react';
 import { Upload } from 'lucide-react';
+import { authorizedFetch } from '../lib/api/client';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "";
 
@@ -58,7 +59,7 @@ export function FileUploadStep({
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await fetch(
+      const response = await authorizedFetch(
         `${API_BASE_URL}/api/integration/detect-format`,
         {
           method: 'POST',

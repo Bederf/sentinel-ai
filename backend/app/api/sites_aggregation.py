@@ -14,7 +14,7 @@ from typing import Dict, List, Any
 from pydantic import BaseModel, Field
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
@@ -96,8 +96,8 @@ class SiteAlerts(BaseModel):
     summary="Get site summary",
     description="Fetch complete aggregated site data (equipment, safety, alerts, predictions) in a single request."
 )
-@limiter.limit("60/minute")
-async def get_site_summary(site_id: str) -> SiteSummary:
+@limiter.limit("600/minute")
+async def get_site_summary(request: Request, site_id: str) -> SiteSummary:
     """Get aggregated site summary.
 
     Returns:
@@ -126,8 +126,20 @@ async def get_site_summary(site_id: str) -> SiteSummary:
         if not building:
             raise HTTPException(status_code=404, detail=f"Site {site_id} not found")
         
-        # Get all equipment for this site
+        building_uuid = building.get("id")
+        
+        # Get all equipment for this site FROM SUPABASE ONLY
         equipment_list = building_repo.get_equipment(site_id)
+        logger.info(f"Site {site_id}: Got {len(equipment_list)} equipment from Supabase")
+        
+        # ⚠️  IMPORTANT: Do NOT fall back to device_manager or JSON data
+        # The requirement is: "we must be reading from the supabase only"
+        # If equipment is missing, it should be added to Supabase via seeding, not loaded from fallback
+        if not equipment_list:
+            logger.error(f"Site {site_id}: No equipment found in Supabase! Please seed equipment data.")
+            # Return empty summary rather than falling back to inconsistent device_manager data
+            equipment_list = []
+        
         equipment_count = len(equipment_list) if equipment_list else 0
         
         # Count equipment by type
@@ -167,7 +179,7 @@ async def get_site_summary(site_id: str) -> SiteSummary:
                     safety_counts["warning"] += 1
         
         # Get alerts for this site
-        alerts = alert_repo.get_by_site(site_id)
+        alerts = alert_repo.get_active_by_building(building_uuid)
         alert_counts = {"critical": 0, "warning": 0, "info": 0}
         for alert in (alerts or []):
             severity = alert.get("severity", "info").lower()
@@ -179,7 +191,7 @@ async def get_site_summary(site_id: str) -> SiteSummary:
         # Get predictions for this site (if available)
         try:
             prediction_repo = PredictionRepository()
-            predictions = prediction_repo.get_by_site(site_id)
+            predictions = prediction_repo.get_active_by_building(building_uuid)
             prediction_counts = {"high_risk": 0, "medium_risk": 0, "low_risk": 0}
             for pred in (predictions or []):
                 risk_level = pred.get("risk_level", "low").lower()
@@ -216,8 +228,9 @@ async def get_site_summary(site_id: str) -> SiteSummary:
     summary="Get site alerts",
     description="Fetch paginated alerts for a site."
 )
-@limiter.limit("60/minute")
+@limiter.limit("600/minute")
 async def get_site_alerts(
+    request: Request,
     site_id: str,
     offset: int = 0,
     limit: int = 50
@@ -257,8 +270,8 @@ async def get_site_alerts(
     summary="Get site predictions summary",
     description="Fetch predictions summary for a site."
 )
-@limiter.limit("60/minute")
-async def get_site_predictions(site_id: str) -> PredictionSummary:
+@limiter.limit("600/minute")
+async def get_site_predictions(request: Request, site_id: str) -> PredictionSummary:
     """Get predictions summary for a site.
 
     Args:

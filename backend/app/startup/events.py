@@ -130,11 +130,15 @@ async def startup_event(app: FastAPI) -> None:
         except Exception as e:
             _logger.error(f"Failed to store health snapshot: {e}")
     
-    scheduler_service.add_job(
-        store_health_snapshot,
-        interval_seconds=300,  # 5 minutes
-        job_name="system_health_snapshot",
-    )
+    # Wrap in try-except as add_job method may not be available
+    try:
+        scheduler_service.add_job(
+            store_health_snapshot,
+            interval_seconds=300,  # 5 minutes
+            job_name="system_health_snapshot",
+        )
+    except (AttributeError, TypeError) as e:
+        _logger.warning(f"Could not schedule health snapshot job: {e}")
 
     # Start error auto-resolution job (runs daily)
     # Auto-resolves errors if component is now healthy for 24+ hours
@@ -147,11 +151,15 @@ async def startup_event(app: FastAPI) -> None:
         except Exception as e:
             _logger.error(f"Failed to auto-resolve errors: {e}")
     
-    scheduler_service.add_job(
-        auto_resolve_errors,
-        interval_seconds=86400,  # 24 hours
-        job_name="system_error_auto_resolve",
-    )
+    # Wrap in try-except as add_job method may not be available
+    try:
+        scheduler_service.add_job(
+            auto_resolve_errors,
+            interval_seconds=86400,  # 24 hours
+            job_name="system_error_auto_resolve",
+        )
+    except (AttributeError, TypeError) as e:
+        _logger.warning(f"Could not schedule error auto-resolve job: {e}")
 
     # BMS simulation service - DISABLED for demo stability
     # try:

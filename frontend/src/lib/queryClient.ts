@@ -20,26 +20,45 @@ export const queryClient = new QueryClient({
       staleTime: 30 * 1000, // 30s default - data fresh for 30s
       gcTime: 5 * 60 * 1000, // 5m - keep in cache 5m after all observers unsubscribe
       retry: (failureCount, error: unknown) => {
-        // 429 errors: retry up to 3 times with exponential backoff
+        // Check for ApiError object structure (status property)
+        const apiError = error as { status?: number; message?: string } | null;
+
+        // 429 errors (rate limit): Retry up to 3 times with exponential backoff
+        // (apiFetch already handles initial retries, React Query adds extra layer)
+        if (apiError?.status === 429) {
+          return failureCount < 3;
+        }
+        
+        // Check Error message string as fallback
         if (
           error instanceof Error &&
           error.message.includes("429")
         ) {
           return failureCount < 3;
         }
-        // Network errors: retry once
+        
+        // Network errors: retry up to 2 times
         if (
           error instanceof Error &&
-          error.message.includes("Network")
+          error.message.includes("NetworkError")
         ) {
-          return failureCount < 1;
+          return failureCount < 2;
         }
+        
+        // Check for network-related ApiError messages
+        if (apiError?.message?.includes("NetworkError")) {
+          return failureCount < 2;
+        }
+        
         // Other errors: don't retry
         return false;
       },
       retryDelay: (attemptIndex: number) => {
-        // Exponential backoff: 1s, 2s, 4s
-        return Math.min(1000 * 2 ** attemptIndex, 30000);
+        // Exponential backoff with jitter: 1s, 2s, 4s, 8s
+        const baseDelay = Math.min(1000 * 2 ** attemptIndex, 16000);
+        // Add random jitter (0-30% of delay) to avoid thundering herd
+        const jitter = Math.random() * baseDelay * 0.3;
+        return baseDelay + jitter;
       },
       refetchOnWindowFocus: false, // Prevent refetch when user returns to tab
       refetchOnReconnect: true, // Refetch when internet reconnects

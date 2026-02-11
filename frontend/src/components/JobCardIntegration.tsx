@@ -10,6 +10,7 @@
 
 import { useState, useEffect } from 'react';
 import { FileText, Clock, AlertCircle, CheckCircle, Plus, X, Loader2 } from 'lucide-react';
+import { authorizedFetch } from '../lib/api/client';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
@@ -66,7 +67,7 @@ export default function JobCardIntegration({
     const fetchActiveOrders = async () => {
       setLoadingOrders(true);
       try {
-        const response = await fetch(`${API_BASE_URL}/api/work-orders/technician?status=in_progress`);
+        const response = await authorizedFetch(`${API_BASE_URL}/api/work-orders/technician?status=in_progress`);
         if (response.ok) {
           const orders = await response.json();
           setActiveOrders(orders.slice(0, 3)); // Show max 3
@@ -99,7 +100,7 @@ export default function JobCardIntegration({
     };
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/work-orders/technician`, {
+      const response = await authorizedFetch(`${API_BASE_URL}/api/work-orders/technician`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(workOrder),

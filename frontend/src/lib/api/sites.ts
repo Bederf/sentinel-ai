@@ -235,7 +235,7 @@ export const sitesApi = {
    * @returns Map of zone_id → centroid coordinates
    */
   getZoneCentroids: (buildingId: string) =>
-    fetchApi<AllZoneCentroidsResponse>(`/api/buildings/${buildingId}/desks/centroids`),
+    fetchApi<AllZoneCentroidsResponse>(`/api/buildings/${buildingId}/zone-ingestion/centroids`),
 
   /**
    * Get desk statistics for a building

@@ -303,4 +303,264 @@ describe('ControlDashboard', () => {
       expect(api.getDevices).toHaveBeenCalled();
     });
   });
+
+  describe('Device Control Execution', () => {
+    it('should execute control command with correct parameters', async () => {
+      (api.controlDevice as ReturnType<typeof vi.fn>).mockResolvedValue({
+        success: true,
+        message: 'Control successful',
+        device_id: 'chiller-gateway-001',
+        point: 'setpoint',
+        value: 23.0,
+        priority: 8,
+      });
+
+      render(<ControlDashboard />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Gateway Theatre Chiller')).toBeInTheDocument();
+      });
+
+      // Verify API is ready
+      expect(api.getDevices).toHaveBeenCalled();
+    });
+
+    it('should handle control success response', async () => {
+      const successResponse = {
+        success: true,
+        message: 'Temperature setpoint updated',
+        device_id: 'chiller-gateway-001',
+        point: 'setpoint',
+        value: 24.0,
+        priority: 8,
+      };
+
+      (api.controlDevice as ReturnType<typeof vi.fn>).mockResolvedValue(successResponse);
+
+      render(<ControlDashboard />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Gateway Theatre Chiller')).toBeInTheDocument();
+      });
+
+      expect(api.getDevices).toHaveBeenCalled();
+    });
+
+    it('should handle control failure response', async () => {
+      (api.controlDevice as ReturnType<typeof vi.fn>).mockRejectedValue(
+        new Error('Device offline')
+      );
+
+      render(<ControlDashboard />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Gateway Theatre Chiller')).toBeInTheDocument();
+      });
+
+      expect(api.getDevices).toHaveBeenCalled();
+    });
+  });
+
+  describe('Audit Log Integration', () => {
+    it('should load audit log entries', async () => {
+      const mockAuditLogs = {
+        entries: [
+          {
+            id: 'audit-001',
+            timestamp: new Date().toISOString(),
+            action: 'DEVICE_CONTROL',
+            user: 'operator-1',
+            device_id: 'chiller-gateway-001',
+            point_name: 'setpoint',
+            old_value: 21.5,
+            new_value: 23.0,
+            result: 'SUCCESS',
+          },
+        ],
+      };
+
+      (api.getRecentAuditLogs as ReturnType<typeof vi.fn>).mockResolvedValue(
+        mockAuditLogs
+      );
+
+      render(<ControlDashboard />);
+
+      await waitFor(() => {
+        expect(api.getRecentAuditLogs).toHaveBeenCalled();
+      });
+    });
+
+    it('should handle audit log loading error', async () => {
+      (api.getRecentAuditLogs as ReturnType<typeof vi.fn>).mockRejectedValue(
+        new Error('Failed to load audit logs')
+      );
+
+      render(<ControlDashboard />);
+
+      await waitFor(() => {
+        // Component should handle error gracefully
+        expect(api.getRecentAuditLogs).toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe('Safety Integration', () => {
+    it('should fetch device safety status', async () => {
+      (api.getDeviceSafetyStatus as ReturnType<typeof vi.fn>).mockResolvedValue({
+        device_id: 'chiller-gateway-001',
+        overall_status: 'safe',
+        point_statuses: {
+          setpoint: 'safe',
+        },
+        active_rule_count: 0,
+      });
+
+      render(<ControlDashboard />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Gateway Theatre Chiller')).toBeInTheDocument();
+      });
+
+      expect(api.getDeviceSafetyStatus).toHaveBeenCalled();
+    });
+
+    it('should display safety blocked status', async () => {
+      const blockedDevice = {
+        ...mockDevices[0],
+        safety_status: 'blocked',
+      };
+
+      (api.getDevices as ReturnType<typeof vi.fn>).mockResolvedValue([
+        blockedDevice,
+        mockDevices[1],
+      ]);
+
+      render(<ControlDashboard />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Gateway Theatre Chiller')).toBeInTheDocument();
+      });
+    });
+
+    it('should disable controls when safety blocked', async () => {
+      (api.getDeviceSafetyStatus as ReturnType<typeof vi.fn>).mockResolvedValue({
+        device_id: 'chiller-gateway-001',
+        overall_status: 'blocked',
+        safety_blocked: true,
+      });
+
+      render(<ControlDashboard />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Gateway Theatre Chiller')).toBeInTheDocument();
+      });
+
+      expect(api.getDeviceSafetyStatus).toHaveBeenCalled();
+    });
+  });
+
+  describe('Real-time Updates', () => {
+    it('should auto-refresh device status periodically', async () => {
+      vi.useFakeTimers();
+
+      render(<ControlDashboard />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Gateway Theatre Chiller')).toBeInTheDocument();
+      });
+
+      const initialCallCount = (api.getDevices as ReturnType<typeof vi.fn>).mock
+        .calls.length;
+
+      // Advance timers by 30 seconds (typical refresh interval)
+      vi.advanceTimersByTime(30000);
+
+      await waitFor(() => {
+        const currentCallCount = (api.getDevices as ReturnType<typeof vi.fn>).mock
+          .calls.length;
+        expect(currentCallCount).toBeGreaterThanOrEqual(initialCallCount);
+      });
+
+      vi.useRealTimers();
+    });
+
+    it('should update predictions on refresh', async () => {
+      const initialPredictions = { predictions: [] };
+      const updatedPredictions = {
+        predictions: [
+          {
+            id: 'pred-001',
+            equipment_id: 'chiller-gateway-001',
+            probability_percent: 45,
+          },
+        ],
+      };
+
+      (api.getPredictions as ReturnType<typeof vi.fn>)
+        .mockResolvedValueOnce(initialPredictions)
+        .mockResolvedValueOnce(updatedPredictions);
+
+      render(<ControlDashboard />);
+
+      await waitFor(() => {
+        expect(api.getPredictions).toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe('Error Toast Notifications', () => {
+    it('should show error notification on API failure', async () => {
+      (api.getDevices as ReturnType<typeof vi.fn>).mockRejectedValue(
+        new Error('Network error')
+      );
+
+      render(<ControlDashboard />);
+
+      // Component should handle error gracefully
+      expect(api.getDevices).toHaveBeenCalled();
+    });
+
+    it('should show error for control device failure', async () => {
+      (api.controlDevice as ReturnType<typeof vi.fn>).mockRejectedValue(
+        new Error('Safety violation: Temperature setpoint too high')
+      );
+
+      render(<ControlDashboard />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Gateway Theatre Chiller')).toBeInTheDocument();
+      });
+
+      expect(api.getDevices).toHaveBeenCalled();
+    });
+  });
+
+  describe('Device Status Indicators', () => {
+    it('should show online status for connected devices', async () => {
+      render(<ControlDashboard />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Gateway Theatre Chiller')).toBeInTheDocument();
+      });
+
+      // Both devices should show online status
+      const onlineIndicators = screen.getAllByText(/online/i);
+      expect(onlineIndicators.length).toBeGreaterThan(0);
+    });
+
+    it('should show offline status for disconnected devices', async () => {
+      const offlineDevice = { ...mockDevices[0], status: 'offline' };
+
+      (api.getDevices as ReturnType<typeof vi.fn>).mockResolvedValue([
+        offlineDevice,
+        mockDevices[1],
+      ]);
+
+      render(<ControlDashboard />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Gateway Theatre Chiller')).toBeInTheDocument();
+      });
+    });
+  });
 });

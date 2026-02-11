@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { Button, Card, Title, Text, Callout } from '@tremor/react';
 import { CheckCircle } from 'lucide-react';
+import { authorizedFetch } from '../lib/api/client';
 import { FileUploadStep } from './FileUploadStep';
 import { ColumnMappingStep } from './ColumnMappingStep';
 import { PointMatchingStep } from './PointMatchingStep';
@@ -271,7 +272,7 @@ export function IntegrationWizard({ buildingId, onClose, onComplete: _onComplete
           wizardData={wizardData}
           onActivate={async () => {
             // Activate integration
-            const response = await fetch(`${API_BASE_URL}/api/integration/ingest`, {
+            const response = await authorizedFetch(`${API_BASE_URL}/api/integration/ingest`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({

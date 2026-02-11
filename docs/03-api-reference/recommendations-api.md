@@ -4,19 +4,21 @@ type: "api-reference"
 status: "complete"
 version: "1.0.0"
 created: "2026-02-09"
-updated: "2026-02-09"
+updated: "2026-02-11"
 author: "SENTINEL Development Team"
-tags: ["api", "recommendations", "optimization", "approval-workflow"]
+tags: ["api", "recommendations", "optimization", "approval-workflow", "background-jobs"]
 domain: "optimization"
-audience: "developers|integrators"
+audience: "developers|integrators|operators"
 complexity: "intermediate"
 estimated_read_time: 10
+related: ["../08-ai-ml/ai-recommendation-system.md", "../08-ai-ml/background-recommendation-generation.md", "../04-features/72-profile-based-optimization.md"]
 ---
 
 # Recommendations API Reference
 
 **Base URL:** `http://localhost:9095/api`  
-**Authentication:** JWT bearer token in `Authorization` header
+**Authentication:** JWT bearer token in `Authorization` header  
+**Auto-Generation:** Recommendations are generated automatically every 10 minutes. See [Background Recommendation Generation](../08-ai-ml/background-recommendation-generation.md) for details.
 
 ---
 

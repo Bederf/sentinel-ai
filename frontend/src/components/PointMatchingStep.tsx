@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { Badge, Button, Card, Callout, Select, SelectItem, Table, TableBody, TableCell, TableHead, TableRow, Text, Title } from '@tremor/react';
 import { CheckCircle, AlertTriangle } from 'lucide-react';
+import { authorizedFetch } from '../lib/api/client';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "";
 
@@ -50,7 +51,7 @@ export function PointMatchingStep({ buildingId, columnMappings: _columnMappings,
   const loadMatches = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/integration/match-points`, {
+      const response = await authorizedFetch(`${API_BASE_URL}/api/integration/match-points`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -87,7 +88,7 @@ export function PointMatchingStep({ buildingId, columnMappings: _columnMappings,
 
     try {
       // Save sync settings and activate
-      const response = await fetch(`${API_BASE_URL}/api/integration/ingest`, {
+      const response = await authorizedFetch(`${API_BASE_URL}/api/integration/ingest`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

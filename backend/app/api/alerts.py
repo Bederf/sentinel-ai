@@ -461,6 +461,65 @@ class CreateAlertResponse(BaseModel):
     message: str
 
 
+
+async def recalculate_equipment_health_score(client, equipment_id: str):
+    """
+    Recalculate equipment health score based on remaining active alerts.
+    
+    Called after an alert is acknowledged or resolved to update equipment
+    health_score and status based on any remaining active alerts.
+    
+    Health score mapping:
+    - No active alerts: 85 (normal)
+    - Active warning alerts: 60 (warning)
+    - Active critical alerts: 30 (critical)
+    """
+    if not equipment_id:
+        return
+    
+    try:
+        # Get all non-acknowledged, non-resolved alerts for this equipment
+        active_alerts = client.table("alerts").select("severity").eq(
+            "equipment_id", equipment_id
+        ).neq("status", "acknowledged").neq("status", "resolved").execute()
+        
+        # Determine new health score based on remaining active alerts
+        if not active_alerts.data or len(active_alerts.data) == 0:
+            # No more active alerts - return to normal health
+            new_health_score = 85
+            new_status = "normal"
+        else:
+            # Calculate health score based on highest remaining alert severity
+            severities = [a.get("severity", "").lower() for a in active_alerts.data]
+            if "critical" in severities:
+                new_health_score = 30
+                new_status = "critical"
+            elif "warning" in severities:
+                new_health_score = 60
+                new_status = "warning"
+            else:
+                new_health_score = 85
+                new_status = "normal"
+        
+        # Update equipment health score and status
+        client.table("equipment").update({
+            "health_score": new_health_score,
+            "status": new_status
+        }).eq("id", equipment_id).execute()
+        
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(
+            f"Recalculated equipment {equipment_id} health_score to {new_health_score} "
+            f"(active alerts: {len(active_alerts.data) if active_alerts.data else 0}, "
+            f"status: {new_status})"
+        )
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f"Failed to recalculate health_score for equipment {equipment_id}: {e}")
+
+
 @limiter.limit("15/minute")
 @router.post("/alerts", response_model=CreateAlertResponse)
 async def create_alert(http_request: Request, request: CreateAlertRequest) -> CreateAlertResponse:
@@ -468,6 +527,7 @@ async def create_alert(http_request: Request, request: CreateAlertRequest) -> Cr
     Create a new alert and optionally notify via Clawd Telegram.
 
     Used by sensors/thermostats to report issues.
+    Also updates equipment health_score based on alert severity.
     """
     from app.database.supabase_client import get_supabase_client
 
@@ -502,6 +562,27 @@ async def create_alert(http_request: Request, request: CreateAlertRequest) -> Cr
 
     client.table("alerts").insert(alert_data).execute()
 
+    # === UPDATE EQUIPMENT HEALTH SCORE BASED ON ALERT SEVERITY ===
+    # When alerts are created, update the equipment health score to trigger prediction generation
+    # Health score mapping:
+    # - critical alert → health_score = 30 (well below 90 threshold)
+    # - warning alert → health_score = 60 (below 90 threshold)
+    try:
+        health_score = 30 if request.severity.lower() == "critical" else 60 if request.severity.lower() == "warning" else 85
+        
+        client.table("equipment").update({
+            "health_score": health_score,
+            "status": request.severity.lower()  # Also update status to warning/critical
+        }).eq("id", eq["id"]).execute()
+        
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Updated equipment {request.equipment_code} health_score to {health_score} (severity: {request.severity})")
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f"Failed to update health_score for equipment {request.equipment_code}: {e}")
+
     # Send Clawd notification if requested
     clawd_notified = False
     if request.notify_clawd:
@@ -530,7 +611,7 @@ async def create_alert(http_request: Request, request: CreateAlertRequest) -> Cr
 @limiter.limit("20/minute")
 @router.post("/alerts/{alert_id}/acknowledge")
 async def acknowledge_alert(request: Request, alert_id: str, acknowledged_by: str = "operator"):
-    """Acknowledge an alert."""
+    """Acknowledge an alert and recalculate equipment health score."""
 
     # Handle simulation alerts (SIM-ALERT-*)
     if alert_id.startswith("SIM-ALERT-"):
@@ -545,6 +626,16 @@ async def acknowledge_alert(request: Request, alert_id: str, acknowledged_by: st
         from app.database.supabase_client import get_supabase_client
         client = get_supabase_client()
 
+        # First, fetch the alert to get equipment_id
+        alert_result = client.table("alerts").select("id, equipment_id, severity").eq("id", alert_id).execute()
+        
+        if not alert_result.data:
+            raise HTTPException(status_code=404, detail=f"Alert {alert_id} not found")
+        
+        alert_data = alert_result.data[0]
+        equipment_id = alert_data.get("equipment_id")
+
+        # Update the alert status
         result = client.table("alerts").update({
             "status": "acknowledged",
             "acknowledged_at": datetime.now().isoformat(),
@@ -554,7 +645,12 @@ async def acknowledge_alert(request: Request, alert_id: str, acknowledged_by: st
         if not result.data:
             raise HTTPException(status_code=404, detail=f"Alert {alert_id} not found")
 
+        # Recalculate equipment health score based on remaining active alerts
+        await recalculate_equipment_health_score(client, equipment_id)
+
         return {"status": "acknowledged", "alert_id": alert_id}
+    except HTTPException:
+        raise
     except Exception as e:
         # If Supabase fails, the alert might be from static JSON (not acknowledgeable)
         raise HTTPException(status_code=404, detail=f"Alert {alert_id} not found or cannot be acknowledged")

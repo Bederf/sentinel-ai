@@ -167,7 +167,7 @@ class ZoneIngestionService:
             raise ValueError("Duplicate desk_ids detected within ingestion")
 
         # Validate zone references
-        zones = await self.zone_repo.get_by_building(building_uuid)
+        zones = self.zone_repo.get_by_building(building_uuid)
         valid_zone_ids = {z["zone_id"] for z in zones}
         valid_zone_dict = {z["zone_id"]: z for z in zones}
 
@@ -221,7 +221,7 @@ class ZoneIngestionService:
                 "z_coord": Decimal(str(desk["coordinates"]["z"])),
             }
             try:
-                await self.desk_repo.upsert(desk_data)
+                self.desk_repo.upsert(desk_data)
             except Exception as e:
                 logger.error(f"Failed to create desk {desk['desk_id']}: {e}")
                 raise ValueError(f"Failed to create desk {desk['desk_id']}: {e}")
@@ -251,7 +251,7 @@ class ZoneIngestionService:
             logger.warning(f"Building not found: {building_id}")
             return None
 
-        desks = await self.desk_repo.get_by_zone_id(building_uuid, zone_id)
+        desks = self.desk_repo.get_by_zone_id(building_uuid, zone_id)
 
         if not desks:
             logger.warning(f"No desks found for zone {zone_id} in building {building_id}")
@@ -262,7 +262,7 @@ class ZoneIngestionService:
 
         return {"x": round(avg_x, 2), "z": round(avg_z, 2)}
 
-    async def get_all_zone_centroids(
+    def get_all_zone_centroids(
         self, building_id: str
     ) -> Dict[str, Dict[str, float]]:
         """Get centroids for all zones in a building.
@@ -282,8 +282,8 @@ class ZoneIngestionService:
             logger.warning(f"Building not found: {building_id}")
             return {}
 
-        zones = await self.zone_repo.get_by_building(building_uuid)
-        all_desks = await self.desk_repo.get_by_building_uuid(building_uuid)
+        zones = self.zone_repo.get_by_building(building_uuid)
+        all_desks = self.desk_repo.get_by_building_uuid(building_uuid)
 
         centroids = {}
         for zone in zones:
@@ -321,8 +321,8 @@ class ZoneIngestionService:
         if not building_uuid:
             return False, [f"Building not found: {building_id}"]
 
-        zones = await self.zone_repo.get_by_building(building_uuid)
-        desks = await self.desk_repo.get_by_building_uuid(building_uuid)
+        zones = self.zone_repo.get_by_building(building_uuid)
+        desks = self.desk_repo.get_by_building_uuid(building_uuid)
 
         if not zones:
             errors.append("No zones configured for building")

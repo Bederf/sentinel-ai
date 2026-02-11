@@ -513,13 +513,13 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
             </div>
           )}
 
-          {/* Risk Alert Count - Show warning + alarm equipment from summary */}
+          {/* Risk Alert Count - Show warning + alarm + blocked equipment from summary */}
           {showSafetyStatus && safetySummary ? (
             <div className="flex items-center gap-2">
               <AlertTriangle
                 className="h-4 w-4"
                 style={{
-                  color: (safetySummary.warning + safetySummary.alarm) > 0
+                  color: (safetySummary.warning + safetySummary.alarm + safetySummary.blocked) > 0
                     ? "var(--color-sentinel-amber)"
                     : "var(--color-sentinel-text-disabled)",
                 }}
@@ -528,13 +528,13 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
                 <div
                   className="text-lg font-medium"
                   style={{
-                    color: (safetySummary.warning + safetySummary.alarm) > 0
+                    color: (safetySummary.warning + safetySummary.alarm + safetySummary.blocked) > 0
                       ? "var(--color-sentinel-amber)"
                       : "var(--color-sentinel-text-primary)",
                     fontVariantNumeric: "tabular-nums",
                   }}
                 >
-                  {safetySummary.warning + safetySummary.alarm}
+                  {safetySummary.warning + safetySummary.alarm + safetySummary.blocked}
                 </div>
                 <div
                   className="text-xs"

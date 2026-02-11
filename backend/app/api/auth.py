@@ -45,6 +45,11 @@ class ApiKeyCreateRequest(BaseModel):
     expires_in_days: Optional[int] = Field(default=None, ge=1, le=3650)
 
 
+class RefreshTokenRequest(BaseModel):
+    """SECURITY: Refresh token must be in request body, not URL (Phase 75-07)"""
+    refresh_token: str = Field(..., description="Valid refresh token")
+
+
 def _get_current_user_from_request(request: Request) -> dict:
     """Extract current user payload from access token."""
     auth_header = request.headers.get("Authorization", "")
@@ -516,16 +521,29 @@ async def logout(request: Request, refresh_token: Optional[str] = None):
 
     Phase 65-02: Now actually invalidates tokens by blacklisting them in Redis.
     Phase 65-04: Add audit logging for logout events
+    Phase 75-07: SECURITY - Accept refresh_token in request body, not URL
 
     Args:
         request: FastAPI request
-        refresh_token: Optional refresh token to invalidate
+        refresh_token: Optional refresh token from query param (deprecated, kept for backward compatibility)
 
     Returns:
         Success message
     """
     user_id: Optional[str] = None
     source_ip = _extract_ip_address(request)
+
+    # SECURITY: Try to get refresh_token from request body first (Phase 75-07)
+    body_refresh_token = None
+    try:
+        body = await request.json()
+        body_refresh_token = body.get("refresh_token")
+    except Exception:
+        pass
+
+    # Use body token if available, fall back to query param for backward compatibility
+    if body_refresh_token:
+        refresh_token = body_refresh_token
 
     # Extract and blacklist access token
     auth_header = request.headers.get("Authorization", "")
@@ -578,16 +596,17 @@ async def logout(request: Request, refresh_token: Optional[str] = None):
 
 @router.post("/refresh")
 @limiter.limit("5/15minutes")
-async def refresh_access_token(request: Request, refresh_token: str):
+async def refresh_access_token(request: Request, body: RefreshTokenRequest):
     """Refresh access token using a valid refresh token.
 
     Phase 65-02: Implements token rotation - old refresh token is invalidated,
     new access + refresh token pair is issued.
     Phase 65-04: Add audit logging for token refresh
+    Phase 75-07: SECURITY - Accept refresh_token in request body, not URL
 
     Args:
         request: FastAPI request
-        refresh_token: Valid refresh token
+        body: Request body containing refresh_token (SECURITY: not in URL)
 
     Returns:
         New access_token and refresh_token
@@ -596,6 +615,7 @@ async def refresh_access_token(request: Request, refresh_token: str):
         HTTPException 401 if refresh token is invalid
     """
     source_ip = _extract_ip_address(request)
+    refresh_token = body.refresh_token
     payload = validate_jwt_token(refresh_token, required_token_type="refresh")
     if not payload:
         # Log failed refresh attempt

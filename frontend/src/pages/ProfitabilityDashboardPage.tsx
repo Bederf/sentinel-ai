@@ -179,6 +179,7 @@ export function ProfitabilityDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [periodFilter, setPeriodFilter] = useState<PeriodOption>("this_month");
+  const [buildingFilter, setBuildingFilter] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedContractId, setSelectedContractId] = useState<string | null>(
     null
@@ -474,22 +475,48 @@ export function ProfitabilityDashboardPage() {
     return sorted;
   }, [contracts, sortField, sortDirection]);
 
-  // Filter contracts by search
+  // Extract unique buildings for dropdown
+  const buildings = useMemo(() => {
+    const buildingMap = new Map<string, string>();
+    contracts.forEach((c) => {
+      const id = c.building_id;
+      const name = c.building_name || c.building_id || "Unknown";
+      if (id && !buildingMap.has(id)) {
+        buildingMap.set(id, name);
+      }
+    });
+    return Array.from(buildingMap.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [contracts]);
+
+  // Filter contracts by search and building
   const filteredContracts = useMemo(() => {
-    if (!searchQuery) return sortedContracts;
-    const query = searchQuery.toLowerCase();
-    return sortedContracts.filter(
-      (c) =>
-        c.contract_name.toLowerCase().includes(query) ||
-        (c.building_name || c.building_id || "")
-          .toLowerCase()
-          .includes(query)
-    );
-  }, [sortedContracts, searchQuery]);
+    let filtered = sortedContracts;
+
+    // Filter by building
+    if (buildingFilter) {
+      filtered = filtered.filter((c) => c.building_id === buildingFilter);
+    }
+
+    // Filter by search query
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (c) =>
+          c.contract_name.toLowerCase().includes(query) ||
+          (c.building_name || c.building_id || "")
+            .toLowerCase()
+            .includes(query)
+      );
+    }
+
+    return filtered;
+  }, [sortedContracts, searchQuery, buildingFilter]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, periodRange, contracts.length]);
+  }, [searchQuery, periodRange, buildingFilter, contracts.length]);
 
   const paginatedContracts = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
@@ -592,8 +619,23 @@ export function ProfitabilityDashboardPage() {
           </Text>
         </div>
 
-        {/* Period Filter */}
+        {/* Filters */}
         <div className="flex items-center gap-3">
+          <Select
+            value={buildingFilter || "all"}
+            onValueChange={(v) =>
+              setBuildingFilter(v === "all" ? null : v)
+            }
+            className="w-48"
+          >
+            <SelectItem value="all">All Buildings</SelectItem>
+            {buildings.map((building) => (
+              <SelectItem key={building.id} value={building.id}>
+                {building.name}
+              </SelectItem>
+            ))}
+          </Select>
+
           <Select
             value={periodFilter}
             onValueChange={(v) =>
@@ -684,13 +726,19 @@ export function ProfitabilityDashboardPage() {
 
       {/* Section 2: Loss Leaders Alert Panel */}
       {lossLeaders.length > 0 && (
-        <Callout
-          title="Loss-Making Contracts Detected"
-          icon={AlertTriangle}
-          color="rose"
-          className="glass-panel"
+        <div className="glass-panel border border-[var(--color-sentinel-border)] rounded-lg p-4"
+          style={{
+            background: "var(--color-sentinel-bg-panel)",
+            borderColor: "var(--color-sentinel-border)",
+          }}
         >
-          <div className="space-y-2 mt-3">
+          <div className="flex items-center gap-2 mb-3">
+            <AlertTriangle className="h-5 w-5 text-[var(--color-sentinel-red)]" />
+            <h3 style={{ color: "var(--color-sentinel-text-primary)" }} className="font-semibold">
+              Loss-Making Contracts Detected
+            </h3>
+          </div>
+          <div className="space-y-2">
             {lossLeaders.slice(0, 3).map((leader) => (
               <div
                 key={leader.contract_id}
@@ -730,7 +778,7 @@ export function ProfitabilityDashboardPage() {
               </div>
             ))}
           </div>
-        </Callout>
+        </div>
       )}
 
       {/* Section 3: Contract Profitability Table */}
@@ -1007,23 +1055,31 @@ export function ProfitabilityDashboardPage() {
               Loading report...
             </div>
           ) : reportError ? (
-            <Callout
-              title="Report unavailable"
-              color="rose"
-              icon={AlertTriangle}
-            >
-              {reportError}
-            </Callout>
+            <div className="border border-[var(--color-sentinel-border)] rounded-lg p-4 bg-[var(--color-sentinel-bg-panel)]">
+              <div className="flex items-center gap-2 mb-2">
+                <AlertTriangle className="h-5 w-5 text-[var(--color-sentinel-red)]" />
+                <h3 style={{ color: "var(--color-sentinel-text-primary)" }} className="font-semibold">
+                  Report unavailable
+                </h3>
+              </div>
+              <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                {reportError}
+              </Text>
+            </div>
           ) : selectedReport ? (
             <div className="space-y-4">
               {selectedReport.data_quality_flags.length > 0 && (
-                <Callout
-                  title="Data quality flags"
-                  color="amber"
-                  icon={AlertTriangle}
-                >
-                  {selectedReport.data_quality_flags.join(", ")}
-                </Callout>
+                <div className="border border-amber-500/30 rounded-lg p-4 bg-amber-500/5">
+                  <div className="flex items-center gap-2 mb-2">
+                    <AlertTriangle className="h-5 w-5 text-amber-600" />
+                    <h3 style={{ color: "var(--color-sentinel-text-primary)" }} className="font-semibold">
+                      Data quality flags
+                    </h3>
+                  </div>
+                  <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                    {selectedReport.data_quality_flags.join(", ")}
+                  </Text>
+                </div>
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

@@ -3,6 +3,9 @@ import { Clock, Wifi, WifiOff, Bell, X, LogOut } from "lucide-react";
 import { Toaster, toast } from "sonner";
 import { formatTime } from "./lib/timeFormat";
 import api, { AUTH_EXPIRED_EVENT, isExpectedApiError, type Alert, type AuthUser } from "./lib/api";
+
+// Security: Prevent console logging in production (Phase 75-07)
+import { initializeSecurityProtections } from "./lib/api/security-utils";
 import { Chat } from "./components/Chat";
 import TechnicianChat from "./components/TechnicianChat";
 import { Dashboard } from "./components/Dashboard";
@@ -16,7 +19,7 @@ import { EmailEntry } from "./components/EmailEntry";
 import { AlertFeed } from "./components/AlertFeed";
 import { CalendarPicker } from "./components/CalendarPicker";
 import { IntegrationMonitoringPage } from "./components/IntegrationMonitoringPage";
-import { SystemHealthPage } from "./components/SystemHealthPage";
+import SystemHealthPage from "./components/SystemHealthPage";
 import { AssetWorkflowDashboard } from "./components/AssetWorkflowDashboard";
 import { OccupancyPanel } from "./components/OccupancyPanel";
 import { SecurityDashboard } from "./components/SecurityDashboard";
@@ -33,7 +36,8 @@ import { ProfitabilityDashboardPage } from "./pages/ProfitabilityDashboardPage";
 import { DigitalTwin } from "./components/digital-twin/DigitalTwin";
 import { ModuleProvider } from "./contexts/ModuleContext";
 import { useModules } from "./contexts/ModuleHooks";
-import { type View, VIEW_TITLES, isModuleGatedView, getRequiredModule } from "./lib/navigation";
+import { type View, VIEW_TITLES, isModuleGatedView, getRequiredModule, ALL_NAV_ITEMS } from "./lib/navigation";
+import { canAccessView, getDefaultView } from "./lib/access-control";
 
 interface HealthStatus {
   status: string;
@@ -87,7 +91,19 @@ function App() {
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [currentView, setCurrentView] = useState<View>("chat");
+  const [currentView, setCurrentView] = useState<View>(() => {
+    // Get default view based on user's company if logged in
+    const storedUser = localStorage.getItem("sentinel_user");
+    if (storedUser) {
+      try {
+        const user = JSON.parse(storedUser);
+        return getDefaultView(user.email);
+      } catch {
+        return "chat";
+      }
+    }
+    return "chat";
+  });
   const [viewRefreshKey, setViewRefreshKey] = useState(0);
   const [showCardLibrary, setShowCardLibrary] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -98,6 +114,11 @@ function App() {
   const alertsPanelRef = useRef<HTMLDivElement | null>(null);
   const calendarButtonRef = useRef<HTMLDivElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Security: Initialize protections on app startup (Phase 75-07)
+  useEffect(() => {
+    initializeSecurityProtections();
+  }, []);
 
   // Update time every second for Grafana-like time display
   useEffect(() => {
@@ -260,6 +281,19 @@ function App() {
 
   // Handle view changes - scroll to top and refresh when re-clicking same view
   const handleViewChange = useCallback((view: View) => {
+    // Check access control - redirect to allowed view if not permitted
+    if (currentUser?.email) {
+      const allViewIds = ALL_NAV_ITEMS.map(item => item.id);
+      if (!canAccessView(currentUser.email, view, allViewIds)) {
+        const defaultView = getDefaultView(currentUser.email);
+        toast.warning(`Access to ${view} is not available in your demo configuration`);
+        if (view !== defaultView) {
+          setCurrentView(defaultView);
+        }
+        return;
+      }
+    }
+
     if (view === currentView) {
       // Same view re-clicked: scroll to top and bump refresh key
       const main = document.querySelector('main');
@@ -271,7 +305,7 @@ function App() {
     } else {
       setCurrentView(view);
     }
-  }, [currentView]);
+  }, [currentView, currentUser?.email]);
 
   // Close alerts panel when clicking outside
   useEffect(() => {
@@ -293,20 +327,25 @@ function App() {
     }
   }, [showAlertsPanel]);
 
+  // Memoize callbacks to prevent SplashScreen/EmailEntry remounting
+  const handleSplashComplete = useCallback(() => {
+    setShowSplash(false);
+  }, []);
+
+  const handleEmailEntrySuccess = useCallback((user: AuthUser) => {
+    console.log('Login success:', user);
+    setCurrentUser(user);
+  }, []);
+
   // Show splash screen on initial load
   if (showSplash) {
-    return <SplashScreen onComplete={() => {
-      setShowSplash(false);
-    }} />;
+    return <SplashScreen onComplete={handleSplashComplete} />;
   }
 
   // Show email entry if not authenticated
   if (!currentUser) {
     console.log('Showing email entry (user =', currentUser, ')');
-    return <EmailEntry onSuccess={(user) => {
-      console.log('Login success:', user);
-      setCurrentUser(user);
-    }} />;
+    return <EmailEntry onSuccess={handleEmailEntrySuccess} />;
   }
 
   return (
@@ -322,6 +361,7 @@ function App() {
         version={health?.version || "13.0"}
         onCustomizeDashboard={() => setShowCardLibrary(true)}
         userRole={currentUser?.role}
+        userEmail={currentUser?.email}
       />
 
       {/* Main Content Area */}

@@ -44,6 +44,42 @@ def _normalize_device_id(device_id: str) -> str:
     return device_id
 
 
+def _normalize_equipment_type(equipment_code: str, equipment_type: str) -> str:
+    """Extract equipment type from code if type is unknown.
+
+    Equipment code format: {site}-{type}-{floor}-{zone}
+    Example: S002-CHILLER-B1-001 -> chiller
+    """
+    if equipment_type and equipment_type.lower() != "unknown":
+        return equipment_type.lower()
+
+    # Extract type from code (second segment after first hyphen)
+    try:
+        parts = equipment_code.split("-")
+        if len(parts) >= 2:
+            # Second segment is the equipment type
+            type_segment = parts[1].lower()
+            # Map common type aliases
+            type_aliases = {
+                "chiller": "chiller",
+                "ahu": "ahu",
+                "fcu": "fcu",
+                "vav": "vav",
+                "dali": "dali",
+                "lum": "luminaire",
+                "gen": "generator",
+                "tx": "transformer",
+                "ups": "ups",
+                "ats": "ats",
+                "mtr": "meter",
+            }
+            return type_aliases.get(type_segment, type_segment)
+    except Exception:
+        pass
+
+    return equipment_type.lower() if equipment_type else "unknown"
+
+
 def _is_device_controllable(device_id: str, equipment_points: dict) -> bool:
     """Check if device is controllable by checking equipment points or device_manager.
 
@@ -681,8 +717,10 @@ async def get_building_equipment(building_id: str) -> dict:
             categories = {}
 
             for eq in equipment_data:
-                # Determine category from type
-                eq_type = eq.get("type", "unknown").lower()
+                # Determine category from type - normalize if type is unknown
+                eq_code = eq.get("code", "")
+                eq_type_raw = eq.get("type", "unknown")
+                eq_type = _normalize_equipment_type(eq_code, eq_type_raw)
                 type_to_category = {
                     "sensor": "Sensors",
                     "daylight_sensor": "Sensors",
@@ -729,11 +767,13 @@ async def get_building_equipment(building_id: str) -> dict:
 
                 equipment_list.append({
                     "id": eq.get("code", eq.get("id")),
+                    "code": eq.get("code"),
                     "name": eq.get("name"),
-                    "type": eq_type,
+                    "equipment_type": eq_type,  # Frontend expects equipment_type, not type
+                    "type": eq_type,  # Keep for backward compatibility
                     "category": category,
                     "status": status,
-                    "health": health,
+                    "health_score": health,
                     "location": eq.get("location", ""),
                     "building_id": site_code,
                     "building_name": building_name,
@@ -834,7 +874,7 @@ async def get_building_equipment(building_id: str) -> dict:
                     "type": "hvac_zone",
                     "category": "HVAC",
                     "status": status,
-                    "health": health,
+                    "health_score": health,
                     "location": f"Floor {zone.get('floor', 'N/A')}",
                     "building_id": site_code,
                     "building_name": building.name,
@@ -865,7 +905,7 @@ async def get_building_equipment(building_id: str) -> dict:
                     "type": "diesel_tank",
                     "category": "Generator Plant",
                     "status": status,
-                    "health": health,
+                    "health_score": health,
                     "location": tank.get("location", ""),
                     "building_id": site_code,
                     "building_name": building.name,
@@ -886,7 +926,7 @@ async def get_building_equipment(building_id: str) -> dict:
                     "type": "generator_group",
                     "category": "Generator Plant",
                     "status": status,
-                    "health": health,
+                    "health_score": health,
                     "location": group.get("location", ""),
                     "building_id": site_code,
                     "building_name": building.name,
@@ -908,7 +948,7 @@ async def get_building_equipment(building_id: str) -> dict:
                     "type": "generator",
                     "category": "Generator Plant",
                     "status": status,
-                    "health": health,
+                    "health_score": health,
                     "location": gen.get("location", ""),
                     "building_id": site_code,
                     "building_name": building.name,
@@ -937,7 +977,7 @@ async def get_building_equipment(building_id: str) -> dict:
                     "type": "mv_incomer",
                     "category": "Energy Centre",
                     "status": status,
-                    "health": health,
+                    "health_score": health,
                     "location": incomer.get("location", ""),
                     "building_id": site_code,
                     "building_name": building.name,
@@ -959,7 +999,7 @@ async def get_building_equipment(building_id: str) -> dict:
                     "type": "transformer",
                     "category": "Energy Centre",
                     "status": status,
-                    "health": health,
+                    "health_score": health,
                     "location": tx.get("location", ""),
                     "building_id": site_code,
                     "building_name": building.name,
@@ -981,7 +1021,7 @@ async def get_building_equipment(building_id: str) -> dict:
                     "type": "lv_switchboard",
                     "category": "Energy Centre",
                     "status": status,
-                    "health": health,
+                    "health_score": health,
                     "location": sb.get("location", ""),
                     "building_id": site_code,
                     "building_name": building.name,
@@ -1008,7 +1048,7 @@ async def get_building_equipment(building_id: str) -> dict:
                     "type": "ats",
                     "category": "Energy Centre",
                     "status": status,
-                    "health": health,
+                    "health_score": health,
                     "location": ats.get("location", ""),
                     "building_id": site_code,
                     "building_name": building.name,
@@ -1049,7 +1089,7 @@ async def get_building_equipment(building_id: str) -> dict:
                     "type": "pfc_bank",
                     "category": "Energy Centre",
                     "status": status,
-                    "health": health,
+                    "health_score": health,
                     "location": pfc.get("location", ""),
                     "building_id": site_code,
                     "building_name": building.name,
@@ -1070,7 +1110,7 @@ async def get_building_equipment(building_id: str) -> dict:
                     "type": "ups",
                     "category": "Energy Centre",
                     "status": status,
-                    "health": health,
+                    "health_score": health,
                     "location": ups.get("location", ""),
                     "building_id": site_code,
                     "building_name": building.name,
@@ -1093,7 +1133,7 @@ async def get_building_equipment(building_id: str) -> dict:
                     "type": "feeder",
                     "category": "Energy Centre",
                     "status": status,
-                    "health": health,
+                    "health_score": health,
                     "location": feeder.get("location", ""),
                     "building_id": site_code,
                     "building_name": building.name,
@@ -1125,7 +1165,7 @@ async def get_building_equipment(building_id: str) -> dict:
                         "type": "dali_controller",
                         "category": "Lighting",
                         "status": status,
-                        "health": health,
+                        "health_score": health,
                         "location": controller.get("location", ""),
                         "building_id": site_code,
                         "building_name": building.name,
@@ -1148,10 +1188,12 @@ async def get_building_equipment(building_id: str) -> dict:
                     eq = json.load(f)
 
                 eq_id = eq.get("id", eq.get("code", ""))
+                eq_code = eq.get("code", eq_id)
                 if eq_id in existing_ids:
                     continue  # Skip duplicates
 
-                eq_type = eq.get("equipment_type", eq.get("device_type", "unknown"))
+                eq_type_raw = eq.get("equipment_type", eq.get("device_type", "unknown"))
+                eq_type = _normalize_equipment_type(eq_code, eq_type_raw)
                 type_to_category = {
                     "ahu": "HVAC", "fcu": "HVAC", "vav": "HVAC", "chiller": "HVAC",
                     "cooling_tower": "HVAC", "pump": "HVAC", "boiler": "HVAC",
@@ -1168,11 +1210,13 @@ async def get_building_equipment(building_id: str) -> dict:
 
                 equipment_list.append({
                     "id": eq_id,
+                    "code": eq_code,
                     "name": eq.get("name", eq_id),
-                    "type": eq_type,
+                    "equipment_type": eq_type,  # Frontend expects equipment_type
+                    "type": eq_type,  # Keep for backward compatibility
                     "category": category,
                     "status": status,
-                    "health": health,
+                    "health_score": health,
                     "location": eq.get("location", ""),
                     "building_id": site_code,
                     "building_name": building.name,
@@ -1196,7 +1240,9 @@ async def get_building_equipment(building_id: str) -> dict:
             for eq in legacy_equipment:
                 # Match by site_id
                 if eq.get("site_id") == site_id:
-                    eq_type = eq.get("type", "unknown")
+                    eq_code = eq.get("code", eq.get("id", ""))
+                    eq_type_raw = eq.get("type", "unknown")
+                    eq_type = _normalize_equipment_type(eq_code, eq_type_raw)
                     # Determine category based on type
                     type_to_category = {
                         "sensor": "Sensors",
@@ -1234,11 +1280,13 @@ async def get_building_equipment(building_id: str) -> dict:
 
                     equipment_list.append({
                         "id": eq.get("id"),
+                        "code": eq_code,
                         "name": eq.get("name"),
-                        "type": eq_type,
+                        "equipment_type": eq_type,  # Frontend expects equipment_type
+                        "type": eq_type,  # Keep for backward compatibility
                         "category": category,
                         "status": status,
-                        "health": health,
+                        "health_score": health,
                         "location": eq.get("location", ""),
                         "building_id": site_code,
                         "building_name": building.name,

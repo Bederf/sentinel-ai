@@ -71,10 +71,13 @@ export const authApi = {
   /** Logout */
   logout: () => {
     const refreshToken = getRefreshToken();
-    const endpoint = refreshToken
-      ? `/api/auth/logout?refresh_token=${encodeURIComponent(refreshToken)}`
-      : "/api/auth/logout";
-    return fetchApi<{ message: string }>(endpoint, { method: "POST" });
+    // SECURITY: Send refresh token in request body, NOT in URL (Phase 75-07)
+    const body = refreshToken ? JSON.stringify({ refresh_token: refreshToken }) : undefined;
+    return fetchApi<{ message: string }>("/api/auth/logout", {
+      method: "POST",
+      body,
+      headers: body ? { "Content-Type": "application/json" } : {}
+    });
   },
 };
 

@@ -30,6 +30,7 @@ import {
   getPersistedAddonOrder,
   persistAddonOrder,
 } from "../lib/navigation";
+import { getAllowedViews, canAccessView } from "../lib/access-control";
 
 export type { View } from "../lib/navigation";
 
@@ -39,9 +40,10 @@ interface SidebarProps {
   version?: string;
   onCustomizeDashboard?: () => void;
   userRole?: string;
+  userEmail?: string;
 }
 
-export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomizeDashboard, userRole }: SidebarProps) {
+export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomizeDashboard, userRole, userEmail }: SidebarProps) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(true); // Start minimized
@@ -85,6 +87,28 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
     );
   }, [userRole]);
 
+  // Apply access control based on user email (company demo restrictions)
+  const allowedBaseItems = useMemo(() => {
+    if (!userEmail) return BASE_NAV_ITEMS;
+    const allItems = [...BASE_NAV_ITEMS, ...visibleAddons, ...visibleInternal];
+    const allowed = getAllowedViews(userEmail, allItems.map(i => i.id));
+    return BASE_NAV_ITEMS.filter(item => allowed.includes(item.id));
+  }, [userEmail, visibleAddons, visibleInternal]);
+
+  const allowedAddonItems = useMemo(() => {
+    if (!userEmail) return visibleAddons;
+    const allItems = [...BASE_NAV_ITEMS, ...visibleAddons, ...visibleInternal];
+    const allowed = getAllowedViews(userEmail, allItems.map(i => i.id));
+    return visibleAddons.filter(item => allowed.includes(item.id));
+  }, [userEmail, visibleAddons, visibleInternal]);
+
+  const allowedInternalItems = useMemo(() => {
+    if (!userEmail) return visibleInternal;
+    const allItems = [...BASE_NAV_ITEMS, ...visibleAddons, ...visibleInternal];
+    const allowed = getAllowedViews(userEmail, allItems.map(i => i.id));
+    return visibleInternal.filter(item => allowed.includes(item.id));
+  }, [userEmail, visibleAddons, visibleInternal]);
+
   const handleNavClick = (view: View) => {
     onViewChange(view);
     setIsMobileOpen(false);
@@ -94,7 +118,7 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
   const moveAddon = useCallback((itemId: View, direction: "up" | "down") => {
     setAddonOrder((prev) => {
       // Build current order from visible addons
-      const currentIds = visibleAddons.map((i) => i.id);
+      const currentIds = allowedAddonItems.map((i) => i.id);
       const ordered = prev.length > 0
         ? [...currentIds].sort((a, b) => {
             const aIdx = prev.indexOf(a);
@@ -115,7 +139,7 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
       persistAddonOrder(newOrder);
       return newOrder;
     });
-  }, [visibleAddons]);
+  }, [allowedAddonItems]);
 
   // Items to hide on mobile by default (less frequently used)
   const MOBILE_HIDDEN_ITEMS = ['control-audit', 'integrations', 'simbiot', 'fleet', 'mlops'];
@@ -343,12 +367,12 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
             </span>
           </div>
 
-          {BASE_NAV_ITEMS.map((item) =>
+          {allowedBaseItems.map((item) =>
             renderNavItem(item, currentView === item.id)
           )}
 
           {/* Addon section - only shown if there are active add-on modules */}
-          {visibleAddons.length > 0 && (
+          {allowedAddonItems.length > 0 && (
             <>
               <div
                 className="mx-3 mt-3 mb-2 pt-3"
@@ -362,17 +386,17 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
                 </span>
               </div>
 
-              {visibleAddons.map((item, index) =>
+              {allowedAddonItems.map((item, index) =>
                 renderNavItem(item, currentView === item.id, {
                   index,
-                  total: visibleAddons.length,
+                  total: allowedAddonItems.length,
                 })
               )}
             </>
           )}
 
           {/* Internal section - only shown if there are visible internal items */}
-          {visibleInternal.length > 0 && (
+          {allowedInternalItems.length > 0 && (
             <>
               <div
                 className="mx-3 mt-3 mb-2 pt-3"
@@ -386,7 +410,7 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
                 </span>
               </div>
 
-              {visibleInternal.map((item) =>
+              {allowedInternalItems.map((item) =>
                 renderNavItem(item, currentView === item.id)
               )}
             </>

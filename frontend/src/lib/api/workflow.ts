@@ -101,5 +101,24 @@ export const workflowApi = {
       method: "POST",
       body: JSON.stringify({ state, message }),
     }),
+
+  /**
+   * Get equipment with workflow states for dashboard
+   * Returns equipment list + workflow state for each
+   */
+  getDashboardEquipment: (siteId?: string) => {
+    const url = siteId 
+      ? `/api/workflow/dashboard/equipment?site_id=${encodeURIComponent(siteId)}`
+      : `/api/workflow/dashboard/equipment`;
+    return fetchApi<{
+      equipment: Array<{
+        equipment_id: string;
+        name: string;
+        type: string;
+        current_state: string;
+      }>;
+      workflow_states: Record<string, any>;
+    }>(url);
+  },
 };
 

@@ -1,7 +1,11 @@
 """Repository for equipment operations."""
 
 from typing import List, Optional, Dict, Any
+import time
+import logging
 from app.database.supabase_client import get_supabase_client
+
+logger = logging.getLogger(__name__)
 
 
 class EquipmentRepository:
@@ -10,6 +14,39 @@ class EquipmentRepository:
     def __init__(self):
         """Initialize the repository with a Supabase client."""
         self.client = get_supabase_client()
+
+    def _execute_with_retry(self, query, max_retries: int = 3):
+        """Execute a Supabase query with retry on rate limit.
+        
+        Args:
+            query: Supabase query object
+            max_retries: Maximum number of retries
+            
+        Returns:
+            Response data
+        """
+        delay = 0.5
+        last_error = None
+        
+        for attempt in range(max_retries + 1):
+            try:
+                return query.execute()
+            except Exception as e:
+                error_msg = str(e)
+                if '429' in error_msg or 'rate limit' in error_msg.lower():
+                    last_error = e
+                    if attempt < max_retries:
+                        logger.warning(f"Rate limit hit, retrying in {delay}s... (attempt {attempt + 1}/{max_retries})")
+                        time.sleep(delay)
+                        delay *= 2.0
+                    else:
+                        logger.error(f"Rate limit persists after {max_retries} retries")
+                        raise e
+                else:
+                    raise e
+        
+        if last_error:
+            raise last_error
 
     def get_all(self, building_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """Get all equipment with optional filtering.
@@ -69,20 +106,18 @@ class EquipmentRepository:
         Returns:
             List of equipment items
         """
-        # First get the building UUID
-        building_response = self.client.table('buildings').select('id').eq(
-            'code', building_code
-        ).execute()
+        # First get the building UUID (with retry)
+        building_query = self.client.table('buildings').select('id').eq('code', building_code)
+        building_response = self._execute_with_retry(building_query)
 
         if not building_response.data:
             return []
 
         building_uuid = building_response.data[0]['id']
 
-        # Get equipment for this building
-        equipment_response = self.client.table('equipment').select("*").eq(
-            'building_id', building_uuid
-        ).execute()
+        # Get equipment for this building (with retry)
+        equipment_query = self.client.table('equipment').select("*").eq('building_id', building_uuid)
+        equipment_response = self._execute_with_retry(equipment_query)
 
         return equipment_response.data
 

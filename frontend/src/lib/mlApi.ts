@@ -3,6 +3,8 @@
  * Phase 43: ML Model Development
  */
 
+import { authorizedFetch } from "./api/client";
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || "";
 
 // ============= Response Interfaces =============
@@ -97,8 +99,7 @@ export async function getLSTMPrediction(
   equipmentId: string,
   equipmentType: string
 ): Promise<LSTMPrediction> {
-  const response = await fetch(
-    `${API_BASE_URL}/api/ml/predictions/lstm/${equipmentId}?equipment_type=${equipmentType}`
+  const response = await authorizedFetch(`/api/ml/predictions/lstm/${equipmentId}?equipment_type=${equipmentType}`
   );
   if (!response.ok) {
     const error = await response.json();
@@ -115,8 +116,7 @@ export async function getPredictionTrend(
   equipmentType: string,
   hoursHistory: number = 168
 ): Promise<TrendData> {
-  const response = await fetch(
-    `${API_BASE_URL}/api/ml/predictions/trend/${equipmentId}?equipment_type=${equipmentType}&hours_history=${hoursHistory}`
+  const response = await authorizedFetch(`/api/ml/predictions/trend/${equipmentId}?equipment_type=${equipmentType}&hours_history=${hoursHistory}`
   );
   if (!response.ok) {
     const error = await response.json();
@@ -131,7 +131,7 @@ export async function getPredictionTrend(
 export async function getBatchPredictions(
   equipmentList: Array<{ equipment_id: string; equipment_type: string }>
 ): Promise<LSTMPrediction[]> {
-  const response = await fetch(`${API_BASE_URL}/api/ml/predictions/batch`, {
+  const response = await authorizedFetch(`/api/ml/predictions/batch`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(equipmentList),
@@ -149,8 +149,7 @@ export async function checkEquipmentAnomaly(
   equipmentId: string,
   equipmentType: string
 ): Promise<AnomalyResult> {
-  const response = await fetch(
-    `${API_BASE_URL}/api/ml/anomalies/equipment/${equipmentId}?equipment_type=${equipmentType}`
+  const response = await authorizedFetch(`/api/ml/anomalies/equipment/${equipmentId}?equipment_type=${equipmentType}`
   );
   if (!response.ok) {
     const error = await response.json();
@@ -163,7 +162,7 @@ export async function checkEquipmentAnomaly(
  * Get anomaly status for all equipment
  */
 export async function getAllAnomalies(limit: number = 20): Promise<AnomalyResult[]> {
-  const response = await fetch(`${API_BASE_URL}/api/ml/anomalies/all?limit=${limit}`);
+  const response = await authorizedFetch(`/api/ml/anomalies/all?limit=${limit}`);
   if (!response.ok) {
     throw new Error("Failed to get anomalies");
   }
@@ -174,7 +173,7 @@ export async function getAllAnomalies(limit: number = 20): Promise<AnomalyResult
  * Get active anomaly alerts
  */
 export async function getAnomalyAlerts(): Promise<AnomalyResult[]> {
-  const response = await fetch(`${API_BASE_URL}/api/ml/anomalies/alerts`);
+  const response = await authorizedFetch(`/api/ml/anomalies/alerts`);
   if (!response.ok) {
     throw new Error("Failed to get anomaly alerts");
   }
@@ -189,8 +188,7 @@ export async function getAnomalyHistory(
   equipmentType: string,
   days: number = 7
 ): Promise<AnomalyHistoryEntry[]> {
-  const response = await fetch(
-    `${API_BASE_URL}/api/ml/anomalies/history/${equipmentId}?equipment_type=${equipmentType}&days=${days}`
+  const response = await authorizedFetch(`/api/ml/anomalies/history/${equipmentId}?equipment_type=${equipmentType}&days=${days}`
   );
   if (!response.ok) {
     throw new Error("Failed to get anomaly history");
@@ -211,7 +209,7 @@ export async function listMLModels(
   if (equipmentType) params.append("equipment_type", equipmentType);
   if (status) params.append("status", status);
 
-  const response = await fetch(`${API_BASE_URL}/api/ml/models?${params}`);
+  const response = await authorizedFetch(`/api/ml/models?${params}`);
   if (!response.ok) {
     throw new Error("Failed to list models");
   }
@@ -222,7 +220,7 @@ export async function listMLModels(
  * Get ML service health
  */
 export async function getMLHealth(): Promise<MLHealth> {
-  const response = await fetch(`${API_BASE_URL}/api/ml/health`);
+  const response = await authorizedFetch(`/api/ml/health`);
   if (!response.ok) {
     throw new Error("Failed to get ML health");
   }
@@ -238,8 +236,7 @@ export async function trainModel(
   epochs: number = 50,
   useDemoData: boolean = true
 ): Promise<TrainResponse> {
-  const response = await fetch(
-    `${API_BASE_URL}/api/ml/train/${modelType}/${equipmentType}`,
+  const response = await authorizedFetch(`/api/ml/train/${modelType}/${equipmentType}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -257,7 +254,7 @@ export async function trainModel(
  * Activate a specific model version
  */
 export async function activateModel(modelId: string): Promise<{ status: string; message: string }> {
-  const response = await fetch(`${API_BASE_URL}/api/ml/models/${modelId}/activate`, {
+  const response = await authorizedFetch(`/api/ml/models/${modelId}/activate`, {
     method: "POST",
   });
   if (!response.ok) {

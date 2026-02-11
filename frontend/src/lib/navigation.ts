@@ -81,7 +81,7 @@ export const VIEW_TITLES: Record<View, string> = {
   "control-audit": "Control Audit Trail",
   optimization: "Load Shedding Optimization",
   settings: "Settings",
-  integrations: "Integration Monitoring",
+  integrations: "System Health",
   occupancy: "DALI Occupancy",
   workflow: "Asset Workflow",
   security: "Security",
@@ -121,7 +121,7 @@ export const ADDON_NAV_ITEMS: NavItem[] = [
   { id: "control-audit", label: "Control Audit", icon: ClipboardList, description: "Control System Logs", category: "addon", requiredModule: "control", defaultOrder: 1 },
   { id: "workflow", label: "Asset Workflow", icon: GitBranch, description: "Lifecycle Management", category: "addon", requiredModule: "assets", defaultOrder: 2 },
   { id: "simbiot", label: "SIMBIOT", icon: Plug, description: "BMS Connection Wizard", category: "addon", requiredModule: "simbiot", defaultOrder: 3 },
-  { id: "integrations", label: "Integrations", icon: Activity, description: "BMS Integration Health", category: "addon", requiredModule: "integrations", defaultOrder: 4 },
+  { id: "integrations", label: "System Health", icon: Activity, description: "Real-time Health Monitoring", category: "addon", requiredModule: "integrations", defaultOrder: 4 },
   // Visualization and analytics
   { id: "digital-twin", label: "Digital Twin", icon: Box, description: "3D Building Visualization", category: "addon", requiredModule: "control", defaultOrder: 5 },
   // Building system modules

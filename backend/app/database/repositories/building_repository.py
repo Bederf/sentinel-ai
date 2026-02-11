@@ -1,8 +1,12 @@
 """Repository for building/site operations."""
 
+import logging
+import time
 from typing import List, Optional, Dict, Any
 from app.database.supabase_client import get_supabase_client
 from app.models.auth import SentinelRole
+
+logger = logging.getLogger(__name__)
 
 
 class BuildingRepository:
@@ -11,6 +15,31 @@ class BuildingRepository:
     def __init__(self):
         """Initialize the repository with a Supabase client."""
         self.client = get_supabase_client()
+
+    def _execute_with_retry(self, query, max_retries: int = 3):
+        """Execute a Supabase query with retry on rate limit."""
+        delay = 0.5
+        last_error = None
+        
+        for attempt in range(max_retries + 1):
+            try:
+                return query.execute()
+            except Exception as e:
+                error_msg = str(e)
+                if '429' in error_msg or 'rate limit' in error_msg.lower():
+                    last_error = e
+                    if attempt < max_retries:
+                        logger.warning(f"Rate limit hit, retrying in {delay}s... (attempt {attempt + 1}/{max_retries})")
+                        time.sleep(delay)
+                        delay *= 2.0
+                    else:
+                        logger.error(f"Rate limit persists after {max_retries} retries")
+                        raise e
+                else:
+                    raise e
+        
+        if last_error:
+            raise last_error
 
     def get_all(
         self,
@@ -33,7 +62,7 @@ class BuildingRepository:
         if site_type:
             query = query.eq('type', site_type)
 
-        response = query.execute()
+        response = self._execute_with_retry(query)
         return response.data
 
     def get_by_id(self, building_id: str) -> Optional[Dict[str, Any]]:
@@ -45,7 +74,8 @@ class BuildingRepository:
         Returns:
             Building data or None if not found
         """
-        response = self.client.table('buildings').select("*").eq('code', building_id).execute()
+        query = self.client.table('buildings').select("*").eq('code', building_id)
+        response = self._execute_with_retry(query)
 
         if response.data:
             return response.data[0]
@@ -60,7 +90,8 @@ class BuildingRepository:
         Returns:
             Building data or None if not found
         """
-        response = self.client.table('buildings').select("*").eq('id', uuid).execute()
+        query = self.client.table('buildings').select("*").eq('id', uuid)
+        response = self._execute_with_retry(query)
 
         if response.data:
             return response.data[0]
@@ -126,9 +157,11 @@ class BuildingRepository:
         if not building:
             return []
         
-        # Query equipment table by building_id
+        # Query equipment table by building_id (includes metadata fields)
         response = self.client.table('equipment').select(
-            "id, code, name, status, health_score, type, building_id"
+            "id, code, name, status, health_score, type, building_id, "
+            "manufacturer, model, install_date, commissioning_date, "
+            "device_info, operating_data, network_info, location"
         ).eq('building_id', building['id']).execute()
         
         return response.data or []

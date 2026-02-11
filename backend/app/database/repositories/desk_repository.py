@@ -2,6 +2,7 @@
 
 from typing import List, Optional, Dict, Any
 import logging
+import time
 from app.database.supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
@@ -13,6 +14,31 @@ class DeskRepository:
     def __init__(self):
         """Initialize the repository with a Supabase client."""
         self.client = get_supabase_client()
+
+    def _execute_with_retry(self, query, max_retries: int = 3):
+        """Execute a Supabase query with retry on rate limit."""
+        delay = 0.5
+        last_error = None
+        
+        for attempt in range(max_retries + 1):
+            try:
+                return query.execute()
+            except Exception as e:
+                error_msg = str(e)
+                if '429' in error_msg or 'rate limit' in error_msg.lower():
+                    last_error = e
+                    if attempt < max_retries:
+                        logger.warning(f"Rate limit hit, retrying in {delay}s... (attempt {attempt + 1}/{max_retries})")
+                        time.sleep(delay)
+                        delay *= 2.0
+                    else:
+                        logger.error(f"Rate limit persists after {max_retries} retries")
+                        raise e
+                else:
+                    raise e
+        
+        if last_error:
+            raise last_error
 
     def get_all(self, building_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """Get all desks with optional building filter.
@@ -326,10 +352,8 @@ class DeskRepository:
         Returns:
             List of desks in the building
         """
-        response = self.client.table('desks').select("*").eq(
-            'building_id', building_id
-        ).execute()
-
+        query = self.client.table('desks').select("*").eq('building_id', building_id)
+        response = self._execute_with_retry(query)
         return response.data
 
     def get_by_zone_id(self, building_id: str, zone_id: str) -> List[Dict[str, Any]]:

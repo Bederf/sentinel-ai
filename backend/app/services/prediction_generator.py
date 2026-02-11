@@ -145,24 +145,21 @@ class PredictionGeneratorService:
         # Calculate probability based on health (inverse relationship)
         probability = min(95, max(60, 100 - health_score + 10))
 
-        # Determine severity based on health status - aligned with settings thresholds
-        # Uses configurable thresholds from health_threshold_service:
-        # - health >= healthy (default 90): healthy
-        # - health < critical (default 50): critical
-        # - Everything in between: warning
-        # Note: DB constraint allows: critical, high, medium, low (not 'warning')
+        # Determine severity based on health status - aligned with database constraint
+        # Database allows: critical, warning, healthy (NOT high, medium, low)
         health_status = get_health_status(health_score)
         if health_status == "critical":
             severity = "critical"
             timeframe_days = 7
             urgency = "immediate"
         elif health_status == "warning":
-            severity = "high"  # Map warning health to high severity (DB constraint)
+            severity = "warning"  # Use 'warning' not 'high' (DB constraint)
             timeframe_days = 14
             urgency = "soon"
         else:
-            # Should not reach here as we only generate for unhealthy equipment
-            severity = "low"
+            # Healthy equipment shouldn't reach here (only generate for health < 90)
+            # But if it does, use 'healthy' not 'low'
+            severity = "healthy"
             timeframe_days = 30
             urgency = "scheduled"
 

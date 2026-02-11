@@ -17,18 +17,24 @@ import type {
   DeviceControlResponse,
   HealthResponse,
   EnergyResponse,
+  DashboardPreferencesResponse,
+  DashboardPreferences,
 } from '@/lib/api';
 import {
   createMockSite,
   createMockDevice,
   createMockAlert,
   createMockPrediction,
+  createMockPredictions,
   createMockEquipment,
   createMockAuditLog,
   createMockDashboardStats,
   createMockOptimizationStatus,
   createMockDeviceStatus,
   createMockDeviceSafetyStatus,
+  createMockEnergyDataPoint,
+  createMockEnergyResponse,
+  createMockBuildingEquipmentItem,
 } from '../test-utils/factories';
 
 /**
@@ -65,22 +71,13 @@ const createMockApi = () => {
       createMockEquipment({ id: 'equipment-001' }),
     ] satisfies Equipment[]),
 
-    getEnergy: vi.fn().mockResolvedValue({
-      days: 30,
-      site_id: null,
-      data: [],
-    } as EnergyResponse),
+    getEnergy: vi.fn().mockResolvedValue(
+      createMockEnergyResponse() satisfies EnergyResponse
+    ),
 
-    getPredictions: vi.fn().mockResolvedValue({
-      total: 1,
-      avg_probability: 0.85,
-      total_repair_cost_zar: 45000,
-      total_potential_loss_zar: 180000,
-      potential_savings_zar: 135000,
-      by_severity: { critical: 1 },
-      by_equipment_type: { chiller: 1 },
-      predictions: [createMockPrediction()],
-    }),
+    getPredictions: vi.fn().mockResolvedValue(
+      createMockPredictions([createMockPrediction()])
+    ),
 
     getPrediction: vi.fn().mockResolvedValue(
       createMockPrediction() satisfies Prediction

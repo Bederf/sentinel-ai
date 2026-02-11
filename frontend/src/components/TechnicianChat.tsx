@@ -12,6 +12,7 @@
 import { useState, useRef, useEffect } from 'react';
 import type { FormEvent, KeyboardEvent } from 'react';
 import { Send, Wrench, Search, AlertTriangle, CheckCircle, Info, ChevronDown, ChevronUp, ExternalLink, Clipboard, PlayCircle, Eye, ImageIcon } from 'lucide-react';
+import { authorizedFetch } from '../lib/api/client';
 import DiagnosisFlow from './DiagnosisFlow';
 import PhotoCapture from './PhotoCapture';
 
@@ -259,7 +260,7 @@ export default function TechnicianChat() {
     try {
       // Call equipment lookup search endpoint
       const params = new URLSearchParams({ query: text });
-      const response = await fetch(`${API_BASE_URL}/api/equipment-lookup/search?${params}`, {
+      const response = await authorizedFetch(`${API_BASE_URL}/api/equipment-lookup/search?${params}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       });

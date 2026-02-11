@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { authorizedFetch } from '../lib/api/client';
 
 interface EmergencyStopButtonProps {
   onEmergencyStop?: () => void;
@@ -22,7 +23,7 @@ export const EmergencyStopButton: React.FC<EmergencyStopButtonProps> = ({
 
     try {
       setIsProcessing(true);
-      const response = await fetch('/api/safety/escalation/emergency-stop', {
+      const response = await authorizedFetch('/api/safety/escalation/emergency-stop', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

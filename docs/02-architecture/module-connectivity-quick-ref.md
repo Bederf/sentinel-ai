@@ -95,7 +95,7 @@ See [Profile-Based Optimization Architecture](profile-based-optimization.md) for
    ↓
 4. AI Optimizer runs with profile weights injected
    ↓
-5. Multi-objective scoring ranks recommendation1111111111111111s (profile-aligned)
+5. Multi-objective scoring ranks recommendations (profile-aligned)
    ↓
 6. Control tier decides: Auto-execute, Require approval, or Display only
    ↓

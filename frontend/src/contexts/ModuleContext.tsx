@@ -61,6 +61,11 @@ export function ModuleProvider({
       const modules = await moduleRegistryApi.getAvailableModules();
       setAvailableModules(modules);
     } catch (err) {
+      // Suppress rate limit errors - they're expected and will retry
+      if (err instanceof Error && err.message.includes('429')) {
+        console.warn('Module API rate limited, will retry with cache');
+        return;
+      }
       if (!isExpectedApiError(err)) {
         console.error('Failed to load available modules:', err);
       }

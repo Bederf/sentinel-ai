@@ -127,10 +127,11 @@ async function tryRefreshAccessToken(): Promise<string | null> {
 
   refreshInFlight = (async () => {
     try {
-      const refreshUrl = `${API_BASE_URL}/api/auth/refresh?refresh_token=${encodeURIComponent(refreshToken)}`;
-      const response = await fetch(refreshUrl, {
+      // SECURITY: Send refresh token in request body, NOT in URL (Phase 75-07)
+      const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh_token: refreshToken }),
       });
       if (!response.ok) return null;
       const data = await response.json() as { access_token?: string; refresh_token?: string };
@@ -381,12 +382,15 @@ export interface CategoryStatus {
 }
 
 // Building equipment response (from /api/buildings/{id}/equipment)
+// NOTE: This is deprecated - use the version from lib/api/sites.ts instead
+// Keeping for backward compatibility but should use Equipment[] not BuildingEquipmentItem[]
 export interface BuildingEquipmentResponse {
   building_id: string;
   building_name: string;
   total_equipment: number;
   categories: Record<string, CategoryStatus>;
-  equipment: BuildingEquipmentItem[];
+  // Use Equipment array (from modular API) instead of BuildingEquipmentItem
+  equipment: Equipment[];
 }
 
 // Equipment metadata (from /api/equipment/{id}/metadata)
@@ -4364,10 +4368,13 @@ export const authApi = {
   /** Logout */
   logout: () => {
     const refreshToken = getRefreshToken();
-    const endpoint = refreshToken
-      ? `/api/auth/logout?refresh_token=${encodeURIComponent(refreshToken)}`
-      : "/api/auth/logout";
-    return fetchApi<{ message: string }>(endpoint, { method: "POST" });
+    // SECURITY: Send refresh token in request body, NOT in URL (Phase 75-07)
+    const body = refreshToken ? JSON.stringify({ refresh_token: refreshToken }) : undefined;
+    return fetchApi<{ message: string }>("/api/auth/logout", {
+      method: "POST",
+      body,
+      headers: body ? { "Content-Type": "application/json" } : {}
+    });
   },
 };
 

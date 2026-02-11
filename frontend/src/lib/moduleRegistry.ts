@@ -33,6 +33,10 @@ export interface ModuleDefinition {
   ai_features: string[];
 }
 
+// Cache for available modules (5 minute TTL)
+const MODULES_CACHE_TTL = 5 * 60 * 1000;
+let modulesCache: { data: ModuleDefinition[] | null; timestamp: number } = { data: null, timestamp: 0 };
+
 export interface ModuleInstance {
   instance_id: string;
   site_id: string;
@@ -113,11 +117,32 @@ async function fetchWithAuth(input: RequestInfo, init?: RequestInit) {
 export const moduleRegistryApi = {
   /**
    * Get all available module definitions
+   * Cached for 5 minutes to prevent rate limit hits
    */
   async getAvailableModules(): Promise<ModuleDefinition[]> {
-    const response = await fetchWithAuth(`${API_BASE}/api/modules/available`);
-    if (!response.ok) throw new Error('Failed to fetch available modules');
-    return response.json();
+    const now = Date.now();
+    
+    // Return cached data if still valid
+    if (modulesCache.data && (now - modulesCache.timestamp) < MODULES_CACHE_TTL) {
+      return modulesCache.data;
+    }
+    
+    try {
+      const response = await fetchWithAuth(`${API_BASE}/api/modules/available`);
+      if (!response.ok) throw new Error('Failed to fetch available modules');
+      const data = await response.json();
+      
+      // Update cache
+      modulesCache = { data, timestamp: now };
+      return data;
+    } catch (error) {
+      // If request fails but we have cached data, return it even if expired
+      if (modulesCache.data) {
+        console.warn('Failed to fetch modules, using stale cache:', error);
+        return modulesCache.data;
+      }
+      throw error;
+    }
   },
 
   /**
