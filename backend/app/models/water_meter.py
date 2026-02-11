@@ -122,6 +122,8 @@ class WaterConsumption:
         pulse_count: Raw pulse count from meter
         temperature: Water temperature (optional)
         pressure: Water pressure (optional)
+        zone_id: Zone identifier for zone-aware consumption tracking (optional)
+        zone_name: Zone display name (optional)
     """
     meter_id: str
     timestamp: datetime
@@ -130,6 +132,8 @@ class WaterConsumption:
     pulse_count: int = 0
     temperature: Optional[float] = None
     pressure: Optional[float] = None
+    zone_id: Optional[str] = None
+    zone_name: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
@@ -141,6 +145,8 @@ class WaterConsumption:
             "pulse_count": self.pulse_count,
             "temperature": self.temperature,
             "pressure": self.pressure,
+            "zone_id": self.zone_id,
+            "zone_name": self.zone_name,
         }
 
     @classmethod
@@ -154,6 +160,8 @@ class WaterConsumption:
             pulse_count=data.get("pulse_count", 0),
             temperature=data.get("temperature"),
             pressure=data.get("pressure"),
+            zone_id=data.get("zone_id"),
+            zone_name=data.get("zone_name"),
         )
 
 
