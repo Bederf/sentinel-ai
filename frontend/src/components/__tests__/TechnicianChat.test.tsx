@@ -247,10 +247,15 @@ describe('TechnicianChat', () => {
         /Describe a fault or search for parts/
       ) as HTMLInputElement;
 
-      await userEvent.type(input, 'line 1{Shift>}{Enter}{/Shift}');
+      // Type text and then Shift+Enter (which should create newline, not send)
+      await userEvent.type(input, 'line 1');
+      // Simulate Shift+Enter by firing keyboard event with shiftKey=true
+      fireEvent.keyDown(input, { key: 'Enter', code: 'Enter', shiftKey: true });
 
-      // Message should not be sent
+      // Message should not be sent (Shift+Enter creates newline, not send)
       expect(screen.queryByText(/line 1/)).not.toBeInTheDocument();
+      // But input should still have the text
+      expect(input.value).toBe('line 1');
     });
 
     it('should clear input after sending', async () => {
@@ -386,8 +391,10 @@ describe('TechnicianChat', () => {
       await userEvent.type(input, 'test');
       fireEvent.click(sendButton!);
 
+      // Component should display the formatted response "Found: E4 - High Pressure"
       await waitFor(() => {
-        expect(screen.getByText(/Found:/)).toBeInTheDocument();
+        expect(screen.getByText(/E4/)).toBeInTheDocument();
+        expect(screen.getByText(/High Pressure/)).toBeInTheDocument();
       });
     });
 
@@ -507,13 +514,11 @@ describe('TechnicianChat', () => {
       await userEvent.type(input, 'test');
       fireEvent.click(sendButton!);
 
-      await waitFor(() => {
-        const causesButton = screen.getByText(/Probable Causes/);
-        fireEvent.click(causesButton);
-      });
-
+      // Probable causes are shown by default in DiagnosisMessage (showCauses=true)
+      // Just wait for the message to appear and the causes to be visible
       await waitFor(() => {
         expect(screen.getByText('Low refrigerant')).toBeInTheDocument();
+        expect(screen.getByText('Dirty condenser')).toBeInTheDocument();
       });
     });
 
@@ -545,13 +550,11 @@ describe('TechnicianChat', () => {
       await userEvent.type(input, 'test');
       fireEvent.click(sendButton!);
 
+      // Recommended actions are shown by default in DiagnosisMessage (showFix=true)
+      // Just wait for the message to appear and the actions to be visible
       await waitFor(() => {
-        const actionsButton = screen.getByText(/Recommended Actions/);
-        fireEvent.click(actionsButton);
-      });
-
-      await waitFor(() => {
-        expect(screen.getByText(/Check refrigerant pressure/)).toBeInTheDocument();
+        expect(screen.getByText('Check refrigerant pressure')).toBeInTheDocument();
+        expect(screen.getByText('Inspect condenser coils')).toBeInTheDocument();
       });
     });
 

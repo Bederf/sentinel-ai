@@ -8,34 +8,34 @@ interface EquipmentMarkerProps {
   onClick: () => void;
 }
 
-// Equipment type to icon/emoji mapping
-const EQUIPMENT_ICONS: Record<string, string> = {
-  'chiller': '❄️',
-  'ahu': '🌬️',
-  'fcu': '💨',
-  'vav': '🎚️',
-  'cooling_tower': '🌊',
-  'ct': '🌊',
-  'generator': '⚡',
-  'gen': '⚡',
-  'ups': '🔋',
-  'transformer': '⚙️',
-  'tx': '⚙️',
-  'ats': '🔀',
-  'dali': '💡',
-  'luminaire': '💡',
-  'lum': '💡',
-  'meter': '📊',
-  'mtr': '📊',
-  'fire': '🔥',
-  'sprinkler': '💧',
-  'cctv': '📹',
-  'access': '🔐',
-  'acc': '🔐',
-  'sensor': '📡',
-  'pump': '🔵',
-  'boiler': '🟠',
-  'hvac_zone': '🎛️',
+// Equipment type labels (no icons/emojis)
+const EQUIPMENT_LABELS: Record<string, string> = {
+  'chiller': 'CHILLER',
+  'ahu': 'AHU',
+  'fcu': 'FCU',
+  'vav': 'VAV',
+  'cooling_tower': 'COOLING TOWER',
+  'ct': 'COOLING TOWER',
+  'generator': 'GENERATOR',
+  'gen': 'GENERATOR',
+  'ups': 'UPS',
+  'transformer': 'TRANSFORMER',
+  'tx': 'TRANSFORMER',
+  'ats': 'ATS',
+  'dali': 'DALI',
+  'luminaire': 'LUMINAIRE',
+  'lum': 'LUMINAIRE',
+  'meter': 'METER',
+  'mtr': 'METER',
+  'fire': 'FIRE',
+  'sprinkler': 'SPRINKLER',
+  'cctv': 'CCTV',
+  'access': 'ACCESS',
+  'acc': 'ACCESS',
+  'sensor': 'SENSOR',
+  'pump': 'PUMP',
+  'boiler': 'BOILER',
+  'hvac_zone': 'HVAC ZONE',
 };
 
 // Equipment type to size mapping for visual differentiation
@@ -71,8 +71,8 @@ export function EquipmentMarker({ equipment, position, onClick }: EquipmentMarke
     return '#6b7280';  // gray
   };
 
-  const getEquipmentIcon = (type: string): string => {
-    return EQUIPMENT_ICONS[type] || '🏗️'; // Default icon
+  const getEquipmentLabel = (type: string): string => {
+    return EQUIPMENT_LABELS[type] || type.toUpperCase();
   };
 
   const getEquipmentSize = (type: string): number => {
@@ -80,7 +80,7 @@ export function EquipmentMarker({ equipment, position, onClick }: EquipmentMarke
   };
 
   const color = getStatusColor(equipment);
-  const icon = getEquipmentIcon(equipmentType);
+  const label = getEquipmentLabel(equipmentType);
   const size = getEquipmentSize(equipmentType);
 
   const handleClick = () => {
@@ -123,7 +123,7 @@ export function EquipmentMarker({ equipment, position, onClick }: EquipmentMarke
         </mesh>
       )}
 
-      {/* Equipment type icon and label */}
+      {/* Equipment name and type label */}
       <Html distanceFactor={10} position={[0, size + 0.8, 0]}>
         <div
           className="flex flex-col items-center gap-1 pointer-events-none select-none"
@@ -131,37 +131,31 @@ export function EquipmentMarker({ equipment, position, onClick }: EquipmentMarke
             filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))',
           }}
         >
-          {/* Equipment type icon */}
-          <div
-            className="text-2xl"
-            style={{
-              textShadow: '0 1px 2px rgba(0,0,0,0.8)',
-            }}
-          >
-            {icon}
-          </div>
           {/* Equipment name */}
           <div
-            className="text-xs px-2 py-0.5 rounded font-medium whitespace-nowrap"
+            className="text-xs px-2 py-1 rounded font-medium whitespace-nowrap"
             style={{
-              background: 'rgba(0, 0, 0, 0.8)',
-              color: 'white',
+              background: 'rgba(0, 0, 0, 0.85)',
+              color: color,
               border: `1px solid ${color}`,
+              fontSize: '0.7rem',
+              fontWeight: '600',
             }}
           >
             {equipment.name || (equipment as any).code || 'Unknown'}
           </div>
           {/* Equipment type label */}
           <div
-            className="text-xs px-1.5 py-0.5 rounded font-medium whitespace-nowrap"
+            className="text-xs px-2 py-0.5 rounded font-medium whitespace-nowrap"
             style={{
               background: color,
               color: 'white',
-              opacity: 0.9,
-              fontSize: '0.65rem',
+              opacity: 0.85,
+              fontSize: '0.6rem',
+              fontWeight: '500',
             }}
           >
-            {equipmentType.toUpperCase()}
+            {label}
           </div>
         </div>
       </Html>

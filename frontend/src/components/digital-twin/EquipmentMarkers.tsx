@@ -55,16 +55,34 @@ function getEquipmentPosition(
   const normalizedFloor = floorCode === 'G' ? 'L0' : floorCode;
 
   // Map floor to Y coordinate (height)
+  // Outdoor equipment (Roof, Basement) positioned outside building envelope
   const floorHeights: Record<string, number> = {
-    'B1': 0.5,
-    'B2': -2.5,
+    'B1': -3,       // Basement: below ground level
+    'B2': -5,       // Deep basement
     'G': 3.5,
-    'L0': 3.5,
-    'L1': 6.5,
-    'L2': 9.5,
-    'R': 12.5,
+    'L0': 3.5,      // Ground floor (inside)
+    'L1': 6.5,      // First floor (inside)
+    'L2': 9.5,      // Second floor (inside)
+    'R': 15,        // Roof: above building envelope
   };
   const y = floorHeights[normalizedFloor] || floorHeights[floorCode] || 3.5;
+
+  // For outdoor equipment (Basement, Roof), position around building perimeter
+  if (normalizedFloor === 'B1' || normalizedFloor === 'B2' || normalizedFloor === 'R') {
+    // Extract numeric ID from code for perimeter distribution (e.g., "S002-CHILLER-B1-001" → 001)
+    const numMatch = code.match(/-(\d+)$/);
+    const itemNum = numMatch ? parseInt(numMatch[1], 10) : 0;
+    
+    // Distribute around building perimeter (30m × 20m building)
+    // Position around edges at distance from center
+    const buildingEdge = 20; // Distance from center to building edge
+    const angleStep = (itemNum % 8) * (Math.PI / 4); // 8 positions around building
+    
+    const x = Math.sin(angleStep) * buildingEdge;
+    const z = Math.cos(angleStep) * buildingEdge;
+    
+    return [x, y, z];
+  }
 
   // Extract zone letter from equipment code
   // Supports both formats: Zone-L1-A (end match) or numeric (e.g., 001)
