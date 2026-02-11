@@ -395,3 +395,148 @@ class ConnectorStatus:
             "error_count": self.error_count,
             "stale_threshold_seconds": self.stale_threshold_seconds,
         }
+
+
+# === Grid Compliance Models (Phase 34, Module 8) ===
+
+
+class GridCode(str, Enum):
+    """Grid compliance standards."""
+    NRS_097_2_3 = "nrs_097_2_3"  # South African grid code
+    IEC_61727 = "iec_61727"  # International standard
+    IEEE_1547 = "ieee_1547"  # US standard
+
+
+class GridParameter(str, Enum):
+    """Grid parameters being monitored."""
+    FREQUENCY = "frequency"
+    VOLTAGE = "voltage"
+    CURRENT = "current"
+    POWER_FACTOR = "power_factor"
+    THD = "thd"
+    RAMP_RATE = "ramp_rate"
+
+
+class ComplianceSeverity(str, Enum):
+    """Severity of compliance violations."""
+    CRITICAL = "critical"  # Immediate action required, trip threshold
+    WARNING = "warning"  # Action recommended, pre-violation
+    INFO = "info"  # Informational only
+
+
+@dataclass
+class FrequencyBand:
+    """Frequency operating band for a grid code."""
+    band_name: str  # "normal", "recovery", "emergency"
+    min_hz: float
+    max_hz: float
+    trip_low_hz: Optional[float] = None  # Mandatory disconnect point
+    trip_high_hz: Optional[float] = None
+    disconnect_delay_ms: int = 200  # Max time before mandatory disconnect
+
+
+@dataclass
+class VoltageBand:
+    """Voltage operating band for a grid code (per phase)."""
+    band_name: str  # "normal", "recovery", "emergency"
+    nominal_v: float
+    min_v: float
+    max_v: float
+    trip_low_v: Optional[float] = None
+    trip_high_v: Optional[float] = None
+    disconnect_delay_ms: int = 500
+
+
+@dataclass
+class RampRateLimit:
+    """Maximum rate of power change (percentage per minute)."""
+    condition: str  # "normal", "curtailment", "recovery"
+    max_pct_per_min: float
+    applies_to: str = "ac_power"  # Which power measurement
+
+
+@dataclass
+class ComplianceViolation:
+    """Record of a grid code violation."""
+    timestamp: str  # ISO 8601 datetime
+    system_id: str  # Inverter or site ID
+    parameter: str  # frequency, voltage, ramp_rate, etc.
+    measured_value: float
+    limit_value: float
+    violation_type: str  # exceeds_max, below_min, ramp_too_fast
+    severity: str  # critical, warning, info
+    auto_action: Optional[str] = None  # "curtailment", "standby", "droop", etc.
+    duration_ms: Optional[int] = None  # Time until resolution
+    resolved: bool = False
+    resolution_time: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "timestamp": self.timestamp,
+            "system_id": self.system_id,
+            "parameter": self.parameter,
+            "measured_value": self.measured_value,
+            "limit_value": self.limit_value,
+            "violation_type": self.violation_type,
+            "severity": self.severity,
+            "auto_action": self.auto_action,
+            "duration_ms": self.duration_ms,
+            "resolved": self.resolved,
+            "resolution_time": self.resolution_time,
+        }
+
+
+@dataclass
+class GridComplianceStatus:
+    """Current grid compliance status snapshot."""
+    system_id: str
+    grid_code: str
+    compliant: bool
+    last_check: str  # ISO 8601 datetime
+    next_check: str  # ISO 8601 datetime
+    active_violations: List[ComplianceViolation] = field(default_factory=list)
+    frequency_hz: float = 50.0
+    voltage_v: float = 400.0
+    current_a: float = 0.0
+    power_factor: float = 1.0
+    temperature_c: float = 25.0
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "system_id": self.system_id,
+            "grid_code": self.grid_code,
+            "compliant": self.compliant,
+            "last_check": self.last_check,
+            "next_check": self.next_check,
+            "active_violations": [v.to_dict() for v in self.active_violations],
+            "measurements": {
+                "frequency_hz": self.frequency_hz,
+                "voltage_v": self.voltage_v,
+                "current_a": self.current_a,
+                "power_factor": self.power_factor,
+                "temperature_c": self.temperature_c,
+            },
+        }
+
+
+@dataclass
+class LoadShedEvent:
+    """Load shedding stage transition event."""
+    timestamp: str  # ISO 8601 datetime
+    frequency_hz: float
+    previous_stage: int
+    current_stage: int
+    dispatch_action: str  # "bess_discharge", "solar_curtailment", "standby", "ramp_up"
+    affected_systems: List[str] = field(default_factory=list)  # equipment IDs
+    expected_reduction_kw: float = 0.0
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "timestamp": self.timestamp,
+            "frequency_hz": self.frequency_hz,
+            "previous_stage": self.previous_stage,
+            "current_stage": self.current_stage,
+            "dispatch_action": self.dispatch_action,
+            "affected_systems": self.affected_systems,
+            "expected_reduction_kw": self.expected_reduction_kw,
+        }

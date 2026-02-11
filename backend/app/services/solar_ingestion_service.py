@@ -684,16 +684,26 @@ class SolarIngestionService:
 
     def get_registered_sites(self) -> List[Dict]:
         """List all registered solar sites with building names."""
-        from app.database.repositories.building_repository import BuildingRepository
-        
-        building_repo = BuildingRepository()
         results = []
-        
+
+        # Try to fetch building names from repository if available
+        building_repo = None
+        try:
+            from app.database.repositories.building_repository import BuildingRepository
+            building_repo = BuildingRepository()
+        except Exception as e:
+            logger.debug(f"Building repository unavailable: {e}")
+
         for site in self._sites.values():
-            # Fetch building name from repository
-            building = building_repo.get_by_id(site.site_id)
-            building_name = building.get("name", "") if building else ""
-            
+            # Fetch building name from repository if available
+            building_name = ""
+            if building_repo:
+                try:
+                    building = building_repo.get_by_id(site.site_id)
+                    building_name = building.get("name", "") if building else ""
+                except Exception as e:
+                    logger.debug(f"Could not fetch building {site.site_id}: {e}")
+
             results.append({
                 "site_id": site.site_id,
                 "site_name": site.site_name,
@@ -702,7 +712,7 @@ class SolarIngestionService:
                 "connectors": len(site.connectors),
                 "last_poll": site.last_poll,
             })
-        
+
         return results
 
 
