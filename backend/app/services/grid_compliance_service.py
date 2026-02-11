@@ -385,12 +385,13 @@ class MonitoringEngine:
                 return
 
             # Insert into compliance_log table
-            response = await supabase.table("compliance_log").insert({
+            # Note: Supabase client in synchronous mode, call it directly
+            response = supabase.table("compliance_log").insert({
                 "system_id": violation.system_id,
                 "timestamp": violation.timestamp,
                 "parameter": violation.parameter,
-                "measured_value": violation.measured_value,
-                "limit_value": violation.limit_value,
+                "measured_value": float(violation.measured_value),
+                "limit_value": float(violation.limit_value),
                 "violation_type": violation.violation_type,
                 "severity": violation.severity,
                 "auto_action": violation.auto_action,
@@ -521,14 +522,15 @@ class LoadShedScheduler:
                 return
 
             # Insert into load_shed_events table
-            response = await supabase.table("load_shed_events").insert({
+            # Note: Supabase client in synchronous mode, call it directly
+            response = supabase.table("load_shed_events").insert({
                 "timestamp": event.timestamp,
-                "frequency_hz": event.frequency_hz,
+                "frequency_hz": float(event.frequency_hz),
                 "previous_stage": event.previous_stage,
                 "current_stage": event.current_stage,
                 "dispatch_action": event.dispatch_action,
                 "affected_systems": event.affected_systems,
-                "expected_reduction_kw": event.expected_reduction_kw,
+                "expected_reduction_kw": float(event.expected_reduction_kw),
             }).execute()
 
             logger.debug(f"Logged load shedding stage transition: stage {event.current_stage}")

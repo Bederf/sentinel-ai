@@ -60,7 +60,7 @@ export interface PerformanceSummary {
   capacity_factor_30d: number;
   soiling_loss_percent: number;
   soiling_annual_percent: number;
-  soiling_trend: 'improving' | 'stable' | 'increasing';
+  soiling_trend: 'improving' | 'stable' | 'declining';
   degradation_yearly_percent: number;
   degradation_annual_percent: number;
   warranty_status: 'active' | 'expired' | 'limited';

@@ -275,7 +275,7 @@ export function SolarPerformanceWidgets({ siteId }: SolarPerformanceWidgetsProps
             <HelpTooltip text="Power loss due to dust, dirt, or other surface contamination reducing light transmission" />
           </div>
           <TrendIndicator
-            trend={data.soiling_trend}
+            trend={data.soiling_trend as 'improving' | 'stable' | 'declining'}
             isImproving={data.soiling_trend === 'improving'}
           />
         </div>
