@@ -17,7 +17,7 @@ import userEvent from '@testing-library/user-event';
 import { IntegrationWizard } from '../IntegrationWizard';
 
 // Mock API client
-vi.mock('../lib/api/client', () => ({
+vi.mock('@/lib/api/client', () => ({
   authorizedFetch: vi.fn(),
 }));
 
@@ -289,7 +289,7 @@ describe('IntegrationWizard', () => {
       });
 
       // Go back
-      const backButton = screen.getByRole('button', { name: 'Back' });
+      const backButton = screen.getAllByRole('button', { name: 'Back' })[0];
       fireEvent.click(backButton);
 
       await waitFor(() => {
@@ -307,9 +307,15 @@ describe('IntegrationWizard', () => {
       );
 
       // Navigate to matching
-      const nextButtons = screen.getAllByRole('button', { name: 'Next' });
+      let nextButtons = screen.getAllByRole('button', { name: 'Next' });
       fireEvent.click(nextButtons[0]); // Upload → Mapping
-      fireEvent.click(nextButtons[1]); // Mapping → Matching (will be found after re-render)
+
+      await waitFor(() => {
+        expect(screen.getByTestId('column-mapping-step')).toBeInTheDocument();
+      });
+
+      nextButtons = screen.getAllByRole('button', { name: 'Next' });
+      fireEvent.click(nextButtons[0]); // Mapping → Matching
 
       await waitFor(() => {
         expect(screen.getByTestId('point-matching-step')).toBeInTheDocument();

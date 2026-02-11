@@ -220,6 +220,7 @@ export function IntegrationWizard({ buildingId, onClose, onComplete: _onComplete
                   {index + 1}
                 </div>
                 <span className="text-xs mt-1 text-center">{step.title}</span>
+                <span className="text-xs mt-0.5 text-center opacity-75">{step.description}</span>
               </div>
               {index < steps.length - 1 && (
                 <div className={`flex-1 h-0.5 mx-2 ${
