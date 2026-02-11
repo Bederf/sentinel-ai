@@ -9,132 +9,112 @@ interface EquipmentMarkersProps {
 }
 
 /**
- * Type-specific position offsets from zone centroid.
- * Applied relative to zone centroid to spread equipment naturally within zone.
+ * Building from BuildingModel.tsx: Width=30 (X: -15..+15), Depth=20 (Z: -10..+10)
+ * Landing page building:           Width=12 (X: -6..+6),   Depth=8  (Z: -4..+4)
+ *
+ * 5 zones (A–E) spread across building width.
+ * Equipment x/z offsets kept SMALL (max ±2) so nothing escapes the floor slab.
  */
-const TYPE_OFFSET_MAP: Record<string, [number, number]> = {
-  'chiller': [-12, -8],      // Plant room - back left
-  'ahu': [10, 8],            // Plant room - back right
-  'fcu': [-1, 0],            // Slightly left of center
-  'fcuventilation': [-1, 0],
-  'vav': [0, -2],            // Slightly front
-  'cooling_tower': [-10, -10],
-  'ct': [-10, -10],
-  'generator': [-14, 0],
-  'gen': [-14, 0],
-  'dali': [1, 1],            // Spread across zone
-  'luminaire': [1, 1],
-  'lum': [1, 1],
-  'meter': [-2, 5],
-  'mtr': [-2, 5],
-  'ups': [0, -5],
-  'ats': [-3, -5],
-  'switch': [5, 5],
-  'db': [5, 5],
-  'distribution_board': [5, 5],
-  'transformer': [-8, 8],
-  'tx': [-8, 8],
-  'fire': [10, -5],
-  'sprinkler': [10, -5],
-  'cctv': [12, 5],
-  'access': [12, 0],
-  'acc': [12, 0],
+
+// Fallback zone centroids: 5 zones across building width, centered on Z
+const ZONE_FALLBACK: Record<string, { x: number; z: number }> = {
+  A: { x: -10, z: 0 },
+  B: { x: -5,  z: 0 },
+  C: { x:  0,  z: 0 },
+  D: { x:  5,  z: 0 },
+  E: { x:  10, z: 0 },
 };
+
+// Small type offsets WITHIN a zone (max ±2 to stay in bounds)
+const TYPE_OFFSET: Record<string, [number, number]> = {
+  chiller:       [-1.5, -2],    ahu:           [ 1.5,  2],
+  fcu:           [-0.5,  0.5],  fcuventilation:[-0.5,  0.5],
+  vav:           [ 0,   -1],    cooling_tower: [-2,   -2],
+  ct:            [-2,   -2],    generator:     [-1.5,  1.5],
+  gen:           [-1.5,  1.5],  dali:          [ 0.5,  0.5],
+  luminaire:     [ 0.5,  0.5],  lum:           [ 0.5,  0.5],
+  meter:         [-1,    1.5],  mtr:           [-1,    1.5],
+  ups:           [ 0,   -1.5],  ats:           [-1,   -1.5],
+  switch:        [ 1,    1],    db:            [ 1,    1],
+  distribution_board: [1, 1],   transformer:   [-1.5,  1],
+  tx:            [-1.5,  1],    fire:          [ 1.5, -1],
+  sprinkler:     [ 1.5, -1],    cctv:          [ 2,    1],
+  access:        [ 2,    0],    acc:           [ 2,    0],
+  sensor:        [ 0,    0],    pump:          [-1,   -1],
+  boiler:        [ 1,   -1.5],  hvac_zone:     [ 0,    0],
+  solar:         [ 0,    2],    bess:          [ 1.5, -2],
+  mcc:           [-1,   -1],    fire_panel:    [ 1.5, -1],
+};
+
+// Floor code → Y height (BuildingModel floor.y + 0.5 offset above slab)
+const FLOOR_Y: Record<string, number> = {
+  B2: -2.5, B1: 0.5, G: 3.5, L0: 3.5, L1: 6.5, L2: 9.5, R: 12.5,
+};
+
+// Floor code → floor selector ID
+const FLOOR_ID: Record<string, number> = {
+  B2: -1, B1: 0, G: 1, L0: 1, L1: 2, L2: 3, R: 4,
+};
+
+function clamp(val: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, val));
+}
+
+/** Extract floor from code: S002-CHILLER-B1-001 → B1 */
+function extractFloor(code: string): string {
+  const m = code.match(/-(B\d|G|L\d+|R)-/i);
+  return m ? m[1].toUpperCase() : 'G';
+}
+
+/** Extract zone letter from end of code: ...-A or ...-001 (numeric → distribute) */
+function extractZoneLetter(code: string): string {
+  const letterMatch = code.match(/-([A-E])$/i);
+  if (letterMatch) return letterMatch[1].toUpperCase();
+  const numMatch = code.match(/-(\d+)$/);
+  if (numMatch) {
+    const idx = (parseInt(numMatch[1], 10) - 1) % 5;
+    return String.fromCharCode(65 + idx);
+  }
+  return 'C'; // center
+}
 
 function getEquipmentPosition(
   equipment: Equipment,
-  zoneCentroids?: Record<string, ZoneCentroid>
+  zoneCentroids?: Record<string, ZoneCentroid>,
 ): [number, number, number] {
-  const code = (equipment as any).code || '';
+  const code = (equipment as any).code || equipment.id || '';
+  const type = ((equipment as any).equipment_type || (equipment as any).type || '').toLowerCase();
 
-  // Extract floor from code (e.g., "S002-CHILLER-B1-001" → B1)
-  const floorMatch = code.match(/-(B\d|G|L\d+|R)-/);
-  const floorCode = floorMatch ? floorMatch[1] : 'L0';
-
-  // Normalize floor code (L0 is ground, G is legacy)
+  const floorCode = extractFloor(code);
+  const y = FLOOR_Y[floorCode] ?? FLOOR_Y['G'];
+  const zoneLetter = extractZoneLetter(code);
   const normalizedFloor = floorCode === 'G' ? 'L0' : floorCode;
+  const [dx, dz] = TYPE_OFFSET[type] || [0, 0];
 
-  // Map floor to Y coordinate - MUST match BuildingModel.tsx floor positions
-  // BuildingModel: B1=0, L0=3, L1=6, L2=9, R=12
-  // Outdoor equipment positioned outside/above building
-  const floorHeights: Record<string, number> = {
-    'B1': 0,        // Basement - at ground level floor
-    'B2': -2,       // Deep basement - below
-    'G': 3,
-    'L0': 3,        // Ground floor - matches building
-    'L1': 6,        // First floor - matches building
-    'L2': 9,        // Second floor - matches building
-    'R': 14,        // Roof - above building (roof is at Y=12)
-  };
-  const y = floorHeights[normalizedFloor] || floorHeights[floorCode] || 3;
-
-  // For outdoor equipment (Basement, Roof), position around building perimeter
-  if (normalizedFloor === 'B1' || normalizedFloor === 'B2' || normalizedFloor === 'R') {
-    // Extract numeric ID from code for perimeter distribution (e.g., "S002-CHILLER-B1-001" → 001)
-    const numMatch = code.match(/-(\d+)$/);
-    const itemNum = numMatch ? parseInt(numMatch[1], 10) : 0;
-    
-    // Distribute around building perimeter (30m × 20m building)
-    // Position around edges at distance from center
-    const buildingEdge = 20; // Distance from center to building edge
-    const angleStep = (itemNum % 8) * (Math.PI / 4); // 8 positions around building
-    
-    const x = Math.sin(angleStep) * buildingEdge;
-    const z = Math.cos(angleStep) * buildingEdge;
-    
-    return [x, y, z];
-  }
-
-  // Extract zone letter from equipment code
-  // Supports both formats: Zone-L1-A (end match) or numeric (e.g., 001)
-  const zoneMatch = code.match(/-([A-Z0-9]+)$/);
-  const zoneLetterOrNum = zoneMatch ? zoneMatch[1] : 'A';
-  const zoneLetter = /^[A-Z]$/.test(zoneLetterOrNum) ? zoneLetterOrNum : 'A';
-
-  // Get type-specific offset
-  const type = (equipment as any).equipment_type?.toLowerCase() || '';
-  const [typeOffsetX, typeOffsetZ] = TYPE_OFFSET_MAP[type] || [0, 0];
-
-  // Try to use zone centroids for accurate positioning
+  // Try API centroids first
   if (zoneCentroids) {
     const zoneId = `Zone-${normalizedFloor}-${zoneLetter}`;
     const centroid = zoneCentroids[zoneId];
-
     if (centroid) {
-      // Position relative to zone centroid with type offset
-      return [centroid.x + typeOffsetX, y, centroid.z + typeOffsetZ];
+      return [
+        clamp(centroid.x + dx, -14, 14),
+        y,
+        clamp(centroid.z + dz, -9, 9),
+      ];
     }
   }
 
-  // Fallback: Use zone letter offset within building bounds
-  // Building is 30m × 20m centered at (0, 0)
-  // X: -15 to +15, Z: -10 to +10
-  // 5 zones (A-E) each 6m wide
-  const zoneIndex = zoneLetter.charCodeAt(0) - 65; // A=0, B=1, C=2, D=3, E=4
-  const baseX = -12 + (zoneIndex * 6);    // A=-12, B=-6, C=0, D=6, E=12 (zone centers)
-  const baseZ = 0;                         // Center depth of zone
-
-  // Apply type offset to baseline position
-  return [baseX + typeOffsetX, y, baseZ + typeOffsetZ];
+  // Fallback: 5-zone layout
+  const fb = ZONE_FALLBACK[zoneLetter] || ZONE_FALLBACK['C'];
+  return [
+    clamp(fb.x + dx, -14, 14),
+    y,
+    clamp(fb.z + dz, -9, 9),
+  ];
 }
 
 function getFloorIdFromCode(code: string): number {
-  const floorMatch = code.match(/-(B\d|G|L\d+|R)-/);
-  const floorCode = floorMatch ? floorMatch[1] : 'L0';
-
-  // Floor IDs must match FLOORS array in DigitalTwin.tsx
-  // B1(0), L0(1), L1(2), L2(3), R(4)
-  const floorMap: Record<string, number> = {
-    'B1': 0,    // Basement
-    'B2': -1,   // Deep basement (not in building)
-    'G': 1,     // Legacy: maps to L0
-    'L0': 1,    // Ground floor
-    'L1': 2,    // First floor
-    'L2': 3,    // Second floor
-    'R': 4,     // Roof
-  };
-
-  return floorMap[floorCode] ?? 1;
+  return FLOOR_ID[extractFloor(code)] ?? 1;
 }
 
 export function EquipmentMarkers({
@@ -146,19 +126,17 @@ export function EquipmentMarkers({
   return (
     <group>
       {equipment.map((eq) => {
-        const floorId = getFloorIdFromCode((eq as any).code || '');
-        if (!selectedFloors.has(floorId)) {
-          return null;
-        }
+        const code = (eq as any).code || eq.id || '';
+        const floorId = getFloorIdFromCode(code);
+        if (!selectedFloors.has(floorId)) return null;
 
-        // Use zone centroids for accurate positioning, fallback to zone letter offsets
         const position = getEquipmentPosition(eq, zoneCentroids);
         return (
           <EquipmentMarker
-            key={eq.id || (eq as any).code}
+            key={eq.id || code}
             equipment={eq}
             position={position}
-            onClick={() => onEquipmentClick(eq.id || (eq as any).code)}
+            onClick={() => onEquipmentClick(eq.id || code)}
           />
         );
       })}
