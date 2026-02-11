@@ -146,7 +146,7 @@ describe('BatchAggregator - Batch Window Aggregation', () => {
       windowMs: 50,
     });
 
-    batcher('id-1');
+    const p1 = batcher('id-1');
 
     // Before window expires
     expect(apiFetch).not.toHaveBeenCalled();
@@ -155,6 +155,7 @@ describe('BatchAggregator - Batch Window Aggregation', () => {
     vi.advanceTimersByTime(60);
 
     expect(apiFetch).toHaveBeenCalled();
+    await p1;
   });
 
   it('should respect custom window size', async () => {
@@ -167,7 +168,7 @@ describe('BatchAggregator - Batch Window Aggregation', () => {
       windowMs: 100,
     });
 
-    batcher('id-1');
+    const p1 = batcher('id-1');
 
     // 50ms should not trigger (window is 100ms)
     vi.advanceTimersByTime(50);
@@ -176,6 +177,7 @@ describe('BatchAggregator - Batch Window Aggregation', () => {
     // 100ms should trigger
     vi.advanceTimersByTime(60);
     expect(apiFetch).toHaveBeenCalled();
+    await p1;
   });
 
   it('should use default 50ms window', () => {
@@ -376,10 +378,12 @@ describe('BatchAggregator - Request Payload', () => {
       windowMs: 50,
     });
 
-    batcher('id-1');
-    batcher('id-2');
+    const p1 = batcher('id-1');
+    const p2 = batcher('id-2');
 
     vi.advanceTimersByTime(60);
+
+    await Promise.all([p1, p2]);
 
     const call = (apiFetch as any).mock.calls[0];
     const body = JSON.parse(call[1].body);
@@ -391,15 +395,19 @@ describe('BatchAggregator - Request Payload', () => {
   });
 
   it('should use POST method for batch requests', async () => {
-    (apiFetch as any).mockResolvedValueOnce({});
+    (apiFetch as any).mockResolvedValueOnce({
+      'id-1': { id: 'id-1', value: 'test' },
+    });
 
     const batcher = createBatchAggregator<MockBatchItem>({
       endpoint: '/api/batch',
       windowMs: 50,
     });
 
-    batcher('id-1');
+    const p1 = batcher('id-1');
     vi.advanceTimersByTime(60);
+
+    await p1;
 
     const call = (apiFetch as any).mock.calls[0];
     expect(call[1].method).toBe('POST');

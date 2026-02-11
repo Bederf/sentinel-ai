@@ -22,18 +22,13 @@ import TechnicianChat from '../TechnicianChat';
 Element.prototype.scrollIntoView = vi.fn();
 HTMLElement.prototype.scrollIntoView = vi.fn();
 
-// Mock API client FIRST
-vi.mock('../lib/api/client', () => ({
+// Mock API client FIRST (use alias path)
+vi.mock('@/lib/api/client', () => ({
   authorizedFetch: vi.fn(),
 }));
 
 // Then import after mock is defined
-import {
-  createMockChatMessage,
-  createMockFaultDiagnosis,
-} from '@/test-utils/factories';
-
-import { authorizedFetch } from '../lib/api/client';
+import { authorizedFetch } from '@/lib/api/client';
 
 // Mock DiagnosisFlow component
 vi.mock('../DiagnosisFlow', () => ({
@@ -128,7 +123,7 @@ describe('TechnicianChat', () => {
 
   describe('Quick Action Buttons', () => {
     it('should send message when quick action clicked', async () => {
-      vi.mocked(authorizedFetch).mockResolvedValue({
+      (authorizedFetch as any).mockResolvedValue({
         ok: true,
         json: async () => ({ fault: { code: 'E4', name: 'High Pressure', severity: 'high' } }),
       } as any);
@@ -144,9 +139,9 @@ describe('TechnicianChat', () => {
     });
 
     it('should hide quick actions after sending message', async () => {
-      vi.mocked(authorizedFetch).mockResolvedValue({
+      (authorizedFetch as any).mockResolvedValue({
         ok: true,
-        json: async () => ({ fault: { code: 'E4' } }),
+        json: async () => ({ fault: { code: 'E4', severity: 'high', name: 'Test Fault' } }),
       } as any);
 
       render(<TechnicianChat />);
@@ -160,9 +155,9 @@ describe('TechnicianChat', () => {
     });
 
     it('should call API with correct query parameter', async () => {
-      vi.mocked(authorizedFetch).mockResolvedValue({
+      (authorizedFetch as any).mockResolvedValue({
         ok: true,
-        json: async () => ({}),
+        json: async () => ({ fault: { code: 'E4', severity: 'high', name: 'Test Fault' } }),
       } as any);
 
       render(<TechnicianChat />);
@@ -171,8 +166,8 @@ describe('TechnicianChat', () => {
       fireEvent.click(carrierButton);
 
       await waitFor(() => {
-        expect(vi.mocked(authorizedFetch)).toHaveBeenCalled();
-        const call = vi.mocked(authorizedFetch).mock.calls[0];
+        expect((authorizedFetch as any)).toHaveBeenCalled();
+        const call = (authorizedFetch as any).mock.calls[0];
         expect(call[0]).toContain('equipment-lookup/search');
       });
     });
@@ -200,9 +195,9 @@ describe('TechnicianChat', () => {
     });
 
     it('should send message when Send button clicked', async () => {
-      vi.mocked(authorizedFetch).mockResolvedValue({
+      (authorizedFetch as any).mockResolvedValue({
         ok: true,
-        json: async () => ({}),
+        json: async () => ({ fault: { code: 'E4', severity: 'high', name: 'Test Fault' } }),
       } as any);
 
       render(<TechnicianChat />);
@@ -221,7 +216,7 @@ describe('TechnicianChat', () => {
     });
 
     it('should send message on Enter key', async () => {
-      vi.mocked(authorizedFetch).mockResolvedValue({
+      (authorizedFetch as any).mockResolvedValue({
         ok: true,
         json: async () => ({}),
       } as any);
@@ -240,7 +235,7 @@ describe('TechnicianChat', () => {
     });
 
     it('should not send on Shift+Enter', async () => {
-      vi.mocked(authorizedFetch).mockResolvedValue({
+      (authorizedFetch as any).mockResolvedValue({
         ok: true,
         json: async () => ({}),
       } as any);
@@ -258,7 +253,7 @@ describe('TechnicianChat', () => {
     });
 
     it('should clear input after sending', async () => {
-      vi.mocked(authorizedFetch).mockResolvedValue({
+      (authorizedFetch as any).mockResolvedValue({
         ok: true,
         json: async () => ({}),
       } as any);
@@ -279,7 +274,7 @@ describe('TechnicianChat', () => {
     });
 
     it('should disable send button while typing', async () => {
-      vi.mocked(authorizedFetch).mockImplementation(
+      (authorizedFetch as any).mockImplementation(
         () =>
           new Promise((resolve) =>
             setTimeout(
@@ -310,7 +305,7 @@ describe('TechnicianChat', () => {
     });
 
     it('should disable input while typing', async () => {
-      vi.mocked(authorizedFetch).mockImplementation(
+      (authorizedFetch as any).mockImplementation(
         () =>
           new Promise((resolve) =>
             setTimeout(
@@ -343,7 +338,7 @@ describe('TechnicianChat', () => {
 
   describe('Message Display', () => {
     it('should display user message on right side', async () => {
-      vi.mocked(authorizedFetch).mockResolvedValue({
+      (authorizedFetch as any).mockResolvedValue({
         ok: true,
         json: async () => ({}),
       } as any);
@@ -366,7 +361,7 @@ describe('TechnicianChat', () => {
     });
 
     it('should display assistant message on left side', async () => {
-      vi.mocked(authorizedFetch).mockResolvedValue({
+      (authorizedFetch as any).mockResolvedValue({
         ok: true,
         json: async () => ({
           fault: {
@@ -396,7 +391,7 @@ describe('TechnicianChat', () => {
     });
 
     it('should display timestamp for each message', async () => {
-      vi.mocked(authorizedFetch).mockResolvedValue({
+      (authorizedFetch as any).mockResolvedValue({
         ok: true,
         json: async () => ({}),
       } as any);
@@ -423,7 +418,7 @@ describe('TechnicianChat', () => {
 
   describe('Diagnosis Message Rendering', () => {
     it('should display diagnosis message with fault code and name', async () => {
-      vi.mocked(authorizedFetch).mockResolvedValue({
+      (authorizedFetch as any).mockResolvedValue({
         ok: true,
         json: async () => ({
           fault: {
@@ -453,7 +448,7 @@ describe('TechnicianChat', () => {
     });
 
     it('should display severity badge with correct color', async () => {
-      vi.mocked(authorizedFetch).mockResolvedValue({
+      (authorizedFetch as any).mockResolvedValue({
         ok: true,
         json: async () => ({
           fault: {
@@ -483,7 +478,7 @@ describe('TechnicianChat', () => {
     });
 
     it('should display probable causes when expanded', async () => {
-      vi.mocked(authorizedFetch).mockResolvedValue({
+      (authorizedFetch as any).mockResolvedValue({
         ok: true,
         json: async () => ({
           fault: {
@@ -522,7 +517,7 @@ describe('TechnicianChat', () => {
     });
 
     it('should display recommended actions', async () => {
-      vi.mocked(authorizedFetch).mockResolvedValue({
+      (authorizedFetch as any).mockResolvedValue({
         ok: true,
         json: async () => ({
           fault: {
@@ -560,7 +555,7 @@ describe('TechnicianChat', () => {
     });
 
     it('should display parts needed section', async () => {
-      vi.mocked(authorizedFetch).mockResolvedValue({
+      (authorizedFetch as any).mockResolvedValue({
         ok: true,
         json: async () => ({
           fault: {
@@ -604,7 +599,7 @@ describe('TechnicianChat', () => {
     });
 
     it('should display Start Guided Diagnosis button', async () => {
-      vi.mocked(authorizedFetch).mockResolvedValue({
+      (authorizedFetch as any).mockResolvedValue({
         ok: true,
         json: async () => ({
           fault: {
@@ -732,7 +727,7 @@ describe('TechnicianChat', () => {
     });
 
     it('should disable photo button while typing', async () => {
-      vi.mocked(authorizedFetch).mockImplementation(
+      (authorizedFetch as any).mockImplementation(
         () =>
           new Promise((resolve) =>
             setTimeout(
@@ -765,7 +760,7 @@ describe('TechnicianChat', () => {
 
   describe('Typing Indicator', () => {
     it('should display typing indicator while waiting for response', async () => {
-      vi.mocked(authorizedFetch).mockImplementation(
+      (authorizedFetch as any).mockImplementation(
         () =>
           new Promise((resolve) =>
             setTimeout(
@@ -795,7 +790,7 @@ describe('TechnicianChat', () => {
     });
 
     it('should remove typing indicator after response', async () => {
-      vi.mocked(authorizedFetch).mockResolvedValue({
+      (authorizedFetch as any).mockResolvedValue({
         ok: true,
         json: async () => ({}),
       } as any);
@@ -820,7 +815,7 @@ describe('TechnicianChat', () => {
 
   describe('Error Handling', () => {
     it('should display error message on API failure', async () => {
-      vi.mocked(authorizedFetch).mockRejectedValue(new Error('Network error'));
+      (authorizedFetch as any).mockRejectedValue(new Error('Network error'));
 
       render(<TechnicianChat />);
 
@@ -842,7 +837,7 @@ describe('TechnicianChat', () => {
     });
 
     it('should display error on non-200 response', async () => {
-      vi.mocked(authorizedFetch).mockResolvedValue({
+      (authorizedFetch as any).mockResolvedValue({
         ok: false,
         status: 500,
       } as any);
@@ -867,7 +862,7 @@ describe('TechnicianChat', () => {
     });
 
     it('should focus input after error', async () => {
-      vi.mocked(authorizedFetch).mockRejectedValue(new Error('Network error'));
+      (authorizedFetch as any).mockRejectedValue(new Error('Network error'));
 
       render(<TechnicianChat />);
 
@@ -889,7 +884,7 @@ describe('TechnicianChat', () => {
 
   describe('Message Scrolling', () => {
     it('should auto-scroll to latest message', async () => {
-      vi.mocked(authorizedFetch).mockResolvedValue({
+      (authorizedFetch as any).mockResolvedValue({
         ok: true,
         json: async () => ({}),
       } as any);
@@ -934,7 +929,7 @@ describe('TechnicianChat', () => {
 
   describe('Suggestions Message Rendering', () => {
     it('should display suggestions message type', async () => {
-      vi.mocked(authorizedFetch).mockResolvedValue({
+      (authorizedFetch as any).mockResolvedValue({
         ok: true,
         json: async () => ({
           suggestions: [
