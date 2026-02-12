@@ -2,20 +2,27 @@
 title: "ML Predictions API Reference"
 type: "reference"
 status: "approved"
-version: "1.0.0"
+version: "2.0.0"
 created: "2026-02-06"
-updated: "2026-02-06"
+updated: "2026-02-12"
 author: "Sentinel Development Team"
-tags: ["api", "ml", "predictions", "lstm", "anomaly", "maintenance"]
+tags: ["api", "ml", "predictions", "lstm", "anomaly", "maintenance", "registry", "phase-68-03"]
 domain: "general"
 audience: "developers"
 complexity: "intermediate"
-estimated_read_time: 12
+estimated_read_time: 15
+changes: "Phase 68-03: Database-driven ML registry, async endpoints, multi-site support"
 ---
 
 # ML Predictions API Reference
 
-Phase 43 ML Model Development endpoints. LSTM forecasting, autoencoder anomaly detection, model management, training, and maintenance recommendations.
+ML Model Development endpoints. LSTM forecasting, autoencoder anomaly detection, model management, training, and maintenance recommendations. **Phase 68-03+:** Database-driven registry with async support for multi-site deployment.
+
+**Architecture:**
+- Backend queries Supabase `ml_models` and `model_thresholds` tables
+- Predictions use equipment type to lookup active models
+- Confidence thresholds configured per equipment type (Tier 2: advisory, Tier 3: auto-execute)
+- Graceful degradation: equipment without models returns no predictions (not errors)
 
 Base path: `/api/ml`
 

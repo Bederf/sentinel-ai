@@ -23,14 +23,13 @@ import {
   extractZoneLetter,
   type EquipmentPosition,
 } from '@/utils/equipmentPositioning';
-
-const FLOORS = [
-  { id: 0, label: 'B1 - Basement', code: 'B1' },
-  { id: 1, label: 'L0 - Ground', code: 'L0' },
-  { id: 2, label: 'L1 - First Floor', code: 'L1' },
-  { id: 3, label: 'L2 - Second Floor', code: 'L2' },
-  { id: 4, label: 'R - Roof', code: 'R' },
-];
+import {
+  generateFloorsFromEquipment,
+  generateFloors,
+  getFloorY,
+  getFloorId,
+  extractFloorFromCode,
+} from '@/utils/floorExtraction';
 
 // Equipment type to icon/emoji mapping
 const EQUIPMENT_ICONS: Record<string, string> = {
@@ -60,28 +59,14 @@ const EQUIPMENT_ICONS: Record<string, string> = {
   'pump': '🔵',
   'boiler': '🟠',
   'hvac_zone': '🎛️',
-};
-
-// Floor code → Y height (BuildingModel floor.y + 0.5 offset above slab)
-const FLOOR_Y: Record<string, number> = {
-  B2: -2.5,
-  B1: 0.5,
-  G: 3.5,
-  L0: 3.5,
-  L1: 6.5,
-  L2: 9.5,
-  R: 12.5,
-};
-
-// Floor code → floor selector ID
-const FLOOR_ID: Record<string, number> = {
-  B2: -1,
-  B1: 0,
-  G: 1,
-  L0: 1,
-  L1: 2,
-  L2: 3,
-  R: 4,
+  'jace': '🎛️',
+  'lift': '🛗',
+  'cold': '❄️',
+  'medgas': '🔬',
+  'msb': '⚡',
+  'boiler': '🔥',
+  'kef': '💨',
+  'split': '🌡️',
 };
 
 export function DigitalTwin() {
@@ -101,11 +86,31 @@ export function DigitalTwin() {
   const buildingId = selectedBuildingId;
   const { equipment, loading, error } = useEquipmentData(buildingId);
   const [selectedEquipment, setSelectedEquipment] = useState<string | null>(null);
-  // By default, only show ground floor (1) for performance - user can select more
-  const [selectedFloors, setSelectedFloors] = useState<Set<number>>(new Set([1]));
   const [equipmentTypeFilter, setEquipmentTypeFilter] = useState<string | null>(null);
   // View mode toggle: 2D floor plan or 3D visualization (default: 3D)
   const [viewMode, setViewMode] = useState<'2D' | '3D'>('3D');
+
+  // Dynamically generate floors from equipment data
+  const dynamicFloors = useMemo(() => {
+    if (equipment.length === 0) return [];
+    const floorCodes = generateFloorsFromEquipment(equipment);
+    return generateFloors(floorCodes);
+  }, [equipment]);
+
+  // Initialize selected floors when floors change
+  const [selectedFloors, setSelectedFloors] = useState<Set<number>>(new Set());
+
+  useEffect(() => {
+    if (dynamicFloors.length > 0 && selectedFloors.size === 0) {
+      // Auto-select ground floor (L0/G) or first floor if available
+      const groundFloor = dynamicFloors.find((f) => f.code === 'L0' || f.code === 'G');
+      if (groundFloor) {
+        setSelectedFloors(new Set([groundFloor.id]));
+      } else {
+        setSelectedFloors(new Set([dynamicFloors[0].id]));
+      }
+    }
+  }, [dynamicFloors]);
 
   // Load zone centroids via React Query hook (auto-caching, deduplication)
   const { data: zoneCentroids = {} } = useZoneCentroids(buildingId);

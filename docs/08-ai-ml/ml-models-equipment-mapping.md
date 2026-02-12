@@ -2,20 +2,78 @@
 title: "SENTINEL ML Model Specifications & Equipment Type Mapping"
 type: "technical-reference"
 status: "active"
-version: "1.0.0"
+version: "2.0.0"
 created: "2026-02-10"
-updated: "2026-02-10"
+updated: "2026-02-12"
 author: "SENTINEL Development Team"
-tags: ["ml", "lstm", "autoencoder", "models", "equipment-type", "predictions"]
+tags: ["ml", "lstm", "autoencoder", "models", "equipment-type", "predictions", "registry", "database-driven"]
 domain: "ai-ml"
-audience: ["developers", "data-scientists", "operations"]
+audience: ["developers", "data-scientists", "operations", "devops"]
 complexity: "advanced"
-estimated_read_time: 30
+estimated_read_time: 40
+changes: "Phase 68-03: Database-driven ML registry, async infrastructure, multi-site support, 23 equipment types"
 ---
 
 # SENTINEL ML Model Specifications & Equipment Type Mapping
 
-Complete specifications for SENTINEL's 14 ML models (7 equipment types × 2 model architectures). Used by Clawd Bot to determine which predictive models apply to discovered equipment and generate equipment-specific health scores and maintenance recommendations.
+Complete specifications for SENTINEL's ML models and equipment type mapping system. Used by the ML inference engine to determine which predictive models apply to discovered equipment and generate equipment-specific health scores and maintenance recommendations.
+
+## Database-Driven ML Registry (Phase 68-03)
+
+**Architecture:** Supabase-driven configuration replaces hardcoded models, enabling multi-site support and graceful degradation.
+
+### Registry Overview
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| **ml_models** | Supabase table | Trained model versions (LSTM, autoencoder), paths, performance metrics (R²) |
+| **model_thresholds** | Supabase table | Confidence thresholds per equipment type (Tier 2: advisory, Tier 3: auto-execute) |
+| **model_registry_db.py** | Backend service | Async database-driven registry with caching (1-hour TTL) |
+| **NiagaraMLInference** | Backend service | Async inference engine that queries Supabase for models/thresholds |
+
+### Multi-Site Equipment Coverage (Current)
+
+| Site | Items | Types | ML Coverage | Rules Fallback | Notes |
+|------|-------|-------|-------------|----------------|-------|
+| **S002** | 26 | 12 | 21% (6 items) | 79% | Office building |
+| **S005** | 90 | 15 | 56% (50 items) | 44% | Hospital with LIFT, JACE, COLD, MEDGAS |
+| **S012** | 19 | 7 | 79% (15 items) | 21% | Office building |
+| **TOTAL** | 135 | 23 | 48% (65 items) | 52% | Multi-site production |
+
+### Active ML Models (Tier 2 Recommendations)
+
+| Equipment Type | Instances | R² Score | Tier 2 | Tier 3 | Status |
+|---|---|---|---|---|---|
+| **CHILLER** | 4 | 0.6065 | 0.70 | 0.85 | ✅ Active |
+| **AHU** | 30 | 0.4915 | 0.70 | 0.85 | ✅ Active |
+| **FCU** | 8 | 0.4236 | 0.70 | 0.85 | ✅ Active |
+| **UPS** | 4 | 0.4144 | 0.70 | 0.85 | ✅ Active |
+| **GENERATOR** | 14 | 0.3710 | 0.85 | 0.95 | ✅ Active (elevated) |
+| **DALI** | 4 | N/A | 0.70 | 0.85 | ✅ Placeholder |
+
+### Disabled Equipment Types (Rules Fallback)
+
+Equipment without trained ML models uses graceful degradation: `threshold=1.0` (impossible to meet) → disables recommendations but doesn't break system.
+
+- **Hospital-specific** (Site 005): LIFT (12), JACE (10), COLD (3), MEDGAS (1), BOILER (2), KEF (2), MSB (3), DB (2)
+- **General-purpose**: PUMP (5), METER (6), BESS (1), CT (9), SPLIT (4), INV (4), FIRE (4), ACC, CCTV, VAV (3)
+
+### Graceful Degradation Strategy
+
+```
+Equipment without ML model:
+  1. threshold = 1.0 (impossible to meet)
+  2. Recommendations automatically DISABLED
+  3. System falls back to rule-based predictions
+  4. No errors, no data loss
+  5. Ready for upgrade when model trained
+
+When model trained:
+  1. Add to ml_models table
+  2. Update threshold to normal (0.70/0.85)
+  3. Recommendations automatically ENABLED
+  4. Live within minutes (cache expires)
+```
 
 ---
 
