@@ -20,7 +20,7 @@ from typing import Dict, Tuple, Optional
 from enum import Enum
 
 from app.config.settings import settings
-from app.ml.models.model_registry_db import get_model_registry_db
+from app.ml.models.model_registry_db import get_model_registry
 from app.database.repositories.parasite_decision_repository import (
     get_parasite_decision_repository,
 )
@@ -72,7 +72,7 @@ class TierRoutingEngine:
     def __init__(self):
         """Initialize tier routing engine with settings and repositories."""
         self.settings = settings
-        self.model_registry = get_model_registry_db()
+        self.model_registry = None  # Lazy-load via async getter
         self.parasite_repo = get_parasite_decision_repository()
         self._auto_executions_this_hour = 0
         self._hour_start = datetime.utcnow()
@@ -124,7 +124,9 @@ class TierRoutingEngine:
         equipment_type = self._extract_equipment_type(recommendation)
         risk_level = recommendation.get("risk_level", "medium")
 
-        # 3. Get thresholds from TWO sources, use stricter
+        # 3. Get thresholds from TWO sources, use stricter (lazy-load model_registry)
+        if self.model_registry is None:
+            self.model_registry = await get_model_registry()
         tier2_threshold, tier3_threshold, threshold_source = await self.get_effective_thresholds(
             equipment_type
         )
