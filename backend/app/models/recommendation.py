@@ -75,6 +75,7 @@ class Recommendation:
     reason: str = ""
     expected_impact: Dict[str, Any] = field(default_factory=dict)
     confidence: str = "medium"  # "high" | "medium" | "low"
+    confidence_score: float = 0.0  # Numeric confidence (0.0-1.0) for tier routing
     profile: str = ""
     multi_objective_score: float = 0.0
     status: RecommendationStatus = RecommendationStatus.PENDING
@@ -84,6 +85,24 @@ class Recommendation:
     executed_at: Optional[datetime] = None
     execution_result: Optional[Dict[str, Any]] = None
     rejection_reason: Optional[str] = None
+
+    def get_numeric_confidence(self) -> float:
+        """Return numeric confidence, converting string if needed.
+
+        Returns numeric confidence (0.0-1.0) from either confidence_score field
+        or by mapping the string confidence value. Ensures PARASITE tier routing
+        always has numeric confidence.
+
+        Returns:
+            Float between 0.0 and 1.0
+        """
+        # If numeric confidence_score is set, use it
+        if self.confidence_score > 0:
+            return self.confidence_score
+
+        # Fallback: map string confidence to numeric
+        mapping = {"high": 0.90, "medium": 0.75, "low": 0.50}
+        return mapping.get(self.confidence, 0.50)
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialize to dictionary for JSON storage.
@@ -101,6 +120,7 @@ class Recommendation:
             "reason": self.reason,
             "expected_impact": self.expected_impact,
             "confidence": self.confidence,
+            "confidence_score": self.confidence_score,
             "profile": self.profile,
             "multi_objective_score": self.multi_objective_score,
             "status": self.status.value if isinstance(self.status, RecommendationStatus) else self.status,
@@ -161,6 +181,7 @@ class Recommendation:
             reason=data.get("reason", ""),
             expected_impact=data.get("expected_impact", {}),
             confidence=data.get("confidence", "medium"),
+            confidence_score=float(data.get("confidence_score", 0.0)),
             profile=data.get("profile", ""),
             multi_objective_score=float(data.get("multi_objective_score", 0.0)),
             status=status,
