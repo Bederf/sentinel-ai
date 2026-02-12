@@ -890,7 +890,9 @@ describe('TechnicianChat', () => {
     it('should auto-scroll to latest message', async () => {
       (authorizedFetch as any).mockResolvedValue({
         ok: true,
-        json: async () => ({}),
+        json: async () => ({
+          note: 'I found some information that might help.'
+        }),
       } as any);
 
       render(<TechnicianChat />);
@@ -898,12 +900,12 @@ describe('TechnicianChat', () => {
       const input = screen.getByPlaceholderText(
         /Describe a fault or search for parts/
       ) as HTMLInputElement;
-      const sendButton = screen.getAllByRole('button').find(
-        (btn) => !btn.testContent
-      );
+      // Find send button - it's the button with type="submit" in the form
+      const buttons = screen.getAllByRole('button');
+      const sendButton = buttons[buttons.length - 1]; // Last button is the send button
 
       await userEvent.type(input, 'test message 1');
-      fireEvent.click(sendButton!);
+      fireEvent.click(sendButton);
 
       // Verify that the message appears in the chat
       await waitFor(() => {
