@@ -177,13 +177,15 @@ describe('Dashboard', () => {
     it('should display loading state initially', async () => {
       vi.mocked(api.getStats).mockImplementation(() => new Promise(() => {})); // Never resolves
       vi.mocked(api.getPredictions).mockImplementation(() => new Promise(() => {}));
+      vi.mocked(api.getDashboardPreferences).mockRejectedValue(new Error('Not found'));
+      vi.mocked(api.getEnergy).mockResolvedValue({ data: [] });
       vi.mocked(useBuildingsList).mockReturnValue({ data: [] } as any);
 
       render(<Dashboard onViewChange={vi.fn()} />, { wrapper: createTestWrapper() });
 
       // Wait for loading state to be displayed
       await waitFor(() => {
-        expect(screen.getByText(/loading dashboard/i)).toBeInTheDocument();
+        expect(screen.getByText(/initializing sentinel|loading/i)).toBeInTheDocument();
       }, { timeout: 1000 });
     });
 
@@ -322,6 +324,7 @@ describe('Dashboard', () => {
       vi.mocked(api.getStats).mockResolvedValue(stats);
       vi.mocked(api.getPredictions).mockResolvedValue({ predictions });
       vi.mocked(api.getDashboardPreferences).mockRejectedValue(new Error('Not found'));
+      vi.mocked(api.getEnergy).mockResolvedValue({ data: [] } as any);
       vi.mocked(useBuildingsList).mockReturnValue({ data: [] } as any);
 
       render(<Dashboard onViewChange={vi.fn()} />, { wrapper: createTestWrapper() });
@@ -635,6 +638,7 @@ describe('Dashboard', () => {
       vi.mocked(api.getStats).mockResolvedValue(stats);
       vi.mocked(api.getPredictions).mockResolvedValue({ predictions });
       vi.mocked(api.getDashboardPreferences).mockRejectedValue(new Error('Not found'));
+      vi.mocked(api.getEnergy).mockResolvedValue({ data: [] } as any);
       vi.mocked(useBuildingsList).mockReturnValue({ data: [] } as any);
 
       render(<Dashboard onViewChange={vi.fn()} />, { wrapper: createTestWrapper() });
@@ -876,6 +880,7 @@ describe('Dashboard', () => {
       vi.mocked(api.getStats).mockResolvedValue(stats);
       vi.mocked(api.getPredictions).mockResolvedValue({ predictions: [] });
       vi.mocked(api.getDashboardPreferences).mockRejectedValue(new Error('Not found'));
+      vi.mocked(api.getEnergy).mockResolvedValue({ data: [] } as any);
       vi.mocked(useBuildingsList).mockReturnValue({ data: [] } as any);
 
       render(<Dashboard onViewChange={vi.fn()} />, { wrapper: createTestWrapper() });
