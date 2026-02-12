@@ -14,7 +14,7 @@ from app.api import complaints, clawd_webhooks, lifecycle_simulation, simulation
 from app.api import integration, concept
 from app.api import modules, health_config, service_records, preferences
 from app.api import solar, water, sustainability, contracts, pricing, municipal_billing
-from app.api import parts_orders, approval_workflow, delivery_tracking, approvals
+from app.api import parts_orders, approval_workflow, delivery_tracking, approvals, parasite_decisions
 
 
 def register_operations_routers(app: FastAPI) -> None:
@@ -67,6 +67,9 @@ def register_operations_routers(app: FastAPI) -> None:
 
     # Niagara equipment control approvals (Phase 68-02)
     app.include_router(approvals.router, tags=["approvals"])
+
+    # PARASITE decisions visibility (Phase 80-05)
+    app.include_router(parasite_decisions.router)
 
     # Commercial operations
     app.include_router(contracts.router, prefix="/api", tags=["contracts"])

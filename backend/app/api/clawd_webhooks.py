@@ -24,6 +24,7 @@ from app.services.clawd_integration.work_order_notifier import work_order_notifi
 from app.services.ocr_service import get_ocr_service
 from app.services.clawd_integration.ocr_correction_handler import get_ocr_correction_handler
 from app.models.service_record import ServiceStatus
+from app.database.repositories.service_record_repository import ServiceRecordRepository
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/clawd", tags=["clawd"])
