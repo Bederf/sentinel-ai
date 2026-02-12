@@ -85,6 +85,17 @@ class Settings(BaseSettings):
     redis_enabled: bool = True
     redis_default_ttl: int = 300  # 5 minutes default TTL
 
+    # PARASITE Autonomous Control Configuration
+    parasite_enabled: bool = False  # Master switch for PARASITE autonomous features
+    parasite_tier3_enabled: bool = False  # Enable Tier 3 auto-execute (requires parasite_enabled)
+    parasite_confidence_tier2_min: float = 0.70  # Min confidence for Tier 2 (supervised)
+    parasite_confidence_tier3_min: float = 0.85  # Min confidence for Tier 3 (autonomous)
+    parasite_cov_timeout_seconds: int = 30  # Max time to wait for COV verification
+    parasite_outcome_window_minutes: int = 10  # Time to measure outcome after execution
+    parasite_auto_rollback_enabled: bool = True  # Auto-rollback on COV failure
+    parasite_max_auto_executions_per_hour: int = 10  # Rate limit for Tier 3 actions
+    parasite_bacnet_priority: int = 8  # BACnet priority array slot (8 = PARASITE level)
+
     # EskomSePush API (load shedding data)
     eskomsepush_api_token: str = ""
     eskomsepush_area_id: str = ""  # Area ID from EskomSePush (use /areas_search to find)
