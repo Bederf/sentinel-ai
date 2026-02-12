@@ -104,27 +104,28 @@ class TierRoutingEngine:
         Returns:
             TierRoutingResult with tier, action, thresholds, and reasoning
         """
-        # 1. Master switch check
+        # 1. Extract basics (equipment type, risk level, confidence)
+        equipment_type = self._extract_equipment_type(recommendation)
+        risk_level = recommendation.get("risk_level", "medium")
+        confidence_score = self._extract_confidence(recommendation)
+
+        # 2. Master switch check
         if not self.settings.parasite_enabled:
             logger.debug("PARASITE disabled globally, routing to Tier 1 advisory")
             return TierRoutingResult(
                 tier=TierLevel.TIER1.value,
                 action="advisory",
-                confidence_score=0.0,
+                confidence_score=confidence_score,
                 threshold_source="settings",
                 tier2_threshold=self.settings.parasite_confidence_tier2_min,
                 tier3_threshold=self.settings.parasite_confidence_tier3_min,
                 reason="PARASITE master switch is disabled",
-                equipment_type=recommendation.get("target_equipment", "unknown"),
-                risk_level=recommendation.get("risk_level", "medium"),
+                equipment_type=equipment_type,
+                risk_level=risk_level,
             )
 
-        # 2. Extract and normalize confidence
-        confidence_score = self._extract_confidence(recommendation)
-        equipment_type = self._extract_equipment_type(recommendation)
-        risk_level = recommendation.get("risk_level", "medium")
-
         # 3. Get thresholds from TWO sources, use stricter (lazy-load model_registry)
+        #    Only reached if PARASITE is enabled
         if self.model_registry is None:
             self.model_registry = await get_model_registry()
         tier2_threshold, tier3_threshold, threshold_source = await self.get_effective_thresholds(
