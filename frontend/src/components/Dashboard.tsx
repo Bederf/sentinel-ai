@@ -12,6 +12,7 @@
  */
 
 import { useState, useEffect, useMemo } from "react";
+import { useServerEvents } from "@/hooks/useServerEvents";
 import {
   Building2,
   AlertTriangle,
@@ -93,7 +94,10 @@ interface DashboardProps {
 export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }: DashboardProps) {
   // React Query hooks - replaces old manual API calls (stale-while-revalidate approach via React Query)
   const { data: buildingsList = [] } = useBuildingsList();
-  
+
+  // Real-time event updates from backend SSE
+  useServerEvents();
+
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [loading, setLoading] = useState(true);

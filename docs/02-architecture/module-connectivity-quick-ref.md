@@ -103,7 +103,7 @@ See [Profile-Based Optimization Architecture](profile-based-optimization.md) for
    ↓
 8. Learn from rejections: 3+ similar rejections → auto-create constraints
 ```
-
+11111111
 ## Upsell Progression (with Profiles)
 
 ```

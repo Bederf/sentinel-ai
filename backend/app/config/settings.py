@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     debug: bool = False
 
     # CORS settings (restrict to known frontend origins)
-    cors_origins: list[str] = ["http://localhost:9096"]
+    cors_origins: list[str] = ["http://localhost:9096", "https://localhost:9096", "http://127.0.0.1:9096", "https://127.0.0.1:9096"]
 
     # Backend URL (for external service health checks)
     backend_url: str = ""

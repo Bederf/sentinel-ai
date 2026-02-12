@@ -512,6 +512,22 @@ class FeedbackCollectionService:
                     f"Updated {session.equipment_code} health: {current_health} -> {new_health} "
                     f"(change: {health_change:+d})"
                 )
+
+                # Emit real-time SSE event for dashboard update
+                try:
+                    from app.services.event_emitter import get_event_emitter
+                    import asyncio
+                    emitter = get_event_emitter()
+                    asyncio.create_task(emitter.emit_health_changed(
+                        equipment_id=equipment.get("id", session.equipment_code),
+                        equipment_code=session.equipment_code,
+                        equipment_name=equipment.get("name", session.equipment_code),
+                        old_health_score=current_health,
+                        new_health_score=new_health,
+                        reason="service_feedback"
+                    ))
+                except Exception as e:
+                    logger.warning(f"Failed to emit health_changed event: {e}")
         except Exception as e:
             logger.error(f"Failed to update equipment health: {e}")
 

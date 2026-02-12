@@ -58,15 +58,19 @@ class TechnicianRepository:
         """
         Parse equipment type from code and map to specialty.
 
-        Equipment code format: {site}-{type}-{floor}-{zone}
-        Example: S002-DALI-L2-20 → type=DALI → specialty=dali
+        Supports two equipment code formats:
+        1. Compact (Office): {site}-{type}-{floor/zone}
+           Example: S002-DALI-L2-20 → parts[1]=DALI → specialty=dali
+        2. Hospital: {site}-{building}-{type}-{floor}-{id}
+           Example: site-005-UMH-AHU-L3-ICU → parts[3]=AHU → specialty=hvac
+
+        Returns the matched specialty or 'general' as fallback.
         """
         try:
             parts = equipment_code.upper().split('-')
             if len(parts) < 2:
+                logger.warning(f"Cannot parse {equipment_code}: insufficient parts ({len(parts)})")
                 return 'general'
-
-            eq_type = parts[1]
 
             # Map equipment type to specialty
             # Based on official naming conventions (docs/02-architecture/naming-conventions.md)
@@ -79,6 +83,7 @@ class TechnicianRepository:
                 'SPLIT': 'hvac',
                 'CT': 'hvac',      # Cooling Tower
                 'CRAC': 'hvac',
+                'PUMP': 'hvac',    # PUMP is HVAC (not plumbing) per Phase 79
                 # DALI Lighting (v2.0 naming)
                 'DALI': 'dali',
                 'LUM': 'dali',     # Luminaire
@@ -93,13 +98,20 @@ class TechnicianRepository:
                 'FDR': 'electrical',  # Feeder
                 'MV': 'electrical',   # Medium Voltage
                 'DB': 'electrical',   # Distribution Board
+                # Additional electrical types from hospital naming
+                'KEF': 'electrical',  # Kitchen Exhaust Fan
+                'JACE': 'electrical', # Building automation controller
+                # Medical equipment
+                'COLD': 'general',    # Cold storage (vaccine/blood)
+                'BOILER': 'hvac',     # Boiler (hot water heating)
+                'LIFT': 'general',    # Elevators (structural/safety)
+                'MEDGAS': 'general',  # Medical gas systems
                 # Sensors (monitored by general)
                 'TS': 'general',      # Temperature Sensor
                 'CO2': 'general',     # CO2 Sensor
                 'OCC': 'general',     # Occupancy Sensor
                 'DLS': 'general',     # Daylight Sensor
-                # Plumbing
-                'PUMP': 'plumbing',
+                # Plumbing (legacy - now PUMP is HVAC)
                 'TANK': 'plumbing',
                 'BORE': 'plumbing',
                 # Fire (v2.0 naming)
@@ -109,9 +121,20 @@ class TechnicianRepository:
                 'CCTV': 'security',
             }
 
-            return type_to_specialty.get(eq_type, 'general')
+            # Try parsing in order of likelihood
+            # Strategy 1: parts[1] for compact format (S002-TYPE-...)
+            if parts[1] in type_to_specialty:
+                return type_to_specialty[parts[1]]
 
-        except Exception:
+            # Strategy 2: parts[3] for hospital format (site-005-UMH-TYPE-...)
+            if len(parts) > 3 and parts[3] in type_to_specialty:
+                return type_to_specialty[parts[3]]
+
+            # Strategy 3: Fallback to general
+            return 'general'
+
+        except Exception as e:
+            logger.error(f"Error parsing {equipment_code}: {e}")
             return 'general'
 
     async def get_technician_for_equipment_code(self, equipment_code: str) -> Optional[Dict[str, Any]]:
@@ -122,7 +145,7 @@ class TechnicianRepository:
         the assigned technician for that specialty at the equipment's site.
 
         Args:
-            equipment_code: Equipment code (e.g., S002-DALI-L2-20)
+            equipment_code: Equipment code (e.g., S002-DALI-L2-20 or site-005-UMH-AHU-L3-ICU)
 
         Returns:
             Technician details or None if not found
@@ -145,14 +168,9 @@ class TechnicianRepository:
             equipment_id = equipment["id"]
             building_id = equipment["building_id"]
 
-            # Try Supabase function first
-            try:
-                return await self.get_technician_for_equipment(equipment_id)
-            except Exception as func_error:
-                logger.debug(f"Supabase function failed, using fallback: {func_error}")
-
-            # Fallback: Parse code and lookup manually
+            # Parse code to determine specialty (supports both site-002 and site-005 formats)
             specialty = self._parse_specialty_from_code(equipment_code)
+            logger.debug(f"Parsed equipment {equipment_code} → specialty={specialty}")
 
             # Get technician for this building and specialty
             result = self.client.table("site_technicians").select(
@@ -161,9 +179,12 @@ class TechnicianRepository:
                 "is_primary", True
             ).execute()
 
+            logger.debug(f"Site_technicians query for specialty={specialty}: found {len(result.data) if result.data else 0} results")
+
             if result.data and len(result.data) > 0:
                 assignment = result.data[0]
                 tech = assignment.get("technicians", {})
+                logger.debug(f"Found technician {tech.get('name')} for {equipment_code} (specialty={assignment.get('specialty')})")
                 return {
                     "id": tech.get("id"),
                     "name": tech.get("name"),
@@ -172,6 +193,8 @@ class TechnicianRepository:
                     "telegram_id": tech.get("telegram_id"),
                     "specialty": assignment.get("specialty")
                 }
+
+            logger.debug(f"No technician found for specialty={specialty}, trying fallback to 'general'")
 
             # Fallback to 'general' specialty
             if specialty != 'general':

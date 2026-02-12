@@ -8,6 +8,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import { useServerEvents } from '@/hooks/useServerEvents';
 import {
   TabGroup,
   TabList,
@@ -45,6 +46,9 @@ interface HealthSnapshot {
 }
 
 export default function SystemHealthPage() {
+  // Real-time event updates from backend SSE
+  useServerEvents();
+
   const [selectedTab, setSelectedTab] = useState(0);
   const [currentHealth, setCurrentHealth] = useState<any>(null);
   const [history, setHistory] = useState<any>(null);

@@ -71,7 +71,41 @@ def _derive_status(condition: str, health_score: int) -> str:
 
 
 async def load_equipment() -> list[dict]:
-    """Load equipment from assets.csv via csv_loader (primary source)."""
+    """Load equipment from Supabase (primary source), fallback to CSV/JSON."""
+    try:
+        # Primary source: Load from Supabase
+        equipment_data = equipment_repo.get_all()
+
+        if equipment_data:
+            equipment_list = []
+            for eq in equipment_data:
+                # Transform Supabase equipment to API response format
+                # Ensure all string fields have non-null defaults
+                equipment_list.append({
+                    "id": eq.get("id") or "",
+                    "site_id": (eq.get("code", "").split("-")[0].lower() if eq.get("code") else "") or "unknown",
+                    "site_name": eq.get("site_name") or "",
+                    "type": eq.get("type") or "unknown",
+                    "name": eq.get("name") or "Unknown Equipment",
+                    "code": eq.get("code") or "",
+                    "manufacturer": eq.get("manufacturer") or "Unknown",
+                    "model": eq.get("model") or "Unknown",
+                    "capacity": eq.get("capacity") or "N/A",
+                    "install_date": eq.get("install_date") or "",
+                    "last_service": eq.get("last_service") or "",
+                    "status": eq.get("status") or "normal",
+                    "health_score": int(eq.get("health_score") or 100),
+                    "location": eq.get("location") or "",
+                    "serial_number": eq.get("serial_number") or "",
+                    "building_id": eq.get("building_id") or "",
+                })
+
+            logger.info(f"Loaded {len(equipment_list)} equipment items from Supabase")
+            return equipment_list
+    except Exception as e:
+        logger.error(f"Failed to load from Supabase: {e}")
+
+    # Fallback to CSV/JSON if Supabase fails
     try:
         # Load from CSV using the csv_loader service
         assets = AssetData.load()
@@ -142,7 +176,7 @@ async def load_equipment() -> list[dict]:
                     "remaining_life_years": asset.get("remaining_life_years", 0),
                 })
 
-            logger.info(f"Loaded {len(equipment_list)} equipment items from assets.csv")
+            logger.info(f"Loaded {len(equipment_list)} equipment items from assets.csv (Supabase unavailable)")
             return equipment_list
     except Exception as e:
         logger.error(f"Failed to load from assets.csv: {e}")

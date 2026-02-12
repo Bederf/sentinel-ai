@@ -542,26 +542,51 @@ async def create_alert(http_request: Request, request: CreateAlertRequest) -> Cr
 
     client = get_supabase_client()
 
-    # Get equipment by code
-    equipment = client.table("equipment").select("id, name, building_id").eq(
-        "code", request.equipment_code
+    # Get equipment by name or code
+    # Try by name first (primary identifier in the API)
+    equipment = client.table("equipment").select("id, name, code").eq(
+        "name", request.equipment_code
     ).execute()
+
+    # If not found by name, try by code
+    if not equipment.data:
+        equipment = client.table("equipment").select("id, name, code").eq(
+            "code", request.equipment_code
+        ).execute()
 
     if not equipment.data:
         raise HTTPException(status_code=404, detail=f"Equipment {request.equipment_code} not found")
 
     eq = equipment.data[0]
+    equipment_id = eq["id"]
 
-    # Get building name
-    building = client.table("buildings").select("name").eq("id", eq["building_id"]).execute()
-    building_name = building.data[0]["name"] if building.data else "Unknown"
+    # Get building_id if available (for schema compliance)
+    building_id = None
+    try:
+        equipment_with_building = client.table("equipment").select("building_id").eq(
+            "id", equipment_id
+        ).execute()
+        if equipment_with_building.data:
+            building_id = equipment_with_building.data[0].get("building_id")
+    except:
+        pass  # building_id might not exist in this table
 
-    # Create alert
+    # Get building name from buildings table if building_id exists
+    building_name = "Unknown"
+    if building_id:
+        try:
+            building = client.table("buildings").select("name").eq("id", building_id).execute()
+            if building.data:
+                building_name = building.data[0].get("name", "Unknown")
+        except:
+            building_name = "Unknown"  # Default if query fails
+
+    # Create alert using building_id from equipment foreign key
     alert_id = str(uuid.uuid4())
     alert_data = {
         "id": alert_id,
-        "building_id": eq["building_id"],
-        "equipment_id": eq["id"],
+        "building_id": building_id,
+        "equipment_id": equipment_id,
         "type": request.type,
         "severity": request.severity,
         "status": "active",
@@ -591,6 +616,26 @@ async def create_alert(http_request: Request, request: CreateAlertRequest) -> Cr
         import logging
         logger = logging.getLogger(__name__)
         logger.warning(f"Failed to update health_score for equipment {request.equipment_code}: {e}")
+
+    # Emit real-time SSE event for dashboard
+    try:
+        from app.services.event_emitter import get_event_emitter
+        import asyncio
+        emitter = get_event_emitter()
+        # Use asyncio.create_task to emit event without blocking
+        asyncio.create_task(emitter.emit_alert_created(
+            alert_id=alert_id,
+            equipment_id=eq["id"],
+            equipment_code=request.equipment_code,
+            equipment_name=eq["name"],
+            severity=request.severity,
+            health_score=health_score,
+            message=request.message
+        ))
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f"Failed to emit alert event: {e}")
 
     # Send Clawd notification if requested
     clawd_notified = False
