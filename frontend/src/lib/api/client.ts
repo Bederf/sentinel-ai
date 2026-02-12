@@ -137,7 +137,9 @@ export async function authorizedFetch(
   options?: RequestInit,
   absoluteUrl: boolean = false
 ): Promise<Response> {
-  const url = absoluteUrl ? endpoint : `${API_BASE_URL}${endpoint}`;
+  // Auto-detect if URL is already absolute (starts with http:// or https://)
+  const isAbsolute = endpoint.startsWith('http://') || endpoint.startsWith('https://') || absoluteUrl;
+  const url = isAbsolute ? endpoint : `${API_BASE_URL}${endpoint}`;
   return fetchWithAuthRetry(url, options, true);
 }
 

@@ -133,12 +133,18 @@ describe('BatchAggregator - Batch Window Aggregation', () => {
   });
 
   afterEach(() => {
+    vi.clearAllTimers();
     vi.useRealTimers();
   });
 
   it('should send batch after window expires', async () => {
-    (apiFetch as any).mockResolvedValueOnce({
-      'id-1': { id: 'id-1', value: 'test' },
+    (apiFetch as any).mockImplementation(async (endpoint, options) => {
+      const body = JSON.parse(options.body);
+      const response: Record<string, any> = {};
+      for (const id of body.device_ids) {
+        response[id] = { id, value: `test-${id}` };
+      }
+      return response;
     });
 
     const batcher = createBatchAggregator<MockBatchItem>({
@@ -160,8 +166,13 @@ describe('BatchAggregator - Batch Window Aggregation', () => {
   });
 
   it('should respect custom window size', async () => {
-    (apiFetch as any).mockResolvedValueOnce({
-      'id-1': { id: 'id-1', value: 'test' },
+    (apiFetch as any).mockImplementation(async (endpoint, options) => {
+      const body = JSON.parse(options.body);
+      const response: Record<string, any> = {};
+      for (const id of body.device_ids) {
+        response[id] = { id, value: `test-${id}` };
+      }
+      return response;
     });
 
     const batcher = createBatchAggregator<MockBatchItem>({
@@ -198,6 +209,7 @@ describe('BatchAggregator - ID Deduplication', () => {
   });
 
   afterEach(() => {
+    vi.clearAllTimers();
     vi.useRealTimers();
   });
 
@@ -385,7 +397,7 @@ describe('BatchAggregator - Request Payload', () => {
   });
 
   it('should send device_ids array in request body', async () => {
-    (apiFetch as any).mockImplementationOnce(async (endpoint, options) => {
+    (apiFetch as any).mockImplementation(async (endpoint, options) => {
       const body = JSON.parse(options.body);
       const response: Record<string, any> = {};
       for (const id of body.device_ids) {

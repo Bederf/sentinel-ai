@@ -260,7 +260,7 @@ export default function TechnicianChat() {
     try {
       // Call equipment lookup search endpoint
       const params = new URLSearchParams({ query: text });
-      const response = await authorizedFetch(`${API_BASE_URL}/api/equipment-lookup/search?${params}`, {
+      const response = await authorizedFetch(`/api/equipment-lookup/search?${params}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       });
