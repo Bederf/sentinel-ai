@@ -21,8 +21,6 @@ import {
   XCircle,
   Clock,
   FileText,
-  Building2,
-  ChevronDown,
 } from "lucide-react";
 import {
   mlopsApi,
@@ -34,6 +32,7 @@ import {
 } from "../lib/mlopsApi";
 import { sitesApi } from "@/lib/api/sites";
 import type { Site } from "@/lib/api/sites";
+import { BuildingSelector } from "./BuildingSelector";
 
 // --- Skeleton ---
 function Skeleton({ className = "" }: { className?: string }) {
@@ -425,37 +424,12 @@ export function MLMetrics() {
         </div>
         <div className="flex items-center gap-3">
           {/* Building Selector */}
-          <div className="relative">
-            <Building2
-              className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4"
-              style={{ color: "var(--color-sentinel-text-secondary)" }}
-            />
-            <ChevronDown
-              className="absolute right-2 top-1/2 transform -translate-y-1/2 h-3 w-3 pointer-events-none"
-              style={{ color: "var(--color-sentinel-text-secondary)" }}
-            />
-            <select
+          <div style={{ minWidth: "250px" }}>
+            <BuildingSelector
               value={selectedSiteId}
-              onChange={(e) => setSelectedSiteId(e.target.value)}
-              className="pl-9 pr-7 py-1.5 text-sm rounded appearance-none cursor-pointer"
-              style={{
-                background: "var(--color-sentinel-bg-secondary)",
-                border: "1px solid var(--color-sentinel-border)",
-                color: "var(--color-sentinel-text-primary)",
-                outline: "none",
-                minWidth: "250px",
-              }}
-            >
-              {Array.isArray(sites) ? (
-                sites.map((site) => (
-                  <option key={site.id} value={site.id}>
-                    {site.name}
-                  </option>
-                ))
-              ) : (
-                <option>Loading sites...</option>
-              )}
-            </select>
+              onChange={setSelectedSiteId}
+              sites={sites}
+            />
           </div>
 
           {/* Health badge */}

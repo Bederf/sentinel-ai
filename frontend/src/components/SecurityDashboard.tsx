@@ -26,8 +26,6 @@ import {
   VideoOff,
   Lock,
   Unlock,
-  Building2,
-  ChevronDown,
 } from "lucide-react";
 import api, { isExpectedApiError, securityApi } from '@/lib/api';
 import type {
@@ -40,6 +38,7 @@ import { AccessEventsPanel } from "./AccessEventsPanel";
 import { SecurityOccupancyPanel } from "./SecurityOccupancyPanel";
 import { SecurityAnomaliesPanel } from "./SecurityAnomaliesPanel";
 import { PageLoading } from "./PageLoading";
+import { BuildingSelector } from "./BuildingSelector";
 
 export function SecurityDashboard() {
   const [status, setStatus] = useState<SecuritySystemStatus | null>(null);
@@ -242,36 +241,11 @@ export function SecurityDashboard() {
           </div>
           <div className="flex items-center gap-3">
             {/* Building Selector */}
-            <div className="relative">
-              <Building2
-                className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4"
-                style={{ color: "var(--color-sentinel-text-secondary)" }}
-              />
-              <select
+            <div style={{ minWidth: "200px" }}>
+              <BuildingSelector
                 value={selectedSiteId}
-                onChange={(e) => setSelectedSiteId(e.target.value)}
-                className="pl-9 pr-8 py-1.5 text-sm rounded appearance-none cursor-pointer"
-                style={{
-                  background: "var(--color-sentinel-bg-secondary)",
-                  border: "1px solid var(--color-sentinel-border)",
-                  color: "var(--color-sentinel-text-primary)",
-                  outline: "none",
-                  minWidth: "200px",
-                }}
-              >
-                {sites.length > 0 ? (
-                  sites.map((site) => (
-                    <option key={site.id} value={site.id}>
-                      {site.name}
-                    </option>
-                  ))
-                ) : (
-                  <option value="site-002">Sandton City Office Tower</option>
-                )}
-              </select>
-              <ChevronDown
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 pointer-events-none"
-                style={{ color: "var(--color-sentinel-text-secondary)" }}
+                onChange={setSelectedSiteId}
+                sites={sites}
               />
             </div>
             {lastUpdated && (

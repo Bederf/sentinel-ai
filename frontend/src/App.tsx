@@ -681,7 +681,7 @@ function App() {
               <TechnicianChat />
             </div>
           ) : currentView === "integrations" ? (
-            <SystemHealthPage />
+            <IntegrationMonitoringPage />
           ) : currentView === "occupancy" ? (
             <div className="h-full overflow-y-auto p-4 md:p-6">
               <OccupancyPanel compact={false} />

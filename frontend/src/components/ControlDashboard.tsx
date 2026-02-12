@@ -27,7 +27,6 @@ import {
   ChevronDown,
   ChevronUp,
   Shield,
-  Building2,
   X,
   Bell,
 } from "lucide-react";
@@ -39,6 +38,7 @@ import { ControlPanel } from "./ControlPanel";
 import { PageLoading } from "./PageLoading";
 import { RecentActions } from "./RecentActions";
 import { PredictionDetail } from "./PredictionDetail";
+import { BuildingSelector } from "./BuildingSelector";
 
 interface ControlDashboardProps {
   onError?: (error: string) => void;
@@ -464,39 +464,12 @@ export function ControlDashboard({ onError }: ControlDashboardProps) {
           className="flex-none p-3 border-b"
           style={{ borderColor: "var(--color-sentinel-border)" }}
         >
-          <div className="relative">
-            <Building2
-              className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4"
-              style={{ color: "var(--color-sentinel-text-secondary)" }}
-            />
-            <select
-              value={selectedSiteId || ""}
-              onChange={(e) => setSelectedSiteId(e.target.value)}
-              className="w-full pl-9 pr-8 py-2 text-sm rounded appearance-none cursor-pointer"
-              style={{
-                background: "var(--color-sentinel-bg-secondary)",
-                border: "1px solid var(--color-sentinel-border)",
-                color: "var(--color-sentinel-text-primary)",
-                outline: "none",
-              }}
-            >
-              {filteredSortedSites.length > 0 ? (
-                filteredSortedSites.map((site) => (
-                  <option key={site.id} value={site.id}>
-                    {site.name}
-                  </option>
-                ))
-              ) : (
-                <option disabled value="">
-                  No buildings with devices
-                </option>
-              )}
-            </select>
-            <ChevronDown
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 pointer-events-none"
-              style={{ color: "var(--color-sentinel-text-secondary)" }}
-            />
-          </div>
+          <BuildingSelector
+            value={selectedSiteId || ""}
+            onChange={setSelectedSiteId}
+            sites={filteredSortedSites}
+            disabled={filteredSortedSites.length === 0}
+          />
         </div>
 
         {/* Device List Header */}

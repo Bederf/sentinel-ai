@@ -28,6 +28,7 @@ import { isExpectedApiError, monitoringApi } from '@/lib/api';
 import { formatDateTime } from "../lib/timeFormat";
 import { GoLiveChecklist } from "./GoLiveChecklist";
 import { IntegrationWizard } from "./IntegrationWizard";
+import { BuildingSelector } from "./BuildingSelector";
 import type {
   IntegrationHealthSummary,
   IntegrationAlert,
@@ -473,22 +474,13 @@ export function IntegrationMonitoringPage() {
 
         <div className="flex items-center gap-3">
           {/* Building Filter */}
-          <select
-            value={selectedBuildingId || ""}
-            onChange={(e) => setSelectedBuildingId(e.target.value)}
-            className="text-sm rounded px-3 py-2"
-            style={{
-              background: "var(--color-sentinel-bg-secondary)",
-              border: "1px solid var(--color-sentinel-border)",
-              color: "var(--color-sentinel-text-primary)",
-            }}
-          >
-            {sites.map((site) => (
-              <option key={site.id} value={site.id}>
-                {site.name}
-              </option>
-            ))}
-          </select>
+          <div style={{ minWidth: "200px" }}>
+            <BuildingSelector
+              value={selectedBuildingId || ""}
+              onChange={setSelectedBuildingId}
+              sites={sites}
+            />
+          </div>
 
           {/* Add Data Source button */}
           <button

@@ -30,6 +30,7 @@ import {
   TrendingDown,
 } from 'lucide-react';
 import { authorizedFetch } from '../lib/api/client';
+import { PageLoading } from './PageLoading';
 
 interface HealthComponent {
   name: string;
@@ -108,11 +109,7 @@ export default function SystemHealthPage() {
   };
 
   if (loading && !currentHealth) {
-    return (
-      <div className="p-6">
-        <Text>Loading system health data...</Text>
-      </div>
-    );
+    return <PageLoading message="Loading system health data..." />;
   }
 
   if (error && !currentHealth) {

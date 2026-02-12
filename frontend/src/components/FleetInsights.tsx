@@ -30,6 +30,7 @@ import {
   type FineTunedModel,
   type ImprovementSummary,
 } from "../lib/fleetApi";
+import { PageLoading } from "./PageLoading";
 
 // --- Skeleton Loading ---
 function Skeleton({ className = "" }: { className?: string }) {
@@ -406,6 +407,10 @@ export function FleetInsights() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  if (loading && !summary) {
+    return <PageLoading message="Loading fleet analytics..." />;
+  }
 
   if (error) {
     return (

@@ -11,9 +11,10 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@tremor/react";
-import { Zap, Clock, Thermometer, CheckCircle, Play, Square, Eye, Building2, ChevronDown, ShieldCheck } from "lucide-react";
+import { Zap, Clock, Thermometer, CheckCircle, Play, Square, Eye, ShieldCheck } from "lucide-react";
 import { PageLoading } from "./PageLoading";
 import { ThermalRunwayChart } from "./ThermalRunwayChart";
+import { BuildingSelector } from "./BuildingSelector";
 import api from '@/lib/api';
 import type {
   EskomStatusResponse,
@@ -304,30 +305,11 @@ export function OptimizationPanel({ siteId: initialSiteId = "site-001", scenario
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           {/* Building Selector */}
-          <div className="relative min-w-[200px]">
-            <Building2
-              className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4"
-              style={{ color: "var(--color-sentinel-text-secondary)" }}
-            />
-            <select
+          <div style={{ minWidth: "200px" }}>
+            <BuildingSelector
               value={selectedSiteId}
-              onChange={(e) => setSelectedSiteId(e.target.value)}
-              className="w-full pl-9 pr-8 py-2 text-sm rounded appearance-none cursor-pointer"
-              style={{
-                background: "var(--color-sentinel-bg-secondary)",
-                border: "1px solid var(--color-sentinel-border)",
-                color: "var(--color-sentinel-text-primary)",
-              }}
-            >
-              {sites.map((site) => (
-                <option key={site.id} value={site.id}>
-                  {site.name}
-                </option>
-              ))}
-            </select>
-            <ChevronDown
-              className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 pointer-events-none"
-              style={{ color: "var(--color-sentinel-text-secondary)" }}
+              onChange={setSelectedSiteId}
+              sites={sites}
             />
           </div>
           <div>
