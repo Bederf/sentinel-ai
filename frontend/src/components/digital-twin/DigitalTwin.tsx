@@ -11,9 +11,18 @@ import { FloorSelector } from './FloorSelector';
 import { StatsBar } from './StatsBar';
 import { AlertBanner } from './AlertBanner';
 import { Compass } from '../3d/Compass';
+import { FloorPlan2D } from './FloorPlan2D';
+import { ViewToggle } from './ViewToggle';
 import { useEquipmentData } from '@/hooks/useEquipmentData';
 import { useSitesList } from '@/hooks/useSitesList';
 import { useZoneCentroids } from '@/hooks/useZoneCentroids';
+import { useZoneBounds } from '@/hooks/useZoneBounds';
+import {
+  distributeEquipmentInZone,
+  extractFloor,
+  extractZoneLetter,
+  type EquipmentPosition,
+} from '@/utils/equipmentPositioning';
 
 const FLOORS = [
   { id: 0, label: 'B1 - Basement', code: 'B1' },
@@ -53,6 +62,28 @@ const EQUIPMENT_ICONS: Record<string, string> = {
   'hvac_zone': '🎛️',
 };
 
+// Floor code → Y height (BuildingModel floor.y + 0.5 offset above slab)
+const FLOOR_Y: Record<string, number> = {
+  B2: -2.5,
+  B1: 0.5,
+  G: 3.5,
+  L0: 3.5,
+  L1: 6.5,
+  L2: 9.5,
+  R: 12.5,
+};
+
+// Floor code → floor selector ID
+const FLOOR_ID: Record<string, number> = {
+  B2: -1,
+  B1: 0,
+  G: 1,
+  L0: 1,
+  L1: 2,
+  L2: 3,
+  R: 4,
+};
+
 export function DigitalTwin() {
   // Site selection state - auto-select first site when loaded
   const [selectedBuildingId, setSelectedBuildingId] = useState<string>('');
@@ -73,9 +104,14 @@ export function DigitalTwin() {
   // By default, only show ground floor (1) for performance - user can select more
   const [selectedFloors, setSelectedFloors] = useState<Set<number>>(new Set([1]));
   const [equipmentTypeFilter, setEquipmentTypeFilter] = useState<string | null>(null);
+  // View mode toggle: 2D floor plan or 3D visualization (default: 3D)
+  const [viewMode, setViewMode] = useState<'2D' | '3D'>('3D');
 
   // Load zone centroids via React Query hook (auto-caching, deduplication)
   const { data: zoneCentroids = {} } = useZoneCentroids(buildingId);
+
+  // Load zone bounds for adaptive equipment positioning
+  const zoneBounds = useZoneBounds(buildingId);
 
   const toggleFloor = (floor: number) => {
     const newFloors = new Set(selectedFloors);
@@ -121,6 +157,41 @@ export function DigitalTwin() {
       return type === equipmentTypeFilter;
     });
   }, [equipment, equipmentTypeFilter]);
+
+  // Pre-calculate equipment positions using new positioning algorithm
+  // This is shared between 2D and 3D views to ensure consistency
+  const equipmentPositions = useMemo(() => {
+    const positions = new Map<string, EquipmentPosition>();
+
+    // If zone bounds available, use adaptive grid distribution
+    if (zoneBounds && Object.keys(zoneBounds).length > 0) {
+      // Group equipment by zone
+      const byZone: Record<string, typeof filteredEquipment> = {};
+      filteredEquipment.forEach((eq) => {
+        const code = (eq as any).code || eq.id || '';
+        const floor = extractFloor(code);
+        const zone = extractZoneLetter(code);
+        const zoneKey = `Zone-${floor === 'G' ? 'L0' : floor}-${zone}`;
+
+        if (!byZone[zoneKey]) byZone[zoneKey] = [];
+        byZone[zoneKey].push(eq);
+      });
+
+      // Distribute each zone's equipment
+      Object.entries(byZone).forEach(([zoneKey, zoneEquipment]) => {
+        const bounds = zoneBounds[zoneKey];
+        if (!bounds) return;
+
+        const floor = zoneKey.split('-')[1] || 'L0';
+        const floorY = FLOOR_Y[floor] || 3.5;
+
+        const distributed = distributeEquipmentInZone(zoneEquipment, bounds, floorY);
+        distributed.forEach((pos, id) => positions.set(id, pos));
+      });
+    }
+
+    return positions;
+  }, [filteredEquipment, zoneBounds]);
 
   // Find selected equipment data
   const selectedEquipmentData = useMemo(
@@ -249,43 +320,58 @@ export function DigitalTwin() {
       {/* Stats Bar */}
       <StatsBar equipment={filteredEquipment} selectedFloors={selectedFloors} />
 
-      {/* Main 3D Canvas and Controls */}
+      {/* Main Canvas and Controls - 2D/3D Toggle */}
       <div className="flex-1 relative overflow-hidden">
-        <Canvas>
-          {/* Lighting */}
-          <ambientLight intensity={0.5} />
-          <directionalLight position={[10, 10, 5]} intensity={0.8} />
+        {/* View Toggle Button */}
+        <ViewToggle viewMode={viewMode} onToggle={setViewMode} />
 
-          {/* Compass for orientation */}
-          <Compass />
+        {/* Conditional View Rendering */}
+        {viewMode === '3D' ? (
+          <Canvas>
+            {/* Lighting */}
+            <ambientLight intensity={0.5} />
+            <directionalLight position={[10, 10, 5]} intensity={0.8} />
 
-          {/* Camera */}
-          <PerspectiveCamera makeDefault position={[15, 12, 15]} fov={50} />
+            {/* Compass for orientation */}
+            <Compass />
 
-          {/* Building */}
-          <BuildingModel
-            selectedFloors={selectedFloors}
-            onFloorClick={toggleFloor}
-            onFloorDoubleClick={isolateFloor}
-          />
+            {/* Camera */}
+            <PerspectiveCamera makeDefault position={[15, 12, 15]} fov={50} />
 
-          {/* Equipment Markers */}
-          <EquipmentMarkers
+            {/* Building */}
+            <BuildingModel
+              selectedFloors={selectedFloors}
+              onFloorClick={toggleFloor}
+              onFloorDoubleClick={isolateFloor}
+            />
+
+            {/* Equipment Markers */}
+            <EquipmentMarkers
+              equipment={filteredEquipment}
+              selectedFloors={selectedFloors}
+              onEquipmentClick={(id) => setSelectedEquipment(id)}
+              zoneCentroids={Object.keys(zoneCentroids).length > 0 ? zoneCentroids : undefined}
+            />
+
+            {/* Controls */}
+            <OrbitControls
+              enableDamping
+              dampingFactor={0.05}
+              minDistance={10}
+              maxDistance={50}
+              autoRotate={false}
+            />
+          </Canvas>
+        ) : (
+          <FloorPlan2D
             equipment={filteredEquipment}
             selectedFloors={selectedFloors}
-            onEquipmentClick={(id) => setSelectedEquipment(id)}
-            zoneCentroids={Object.keys(zoneCentroids).length > 0 ? zoneCentroids : undefined}
+            zoneBounds={zoneBounds}
+            equipmentPositions={equipmentPositions}
+            onEquipmentClick={setSelectedEquipment}
+            selectedEquipment={selectedEquipment}
           />
-
-          {/* Controls */}
-          <OrbitControls
-            enableDamping
-            dampingFactor={0.05}
-            minDistance={10}
-            maxDistance={50}
-            autoRotate={false}
-          />
-        </Canvas>
+        )}
 
         {/* Floor Selector Overlay */}
         <FloorSelector
@@ -297,7 +383,7 @@ export function DigitalTwin() {
 
         {/* Filter indicator overlay */}
         {equipmentTypeFilter && (
-          <div className="absolute top-4 right-4 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2">
+          <div className="absolute top-4 right-20 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2">
             <span className="text-sm font-medium">
               Filtering: {EQUIPMENT_ICONS[equipmentTypeFilter] || '🏗️'} {equipmentTypeFilter.toUpperCase()}
             </span>

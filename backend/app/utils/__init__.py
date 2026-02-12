@@ -17,23 +17,23 @@ async def retry_on_rate_limit(
     **kwargs
 ) -> T:
     """Retry a function with exponential backoff on rate limit errors.
-    
+
     Args:
         func: Async or sync function to call
         max_retries: Maximum number of retry attempts
         initial_delay: Initial delay between retries in seconds
         backoff_factor: Multiplier for delay on each retry
         *args, **kwargs: Arguments to pass to func
-    
+
     Returns:
         Result from successful function call
-        
+
     Raises:
         Last exception if all retries fail
     """
     delay = initial_delay
     last_error = None
-    
+
     for attempt in range(max_retries + 1):
         try:
             # Handle both async and sync functions
@@ -56,7 +56,7 @@ async def retry_on_rate_limit(
             else:
                 # Not a rate limit error, raise immediately
                 raise e
-    
+
     if last_error:
         raise last_error
 
@@ -70,14 +70,14 @@ def sync_retry_on_rate_limit(
     **kwargs
 ) -> T:
     """Synchronous version of retry_on_rate_limit.
-    
+
     Uses time.sleep instead of asyncio.sleep.
     """
     import time
-    
+
     delay = initial_delay
     last_error = None
-    
+
     for attempt in range(max_retries + 1):
         try:
             return func(*args, **kwargs)
@@ -94,6 +94,6 @@ def sync_retry_on_rate_limit(
                     raise e
             else:
                 raise e
-    
+
     if last_error:
         raise last_error
