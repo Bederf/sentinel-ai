@@ -57,7 +57,8 @@ export type View =
   | "mlops"
   | "contracts"
   | "profitability"
-  | "budget-report";
+  | "budget-report"
+  | "modules";
 
 export type NavCategory = "base" | "addon" | "internal";
 
@@ -96,6 +97,7 @@ export const VIEW_TITLES: Record<View, string> = {
   contracts: "Contract Management",
   profitability: "Profitability Dashboard",
   "budget-report": "Budget Reports",
+  modules: "Module Manager",
 };
 
 /**
@@ -145,6 +147,7 @@ export const ADDON_NAV_ITEMS: NavItem[] = [
  */
 export const INTERNAL_NAV_ITEMS: NavItem[] = [
   { id: "simulation", label: "Simulation", icon: FlaskConical, description: "Lifecycle & Analytics", category: "internal", requiredRole: "admin" },
+  { id: "modules", label: "Modules", icon: Box, description: "Module Configuration", category: "internal", requiredRole: "admin" },
 ];
 
 /** All nav items combined (for lookup) */
