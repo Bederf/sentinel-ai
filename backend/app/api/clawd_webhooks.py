@@ -434,6 +434,51 @@ async def get_ocr_correction_status(service_record_id: str):
     return {"status": "unknown", "message": "No active OCR session"}
 
 
+@router.get("/work-order/pending")
+async def get_pending_work_orders():
+    """Get pending work orders that need Telegram notifications.
+    
+    Returns list of service records with status='notified' that are pending
+    Clawd bot notification delivery. Called by Clawd bot to poll for notifications.
+    
+    Returns:
+        List of pending service records ready for notification
+    """
+    service_repo = ServiceRecordRepository()
+    
+    try:
+        # Get all service records with status 'notified' (awaiting notification)
+        pending = await service_repo.get_by_status("notified")
+        
+        if not pending:
+            return {"pending_count": 0, "work_orders": []}
+        
+        # Format for Clawd bot
+        formatted_orders = []
+        for sr in pending:
+            formatted_orders.append({
+                "service_record_code": sr.get("code"),
+                "service_record_id": sr.get("id"),
+                "technician_id": sr.get("technician_id"),
+                "technician_name": sr.get("technician_name"),
+                "equipment_id": sr.get("equipment_id"),
+                "building_id": sr.get("building_id"),
+                "service_type": sr.get("service_type"),
+                "created_at": sr.get("created_at")
+            })
+        
+        logger.info(f"Clawd bot querying: {len(formatted_orders)} pending work orders")
+        
+        return {
+            "pending_count": len(formatted_orders),
+            "work_orders": formatted_orders
+        }
+        
+    except Exception as e:
+        logger.error(f"Error fetching pending work orders: {e}")
+        return {"pending_count": 0, "work_orders": [], "error": str(e)}
+
+
 # ============================================================================
 # Inspection Checklist for Telegram
 # ============================================================================

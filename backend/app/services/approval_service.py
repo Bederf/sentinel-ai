@@ -18,6 +18,11 @@ from app.services.device_abstraction import device_manager
 from app.database.repositories.recommendation_repository import RecommendationRepository
 from app.database.repositories.audit_repository import AuditRepository
 
+from app.services.tier_routing_engine import TierRoutingResult
+from app.services.cov_monitor_service import get_cov_monitor_service, COVVerificationResult
+from app.database.repositories.parasite_decision_repository import ParasiteDecisionRepository
+from app.config.settings import settings
+
 logger = logging.getLogger(__name__)
 
 
@@ -558,6 +563,341 @@ class ApprovalService:
 
         except Exception as e:
             logger.error(f"Error creating audit log: {str(e)}")
+
+    async def auto_execute_recommendation(
+        self,
+        recommendation_id: str,
+        routing_result: TierRoutingResult,
+    ) -> ApprovalResult:
+        """Autonomously execute a Tier 3 recommendation with safety validation and auto-rollback.
+
+        Flow (reuses patterns from execute_approval):
+        1. Fetch recommendation from repository
+        2. Validate status is PENDING
+        3. Safety validation via SafetyEngine (defense-in-depth: validated at generation AND execution)
+        4. Read original value via device_manager for rollback capability
+        5. Execute device write via device_manager
+        6. COV verification via cov_monitor_service
+        7. Auto-rollback on COV failure if enabled
+        8. Schedule outcome measurement for 10-minute learning window
+        9. Update recommendation status to AUTO_EXECUTED
+        10. Create audit log with parasite_auto_execute action type
+
+        Args:
+            recommendation_id: ID of recommendation to auto-execute
+            routing_result: TierRoutingResult from TierRoutingEngine with tier3 decision
+
+        Returns:
+            ApprovalResult with execution details
+        """
+        try:
+            # Get recommendation
+            recommendation = await self.recommendations_repo.get_by_id(recommendation_id)
+
+            if not recommendation:
+                return ApprovalResult(
+                    success=False,
+                    recommendation_id=recommendation_id,
+                    status="failed",
+                    error_message=f"Recommendation {recommendation_id} not found"
+                )
+
+            if recommendation.status != RecommendationStatus.PENDING:
+                return ApprovalResult(
+                    success=False,
+                    recommendation_id=recommendation_id,
+                    status="failed",
+                    error_message=f"Recommendation is {recommendation.status.value}, not pending"
+                )
+
+            # CRITICAL: Run SafetyEngine validation AGAIN before write (defense-in-depth)
+            equipment_id = recommendation.target_equipment
+            proposed_value = recommendation.action.get("value")
+
+            logger.info(
+                f"Tier 3 auto-execute: Running SafetyEngine validation for {equipment_id} = {proposed_value} "
+                f"(decision_id: {routing_result.decision_id})"
+            )
+            safety_result = await self._validate_safety(equipment_id, proposed_value)
+
+            if not safety_result["is_safe"]:
+                logger.warning(
+                    f"Tier 3 auto-execute: SafetyEngine rejected {recommendation_id}: {safety_result.get('reason')}"
+                )
+                # Log to parasite_decisions as failure
+                parasite_repo = ParasiteDecisionRepository()
+                await parasite_repo.log_decision(
+                    decision_id=routing_result.decision_id,
+                    recommendation_id=recommendation_id,
+                    tier="tier3",
+                    decision_type="tier3_auto_execute",
+                    success=False,
+                    failure_reason=f"Safety constraint violation: {safety_result.get('reason')}"
+                )
+                return ApprovalResult(
+                    success=False,
+                    recommendation_id=recommendation_id,
+                    status="failed",
+                    error_message=f"Safety constraint violation: {safety_result.get('reason')}"
+                )
+
+            # Extract control change from recommendation
+            control_point = recommendation.action.get("point")
+            target_value = recommendation.action.get("value")
+
+            if not control_point or target_value is None:
+                return ApprovalResult(
+                    success=False,
+                    recommendation_id=recommendation_id,
+                    status="failed",
+                    error_message="Recommendation action missing point or value"
+                )
+
+            # Read current value for rollback capability
+            current_result = await self.device_manager.read_value(
+                equipment_id=equipment_id,
+                point_name=control_point
+            )
+            original_value = current_result.get("value") if current_result.get("success") else None
+
+            # Execute write to Niagara device
+            logger.info(
+                f"Tier 3 auto-execute: Writing to device {equipment_id}: {control_point} = {target_value}"
+            )
+            write_result = await self._execute_device_write(
+                equipment_id=equipment_id,
+                point_name=control_point,
+                target_value=target_value
+            )
+
+            if not write_result["success"]:
+                logger.error(f"Tier 3 auto-execute: Device write failed: {write_result.get('error')}")
+                parasite_repo = ParasiteDecisionRepository()
+                await parasite_repo.log_decision(
+                    decision_id=routing_result.decision_id,
+                    recommendation_id=recommendation_id,
+                    tier="tier3",
+                    decision_type="tier3_auto_execute",
+                    success=False,
+                    failure_reason=f"Device write failed: {write_result.get('error')}"
+                )
+                return ApprovalResult(
+                    success=False,
+                    recommendation_id=recommendation_id,
+                    status="failed",
+                    error_message=f"Device write failed: {write_result.get('error')}"
+                )
+
+            # COV verification via dedicated service
+            cov_monitor = get_cov_monitor_service()
+            cov_result = await cov_monitor.verify_write(
+                equipment_id=equipment_id,
+                point_name=control_point,
+                expected_value=target_value
+            )
+
+            logger.info(
+                f"Tier 3 auto-execute: COV verification result for {equipment_id}.{control_point}: "
+                f"verified={cov_result.verified}, actual={cov_result.actual_value}"
+            )
+
+            # Auto-rollback on COV failure if enabled
+            auto_rolled_back = False
+            if not cov_result.verified:
+                if settings.parasite_auto_rollback_enabled:
+                    logger.warning(
+                        f"Tier 3 auto-execute: COV verification failed for {equipment_id}.{control_point}, "
+                        f"initiating auto-rollback"
+                    )
+                    auto_rolled_back = await self._auto_rollback(
+                        recommendation=recommendation,
+                        original_value=original_value,
+                        cov_result=cov_result,
+                        decision_id=routing_result.decision_id
+                    )
+
+                    if auto_rolled_back:
+                        logger.info(f"Tier 3 auto-execute: Auto-rollback completed successfully")
+                        return ApprovalResult(
+                            success=False,
+                            recommendation_id=recommendation_id,
+                            status="rolled_back",
+                            error_message=f"COV verification failed, auto-rollback initiated: expected={cov_result.expected_value}, actual={cov_result.actual_value}",
+                            cov_verified=False
+                        )
+                    else:
+                        logger.error(f"Tier 3 auto-execute: Auto-rollback failed")
+                        return ApprovalResult(
+                            success=False,
+                            recommendation_id=recommendation_id,
+                            status="failed",
+                            error_message=f"COV verification failed and auto-rollback failed"
+                        )
+
+            # Schedule outcome measurement for 10-minute learning window
+            await cov_monitor.schedule_outcome_measurement(
+                recommendation_id=recommendation_id,
+                measurement_window_seconds=600  # 10 minutes
+            )
+
+            # Update recommendation status to AUTO_EXECUTED
+            recommendation.status = RecommendationStatus.AUTO_EXECUTED
+            recommendation.approved_by = "system"
+            recommendation.approval_reason = f"Tier 3 autonomous execution (confidence: {routing_result.confidence_score})"
+            recommendation.executed_at = datetime.utcnow()
+            recommendation.execution_result = {
+                "success": True,
+                "device_write": write_result,
+                "cov_verified": cov_result.verified,
+                "original_value": original_value,
+                "target_value": target_value,
+                "control_point": control_point,
+                "timestamp": datetime.utcnow().isoformat(),
+                "execution_type": "tier3_auto_execute",
+                "decision_id": routing_result.decision_id,
+                "confidence_score": routing_result.confidence_score
+            }
+
+            await self.recommendations_repo.upsert(recommendation)
+
+            # Create audit log entry
+            await self._create_audit_log(
+                action_type="parasite_auto_execute",
+                equipment_code=equipment_id,
+                approved_by="system",
+                approval_notes=f"Tier 3 auto-execute (confidence: {routing_result.confidence_score})",
+                change_description=f"{control_point} = {target_value}",
+                execution_status="success",
+                cov_verified=cov_result.verified
+            )
+
+            # Log to parasite_decisions as success
+            parasite_repo = ParasiteDecisionRepository()
+            await parasite_repo.log_decision(
+                decision_id=routing_result.decision_id,
+                recommendation_id=recommendation_id,
+                tier="tier3",
+                decision_type="tier3_auto_execute",
+                success=True,
+                cov_verified=cov_result.verified
+            )
+
+            logger.info(f"Tier 3 auto-execute: Successfully completed for {recommendation_id}")
+
+            return ApprovalResult(
+                success=True,
+                recommendation_id=recommendation_id,
+                status="auto_executed",
+                executed_at=recommendation.executed_at,
+                cov_verified=cov_result.verified,
+                execution_result=recommendation.execution_result
+            )
+
+        except Exception as e:
+            logger.error(f"Tier 3 auto-execute: Error executing {recommendation_id}: {str(e)}")
+            return ApprovalResult(
+                success=False,
+                recommendation_id=recommendation_id,
+                status="failed",
+                error_message=f"Tier 3 auto-execute error: {str(e)}"
+            )
+
+    async def _auto_rollback(
+        self,
+        recommendation: Recommendation,
+        original_value: Any,
+        cov_result: COVVerificationResult,
+        decision_id: str,
+    ) -> bool:
+        """Automatically rollback a Tier 3 execution when COV verification fails.
+
+        Args:
+            recommendation: Recommendation object being rolled back
+            original_value: Original device value to restore
+            cov_result: COV verification result showing mismatch
+            decision_id: PARASITE decision ID for audit trail
+
+        Returns:
+            True if rollback successful, False otherwise
+        """
+        try:
+            equipment_id = recommendation.target_equipment
+            control_point = recommendation.action.get("point")
+
+            if not original_value or not control_point:
+                logger.warning(
+                    f"Auto-rollback: Cannot rollback {recommendation.id}: missing original_value or control_point"
+                )
+                return False
+
+            logger.info(
+                f"Auto-rollback: Rolling back device {equipment_id}: {control_point} = {original_value} "
+                f"(was {cov_result.actual_value})"
+            )
+
+            # Write original value back to device
+            rollback_result = await self._execute_device_write(
+                equipment_id=equipment_id,
+                point_name=control_point,
+                target_value=original_value
+            )
+
+            if not rollback_result["success"]:
+                logger.error(f"Auto-rollback: Device rollback write failed: {rollback_result.get('error')}")
+                return False
+
+            # Verify rollback via COV
+            cov_monitor = get_cov_monitor_service()
+            rollback_cov_result = await cov_monitor.verify_write(
+                equipment_id=equipment_id,
+                point_name=control_point,
+                expected_value=original_value
+            )
+
+            if not rollback_cov_result.verified:
+                logger.warning(
+                    f"Auto-rollback: COV verification failed for rollback of {equipment_id}.{control_point}"
+                )
+                # Continue anyway - rollback write was issued, but read-back didn't confirm
+
+            # Update recommendation status to ROLLED_BACK
+            recommendation.status = RecommendationStatus.ROLLED_BACK
+            recommendation.execution_result = {
+                **(recommendation.execution_result or {}),
+                "rolled_back": True,
+                "rollback_reason": f"COV verification failed: expected={cov_result.expected_value}, actual={cov_result.actual_value}",
+                "rollback_executed_at": datetime.utcnow().isoformat(),
+                "rollback_cov_verified": rollback_cov_result.verified,
+                "decision_id": decision_id
+            }
+
+            await self.recommendations_repo.upsert(recommendation)
+
+            # Create audit log entry for auto-rollback
+            await self._create_audit_log(
+                action_type="parasite_auto_rollback",
+                equipment_code=equipment_id,
+                approved_by="system",
+                approval_notes=f"Auto-rollback triggered by COV failure",
+                change_description=f"Auto-rollback: {control_point} from {cov_result.actual_value} back to {original_value}",
+                execution_status="success",
+                cov_verified=rollback_cov_result.verified
+            )
+
+            # Update parasite_decisions record
+            parasite_repo = ParasiteDecisionRepository()
+            await parasite_repo.update_decision_rollback(
+                decision_id=decision_id,
+                rolled_back=True,
+                rollback_reason=f"COV verification failed: expected={cov_result.expected_value}, actual={cov_result.actual_value}"
+            )
+
+            logger.info(f"Auto-rollback: Successfully completed for {recommendation.id}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Auto-rollback: Error rolling back recommendation: {str(e)}")
+            return False
 
     async def execute_multi_module_approval(
         self,

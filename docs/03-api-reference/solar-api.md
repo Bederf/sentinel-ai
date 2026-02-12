@@ -484,8 +484,89 @@ All tools accept `site_id` parameter (default: `""`).
 | `get_solar_diagnostics` | "Which inverters are underperforming?" |
 | `get_solar_forecast` | "What's tomorrow's generation forecast?" |
 
+## Peak Demand Management Integration (Phase 081)
+
+The Solar module integrates with the Peak Demand Management system to optimize BESS dispatch for both TOU arbitrage and NMD compliance.
+
+### NMD-Aware BESS Dispatch
+
+When NMD headroom drops below 15% (warning level), BESS discharge is prioritized for peak shaving over TOU arbitrage:
+
+```
+Priority Hierarchy:
+1. NMD Breach Prevention (CRITICAL - prevents R77k+/month penalties)
+2. TOU Arbitrage (IMPORTANT - captures daily savings)
+3. Comfort Optimization (NICE_TO_HAVE - thermal inertia allows flexibility)
+```
+
+**Scenario:** Current demand 5,500 kW, NMD 6,000 kVA (91% utilization):
+- BESS discharge recommended: 200 kW for 60 minutes
+- Estimated cost savings: R31,100/month (demand charge reduction)
+- Decision engine: Prefers BESS discharge over charging during peak tariff
+
+### Coordinator Integration
+
+The Demand-Aware Coordinator (`backend/app/services/demand_aware_coordinator.py`) runs every 5 minutes to:
+1. Query current demand vs NMD from buildings table
+2. Check which modules are active (Solar, HVAC, Energy, etc.)
+3. Generate multi-module recommendations if headroom < 15%
+4. Coordinate BESS discharge with HVAC setpoint adjustments
+5. Calculate combined cost savings
+
+**Typical Coordination:**
+- If Solar + HVAC both active:
+  - Solar: Discharge BESS 200 kW (saves R31,100/month on demand)
+  - HVAC: Increase chilled water setpoint +2°C (saves 5 kW load)
+  - Combined: 250 kW reduction, R38,875/month savings
+
+### NMD Data Sources
+
+NMD limit is extracted from municipal electricity bills and stored in `buildings.nmd_limit_kva`:
+
+**Primary Source (Preferred):**
+- Site manager uploads City Power bill PDF
+- SIMBIOT extracts NMD from bill (e.g., "6,000 kVA")
+- Value persisted to database
+- Last upload tracked: `buildings.bill_last_uploaded_at`
+
+**Fallback (No Bill Available):**
+- S002: 6,000 kVA (default)
+- site-005: 8,000 kVA (default)
+
+**See also:** [Municipal Billing API](municipal-billing.md) - Bill ingestion and NMD extraction
+
+### API Integration
+
+**Peak Demand Status:**
+```bash
+GET /api/peak-demand/S002/status
+```
+Returns: Current demand, NMD headroom, available modules for shaving
+
+**Recommendations:**
+```bash
+GET /api/peak-demand/S002/recommendations
+```
+Returns: Multi-module actions with Solar/HVAC/Energy coordinated changes
+
+**See also:** [Peak Demand API](peak-demand-api.md) - Complete reference
+
+### Dashboard Integration
+
+Solar dashboard shows:
+- **Current Headroom Gauge:** NMD headroom %, color-coded (green/yellow/red)
+- **Peak Risk Alert:** "Peak demand approaching NMD limit at 18:30" (if forecasted)
+- **Shaving Recommendation Panel:** If multi-module recommendation available
+  - BESS discharge: 200 kW for 60 min
+  - HVAC adjustment: +2°C setpoint
+  - "Approve" button triggers Tier 2 approval workflow
+
+---
+
 ## Related Documentation
 
 - [Solar & BESS Module Feature Doc](../04-features/34-solar-bess-module.md)
+- [Peak Demand Management API](peak-demand-api.md) - Full API reference (Phase 081)
+- [Municipal Billing API](municipal-billing.md) - NMD bill extraction
 - [MCP Tools Reference](mcp-tools-reference.md)
 - [Energy Centre Integration](../07-integrations/energy-centre.md)

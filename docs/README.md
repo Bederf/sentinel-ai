@@ -48,6 +48,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - [Fleet Learning API](03-api-reference/fleet-learning-api.md) - Cross-site patterns, global models, fine-tuning (Phase 45-02)
 - [MLOps API](03-api-reference/mlops-api.md) - Drift detection, ML alerts, retraining triggers, success metrics (Phase 45-03)
 - [Solar & BESS API](03-api-reference/solar-api.md) - Solar PV, BESS dispatch, grid compliance, financial reporting, maintenance (Phase 34)
+- **[Peak Demand Management API](03-api-reference/peak-demand-api.md)** - Real-time NMD monitoring, multi-module peak shaving coordination, demand forecasting with municipal bill integration (Phase 081)
 - [Water Meter API](03-api-reference/water-api.md) - Water consumption monitoring, leak detection, trending, alert management (Phase 35)
 - [Contract Management API](03-api-reference/contracts-api.md) - Organizations, contracts, SLA terms, equipment assignments, budgets, condition assessments (Phase 48)
 - [Risk-Based Pricing API](03-api-reference/pricing-api.md) - Quote calculations, SLA tier pricing, risk buffers (Phase 52)
@@ -101,7 +102,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 #### Contract Management
 - **[Contract Management Module](04-features/48-contract-management.md)** - Portfolio KPIs, SLA compliance tracking, budget variance analysis, profitability dashboard (Phase 48)
 - **[SLA Monitoring & Profitability](04-features/50-52-commercial-analytics.md)** - SLA compliance tracking, profitability dashboards, and risk-based pricing (Phases 50-52)
-- **[Municipal Billing Integration](04-features/49-municipal-billing.md)** - SA municipal invoice processing, cost tracking, tariff validation, variance detection, MCP tools for AI-powered workflows (Phase 49)
+- **[Municipal Billing Integration](04-features/49-municipal-billing.md)** - SA municipal invoice processing, cost tracking, tariff validation, variance detection, MCP tools for AI-powered workflows; NMD extraction for peak demand management (Phase 49, enhanced in Phase 081)
 
 #### Additional Features
 - [Technician Chat](04-features/technician-chat.md) - Guided fault diagnosis (Phase 19)

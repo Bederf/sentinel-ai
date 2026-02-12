@@ -34,6 +34,26 @@ The simulation service seeds:
 
 This ensures the municipal billing UI can run end‑to‑end without manual uploads.
 
+## NMD (Notified Maximum Demand) Extraction (Phase 081)
+
+When electricity invoices are uploaded, SIMBIOT automatically extracts the NMD value from the PDF and updates `buildings` table with the extracted NMD limit. This enables real-time peak demand monitoring against the actual contractual NMD limit.
+
+**Extracted Fields:**
+- `buildings.nmd_limit_kva` - Contractual NMD limit
+- `buildings.demand_charge_per_kva` - Cost per kVA exceeding NMD
+- `buildings.electricity_provider` - Municipality/utility name
+- `buildings.nmd_extracted_from_bill` - Extraction status (true/false)
+- `buildings.bill_last_uploaded_at` - Invoice upload timestamp
+- `buildings.billing_cycle_start_date` - Invoice period start
+- `buildings.billing_cycle_end_date` - Invoice period end
+
+**Integration with Peak Demand Management:**
+- Coordinator queries `buildings.nmd_limit_kva` every 5 minutes
+- Generates recommendations if current demand > NMD × 85%
+- Calculates cost savings from peak shaving based on extracted demand charge rate
+
+**See also:** [Peak Demand Management API](../03-api-reference/peak-demand-api.md) - Real-time monitoring and coordination
+
 ## Province-Based Municipality Mapping
 
 Municipality and tariff selection during simulation is based on `buildings.region`:

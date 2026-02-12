@@ -156,6 +156,12 @@ backend/app/
 - AI routing (Ollama/Claude hybrid)
 - Thermal modeling (load shedding)
 - Vision analysis (Claude Vision API)
+- **Demand-Aware Coordinator** (Phase 081) - Peak demand monitoring and multi-module coordination
+  - Runs every 5 minutes
+  - Monitors current demand vs NMD limit from database
+  - Generates AI recommendations for peak shaving
+  - Coordinates Solar BESS discharge with HVAC adjustments
+  - Integrates with Tier 2 approval workflow
 
 ## Frontend Architecture
 
@@ -568,9 +574,31 @@ flowchart TB
 - Safety validation (single point)
 - Unified audit trail
 
+### 6. Demand-Aware Coordinator (Phase 081)
+
+**Decision:** Centralized background service for peak demand monitoring and multi-module coordination
+
+**Rationale:**
+- Single source of truth for NMD monitoring (consistent decisions)
+- Module-agnostic design (works with any combination of Solar, HVAC, Energy, etc.)
+- Automatic NMD extraction from municipal bills (no manual updates)
+- Real-time demand forecasting with multi-module cost-benefit analysis
+- Integration with Tier 2 approval for operator sign-off on high-risk changes
+- 5-minute monitoring cycle (responsive without overwhelming system)
+
+**Key Features:**
+- Queries `buildings.nmd_limit_kva` from Supabase (with fallback defaults)
+- Multi-module recommendations (Solar BESS + HVAC + Load Deferral)
+- Cost savings calculation per module
+- Coordinator works independently of any active modules (graceful degradation)
+- Automatic cache invalidation on bill upload
+
 ## Related Documentation
 
 - [Device Abstraction Layer](device-abstraction-layer.md) - Deep dive
 - [Safety Interlocks Engine](../06-safety-compliance/safety-interlocks-engine.md) - Safety system
 - [Database Schema](database-schema.md) - Data model
 - [REST API Endpoints](../03-api-reference/rest-api-endpoints.md) - API reference
+- [Peak Demand Management API](../03-api-reference/peak-demand-api.md) - Demand monitoring and NMD coordination (Phase 081)
+- [Municipal Billing API](../03-api-reference/municipal-billing.md) - Bill ingestion and NMD extraction
+- [Solar & BESS API](../03-api-reference/solar-api.md) - BESS dispatch coordination with demand management
