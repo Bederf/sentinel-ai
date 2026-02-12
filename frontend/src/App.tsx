@@ -33,6 +33,7 @@ import { WaterPanel } from "./components/water";
 import { ContractManagementPage } from "./pages/ContractManagementPage";
 import { BudgetReportPage } from "./pages/BudgetReportPage";
 import { ProfitabilityDashboardPage } from "./pages/ProfitabilityDashboardPage";
+import { ModularDashboard } from "./components/modules/ModularDashboard";
 import { DigitalTwin } from "./components/digital-twin/DigitalTwin";
 import { ModuleProvider } from "./contexts/ModuleContext";
 import { useModules } from "./contexts/ModuleHooks";
@@ -716,6 +717,8 @@ function App() {
             <ProfitabilityDashboardPage />
           ) : currentView === "budget-report" ? (
             <BudgetReportPage />
+          ) : currentView === "modules" ? (
+            <ModularDashboard />
           ) : (
             <div className="h-full p-4 md:p-6">
               <div className="h-full max-w-4xl mx-auto">

@@ -25,6 +25,11 @@ const HVACDashboard = lazy(() =>
   import('../hvac/HVACDashboard').then(m => ({ default: m.HVACDashboard }))
 );
 
+// Solar & BESS Module Dashboard
+const SolarDashboard = lazy(() =>
+  import('../solar/SolarDashboard').then(m => ({ default: m.SolarDashboard }))
+);
+
 const SecurityDashboard = lazy(() =>
   Promise.resolve({
     default: () => (
@@ -48,27 +53,33 @@ const LightingDashboard = lazy(() =>
 );
 
 interface ModularDashboardProps {
-  siteId: string;
+  siteId?: string;
   siteName?: string;
   showModuleSelector?: boolean;
   showRecommendations?: boolean;
 }
 
 export function ModularDashboard({
-  siteId,
-  siteName,
+  siteId: propSiteId,
+  siteName: propSiteName,
   showModuleSelector = true,
   showRecommendations = true,
 }: ModularDashboardProps) {
-  const { activeModules, addRecommendation, setSite } = useModules();
+  const { activeModules, addRecommendation, setSite, siteId: contextSiteId } = useModules();
   const criticalRecs = useCriticalRecommendations();
   const { thresholds } = useHealthThresholds();
   const [activeTab, setActiveTab] = useState(0);
 
-  // Set site on mount
+  // Use provided siteId or fall back to context siteId
+  const siteId = propSiteId || contextSiteId || '';
+  const siteName = propSiteName || siteId;
+
+  // Set site on mount if prop provided
   useEffect(() => {
-    setSite(siteId, siteName || siteId);
-  }, [siteId, siteName, setSite]);
+    if (propSiteId) {
+      setSite(propSiteId, propSiteName || propSiteId);
+    }
+  }, [propSiteId, propSiteName, setSite]);
 
   // Get module dashboard component
   const getModuleDashboard = (moduleType: ModuleType) => {
@@ -111,6 +122,8 @@ export function ModularDashboard({
             }}
           />
         );
+      case 'solar':
+        return <SolarDashboard />;
       case 'security':
         return <SecurityDashboard />;
       case 'lighting':
