@@ -197,7 +197,7 @@ export function enableSecureFetchLogging(): void {
     // Only log in development with sanitization
     if (import.meta.env.DEV) {
       const method = (config?.method || 'GET').toUpperCase();
-      const url = typeof resource === 'string' ? resource : resource.url;
+      const url = typeof resource === 'string' ? resource : (resource as any).url;
       const sanitizedUrl = sanitizeUrl(url);
 
       // Log request (without sensitive headers)

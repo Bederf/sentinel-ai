@@ -10,6 +10,7 @@ import logging
 from app.services.csv_loader import WorkOrderData, AssetData
 from app.middleware.auth_middleware import require_auth
 from app.models.auth import AuthLevel, AuthContext
+from app.database.repositories.technician_repository import get_technician_repository
 
 logger = logging.getLogger(__name__)
 
@@ -296,6 +297,13 @@ class TechnicianWorkOrderUpdate(BaseModel):
     parts_needed: Optional[List[str]] = None
     status: Optional[str] = None
     estimated_duration: Optional[str] = None
+    priority: Optional[str] = None  # low, medium, high, critical
+
+
+class WorkOrderEscalationRequest(BaseModel):
+    """Request model for escalating work order to service provider."""
+    escalation_reason: str  # e.g., "cannot fix", "requires specialist", "parts unavailable"
+    notes: Optional[str] = None  # Additional escalation notes
 
 
 class TechnicianWorkOrderComplete(BaseModel):
@@ -445,6 +453,7 @@ async def update_technician_work_order(
 
     try:
         repo = get_work_order_repository()
+        tech_repo = get_technician_repository()
         work_order = await repo.get_work_order_by_id(work_order_id)
 
         if not work_order:
@@ -462,6 +471,8 @@ async def update_technician_work_order(
             update_data["status"] = update.status
         if update.estimated_duration is not None:
             update_data["estimated_duration"] = update.estimated_duration
+        if update.priority is not None:
+            update_data["priority"] = update.priority
 
         # Update in database
         updated = await repo.update_work_order(work_order_id, update_data)
@@ -474,6 +485,32 @@ async def update_technician_work_order(
             'details': {'work_order_id': work_order_id, 'changes': update_data},
             'result': 'SUCCESS'
         })
+
+        # Send escalation email if priority changed to critical
+        if update.priority == "critical":
+            try:
+                from app.services.notification_service import NotificationService
+                notification = NotificationService()
+                
+                # Get technician for this equipment
+                equipment_id = work_order.get("equipment_id")
+                if equipment_id:
+                    tech = await tech_repo.get_technician_for_equipment_code(equipment_id)
+                    if tech and tech.get("email"):
+                        # Send escalation email
+                        await notification.send_escalation_email(
+                            to_email=tech.get("email"),
+                            technician_name=tech.get("name"),
+                            work_order_id=work_order_id,
+                            equipment_code=equipment_id,
+                            equipment_name=work_order.get("equipment_name", "Unknown"),
+                            health_score=work_order.get("health_score"),
+                            reason="Priority escalated to CRITICAL"
+                        )
+                        logger.info(f"Sent escalation email to {tech.get('email')} for WO {work_order_id}")
+            except Exception as e:
+                logger.error(f"Failed to send escalation email: {str(e)}")
+                # Non-blocking: don't fail the API if email fails
 
         logger.info(f"Updated technician work order {work_order_id} by user {auth.user_id}")
         return updated
@@ -517,6 +554,7 @@ async def complete_technician_work_order(work_order_id: str, completion: Technic
                 "completion_notes": completion.resolution,
                 "parts_used": completion.parts_used,
                 "actual_hours": completion.time_spent,
+                "equipment_code": work_order.get("equipment_code") or work_order.get("equipment_id"),
             }
         )
     except Exception:
@@ -963,3 +1001,112 @@ async def get_equipment_summary_for_telegram(equipment_code: str):
         "text": "\n".join(lines),
         "parse_mode": "Markdown",
     }
+
+
+
+@router.post("/work-orders/supabase/{work_order_id}/escalate-to-service-provider")
+async def escalate_work_order_to_service_provider(
+    work_order_id: str,
+    request: WorkOrderEscalationRequest,
+    auth: AuthContext = Depends(require_auth),
+):
+    """Escalate a work order from internal team to external service provider.
+
+    This endpoint implements the two-tier escalation workflow:
+    1. Work order initially assigned to internal team
+    2. If internal team cannot fix it, escalate to service provider
+    3. Service provider details from equipment record are used
+    4. Escalation email notification sent to service provider
+
+    Args:
+        work_order_id: ID of the work order to escalate
+        request: Escalation request with reason and notes
+        auth: Authentication context
+
+    Returns:
+        Updated work order with escalation details
+    """
+    from app.database.repositories.work_order_repository import get_work_order_repository
+    from app.database.repositories.equipment_repository import get_equipment_repository
+    from app.services.notification_service import NotificationService
+
+    try:
+        # Get work order
+        wo_repo = get_work_order_repository()
+        work_order = await wo_repo.get_by_id(work_order_id)
+
+        if not work_order:
+            raise HTTPException(status_code=404, detail="Work order not found")
+
+        # Get equipment to find service provider
+        equipment_code = work_order.get("equipment_code")
+        if not equipment_code:
+            raise HTTPException(status_code=400, detail="Work order has no equipment assigned")
+
+        eq_repo = get_equipment_repository()
+        equipment = await eq_repo.get_by_code(equipment_code)
+
+        if not equipment:
+            raise HTTPException(status_code=404, detail=f"Equipment {equipment_code} not found")
+
+        # Verify equipment has service provider details
+        service_provider_email = equipment.get("service_provider_email")
+        service_provider_name = equipment.get("service_provider_name")
+
+        if not service_provider_email or not service_provider_name:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Equipment {equipment_code} does not have a service provider assigned"
+            )
+
+        # Prepare escalation data
+        escalation_data = {
+            "escalated_to_service_provider": True,
+            "assigned_to_internal_team": False,
+            "escalation_reason": request.escalation_reason,
+            "escalation_date": datetime.utcnow().isoformat(),
+            "service_provider_name": service_provider_name,
+            "service_provider_email": service_provider_email,
+            "service_provider_phone": equipment.get("service_provider_phone"),
+            "service_provider_specialty": equipment.get("service_provider_specialty"),
+            "status": "escalated",
+            "notes": request.notes or f"Escalated to service provider: {request.escalation_reason}",
+        }
+
+        # Update work order with escalation details
+        updated_wo = await wo_repo.update(work_order_id, escalation_data)
+
+        # Send escalation email notification
+        try:
+            notification = NotificationService()
+            await notification.send_escalation_email(
+                to_email=service_provider_email,
+                technician_name=service_provider_name,
+                work_order_id=work_order.get("code", work_order_id),
+                equipment_code=equipment_code,
+                equipment_name=equipment.get("name", "Unknown"),
+                health_score=equipment.get("health_score"),
+                reason=request.escalation_reason,
+                notes=request.notes,
+                priority=work_order.get("priority", "normal"),
+            )
+            logger.info(
+                f"Escalation email sent to {service_provider_email} for WO {work_order_id}"
+            )
+        except Exception as e:
+            logger.error(f"Failed to send escalation email: {str(e)}")
+            # Don't fail the escalation if email fails - escalation is complete
+
+        # Audit log
+        logger.info(
+            f"Work order {work_order_id} escalated to {service_provider_name} "
+            f"({service_provider_email}) by {auth.user_id}: {request.escalation_reason}"
+        )
+
+        return updated_wo
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to escalate work order: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to escalate work order: {str(e)}")

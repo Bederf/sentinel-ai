@@ -35,15 +35,27 @@ export function createMockOptimizationScenario(overrides?: Partial<OptimizationS
       without_precooling: 45,
       with_precooling: 120,
       comfort_maintained: true,
+      comfort_breach_time: '00:45:00',
+      calculation_params: {
+        thermal_mass: 100,
+        insulation_factor: 0.8,
+        internal_heat_gain: 50,
+      },
     },
     savings: {
       energy_savings_percent: 18,
       comfort_extension_minutes: 75,
       fuel_savings_percent: 12,
       total_savings_zar: 4250,
+      breakdown: {
+        reduced_generator_runtime: 1000,
+        avoided_peak_demand_charges: 500,
+        improved_efficiency: 1500,
+        reduced_restart_energy: 250,
+      },
     },
     ...overrides,
-  };
+  } as any;
 }
 
 /**
@@ -52,7 +64,6 @@ export function createMockOptimizationScenario(overrides?: Partial<OptimizationS
 export function createMockOptimizationStatus(overrides?: Partial<OptimizationStatusResponse>): OptimizationStatusResponse {
   return {
     site_id: 'site-002',
-    current_status: 'active',
     next_scheduled: new Date(Date.now() + 86400000).toISOString(),
     optimization_history: [
       {
@@ -69,7 +80,7 @@ export function createMockOptimizationStatus(overrides?: Partial<OptimizationSta
       },
     ],
     ...overrides,
-  };
+  } as any;
 }
 
 /**
@@ -77,12 +88,15 @@ export function createMockOptimizationStatus(overrides?: Partial<OptimizationSta
  */
 export function createMockDashboardStats(overrides?: Partial<DashboardStats>): DashboardStats {
   return {
+    total_sites: 5,
     total_equipment: 156,
-    uptime_percent: 97.2,
+    total_sensors: 500,
     active_alerts: 3,
     critical_alerts: 1,
+    pending_anomalies: 2,
+    uptime_percent: 97.2,
     ...overrides,
-  };
+  } as any;
 }
 
 /**
@@ -100,13 +114,16 @@ export function createMockPrediction(overrides?: Partial<Prediction>): Predictio
     severity: 'critical',
     probability_percent: 78,
     timeframe_days: 14,
-    confidence: 'HIGH',
+    confidence: 'high',
     financial_impact: {
+      repair_cost_zar: 50000,
+      replacement_cost_zar: 150000,
+      downtime_cost_per_hour_zar: 5000,
+      estimated_repair_hours: 4,
       potential_loss_zar: 85000,
-      downtime_hours: 24,
     },
     ...overrides,
-  };
+  } as any;
 }
 
 /**
@@ -135,13 +152,13 @@ export function createMockBuildingEquipmentItem(overrides?: Partial<BuildingEqui
  */
 export function createMockEnergyDataPoint(overrides?: Partial<EnergyDataPoint>): EnergyDataPoint {
   return {
-    date: new Date().toISOString().split('T')[0],
+    timestamp: new Date().toISOString(),
     consumption_kwh: 2450,
     cost_zar: 3675,
     peak_kw: 450,
     avg_kw: 102,
     ...overrides,
-  };
+  } as any;
 }
 
 /**
@@ -163,14 +180,13 @@ export function createMockSite(overrides?: Partial<Site>): Site {
   return {
     id: 'site-002',
     name: 'Sandton City Office Tower',
-    code: 'SCT',
     type: 'office',
     status: 'normal',
     location: 'Johannesburg, South Africa',
     equipment_count: 175,
     alert_count: 3,
     ...overrides,
-  };
+  } as any;
 }
 
 /**
@@ -306,10 +322,17 @@ export function createMockDevice(overrides?: Partial<Device>): Device {
     id: 'device-001',
     name: 'Chiller Primary',
     device_type: 'CHILLER',
+    type: 'HVAC_CHILLER',
     location: 'Basement - Plant Room',
-    status: 'normal',
+    status: 'online',
+    site_id: 'site-002',
+    protocol: 'mock',
+    description: 'Primary cooling system',
+    points: {},
+    safety_status: 'safe',
+    last_communication: new Date().toISOString(),
     ...overrides,
-  };
+  } as any;
 }
 
 /**
@@ -318,12 +341,11 @@ export function createMockDevice(overrides?: Partial<Device>): Device {
 export function createMockDeviceStatus(overrides?: Partial<DeviceStatus>): DeviceStatus {
   return {
     device_id: 'device-001',
-    is_responsive: true,
+    status: 'online',
     last_seen_seconds_ago: 5,
     last_reading_time: new Date().toISOString(),
-    is_critical: false,
     ...overrides,
-  };
+  } as any;
 }
 
 /**
@@ -332,13 +354,11 @@ export function createMockDeviceStatus(overrides?: Partial<DeviceStatus>): Devic
 export function createMockDeviceSafetyStatus(overrides?: Partial<DeviceSafetyStatus>): DeviceSafetyStatus {
   return {
     device_id: 'device-001',
-    is_safe: true,
-    safety_status: 'healthy',
-    temp_c: 22.5,
-    setpoint_c: 23,
-    pressure_bar: 4.2,
+    overall_status: 'safe' as const,
+    point_statuses: {},
+    active_rule_count: 0,
     ...overrides,
-  };
+  } as any;
 }
 
 /**
@@ -347,13 +367,13 @@ export function createMockDeviceSafetyStatus(overrides?: Partial<DeviceSafetySta
 export function createMockEquipment(overrides?: Partial<Equipment>): Equipment {
   return {
     id: 'equipment-001',
-    code: 'S002-CHILLER-B1-001',
     name: 'Primary Chiller',
-    equipment_type: 'CHILLER',
+    type: 'CHILLER',
+    site_id: 'site-002',
     health_score: 85,
-    status: 'normal',
+    status: 'online',
     ...overrides,
-  };
+  } as any;
 }
 
 /**

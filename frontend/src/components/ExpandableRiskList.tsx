@@ -60,10 +60,10 @@ export function ExpandableRiskList({
           riskEquipment.sort((a, b) => {
             if (a.status === "critical" && b.status !== "critical") return -1;
             if (b.status === "critical" && a.status !== "critical") return 1;
-            return a.health - b.health;
+            return (a as any).health - (b as any).health;
           });
 
-          setEquipment(riskEquipment);
+          setEquipment(riskEquipment as any);
           setHasFetched(true);
         } catch (error) {
           console.error("Failed to load at-risk equipment:", error);

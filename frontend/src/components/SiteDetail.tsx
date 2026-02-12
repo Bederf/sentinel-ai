@@ -148,13 +148,13 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
         try {
           const buildingEquipment = await api.getBuildingEquipment(buildingId);
           // API returns Equipment[] with health_score field
-          setEquipment(buildingEquipment.equipment);
+          setEquipment(buildingEquipment.equipment as any);
           setEquipmentCategories(buildingEquipment.categories);
         } catch (eqErr) {
           console.warn("Building equipment endpoint failed, falling back to legacy:", eqErr);
           // Fallback to legacy equipment endpoint
           const equipmentData = await api.getEquipment(siteId);
-          setEquipment(equipmentData.map((eq) => ({
+          setEquipment(equipmentData.map((eq: any) => ({
             ...eq,
             health_score: 80,
             health: 80,
@@ -353,15 +353,15 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
       const buildingId = SITE_TO_BUILDING[siteId] || siteId;
       try {
         const buildingEquipment = await api.getBuildingEquipment(buildingId);
-        setEquipment(buildingEquipment.equipment.map((eq) => ({
+        setEquipment(buildingEquipment.equipment.map((eq: any) => ({
           ...eq,
-          health_score: eq.health,
-        })));
+          health_score: eq.health || eq.health_score,
+        })) as any);
         setEquipmentCategories(buildingEquipment.categories);
       } catch {
         // Fallback
         const equipmentData = await api.getEquipment(siteId);
-        setEquipment(equipmentData.map((eq) => ({
+        setEquipment(equipmentData.map((eq: any) => ({
           ...eq,
           health_score: 80,
           health: 80,
@@ -446,7 +446,7 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
   const warningEquipment = equipment.filter((e) => e.status === "warning").length;
   const criticalEquipment = equipment.filter((e) => e.status === "critical" || (e.status as string) === "offline" || (e.status as string) === "maintenance").length;
   const avgHealth = equipment.length > 0
-    ? Math.round(equipment.reduce((sum, e) => sum + e.health_score, 0) / equipment.length)
+    ? Math.round(equipment.reduce((sum, e) => sum + (e.health_score || (e as any).health || 0), 0) / equipment.length)
     : 0;
 
   const statusConfig = site.status

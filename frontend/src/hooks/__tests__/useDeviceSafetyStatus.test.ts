@@ -33,15 +33,9 @@ vi.mock('@/lib/api/batchers', async () => {
   const actual = await vi.importActual('@/lib/api/batchers');
   return {
     ...actual,
-    safetyBatcher: {
-      fetch: vi.fn(),
-    },
-    readingsBatcher: {
-      fetch: vi.fn(),
-    },
-    conditionBatcher: {
-      fetch: vi.fn(),
-    },
+    safetyBatcher: vi.fn(),
+    readingsBatcher: vi.fn(),
+    conditionBatcher: vi.fn(),
   };
 });
 
@@ -72,7 +66,7 @@ describe('useDeviceSafetyStatus Hook', () => {
 
   beforeEach(() => {
     queryClient = createTestQueryClient();
-    mockSafetyBatcher = (apiModule.safetyBatcher as any).fetch;
+    mockSafetyBatcher = apiModule.safetyBatcher as any;
     vi.clearAllMocks();
   });
 
@@ -311,7 +305,7 @@ describe('useDeviceLatestReading Hook', () => {
 
   beforeEach(() => {
     queryClient = createTestQueryClient();
-    mockReadingsBatcher = (apiModule.readingsBatcher as any).fetch;
+    mockReadingsBatcher = apiModule.readingsBatcher as any;
     vi.clearAllMocks();
   });
 
@@ -370,7 +364,7 @@ describe('useDeviceCondition Hook', () => {
 
   beforeEach(() => {
     queryClient = createTestQueryClient();
-    mockConditionBatcher = (apiModule.conditionBatcher as any).fetch;
+    mockConditionBatcher = apiModule.conditionBatcher as any;
     vi.clearAllMocks();
   });
 
@@ -561,7 +555,7 @@ describe('Hook Integration - Batch Aggregation', () => {
 
   beforeEach(() => {
     queryClient = createTestQueryClient();
-    mockSafetyBatcher = (apiModule.safetyBatcher as any).fetch;
+    mockSafetyBatcher = apiModule.safetyBatcher as any;
     vi.clearAllMocks();
   });
 

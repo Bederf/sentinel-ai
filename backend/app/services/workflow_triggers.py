@@ -21,6 +21,9 @@ from enum import Enum
 from app.database.repositories.workflow_event_repository import (
     get_workflow_event_repository,
 )
+from app.services.feedback_collection_service import (
+    get_feedback_collection_service,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -705,25 +708,43 @@ class WorkflowTriggerEngine:
                 self._inspection_tasks[equipment_id] = []
             self._inspection_tasks[equipment_id].append(inspection_task)
 
-            # 3. Queue effectiveness validation (will run after post-repair baseline)
+            # 3. Start guided feedback collection session
+            # Technician will be prompted for readings, observations, photos
+            feedback_session_id = None
+            try:
+                feedback_service = get_feedback_collection_service()
+                equipment_code = completion_data.get("equipment_code", equipment_id)
+                session = await feedback_service.start_feedback_session(
+                    work_order_id=work_order_id,
+                    equipment_id=equipment_id,
+                    equipment_code=equipment_code,
+                    service_type="breakdown"
+                )
+                feedback_session_id = session.session_id
+                logger.info(f"Feedback session {feedback_session_id} started for WO {work_order_id}")
+            except Exception as e:
+                logger.warning(f"Failed to start feedback session (non-critical): {e}")
+
+            # 4. Queue effectiveness validation (will run after post-repair baseline)
             # For demo, store scheduled time
             validation_scheduled_time = datetime.now() + timedelta(hours=3)
 
-            # 4. Send notification
+            # 5. Send notification
             await self._send_alert(
                 f"Repair completed for WO {work_order_id}. "
                 f"Post-repair inspection scheduled for {inspection_task.scheduled_date}."
             )
 
-            # 5. Audit log
+            # 6. Audit log
             await self._audit_log(
                 trigger_type=TriggerType.REPAIR_COMPLETED,
                 equipment_id=equipment_id,
-                action="scheduled_post_repair_inspection",
+                action="initiated_post_repair_workflow",
                 details={
                     "work_order_id": work_order_id,
                     "baseline_task_id": baseline_task.id,
                     "inspection_task_id": inspection_task.id,
+                    "feedback_session_id": feedback_session_id,
                     "validation_scheduled": validation_scheduled_time.isoformat()
                 }
             )
@@ -732,11 +753,12 @@ class WorkflowTriggerEngine:
                 success=True,
                 trigger_type=TriggerType.REPAIR_COMPLETED,
                 equipment_id=equipment_id,
-                action_taken="scheduled_post_repair_inspection",
+                action_taken="initiated_post_repair_workflow",
                 details={
                     "work_order_id": work_order_id,
                     "baseline_task_id": baseline_task.id,
                     "inspection_task_id": inspection_task.id,
+                    "feedback_session_id": feedback_session_id,
                     "validation_scheduled": validation_scheduled_time.isoformat()
                 },
                 follow_up_scheduled=True

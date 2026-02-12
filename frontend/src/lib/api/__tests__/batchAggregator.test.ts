@@ -151,8 +151,9 @@ describe('BatchAggregator - Batch Window Aggregation', () => {
     // Before window expires
     expect(apiFetch).not.toHaveBeenCalled();
 
-    // Trigger window expiration
+    // Trigger window expiration and run all async operations
     vi.advanceTimersByTime(60);
+    await vi.runAllTimersAsync();
 
     expect(apiFetch).toHaveBeenCalled();
     await p1;
@@ -176,6 +177,7 @@ describe('BatchAggregator - Batch Window Aggregation', () => {
 
     // 100ms should trigger
     vi.advanceTimersByTime(60);
+    await vi.runAllTimersAsync();
     expect(apiFetch).toHaveBeenCalled();
     await p1;
   });
@@ -221,6 +223,7 @@ describe('BatchAggregator - ID Deduplication', () => {
 
     // Trigger window expiration and wait for results
     vi.advanceTimersByTime(60);
+    await vi.runAllTimersAsync();
     await Promise.all([p1, p2, p3]);
   });
 
@@ -241,6 +244,7 @@ describe('BatchAggregator - ID Deduplication', () => {
     const p4 = batcher('id-2'); // Duplicate
 
     vi.advanceTimersByTime(60);
+    await vi.runAllTimersAsync();
 
     // Wait for all promises to settle
     await Promise.all([p1, p2, p3, p4]);
@@ -272,6 +276,7 @@ describe('BatchAggregator - ID Deduplication', () => {
     const p2 = batcher('id-1');
 
     vi.advanceTimersByTime(60);
+    await vi.runAllTimersAsync();
 
     await Promise.all([p1, p2]);
     expect(customDeduplicate).toHaveBeenCalled();
@@ -382,6 +387,7 @@ describe('BatchAggregator - Request Payload', () => {
     const p2 = batcher('id-2');
 
     vi.advanceTimersByTime(60);
+    await vi.runAllTimersAsync();
 
     await Promise.all([p1, p2]);
 
@@ -406,6 +412,7 @@ describe('BatchAggregator - Request Payload', () => {
 
     const p1 = batcher('id-1');
     vi.advanceTimersByTime(60);
+    await vi.runAllTimersAsync();
 
     await p1;
 

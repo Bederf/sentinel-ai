@@ -222,6 +222,102 @@ class NotificationService:
             logger.error(f"Error sending emergency notification: {e}")
             return False
 
+
+    async def send_escalation_email(
+        self,
+        to_email: str,
+        technician_name: str,
+        work_order_id: str,
+        equipment_code: str,
+        equipment_name: str,
+        health_score: Optional[float] = None,
+        reason: str = "Work order escalated to service provider",
+        notes: Optional[str] = None,
+        priority: str = "normal",
+    ) -> bool:
+        """
+        Send work order escalation email to service provider.
+
+        Args:
+            to_email: Service provider email address
+            technician_name: Service provider name
+            work_order_id: Work order ID/code
+            equipment_code: Equipment code
+            equipment_name: Equipment name
+            health_score: Equipment health score (optional)
+            reason: Escalation reason
+            notes: Additional notes
+            priority: Work order priority
+
+        Returns:
+            True if email sent successfully
+        """
+        try:
+            if not to_email:
+                logger.warning("No email address provided for escalation notification")
+                return False
+
+            # Generate email content
+            subject = f"[SENTINEL] Work Order Escalation - {equipment_code} ({work_order_id})"
+
+            body = f"""Dear {technician_name},
+
+Your service provider has been assigned to the following escalated work order:
+
+WORK ORDER DETAILS:
+{'='*50}
+Work Order ID: {work_order_id}
+Equipment: {equipment_name} ({equipment_code})
+Priority: {priority.upper()}
+Escalation Reason: {reason}
+"""
+            if health_score is not None:
+                body += f"Equipment Health Score: {health_score}%\n"
+
+            if notes:
+                body += f"\nAdditional Notes:\n{notes}\n"
+
+            body += f"""
+NEXT STEPS:
+1. Review the work order details in the SENTINEL system
+2. Assess the equipment condition
+3. Update the work order with your findings
+4. Complete the service work or request additional information
+
+Please log in to the SENTINEL BMS to view the full work order details.
+
+Questions? Contact your operations team.
+
+---
+This is an automated notification from the SENTINEL Building Management System.
+Work Order Escalation Notification
+"""
+
+            email_content = f"""Subject: {subject}
+
+{body}"""
+
+            # Log the email (in production, this would send via SMTP)
+            logger.info(f"ESCALATION EMAIL to {to_email}:\n{email_content}")
+
+            # Add to notification history
+            self.notification_history.append({
+                "timestamp": datetime.now().isoformat(),
+                "channel": "email",
+                "type": "escalation",
+                "work_order_id": work_order_id,
+                "equipment_code": equipment_code,
+                "recipient": to_email,
+                "reason": reason,
+                "content": email_content,
+            })
+
+            return True
+
+        except Exception as e:
+            logger.error(f"Error sending escalation email: {e}")
+            return False
+
     def _generate_email_content(self, event: EscalationEvent) -> str:
         """Generate email content for escalation event."""
         subject = f"[SENTINEL] {event.escalation_level.name} Alert - {event.device_name}"

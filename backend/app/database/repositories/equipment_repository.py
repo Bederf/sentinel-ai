@@ -240,3 +240,69 @@ class EquipmentRepository:
             Updated equipment or None if not found
         """
         return self.update(equipment_id, {'health_score': health_score})
+
+
+    def update_service_provider(
+        self,
+        equipment_id: str,
+        provider_name: Optional[str] = None,
+        provider_email: Optional[str] = None,
+        provider_phone: Optional[str] = None,
+        provider_specialty: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Update service provider information for equipment.
+
+        Args:
+            equipment_id: Equipment code
+            provider_name: Service provider name
+            provider_email: Service provider email
+            provider_phone: Service provider phone
+            provider_specialty: Service provider specialty (hvac, electrical, plumbing, dali, fire, security, general)
+
+        Returns:
+            Updated equipment or None if not found
+        """
+        update_data = {}
+        if provider_name is not None:
+            update_data['service_provider_name'] = provider_name
+        if provider_email is not None:
+            update_data['service_provider_email'] = provider_email
+        if provider_phone is not None:
+            update_data['service_provider_phone'] = provider_phone
+        if provider_specialty is not None:
+            update_data['service_provider_specialty'] = provider_specialty
+
+        if not update_data:
+            return self.get_by_id(equipment_id)
+
+        return self.update(equipment_id, update_data)
+
+    def get_by_service_provider(self, email: str) -> List[Dict[str, Any]]:
+        """Get all equipment assigned to a service provider by email.
+
+        Args:
+            email: Service provider email
+
+        Returns:
+            List of equipment items
+        """
+        response = self.client.table('equipment').select("*").eq(
+            'service_provider_email', email
+        ).execute()
+
+        return response.data
+
+    def get_by_service_provider_specialty(self, specialty: str) -> List[Dict[str, Any]]:
+        """Get all equipment assigned to service providers with a specific specialty.
+
+        Args:
+            specialty: Service provider specialty
+
+        Returns:
+            List of equipment items
+        """
+        response = self.client.table('equipment').select("*").eq(
+            'service_provider_specialty', specialty
+        ).execute()
+
+        return response.data

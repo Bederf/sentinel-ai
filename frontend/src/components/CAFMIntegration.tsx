@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Sync, AlertCircle, CheckCircle2, Settings } from 'lucide-react';
+import { RefreshCw as Sync, AlertCircle, CheckCircle2, Settings } from 'lucide-react';
 
 interface CAFMConfig {
   system: 'archibus' | 'planon' | 'maximo';
