@@ -105,6 +105,36 @@ useEffect(() => {
 }, []);
 ```
 
+#### Equipment History Hooks
+
+Specialized hooks for fetching equipment maintenance history (work orders and alerts):
+
+```typescript
+// Work orders for equipment
+import { useEquipmentWorkOrders } from '@/hooks/useEquipmentHistory';
+const { data: workOrders, isLoading } = useEquipmentWorkOrders('equipment-uuid', 10);
+
+// Alerts for equipment
+import { useEquipmentAlerts } from '@/hooks/useEquipmentHistory';
+const { data: alerts, isLoading } = useEquipmentAlerts('equipment-uuid', 10);
+```
+
+**Configuration:**
+- Work orders: 60s stale time (infrequent changes)
+- Alerts: 30s stale time (frequent updates)
+- Both: 5-3 minute GC time
+- Automatic retry with exponential backoff
+
+**Integration in PredictionDetail:**
+The MaintenanceHistoryTabs component displays both hooks side-by-side with tab switching:
+```typescript
+<MaintenanceHistoryTabs equipmentId={prediction.id} />
+```
+
+This renders:
+- **Work Orders tab:** List of recent maintenance/repair activities
+- **Alerts & Errors tab:** History of detected issues and alarms
+
 ### Batch Aggregator Integration
 
 React Query integrates with the batch aggregator to automatically deduplicate and batch requests:

@@ -27,6 +27,7 @@ import { CostCard } from "./CostCard";
 import { CostBreakdownDetail } from "./CostBreakdownDetail";
 import { PatternTimeline } from "./PatternTimeline";
 import { HighlightedNotes } from "./HighlightedNotes";
+import { MaintenanceHistoryTabs } from "./maintenance/MaintenanceHistoryTabs";
 
 interface PredictionDetailProps {
   prediction: {
@@ -749,6 +750,31 @@ export function PredictionDetail({ prediction, isOpen, onClose, onCreateWorkOrde
                 </div>
               </div>
             </SectionCard>
+          )}
+
+          {/* Maintenance History Section */}
+          {prediction.id && (
+            <div
+              style={{
+                backgroundColor: "var(--color-grafana-panel-bg)",
+                padding: "1.5rem",
+                borderRadius: "8px",
+                border: "1px solid var(--color-grafana-border)",
+                marginBottom: "1.5rem",
+              }}
+            >
+              <h3
+                style={{
+                  fontSize: "1.125rem",
+                  fontWeight: 600,
+                  marginBottom: "1rem",
+                  color: "var(--color-grafana-text-primary)",
+                }}
+              >
+                Maintenance History
+              </h3>
+              <MaintenanceHistoryTabs equipmentId={prediction.id} />
+            </div>
           )}
 
           {/* Recommended Action */}

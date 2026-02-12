@@ -37,6 +37,11 @@ export {
   type DeviceControlResponse,
 } from './devices';
 export {
+  equipmentHistoryApi,
+  type WorkOrder,
+  type EquipmentAlert,
+} from './equipment_history';
+export {
   sitesApi,
   type Site,
   type Equipment,

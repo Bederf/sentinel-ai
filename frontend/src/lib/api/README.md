@@ -6,17 +6,18 @@ This directory contains the modularized API client for the BMS Intelligence Plat
 
 ```
 api/
-├── README.md          # This file
-├── index.ts           # Barrel export - re-exports all modules
-├── client.ts          # Core HTTP utilities, authentication, and token management
-├── auth.ts            # Authentication APIs (login, MFA, verify token)
-├── devices.ts         # Device control and queries
-├── sites.ts           # Site and building management
-├── workflow.ts        # Inspection and maintenance workflows
-├── (future) chat.ts          # AI chat integration
-├── (future) solar.ts         # Solar PV and BESS APIs
-├── (future) security.ts      # Security and access control
-└── (future) contracts.ts     # Contract management
+├── README.md                   # This file
+├── index.ts                    # Barrel export - re-exports all modules
+├── client.ts                   # Core HTTP utilities, authentication, and token management
+├── auth.ts                     # Authentication APIs (login, MFA, verify token)
+├── devices.ts                  # Device control and queries
+├── sites.ts                    # Site and building management
+├── workflow.ts                 # Inspection and maintenance workflows
+├── equipment_history.ts        # Equipment work orders and alerts history
+├── (future) chat.ts            # AI chat integration
+├── (future) solar.ts           # Solar PV and BESS APIs
+├── (future) security.ts        # Security and access control
+└── (future) contracts.ts       # Contract management
 ```
 
 ## Usage
@@ -100,12 +101,27 @@ import { authApi, type AuthUser } from '@/lib/api/auth';
 **Size:** ~100 lines
 **Types:** WorkflowDashboardResponse, InspectionScheduleItem
 
+### equipment_history.ts (Equipment Maintenance History)
+- `equipmentHistoryApi.getWorkOrders()` - Fetch recent work orders for equipment
+- `equipmentHistoryApi.getAlerts()` - Fetch recent alerts/errors for equipment
+- Handles both response formats (array or object with data/work_orders keys)
+- Graceful error handling with non-blocking fallbacks
+
+**Size:** ~80 lines
+**Types:** WorkOrder (id, code, title, priority, status, assigned_to, created_at, completed_at), EquipmentAlert (id, title, message, severity, status, created_at, acknowledged_at)
+**Integration:** Used in `MaintenanceHistoryTabs` component for failure prediction details
+**Stale Times:** 
+- Work orders: 60 seconds (infrequent changes)
+- Alerts: 30 seconds (more frequent updates)
+**Use Case:** Provide maintenance context in PredictionDetail modal to show past issues and service history
+
 ## Migration Path
 
 ### Phase 1 (Complete)
 - Create `api/client.ts` with shared utilities ✓
 - Create `api/index.ts` barrel export ✓
 - Create domain modules: `auth.ts`, `devices.ts`, `sites.ts`, `workflow.ts` ✓
+- Create `equipment_history.ts` for maintenance history ✓
 
 ### Phase 2 (Planned)
 - Create remaining domain modules: `chat.ts`, `solar.ts`, `security.ts`, `contracts.ts`
