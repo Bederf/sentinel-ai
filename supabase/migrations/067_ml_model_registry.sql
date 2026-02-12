@@ -139,7 +139,7 @@ CREATE INDEX idx_model_thresholds_equipment_type ON model_thresholds(equipment_t
 
 INSERT INTO model_thresholds (equipment_type, tier2_confidence_min, tier3_confidence_min, status, reason, notes)
 VALUES
-  -- Active models with standard thresholds
+  -- Active models with standard thresholds (S002 has these)
   ('chiller', 0.70, 0.85, 'active',
    'CHILLER model performing well (R²=0.654 avg)',
    'Standard thresholds for reliable model'),
@@ -160,15 +160,48 @@ VALUES
    'GENERATOR model with variable performance (R²=0.631 avg), elevated threshold applied',
    'Higher confidence required due to model variability'),
 
-  -- Disabled models (no equipment in current database)
+  -- Disabled models (equipment exists but model underperforming)
   ('vav', 1.0, 1.0, 'disabled',
-   'VAV model disabled (no VAV equipment in database, insufficient retraining data available)',
-   'Defer retraining to Phase 69 when equipment available'),
+   'VAV model disabled (R²=0.317 - too poor for reliable predictions)',
+   'Defer retraining to Phase 69 when additional data available. 6 VAV units at S002 will not get ML recommendations until retrained.'),
 
-  -- Unavailable model (not trained)
+  -- Placeholder models (equipment exists, model not trained yet)
   ('dali', 0.70, 0.85, 'active',
    'DALI lighting control model (placeholder for future training)',
-   'Ready for recommendations once model trained')
+   '5 DALI units at S002. Ready for recommendations once model trained.'),
+
+  -- Unavailable models (equipment exists but no trained model)
+  ('pump', 1.0, 1.0, 'disabled',
+   'PUMP model not trained (no ML model available)',
+   '2 PUMP units at S002. Will use rule-based predictions until model trained.'),
+
+  ('meter', 1.0, 1.0, 'disabled',
+   'METER model not trained (no ML model available)',
+   '3 METER units at S002. Will use rule-based predictions until model trained.'),
+
+  ('bess', 1.0, 1.0, 'disabled',
+   'BESS (Battery Energy Storage) model not trained (no ML model available)',
+   '1 BESS unit at S002. Will use rule-based predictions until model trained.'),
+
+  ('ct', 1.0, 1.0, 'disabled',
+   'CT (Cooling Tower) model not trained (no ML model available)',
+   'Cooling towers detected. Will use rule-based predictions until model trained.'),
+
+  ('inv', 1.0, 1.0, 'disabled',
+   'INV (Solar Inverter) model not trained (no ML model available)',
+   'Solar inverters detected. Will use rule-based predictions until model trained.'),
+
+  ('acc', 1.0, 1.0, 'disabled',
+   'ACC (Access Control) model not trained (no ML model available)',
+   'Security system. Will use rule-based predictions until model trained.'),
+
+  ('cctv', 1.0, 1.0, 'disabled',
+   'CCTV (Camera) model not trained (no ML model available)',
+   'Security cameras. Will use rule-based predictions until model trained.'),
+
+  ('fire', 1.0, 1.0, 'disabled',
+   'FIRE (Fire Safety) model not trained (no ML model available)',
+   'Fire safety system. Will use rule-based predictions until model trained.')
 
 ON CONFLICT (equipment_type) DO NOTHING;
 -- Don't fail if thresholds already exist
