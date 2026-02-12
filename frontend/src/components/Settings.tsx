@@ -279,11 +279,17 @@ export function Settings({ onError }: SettingsProps) {
         </div>
 
         {/* Module Management */}
-        <div className="glass-panel overflow-hidden">
+        <div
+          className="glass-panel overflow-hidden"
+          style={{
+            background: "var(--glass-bg)",
+            border: "1px solid var(--glass-border)",
+          }}
+        >
           <div className="p-4 border-b" style={{ borderColor: "var(--color-sentinel-border)" }}>
             <div className="flex items-center gap-3">
               <div
-                className="p-2 rounded"
+                className="p-2 rounded-lg"
                 style={{
                   background: "rgba(245, 158, 11, 0.15)",
                   color: "var(--color-sentinel-amber)",
@@ -305,8 +311,39 @@ export function Settings({ onError }: SettingsProps) {
             </div>
           </div>
 
-          <div className="p-4">
-            <ModuleSelector />
+          <div className="p-6">
+            <style>{`
+              .module-selector-wrapper .bg-gray-50 {
+                background: var(--color-sentinel-bg-secondary) !important;
+                border-color: var(--glass-border) !important;
+              }
+              .module-selector-wrapper .bg-purple-50 {
+                background: rgba(99, 102, 241, 0.1) !important;
+                border-color: rgba(99, 102, 241, 0.3) !important;
+              }
+              .module-selector-wrapper .text-gray-500 {
+                color: var(--color-sentinel-text-secondary) !important;
+              }
+              .module-selector-wrapper .text-gray-700 {
+                color: var(--color-sentinel-text-primary) !important;
+              }
+              .module-selector-wrapper .text-gray-600 {
+                color: var(--color-sentinel-text-secondary) !important;
+              }
+              .module-selector-wrapper .text-purple-700 {
+                color: rgba(99, 102, 241, 0.8) !important;
+              }
+              .module-selector-wrapper .text-gray-400 {
+                color: var(--color-sentinel-text-disabled) !important;
+              }
+              .module-selector-wrapper > div {
+                background: transparent !important;
+                border: none !important;
+              }
+            `}</style>
+            <div className="module-selector-wrapper">
+              <ModuleSelector />
+            </div>
           </div>
         </div>
 

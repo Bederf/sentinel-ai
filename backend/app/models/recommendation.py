@@ -20,6 +20,7 @@ class RecommendationStatus(str, Enum):
     AUTO_EXECUTED = "auto_executed"  # Auto-executed (Tier 3)
     EXPIRED = "expired"  # Time window passed, no action
     EXECUTED = "executed"  # Successfully applied to BMS
+    ROLLED_BACK = "rolled_back"  # Previously executed change was rolled back
     FAILED = "failed"  # Execution failed
 
 

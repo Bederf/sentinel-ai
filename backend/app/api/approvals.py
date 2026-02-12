@@ -289,13 +289,26 @@ async def rollback_approval(
                 detail=f"Cannot rollback {recommendation.status.value} recommendation. Only executed recommendations can be rolled back."
             )
 
-        # TODO: Implement rollback logic
-        # For now, return placeholder response
-        logger.info(f"Rollback requested for {recommendation_id} by {auth.user_id}")
+        # Execute rollback
+        approval_service = get_approval_service()
+        result = await approval_service.rollback_approval(
+            recommendation_id=recommendation_id,
+            rollback_reason=rollback_reason,
+            initiated_by=auth.user_id
+        )
 
-        raise HTTPException(
-            status_code=501,
-            detail="Rollback functionality not yet implemented"
+        if not result.success:
+            raise HTTPException(
+                status_code=500,
+                detail=result.error_message or "Rollback failed"
+            )
+
+        return ApprovalResponse(
+            success=result.success,
+            recommendation_id=result.recommendation_id,
+            status=result.status,
+            executed_at=result.executed_at,
+            cov_verified=result.cov_verified
         )
 
     except HTTPException:

@@ -14,7 +14,7 @@ from dataclasses import dataclass
 
 from app.models.recommendation import Recommendation, RecommendationStatus
 from app.services.safety_interlocks import SafetyEngine
-from app.services.device_abstraction import get_device_manager
+from app.services.device_abstraction import device_manager
 from app.database.repositories.recommendation_repository import RecommendationRepository
 from app.database.repositories.audit_repository import AuditRepository
 
@@ -39,7 +39,7 @@ class ApprovalService:
     def __init__(self):
         """Initialize approval service with dependencies."""
         self.safety_engine = SafetyEngine()
-        self.device_manager = get_device_manager()
+        self.device_manager = device_manager
         self.recommendations_repo = RecommendationRepository()
         self.audit_repo = AuditRepository()
 
@@ -153,6 +153,13 @@ class ApprovalService:
                     error_message="Recommendation action missing point or value"
                 )
 
+            # Read current value for rollback capability
+            current_result = await self.device_manager.read_value(
+                equipment_id=equipment_id,
+                point_name=control_point
+            )
+            original_value = current_result.get("value") if current_result.get("success") else None
+
             # Execute write to Niagara device
             logger.info(
                 f"Writing to device {equipment_id}: {control_point} = {target_value}"
@@ -193,6 +200,9 @@ class ApprovalService:
                 "success": True,
                 "device_write": write_result,
                 "cov_verified": cov_verified,
+                "original_value": original_value,
+                "target_value": target_value,
+                "control_point": control_point,
                 "timestamp": datetime.utcnow().isoformat()
             }
 
@@ -297,6 +307,131 @@ class ApprovalService:
                 recommendation_id=recommendation_id,
                 status="failed",
                 error_message=f"Rejection error: {str(e)}"
+            )
+
+    async def rollback_approval(
+        self,
+        recommendation_id: str,
+        rollback_reason: Optional[str] = None,
+        initiated_by: Optional[str] = None
+    ) -> ApprovalResult:
+        """Rollback an executed approval to its original state.
+
+        Args:
+            recommendation_id: ID of recommendation to rollback
+            rollback_reason: Optional reason for rollback
+            initiated_by: User ID initiating the rollback
+
+        Returns:
+            ApprovalResult confirming rollback
+        """
+        try:
+            recommendation = await self.recommendations_repo.get_by_id(recommendation_id)
+
+            if not recommendation:
+                return ApprovalResult(
+                    success=False,
+                    recommendation_id=recommendation_id,
+                    status="failed",
+                    error_message=f"Recommendation {recommendation_id} not found"
+                )
+
+            if recommendation.status != RecommendationStatus.EXECUTED:
+                return ApprovalResult(
+                    success=False,
+                    recommendation_id=recommendation_id,
+                    status="failed",
+                    error_message=f"Cannot rollback {recommendation.status.value} recommendation. Only executed recommendations can be rolled back."
+                )
+
+            # Extract rollback details from execution_result
+            exec_result = recommendation.execution_result or {}
+            original_value = exec_result.get("original_value")
+            control_point = exec_result.get("control_point")
+            equipment_id = recommendation.target_equipment
+
+            if not original_value or not control_point:
+                logger.warning(
+                    f"Cannot rollback {recommendation_id}: missing original_value or control_point in execution_result"
+                )
+                return ApprovalResult(
+                    success=False,
+                    recommendation_id=recommendation_id,
+                    status="failed",
+                    error_message="Cannot rollback: missing original state information"
+                )
+
+            # Execute rollback write to restore original value
+            logger.info(
+                f"Rolling back device {equipment_id}: {control_point} = {original_value}"
+            )
+            rollback_result = await self._execute_device_write(
+                equipment_id=equipment_id,
+                point_name=control_point,
+                target_value=original_value
+            )
+
+            if not rollback_result["success"]:
+                logger.error(f"Device rollback failed: {rollback_result.get('error')}")
+                return ApprovalResult(
+                    success=False,
+                    recommendation_id=recommendation_id,
+                    status="failed",
+                    error_message=f"Device rollback failed: {rollback_result.get('error')}"
+                )
+
+            # Verify COV feedback for rollback
+            cov_verified = await self._verify_cov_feedback(
+                equipment_id=equipment_id,
+                point_name=control_point,
+                expected_value=original_value
+            )
+
+            if not cov_verified:
+                logger.warning(
+                    f"COV feedback verification failed for rollback of {equipment_id}.{control_point}"
+                )
+
+            # Update recommendation status to rolled back
+            recommendation.status = RecommendationStatus.ROLLED_BACK
+            recommendation.execution_result = {
+                **exec_result,
+                "rollback_initiated_by": initiated_by,
+                "rollback_reason": rollback_reason,
+                "rollback_executed_at": datetime.utcnow().isoformat(),
+                "rollback_cov_verified": cov_verified
+            }
+
+            await self.recommendations_repo.upsert(recommendation)
+
+            # Create audit log entry
+            await self._create_audit_log(
+                action_type="equipment_rollback",
+                equipment_code=equipment_id,
+                approved_by=initiated_by or "system",
+                approval_notes=rollback_reason,
+                change_description=f"Rollback: {control_point} from {exec_result.get('target_value')} back to {original_value}",
+                execution_status="success",
+                cov_verified=cov_verified
+            )
+
+            logger.info(f"Rollback completed successfully for {recommendation_id}")
+
+            return ApprovalResult(
+                success=True,
+                recommendation_id=recommendation_id,
+                status="rolled_back",
+                executed_at=datetime.utcnow(),
+                cov_verified=cov_verified
+            )
+
+        except Exception as e:
+            logger.error(f"Error rolling back recommendation {recommendation_id}: {str(e)}")
+            return ApprovalResult(
+                success=False,
+                recommendation_id=recommendation_id,
+                status="failed",
+                error_message=f"Rollback error: {str(e)}"
             )
 
     async def _validate_safety(self, equipment_id: str, proposed_value: Any) -> Dict[str, Any]:
