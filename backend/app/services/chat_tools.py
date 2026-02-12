@@ -433,9 +433,9 @@ async def get_optimization_recommendations(site_id: str) -> dict[str, Any]:
         Dictionary with optimization recommendations and projected savings
     """
     try:
-        from app.services.ai_optimizer import ai_optimizer_service
+        from app.services.ai_optimizer import get_ai_optimizer
 
-        recommendation = await ai_optimizer_service.analyze_building(site_id)
+        recommendation = await get_ai_optimizer().analyze_building(site_id)
 
         return {
             "success": True,

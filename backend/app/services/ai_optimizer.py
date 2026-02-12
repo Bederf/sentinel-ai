@@ -2143,5 +2143,12 @@ Provide ONLY the JSON response, no additional text."""
             }
 
 
-# Global service instance
-ai_optimizer_service = AIOptimizerService()
+# Singleton instance
+_ai_optimizer_instance = None
+
+def get_ai_optimizer():
+    """Get or create the singleton AI optimizer instance."""
+    global _ai_optimizer_instance
+    if _ai_optimizer_instance is None:
+        _ai_optimizer_instance = AIOptimizerService()
+    return _ai_optimizer_instance

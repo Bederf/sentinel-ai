@@ -306,3 +306,15 @@ class EquipmentRepository:
         ).execute()
 
         return response.data
+
+
+# Singleton instance
+_equipment_repository_instance: Optional[EquipmentRepository] = None
+
+
+def get_equipment_repository() -> EquipmentRepository:
+    """Get or create the singleton EquipmentRepository instance."""
+    global _equipment_repository_instance
+    if _equipment_repository_instance is None:
+        _equipment_repository_instance = EquipmentRepository()
+    return _equipment_repository_instance

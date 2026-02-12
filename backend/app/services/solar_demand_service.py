@@ -314,7 +314,43 @@ class SolarDemandService:
     def __init__(self):
         self._demand_history: Dict[str, List[DemandInterval]] = {}
         self._monthly_peaks: Dict[str, List[MonthlyPeak]] = {}
+        self._nmd_cache: Dict[str, float] = {}  # PHASE 081: Cache NMD values from database
         self._seed_demo_data("site-002")
+
+    async def get_nmd_limit(self, site_id: str) -> float:
+        """PHASE 081: Fetch actual NMD from database, fallback to hardcoded.
+        
+        Queries buildings table for nmd_limit_kva extracted from municipal bills.
+        Falls back to NMD_LIMIT_KVA constant if not found in database.
+        
+        Args:
+            site_id: Building/site code (e.g., "S002", "site-005")
+            
+        Returns:
+            NMD limit in kVA from database or fallback constant
+        """
+        # Check cache first
+        if site_id in self._nmd_cache:
+            return self._nmd_cache[site_id]
+        
+        try:
+            from app.database.repositories.building_repository import BuildingRepository
+            building_repo = BuildingRepository()
+            building = await building_repo.get_by_code(site_id)
+            
+            if building and building.get("nmd_limit_kva"):
+                nmd_limit = float(building["nmd_limit_kva"])
+                self._nmd_cache[site_id] = nmd_limit
+                logger.info(f"Loaded NMD from database for {site_id}: {nmd_limit} kVA")
+                return nmd_limit
+            else:
+                logger.debug(f"No NMD in database for {site_id}, using default: {self.NMD_LIMIT_KVA} kVA")
+        except Exception as exc:
+            logger.warning(f"Failed to fetch NMD from database for {site_id}: {exc}")
+        
+        # Fallback to constant
+        self._nmd_cache[site_id] = self.NMD_LIMIT_KVA
+        return self.NMD_LIMIT_KVA
 
     def _seed_demo_data(self, site_id: str) -> None:
         """Seed realistic demand profile and monthly peak history."""

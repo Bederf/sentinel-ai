@@ -106,6 +106,11 @@ async def startup_event(app: FastAPI) -> None:
     # - At-risk equipment (<90%): Maintenance & repair recommendations
     scheduler_service.add_recommendation_generation_job(interval_seconds=600)  # 10 minutes
 
+    # Start demand-aware coordinator (runs every 5 minutes)
+    # Phase 081: Cross-module peak demand management
+    # Monitors NMD headroom and coordinates HVAC + BESS + energy actions for shaving
+    scheduler_service.add_demand_aware_coordination_job(interval_seconds=300)  # 5 minutes
+
     # Start model freshness check (runs daily)
     # Phase 45-01: Checks model age and R² score, auto-retrains stale models
     if hasattr(scheduler_service, "add_model_check_job"):

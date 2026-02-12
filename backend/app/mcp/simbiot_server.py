@@ -1792,6 +1792,46 @@ async def process_municipal_bill_tool(
 
         invoice = repo.create_invoice(invoice_payload)
 
+        # ===== PHASE 081: Update buildings table with extracted NMD =====
+        # If electricity bill, extract NMD and update building record
+        if utility_type == "electricity" and invoice:
+            try:
+                from app.database.repositories.building_repository import BuildingRepository
+                building_repo = BuildingRepository()
+                
+                # Extract NMD and demand charge from bill
+                extracted_nmd_kva = extracted_data.get("demand_kva")
+                billing_start = extracted_data.get("billing_period_start")
+                billing_end = extracted_data.get("billing_period_end")
+                
+                if extracted_nmd_kva:
+                    # Update building with real NMD from bill
+                    building_update = {
+                        "nmd_limit_kva": float(extracted_nmd_kva),
+                        "demand_charge_per_kva": 155.50,  # City Power default
+                        "electricity_provider": municipality,
+                        "bill_last_uploaded_at": invoice.get("created_at") or str(__import__('datetime').datetime.utcnow().isoformat()),
+                        "bill_document_path": str(pdf_path),
+                        "nmd_extracted_from_bill": True,
+                    }
+                    
+                    # Add billing cycle dates if extracted
+                    if billing_start:
+                        building_update["billing_cycle_start_date"] = billing_start
+                    if billing_end:
+                        building_update["billing_cycle_end_date"] = billing_end
+                    
+                    # Update the building
+                    await building_repo.update(building_id, building_update)
+                    
+                    logger.info(
+                        f"Updated building {building_id} NMD from bill: {extracted_nmd_kva} kVA "
+                        f"(confidence: {extracted_data.get('confidence', 0.0)})"
+                    )
+            except Exception as exc:
+                logger.warning(f"Failed to update building NMD from bill: {exc}")
+        # ===== END PHASE 081 =====
+
         return {
             "building_id": building_id,
             "municipality": municipality,
@@ -1801,6 +1841,8 @@ async def process_municipal_bill_tool(
             "invoice_id": invoice.get("id") if invoice else None,
             "extracted_data": extracted_data,
             "pdf_file": str(pdf_path),
+            "nmd_extracted_kva": extracted_data.get("demand_kva"),  # PHASE 081: Show extracted NMD
+            "nmd_updated": True if extracted_data.get("demand_kva") else False,  # PHASE 081: Confirm update
             "status": "processed",
             "confidence": extracted_data.get("confidence", 0.0)
         }

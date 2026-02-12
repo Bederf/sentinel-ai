@@ -11,7 +11,7 @@ from fastapi import APIRouter, HTTPException, Body, Request
 from pydantic import BaseModel
 
 from app.middleware.rate_limiter import limiter
-from app.services.ai_optimizer import ai_optimizer_service
+from app.services.ai_optimizer import get_ai_optimizer
 from app.services.device_abstraction import device_manager
 from app.services.audit_logger import AuditLogger
 from app.services.eskomsepush_service import eskomsepush_service
@@ -497,7 +497,7 @@ async def analyze_optimization(request: AnalyzeRequest) -> Dict[str, Any]:
         logger.info(f"Analyzing optimization for site {request.site_id}")
 
         # Call AI optimizer service
-        recommendation = await ai_optimizer_service.analyze_building(
+        recommendation = await get_ai_optimizer().analyze_building(
             site_id=request.site_id,
             current_conditions=request.current_conditions,
             weather_forecast=request.weather_forecast,
@@ -505,7 +505,7 @@ async def analyze_optimization(request: AnalyzeRequest) -> Dict[str, Any]:
         )
 
         # Validate recommendation against safety rules
-        validation = await ai_optimizer_service.validate_recommendation(
+        validation = await get_ai_optimizer().validate_recommendation(
             request.site_id, recommendation
         )
 
@@ -685,14 +685,14 @@ async def analyze_load_shedding(request: LoadSheddingAnalyzeRequest) -> Dict[str
         logger.info(f"Analyzing load shedding optimization for site {request.site_id}, stage {request.load_shedding_stage}")
 
         # Call AI optimizer service with load shedding awareness
-        recommendation = await ai_optimizer_service.analyze_building_load_shedding(
+        recommendation = await get_ai_optimizer().analyze_building_load_shedding(
             site_id=request.site_id,
             load_shedding_stage=request.load_shedding_stage,
             current_conditions=request.current_conditions,
         )
 
         # Validate recommendation against safety rules
-        validation = await ai_optimizer_service.validate_recommendation(
+        validation = await get_ai_optimizer().validate_recommendation(
             request.site_id, recommendation
         )
 

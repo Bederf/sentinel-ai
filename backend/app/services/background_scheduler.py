@@ -14,7 +14,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
 from app.services.audit_logger import AuditLogger
-from app.services.ai_optimizer import ai_optimizer_service
+from app.services.ai_optimizer import get_ai_optimizer
 from app.models.optimization import OptimizationStatus
 
 logger = logging.getLogger(__name__)
@@ -284,7 +284,7 @@ class BackgroundSchedulerService:
                     asyncio.set_event_loop(loop)
 
                     recommendation = loop.run_until_complete(
-                        ai_optimizer_service.analyze_building(site_id)
+                        get_ai_optimizer().analyze_building(site_id)
                     )
 
                     loop.close()
@@ -294,7 +294,7 @@ class BackgroundSchedulerService:
                     asyncio.set_event_loop(loop)
 
                     validation = loop.run_until_complete(
-                        ai_optimizer_service.validate_recommendation(site_id, recommendation)
+                        get_ai_optimizer().validate_recommendation(site_id, recommendation)
                     )
 
                     loop.close()
@@ -698,6 +698,95 @@ class BackgroundSchedulerService:
 
         except Exception as e:
             logger.error(f"Failed to run recommendation generation: {e}")
+
+    def add_demand_aware_coordination_job(self, interval_seconds: int = 300):
+        """
+        Add a job to run demand-aware coordination for peak shaving.
+
+        Monitors NMD headroom and coordinates multi-module shaving actions.
+
+        Args:
+            interval_seconds: How often to run (default: 300 seconds = 5 minutes)
+        """
+        # Remove existing job if it exists
+        if self.scheduler.get_job('demand_aware_coordination'):
+            self.scheduler.remove_job('demand_aware_coordination')
+            logger.info("Removed existing demand coordination job")
+
+        # Add new job
+        self.scheduler.add_job(
+            func=self._run_demand_aware_coordination,
+            trigger=IntervalTrigger(seconds=interval_seconds),
+            id='demand_aware_coordination',
+            name='Demand-Aware Coordination for Peak Shaving',
+            replace_existing=True
+        )
+        logger.info(f"Added demand coordination job with {interval_seconds}s interval")
+
+    def _run_demand_aware_coordination(self):
+        """
+        Run demand-aware coordination for all sites.
+
+        Evaluates current demand state and generates multi-module recommendations
+        for peak shaving when NMD headroom is below thresholds.
+        """
+        try:
+            import asyncio
+            from app.services.demand_aware_coordinator import get_demand_aware_coordinator
+
+            logger.debug("Running demand-aware coordination evaluation...")
+
+            coordinator = get_demand_aware_coordinator()
+
+            # Get all sites to evaluate
+            sites = self._get_all_sites()
+
+            if not sites:
+                logger.debug("No sites configured for demand coordination")
+                return
+
+            # Evaluate demand state for each site
+            for site in sites:
+                site_id = site.get("id") or site.get("code")
+                if not site_id:
+                    continue
+
+                try:
+                    # Run async evaluation
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+
+                    try:
+                        recommendation = loop.run_until_complete(
+                            coordinator.evaluate_current_state(site_id)
+                        )
+
+                        if recommendation:
+                            logger.info(
+                                f"Site {site_id}: Generated {recommendation['type']} recommendation - "
+                                f"Modules: {recommendation.get('modules_involved')}, "
+                                f"Reduction: {recommendation.get('estimated_reduction_kw'):.0f}kW"
+                            )
+                    finally:
+                        loop.close()
+
+                except Exception as e:
+                    logger.warning(f"Demand coordination failed for site {site_id}: {e}")
+
+        except Exception as e:
+            logger.error(f"Failed to run demand-aware coordination: {e}")
+
+    def _get_all_sites(self):
+        """Get all configured sites for demand coordination."""
+        try:
+            import json
+            sites_file = DATA_DIR / "sites.json"
+            if sites_file.exists():
+                with open(sites_file) as f:
+                    return json.load(f)
+        except Exception as e:
+            logger.debug(f"Could not load sites.json: {e}")
+        return []
 
     def add_ml_retraining_job(self, interval_seconds: int = 86400):
         """

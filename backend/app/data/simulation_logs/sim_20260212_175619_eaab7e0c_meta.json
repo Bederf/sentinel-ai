@@ -1,0 +1,15 @@
+{
+  "run_id": "sim_20260212_175619_eaab7e0c",
+  "scenario": "fault_day",
+  "building_code": "site-002",
+  "started_at": "2026-02-12T17:56:19.170674",
+  "ended_at": null,
+  "duration_minutes": null,
+  "event_count": 0,
+  "events_file": "sim_20260212_175619_eaab7e0c_events.jsonl",
+  "config": {
+    "duration_minutes": 24.0,
+    "scenario": "fault_day",
+    "start_hour": 6
+  }
+}

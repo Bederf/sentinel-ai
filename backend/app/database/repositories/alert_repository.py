@@ -222,3 +222,15 @@ class AlertRepository:
                 resolved_count += 1
 
         return resolved_count
+
+
+# Singleton instance
+_alert_repository_instance: Optional['AlertRepository'] = None
+
+
+def get_alert_repository() -> 'AlertRepository':
+    """Get or create the singleton AlertRepository instance."""
+    global _alert_repository_instance
+    if _alert_repository_instance is None:
+        _alert_repository_instance = AlertRepository()
+    return _alert_repository_instance
