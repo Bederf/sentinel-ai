@@ -27,13 +27,27 @@ import {
 import { approvalsApi } from '@/lib/api/approvals'
 import type { ApprovalResponse } from '@/lib/api/approvals'
 
+export interface ModuleAction {
+  module: string
+  action: string
+  duration_min?: number
+  reduction_kw?: number
+  estimated_savings_r?: number
+  comfort_impact?: string
+}
+
 export interface Recommendation {
   id: string
-  target_equipment: string
+  target_equipment?: string
   action?: { point?: string; value?: string | number }
   confidence?: string
   description?: string
   reason?: string
+  // Multi-module fields
+  modules_involved?: string[]
+  module_actions?: ModuleAction[]
+  estimated_reduction_kw?: number
+  estimated_savings_r?: number
 }
 
 interface ApprovalDialogProps {
@@ -54,7 +68,7 @@ export const ApprovalDialog: React.FC<ApprovalDialogProps> = ({
   const [approverName, setApproverName] = useState('')
   const [approvalNotes, setApprovalNotes] = useState('')
   const [rejectionReason, setRejectionReason] = useState('')
-  const [activeTab, setActiveTab] = useState<'approve' | 'reject'>('approve')
+  const [activeTab, setActiveTab] = useState<'details' | 'modules' | 'approve' | 'reject'>('details')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
@@ -85,9 +99,18 @@ export const ApprovalDialog: React.FC<ApprovalDialogProps> = ({
     setRejectionReason('')
     setError(null)
     setSuccess(null)
-    setActiveTab('approve')
+    setActiveTab('details')
     onClose()
   }
+
+  // Update initial tab when recommendation changes
+  useEffect(() => {
+    if (recommendation?.module_actions && recommendation.module_actions.length > 0) {
+      setActiveTab('modules')
+    } else {
+      setActiveTab('details')
+    }
+  }, [recommendation?.id])
 
   const handleApprove = async () => {
     if (!approverName.trim()) {
@@ -267,13 +290,37 @@ export const ApprovalDialog: React.FC<ApprovalDialogProps> = ({
         )}
 
         {/* Tabs */}
-        <div className="px-6 py-3 border-b border-gray-700 flex gap-2">
+        <div className="px-6 py-3 border-b border-gray-700 flex gap-2 flex-wrap">
+          <button
+            onClick={() => setActiveTab('details')}
+            disabled={isLoading}
+            className={`px-3 py-1 text-sm font-medium rounded transition-colors ${
+              activeTab === 'details'
+                ? 'bg-blue-600 text-white'
+                : 'text-gray-400 hover:text-gray-200 disabled:opacity-50'
+            }`}
+          >
+            Details
+          </button>
+          {recommendation.modules_involved && recommendation.modules_involved.length > 0 && (
+            <button
+              onClick={() => setActiveTab('modules')}
+              disabled={isLoading}
+              className={`px-3 py-1 text-sm font-medium rounded transition-colors ${
+                activeTab === 'modules'
+                  ? 'bg-purple-600 text-white'
+                  : 'text-gray-400 hover:text-gray-200 disabled:opacity-50'
+              }`}
+            >
+              Multi-Module ({recommendation.modules_involved.length})
+            </button>
+          )}
           <button
             onClick={() => setActiveTab('approve')}
             disabled={isLoading}
             className={`px-3 py-1 text-sm font-medium rounded transition-colors ${
               activeTab === 'approve'
-                ? 'bg-blue-600 text-white'
+                ? 'bg-green-600 text-white'
                 : 'text-gray-400 hover:text-gray-200 disabled:opacity-50'
             }`}
           >
@@ -292,56 +339,122 @@ export const ApprovalDialog: React.FC<ApprovalDialogProps> = ({
           </button>
         </div>
 
-        {/* Form */}
+        {/* Form - Tab Content */}
         <div className="px-6 py-4 space-y-4">
-          {/* Approver Name */}
-          <div>
-            <label htmlFor="approver-name" className="block text-sm font-medium text-gray-300 mb-1">
-              Your Name *
-            </label>
-            <input
-              ref={approverInputRef}
-              id="approver-name"
-              type="text"
-              value={approverName}
-              onChange={(e) => setApproverName(e.target.value)}
-              disabled={isLoading}
-              placeholder="e.g., John Smith"
-              className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-            />
-          </div>
+          {activeTab === 'details' && (
+            <div className="text-sm space-y-2">
+              <p className="text-gray-400">
+                {recommendation.description || 'No additional details available'}
+              </p>
+            </div>
+          )}
 
-          {/* Approval Notes or Rejection Reason */}
-          {activeTab === 'approve' ? (
-            <div>
-              <label htmlFor="approval-notes" className="block text-sm font-medium text-gray-300 mb-1">
-                Approval Notes (optional)
-              </label>
-              <textarea
-                id="approval-notes"
-                value={approvalNotes}
-                onChange={(e) => setApprovalNotes(e.target.value)}
-                disabled={isLoading}
-                placeholder="Add any notes about this approval..."
-                rows={3}
-                className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 resize-none"
-              />
+          {activeTab === 'modules' && recommendation.module_actions && (
+            <div className="space-y-3">
+              <div className="bg-gray-800/30 p-3 rounded border border-gray-700">
+                <h4 className="font-medium text-white mb-2 flex items-center gap-2">
+                  <div className="w-2 h-2 bg-purple-400 rounded-full" />
+                  Coordinated Module Actions
+                </h4>
+                <div className="space-y-2">
+                  {recommendation.module_actions.map((action, idx) => (
+                    <div key={idx} className="bg-gray-900/50 p-2 rounded border border-gray-700">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="font-medium text-blue-300 uppercase text-xs">
+                            {action.module}
+                          </p>
+                          <p className="text-gray-300 text-sm mt-1">{action.action}</p>
+                        </div>
+                        <div className="text-right">
+                          {action.reduction_kw && (
+                            <p className="text-green-300 text-sm font-medium">
+                              -{action.reduction_kw} kW
+                            </p>
+                          )}
+                          {action.estimated_savings_r && (
+                            <p className="text-amber-300 text-xs">
+                              Save R{action.estimated_savings_r.toLocaleString()}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      {action.comfort_impact && (
+                        <p className="text-xs text-gray-400 mt-1">
+                          Impact: {action.comfort_impact}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {recommendation.estimated_reduction_kw && (
+                <div className="bg-green-900/20 border border-green-700 p-3 rounded">
+                  <p className="text-sm text-green-300">
+                    <strong>Total Reduction:</strong> {recommendation.estimated_reduction_kw} kW
+                  </p>
+                  {recommendation.estimated_savings_r && (
+                    <p className="text-sm text-amber-300 mt-1">
+                      <strong>Estimated Savings:</strong> R{recommendation.estimated_savings_r.toLocaleString()}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
-          ) : (
-            <div>
-              <label htmlFor="rejection-reason" className="block text-sm font-medium text-gray-300 mb-1">
-                Rejection Reason *
-              </label>
-              <textarea
-                id="rejection-reason"
-                value={rejectionReason}
-                onChange={(e) => setRejectionReason(e.target.value)}
-                disabled={isLoading}
-                placeholder="Explain why you're rejecting this recommendation..."
-                rows={3}
-                className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50 resize-none"
-              />
-            </div>
+          )}
+
+          {(activeTab === 'approve' || activeTab === 'reject') && (
+            <>
+              {/* Approver Name */}
+              <div>
+                <label htmlFor="approver-name" className="block text-sm font-medium text-gray-300 mb-1">
+                  Your Name *
+                </label>
+                <input
+                  ref={approverInputRef}
+                  id="approver-name"
+                  type="text"
+                  value={approverName}
+                  onChange={(e) => setApproverName(e.target.value)}
+                  disabled={isLoading}
+                  placeholder="e.g., John Smith"
+                  className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                />
+              </div>
+
+              {/* Approval Notes or Rejection Reason */}
+              {activeTab === 'approve' ? (
+                <div>
+                  <label htmlFor="approval-notes" className="block text-sm font-medium text-gray-300 mb-1">
+                    Approval Notes (optional)
+                  </label>
+                  <textarea
+                    id="approval-notes"
+                    value={approvalNotes}
+                    onChange={(e) => setApprovalNotes(e.target.value)}
+                    disabled={isLoading}
+                    placeholder="Add any notes about this approval..."
+                    rows={3}
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 resize-none"
+                  />
+                </div>
+              ) : (
+                <div>
+                  <label htmlFor="rejection-reason" className="block text-sm font-medium text-gray-300 mb-1">
+                    Rejection Reason *
+                  </label>
+                  <textarea
+                    id="rejection-reason"
+                    value={rejectionReason}
+                    onChange={(e) => setRejectionReason(e.target.value)}
+                    disabled={isLoading}
+                    placeholder="Explain why you're rejecting this recommendation..."
+                    rows={3}
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50 resize-none"
+                  />
+                </div>
+              )}
+            </>
           )}
         </div>
 
@@ -354,7 +467,7 @@ export const ApprovalDialog: React.FC<ApprovalDialogProps> = ({
           >
             Cancel
           </button>
-          {activeTab === 'approve' ? (
+          {activeTab === 'approve' && (
             <button
               onClick={handleApprove}
               disabled={isLoading || !approverName.trim()}
@@ -368,11 +481,12 @@ export const ApprovalDialog: React.FC<ApprovalDialogProps> = ({
               ) : (
                 <>
                   <CheckCircle className="w-4 h-4" />
-                  Approve & Execute
+                  {recommendation.module_actions ? 'Approve All Changes' : 'Approve & Execute'}
                 </>
               )}
             </button>
-          ) : (
+          )}
+          {activeTab === 'reject' && (
             <button
               onClick={handleReject}
               disabled={isLoading || !approverName.trim() || !rejectionReason.trim()}
