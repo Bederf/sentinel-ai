@@ -74,7 +74,7 @@ async def load_equipment() -> list[dict]:
     """Load equipment from Supabase (primary source), fallback to CSV/JSON."""
     try:
         # Primary source: Load from Supabase
-        equipment_data = equipment_repo.get_all()
+        equipment_data = await equipment_repo.get_all()
 
         if equipment_data:
             equipment_list = []
