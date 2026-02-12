@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 import joblib
 import os
 
-from app.ml.models.model_registry import ModelRegistry, ModelStatus
+from app.ml.models.model_registry_db import get_model_registry, ModelRegistryDB
 from app.database.supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
@@ -33,8 +33,14 @@ class NiagaraMLInference:
     def __init__(self):
         """Initialize inference service."""
         self.supabase = get_supabase_client()
-        self.registry = ModelRegistry
+        self._registry: Optional[ModelRegistryDB] = None
         self._model_cache = {}  # Cache loaded models
+
+    async def _get_registry(self) -> ModelRegistryDB:
+        """Get model registry (lazy load)."""
+        if self._registry is None:
+            self._registry = await get_model_registry()
+        return self._registry
 
     async def get_prediction_with_confidence(
         self,
@@ -64,8 +70,9 @@ class NiagaraMLInference:
                 logger.warning(f"Could not extract equipment type from {equipment_code}")
                 return None
 
-            # Check if model available for this equipment type
-            if not self.registry.is_model_available(equipment_type):
+            # Get registry and check if model available
+            registry = await self._get_registry()
+            if not await registry.is_model_available(equipment_type):
                 logger.debug(f"No model available for {equipment_type}")
                 return None
 
@@ -76,7 +83,7 @@ class NiagaraMLInference:
                 return None
 
             # Get model configuration
-            model_config = self.registry.get_model(equipment_type)
+            model_config = await registry.get_model(equipment_type)
             if not model_config:
                 return None
 
@@ -98,13 +105,17 @@ class NiagaraMLInference:
                 return None
 
             # Check threshold
-            threshold = self.registry.get_threshold(equipment_type, tier)
-            if confidence < threshold:
+            threshold = await registry.get_threshold_value(equipment_type, tier)
+            if threshold is None or confidence < threshold:
                 logger.debug(
                     f"Confidence {confidence:.2%} below threshold "
                     f"{threshold:.2%} for {equipment_code} (tier {tier})"
+                    if threshold else f"Confidence {confidence:.2%} but no threshold configured"
                 )
                 return None
+
+            # Get tier 3 threshold for comparison
+            tier3_threshold = await registry.get_threshold_value(equipment_type, 3) or 0.85
 
             # Return prediction with confidence and metadata
             return {
@@ -112,13 +123,13 @@ class NiagaraMLInference:
                 "equipment_type": equipment_type,
                 "equipment_name": equipment.get("name"),
                 "confidence": confidence,
-                "model_r_squared": model_config.r_squared,
-                "model_version": model_config.version,
-                "model_status": model_config.status.value,
-                "threshold_tier2": self.registry.get_threshold(equipment_type, 2),
-                "threshold_tier3": self.registry.get_threshold(equipment_type, 3),
-                "meets_tier2_requirement": confidence >= self.registry.get_threshold(equipment_type, 2),
-                "meets_tier3_requirement": confidence >= self.registry.get_threshold(equipment_type, 3),
+                "model_r_squared": model_config.r_squared_avg,
+                "model_id": model_config.model_id,
+                "model_status": model_config.status,
+                "threshold_tier2": threshold,
+                "threshold_tier3": tier3_threshold,
+                "meets_tier2_requirement": confidence >= threshold,
+                "meets_tier3_requirement": confidence >= tier3_threshold,
                 "timestamp": datetime.now().isoformat(),
                 "health_score": equipment.get("health_score"),
                 "last_alert": equipment.get("last_alert_timestamp"),
@@ -178,7 +189,8 @@ class NiagaraMLInference:
                     continue
 
                 # Skip if no model
-                if not self.registry.is_model_available(eq_type):
+                registry = await self._get_registry()
+                if not await registry.is_model_available(eq_type):
                     continue
 
                 results["summary"]["with_models"] += 1
