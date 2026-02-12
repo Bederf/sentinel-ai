@@ -745,12 +745,14 @@ async def create_supabase_work_order(
 async def list_supabase_work_orders(
     status: Optional[str] = Query(None, description="Filter by status"),
     priority: Optional[str] = Query(None, description="Filter by priority"),
+    equipment_id: Optional[str] = Query(None, description="Filter by equipment ID (UUID)"),
     limit: int = Query(50, description="Maximum number of results"),
-    auth: AuthContext = Depends(require_auth(AuthLevel.OPERATOR))
+    auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED))
 ):
     """List work orders from Supabase with optional filters.
 
-    Requires authentication (OPERATOR or higher).
+    Requires authentication (AUTHENTICATED or higher).
+    Supports filtering by status, priority, and equipment ID.
     """
     from app.database.repositories.work_order_repository import get_work_order_repository
 
@@ -762,6 +764,8 @@ async def list_supabase_work_orders(
             work_orders = [wo for wo in work_orders if wo.get("status") == status]
         if priority:
             work_orders = [wo for wo in work_orders if wo.get("priority") == priority]
+        if equipment_id:
+            work_orders = [wo for wo in work_orders if wo.get("equipment_id") == equipment_id]
 
         return work_orders
     except Exception as e:

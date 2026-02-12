@@ -235,18 +235,22 @@ class AnomalyListResponse(BaseModel):
 async def list_alerts(
     request: Request,
     site_id: Optional[str] = Query(None, description="Filter by site ID"),
+    equipment_id: Optional[str] = Query(None, description="Filter by equipment ID (UUID)"),
     severity: Optional[str] = Query(None, description="Filter by severity"),
     status: Optional[str] = Query(None, description="Filter by status (active, acknowledged, resolved)"),
     category: Optional[str] = Query(None, description="Filter by category (hvac, electrical, maintenance)"),
+    limit: int = Query(50, description="Maximum number of results"),
 ) -> AlertListResponse:
     """
     List all alerts with optional filtering.
 
     Args:
         site_id: Filter by site ID
+        equipment_id: Filter by equipment ID (UUID)
         severity: Filter by severity (critical, warning, info)
         status: Filter by status (active, acknowledged, resolved)
         category: Filter by category
+        limit: Maximum number of results to return
 
     Returns:
         AlertListResponse with total count and list of alerts.
@@ -262,6 +266,8 @@ async def list_alerts(
     # Apply filters
     if site_id:
         alerts = [a for a in alerts if a["site_id"] == site_id]
+    if equipment_id:
+        alerts = [a for a in alerts if a["equipment_id"] == equipment_id]
     if severity:
         alerts = [a for a in alerts if a["severity"].lower() == severity.lower()]
     if status:
@@ -294,10 +300,13 @@ async def list_alerts(
     # Sort by priority
     result.sort(key=lambda a: a.priority)
 
+    # Apply limit
+    limited_results = result[:limit]
+
     return AlertListResponse(
-        total=len(result),
+        total=len(limited_results),
         by_severity=by_severity,
-        alerts=result,
+        alerts=limited_results,
     )
 
 
