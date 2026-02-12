@@ -68,6 +68,11 @@ export {
   type Outcome,
 } from './optimization';
 export {
+  approvalsApi,
+  type ApprovalResponse,
+  type ApprovalStatus,
+} from './approvals';
+export {
   zoneIngestionApi,
   type ZoneConfig,
   type DeskConfig,

@@ -12,7 +12,6 @@ import { StatsBar } from './StatsBar';
 import { AlertBanner } from './AlertBanner';
 import { Compass } from '../3d/Compass';
 import { FloorPlan2D } from './FloorPlan2D';
-import { ViewToggle } from './ViewToggle';
 import { useEquipmentData } from '@/hooks/useEquipmentData';
 import { useSitesList } from '@/hooks/useSitesList';
 import { useZoneCentroids } from '@/hooks/useZoneCentroids';
@@ -57,14 +56,13 @@ const EQUIPMENT_ICONS: Record<string, string> = {
   'acc': '🔐',
   'sensor': '📡',
   'pump': '🔵',
-  'boiler': '🟠',
+  'boiler': '🔥',
   'hvac_zone': '🎛️',
   'jace': '🎛️',
   'lift': '🛗',
   'cold': '❄️',
   'medgas': '🔬',
   'msb': '⚡',
-  'boiler': '🔥',
   'kef': '💨',
   'split': '🌡️',
 };
@@ -188,7 +186,7 @@ export function DigitalTwin() {
         if (!bounds) return;
 
         const floor = zoneKey.split('-')[1] || 'L0';
-        const floorY = FLOOR_Y[floor] || 3.5;
+        const floorY = getFloorY(floor);
 
         const distributed = distributeEquipmentInZone(zoneEquipment, bounds, floorY);
         distributed.forEach((pos, id) => positions.set(id, pos));
@@ -283,6 +281,30 @@ export function DigitalTwin() {
                 style={{ color: 'var(--color-sentinel-text-secondary)' }}
               />
             </div>
+
+            {/* 2D/3D Toggle - Moved to header next to building selector */}
+            <div className="flex items-center gap-2 ml-4 pl-4 border-l" style={{ borderColor: 'var(--color-sentinel-border)' }}>
+              <button
+                onClick={() => setViewMode('3D')}
+                className={`px-3 py-1.5 text-sm font-medium rounded transition ${
+                  viewMode === '3D'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                }`}
+              >
+                3D
+              </button>
+              <button
+                onClick={() => setViewMode('2D')}
+                className={`px-3 py-1.5 text-sm font-medium rounded transition ${
+                  viewMode === '2D'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                }`}
+              >
+                2D
+              </button>
+            </div>
           </div>
 
           {/* Equipment count */}
@@ -325,11 +347,8 @@ export function DigitalTwin() {
       {/* Stats Bar */}
       <StatsBar equipment={filteredEquipment} selectedFloors={selectedFloors} />
 
-      {/* Main Canvas and Controls - 2D/3D Toggle */}
+      {/* Main Canvas and Controls */}
       <div className="flex-1 relative overflow-hidden">
-        {/* View Toggle Button */}
-        <ViewToggle viewMode={viewMode} onToggle={setViewMode} />
-
         {/* Conditional View Rendering */}
         {viewMode === '3D' ? (
           <Canvas>
@@ -380,7 +399,7 @@ export function DigitalTwin() {
 
         {/* Floor Selector Overlay */}
         <FloorSelector
-          floors={FLOORS}
+          floors={dynamicFloors}
           selectedFloors={selectedFloors}
           onToggle={toggleFloor}
           onIsolate={isolateFloor}
@@ -400,15 +419,22 @@ export function DigitalTwin() {
             </button>
           </div>
         )}
-      </div>
 
-      {/* Equipment Detail Panel */}
-      {selectedEquipmentData && (
-        <EquipmentDetailPanel
-          equipment={selectedEquipmentData}
-          onClose={() => setSelectedEquipment(null)}
-        />
-      )}
+        {/* Equipment Detail Panel - Right side overlay */}
+        {selectedEquipmentData && (
+          <div className="absolute right-0 top-0 bottom-0 w-96 shadow-2xl overflow-y-auto z-50"
+            style={{ 
+              borderLeft: '2px solid var(--color-sentinel-accent)',
+              borderColor: 'var(--color-sentinel-border)',
+              background: 'var(--color-sentinel-bg-secondary)'
+            }}>
+            <EquipmentDetailPanel
+              equipment={selectedEquipmentData}
+              onClose={() => setSelectedEquipment(null)}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -199,6 +199,36 @@ class WorkOrderRepository:
             logger.error(f"Error getting work orders for equipment list: {e}")
             return []
 
+    async def get_all_work_orders(
+        self,
+        limit: int = 100,
+        status: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get all work orders with optional status filter.
+
+        Args:
+            limit: Maximum number of work orders to return
+            status: Optional filter by status (scheduled, assigned, in_progress, completed, cancelled)
+
+        Returns:
+            List of all work orders
+        """
+        if not self.client:
+            return []
+
+        try:
+            query = self.client.table("work_orders").select("*").order("created_at", desc=True).limit(limit)
+
+            if status:
+                query = query.eq("status", status)
+
+            result = query.execute()
+            return result.data or []
+
+        except Exception as e:
+            logger.error(f"Error getting all work orders: {e}")
+            return []
+
 
 # Singleton instance
 _repository: Optional[WorkOrderRepository] = None

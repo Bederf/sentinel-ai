@@ -66,31 +66,61 @@ def _check_admin_rate_limit(source_ip: str) -> JSONResponse | None:
     return None
 
 
+def _get_cors_headers(request: Request | None = None) -> dict:
+    """Get standard CORS headers for error responses."""
+    headers = {}
+    if not settings.cors_origins:
+        return headers
+    
+    # Check if request has an Origin header and if it's allowed
+    origin = request.headers.get("origin") if request else None
+    
+    if origin and origin in settings.cors_origins:
+        # Origin is in allowed list, allow it specifically
+        headers["Access-Control-Allow-Origin"] = origin
+    elif settings.cors_origins:
+        # Allow the first configured origin as fallback
+        headers["Access-Control-Allow-Origin"] = settings.cors_origins[0]
+    
+    # Always allow credentials and methods for configured origins
+    headers["Access-Control-Allow-Credentials"] = "true"
+    headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+    headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type"
+    
+    return headers
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     """Register exception handlers for the application."""
     @app.exception_handler(RateLimitExceeded)
     async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
         """Return 429 with Retry-After header when rate limit exceeded."""
+        headers = {"Retry-After": str(exc.retry_after)}
+        headers.update(_get_cors_headers(request))
         return JSONResponse(
             status_code=429,
             content={"detail": "Rate limit exceeded. Please try again later."},
-            headers={"Retry-After": str(exc.retry_after)},
+            headers=headers,
         )
 
     @app.exception_handler(Exception)
     async def global_exception_handler(request: Request, exc: Exception):
         """Catch-all handler that hides internals in production."""
+        headers = _get_cors_headers(request)
+        
         if settings.debug:
             # In debug mode, return full detail for developer convenience
             return JSONResponse(
                 status_code=500,
                 content={"detail": str(exc)},
+                headers=headers,
             )
         # Log the real error server-side, return a generic message to the client
         _logger.error(f"Unhandled exception on {request.method} {request.url.path}: {exc}", exc_info=True)
         return JSONResponse(
             status_code=500,
             content={"detail": "Internal server error"},
+            headers=headers,
         )
 
 

@@ -28,11 +28,9 @@ export function EquipmentDetailPanel({ equipment, onClose }: EquipmentDetailPane
 
   return (
     <div
-      className="absolute right-0 top-0 bottom-0 w-96 shadow-2xl overflow-y-auto flex flex-col"
+      className="h-full w-full flex flex-col"
       style={{
         background: 'var(--color-sentinel-bg-panel)',
-        border: '1px solid var(--color-sentinel-border)',
-        borderLeft: '2px solid var(--color-sentinel-accent)',
       }}
     >
       {/* Header */}

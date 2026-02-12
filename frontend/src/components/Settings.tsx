@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Settings as SettingsIcon, Bell, Monitor, Shield, Lock, Unlock } from "lucide-react";
+import { Settings as SettingsIcon, Bell, Monitor, Shield, Lock, Unlock, Zap } from "lucide-react";
 import { useHealthThresholds } from "../hooks/useHealthThresholds";
 import { useGlassTheme } from "../hooks/useGlassTheme";
 import { GLASS_PRESETS } from "../lib/settings";
@@ -7,6 +7,7 @@ import { ThresholdEditor } from "./ThresholdEditor";
 import { SafetyRulesEditor } from "./SafetyRulesEditor";
 import { PasswordModal } from "./PasswordModal";
 import { NotificationSettings } from "./NotificationSettings";
+import { ModuleSelector } from "./modules/ModuleSelector";
 
 interface SettingsProps {
   onError?: (error: string) => void;
@@ -274,6 +275,38 @@ export function Settings({ onError }: SettingsProps) {
                 setTimeout(() => setSaveSuccess(false), 3000);
               }}
             />
+          </div>
+        </div>
+
+        {/* Module Management */}
+        <div className="glass-panel overflow-hidden">
+          <div className="p-4 border-b" style={{ borderColor: "var(--color-sentinel-border)" }}>
+            <div className="flex items-center gap-3">
+              <div
+                className="p-2 rounded"
+                style={{
+                  background: "rgba(245, 158, 11, 0.15)",
+                  color: "var(--color-sentinel-amber)",
+                }}
+              >
+                <Zap className="h-5 w-5" />
+              </div>
+              <div>
+                <h2
+                  className="text-lg font-semibold"
+                  style={{ color: "var(--color-sentinel-text-primary)" }}
+                >
+                  Building Modules
+                </h2>
+                <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                  Activate or deactivate feature modules for this site
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-4">
+            <ModuleSelector />
           </div>
         </div>
 

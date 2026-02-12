@@ -243,9 +243,9 @@ export function ROISummaryCard({ predictions }: ROISummaryCardProps) {
             <Calendar className="h-4 w-4" style={{ color: "var(--color-grafana-orange)" }} />
             <span style={{ color: "var(--color-grafana-text-secondary)" }}>
               <strong style={{ color: "var(--color-grafana-text-primary)" }}>
-                {minDays}-{maxDays}
+                {minDays === maxDays ? `${minDays}` : `${minDays}-${maxDays}`}
               </strong>{" "}
-              day window to act
+              {minDays === maxDays ? "day" : "day window"} to act
             </span>
           </div>
 
