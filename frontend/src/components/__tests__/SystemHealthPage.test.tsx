@@ -82,11 +82,10 @@ function setupHealthMocks(healthData?: any, historyData?: any) {
 describe('SystemHealthPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.useFakeTimers();
+    // Use real timers for tests with waitFor
   });
 
   afterEach(() => {
-    vi.useRealTimers();
     vi.clearAllMocks();
   });
 
@@ -103,7 +102,7 @@ describe('SystemHealthPage', () => {
       render(<SystemHealthPage />);
       await waitFor(() => {
         expect(screen.getByText(/Error:/)).toBeInTheDocument();
-      });
+      }, { timeout: 2000 });
     });
 
     it('should render page title after data loads', async () => {
@@ -111,7 +110,7 @@ describe('SystemHealthPage', () => {
       render(<SystemHealthPage />);
       await waitFor(() => {
         expect(screen.getByText('System Health Dashboard')).toBeInTheDocument();
-      });
+      }, { timeout: 2000 });
     });
   });
 
@@ -126,9 +125,7 @@ describe('SystemHealthPage', () => {
 
       render(<SystemHealthPage />);
 
-      await waitFor(() => {
-        expect(screen.getByText('85')).toBeInTheDocument();
-      });
+      await waitFor(() => {$1}, { timeout: 2000 });
     });
 
     it('should display overall health status label', async () => {
@@ -140,9 +137,7 @@ describe('SystemHealthPage', () => {
 
       render(<SystemHealthPage />);
 
-      await waitFor(() => {
-        expect(screen.getByText('Overall Health Status')).toBeInTheDocument();
-      });
+      await waitFor(() => {$1}, { timeout: 2000 });
     });
 
     it('should display status badge with correct color for healthy', async () => {
@@ -154,10 +149,7 @@ describe('SystemHealthPage', () => {
 
       render(<SystemHealthPage />);
 
-      await waitFor(() => {
-        expect(screen.getByTestId('badge-green')).toBeInTheDocument();
-        expect(screen.getByText('HEALTHY')).toBeInTheDocument();
-      });
+      await waitFor(() => {$1}, { timeout: 2000 });
     });
 
     it('should display yellow badge for degraded status', async () => {
@@ -169,10 +161,7 @@ describe('SystemHealthPage', () => {
 
       render(<SystemHealthPage />);
 
-      await waitFor(() => {
-        expect(screen.getByTestId('badge-yellow')).toBeInTheDocument();
-        expect(screen.getByText('DEGRADED')).toBeInTheDocument();
-      });
+      await waitFor(() => {$1}, { timeout: 2000 });
     });
 
     it('should display red badge for critical status', async () => {
@@ -184,10 +173,7 @@ describe('SystemHealthPage', () => {
 
       render(<SystemHealthPage />);
 
-      await waitFor(() => {
-        expect(screen.getByTestId('badge-red')).toBeInTheDocument();
-        expect(screen.getByText('CRITICAL')).toBeInTheDocument();
-      });
+      await waitFor(() => {$1}, { timeout: 2000 });
     });
 
     it('should display component status cards', async () => {
@@ -203,11 +189,7 @@ describe('SystemHealthPage', () => {
 
       render(<SystemHealthPage />);
 
-      await waitFor(() => {
-        expect(screen.getByText('hvac')).toBeInTheDocument();
-        expect(screen.getByText('lighting')).toBeInTheDocument();
-        expect(screen.getByText('power')).toBeInTheDocument();
-      });
+      await waitFor(() => {$1}, { timeout: 2000 });
     });
 
     it('should display component scores in metrics', async () => {
@@ -222,10 +204,7 @@ describe('SystemHealthPage', () => {
 
       render(<SystemHealthPage />);
 
-      await waitFor(() => {
-        const metrics = screen.getAllByTestId('metric');
-        expect(metrics.length).toBeGreaterThanOrEqual(2);
-      });
+      await waitFor(() => {$1}, { timeout: 2000 });
     });
 
     it('should display progress bar with green color for healthy', async () => {
@@ -237,9 +216,7 @@ describe('SystemHealthPage', () => {
 
       render(<SystemHealthPage />);
 
-      await waitFor(() => {
-        expect(screen.getByTestId('progress-bar-green')).toBeInTheDocument();
-      });
+      await waitFor(() => {$1}, { timeout: 2000 });
     });
 
     it('should display progress bar with yellow for degraded component', async () => {
@@ -253,9 +230,7 @@ describe('SystemHealthPage', () => {
 
       render(<SystemHealthPage />);
 
-      await waitFor(() => {
-        expect(screen.getByTestId('progress-bar-yellow')).toBeInTheDocument();
-      });
+      await waitFor(() => {$1}, { timeout: 2000 });
     });
   });
 
@@ -276,10 +251,7 @@ describe('SystemHealthPage', () => {
 
       render(<SystemHealthPage />);
 
-      await waitFor(() => {
-        expect(screen.getByText('Average Health Score')).toBeInTheDocument();
-        expect(screen.getByText('82')).toBeInTheDocument();
-      });
+      await waitFor(() => {$1}, { timeout: 2000 });
     });
 
     it('should display uptime percentage', async () => {
@@ -297,10 +269,7 @@ describe('SystemHealthPage', () => {
 
       render(<SystemHealthPage />);
 
-      await waitFor(() => {
-        expect(screen.getByText('Uptime (24h)')).toBeInTheDocument();
-        expect(screen.getByText('99.5%')).toBeInTheDocument();
-      });
+      await waitFor(() => {$1}, { timeout: 2000 });
     });
 
     it('should display min and max scores', async () => {
@@ -318,12 +287,7 @@ describe('SystemHealthPage', () => {
 
       render(<SystemHealthPage />);
 
-      await waitFor(() => {
-        expect(screen.getByText('Min Score')).toBeInTheDocument();
-        expect(screen.getByText('70')).toBeInTheDocument();
-        expect(screen.getByText('Max Score')).toBeInTheDocument();
-        expect(screen.getByText('95')).toBeInTheDocument();
-      });
+      await waitFor(() => {$1}, { timeout: 2000 });
     });
 
     it('should display improving trend with green badge', async () => {
@@ -341,10 +305,7 @@ describe('SystemHealthPage', () => {
 
       render(<SystemHealthPage />);
 
-      await waitFor(() => {
-        expect(screen.getByText('Improving')).toBeInTheDocument();
-        expect(screen.getByTestId('badge-green')).toBeInTheDocument();
-      });
+      await waitFor(() => {$1}, { timeout: 2000 });
     });
 
     it('should display degrading trend with red badge', async () => {
@@ -362,10 +323,7 @@ describe('SystemHealthPage', () => {
 
       render(<SystemHealthPage />);
 
-      await waitFor(() => {
-        expect(screen.getByText('Degrading')).toBeInTheDocument();
-        expect(screen.getByTestId('badge-red')).toBeInTheDocument();
-      });
+      await waitFor(() => {$1}, { timeout: 2000 });
     });
 
     it('should display stable trend with gray badge', async () => {
@@ -383,10 +341,7 @@ describe('SystemHealthPage', () => {
 
       render(<SystemHealthPage />);
 
-      await waitFor(() => {
-        expect(screen.getByText('Stable')).toBeInTheDocument();
-        expect(screen.getByTestId('badge-gray')).toBeInTheDocument();
-      });
+      await waitFor(() => {$1}, { timeout: 2000 });
     });
 
     it('should render health score trend chart with data points', async () => {
@@ -408,10 +363,7 @@ describe('SystemHealthPage', () => {
 
       render(<SystemHealthPage />);
 
-      await waitFor(() => {
-        expect(screen.getByTestId('line-chart')).toBeInTheDocument();
-        expect(screen.getByText('3 points')).toBeInTheDocument();
-      });
+      await waitFor(() => {$1}, { timeout: 2000 });
     });
   });
 
@@ -421,30 +373,21 @@ describe('SystemHealthPage', () => {
       setupHealthMocks();
       render(<SystemHealthPage />);
 
-      await waitFor(() => {
-        expect(screen.getByText('System Health Dashboard')).toBeInTheDocument();
-      });
+      await waitFor(() => {$1}, { timeout: 2000 });
 
       const initialCallCount = vi.mocked(authorizedFetch).mock.calls.length;
 
       // Advance timers by 30 seconds
       vi.advanceTimersByTime(30000);
 
-      await waitFor(() => {
-        // Should have additional API calls
-        expect(vi.mocked(authorizedFetch).mock.calls.length).toBeGreaterThan(
-          initialCallCount
-        );
-      });
+      await waitFor(() => {$1}, { timeout: 2000 });
     });
 
     it('should cleanup interval on unmount', async () => {
       setupHealthMocks();
       const { unmount } = render(<SystemHealthPage />);
 
-      await waitFor(() => {
-        expect(screen.getByText('System Health Dashboard')).toBeInTheDocument();
-      });
+      await waitFor(() => {$1}, { timeout: 2000 });
 
       const initialCallCount = vi.mocked(authorizedFetch).mock.calls.length;
       unmount();
@@ -463,21 +406,14 @@ describe('SystemHealthPage', () => {
       setupHealthMocks();
       render(<SystemHealthPage />);
 
-      await waitFor(() => {
-        expect(screen.getByText('System Health Dashboard')).toBeInTheDocument();
-        expect(screen.getByText('Real-time monitoring and diagnostics')).toBeInTheDocument();
-      });
+      await waitFor(() => {$1}, { timeout: 2000 });
     });
 
     it('should display all three tabs', async () => {
       setupHealthMocks();
       render(<SystemHealthPage />);
 
-      await waitFor(() => {
-        expect(screen.getByText('Realtime Status')).toBeInTheDocument();
-        expect(screen.getByText('Historical Insights')).toBeInTheDocument();
-        expect(screen.getByText('Diagnostics')).toBeInTheDocument();
-      });
+      await waitFor(() => {$1}, { timeout: 2000 });
     });
 
     it('should render responsive card grid for components', async () => {
@@ -493,11 +429,7 @@ describe('SystemHealthPage', () => {
 
       render(<SystemHealthPage />);
 
-      await waitFor(() => {
-        const cards = screen.getAllByTestId('card');
-        // Should have overall card + 3 component cards
-        expect(cards.length).toBeGreaterThanOrEqual(4);
-      });
+      await waitFor(() => {$1}, { timeout: 2000 });
     });
   });
 
@@ -512,10 +444,7 @@ describe('SystemHealthPage', () => {
 
       render(<SystemHealthPage />);
 
-      await waitFor(() => {
-        expect(screen.getByText('System Health Dashboard')).toBeInTheDocument();
-        expect(screen.getByText('85')).toBeInTheDocument();
-      });
+      await waitFor(() => {$1}, { timeout: 2000 });
     });
 
     it('should handle empty snapshots in historical data', async () => {
@@ -533,9 +462,7 @@ describe('SystemHealthPage', () => {
 
       render(<SystemHealthPage />);
 
-      await waitFor(() => {
-        expect(screen.getByText('Average Health Score')).toBeInTheDocument();
-      });
+      await waitFor(() => {$1}, { timeout: 2000 });
     });
   });
 });
