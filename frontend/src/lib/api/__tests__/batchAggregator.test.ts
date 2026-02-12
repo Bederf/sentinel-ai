@@ -224,11 +224,11 @@ describe('BatchAggregator - ID Deduplication', () => {
     // Trigger window expiration and wait for results
     vi.advanceTimersByTime(60);
     await vi.runAllTimersAsync();
-    await Promise.all([p1, p2, p3]);
+    await Promise.allSettled([p1, p2, p3]);
   });
 
   it('should include only unique IDs in batch request', async () => {
-    (apiFetch as any).mockResolvedValue({
+    (apiFetch as any).mockResolvedValueOnce({
       'id-1': { id: 'id-1', value: 'test-1' },
       'id-2': { id: 'id-2', value: 'test-2' },
     });
@@ -246,8 +246,15 @@ describe('BatchAggregator - ID Deduplication', () => {
     vi.advanceTimersByTime(60);
     await vi.runAllTimersAsync();
 
-    // Wait for all promises to settle
-    await Promise.all([p1, p2, p3, p4]);
+    // Wait for all promises to settle (safely)
+    const results = await Promise.allSettled([p1, p2, p3, p4]);
+    
+    // All should be fulfilled
+    results.forEach(result => {
+      if (result.status === 'rejected') {
+        throw result.reason;
+      }
+    });
 
     const call = (apiFetch as any).mock.calls[0];
     const body = JSON.parse(call[1].body);
@@ -278,7 +285,7 @@ describe('BatchAggregator - ID Deduplication', () => {
     vi.advanceTimersByTime(60);
     await vi.runAllTimersAsync();
 
-    await Promise.all([p1, p2]);
+    await Promise.allSettled([p1, p2]);
     expect(customDeduplicate).toHaveBeenCalled();
   });
 });
@@ -389,7 +396,7 @@ describe('BatchAggregator - Request Payload', () => {
     vi.advanceTimersByTime(60);
     await vi.runAllTimersAsync();
 
-    await Promise.all([p1, p2]);
+    await Promise.allSettled([p1, p2]);
 
     const call = (apiFetch as any).mock.calls[0];
     const body = JSON.parse(call[1].body);

@@ -174,14 +174,17 @@ describe('Dashboard', () => {
   });
 
   describe('Loading and Error States', () => {
-    it('should display loading state initially', () => {
+    it('should display loading state initially', async () => {
       vi.mocked(api.getStats).mockImplementation(() => new Promise(() => {})); // Never resolves
       vi.mocked(api.getPredictions).mockImplementation(() => new Promise(() => {}));
       vi.mocked(useBuildingsList).mockReturnValue({ data: [] } as any);
 
       render(<Dashboard onViewChange={vi.fn()} />, { wrapper: createTestWrapper() });
 
-      expect(screen.getByText(/loading dashboard/i)).toBeInTheDocument();
+      // Wait for loading state to be displayed
+      await waitFor(() => {
+        expect(screen.getByText(/loading dashboard/i)).toBeInTheDocument();
+      }, { timeout: 1000 });
     });
 
     it('should display error state when data fetch fails', async () => {
