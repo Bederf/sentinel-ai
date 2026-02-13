@@ -14,7 +14,7 @@ import logging
 from typing import Dict, List, Any, Optional
 from pydantic import BaseModel, Field
 
-from fastapi import APIRouter, HTTPException, Body
+from fastapi import APIRouter, HTTPException, Body, Request
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
@@ -59,7 +59,10 @@ class BatchDeviceResponse(BaseModel):
                 "Uses single Supabase query instead of N individual queries."
 )
 @limiter.limit("30/minute")
-async def batch_safety_status(request: BatchDeviceRequest = Body(...)) -> BatchDeviceResponse:
+async def batch_safety_status(
+    request: Request,
+    payload: BatchDeviceRequest = Body(...),
+) -> BatchDeviceResponse:
     """Get safety status for multiple devices.
 
     Deduplicates device IDs and uses single Supabase query to fetch all statuses.
@@ -75,7 +78,7 @@ async def batch_safety_status(request: BatchDeviceRequest = Body(...)) -> BatchD
         HTTPException: 400 if > 100 devices requested
     """
     # Deduplicate device IDs
-    unique_device_ids = list(set(request.device_ids))
+    unique_device_ids = list(set(payload.device_ids))
 
     if len(unique_device_ids) > 100:
         raise HTTPException(
@@ -112,7 +115,10 @@ async def batch_safety_status(request: BatchDeviceRequest = Body(...)) -> BatchD
                 "Uses single Supabase query instead of N individual queries."
 )
 @limiter.limit("30/minute")
-async def batch_latest_readings(request: BatchDeviceRequest = Body(...)) -> BatchDeviceResponse:
+async def batch_latest_readings(
+    request: Request,
+    payload: BatchDeviceRequest = Body(...),
+) -> BatchDeviceResponse:
     """Get latest readings for multiple devices.
 
     Deduplicates device IDs and fetches latest point readings for all devices.
@@ -128,7 +134,7 @@ async def batch_latest_readings(request: BatchDeviceRequest = Body(...)) -> Batc
         HTTPException: 400 if > 100 devices requested
     """
     # Deduplicate device IDs
-    unique_device_ids = list(set(request.device_ids))
+    unique_device_ids = list(set(payload.device_ids))
 
     if len(unique_device_ids) > 100:
         raise HTTPException(
@@ -166,7 +172,10 @@ async def batch_latest_readings(request: BatchDeviceRequest = Body(...)) -> Batc
                 "Uses single Supabase query instead of N individual queries."
 )
 @limiter.limit("30/minute")
-async def batch_condition(request: BatchDeviceRequest = Body(...)) -> BatchDeviceResponse:
+async def batch_condition(
+    request: Request,
+    payload: BatchDeviceRequest = Body(...),
+) -> BatchDeviceResponse:
     """Get device condition for multiple devices.
 
     Deduplicates device IDs and fetches condition/health metrics for all devices.
@@ -182,7 +191,7 @@ async def batch_condition(request: BatchDeviceRequest = Body(...)) -> BatchDevic
         HTTPException: 400 if > 100 devices requested
     """
     # Deduplicate device IDs
-    unique_device_ids = list(set(request.device_ids))
+    unique_device_ids = list(set(payload.device_ids))
 
     if len(unique_device_ids) > 100:
         raise HTTPException(

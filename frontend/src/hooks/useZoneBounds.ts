@@ -28,7 +28,7 @@ export function useZoneBounds(buildingId: string): Record<string, ZoneBounds> {
     queryFn: () => sitesApi.getDesks(buildingId),
     staleTime: 5 * 60 * 1000, // 5 minutes
     enabled: !!buildingId,
-    retry: 1,
+    retry: 0,
     // Return empty array on failure (fallback positioning will be used)
     throwOnError: false,
   });

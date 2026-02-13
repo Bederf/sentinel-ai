@@ -15,7 +15,7 @@ from app.api import rag, ml_retraining, fleet_learning, mlops
 from app.api import mcp, mcp_sse, mcp_openai
 from app.api import recommendations, simulation_analytics
 from app.api import system_health, solar, solar_grid, solar_performance, solar_arbitrage
-from app.api import peak_demand
+from app.api import solar_config, peak_demand
 
 
 def register_analytics_routers(app: FastAPI) -> None:
@@ -62,6 +62,7 @@ def register_analytics_routers(app: FastAPI) -> None:
 
     # Solar & BESS
     app.include_router(solar.router, prefix="/api", tags=["solar"])
+    app.include_router(solar_config.router, tags=["solar-config"])
     app.include_router(solar_grid.router, prefix="/api", tags=["solar-grid"])
     app.include_router(solar_performance.router, prefix="/api", tags=["solar-performance"])
     app.include_router(solar_arbitrage.router, prefix="/api", tags=["solar-arbitrage"])

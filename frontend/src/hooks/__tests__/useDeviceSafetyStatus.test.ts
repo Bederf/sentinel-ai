@@ -49,7 +49,7 @@ function createTestQueryClient() {
   return new QueryClient({
     defaultOptions: {
       queries: {
-        retry: false,
+        retry: 0,  // Disable all retries in tests
       },
     },
   });

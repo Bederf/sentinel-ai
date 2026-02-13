@@ -31,7 +31,7 @@ export function usePeakDemandStatus(siteId: string | undefined) {
     enabled: !!siteId,
     staleTime: 15 * 1000,
     gcTime: 5 * 60 * 1000, // 5 minutes
-    retry: 1,
+    retry: 0,
   });
 }
 
@@ -47,7 +47,7 @@ export function usePeakDemandForecast(siteId: string | undefined) {
     enabled: !!siteId,
     staleTime: 60 * 1000,
     gcTime: 10 * 60 * 1000, // 10 minutes
-    retry: 1,
+    retry: 0,
   });
 }
 
@@ -63,7 +63,7 @@ export function usePeakDemandRecommendations(siteId: string | undefined) {
     enabled: !!siteId,
     staleTime: 30 * 1000,
     gcTime: 5 * 60 * 1000, // 5 minutes
-    retry: 1,
+    retry: 0,
   });
 }
 
@@ -79,6 +79,6 @@ export function usePeakDemandSummary(siteId: string | undefined) {
     enabled: !!siteId,
     staleTime: 20 * 1000,
     gcTime: 5 * 60 * 1000, // 5 minutes
-    retry: 1,
+    retry: 0,
   });
 }

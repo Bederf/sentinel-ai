@@ -21,7 +21,7 @@ import React from 'react';
 
 function createTestQueryClient() {
   return new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: Infinity } },
+    defaultOptions: { queries: { retry: 0,  // Disable all retries in tests gcTime: Infinity } },
   });
 }
 

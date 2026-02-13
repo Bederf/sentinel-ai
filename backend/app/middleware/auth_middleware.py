@@ -270,6 +270,13 @@ def _extract_bearer_token(request: Request) -> Optional[str]:
         if token.startswith("sent_sk_"):
             return None
         return token
+
+    # EventSource cannot send custom Authorization headers in browsers.
+    # Allow access token as query param for the SSE stream endpoint only.
+    if request.url.path == "/api/events/stream":
+        query_token = request.query_params.get("access_token", "")
+        if query_token and not query_token.startswith("sent_sk_"):
+            return query_token
     return None
 
 
@@ -784,4 +791,3 @@ def get_current_auth(request: Request) -> Optional[AuthContext]:
 
 # Convenience dependency for OPERATOR-level auth requirement
 require_operator = require_auth(AuthLevel.OPERATOR)
-

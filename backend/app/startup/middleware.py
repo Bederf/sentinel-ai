@@ -174,6 +174,21 @@ def register_middleware(app: FastAPI) -> None:
         ):
             return await call_next(request)
 
+        # Allow /api/sites/* with Clawd bot API key
+        if path.startswith("/api/sites/") and settings.clawd_bot_api_key:
+            api_key = request.headers.get("X-Clawd-API-Key", "")
+            if api_key == settings.clawd_bot_api_key:
+                _logger.info(f"Clawd bot API key authenticated for {path}")
+                return await call_next(request)
+            # If API key provided but wrong, log it as security event
+            if api_key:
+                _logger.warning(f"Invalid Clawd API key attempt on {path} from {_extract_ip_address(request)}")
+                return JSONResponse(
+                    status_code=401,
+                    content={"detail": "Invalid API key"},
+                    headers=_get_cors_headers(request),
+                )
+
         # In demo mode, allow localhost without credentials
         if settings.demo_mode:
             source_ip = _extract_ip_address(request)

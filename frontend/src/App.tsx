@@ -34,6 +34,7 @@ import { ContractManagementPage } from "./pages/ContractManagementPage";
 import { BudgetReportPage } from "./pages/BudgetReportPage";
 import { ProfitabilityDashboardPage } from "./pages/ProfitabilityDashboardPage";
 import { ModularDashboard } from "./components/modules/ModularDashboard";
+import { SolarConfigWizard } from "./components/wizards/SolarConfigWizard";
 import { DigitalTwin } from "./components/digital-twin/DigitalTwin";
 import { ModuleProvider } from "./contexts/ModuleContext";
 import { useModules } from "./contexts/ModuleHooks";
@@ -717,6 +718,10 @@ function App() {
             <ProfitabilityDashboardPage />
           ) : currentView === "budget-report" ? (
             <BudgetReportPage />
+          ) : currentView === "solar-config" ? (
+            <div className="h-full overflow-y-auto p-4 md:p-6">
+              <SolarConfigWizard />
+            </div>
           ) : currentView === "modules" ? (
             <ModularDashboard />
           ) : (

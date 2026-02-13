@@ -1,46 +1,44 @@
 /**
- * React Query Hooks for Equipment History
+ * useEquipmentHistory - React Query hooks for equipment maintenance and alert history
  *
- * Provides hooks for querying work orders and alerts for equipment.
+ * Provides hooks for fetching work order and alert history with caching.
  */
 
 import { useQuery } from '@tanstack/react-query';
-import { equipmentHistoryApi, type WorkOrder, type EquipmentAlert } from '@/lib/api/equipment_history';
+import type { WorkOrder, EquipmentAlert } from '../lib/api';
 
 /**
- * Hook to fetch work orders for equipment
- *
- * @param equipmentId - Equipment UUID
- * @param limit - Maximum number of work orders to return (default: 10)
- * @returns Query result with work orders array
+ * Fetch work order history for equipment
  */
-export function useEquipmentWorkOrders(equipmentId: string, limit: number = 10) {
+export function useEquipmentWorkOrders(equipmentId: string | undefined, limit = 10) {
   return useQuery({
-    queryKey: ['equipment-work-orders', equipmentId, limit],
-    queryFn: () => equipmentHistoryApi.getWorkOrders(equipmentId, limit),
-    staleTime: 60000, // 1 minute (work orders change infrequently)
-    gcTime: 5 * 60 * 1000, // 5 minutes (formerly cacheTime)
+    queryKey: ['equipment', 'workOrders', equipmentId, limit],
+    queryFn: async () => {
+      if (!equipmentId) return [];
+      const response = await fetch(`/api/work-orders/supabase?equipment_id=${equipmentId}&limit=${limit}`);
+      if (!response.ok) throw new Error('Failed to fetch work orders');
+      return response.json();
+    },
     enabled: !!equipmentId,
-    retry: 2,
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
+    staleTime: 60 * 1000, // 60 seconds
+    gcTime: 5 * 60 * 1000, // 5 minutes
   });
 }
 
 /**
- * Hook to fetch alerts for equipment
- *
- * @param equipmentId - Equipment UUID
- * @param limit - Maximum number of alerts to return (default: 10)
- * @returns Query result with alerts array
+ * Fetch alert history for equipment
  */
-export function useEquipmentAlerts(equipmentId: string, limit: number = 10) {
+export function useEquipmentAlerts(equipmentId: string | undefined, limit = 10) {
   return useQuery({
-    queryKey: ['equipment-alerts', equipmentId, limit],
-    queryFn: () => equipmentHistoryApi.getAlerts(equipmentId, limit),
-    staleTime: 30000, // 30 seconds (alerts update more frequently)
-    gcTime: 3 * 60 * 1000, // 3 minutes (formerly cacheTime)
+    queryKey: ['equipment', 'alerts', equipmentId, limit],
+    queryFn: async () => {
+      if (!equipmentId) return [];
+      const response = await fetch(`/api/alerts?equipment_id=${equipmentId}&limit=${limit}`);
+      if (!response.ok) throw new Error('Failed to fetch alerts');
+      return response.json();
+    },
     enabled: !!equipmentId,
-    retry: 2,
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
+    staleTime: 30 * 1000, // 30 seconds
+    gcTime: 3 * 60 * 1000, // 3 minutes
   });
 }

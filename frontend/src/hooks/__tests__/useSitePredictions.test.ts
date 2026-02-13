@@ -28,8 +28,8 @@ function createTestQueryClient() {
   return new QueryClient({
     defaultOptions: {
       queries: {
-        retry: false,
-        gcTime: Infinity,
+        retry: 0,  // Disable all retries in tests
+        gcTime: 0,  // No garbage collection in tests
         staleTime: Infinity,
       },
     },
@@ -357,7 +357,7 @@ describe('useSitePredictions Hook', () => {
         expect(result.current.isError).toBe(true);
       });
 
-      // With retry: false, should fail immediately
+      // With retry: 0,  // Disable all retries in tests should fail immediately
       expect(mockApiFetch).toHaveBeenCalledTimes(1);
     });
 

@@ -88,6 +88,20 @@ export {
   type IngestionResponse,
   type ZoneValidationResult,
 } from './zone_ingestion';
+export {
+  solarConfigApi,
+  isValidEquipmentCode,
+  calculateInverterCoverage,
+  suggestEquipmentId,
+  type SolarPlant,
+  type SolarInverter,
+  type BESSConfig,
+  type GridMeterConfig,
+  type SolarConfig,
+  type SolarSiteRequest,
+  type SolarSiteResponse,
+  type ValidationResult,
+} from './solar_config';
 
 // Desk positioning data types
 export {

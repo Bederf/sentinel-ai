@@ -31,7 +31,7 @@ vi.mock('@/lib/api', () => ({
 function createTestQueryClient() {
   return new QueryClient({
     defaultOptions: {
-      queries: { retry: false, gcTime: Infinity },
+      queries: { retry: 0,  // Disable all retries in tests gcTime: Infinity },
     },
   });
 }

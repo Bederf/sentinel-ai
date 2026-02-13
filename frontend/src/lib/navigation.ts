@@ -52,6 +52,7 @@ export type View =
   | "digital-twin"
   | "sustainability"
   | "solar"
+  | "solar-config"
   | "water"
   | "fleet"
   | "mlops"
@@ -91,6 +92,7 @@ export const VIEW_TITLES: Record<View, string> = {
   "digital-twin": "3D Digital Twin",
   sustainability: "Sustainability & ESG",
   solar: "Solar & BESS",
+  "solar-config": "Solar Setup Wizard",
   water: "Water Consumption",
   fleet: "Fleet ML Insights",
   mlops: "ML Metrics",
@@ -147,6 +149,7 @@ export const ADDON_NAV_ITEMS: NavItem[] = [
  */
 export const INTERNAL_NAV_ITEMS: NavItem[] = [
   { id: "simulation", label: "Simulation", icon: FlaskConical, description: "Lifecycle & Analytics", category: "internal", requiredRole: "admin" },
+  { id: "solar-config", label: "Solar Setup", icon: Sun, description: "Configure Solar Sites", category: "internal", requiredRole: "admin" },
   { id: "modules", label: "Modules", icon: Box, description: "Module Configuration", category: "internal", requiredRole: "admin" },
 ];
 

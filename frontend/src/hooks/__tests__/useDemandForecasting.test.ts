@@ -70,8 +70,8 @@ function createTestQueryClient() {
   return new QueryClient({
     defaultOptions: {
       queries: {
-        retry: false,
-        gcTime: Infinity,
+        retry: 0,  // Disable all retries in tests
+        gcTime: 0,  // No garbage collection in tests
       },
     },
   });

@@ -55,6 +55,9 @@ class Settings(BaseSettings):
     # Clawd webhook secret (required for Telegram bot integration)
     clawd_webhook_secret: str = ""
 
+    # Clawd bot API key (for authenticated access to /api/sites/* endpoints)
+    clawd_bot_api_key: str = ""
+
     # SIMBIOT Concept Evolution (FSI Public API) credentials
     simbiot_api_key: str = ""
     simbiot_api_url: str = ""
