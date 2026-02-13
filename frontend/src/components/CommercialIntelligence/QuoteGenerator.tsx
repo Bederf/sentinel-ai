@@ -22,13 +22,11 @@ import {
   TextInput,
   Select,
   SelectItem,
-  Spinner,
   Text,
   Title,
   Badge,
   Grid,
   Col,
-  Alert,
   TabGroup,
   TabList,
   Tab,
@@ -52,7 +50,7 @@ import {
   type SLATier,
   type EquipmentTypesResponse,
   type SLATiersResponse,
-} from '@/lib/api'
+} from '@/lib/api/pricing'
 
 interface QuoteGeneratorProps {
   buildingId: string
@@ -300,7 +298,9 @@ export default function QuoteGenerator({
       <Card>
         <div className="flex items-center justify-center py-12">
           <div className="flex flex-col items-center gap-3">
-            <Spinner />
+            <div className="animate-spin">
+              <Zap className="h-6 w-6 text-tremor-brand" />
+            </div>
             <Text>Loading quote builder...</Text>
           </div>
         </div>
@@ -500,14 +500,7 @@ export default function QuoteGenerator({
           className="w-full mt-6"
           icon={DollarSign}
         >
-          {submitting ? (
-            <>
-              <Spinner />
-              Generating Quote...
-            </>
-          ) : (
-            'Generate Quote'
-          )}
+          {submitting ? 'Generating Quote...' : 'Generate Quote'}
         </Button>
       </Card>
     </div>

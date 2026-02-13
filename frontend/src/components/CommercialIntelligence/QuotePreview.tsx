@@ -15,14 +15,12 @@
  * Phase 52-02: Quote Generation UI
  */
 
-import { useState } from 'react'
-import html2pdf from 'html2pdf.js'
+import { useState, useRef } from 'react'
 import {
   Card,
   Title,
   Text,
   Button,
-  Divider,
   Badge,
   Table,
   TableHead,
@@ -35,15 +33,14 @@ import {
 } from '@tremor/react'
 import {
   Download,
-  Mail,
   Copy,
   Edit,
   AlertCircle,
   CheckCircle2,
-  MapPin,
   Calendar,
 } from 'lucide-react'
-import { formatZAR, formatPercent, type QuoteResponse } from '@/lib/api'
+import { formatZAR } from '@/lib/api/pricing'
+import type { QuoteResponse } from '@/lib/api/pricing'
 
 interface QuotePreviewProps {
   quote: QuoteResponse
@@ -65,7 +62,7 @@ export default function QuotePreview({
   onEdit,
 }: QuotePreviewProps) {
   const [copied, setCopied] = useState(false)
-  const quoteRef = useState<HTMLDivElement | null>(null)
+  const quoteRef = useRef<HTMLDivElement | null>(null)
 
   // Calculate totals
   const monthlyFee = parseFloat(
@@ -85,21 +82,37 @@ export default function QuotePreview({
 
   const slaInfo = slaDetails[slaTier as keyof typeof slaDetails] || slaDetails.standard
 
-  // Generate PDF
+  // Generate PDF using browser print API
   const handleDownloadPDF = () => {
     const element = document.getElementById('quote-preview-content')
     if (!element) return
 
-    const filename = `quote-${quote.request_id}-${new Date().toISOString().split('T')[0]}.pdf`
-    const opt = {
-      margin: 10,
-      filename,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2 },
-      jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4' },
-    }
+    // Use browser's print-to-PDF functionality
+    const printWindow = window.open('', '', 'width=800,height=600')
+    if (!printWindow) return
 
-    html2pdf().set(opt).from(element).save()
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Quote ${quote.request_id}</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 40px; }
+            h1 { font-size: 24px; margin-bottom: 20px; }
+            table { width: 100%; border-collapse: collapse; }
+            th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+            th { background-color: #f5f5f5; font-weight: bold; }
+          </style>
+        </head>
+        <body>
+          ${element.innerHTML}
+          <script>
+            window.print();
+            window.close();
+          </script>
+        </body>
+      </html>
+    `)
+    printWindow.document.close()
   }
 
   // Copy to clipboard
@@ -160,9 +173,7 @@ Valid until: ${quote.valid_until}
       <div
         id="quote-preview-content"
         className="space-y-6 bg-white p-8 rounded-lg"
-        ref={(el) => {
-          if (el) quoteRef[1] = el
-        }}
+        ref={quoteRef}
       >
         {/* Header */}
         <div className="space-y-4 border-b pb-6">

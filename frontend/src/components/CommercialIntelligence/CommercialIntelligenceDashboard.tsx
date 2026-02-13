@@ -24,16 +24,14 @@ import {
   TabPanels,
   TabPanel,
   Button,
-  Breadcrumbs,
-  BreadcrumbItem,
 } from '@tremor/react'
 import {
-  ChevronLeft,
   FileText,
   BarChart3,
   Plus,
+  ChevronLeft,
 } from 'lucide-react'
-import type { QuoteResponse } from '@/lib/api'
+import type { QuoteResponse, SLATier } from '@/lib/api/pricing'
 import QuoteGenerator from './QuoteGenerator'
 import SensitivityAnalysis from './SensitivityAnalysis'
 import QuotePreview from './QuotePreview'
@@ -75,14 +73,16 @@ export default function CommercialIntelligenceDashboard({
 
   return (
     <div className="space-y-6">
-      {/* Breadcrumbs */}
-      <Breadcrumbs>
-        <BreadcrumbItem icon={ChevronLeft} onClick={onClose}>
-          Buildings
-        </BreadcrumbItem>
-        <BreadcrumbItem>{buildingName}</BreadcrumbItem>
-        <BreadcrumbItem>Commercial Intelligence</BreadcrumbItem>
-      </Breadcrumbs>
+      {/* Navigation */}
+      {onClose && (
+        <button
+          onClick={onClose}
+          className="flex items-center gap-2 text-tremor-brand hover:underline"
+        >
+          <ChevronLeft className="h-4 w-4" />
+          Back to Buildings
+        </button>
+      )}
 
       {/* Header */}
       <Card>

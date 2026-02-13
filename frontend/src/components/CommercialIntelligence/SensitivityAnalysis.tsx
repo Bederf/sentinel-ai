@@ -21,7 +21,6 @@ import {
   Text,
   Button,
   BarChart,
-  LineChart,
   Table,
   TableHead,
   TableBody,
@@ -30,9 +29,6 @@ import {
   Badge,
   Grid,
   Col,
-  Slider,
-  ToggleButton,
-  ToggleButtonGroup,
 } from '@tremor/react'
 import {
   Copy,
@@ -41,11 +37,8 @@ import {
   DollarSign,
   AlertCircle,
 } from 'lucide-react'
-import {
-  formatZAR,
-  formatPercent,
-  type QuoteResponse,
-} from '@/lib/api'
+import { pricingApi, formatZAR, formatPercent } from '@/lib/api/pricing'
+import type { QuoteResponse } from '@/lib/api/pricing'
 
 interface SensitivityAnalysisProps {
   quote: QuoteResponse
@@ -64,7 +57,6 @@ export default function SensitivityAnalysis({
   onCopyToNegotiation,
 }: SensitivityAnalysisProps) {
   const [variance, setVariance] = useState<number>(10)
-  const [viewMode, setViewMode] = useState<'chart' | 'table'>('chart')
 
   // Parse decimal values from API response
   const baseFee = parseFloat(
@@ -184,13 +176,14 @@ export default function SensitivityAnalysis({
                 ±{variance}%
               </Badge>
             </div>
-            <Slider
-              value={[variance]}
-              onValueChange={(values) => setVariance(values[0])}
-              min={0}
-              max={50}
-              step={1}
-              className="w-full"
+            <input
+              type="range"
+              min="0"
+              max="50"
+              step="1"
+              value={variance}
+              onChange={(e) => setVariance(parseInt(e.target.value))}
+              className="w-full h-2 bg-tremor-background-muted rounded-lg appearance-none cursor-pointer"
             />
             <Text className="text-tremor-label text-tremor-content-subtitle mt-2">
               Adjust variance to see min/max negotiation range (0-50%)
@@ -245,66 +238,20 @@ export default function SensitivityAnalysis({
         </Grid>
       </Card>
 
-      {/* Visualization Toggle */}
+      {/* Visualization Chart */}
       <Card>
-        <div className="flex items-center justify-between mb-4">
-          <Title className="text-base">Visualization</Title>
-          <ToggleButtonGroup
-            defaultValue="chart"
-            onValueChange={(val) => setViewMode(val as 'chart' | 'table')}
-          >
-            <ToggleButton value="chart" text="Chart" />
-            <ToggleButton value="table" text="Table" />
-          </ToggleButtonGroup>
-        </div>
-
-        {viewMode === 'chart' ? (
-          <BarChart
-            data={chartData}
-            index="name"
-            categories={['Fee (ZAR)']}
-            colors={['blue']}
-            showYAxis={true}
-            showTooltip={true}
-            showLegend={true}
-            yAxisLabel="Fee (ZAR)"
-            className="mt-4 h-64"
-          />
-        ) : (
-          <Table className="mt-4">
-            <TableHead>
-              <TableRow>
-                <TableCell>Scenario</TableCell>
-                <TableCell className="text-right">Fee</TableCell>
-                <TableCell className="text-right">Variance</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {chartData.map((row) => (
-                <TableRow key={row.name}>
-                  <TableCell>{row.name}</TableCell>
-                  <TableCell className="text-right font-semibold">
-                    {formatZAR(row['Fee (ZAR)'])}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Badge
-                      variant={
-                        row['Margin Impact'] < 0
-                          ? 'neutral'
-                          : row['Margin Impact'] > 0
-                            ? 'success'
-                            : 'default'
-                      }
-                    >
-                      {row['Margin Impact'] > 0 ? '+' : ''}
-                      {row['Margin Impact']}%
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
+        <Title className="text-base">Price Visualization</Title>
+        <BarChart
+          data={chartData}
+          index="name"
+          categories={['Fee (ZAR)']}
+          colors={['blue']}
+          showYAxis={true}
+          showTooltip={true}
+          showLegend={true}
+          yAxisLabel="Fee (ZAR)"
+          className="mt-4 h-64"
+        />
       </Card>
 
       {/* Cost Impact Analysis */}
@@ -381,13 +328,12 @@ export default function SensitivityAnalysis({
                   {formatZAR(scenario.resultFee)}
                 </TableCell>
                 <TableCell className="text-right">
-                  <Badge
-                    variant={
+                  <Badge className={
                       scenario.variance < variance
-                        ? 'neutral'
+                        ? 'bg-gray-100 text-gray-800'
                         : scenario.variance > variance
-                          ? 'success'
-                          : 'default'
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-blue-100 text-blue-800'
                     }
                   >
                     {scenario.variance > 0 ? '+' : ''}
