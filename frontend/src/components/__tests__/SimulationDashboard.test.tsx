@@ -16,10 +16,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import SimulationDashboard from '../SimulationDashboard';
-import { createTremorMocks } from '@/test-utils/mockTremor';
 
 // Mock simulation API
-vi.mock('../lib/simulationApi', () => ({
+vi.mock('../../lib/simulationApi', () => ({
   fetchScenarios: vi.fn(() =>
     Promise.resolve([
       { id: 'normal_day', name: 'Normal Day', description: 'Regular operation' },
@@ -78,8 +77,11 @@ vi.mock('../BuildingSelector', () => ({
   ),
 }));
 
-// Mock Tremor components
-vi.mock('@tremor/react', () => createTremorMocks());
+// Mock Tremor components - import function directly into factory
+vi.mock('@tremor/react', async () => {
+  const { createTremorMocks } = await import('@/test-utils/mockTremor');
+  return createTremorMocks();
+});
 
 describe('SimulationDashboard', () => {
   beforeEach(() => {

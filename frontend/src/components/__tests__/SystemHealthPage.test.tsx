@@ -19,16 +19,23 @@ vi.mock('@/lib/api/client', () => ({
   authorizedFetch: vi.fn(),
 }));
 
-// Import and use unified Tremor mocking strategy
-import { createTremorMocks } from '@/test-utils/mockTremor';
-vi.mock('@tremor/react', () => ({
-  ...createTremorMocks(),
-  // Additional components specific to SystemHealthPage
-  Text: ({ children }: any) => <div data-testid="text">{children}</div>,
-  ProgressBar: ({ value, color }: any) => (
-    <div data-testid={`progress-bar-${color}`}>{value}%</div>
-  ),
-}));
+// Mock Tremor components - import function directly into factory
+vi.mock('@tremor/react', async () => {
+  const { createTremorMocks } = await import('@/test-utils/mockTremor');
+  const React = await import('react');
+  const baseMocks = createTremorMocks();
+  return {
+    ...baseMocks,
+    // Additional components specific to SystemHealthPage
+    Text: ({ children }: any) =>
+      React.default.createElement('div', { 'data-testid': 'text', children }),
+    ProgressBar: ({ value, color }: any) =>
+      React.default.createElement('div', {
+        'data-testid': `progress-bar-${color}`,
+        children: `${value}%`,
+      }),
+  };
+});
 
 import { authorizedFetch } from '@/lib/api/client';
 

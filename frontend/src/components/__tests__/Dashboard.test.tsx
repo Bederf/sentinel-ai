@@ -16,7 +16,6 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import Dashboard from '../Dashboard';
 import { createTestQueryClient } from '@/test-utils/mockQueryClient';
-import { createTremorMocks } from '@/test-utils/mockTremor';
 import {
   createMockDashboardStats,
   createMockSite,
@@ -25,8 +24,11 @@ import {
 } from '@/test-utils/factories';
 import type { DashboardStats, Site, Prediction } from '@/lib/api';
 
-// Mock Tremor components
-vi.mock('@tremor/react', () => createTremorMocks());
+// Mock Tremor components - import function directly into factory
+vi.mock('@tremor/react', async () => {
+  const { createTremorMocks } = await import('@/test-utils/mockTremor');
+  return createTremorMocks();
+});
 
 // Mock API module
 vi.mock('@/lib/api', () => ({
