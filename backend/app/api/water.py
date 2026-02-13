@@ -11,7 +11,7 @@ Provides real-time and historical data for water meter installations:
 
 import logging
 from datetime import datetime, date, timedelta
-from typing import Optional, List
+from typing import Optional, List, Dict
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
@@ -19,8 +19,12 @@ from app.middleware.rate_limiter import limiter
 
 from app.services.water_ingestion_service import get_water_ingestion_service
 from app.services.water_alert_service import get_water_alert_service, WaterAlertThresholds
+from app.services.water_cost_service import get_water_cost_service
 from app.database.repositories.water_consumption_repository import WaterConsumptionRepository
-from app.models.water_meter import WaterAlert, WaterTrend
+from app.database.repositories.water_cost_repository import WaterCostRepository
+from app.models.water_meter import WaterAlert, WaterTrend, WaterTariff, WaterCost
+from typing import Dict
+import uuid
 
 logger = logging.getLogger(__name__)
 
@@ -819,4 +823,250 @@ async def get_zone_anomaly_history(
 
     except Exception as e:
         logger.error(f"Error fetching anomaly history for zone {zone_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# === Cost management endpoints ===
+
+
+@limiter.limit("30/minute")
+@router.get("/water/tariffs/{site}")
+async def get_site_tariffs(request: Request, site: str) -> Dict:
+    """Get all tariff configurations for a site.
+
+    Args:
+        site: Building site code
+
+    Returns:
+        List of tariffs with tier rates and effective dates
+    """
+    try:
+        cost_repo = WaterCostRepository()
+        tariffs = await cost_repo.list_tariffs(site)
+
+        return {
+            "site": site,
+            "tariff_count": len(tariffs),
+            "tariffs": [t.to_dict() for t in tariffs],
+        }
+
+    except Exception as e:
+        logger.error(f"Error fetching tariffs for {site}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@limiter.limit("30/minute")
+@router.post("/water/tariffs/{site}")
+async def create_tariff(
+    request: Request,
+    site: str,
+    tariff_data: Dict,
+) -> Dict:
+    """Create new tariff configuration for a site.
+
+    Args:
+        site: Building site code
+        tariff_data: Tariff configuration with tier rates
+
+    Returns:
+        Created tariff with ID
+    """
+    try:
+        tariff_data["site"] = site
+        tariff = WaterTariff(**tariff_data)
+
+        cost_repo = WaterCostRepository()
+        created = await cost_repo.create_tariff(tariff)
+
+        return {
+            "site": site,
+            "tariff": created.to_dict(),
+            "message": "Tariff created successfully",
+        }
+
+    except Exception as e:
+        logger.error(f"Error creating tariff for {site}: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@limiter.limit("30/minute")
+@router.get("/water/costs/site/{site}")
+async def get_site_costs(
+    request: Request,
+    site: str,
+    start: Optional[str] = Query(None, description="Start date (ISO format)"),
+    end: Optional[str] = Query(None, description="End date (ISO format)"),
+) -> Dict:
+    """Get cost summary for a site in date range.
+
+    Args:
+        site: Building site code
+        start: Optional start date (default: 30 days ago)
+        end: Optional end date (default: today)
+
+    Returns:
+        Total cost by tier with zone breakdown
+    """
+    try:
+        cost_repo = WaterCostRepository()
+
+        # Parse dates
+        end_date = datetime.fromisoformat(end) if end else datetime.now()
+        start_date = datetime.fromisoformat(start) if start else end_date - timedelta(days=30)
+
+        result = await cost_repo.get_site_costs(site, start_date, end_date)
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Error fetching site costs for {site}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@limiter.limit("30/minute")
+@router.get("/water/costs/zone/{zone_id}")
+async def get_zone_costs(
+    request: Request,
+    zone_id: str,
+    start: Optional[str] = Query(None, description="Start date (ISO format)"),
+    end: Optional[str] = Query(None, description="End date (ISO format)"),
+) -> Dict:
+    """Get cost summary for a zone in date range.
+
+    Args:
+        zone_id: Zone identifier
+        start: Optional start date (default: 30 days ago)
+        end: Optional end date (default: today)
+
+    Returns:
+        Total cost breakdown by tier
+    """
+    try:
+        cost_repo = WaterCostRepository()
+
+        # Parse dates
+        end_date = datetime.fromisoformat(end) if end else datetime.now()
+        start_date = datetime.fromisoformat(start) if start else end_date - timedelta(days=30)
+
+        result = await cost_repo.get_zone_costs(zone_id, start_date, end_date)
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Error fetching zone costs for {zone_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@limiter.limit("30/minute")
+@router.get("/water/forecast/monthly")
+async def forecast_monthly(
+    request: Request,
+    site: str = Query(..., description="Building site code"),
+    zone_id: Optional[str] = Query(None, description="Optional zone filter"),
+) -> Dict:
+    """Forecast monthly water cost based on recent consumption.
+
+    Args:
+        site: Building site code
+        zone_id: Optional zone identifier
+
+    Returns:
+        Projected 30-day cost with tier breakdown
+    """
+    try:
+        cost_svc = get_water_cost_service()
+        result = await cost_svc.forecast_monthly_cost(site, zone_id)
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Error forecasting monthly cost for {site}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@limiter.limit("30/minute")
+@router.get("/water/forecast/annual")
+async def forecast_annual(
+    request: Request,
+    site: str = Query(..., description="Building site code"),
+    zone_id: Optional[str] = Query(None, description="Optional zone filter"),
+) -> Dict:
+    """Forecast annual water cost based on recent consumption.
+
+    Args:
+        site: Building site code
+        zone_id: Optional zone identifier
+
+    Returns:
+        Projected 365-day cost with tier breakdown
+    """
+    try:
+        cost_svc = get_water_cost_service()
+        result = await cost_svc.forecast_annual_cost(site, zone_id)
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Error forecasting annual cost for {site}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@limiter.limit("30/minute")
+@router.get("/water/zones/cost-comparison")
+async def zone_cost_comparison(
+    request: Request,
+    site: str = Query(..., description="Building site code"),
+    days: int = Query(30, ge=1, le=365, description="Look-back period in days"),
+) -> Dict:
+    """Compare water costs across zones at a site.
+
+    Args:
+        site: Building site code
+        days: Analysis period
+
+    Returns:
+        List of zones ranked by cost (highest first)
+    """
+    try:
+        cost_svc = get_water_cost_service()
+        zones = await cost_svc.get_zone_cost_comparison(site, days)
+
+        return {
+            "site": site,
+            "period_days": days,
+            "zone_count": len(zones),
+            "zones": zones,
+        }
+
+    except Exception as e:
+        logger.error(f"Error comparing zone costs for {site}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@limiter.limit("30/minute")
+@router.post("/water/cost-impact")
+async def calculate_cost_impact(
+    request: Request,
+    site: str = Query(..., description="Building site code"),
+    reduction_liters: float = Query(..., ge=0, description="Consumption reduction target"),
+    period_days: int = Query(30, ge=1, le=365, description="Base period for analysis"),
+) -> Dict:
+    """Simulate cost savings from consumption reduction.
+
+    Args:
+        site: Building site code
+        reduction_liters: Target reduction volume
+        period_days: Period for baseline cost calculation
+
+    Returns:
+        Current cost, reduced cost, and savings impact
+    """
+    try:
+        cost_svc = get_water_cost_service()
+        result = await cost_svc.calculate_cost_impact(reduction_liters, site, period_days)
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Error calculating cost impact for {site}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
