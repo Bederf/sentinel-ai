@@ -56,7 +56,7 @@ import {
 
 interface QuoteGeneratorProps {
   buildingId: string
-  onQuoteGenerated?: (quote: QuoteResponse) => void
+  onQuoteGenerated?: (quote: QuoteResponse, equipmentCodes: string[], slaTier: string, contractMonths: number) => void
 }
 
 interface FormState {
@@ -164,7 +164,7 @@ export default function QuoteGenerator({
       setQuote(result)
 
       if (onQuoteGenerated) {
-        onQuoteGenerated(result)
+        onQuoteGenerated(result, formData.equipmentCodes, formData.slaTier, formData.contractMonths)
       }
     } catch (err) {
       console.error('Failed to generate quote:', err)

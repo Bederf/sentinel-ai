@@ -85,6 +85,12 @@ class QuoteResponse(BaseModel):
     market_comparison: Optional[Dict[str, Any]] = Field(None, description="Market benchmark data")
     valid_until: date = Field(..., description="Quote validity date")
 
+    # Optional fields for database storage and tracking
+    quote_id: Optional[str] = Field(None, description="UUID for quote tracking")
+    company_name: Optional[str] = Field(None, description="Client company name")
+    created_by: Optional[str] = Field(None, description="Sales person or technician who created quote")
+    status: Optional[str] = Field(default="draft", description="Quote status: draft, sent, accepted, rejected")
+
 
 class WhatIfScenario(BaseModel):
     """Scenario override for pricing what-if analysis."""

@@ -8,6 +8,7 @@ Implements multiple leak detection strategies:
 """
 
 import logging
+import uuid
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
 from statistics import mean, stdev
@@ -64,6 +65,8 @@ class WaterAlertService:
         night_flow_hours_start: int = 2,
         night_flow_hours_end: int = 4,
         night_occupancy_max: int = 0,  # Building should be empty at night
+        work_order_service: Optional[Any] = None,
+        technician_repository: Optional[Any] = None,
     ):
         """Initialize alert service with detection thresholds."""
         self.continuous_flow_threshold_lpm = continuous_flow_threshold_lpm
@@ -81,6 +84,8 @@ class WaterAlertService:
 
         self._repository = WaterConsumptionRepository()
         self.occupancy_service = _get_occupancy_service()
+        self.work_order_service = work_order_service
+        self.technician_repository = technician_repository
 
     # === Detection algorithms ===
 
@@ -613,6 +618,120 @@ class WaterAlertService:
             return True
         logger.error(f"Failed to resolve alert {alert_id}")
         return False
+
+    # === Work order integration ===
+
+    async def create_work_order_from_alert(self, alert: WaterAlert) -> Optional[Dict]:
+        """Create work order from water alert.
+
+        Args:
+            alert: WaterAlert object
+
+        Returns:
+            Dictionary with work_order_id, alert_id, created_at, technician_id, status
+        """
+        if not self.work_order_service:
+            logger.warning("WorkOrderService not initialized - cannot create work order")
+            return None
+
+        try:
+            # Extract zone ID from alert (meter_id format: "zone_id-meter" or similar)
+            zone_id = alert.meter_id.replace("-meter", "") if alert.meter_id else "unknown"
+
+            # Determine priority based on severity
+            priority = "critical" if alert.severity == AlertSeverity.CRITICAL else (
+                "high" if alert.severity == AlertSeverity.HIGH else "medium"
+            )
+
+            # Create work order
+            work_order = self.work_order_service.create_work_order(
+                description=alert.description,
+                site_id=alert.site,
+                equipment_ref=f"METER-{zone_id}",
+                category="water_maintenance",
+                priority=priority,
+                reported_by="WATER_ALERT_SERVICE",
+            )
+
+            # Try to assign technician
+            technician_id = None
+            if self.technician_repository:
+                try:
+                    # Look up technician for water maintenance specialty
+                    technician = await self.technician_repository.get_technician_for_specialty(
+                        specialty="water_maintenance",
+                        zone_id=zone_id
+                    )
+                    if technician:
+                        technician_id = technician.get("id")
+                        logger.info(f"Assigned technician {technician_id} to water work order {work_order.id}")
+                except Exception as e:
+                    logger.warning(f"Could not assign technician: {e}")
+
+            result = {
+                "work_order_id": work_order.id,
+                "alert_id": alert.alert_id,
+                "created_at": work_order.created_at,
+                "technician_id": technician_id,
+                "status": work_order.status,
+                "priority": priority,
+                "zone_id": zone_id,
+            }
+
+            logger.info(f"Created work order {work_order.id} from water alert {alert.alert_id}")
+            return result
+
+        except Exception as e:
+            logger.error(f"Failed to create work order from alert: {e}")
+            return None
+
+    async def acknowledge_alert(
+        self,
+        alert_id: str,
+        acknowledged_by: str,
+        notes: Optional[str] = None,
+        work_order_id: Optional[str] = None,
+    ) -> Dict:
+        """Mark alert as acknowledged.
+
+        Args:
+            alert_id: Alert ID to acknowledge
+            acknowledged_by: User or system acknowledging
+            notes: Optional acknowledgment notes
+            work_order_id: Link to associated work order
+
+        Returns:
+            Dictionary with alert_id, status, acknowledged_at, acknowledged_by, work_order_id
+        """
+        try:
+            acknowledged_at = datetime.now().isoformat()
+
+            # Update alert status to acknowledged (using resolve_alert)
+            self._repository.resolve_alert(
+                alert_id=alert_id,
+                resolved_by=acknowledged_by,
+                resolution_notes=notes or "Alert acknowledged by technician/system",
+            )
+
+            result = {
+                "alert_id": alert_id,
+                "status": "acknowledged",
+                "acknowledged_at": acknowledged_at,
+                "acknowledged_by": acknowledged_by,
+                "work_order_id": work_order_id,
+                "notes": notes,
+            }
+
+            logger.info(f"Alert {alert_id} acknowledged by {acknowledged_by}")
+            return result
+
+        except Exception as e:
+            logger.error(f"Failed to acknowledge alert {alert_id}: {e}")
+            return {
+                "alert_id": alert_id,
+                "status": "error",
+                "message": str(e),
+            }
 
     # === Helper methods ===
 
