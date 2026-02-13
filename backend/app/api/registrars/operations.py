@@ -15,7 +15,7 @@ from app.api import integration, concept
 from app.api import modules, health_config, service_records, preferences
 from app.api import solar, water, sustainability, contracts, pricing, municipal_billing
 from app.api import parts_orders, approval_workflow, delivery_tracking, approvals, parasite_decisions
-from app.api import security
+from app.api import security, compliance
 
 
 def register_operations_routers(app: FastAPI) -> None:
@@ -84,3 +84,6 @@ def register_operations_routers(app: FastAPI) -> None:
 
     # Security module (Phase 27)
     app.include_router(security.router, tags=["security"])
+
+    # Compliance module (Phase 28)
+    app.include_router(compliance.router, tags=["compliance"])
