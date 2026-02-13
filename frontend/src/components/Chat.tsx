@@ -11,9 +11,10 @@
 
 import { useState, useRef, useEffect } from "react";
 import type { FormEvent, KeyboardEvent } from "react";
-import { Send, MessageSquare, Bot, BookOpen, Building2, ChevronDown } from "lucide-react";
+import { Send, MessageSquare, Bot, BookOpen } from "lucide-react";
 import { ChatMessage } from "./ChatMessage";
 import { DocumentUpload } from "./DocumentUpload";
+import BuildingSelector from "./BuildingSelector";
 import api, { isExpectedApiError, streamChat } from '@/lib/api';
 import type { Site } from '@/lib/api';
 
@@ -188,32 +189,12 @@ export function Chat() {
         </div>
 
         {/* Building selector */}
-        <div className="relative">
-          <select
-            value={selectedSiteId}
-            onChange={(e) => setSelectedSiteId(e.target.value)}
-            className="appearance-none pl-8 pr-8 py-1.5 text-sm rounded cursor-pointer focus:outline-none focus:ring-1"
-            style={{
-              background: "var(--color-grafana-bg-secondary)",
-              border: "1px solid var(--color-grafana-border)",
-              color: "var(--color-grafana-text-primary)",
-            }}
-          >
-            {sites.map((site) => (
-              <option key={site.id} value={site.id}>
-                {site.name}
-              </option>
-            ))}
-          </select>
-          <Building2
-            className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none"
-            style={{ color: "var(--color-grafana-text-secondary)" }}
-          />
-          <ChevronDown
-            className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none"
-            style={{ color: "var(--color-grafana-text-secondary)" }}
-          />
-        </div>
+        <BuildingSelector
+          value={selectedSiteId}
+          onChange={setSelectedSiteId}
+          sites={sites}
+          disabled={sites.length === 0}
+        />
       </div>
 
       {/* Messages area */}
