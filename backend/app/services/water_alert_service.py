@@ -20,6 +20,17 @@ from pydantic import BaseModel
 logger = logging.getLogger(__name__)
 
 
+class WaterAlertNotificationSettings(BaseModel):
+    """Configuration for water alert notifications."""
+
+    enabled: bool = True
+    notify_critical: bool = True
+    notify_warning: bool = True
+    notify_channels: List[str] = ["clawd"]
+    technician_group: str = "water_maintenance"
+    escalate_after_hours: int = 2
+
+
 class WaterAlertThresholds(BaseModel):
     """Configuration model for water alert thresholds."""
 
@@ -86,6 +97,7 @@ class WaterAlertService:
         self.occupancy_service = _get_occupancy_service()
         self.work_order_service = work_order_service
         self.technician_repository = technician_repository
+        self.notification_settings = WaterAlertNotificationSettings()
 
     # === Detection algorithms ===
 
@@ -731,6 +743,90 @@ class WaterAlertService:
                 "alert_id": alert_id,
                 "status": "error",
                 "message": str(e),
+            }
+
+    async def notify_clawd_water_alert(
+        self,
+        alert: WaterAlert,
+        work_order_id: str,
+        technician_id: Optional[str] = None,
+    ) -> Dict:
+        """Notify Clawd bot of water leak alert.
+
+        Args:
+            alert: WaterAlert object
+            work_order_id: Associated work order ID
+            technician_id: Assigned technician ID (optional)
+
+        Returns:
+            Dictionary with notification_id, sent_at, channel, status
+        """
+        if not self.notification_settings.enabled:
+            logger.info("Water alert notifications disabled")
+            return {"status": "disabled"}
+
+        # Check if we should notify based on severity
+        if alert.severity == AlertSeverity.WARNING and not self.notification_settings.notify_warning:
+            logger.info(f"Warning alert notifications disabled, skipping alert {alert.alert_id}")
+            return {"status": "skipped", "reason": "warning notifications disabled"}
+
+        try:
+            notification_id = str(uuid.uuid4())
+            sent_at = datetime.now().isoformat()
+
+            # Format Clawd message
+            severity_emoji = "🚨" if alert.severity == AlertSeverity.CRITICAL else (
+                "⚠️" if alert.severity == AlertSeverity.HIGH else "ℹ️"
+            )
+
+            zone_id = alert.meter_id.replace("-meter", "") if alert.meter_id else "unknown"
+
+            message_lines = [
+                f"{severity_emoji} WATER ALERT: {alert.severity.value.upper()}",
+                f"Zone: {zone_id}",
+                f"Flow: {alert.flow_rate_lpm:.1f} L/min (threshold: {alert.threshold_lpm:.1f} L/min)",
+                f"Type: {alert.alert_type.value.replace('_', ' ').title()}",
+                "",
+                f"Issue: {alert.description}",
+                "",
+                f"Work Order: {work_order_id}",
+            ]
+
+            if technician_id:
+                message_lines.append(f"Technician: {technician_id}")
+
+            message_lines.extend([
+                "",
+                f"Command: /water_repair_{work_order_id}",
+                f"Reply with repair details to submit feedback",
+            ])
+
+            clawd_message = "\n".join(message_lines)
+
+            # Log the notification intent
+            result = {
+                "notification_id": notification_id,
+                "sent_at": sent_at,
+                "channel": "clawd",
+                "status": "queued_for_sending",
+                "message_preview": clawd_message[:100] + "..." if len(clawd_message) > 100 else clawd_message,
+                "work_order_id": work_order_id,
+                "alert_id": alert.alert_id,
+            }
+
+            logger.info(
+                f"Water alert notification queued: {notification_id} for work order {work_order_id}. "
+                f"Message: {clawd_message[:200]}"
+            )
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Failed to create Clawd notification for alert {alert.alert_id}: {e}")
+            return {
+                "status": "error",
+                "message": str(e),
+                "alert_id": alert.alert_id,
             }
 
     # === Helper methods ===
