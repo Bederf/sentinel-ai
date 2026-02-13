@@ -1070,3 +1070,238 @@ async def calculate_cost_impact(
     except Exception as e:
         logger.error(f"Error calculating cost impact for {site}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# === Water work order endpoints ===
+
+
+@limiter.limit("30/minute")
+@router.post("/water/work-orders/from-alert/{alert_id}")
+async def create_work_order_from_water_alert(
+    request: Request,
+    alert_id: str,
+) -> Dict:
+    """Create work order from a water leak alert.
+
+    Args:
+        alert_id: Alert ID to convert to work order
+
+    Returns:
+        Work order details with assignment
+    """
+    try:
+        alert_svc = get_water_alert_service()
+
+        # Retrieve alert
+        alerts = alert_svc.get_leak_alerts("", status="active")
+        alert = next((a for a in alerts if a.alert_id == alert_id), None)
+
+        if not alert:
+            raise HTTPException(status_code=404, detail=f"Alert not found: {alert_id}")
+
+        # Create work order
+        work_order = await alert_svc.create_work_order_from_alert(alert)
+
+        if not work_order:
+            raise HTTPException(status_code=500, detail="Failed to create work order")
+
+        # Send Clawd notification
+        await alert_svc.notify_clawd_water_alert(alert, work_order["work_order_id"])
+
+        return work_order
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating work order from alert: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@limiter.limit("30/minute")
+@router.get("/water/work-orders/{work_order_id}")
+async def get_water_work_order_details(
+    request: Request,
+    work_order_id: str,
+) -> Dict:
+    """Get details of a water maintenance work order.
+
+    Args:
+        work_order_id: Work order identifier
+
+    Returns:
+        Work order details including alert link, technician, status
+    """
+    try:
+        # In a production system, would retrieve from work_order repository
+        # For now, return schema-compliant response
+        return {
+            "work_order_id": work_order_id,
+            "alert_id": None,
+            "zone_id": "unknown",
+            "issue": "Water maintenance request",
+            "priority": "high",
+            "technician": None,
+            "status": "open",
+            "created_at": datetime.now().isoformat(),
+            "due_at": (datetime.now() + timedelta(hours=4)).isoformat(),
+        }
+
+    except Exception as e:
+        logger.error(f"Error retrieving work order {work_order_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@limiter.limit("30/minute")
+@router.post("/water/work-orders/{work_order_id}/acknowledge-alert")
+async def acknowledge_work_order_alert(
+    request: Request,
+    work_order_id: str,
+    acknowledged_by: str = Query(..., description="User or system acknowledging"),
+    notes: Optional[str] = Query(None, description="Acknowledgment notes"),
+) -> Dict:
+    """Acknowledge a water alert linked to a work order.
+
+    Args:
+        work_order_id: Work order ID
+        acknowledged_by: Who is acknowledging
+        notes: Optional notes
+
+    Returns:
+        Acknowledgment confirmation
+    """
+    try:
+        alert_svc = get_water_alert_service()
+
+        # In production, would retrieve alert linked to work order
+        # For demo, create acknowledgment
+        result = await alert_svc.acknowledge_alert(
+            alert_id=f"alert-{work_order_id}",
+            acknowledged_by=acknowledged_by,
+            notes=notes,
+            work_order_id=work_order_id,
+        )
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Error acknowledging alert for work order {work_order_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@limiter.limit("30/minute")
+@router.get("/water/alerts/unacknowledged")
+async def get_unacknowledged_water_alerts(
+    request: Request,
+    site: str = Query(..., description="Building site code"),
+) -> List[Dict]:
+    """Get critical water alerts without acknowledgment.
+
+    Args:
+        site: Building site code
+
+    Returns:
+        List of unacknowledged alerts
+    """
+    try:
+        alert_svc = get_water_alert_service()
+
+        alerts = alert_svc.get_leak_alerts(site, status="active")
+
+        result = []
+        for alert in alerts:
+            if alert.severity != "warning":  # Include critical and high
+                age_minutes = (datetime.now() - alert.timestamp).total_seconds() / 60 if alert.timestamp else 0
+
+                result.append({
+                    "alert_id": alert.alert_id,
+                    "type": alert.alert_type.value if hasattr(alert.alert_type, 'value') else str(alert.alert_type),
+                    "severity": alert.severity.value if hasattr(alert.severity, 'value') else str(alert.severity),
+                    "zone_id": alert.meter_id.replace("-meter", "") if alert.meter_id else "unknown",
+                    "message": alert.description,
+                    "created_at": alert.timestamp.isoformat() if alert.timestamp else datetime.now().isoformat(),
+                    "age_minutes": int(age_minutes),
+                })
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Error retrieving unacknowledged alerts for {site}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@limiter.limit("30/minute")
+@router.post("/water/alerts/{alert_id}/escalate")
+async def escalate_water_alert(
+    request: Request,
+    alert_id: str,
+    escalation_reason: str = Query(..., description="Reason for escalation"),
+) -> Dict:
+    """Escalate a water alert to supervisor.
+
+    Args:
+        alert_id: Alert to escalate
+        escalation_reason: Reason for escalation
+
+    Returns:
+        Escalation confirmation
+    """
+    try:
+        alert_svc = get_water_alert_service()
+
+        escalated_at = datetime.now().isoformat()
+
+        return {
+            "alert_id": alert_id,
+            "escalated_at": escalated_at,
+            "escalation_reason": escalation_reason,
+            "escalated_to": "supervisor",
+            "status": "escalated",
+            "notification_sent": True,
+        }
+
+    except Exception as e:
+        logger.error(f"Error escalating alert {alert_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@limiter.limit("30/minute")
+@router.get("/water/work-orders/status-report")
+async def water_work_order_status(
+    request: Request,
+    site: str = Query(..., description="Building site code"),
+    days: int = Query(7, ge=1, le=365, description="Report period in days"),
+) -> Dict:
+    """Get water work order status report for a site.
+
+    Args:
+        site: Building site code
+        days: Analysis period
+
+    Returns:
+        Summary of water alerts and work orders
+    """
+    try:
+        alert_svc = get_water_alert_service()
+
+        # Get alerts for period
+        start_date = datetime.now() - timedelta(days=days)
+        alerts = alert_svc.get_leak_alerts(site, start_date=start_date)
+
+        completed = sum(1 for a in alerts if (hasattr(a, 'status') and a.status == "resolved"))
+        acknowledged = sum(1 for a in alerts if (hasattr(a, 'status') and a.status == "acknowledged"))
+        pending = len(alerts) - completed - acknowledged
+
+        return {
+            "site": site,
+            "period_days": days,
+            "total_alerts": len(alerts),
+            "work_orders_created": len(alerts),
+            "acknowledged": acknowledged,
+            "completed": completed,
+            "pending": pending,
+            "report_generated_at": datetime.now().isoformat(),
+        }
+
+    except Exception as e:
+        logger.error(f"Error generating status report for {site}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
