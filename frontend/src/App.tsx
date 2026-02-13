@@ -3,6 +3,8 @@ import { Clock, Wifi, WifiOff, Bell, X, LogOut } from "lucide-react";
 import { Toaster, toast } from "sonner";
 import { formatTime } from "./lib/timeFormat";
 import api, { AUTH_EXPIRED_EVENT, isExpectedApiError, type Alert, type AuthUser } from "./lib/api";
+import { SimulationTimeIndicator } from "./components/SimulationTimeIndicator";
+import { useRecommendationToasts } from "./components/RecommendationToast";
 
 // Security: Prevent console logging in production (Phase 75-07)
 import { initializeSecurityProtections } from "./lib/api/security-utils";
@@ -26,7 +28,7 @@ import { SimbiotPage } from "./components/SimbiotPage";
 import { SimulationDashboard } from "./components/SimulationDashboard";
 import { FleetInsights } from "./components/FleetInsights";
 import { MLMetrics } from "./components/MLMetrics";
-import { SustainabilityDashboard } from "./components/sustainability";
+import { ESGPage } from "./components/sustainability/ESGPage";
 import { SolarDashboard } from "./components/solar/SolarDashboard";
 import { WaterPanel } from "./components/water";
 import { ContractManagementPage } from "./pages/ContractManagementPage";
@@ -113,6 +115,7 @@ function App() {
   const [showCalendar, setShowCalendar] = useState(false);
   const [unreadAlertCount, setUnreadAlertCount] = useState(0);
   const [lastViewedAlertTime, setLastViewedAlertTime] = useState<Date | null>(null);
+  const [simulationRunning, setSimulationRunning] = useState(false);
   const alertsPanelRef = useRef<HTMLDivElement | null>(null);
   const calendarButtonRef = useRef<HTMLDivElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -127,6 +130,29 @@ function App() {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // Monitor simulation status
+  useEffect(() => {
+    const checkSimulationStatus = async () => {
+      try {
+        const response = await fetch('/api/lifecycle/status/site-002');
+        const data = await response.json();
+        setSimulationRunning(data.running === true);
+      } catch (error) {
+        // Fail silently - simulation might not be running
+        setSimulationRunning(false);
+      }
+    };
+
+    // Check on mount and every 5 seconds
+    checkSimulationStatus();
+    const interval = setInterval(checkSimulationStatus, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Use recommendation toasts hook when logged in
+  const siteId = currentUser ? 'site-002' : '';
+  useRecommendationToasts(siteId);
 
   useEffect(() => {
     const checkHealth = async () => {
@@ -365,6 +391,9 @@ function App() {
         userRole={currentUser?.role}
         userEmail={currentUser?.email}
       />
+
+      {/* Simulation Time Indicator - Shows when simulation is running */}
+      <SimulationTimeIndicator simulationRunning={simulationRunning} siteId="site-002" />
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
@@ -683,7 +712,9 @@ function App() {
               <TechnicianChat />
             </div>
           ) : currentView === "integrations" ? (
-            <SystemHealthPage />
+            <div className="h-full overflow-y-auto">
+              <SystemHealthPage />
+            </div>
           ) : currentView === "occupancy" ? (
             <div className="h-full overflow-y-auto p-4 md:p-6">
               <OccupancyPanel compact={false} />
@@ -701,8 +732,8 @@ function App() {
               <SimulationDashboard />
             </div>
           ) : currentView === "sustainability" ? (
-            <div className="h-full overflow-y-auto p-4 md:p-6">
-              <SustainabilityDashboard />
+            <div className="h-full overflow-y-auto">
+              <ESGPage selectedBuilding={selectedSite ? { id: selectedSite.id, name: selectedSite.name, code: selectedSite.code } : undefined} />
             </div>
           ) : currentView === "fleet" ? (
             <FleetInsights />

@@ -4,7 +4,7 @@
  * 8 endpoints for carbon emissions tracking, ESG metrics, and benchmarking
  */
 
-import { client } from './client';
+import { fetchApi } from './client';
 
 // ==================== Types ====================
 
@@ -123,7 +123,7 @@ export const sustainabilityApi = {
     if (startDate) params.append('start_date', startDate);
     if (endDate) params.append('end_date', endDate);
     const query = params.toString() ? `?${params.toString()}` : '';
-    return client.get(`/api/sustainability/buildings/${buildingId}/emissions/monthly${query}`);
+    return fetchApi(`/api/sustainability/buildings/${buildingId}/emissions/monthly${query}`);
   },
 
   /**
@@ -131,7 +131,7 @@ export const sustainabilityApi = {
    * Current year emissions summary with source breakdown
    */
   getEmissionsSummary: async (buildingId: string): Promise<EmissionsSummary> => {
-    return client.get(`/api/sustainability/buildings/${buildingId}/emissions/summary`);
+    return fetchApi(`/api/sustainability/buildings/${buildingId}/emissions/summary`);
   },
 
   /**
@@ -139,7 +139,7 @@ export const sustainabilityApi = {
    * Emissions breakdown by source for pie chart (last 12 months)
    */
   getEmissionsBySource: async (buildingId: string, months = 12): Promise<EmissionsBySource> => {
-    return client.get(`/api/sustainability/buildings/${buildingId}/emissions/by-source?months=${months}`);
+    return fetchApi(`/api/sustainability/buildings/${buildingId}/emissions/by-source?months=${months}`);
   },
 
   /**
@@ -147,7 +147,7 @@ export const sustainabilityApi = {
    * Compare building to portfolio and industry benchmarks
    */
   getBenchmark: async (buildingId: string): Promise<Benchmark> => {
-    return client.get(`/api/sustainability/portfolio/emissions/benchmark?building_id=${buildingId}`);
+    return fetchApi(`/api/sustainability/portfolio/emissions/benchmark?building_id=${buildingId}`);
   },
 
   /**
@@ -155,7 +155,7 @@ export const sustainabilityApi = {
    * Overall ESG score and component metrics
    */
   getESGMetrics: async (buildingId: string): Promise<ESGMetrics> => {
-    return client.get(`/api/sustainability/buildings/${buildingId}/esg-metrics`);
+    return fetchApi(`/api/sustainability/buildings/${buildingId}/esg-metrics`);
   },
 
   /**
@@ -163,7 +163,7 @@ export const sustainabilityApi = {
    * Green Star/LEED/Carbon Trust certification progress
    */
   getCertifications: async (buildingId: string): Promise<Certifications> => {
-    return client.get(`/api/sustainability/buildings/${buildingId}/certifications`);
+    return fetchApi(`/api/sustainability/buildings/${buildingId}/certifications`);
   },
 
   /**
@@ -177,11 +177,15 @@ export const sustainabilityApi = {
     value: number,
     unit: string,
   ): Promise<{ status: string; calculated_co2e_kg: number }> => {
-    return client.post(`/api/sustainability/buildings/${buildingId}/update-emissions`, {
-      source_type: sourceType,
-      month,
-      value,
-      unit,
+    return fetchApi(`/api/sustainability/buildings/${buildingId}/update-emissions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        source_type: sourceType,
+        month,
+        value,
+        unit,
+      }),
     });
   },
 
@@ -190,6 +194,6 @@ export const sustainabilityApi = {
    * 12-month emissions projection with seasonal adjustment
    */
   getForecast: async (buildingId: string): Promise<Forecast> => {
-    return client.get(`/api/sustainability/buildings/${buildingId}/emissions/forecast`);
+    return fetchApi(`/api/sustainability/buildings/${buildingId}/emissions/forecast`);
   },
 };
