@@ -15,6 +15,12 @@ from typing import Dict, List, Optional, Any
 from app.database.supabase_client import get_supabase_client
 from app.database.repositories.prediction_repository import PredictionRepository
 from app.services.health_threshold_service import get_health_thresholds, get_health_status
+from app.services.prediction_taxonomy import (
+    FORMULA_VERSION_STATIC,
+    confidence_from_probability,
+    normalize_prediction_urgency,
+    urgency_from_severity,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -151,17 +157,17 @@ class PredictionGeneratorService:
         if health_status == "critical":
             severity = "critical"
             timeframe_days = 7
-            urgency = "immediate"
+            urgency = "critical"
         elif health_status == "warning":
             severity = "warning"  # Use 'warning' not 'high' (DB constraint)
             timeframe_days = 14
-            urgency = "soon"
+            urgency = "warning"
         else:
             # Healthy equipment shouldn't reach here (only generate for health < 90)
             # But if it does, use 'healthy' not 'low'
             severity = "healthy"
             timeframe_days = 30
-            urgency = "scheduled"
+            urgency = "healthy"
 
         # Calculate predicted failure date
         predicted_date = datetime.now() + timedelta(days=timeframe_days)
@@ -190,7 +196,7 @@ class PredictionGeneratorService:
             "equipment_id": equipment.get("id"),
             "prediction_type": prediction_type,
             "probability_percent": probability,
-            "confidence": "high" if probability >= 80 else "medium" if probability >= 65 else "low",
+            "confidence": confidence_from_probability(probability, high_threshold=80, medium_threshold=65),
             "predicted_failure_date": predicted_date.isoformat(),
             "timeframe_days": timeframe_days,
             "severity": severity,
@@ -203,7 +209,7 @@ class PredictionGeneratorService:
             "downtime_cost_per_hour_zar": financial_impact["downtime_cost_per_hour"],
             "potential_loss_zar": financial_impact["potential_loss"],
             "recommended_action": recommended_action,
-            "urgency": urgency,
+            "urgency": normalize_prediction_urgency(urgency) or urgency_from_severity(severity),
         }
 
     def _determine_prediction_type(self, equipment_type: str, health_score: float) -> str:
@@ -236,6 +242,7 @@ class PredictionGeneratorService:
         return {
             "health_score": health_score,
             "health_trend": "declining" if health_score < 70 else "stable",
+            "formula_version": FORMULA_VERSION_STATIC,
             "data_source": "automatic_health_monitoring",
             "last_reading": {
                 "parameter": "health_score",

@@ -1,276 +1,395 @@
-"""Repository for security module data operations.
+"""Repository for security data operations.
 
-Follows dual-write pattern: Supabase (primary) + JSON (fallback/offline).
-Static configuration (zones, doors, cameras) loaded from security_config.json.
-Dynamic state (badge events, occupancy, alarm status) persisted to both stores.
+Implements dual-write pattern: Supabase (primary) + JSON file (backup).
+Gracefully falls back to JSON-only when Supabase is unavailable.
 """
 
+from typing import List, Optional, Dict, Any
+from datetime import datetime, timedelta
 import json
 import logging
-from datetime import datetime
-from typing import Any, Dict, List, Optional
 from pathlib import Path
 
-from app.config.settings import settings
+from app.database.supabase_client import get_supabase_client
+from app.models.security import (
+    AccessEvent, AccessPoint, AccessCard, Visitor, SecurityAlert,
+    AccessStatus, PointStatus, VisitorStatus, AlertStatus
+)
 
 logger = logging.getLogger(__name__)
 
-DATA_DIR = Path(__file__).parent.parent.parent / "data"
-CONFIG_FILE = DATA_DIR / "security_config.json"
-STATE_FILE = DATA_DIR / "security_state.json"
-
-# Singleton instance
-_instance: Optional["SecurityRepository"] = None
-
 
 class SecurityRepository:
-    """Repository for security data with Supabase + JSON dual-write."""
+    """Repository for security data with dual-write support."""
 
     def __init__(self):
-        self._client = None
-        self._use_json = settings.use_json_storage
-        self._config_cache: Optional[Dict[str, Any]] = None
+        """Initialize repository with Supabase client."""
+        self.client = get_supabase_client()
+        self.json_backup_dir = Path("backend/app/data/security")
 
-    @property
-    def client(self):
-        """Lazy load Supabase client."""
-        if self._client is None and not self._use_json:
-            try:
-                from app.database.supabase_client import get_supabase_client
-                self._client = get_supabase_client()
-            except Exception as e:
-                logger.warning(f"Failed to get Supabase client, using JSON fallback: {e}")
-                self._use_json = True
-        return self._client
+    def _get_json_backup_path(self, data_type: str) -> Path:
+        """Get path to JSON backup file for a data type."""
+        self.json_backup_dir.mkdir(parents=True, exist_ok=True)
+        return self.json_backup_dir / f"{data_type}.json"
 
-    # --- JSON helpers ---
-
-    def _load_config(self) -> Dict[str, Any]:
-        """Load static security configuration from JSON."""
-        if self._config_cache is not None:
-            return self._config_cache
-        if CONFIG_FILE.exists():
-            with open(CONFIG_FILE) as f:
-                self._config_cache = json.load(f)
-                return self._config_cache
-        return {}
-
-    def _load_state(self) -> Dict[str, Any]:
-        """Load dynamic security state from JSON."""
-        if STATE_FILE.exists():
-            with open(STATE_FILE) as f:
+    def _load_json_backup(self, data_type: str) -> Dict[str, Any]:
+        """Load data from JSON backup."""
+        json_path = self._get_json_backup_path(data_type)
+        if not json_path.exists():
+            return {}
+        try:
+            with open(json_path, "r") as f:
                 return json.load(f)
-        # Initialize from config
-        config = self._load_config()
-        return {
-            "badge_events": config.get("badge_events", []),
-            "alarm_zones": config.get("alarm_zones", []),
-            "occupancy": [],
-        }
+        except Exception as e:
+            logger.warning(f"Failed to load JSON backup for {data_type}: {e}")
+            return {}
 
-    def _save_state(self, state: Dict[str, Any]) -> None:
-        """Save dynamic security state to JSON."""
-        with open(STATE_FILE, "w") as f:
-            json.dump(state, f, indent=2, default=str)
+    def _save_json_backup(self, data_type: str, data: Dict[str, Any]) -> None:
+        """Save data to JSON backup."""
+        json_path = self._get_json_backup_path(data_type)
+        try:
+            with open(json_path, "w") as f:
+                json.dump(data, f, indent=2, default=str)
+        except Exception as e:
+            logger.warning(f"Failed to save JSON backup for {data_type}: {e}")
 
-    # --- Access zone operations (static config) ---
+    # ========================================================================
+    # Access Events
+    # ========================================================================
 
-    def get_zones(self) -> List[Dict[str, Any]]:
-        """Get all access zones."""
-        if not self._use_json and self.client:
-            try:
-                response = self.client.table("security_access_zones").select("*").execute()
-                if response.data:
-                    return response.data
-            except Exception as e:
-                logger.warning(f"Supabase security_access_zones query failed, using JSON: {e}")
+    def list_events(
+        self,
+        site: str,
+        limit: int = 100,
+        offset: int = 0,
+        after_hours: bool = False,
+        location: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """List access events for a site."""
+        try:
+            query = self.client.table("access_events").select("*").eq("building_id", site)
+            
+            if location:
+                query = query.eq("location", location)
+            
+            query = query.order("timestamp", desc=True).limit(limit).offset(offset)
+            response = query.execute()
+            events = response.data
+            
+            if after_hours:
+                events = [e for e in events if self._is_after_hours(e.get("timestamp"))]
+            
+            # Backup to JSON
+            backup = self._load_json_backup("access_events")
+            backup[site] = [e for e in events]
+            self._save_json_backup("access_events", backup)
+            
+            return events
+        except Exception as e:
+            logger.warning(f"Supabase query failed, using JSON backup: {e}")
+            backup = self._load_json_backup("access_events")
+            events = backup.get(site, [])
+            
+            if location:
+                events = [e for e in events if e.get("location") == location]
+            
+            if after_hours:
+                events = [e for e in events if self._is_after_hours(e.get("timestamp"))]
+            
+            return events[:limit]
 
-        config = self._load_config()
-        return config.get("access_zones", [])
+    def get_event_by_id(self, event_id: str) -> Optional[Dict[str, Any]]:
+        """Get single access event by ID."""
+        try:
+            response = self.client.table("access_events").select("*").eq("event_id", event_id).execute()
+            return response.data[0] if response.data else None
+        except Exception as e:
+            logger.warning(f"Failed to fetch event {event_id}: {e}")
+            backup = self._load_json_backup("access_events")
+            for events in backup.values():
+                for event in events:
+                    if event.get("event_id") == event_id:
+                        return event
+            return None
 
-    def get_zone(self, zone_id: str) -> Optional[Dict[str, Any]]:
-        """Get a single access zone by ID."""
-        zones = self.get_zones()
-        return next((z for z in zones if z.get("zone_id") == zone_id), None)
+    def create_event(self, event: AccessEvent) -> Optional[Dict[str, Any]]:
+        """Create access event."""
+        event_data = event.to_dict()
+        
+        try:
+            response = self.client.table("access_events").insert(event_data).execute()
+            record = response.data[0]
+            
+            # Backup
+            backup = self._load_json_backup("access_events")
+            building_id = event.location.split("-")[0]
+            if building_id not in backup:
+                backup[building_id] = []
+            backup[building_id].append(record)
+            self._save_json_backup("access_events", backup)
+            
+            return record
+        except Exception as e:
+            logger.warning(f"Failed to create event in Supabase: {e}")
+            # Fallback to JSON only
+            backup = self._load_json_backup("access_events")
+            building_id = event.location.split("-")[0]
+            if building_id not in backup:
+                backup[building_id] = []
+            backup[building_id].append(event_data)
+            self._save_json_backup("access_events", backup)
+            return event_data
 
-    # --- Door operations (static config + dynamic status) ---
+    # ========================================================================
+    # Access Points
+    # ========================================================================
 
-    def get_doors(self) -> List[Dict[str, Any]]:
-        """Get all doors with current status."""
-        if not self._use_json and self.client:
-            try:
-                response = self.client.table("security_doors").select("*").execute()
-                if response.data:
-                    return response.data
-            except Exception as e:
-                logger.warning(f"Supabase security_doors query failed, using JSON: {e}")
+    def get_access_points(self, site: str) -> List[Dict[str, Any]]:
+        """List all access points for a site."""
+        try:
+            response = self.client.table("access_points").select("*").eq("building_id", site).execute()
+            points = response.data
+            
+            # Backup
+            backup = self._load_json_backup("access_points")
+            backup[site] = points
+            self._save_json_backup("access_points", backup)
+            
+            return points
+        except Exception as e:
+            logger.warning(f"Failed to fetch access points for {site}: {e}")
+            backup = self._load_json_backup("access_points")
+            return backup.get(site, [])
 
-        config = self._load_config()
-        return config.get("doors", [])
+    def get_access_point_by_id(self, point_id: str) -> Optional[Dict[str, Any]]:
+        """Get single access point by ID."""
+        try:
+            response = self.client.table("access_points").select("*").eq("point_id", point_id).execute()
+            return response.data[0] if response.data else None
+        except Exception as e:
+            logger.warning(f"Failed to fetch access point {point_id}: {e}")
+            backup = self._load_json_backup("access_points")
+            for points in backup.values():
+                for point in points:
+                    if point.get("point_id") == point_id:
+                        return point
+            return None
 
-    def get_door_status(self, door_id: str) -> Optional[Dict[str, Any]]:
-        """Get a single door by ID."""
-        doors = self.get_doors()
-        return next((d for d in doors if d.get("door_id") == door_id), None)
+    # ========================================================================
+    # Visitors
+    # ========================================================================
 
-    # --- Camera operations (static config + dynamic status) ---
+    def list_visitors(self, site: str, limit: int = 50) -> List[Dict[str, Any]]:
+        """List active visitors for a site."""
+        try:
+            response = (
+                self.client.table("visitors")
+                .select("*")
+                .eq("site", site)
+                .in_("status", ["pending", "checked_in"])
+                .order("visit_date", desc=True)
+                .limit(limit)
+                .execute()
+            )
+            visitors = response.data
+            
+            # Backup
+            backup = self._load_json_backup("visitors")
+            backup[site] = visitors
+            self._save_json_backup("visitors", backup)
+            
+            return visitors
+        except Exception as e:
+            logger.warning(f"Failed to fetch visitors for {site}: {e}")
+            backup = self._load_json_backup("visitors")
+            return backup.get(site, [])
 
-    def get_cameras(self) -> List[Dict[str, Any]]:
-        """Get all cameras with current status."""
-        if not self._use_json and self.client:
-            try:
-                response = self.client.table("security_cameras").select("*").execute()
-                if response.data:
-                    return response.data
-            except Exception as e:
-                logger.warning(f"Supabase security_cameras query failed, using JSON: {e}")
+    def record_visit_checkin(self, visitor_id: str) -> Optional[Dict[str, Any]]:
+        """Record visitor check-in."""
+        now = datetime.now()
+        try:
+            response = (
+                self.client.table("visitors")
+                .update({
+                    "status": VisitorStatus.CHECKED_IN,
+                    "checkin_time": now.isoformat()
+                })
+                .eq("visitor_id", visitor_id)
+                .execute()
+            )
+            return response.data[0] if response.data else None
+        except Exception as e:
+            logger.warning(f"Failed to record check-in for {visitor_id}: {e}")
+            return None
 
-        config = self._load_config()
-        return config.get("cameras", [])
+    def record_visit_checkout(self, visitor_id: str) -> Optional[Dict[str, Any]]:
+        """Record visitor check-out."""
+        now = datetime.now()
+        try:
+            response = (
+                self.client.table("visitors")
+                .update({
+                    "status": VisitorStatus.CHECKED_OUT,
+                    "checkout_time": now.isoformat()
+                })
+                .eq("visitor_id", visitor_id)
+                .execute()
+            )
+            return response.data[0] if response.data else None
+        except Exception as e:
+            logger.warning(f"Failed to record check-out for {visitor_id}: {e}")
+            return None
 
-    def get_camera_status(self, camera_id: str) -> Optional[Dict[str, Any]]:
-        """Get a single camera by ID."""
-        cameras = self.get_cameras()
-        return next((c for c in cameras if c.get("camera_id") == camera_id), None)
+    # ========================================================================
+    # Alerts
+    # ========================================================================
 
-    # --- Badge event operations (dynamic) ---
+    def get_alerts(
+        self,
+        site: str,
+        severity: Optional[str] = None,
+        limit: int = 50,
+    ) -> List[Dict[str, Any]]:
+        """Get security alerts."""
+        try:
+            query = self.client.table("security_alerts").select("*").eq("building_id", site)
+            
+            if severity:
+                query = query.eq("severity", severity)
+            
+            query = query.order("timestamp", desc=True).limit(limit)
+            response = query.execute()
+            alerts = response.data
+            
+            # Backup
+            backup = self._load_json_backup("security_alerts")
+            backup[site] = alerts
+            self._save_json_backup("security_alerts", backup)
+            
+            return alerts
+        except Exception as e:
+            logger.warning(f"Failed to fetch alerts for {site}: {e}")
+            backup = self._load_json_backup("security_alerts")
+            alerts = backup.get(site, [])
+            
+            if severity:
+                alerts = [a for a in alerts if a.get("severity") == severity]
+            
+            return alerts[:limit]
 
-    def get_badge_events(self, zone_id: str = None, since: str = None, limit: int = 50) -> List[Dict[str, Any]]:
-        """Get badge events with optional filtering."""
-        if not self._use_json and self.client:
-            try:
-                query = self.client.table("security_badge_events").select("*")
-                if zone_id:
-                    query = query.eq("zone_id", zone_id)
-                if since:
-                    query = query.gte("timestamp", since)
-                query = query.order("timestamp", desc=True).limit(limit)
-                response = query.execute()
-                if response.data is not None:
-                    return response.data
-            except Exception as e:
-                logger.warning(f"Supabase security_badge_events query failed, using JSON: {e}")
+    def create_alert(self, alert: SecurityAlert) -> Optional[Dict[str, Any]]:
+        """Create security alert."""
+        alert_data = alert.to_dict()
+        
+        try:
+            response = self.client.table("security_alerts").insert(alert_data).execute()
+            record = response.data[0]
+            
+            # Backup
+            backup = self._load_json_backup("security_alerts")
+            building_id = alert.building_id
+            if building_id not in backup:
+                backup[building_id] = []
+            backup[building_id].append(record)
+            self._save_json_backup("security_alerts", backup)
+            
+            return record
+        except Exception as e:
+            logger.warning(f"Failed to create alert in Supabase: {e}")
+            # Fallback to JSON
+            backup = self._load_json_backup("security_alerts")
+            building_id = alert.building_id
+            if building_id not in backup:
+                backup[building_id] = []
+            backup[building_id].append(alert_data)
+            self._save_json_backup("security_alerts", backup)
+            return alert_data
 
-        # JSON fallback
-        state = self._load_state()
-        events = state.get("badge_events", [])
+    def acknowledge_alert(self, alert_id: str, acknowledged_by: str) -> Optional[Dict[str, Any]]:
+        """Acknowledge an alert."""
+        now = datetime.now()
+        try:
+            response = (
+                self.client.table("security_alerts")
+                .update({
+                    "status": AlertStatus.ACKNOWLEDGED,
+                    "acknowledged_by": acknowledged_by,
+                    "acknowledged_at": now.isoformat()
+                })
+                .eq("alert_id", alert_id)
+                .execute()
+            )
+            return response.data[0] if response.data else None
+        except Exception as e:
+            logger.warning(f"Failed to acknowledge alert {alert_id}: {e}")
+            return None
 
-        if zone_id:
-            events = [e for e in events if e.get("zone_id") == zone_id]
-        if since:
-            events = [e for e in events if e.get("timestamp", "") >= since]
+    # ========================================================================
+    # Occupancy (for cross-module integration)
+    # ========================================================================
 
-        # Sort by timestamp descending
-        events = sorted(events, key=lambda x: x.get("timestamp", ""), reverse=True)
-        return events[:limit]
+    def get_occupancy(self, site: str) -> Dict[str, Any]:
+        """Get current building occupancy from badge events and visitors."""
+        try:
+            # Get recent badge access (last 30 min)
+            thirty_min_ago = (datetime.now() - timedelta(minutes=30)).isoformat()
+            
+            response = (
+                self.client.table("access_events")
+                .select("*")
+                .eq("building_id", site)
+                .gte("timestamp", thirty_min_ago)
+                .eq("status", AccessStatus.GRANTED)
+                .execute()
+            )
+            
+            recent_events = response.data
+            
+            # Count unique people (granted access in last 30 min)
+            people_in = set()
+            for event in recent_events:
+                if event.get("status") == AccessStatus.GRANTED:
+                    people_in.add(event.get("person_name"))
+            
+            # Add checked-in visitors
+            visitors_resp = (
+                self.client.table("visitors")
+                .select("*")
+                .eq("site", site)
+                .eq("status", VisitorStatus.CHECKED_IN)
+                .execute()
+            )
+            
+            for visitor in visitors_resp.data:
+                people_in.add(visitor.get("name"))
+            
+            return {
+                "total_occupancy": len(people_in),
+                "by_floor": {"L0": len([p for p in people_in if True])},  # Simplified
+                "by_zone": {},
+                "last_updated": datetime.now().isoformat()
+            }
+        except Exception as e:
+            logger.warning(f"Failed to calculate occupancy for {site}: {e}")
+            return {
+                "total_occupancy": 0,
+                "by_floor": {},
+                "by_zone": {},
+                "last_updated": datetime.now().isoformat()
+            }
 
-    def log_badge_event(self, event_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Log a new badge event (dual-write)."""
-        if not self._use_json and self.client:
-            try:
-                response = self.client.table("security_badge_events").insert(event_data).execute()
-                if response.data:
-                    event_data = response.data[0]
-            except Exception as e:
-                logger.warning(f"Supabase security_badge_events insert failed: {e}")
+    # ========================================================================
+    # Helper Methods
+    # ========================================================================
 
-        # Always write to JSON as backup
-        state = self._load_state()
-        state.setdefault("badge_events", []).append(event_data)
-        # Keep only last 500 events in JSON
-        if len(state["badge_events"]) > 500:
-            state["badge_events"] = state["badge_events"][-500:]
-        self._save_state(state)
-        return event_data
-
-    # --- Alarm zone operations (dynamic) ---
-
-    def get_alarm_zones(self) -> List[Dict[str, Any]]:
-        """Get all alarm zones with current status."""
-        if not self._use_json and self.client:
-            try:
-                response = self.client.table("security_alarm_zones").select("*").execute()
-                if response.data:
-                    return response.data
-            except Exception as e:
-                logger.warning(f"Supabase security_alarm_zones query failed, using JSON: {e}")
-
-        state = self._load_state()
-        alarm_zones = state.get("alarm_zones", [])
-        if alarm_zones:
-            return alarm_zones
-        config = self._load_config()
-        return config.get("alarm_zones", [])
-
-    def update_alarm_zone_status(self, zone_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Update alarm zone status (dual-write)."""
-        if not self._use_json and self.client:
-            try:
-                self.client.table("security_alarm_zones").update(data).eq("zone_id", zone_id).execute()
-            except Exception as e:
-                logger.warning(f"Supabase security_alarm_zones update failed: {e}")
-
-        state = self._load_state()
-        for zone in state.get("alarm_zones", []):
-            if zone.get("zone_id") == zone_id:
-                zone.update(data)
-                break
-        self._save_state(state)
-        return data
-
-    # --- Occupancy operations (dynamic) ---
-
-    def get_occupancy(self, zone_id: str = None) -> List[Dict[str, Any]]:
-        """Get occupancy data, optionally filtered by zone."""
-        if not self._use_json and self.client:
-            try:
-                query = self.client.table("security_occupancy").select("*")
-                if zone_id:
-                    query = query.eq("zone_id", zone_id)
-                query = query.order("last_updated", desc=True)
-                response = query.execute()
-                if response.data is not None:
-                    return response.data
-            except Exception as e:
-                logger.warning(f"Supabase security_occupancy query failed, using JSON: {e}")
-
-        state = self._load_state()
-        occupancy = state.get("occupancy", [])
-        if zone_id:
-            occupancy = [o for o in occupancy if o.get("zone_id") == zone_id]
-        return occupancy
-
-    def update_occupancy(self, occupancy_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Update occupancy for a zone (dual-write)."""
-        zone_id = occupancy_data.get("zone_id")
-
-        if not self._use_json and self.client:
-            try:
-                # Upsert based on zone_id
-                self.client.table("security_occupancy").upsert(
-                    occupancy_data, on_conflict="zone_id"
-                ).execute()
-            except Exception as e:
-                logger.warning(f"Supabase security_occupancy upsert failed: {e}")
-
-        # Always update JSON
-        state = self._load_state()
-        occupancy_list = state.setdefault("occupancy", [])
-        found = False
-        for i, o in enumerate(occupancy_list):
-            if o.get("zone_id") == zone_id:
-                occupancy_list[i] = occupancy_data
-                found = True
-                break
-        if not found:
-            occupancy_list.append(occupancy_data)
-        self._save_state(state)
-        return occupancy_data
-
-
-def get_security_repository() -> SecurityRepository:
-    """Get or create singleton SecurityRepository."""
-    global _instance
-    if _instance is None:
-        _instance = SecurityRepository()
-    return _instance
+    @staticmethod
+    def _is_after_hours(timestamp_str: Optional[str]) -> bool:
+        """Check if timestamp is during after-hours (18:00-06:00)."""
+        if not timestamp_str:
+            return False
+        try:
+            dt = datetime.fromisoformat(timestamp_str)
+            hour = dt.hour
+            return hour >= 18 or hour < 6
+        except Exception:
+            return False

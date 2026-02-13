@@ -1,256 +1,292 @@
-"""Security module models.
+"""Security module data models.
 
-Pydantic models for access control, CCTV monitoring, occupancy tracking,
-alarm zones, and cross-module coordination with HVAC/Lighting.
+Provides data structures for:
+- Access control events (badge access, overrides, denials)
+- Access points (doors, readers, sensors)
+- Access cards and credentials
+- Visitor management and check-in/out tracking
+- Security alerts (forced entry, tailgating, after-hours access)
 """
 
-from datetime import datetime
+from typing import Optional, List, Dict, Any
 from enum import Enum
-from typing import Dict, List, Optional
+from datetime import datetime
 from pydantic import BaseModel, Field
+import uuid
 
 
-# --- Enums ---
+# ============================================================================
+# Access Control Models
+# ============================================================================
 
-class DoorStatus(str, Enum):
-    """Door status values."""
-    OPEN = "open"
-    CLOSED = "closed"
-    LOCKED = "locked"
-    FAULT = "fault"
+class AccessType(str, Enum):
+    """Type of access credential used."""
+    BADGE = "badge"
+    CODE = "code"
+    OVERRIDE = "override"
+    BIOMETRIC = "biometric"
+    MANUAL = "manual"
+
+
+class AccessStatus(str, Enum):
+    """Result of access attempt."""
+    GRANTED = "granted"
+    DENIED = "denied"
+    TIMEOUT = "timeout"
+    ERROR = "error"
+
+
+class AccessEvent(BaseModel):
+    """Single access control event (person entering/exiting)."""
+    event_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    timestamp: datetime
+    access_point_id: str  # Door/reader ID
+    card_id: str  # Badge or credential ID
+    person_name: str
+    status: AccessStatus  # granted/denied/timeout
+    access_type: AccessType  # badge/code/override/biometric
+    location: str  # Building zone or door name
+    duration_seconds: Optional[int] = None  # Time held door open
+
+    class Config:
+        use_enum_values = True
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "event_id": self.event_id,
+            "timestamp": self.timestamp.isoformat(),
+            "access_point_id": self.access_point_id,
+            "card_id": self.card_id,
+            "person_name": self.person_name,
+            "status": self.status,
+            "access_type": self.access_type,
+            "location": self.location,
+            "duration_seconds": self.duration_seconds,
+        }
+
+
+class DeviceType(str, Enum):
+    """Type of access control device."""
+    READER = "reader"
+    LOCK = "lock"
+    SENSOR = "sensor"
+    CONTROLLER = "controller"
+
+
+class PointStatus(str, Enum):
+    """Status of access control point."""
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+    ALARM = "alarm"
+    MAINTENANCE = "maintenance"
+
+
+class AccessPoint(BaseModel):
+    """Physical access control point (door, gate, reader)."""
+    point_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    building_id: str
+    zone: str  # Floor or area
+    location: str  # Descriptive name (e.g., "Server Room Door")
+    device_type: DeviceType  # reader, lock, sensor, controller
+    status: PointStatus  # active, inactive, alarm, maintenance
+    last_activity: Optional[datetime] = None
+
+    class Config:
+        use_enum_values = True
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "point_id": self.point_id,
+            "building_id": self.building_id,
+            "zone": self.zone,
+            "location": self.location,
+            "device_type": self.device_type,
+            "status": self.status,
+            "last_activity": self.last_activity.isoformat() if self.last_activity else None,
+        }
+
+
+class CardStatus(str, Enum):
+    """Status of access card."""
+    ACTIVE = "active"
+    REVOKED = "revoked"
+    EXPIRED = "expired"
+    SUSPENDED = "suspended"
 
 
 class AccessLevel(str, Enum):
-    """Zone access level."""
-    PUBLIC = "public"
-    RESTRICTED = "restricted"
-    SECURE = "secure"
-    CRITICAL = "critical"
+    """Access privilege level."""
+    VISITOR = "visitor"
+    EMPLOYEE = "employee"
+    CONTRACTOR = "contractor"
+    VENDOR = "vendor"
+    EXECUTIVE = "executive"
 
 
-class CameraStatus(str, Enum):
-    """Camera operational status."""
-    ONLINE = "online"
-    OFFLINE = "offline"
-    FAULT = "fault"
-
-
-class CameraType(str, Enum):
-    """Camera type."""
-    FIXED = "fixed"
-    PTZ = "ptz"
-    DOME = "dome"
-
-
-class AlarmStatus(str, Enum):
-    """Alarm zone status."""
-    ARMED = "armed"
-    DISARMED = "disarmed"
-    TRIGGERED = "triggered"
-    FAULT = "fault"
-
-
-class ArmType(str, Enum):
-    """Alarm arm type."""
-    FULL = "full"
-    PERIMETER = "perimeter"
-    NIGHT = "night"
-
-
-class EventDirection(str, Enum):
-    """Badge event direction."""
-    ENTRY = "entry"
-    EXIT = "exit"
-
-
-class ReaderType(str, Enum):
-    """Door reader type."""
-    CARD = "card"
-    BIOMETRIC = "biometric"
-    PIN = "pin"
-
-
-class OccupancySource(str, Enum):
-    """Occupancy data source."""
-    BADGE = "badge"
-    CAMERA = "camera"
-    COMBINED = "combined"
-
-
-class CCureEventType(str, Enum):
-    """C•CURE 9000 access event types."""
-    ACCESS_GRANTED = "access_granted"
-    ACCESS_DENIED = "access_denied"
-    FORCED_DOOR = "forced_door"
-    DOOR_HELD_OPEN = "door_held_open"
-    ANTI_PASSBACK = "anti_passback"
-    TAMPER = "tamper"
-    CONTROLLER_OFFLINE = "controller_offline"
-    DURESS = "duress"
-
-
-class ControllerStatus(str, Enum):
-    """C•CURE iSTAR controller status."""
-    ONLINE = "online"
-    OFFLINE = "offline"
-    DEGRADED = "degraded"
-
-
-class TamperStatus(str, Enum):
-    """C•CURE controller tamper status."""
-    NORMAL = "normal"
-    ENCLOSURE_OPEN = "enclosure_open"
-    BACK_TAMPER = "back_tamper"
-
-
-# --- Models ---
-
-class AccessZone(BaseModel):
-    """Access zone definition with doors and access level."""
-    zone_id: str
-    name: str
-    floor: str
-    access_level: AccessLevel = AccessLevel.RESTRICTED
-    doors: List[str] = []
-
-
-class Door(BaseModel):
-    """Door with reader and current status."""
-    door_id: str
-    name: str
-    zone_id: str
-    status: DoorStatus = DoorStatus.LOCKED
-    reader_type: ReaderType = ReaderType.CARD
-    last_event_time: Optional[datetime] = None
-
-
-class BadgeEvent(BaseModel):
-    """Badge access event."""
-    event_id: str
-    door_id: str
-    zone_id: str
-    badge_id: str
+class AccessCard(BaseModel):
+    """Access credential (badge, card, code)."""
+    card_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     person_name: str
-    direction: EventDirection = EventDirection.ENTRY
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
-    granted: bool = True
-    reason: str = ""
-    # C•CURE-specific fields (optional, for extended functionality)
-    event_type: Optional[CCureEventType] = CCureEventType.ACCESS_GRANTED
-    clearance_level: Optional[str] = None
-    department: Optional[str] = None
-    after_hours: bool = False
+    access_level: AccessLevel
+    issued_date: datetime
+    expiry_date: datetime
+    status: CardStatus
+    allowed_points: List[str] = Field(default_factory=list)  # Point IDs
+
+    class Config:
+        use_enum_values = True
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "card_id": self.card_id,
+            "person_name": self.person_name,
+            "access_level": self.access_level,
+            "issued_date": self.issued_date.isoformat(),
+            "expiry_date": self.expiry_date.isoformat(),
+            "status": self.status,
+            "allowed_points": self.allowed_points,
+        }
 
 
-class Camera(BaseModel):
-    """CCTV camera status and details."""
-    camera_id: str
+# ============================================================================
+# Visitor Management Models
+# ============================================================================
+
+class VisitorStatus(str, Enum):
+    """Visitor state."""
+    PENDING = "pending"
+    CHECKED_IN = "checked_in"
+    CHECKED_OUT = "checked_out"
+    REVOKED = "revoked"
+
+
+class Visitor(BaseModel):
+    """Temporary visitor with managed access."""
+    visitor_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
-    zone_id: str
-    floor: str
-    status: CameraStatus = CameraStatus.ONLINE
-    type: CameraType = CameraType.FIXED
-    resolution: str = "1080p"
-    has_analytics: bool = False
-    motion_detected: bool = False
+    company: str
+    visit_date: datetime
+    host_contact: str  # Employee receiving visitor
+    access_points: List[str] = Field(default_factory=list)  # Allowed point IDs
+    status: VisitorStatus
+    checkin_time: Optional[datetime] = None
+    checkout_time: Optional[datetime] = None
+    purpose: Optional[str] = None
+
+    class Config:
+        use_enum_values = True
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "visitor_id": self.visitor_id,
+            "name": self.name,
+            "company": self.company,
+            "visit_date": self.visit_date.isoformat(),
+            "host_contact": self.host_contact,
+            "access_points": self.access_points,
+            "status": self.status,
+            "checkin_time": self.checkin_time.isoformat() if self.checkin_time else None,
+            "checkout_time": self.checkout_time.isoformat() if self.checkout_time else None,
+            "purpose": self.purpose,
+        }
 
 
-class AlarmZone(BaseModel):
-    """Intrusion alarm zone."""
-    zone_id: str
-    name: str
-    status: AlarmStatus = AlarmStatus.DISARMED
-    arm_type: ArmType = ArmType.FULL
+class VisitSchedule(BaseModel):
+    """Scheduled visitor visit."""
+    visit_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    visitor_id: str
+    scheduled_date: datetime
+    expected_duration: int  # Minutes
+    purpose: str
+    host_contact: str
 
 
-class SecurityOccupancy(BaseModel):
-    """Per-zone occupancy derived from badge events."""
-    zone_id: str
-    zone_name: str
-    occupancy_count: int = 0
-    badge_entries: int = 0
-    badge_exits: int = 0
-    last_updated: Optional[datetime] = None
-    source: OccupancySource = OccupancySource.BADGE
+# ============================================================================
+# Alert Models
+# ============================================================================
+
+class AlertType(str, Enum):
+    """Type of security alert."""
+    FORCED_ENTRY = "forced_entry"
+    TAILGATING = "tailgating"
+    AFTER_HOURS = "after_hours"
+    OVERRIDE = "override"
+    CARD_REVOKED = "card_revoked"
+    MULTIPLE_ATTEMPTS = "multiple_attempts"
+    UNAUTHORIZED_ACCESS = "unauthorized_access"
 
 
-class SecuritySystemStatus(BaseModel):
-    """Aggregate security system status."""
-    total_doors: int = 0
-    doors_secure: int = 0
-    cameras_online: int = 0
-    cameras_total: int = 0
-    alarm_zones_armed: int = 0
-    alarm_zones_total: int = 0
-    active_alerts: int = 0
-    occupancy_total: int = 0
+class AlertSeverity(str, Enum):
+    """Alert priority level."""
+    CRITICAL = "critical"
+    WARNING = "warning"
+    INFO = "info"
 
 
-# --- C•CURE 9000 Integration Models ---
+class AlertStatus(str, Enum):
+    """Alert resolution state."""
+    OPEN = "open"
+    ACKNOWLEDGED = "acknowledged"
+    RESOLVED = "resolved"
 
 
-class CCurePersonnel(BaseModel):
-    """C•CURE personnel/badge holder information."""
-    person_id: str
-    badge_id: str
-    first_name: str
-    last_name: str
-    department: Optional[str] = None
-    clearance_level: str
-    photo_url: Optional[str] = None
-    active: bool = True
-
-    @property
-    def person_name(self) -> str:
-        """Full name for display."""
-        return f"{self.first_name} {self.last_name}"
-
-
-class CCureController(BaseModel):
-    """C•CURE iSTAR controller hardware status and details."""
-    controller_id: str
-    name: str
-    model: str  # e.g., "iSTAR Ultra", "iSTAR Edge"
-    firmware: str
-    encryption_mode: str  # e.g., "FIPS 197 AES-256"
-    tamper_status: str = TamperStatus.NORMAL
-    last_seen: datetime
-    ip_address: str
-    reader_count: int
-    status: ControllerStatus = ControllerStatus.ONLINE
-
-
-class CCureClearance(BaseModel):
-    """C•CURE clearance/access level definition."""
-    clearance_id: str
-    name: str
-    description: Optional[str] = None
-    partition: str
-    door_ids: List[str] = []
-    time_schedules: List[str] = []
-
-
-class CCureZone(BaseModel):
-    """C•CURE anti-passback zone for occupancy tracking."""
-    zone_id: str
-    name: str
-    current_count: int = 0
-    max_occupancy: int = 0
-    anti_passback_enabled: bool = True
-
-
-class SecurityAnomaly(BaseModel):
-    """Detected security anomaly (after-hours, equipment health, etc.)."""
-    anomaly_id: Optional[str] = None
-    anomaly_type: str  # after_hours_access, controller_offline, forced_door, etc.
-    severity: str  # warning, critical, info
-    badge_event_id: Optional[str] = None
-    zone_id: Optional[str] = None
+class SecurityAlert(BaseModel):
+    """Security event that requires attention."""
+    alert_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    alert_type: AlertType
+    timestamp: datetime
+    location: str
+    building_id: str
+    severity: AlertSeverity
+    status: AlertStatus
     description: str
-    hvac_correlation: Optional[Dict] = None
-    lighting_correlation: Optional[Dict] = None
-    energy_impact: Optional[str] = None
-    resolved: bool = False
-    detected_at: datetime = Field(default_factory=datetime.utcnow)
+    related_events: List[str] = Field(default_factory=list)  # Event IDs
+    acknowledged_by: Optional[str] = None
+    acknowledged_at: Optional[datetime] = None
     resolved_at: Optional[datetime] = None
-    notes: Optional[str] = None
+
+    class Config:
+        use_enum_values = True
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "alert_id": self.alert_id,
+            "alert_type": self.alert_type,
+            "timestamp": self.timestamp.isoformat(),
+            "location": self.location,
+            "building_id": self.building_id,
+            "severity": self.severity,
+            "status": self.status,
+            "description": self.description,
+            "related_events": self.related_events,
+            "acknowledged_by": self.acknowledged_by,
+            "acknowledged_at": self.acknowledged_at.isoformat() if self.acknowledged_at else None,
+            "resolved_at": self.resolved_at.isoformat() if self.resolved_at else None,
+        }
+
+
+# ============================================================================
+# Summary Models (for API responses)
+# ============================================================================
+
+class SecurityOverview(BaseModel):
+    """Security system status summary."""
+    total_access_events_today: int
+    active_visitors: int
+    open_alerts: int
+    after_hours_access_count: int
+    system_status: str  # "online", "polling", "offline"
+    last_updated: datetime
+
+
+class OccupancyData(BaseModel):
+    """Building occupancy from security system."""
+    total_occupancy: int
+    by_floor: Dict[str, int]
+    by_zone: Dict[str, int]
+    last_updated: datetime

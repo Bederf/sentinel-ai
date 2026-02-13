@@ -1,0 +1,23 @@
+{
+  "formula_version": "v1.0-static",
+  "severity_by_probability": [
+    {"probability": 90, "severity": "critical"},
+    {"probability": 70, "severity": "warning"},
+    {"probability": 60, "severity": "healthy"}
+  ],
+  "confidence_by_probability_default": [
+    {"probability": 85, "confidence": "high"},
+    {"probability": 70, "confidence": "medium"},
+    {"probability": 50, "confidence": "low"}
+  ],
+  "urgency_by_severity": [
+    {"severity": "critical", "urgency": "critical"},
+    {"severity": "warning", "urgency": "warning"},
+    {"severity": "healthy", "urgency": "healthy"}
+  ],
+  "hvac_health_default_generator_no_dates": {
+    "health_score": 84.0,
+    "status": "warning",
+    "formula_version": "v1.0-static"
+  }
+}

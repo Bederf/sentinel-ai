@@ -126,6 +126,27 @@ export {
   type WhatIfRequest,
   type WhatIfResponse,
 } from './pricing';
+export {
+  securityApi,
+  useSecurityOverview,
+  useAccessEvents,
+  useAccessPoints,
+  useVisitors,
+  useSecurityAlerts,
+  useOccupancy,
+  useRegisterVisitor,
+  useCheckInVisitor,
+  useCheckOutVisitor,
+  useAcknowledgeAlert,
+  type AccessEvent,
+  type AccessPoint,
+  type Visitor,
+  type SecurityAlert,
+  type SecurityOverview,
+  type OccupancyData,
+  type EventsResponse,
+  type AlertsResponse,
+} from './security';
 
 // Desk positioning data types
 export {

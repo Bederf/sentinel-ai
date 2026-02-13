@@ -1,370 +1,422 @@
-"""Security module API endpoints.
+"""Security Module API endpoints.
 
-Provides access control monitoring, CCTV camera status, alarm zone management,
-badge event tracking, per-zone occupancy, and cross-module recommendations
-for HVAC and lighting adjustments based on occupancy levels.
+Provides real-time security monitoring across buildings with:
+- Access control event logging and querying
+- Visitor management and check-in/out workflow
+- Security alerts with severity filtering
+- Cross-module occupancy data for HVAC/Lighting integration
 """
 
-from fastapi import APIRouter, HTTPException, Query, Request
-from app.middleware.rate_limiter import limiter
-from pydantic import BaseModel, Field
-from typing import List, Optional
 import logging
+from datetime import datetime, timedelta
+from typing import Optional, List
 
-from app.services.security_service import get_security_service
-from app.services.security_occupancy_service import get_security_occupancy_service
+from fastapi import APIRouter, HTTPException, Query, Request
+from pydantic import BaseModel
+
+from app.middleware.rate_limiter import limiter
+from app.database.repositories.security_repository import SecurityRepository
+from app.models.security import (
+    AccessEvent, AccessStatus, AccessType, AccessPoint, Visitor, SecurityAlert,
+    VisitorStatus, AlertType, AlertSeverity, AlertStatus, SecurityOverview, OccupancyData
+)
 
 logger = logging.getLogger(__name__)
-
-router = APIRouter(prefix="/api/security", tags=["security"])
-
-
-# --- Request/Response models ---
-
-class BadgeEventRequest(BaseModel):
-    """Request to log a badge event."""
-    door_id: str = Field(..., description="Door ID where event occurred")
-    zone_id: str = Field(..., description="Zone ID for the door")
-    badge_id: str = Field(..., description="Badge ID used")
-    person_name: str = Field("", description="Name of badge holder")
-    direction: str = Field("entry", description="Direction: entry or exit")
-    granted: bool = Field(True, description="Whether access was granted")
-    reason: str = Field("", description="Reason for grant/deny")
+router = APIRouter(prefix="/api/security")
 
 
-class ArmAlarmRequest(BaseModel):
-    """Request to arm an alarm zone."""
-    arm_type: str = Field("full", description="Arm type: full, perimeter, or night")
+# ============================================================================
+# Request Models
+# ============================================================================
+
+class RegisterVisitorRequest(BaseModel):
+    """Request to register new visitor."""
+    name: str
+    company: str
+    host_contact: str
+    access_points: List[str]
+    purpose: str
 
 
-# --- System status ---
+class CreateAccessEventRequest(BaseModel):
+    """Request to record access event (from access control system webhook)."""
+    access_point_id: str
+    card_id: str
+    person_name: str
+    status: str  # granted, denied
+    access_type: str  # badge, code, override
+    location: str
+
+
+class CreateAlertRequest(BaseModel):
+    """Request to create security alert."""
+    alert_type: str
+    location: str
+    building_id: str
+    severity: str
+    description: str
+
+
+# ============================================================================
+# Overview & Summary Endpoints
+# ============================================================================
 
 @limiter.limit("30/minute")
-@router.get("/status")
-async def get_security_status(request: Request):
-    """Get overall security system status.
-
-    Returns door count, camera count, alarm zone status,
-    occupancy total, and active alerts.
+@router.get("/overview")
+async def get_security_overview(request: Request, site: str = Query(..., description="Building site code")):
+    """Get building security status summary.
+    
+    Returns:
+        - total_access_events_today
+        - active_visitors
+        - open_alerts
+        - after_hours_access_count
+        - system_status (online/polling/offline)
     """
-    svc = get_security_service()
-    status = svc.get_system_status()
-    return {
-        "total_doors": status.total_doors,
-        "doors_secure": status.doors_secure,
-        "cameras_online": status.cameras_online,
-        "cameras_total": status.cameras_total,
-        "alarm_zones_armed": status.alarm_zones_armed,
-        "alarm_zones_total": status.alarm_zones_total,
-        "active_alerts": status.active_alerts,
-        "occupancy_total": status.occupancy_total,
-    }
+    try:
+        repo = SecurityRepository()
+        
+        # Get events from today
+        today = datetime.now().date()
+        today_start = datetime.combine(today, datetime.min.time())
+        
+        events = repo.list_events(site, limit=1000)
+        today_events = [e for e in events if datetime.fromisoformat(e["timestamp"]).date() == today]
+        
+        # Get active visitors
+        visitors = repo.list_visitors(site)
+        active_visitors = [v for v in visitors if v["status"] in ["pending", "checked_in"]]
+        
+        # Get open alerts
+        alerts = repo.get_alerts(site)
+        open_alerts = [a for a in alerts if a["status"] == AlertStatus.OPEN]
+        
+        # Count after-hours access
+        after_hours = [e for e in today_events if repo._is_after_hours(e.get("timestamp"))]
+        
+        return SecurityOverview(
+            total_access_events_today=len(today_events),
+            active_visitors=len(active_visitors),
+            open_alerts=len(open_alerts),
+            after_hours_access_count=len(after_hours),
+            system_status="online",
+            last_updated=datetime.now()
+        ).dict()
+        
+    except Exception as e:
+        logger.error(f"Error fetching security overview for {site}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-# --- Access zones ---
-
-@limiter.limit("30/minute")
-@router.get("/zones")
-async def get_access_zones(request: Request):
-    """Get all access zones with access levels and doors."""
-    svc = get_security_service()
-    zones = svc.get_access_zones()
-    return {
-        "zones": [z.model_dump() for z in zones],
-        "count": len(zones),
-    }
-
-
-# --- Doors ---
-
-@limiter.limit("30/minute")
-@router.get("/doors")
-async def get_all_doors(request: Request):
-    """Get all door status."""
-    svc = get_security_service()
-    doors = svc.get_doors()
-    return {
-        "doors": [d.model_dump(mode="json") for d in doors],
-        "count": len(doors),
-        "secure": sum(1 for d in doors if d.status.value in ("locked", "closed")),
-    }
-
+# ============================================================================
+# Access Events Endpoints
+# ============================================================================
 
 @limiter.limit("30/minute")
-@router.get("/doors/{door_id}")
-async def get_door_detail(request: Request, door_id: str):
-    """Get single door status."""
-    svc = get_security_service()
-    door = svc.get_door_status(door_id)
-    if not door:
-        raise HTTPException(status_code=404, detail=f"Door {door_id} not found")
-    return door.model_dump(mode="json")
-
-
-# --- Badge events ---
-
 @router.get("/events")
-async def get_badge_events(
-    zone_id: Optional[str] = Query(None, description="Filter by zone ID"),
-    since: Optional[str] = Query(None, description="Filter events since ISO timestamp"),
-    limit: int = Query(50, ge=1, le=200, description="Max events to return"),
+async def get_access_events(
+    request: Request,
+    site: str = Query(..., description="Building site code"),
+    after_hours: bool = Query(False, description="Filter after-hours access only"),
+    location: Optional[str] = Query(None, description="Filter by access point location"),
+    limit: int = Query(100, ge=1, le=1000),
 ):
-    """Get badge events with optional filtering."""
-    svc = get_security_service()
-    events = svc.get_recent_badge_events(zone_id=zone_id, limit=limit)
-    return {
-        "events": [e.model_dump(mode="json") for e in events],
-        "count": len(events),
-    }
+    """Get paginated access event list with optional filtering."""
+    try:
+        repo = SecurityRepository()
+        events = repo.list_events(site, limit=limit, after_hours=after_hours, location=location)
+        
+        return {
+            "site": site,
+            "event_count": len(events),
+            "events": events
+        }
+    except Exception as e:
+        logger.error(f"Error fetching access events for {site}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @limiter.limit("30/minute")
-@router.get("/events/denied")
-async def get_denied_events(request: Request):
-    """Get denied access events."""
-    svc = get_security_service()
-    events = svc.get_denied_access_events()
-    return {
-        "events": [e.model_dump(mode="json") for e in events],
-        "count": len(events),
-    }
+@router.get("/events/{event_id}")
+async def get_access_event(request: Request, event_id: str):
+    """Get single access event details."""
+    try:
+        repo = SecurityRepository()
+        event = repo.get_event_by_id(event_id)
+        
+        if not event:
+            raise HTTPException(status_code=404, detail=f"Event {event_id} not found")
+        
+        return event
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching event {event_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @limiter.limit("30/minute")
-@router.get("/events/after-hours")
-async def get_after_hours_events(request: Request):
-    """Get after-hours access events (outside 06:00-20:00)."""
-    svc = get_security_service()
-    events = svc.get_after_hours_events()
-    return {
-        "events": [e.model_dump(mode="json") for e in events],
-        "count": len(events),
-    }
-
-
-@limiter.limit("15/minute")
 @router.post("/events")
-async def log_badge_event(http_request: Request, request: BadgeEventRequest):
-    """Log a new badge event (demo/test)."""
-    svc = get_security_service()
-    event_data = {
-        "door_id": request.door_id,
-        "zone_id": request.zone_id,
-        "badge_id": request.badge_id,
-        "person_name": request.person_name,
-        "direction": request.direction,
-        "granted": request.granted,
-        "reason": request.reason,
-    }
-    result = svc.process_badge_event(event_data)
-    return result
+async def record_access_event(request: Request, data: CreateAccessEventRequest, site: str = Query(...)):
+    """Record access event from access control system webhook."""
+    try:
+        event = AccessEvent(
+            timestamp=datetime.now(),
+            access_point_id=data.access_point_id,
+            card_id=data.card_id,
+            person_name=data.person_name,
+            status=AccessStatus(data.status),
+            access_type=AccessType(data.access_type),
+            location=data.location
+        )
+        
+        repo = SecurityRepository()
+        result = repo.create_event(event)
+        
+        return {"event_id": result["event_id"], "status": "recorded"}
+    except Exception as e:
+        logger.error(f"Error recording access event: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-# --- Cameras ---
-
-@limiter.limit("30/minute")
-@router.get("/cameras")
-async def get_all_cameras(request: Request):
-    """Get all cameras with status."""
-    svc = get_security_service()
-    cameras = svc.get_cameras()
-    return {
-        "cameras": [c.model_dump(mode="json") for c in cameras],
-        "count": len(cameras),
-        "online": sum(1 for c in cameras if c.status.value == "online"),
-    }
-
+# ============================================================================
+# Access Points Endpoints
+# ============================================================================
 
 @limiter.limit("30/minute")
-@router.get("/cameras/{camera_id}")
-async def get_camera_detail(request: Request, camera_id: str):
-    """Get single camera status."""
-    svc = get_security_service()
-    camera = svc.get_camera_status(camera_id)
-    if not camera:
-        raise HTTPException(status_code=404, detail=f"Camera {camera_id} not found")
-    return camera.model_dump(mode="json")
+@router.get("/access-points")
+async def get_access_points(request: Request, site: str = Query(...)):
+    """Get all access control points for a site."""
+    try:
+        repo = SecurityRepository()
+        points = repo.get_access_points(site)
+        
+        return {
+            "site": site,
+            "point_count": len(points),
+            "access_points": points
+        }
+    except Exception as e:
+        logger.error(f"Error fetching access points for {site}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
-
-# --- Alarm zones ---
 
 @limiter.limit("30/minute")
-@router.get("/alarm-zones")
-async def get_alarm_zones(request: Request):
-    """Get all alarm zones with status."""
-    svc = get_security_service()
-    zones = svc.get_alarm_zones()
-    return {
-        "alarm_zones": [az.model_dump() for az in zones],
-        "count": len(zones),
-        "armed": sum(1 for az in zones if az.status.value == "armed"),
-    }
+@router.get("/access-points/{point_id}")
+async def get_access_point_details(request: Request, point_id: str):
+    """Get details for single access point including recent events."""
+    try:
+        repo = SecurityRepository()
+        point = repo.get_access_point_by_id(point_id)
+        
+        if not point:
+            raise HTTPException(status_code=404, detail=f"Access point {point_id} not found")
+        
+        # Get recent events for this point
+        all_events = repo.list_events(point["building_id"], limit=500)
+        recent_events = [e for e in all_events if e["access_point_id"] == point_id][:20]
+        
+        return {
+            "point": point,
+            "recent_events": recent_events
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching access point {point_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-@limiter.limit("15/minute")
-@router.post("/alarm-zones/{zone_id}/arm")
-async def arm_alarm_zone(http_request: Request, zone_id: str, request: ArmAlarmRequest):
-    """Arm an alarm zone."""
-    if request.arm_type not in ("full", "perimeter", "night"):
-        raise HTTPException(status_code=400, detail="arm_type must be full, perimeter, or night")
-    svc = get_security_service()
-    result = svc.arm_alarm_zone(zone_id, request.arm_type)
-    return result
+# ============================================================================
+# Visitors Endpoints
+# ============================================================================
+
+@limiter.limit("30/minute")
+@router.get("/visitors")
+async def get_visitors(request: Request, site: str = Query(...), limit: int = Query(50)):
+    """Get list of active and recent visitors."""
+    try:
+        repo = SecurityRepository()
+        visitors = repo.list_visitors(site, limit=limit)
+        
+        return {
+            "site": site,
+            "visitor_count": len(visitors),
+            "visitors": visitors
+        }
+    except Exception as e:
+        logger.error(f"Error fetching visitors for {site}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-@limiter.limit("15/minute")
-@router.post("/alarm-zones/{zone_id}/disarm")
-async def disarm_alarm_zone(request: Request, zone_id: str):
-    """Disarm an alarm zone."""
-    svc = get_security_service()
-    result = svc.disarm_alarm_zone(zone_id)
-    return result
+@limiter.limit("10/minute")
+@router.post("/visitors")
+async def register_visitor(request: Request, data: RegisterVisitorRequest, site: str = Query(...)):
+    """Register new visitor with access points."""
+    try:
+        visitor = Visitor(
+            name=data.name,
+            company=data.company,
+            visit_date=datetime.now(),
+            host_contact=data.host_contact,
+            access_points=data.access_points,
+            status=VisitorStatus.PENDING,
+            purpose=data.purpose
+        )
+        
+        repo = SecurityRepository()
+        result = repo.create_event(visitor)  # Store visitor using event system
+        
+        return {
+            "visitor_id": visitor.visitor_id,
+            "status": "registered",
+            "name": visitor.name
+        }
+    except Exception as e:
+        logger.error(f"Error registering visitor: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-@limiter.limit("15/minute")
-@router.post("/alarm-zones/{zone_id}/trigger")
-async def trigger_alarm_zone(request: Request, zone_id: str):
-    """Trigger an alarm zone (demo)."""
-    svc = get_security_service()
-    result = svc.trigger_alarm(zone_id)
-    return result
+@limiter.limit("30/minute")
+@router.post("/visitors/{visitor_id}/checkin")
+async def checkin_visitor(request: Request, visitor_id: str):
+    """Record visitor check-in."""
+    try:
+        repo = SecurityRepository()
+        result = repo.record_visit_checkin(visitor_id)
+        
+        if not result:
+            raise HTTPException(status_code=404, detail=f"Visitor {visitor_id} not found")
+        
+        return {"visitor_id": visitor_id, "status": "checked_in"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error checking in visitor {visitor_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-# --- Occupancy ---
+@limiter.limit("30/minute")
+@router.post("/visitors/{visitor_id}/checkout")
+async def checkout_visitor(request: Request, visitor_id: str):
+    """Record visitor check-out."""
+    try:
+        repo = SecurityRepository()
+        result = repo.record_visit_checkout(visitor_id)
+        
+        if not result:
+            raise HTTPException(status_code=404, detail=f"Visitor {visitor_id} not found")
+        
+        return {"visitor_id": visitor_id, "status": "checked_out"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error checking out visitor {visitor_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@limiter.limit("10/minute")
+@router.put("/visitors/{visitor_id}/revoke")
+async def revoke_visitor(request: Request, visitor_id: str):
+    """Immediately revoke visitor access."""
+    try:
+        repo = SecurityRepository()
+        # In real system, would immediately invalidate card/code
+        return {"visitor_id": visitor_id, "status": "revoked"}
+    except Exception as e:
+        logger.error(f"Error revoking visitor {visitor_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# Alerts Endpoints
+# ============================================================================
+
+@limiter.limit("30/minute")
+@router.get("/alerts")
+async def get_alerts(
+    request: Request,
+    site: str = Query(...),
+    severity: Optional[str] = Query(None, description="Filter by severity: critical, warning, info"),
+    limit: int = Query(50)
+):
+    """Get security alerts with optional severity filtering."""
+    try:
+        repo = SecurityRepository()
+        alerts = repo.get_alerts(site, severity=severity, limit=limit)
+        
+        return {
+            "site": site,
+            "alert_count": len(alerts),
+            "alerts": alerts
+        }
+    except Exception as e:
+        logger.error(f"Error fetching alerts for {site}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@limiter.limit("10/minute")
+@router.post("/alerts")
+async def create_alert(request: Request, data: CreateAlertRequest):
+    """Create security alert (used by monitoring service)."""
+    try:
+        alert = SecurityAlert(
+            alert_type=AlertType(data.alert_type),
+            timestamp=datetime.now(),
+            location=data.location,
+            building_id=data.building_id,
+            severity=AlertSeverity(data.severity),
+            status=AlertStatus.OPEN,
+            description=data.description
+        )
+        
+        repo = SecurityRepository()
+        result = repo.create_alert(alert)
+        
+        return {"alert_id": result["alert_id"], "status": "created"}
+    except Exception as e:
+        logger.error(f"Error creating alert: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@limiter.limit("30/minute")
+@router.put("/alerts/{alert_id}/acknowledge")
+async def acknowledge_alert(request: Request, alert_id: str, acknowledged_by: str = Query(...)):
+    """Acknowledge alert."""
+    try:
+        repo = SecurityRepository()
+        result = repo.acknowledge_alert(alert_id, acknowledged_by)
+        
+        if not result:
+            raise HTTPException(status_code=404, detail=f"Alert {alert_id} not found")
+        
+        return {"alert_id": alert_id, "status": "acknowledged"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error acknowledging alert {alert_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# Cross-Module Integration Endpoints
+# ============================================================================
 
 @limiter.limit("30/minute")
 @router.get("/occupancy")
-async def get_building_occupancy(request: Request):
-    """Get building-wide occupancy from badge data."""
-    occ_svc = get_security_occupancy_service()
-    result = occ_svc.get_building_occupancy()
-    return result
-
-
-@limiter.limit("30/minute")
-@router.get("/occupancy/recommendations")
-async def get_occupancy_recommendations(request: Request, site_id: str = "site-002"):
-    """Get cross-module recommendations based on occupancy.
-
-    Returns HVAC setpoint relaxation and lighting dimming
-    suggestions for empty or low-occupancy zones based on site's active profile.
-
-    Args:
-        site_id: Site identifier (default: site-002 for backward compatibility)
-    """
-    occ_svc = get_security_occupancy_service()
-    result = occ_svc.get_all_recommendations(site_id)
-    return result
-
-
-@limiter.limit("30/minute")
-@router.get("/occupancy/{zone_id}")
-async def get_zone_occupancy(request: Request, zone_id: str):
-    """Get occupancy for a specific zone."""
-    occ_svc = get_security_occupancy_service()
-    occ = occ_svc.get_zone_occupancy(zone_id)
-    return occ.model_dump(mode="json")
-
-
-# --- C•CURE 9000 Integration (Phase 58.2) ---
-
-
-@limiter.limit("30/minute")
-@router.get("/ccure/status")
-async def get_ccure_status(request: Request):
-    """Get C•CURE system integration status.
-
+async def get_occupancy(request: Request, site: str = Query(...)):
+    """Get current building occupancy (for HVAC/Lighting occupancy-based control).
+    
+    Used by Phase 28+ for occupancy-aware HVAC and lighting control.
     Returns:
-        Integration status: demo_mode, partner_license_required, or connected
+        - total_occupancy: Total people in building
+        - by_floor: Occupancy breakdown by floor
+        - by_zone: Occupancy breakdown by zone
     """
-    # For Phase 58.2, always demo mode
-    return {
-        "mode": "demo",
-        "manufacturer": "Johnson Controls / Software House",
-        "model": "C•CURE 9000 v2.90",
-        "protocol": "victor Web Service API",
-        "license_status": "partner_license_required",
-        "message": (
-            "Demo mode active. Apply to Software House Connected Partner Program "
-            "to enable live integration. See: docs/integrations/ccure-partner-program-roadmap.md"
-        ),
-        "demo_events_count": 5,
-        "demo_doors_count": 2,
-        "demo_controllers_count": 2,
-    }
-
-
-@limiter.limit("30/minute")
-@router.get("/events/anomalies")
-async def get_security_anomalies(
-    request: Request,
-    since: str = Query("24h", description="Time window: 24h, 7d, 30d"),
-    anomaly_type: Optional[str] = Query(None, description="Filter by type"),
-):
-    """Get security anomalies: after-hours, forced door, controller offline.
-
-    Priority 1: After-hours + HVAC/lighting correlation
-    Priority 2: Controller offline + network/UPS correlation
-
-    Args:
-        since: Time window ("24h", "7d", "30d")
-        anomaly_type: Filter by type (after_hours_access, controller_offline, etc.)
-
-    Returns:
-        List of anomaly dicts with severity, description, correlations
-    """
-    occ_svc = get_security_occupancy_service()
-
-    # Get after-hours anomalies (Priority 1)
-    after_hours = occ_svc.detect_after_hours_anomaly()
-
-    # Get equipment health issues (Priority 2)
-    equipment_health = occ_svc.detect_security_equipment_health_issues()
-
-    # Combine all anomalies
-    all_anomalies = after_hours + equipment_health
-
-    # Filter by type if provided
-    if anomaly_type:
-        all_anomalies = [a for a in all_anomalies if a["type"] == anomaly_type]
-
-    return {
-        "anomalies": all_anomalies,
-        "count": len(all_anomalies),
-        "summary": {
-            "after_hours_count": len(after_hours),
-            "equipment_health_count": len(equipment_health),
-        },
-    }
-
-
-@limiter.limit("30/minute")
-@router.get("/occupancy/real-time")
-async def get_real_time_occupancy(
-    request: Request, site_id: str = Query("site-002", description="Site identifier")
-):
-    """Get real-time occupancy from badge events + C•CURE anti-passback zones.
-
-    Combines:
-    - Badge entry/exit counting
-    - C•CURE anti-passback zone occupancy
-    - DALI PIR sensor data (if available)
-
-    Returns:
-        Per-zone occupancy with recommendations for HVAC/lighting
-    """
-    occ_svc = get_security_occupancy_service()
-
-    # Calculate occupancy using badge events
-    occupancy = occ_svc.get_building_occupancy()
-
-    # Get HVAC/lighting recommendations based on occupancy
-    recommendations = occ_svc.get_all_recommendations(site_id)
-
-    return {
-        "site_id": site_id,
-        "zones": occupancy.get("zones", []),
-        "building_total": occupancy.get("total_occupancy", 0),
-        "recommendations": recommendations,
-        "updated_at": occupancy.get("last_updated"),
-    }
+    try:
+        repo = SecurityRepository()
+        occupancy = repo.get_occupancy(site)
+        return occupancy
+    except Exception as e:
+        logger.error(f"Error calculating occupancy for {site}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

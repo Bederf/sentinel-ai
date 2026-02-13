@@ -6,6 +6,12 @@ from collections import defaultdict
 
 from app.services.csv_loader import WorkOrderData, AssetData, AlarmData
 from app.services.health_threshold_service import get_health_thresholds
+from app.services.prediction_taxonomy import (
+    FORMULA_VERSION_STATIC,
+    confidence_from_probability,
+    severity_from_probability,
+    urgency_from_severity,
+)
 from pathlib import Path
 import json
 
@@ -289,22 +295,13 @@ class PredictionCalculator:
         # Cap at 95% max
         probability = min(95, base_probability)
 
-        # Determine confidence
-        if probability >= 85:
-            confidence = "high"
-        elif probability >= 70:
-            confidence = "medium"
-        else:
-            confidence = "low"
-
-        # Determine severity using normalized system states only
-        # (healthy / warning / critical)
-        if probability >= 85:
-            severity = "critical"
-        elif probability >= 65:
-            severity = "warning"
-        else:
-            severity = "healthy"
+        # Determine confidence and severity from shared taxonomy
+        confidence = confidence_from_probability(
+            probability,
+            high_threshold=85,
+            medium_threshold=70,
+        )
+        severity = severity_from_probability(probability)
 
         # Calculate predicted failure date (based on probability and health score)
         # Lower health score = sooner failure
@@ -439,7 +436,8 @@ class PredictionCalculator:
                     "baseline": thresholds["healthy"],
                     "threshold": thresholds["warning"],
                     "trend": "decreasing" if health_score < thresholds["healthy"] else "stable"
-                }
+                },
+                "formula_version": FORMULA_VERSION_STATIC,
             },
             "contributing_factors": contributing_factors,
             "similar_failures": [],
@@ -453,7 +451,8 @@ class PredictionCalculator:
             "recommended_action": f"Schedule preventive maintenance within {timeframe_days} days to prevent failure",
             "parts_required": parts_required,
             "cost_impact": cost_impact,
-            "urgency": "critical" if probability >= 85 else "warning",
+            "urgency": urgency_from_severity(severity),
+            "formula_version": FORMULA_VERSION_STATIC,
         }
 
     @staticmethod

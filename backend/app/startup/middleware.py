@@ -7,6 +7,7 @@ from main.py to improve maintainability and separation of concerns.
 from collections import defaultdict
 from datetime import datetime, timedelta
 import logging
+from urllib.parse import urlparse
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -47,6 +48,33 @@ _PUBLIC_PREFIXES = (
 _LOCALHOST_IPS = {"127.0.0.1", "::1", "localhost", "testclient"}
 _ADMIN_RATE_LIMIT_PER_MINUTE = 30
 _admin_requests_by_ip: dict[str, list[datetime]] = defaultdict(list)
+
+
+def _extract_allowed_demo_hosts() -> set[str]:
+    """Build host allowlist for DEMO_MODE from configured origins."""
+    hosts: set[str] = set()
+    for configured_origin in (*settings.demo_allowed_origins, *settings.cors_origins):
+        try:
+            parsed = urlparse(configured_origin)
+            if parsed.hostname:
+                hosts.add(parsed.hostname.lower())
+        except Exception:
+            continue
+    return hosts
+
+
+def _is_demo_origin_allowed(request: Request) -> bool:
+    """Return True when request origin/host matches configured demo-safe origins."""
+    origin = (request.headers.get("origin") or "").strip()
+    host_header = (request.headers.get("host") or "").strip()
+    host_only = host_header.split(":", 1)[0].lower() if host_header else ""
+
+    configured_origins = set(settings.demo_allowed_origins) | set(settings.cors_origins)
+    if origin and origin in configured_origins:
+        return True
+
+    allowed_hosts = _extract_allowed_demo_hosts()
+    return bool(host_only and host_only in allowed_hosts)
 
 
 def _check_admin_rate_limit(source_ip: str) -> JSONResponse | None:
@@ -197,6 +225,10 @@ def register_middleware(app: FastAPI) -> None:
                 # Try real auth first; fall back to demo context
                 auth_ctx = await _authenticate_request(request)
                 request.state.auth = auth_ctx  # may be None (endpoints handle via Depends)
+                return await call_next(request)
+            if _is_demo_origin_allowed(request):
+                auth_ctx = await _authenticate_request(request)
+                request.state.auth = auth_ctx
                 return await call_next(request)
             # Non-localhost in demo mode: require real auth
             auth_ctx = await _authenticate_request(request)

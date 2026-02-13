@@ -7,33 +7,13 @@ from fastapi import APIRouter, HTTPException, Query
 
 from app.database.repositories.prediction_repository import PredictionRepository
 from app.services.prediction_generator import get_prediction_generator
+from app.services.prediction_taxonomy import (
+    normalize_prediction_confidence,
+    normalize_prediction_severity,
+    normalize_prediction_urgency,
+)
 
 router = APIRouter()
-
-
-def _normalize_prediction_severity(value: Optional[str]) -> Optional[str]:
-    """Normalize prediction severity to canonical states.
-
-    Canonical values:
-    - critical
-    - warning
-    - healthy
-
-    Legacy values are mapped for backwards compatibility:
-    - high, medium -> warning
-    - low -> healthy
-    """
-    if value is None:
-        return None
-
-    normalized = value.strip().lower()
-    if normalized in ("high", "medium"):
-        return "warning"
-    if normalized == "low":
-        return "healthy"
-    if normalized in ("critical", "warning", "healthy"):
-        return normalized
-    return None
 
 
 def _parse_json_field(value, default):
@@ -102,7 +82,7 @@ def format_prediction_for_frontend(pred: dict) -> dict:
         # Prediction details
         'prediction_type': pred['prediction_type'],
         'probability_percent': pred['probability_percent'],
-        'confidence': pred['confidence'],
+        'confidence': normalize_prediction_confidence(pred.get('confidence')) or pred.get('confidence'),
         'predicted_failure_date': pred['predicted_failure_date'],
         'timeframe_days': pred['timeframe_days'],
         'severity': severity,  # Mapped to system values
@@ -118,7 +98,7 @@ def format_prediction_for_frontend(pred: dict) -> dict:
         # Status
         'status': pred.get('status', 'active'),
         'recommended_action': pred.get('recommended_action'),
-        'urgency': pred.get('urgency'),
+        'urgency': normalize_prediction_urgency(pred.get('urgency')) or pred.get('urgency'),
     }
 
 

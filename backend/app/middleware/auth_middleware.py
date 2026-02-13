@@ -87,6 +87,33 @@ _API_KEY_CACHE: Dict[str, Tuple[datetime, Dict[str, Any]]] = {}
 _API_KEY_CACHE_TTL_SECONDS = 300
 
 
+def _extract_allowed_demo_hosts() -> set[str]:
+    """Build host allowlist for DEMO_MODE from configured origins."""
+    hosts: set[str] = set()
+    for configured_origin in (*settings.demo_allowed_origins, *settings.cors_origins):
+        try:
+            parsed = urlparse(configured_origin)
+            if parsed.hostname:
+                hosts.add(parsed.hostname.lower())
+        except Exception:
+            continue
+    return hosts
+
+
+def _is_demo_origin_allowed(request: Request) -> bool:
+    """Return True when request origin/host matches configured demo-safe origins."""
+    origin = (request.headers.get("origin") or "").strip()
+    host_header = (request.headers.get("host") or "").strip()
+    host_only = host_header.split(":", 1)[0].lower() if host_header else ""
+
+    configured_origins = set(settings.demo_allowed_origins) | set(settings.cors_origins)
+    if origin and origin in configured_origins:
+        return True
+
+    allowed_hosts = _extract_allowed_demo_hosts()
+    return bool(host_only and host_only in allowed_hosts)
+
+
 def register_api_key(
     key_hash: str,
     owner: str,
@@ -581,25 +608,12 @@ def require_auth(level: AuthLevel = AuthLevel.AUTHENTICATED):
 
             # Restrict demo mode to localhost or explicitly allowed origins (C-4)
             _LOCALHOST_IPS = {"127.0.0.1", "::1", "localhost", "testclient", "unknown"}
-            origin = request.headers.get("origin")
-            host = request.headers.get("host")
-
-            allowed_hosts = set()
-            for allowed_origin in settings.demo_allowed_origins:
-                try:
-                    parsed = urlparse(allowed_origin)
-                    if parsed.hostname:
-                        allowed_hosts.add(parsed.hostname)
-                except Exception:
-                    continue
-
             if source_ip not in _LOCALHOST_IPS:
-                origin_allowed = origin in settings.demo_allowed_origins
-                host_allowed = host in allowed_hosts
-                if not origin_allowed and not host_allowed:
+                if not _is_demo_origin_allowed(request):
                     logger.warning(
                         f"DEMO_MODE access denied from non-local IP: "
-                        f"ip={source_ip} origin={origin} host={host} path={request.url.path}"
+                        f"ip={source_ip} origin={request.headers.get('origin')} "
+                        f"host={request.headers.get('host')} path={request.url.path}"
                     )
                     raise HTTPException(
                         status_code=status.HTTP_403_FORBIDDEN,
@@ -715,9 +729,9 @@ def require_role(*roles: SentinelRole):
 
             source_ip = _extract_ip_address(request)
 
-            # Restrict demo mode to localhost only (C-4)
+            # Restrict demo mode to localhost or configured allowed origins/hosts (C-4)
             _LOCALHOST_IPS = {"127.0.0.1", "::1", "localhost", "testclient", "unknown"}
-            if source_ip not in _LOCALHOST_IPS:
+            if source_ip not in _LOCALHOST_IPS and not _is_demo_origin_allowed(request):
                 logger.warning(
                     f"DEMO_MODE role access denied from non-local IP: "
                     f"ip={source_ip} path={request.url.path}"

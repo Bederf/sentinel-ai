@@ -18,6 +18,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from app.services.health_threshold_service import get_health_status, get_health_thresholds
+from app.services.prediction_taxonomy import FORMULA_VERSION_STATIC
 from app.database.repositories.equipment_repository import EquipmentRepository
 from app.database.repositories.hvac_zone_repository import HVACZoneRepository
 from app.database.repositories.safety_rules_repository import SafetyRulesRepository
@@ -178,7 +179,8 @@ def calculate_equipment_health(equipment: dict) -> dict:
         return {
             "health_score": equipment.get("health_score", 85),
             "status": get_health_status(equipment.get("health_score", 85)),
-            "factors": {}
+            "factors": {},
+            "formula_version": FORMULA_VERSION_STATIC,
         }
 
     config = health_config[eq_type]
@@ -268,7 +270,8 @@ def calculate_equipment_health(equipment: dict) -> dict:
     return {
         "health_score": round(total_score, 1),
         "status": get_health_status(total_score),
-        "factors": factors
+        "factors": factors,
+        "formula_version": FORMULA_VERSION_STATIC,
     }
 
 
