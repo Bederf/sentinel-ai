@@ -1,7 +1,8 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
-import { ChevronDown, X } from 'lucide-react';
+import { X } from 'lucide-react';
+import BuildingSelector from '@/components/BuildingSelector';
 import type { ZoneCentroid, Site } from '@/lib/api/sites';
 import { sitesApi } from '@/lib/api/sites';
 import { BuildingModel } from './BuildingModel';
@@ -251,38 +252,15 @@ export function DigitalTwin() {
             <label className="text-sm font-medium" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
               Building:
             </label>
-            <div className="relative w-64">
-              <select
-                value={selectedBuildingId}
-                onChange={(e) => setSelectedBuildingId(e.target.value)}
-                disabled={sitesLoading}
-                className="w-full pl-3 pr-8 py-2 text-sm rounded appearance-none cursor-pointer"
-                style={{
-                  background: 'var(--color-sentinel-bg-secondary)',
-                  border: '1px solid var(--color-sentinel-border)',
-                  color: 'var(--color-sentinel-text-primary)',
-                  outline: 'none',
-                }}
-              >
-                {sites.length > 0 ? (
-                  sites.map((site) => (
-                    <option key={site.id} value={site.id}>
-                      {site.name}
-                    </option>
-                  ))
-                ) : (
-                  <option key="no-sites" disabled value="">
-                    {sitesLoading ? 'Loading sites...' : 'No buildings available'}
-                  </option>
-                )}
-              </select>
-              <ChevronDown
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 pointer-events-none"
-                style={{ color: 'var(--color-sentinel-text-secondary)' }}
-              />
-            </div>
+            <BuildingSelector
+              value={selectedBuildingId}
+              onChange={setSelectedBuildingId}
+              sites={sites}
+              disabled={sitesLoading}
+            />
+          </div>
 
-            {/* 2D/3D Toggle - Moved to header next to building selector */}
+          {/* 2D/3D Toggle - Moved to header next to building selector */}
             <div className="flex items-center gap-2 ml-4 pl-4 border-l" style={{ borderColor: 'var(--color-sentinel-border)' }}>
               <button
                 onClick={() => setViewMode('3D')}
