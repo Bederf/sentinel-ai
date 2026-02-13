@@ -198,6 +198,61 @@ class EquipmentRepository:
             return response.data[0]
         return None
 
+    def update_operating_data(
+        self,
+        equipment_id: str,
+        point_values: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
+        """Update equipment operating_data with new point values.
+
+        Merges new point values into existing operating_data JSONB column.
+        Used by MockDeviceAdapter to sync demo controls to database for realistic demos.
+
+        Args:
+            equipment_id: Equipment UUID or code
+            point_values: Dict of point_name → {value, timestamp, source} to merge
+
+        Returns:
+            Updated equipment record or None if not found
+        """
+        from datetime import datetime
+
+        # Get current equipment by UUID first, then fallback to code
+        equipment = self.get_by_uuid(equipment_id) if self._is_uuid(equipment_id) else None
+        if not equipment:
+            equipment = self.get_by_id(equipment_id)
+
+        if not equipment:
+            return None
+
+        # Get current operating_data to preserve existing points
+        current_data = equipment.get("operating_data", {}) or {}
+        if not isinstance(current_data, dict):
+            current_data = {}
+
+        # Merge new point values into existing data
+        current_data.update(point_values)
+
+        # Update database
+        try:
+            response = self.client.table('equipment').update({
+                "operating_data": current_data,
+                "updated_at": datetime.now().isoformat()
+            }).eq('id', equipment['id']).execute()
+
+            if response.data:
+                return response.data[0]
+            return None
+        except Exception as e:
+            logger.error(f"Failed to update operating_data for {equipment_id}: {e}")
+            return None
+
+    def _is_uuid(self, value: str) -> bool:
+        """Check if value looks like a UUID."""
+        import re
+        uuid_pattern = r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+        return bool(re.match(uuid_pattern, value, re.IGNORECASE))
+
     def delete(self, equipment_id: str) -> bool:
         """Delete equipment.
 

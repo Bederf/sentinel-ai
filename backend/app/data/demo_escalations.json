@@ -1,0 +1,290 @@
+{
+  "escalations": [
+    {
+      "id": "escalation_001",
+      "name": "Gradual Temperature Approach to Limit",
+      "description": "Equipment temperature gradually approaches safety limit with multi-level escalation",
+      "equipment_id": "hvac_001",
+      "control_point": "cooling_setpoint",
+      "timeline": [
+        {
+          "minute": 0,
+          "temperature": 22.0,
+          "status": "normal",
+          "message": "Normal operation"
+        },
+        {
+          "minute": 5,
+          "temperature": 24.5,
+          "headroom_percent": 87.5,
+          "status": "normal",
+          "message": "Temperature increasing, still well within bounds"
+        },
+        {
+          "minute": 10,
+          "temperature": 25.8,
+          "headroom_percent": 79.2,
+          "status": "warning",
+          "escalation_level": 1,
+          "escalation_message": "Level 1 Warning: Temperature at 79% of safety limit. System notification logged.",
+          "action": "none"
+        },
+        {
+          "minute": 15,
+          "temperature": 26.4,
+          "headroom_percent": 75.0,
+          "status": "alert",
+          "escalation_level": 2,
+          "escalation_message": "Level 2 Alert: Temperature at 75% of safety limit. Email sent to operator.",
+          "action": "email_sent"
+        },
+        {
+          "minute": 20,
+          "temperature": 27.1,
+          "headroom_percent": 70.6,
+          "status": "escalated",
+          "escalation_level": 3,
+          "escalation_message": "Level 3 Critical: Temperature at 70% of safety limit. Slack notification sent, dashboard alert raised.",
+          "action": "slack_notification"
+        },
+        {
+          "minute": 22,
+          "user_action": "operator_acknowledgment",
+          "operator": "technician@site-002",
+          "message": "Technician acknowledged alert and increased cooling capacity",
+          "result": "Escalation stopped at Level 3"
+        },
+        {
+          "minute": 25,
+          "temperature": 26.8,
+          "headroom_percent": 72.5,
+          "status": "alert",
+          "escalation_level": 2,
+          "message": "Temperature reduced by cooling increase, escalation de-escalated to Level 2"
+        }
+      ],
+      "operators_involved": ["technician@site-002"],
+      "resolution": "Operator acknowledgment and manual intervention"
+    },
+    {
+      "id": "escalation_002",
+      "name": "Rapid Pressure Increase - Emergency Response",
+      "description": "Critical equipment pressure rises rapidly, triggering Level 4 emergency stop",
+      "equipment_id": "chiller_001",
+      "control_point": "pressure",
+      "timeline": [
+        {
+          "minute": 0,
+          "pressure_kpa": 500,
+          "status": "normal",
+          "message": "Chiller operating normally"
+        },
+        {
+          "minute": 1,
+          "pressure_kpa": 800,
+          "headroom_percent": 83.3,
+          "status": "normal",
+          "message": "Pressure rising, compressor overload suspected"
+        },
+        {
+          "minute": 2,
+          "pressure_kpa": 1050,
+          "headroom_percent": 62.5,
+          "status": "warning",
+          "escalation_level": 1,
+          "escalation_message": "Level 1: Pressure at 62.5% of limit",
+          "action": "system_notification"
+        },
+        {
+          "minute": 2.5,
+          "pressure_kpa": 1110,
+          "headroom_percent": 54.2,
+          "status": "alert",
+          "escalation_level": 2,
+          "escalation_message": "Level 2: Pressure at 54% of limit. Email alert sent.",
+          "action": "email_alert"
+        },
+        {
+          "minute": 3,
+          "pressure_kpa": 1170,
+          "headroom_percent": 45.0,
+          "status": "escalated",
+          "escalation_level": 3,
+          "escalation_message": "Level 3 Critical: Pressure at 45% of limit. Slack urgent, dashboard critical alert.",
+          "action": "slack_urgent"
+        },
+        {
+          "minute": 3.3,
+          "pressure_kpa": 1199,
+          "headroom_percent": 0.1,
+          "status": "emergency",
+          "escalation_level": 4,
+          "escalation_message": "Level 4 EMERGENCY: Pressure at 99.9% of limit. AUTONOMOUS EMERGENCY STOP ACTIVATED.",
+          "action": "emergency_stop"
+        },
+        {
+          "minute": 3.5,
+          "pressure_kpa": 1200,
+          "status": "emergency_stop_applied",
+          "message": "Emergency stop executed - compressor disabled, relief valve triggered"
+        },
+        {
+          "minute": 5,
+          "pressure_kpa": 950,
+          "status": "pressure_relieving",
+          "message": "Pressure decreasing as relief valve bleeds excess pressure"
+        },
+        {
+          "minute": 10,
+          "pressure_kpa": 600,
+          "status": "safe_state",
+          "message": "Equipment pressure safe. Manual inspection required before restart."
+        }
+      ],
+      "escalation_triggers": [
+        {"level": 1, "threshold": "85%", "action": "system_log"},
+        {"level": 2, "threshold": "75%", "action": "email"},
+        {"level": 3, "threshold": "50%", "action": "slack"},
+        {"level": 4, "threshold": "100%", "action": "emergency_stop"}
+      ],
+      "emergency_actions_taken": [
+        "Autonomous emergency stop activated",
+        "Compressor disabled",
+        "Relief valve opened",
+        "Audit log created",
+        "On-call technician notified via SMS"
+      ],
+      "resolution": "Autonomous system triggered emergency stop, prevented equipment failure"
+    },
+    {
+      "id": "escalation_003",
+      "name": "Escalation De-escalation - Successful Manual Intervention",
+      "description": "Equipment approaching boundary triggers escalation, operator intervention prevents critical state",
+      "equipment_id": "hvac_003",
+      "control_point": "supply_temp",
+      "timeline": [
+        {
+          "minute": 0,
+          "supply_temp": 8.2,
+          "status": "normal",
+          "message": "Chilled water supply temperature normal"
+        },
+        {
+          "minute": 3,
+          "supply_temp": 8.8,
+          "headroom_percent": 80,
+          "status": "warning",
+          "escalation_level": 1,
+          "message": "Level 1: Supply temperature rising toward limit"
+        },
+        {
+          "minute": 5,
+          "supply_temp": 9.2,
+          "headroom_percent": 75,
+          "status": "alert",
+          "escalation_level": 2,
+          "message": "Level 2: Supply temperature at 75% of limit. Operator alert sent.",
+          "operators_notified": ["operator@site-002"]
+        },
+        {
+          "minute": 7,
+          "user_action": "operator_acknowledged",
+          "operator": "operator@site-002",
+          "action_taken": "Increased chiller compressor load to 85%",
+          "result": "Supply temperature stabilized"
+        },
+        {
+          "minute": 10,
+          "supply_temp": 8.5,
+          "headroom_percent": 83,
+          "status": "normal",
+          "escalation_level": 0,
+          "message": "De-escalation: Temperature normalized, escalation cleared"
+        }
+      ],
+      "escalation_summary": {
+        "peak_level": 2,
+        "total_duration_minutes": 10,
+        "manual_interventions": 1,
+        "autonomous_actions": 0,
+        "outcome": "Success - prevented escalation to critical level"
+      },
+      "learning": "Operator response time 2 minutes was effective in preventing Level 3 escalation"
+    },
+    {
+      "id": "escalation_004",
+      "name": "Multi-Device Escalation Cascade",
+      "description": "Multiple devices approaching limits simultaneously creates cascade escalation",
+      "simultaneous_escalations": [
+        {
+          "device_id": "hvac_001",
+          "control_point": "cooling_setpoint",
+          "escalation_sequence": "Level 2 at minute 5"
+        },
+        {
+          "device_id": "hvac_003",
+          "control_point": "cooling_setpoint",
+          "escalation_sequence": "Level 2 at minute 7"
+        },
+        {
+          "device_id": "lighting_002",
+          "control_point": "brightness",
+          "escalation_sequence": "Level 1 at minute 6"
+        }
+      ],
+      "timeline": [
+        {
+          "minute": 0,
+          "status": "multi_device_stress",
+          "message": "High occupancy and ambient temperature causing system stress"
+        },
+        {
+          "minute": 5,
+          "device": "hvac_001",
+          "escalation_level": 2,
+          "action": "email_alert"
+        },
+        {
+          "minute": 6,
+          "device": "lighting_002",
+          "escalation_level": 1,
+          "action": "system_notification"
+        },
+        {
+          "minute": 7,
+          "device": "hvac_003",
+          "escalation_level": 2,
+          "action": "email_alert"
+        },
+        {
+          "minute": 8,
+          "status": "cascade_detected",
+          "message": "Multiple devices escalating - triggering building-wide coordination"
+        },
+        {
+          "minute": 10,
+          "user_action": "operator_initiated_demand_response",
+          "actions": [
+            "Increased setpoints by 1.5°C across all HVAC units",
+            "Dimmed non-essential lighting to 70%",
+            "Adjusted occupancy profile in system"
+          ]
+        },
+        {
+          "minute": 15,
+          "status": "stabilized",
+          "devices_de_escalated": 3,
+          "message": "All devices returned to normal operation"
+        }
+      ],
+      "cascade_insights": {
+        "root_cause": "Peak occupancy combined with high outdoor temperature",
+        "duration": 15,
+        "devices_affected": 3,
+        "peak_escalation_level": 2,
+        "prevented_critical": true,
+        "recommendation": "Pre-emptive setpoint adjustment during peak hours can prevent cascades"
+      }
+    }
+  ]
+}

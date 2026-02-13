@@ -111,6 +111,26 @@ async def startup_event(app: FastAPI) -> None:
     # Monitors NMD headroom and coordinates HVAC + BESS + energy actions for shaving
     scheduler_service.add_demand_aware_coordination_job(interval_seconds=300)  # 5 minutes
 
+    # Initialize bounded autonomy system (Phase 9)
+    # Autonomous decision engine with safety boundaries and escalation management
+    from app.services.autonomous_decision_engine import autonomous_decision_engine
+    from app.services.escalation_engine import escalation_engine
+    from app.services.safety_boundary_service import safety_boundary_service
+    
+    try:
+        await autonomous_decision_engine.initialize(load_demo_data=True)
+        _logger.info("Autonomous decision engine initialized successfully")
+        
+        if not escalation_engine._initialized:
+            await escalation_engine.initialize()
+            _logger.info("Escalation engine initialized successfully")
+        
+        if not safety_boundary_service._initialized:
+            await safety_boundary_service.initialize()
+            _logger.info("Safety boundary service initialized successfully")
+    except Exception as e:
+        _logger.error(f"Failed to initialize autonomous system: {e}")
+
     # Start Clawd notification processing (runs every 30 seconds)
     # When equipment health drops to warning/critical, technicians receive Telegram notifications
     # This background job ensures notifications are sent promptly even if Clawd bot polling is delayed

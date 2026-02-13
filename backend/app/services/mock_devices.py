@@ -213,7 +213,53 @@ class MockDeviceAdapter(DeviceAdapter):
         # Update device timestamp
         self.device.updated_at = datetime.now().isoformat()
 
+        # Sync to database for realistic demo behavior (DEMO_MODE only)
+        await self._sync_to_database(point_name, value)
+
         return True
+
+    async def _sync_to_database(self, point_name: str, value: Any) -> None:
+        """Sync mock device state to Supabase for dashboard visibility.
+
+        Updates equipment.operating_data JSONB column with current point values.
+        Only runs in DEMO_MODE for realistic demonstrations.
+
+        Args:
+            point_name: Name of the device point being written
+            value: Value written to the point
+        """
+        try:
+            from app.config.settings import settings
+            from app.database.repositories.equipment_repository import EquipmentRepository
+
+            if not settings.demo_mode:
+                return  # Only sync in DEMO_MODE
+
+            # Get equipment record by code
+            repo = EquipmentRepository()
+            equipment = repo.get_by_id(self.device.id)
+            if not equipment:
+                logger.warning(f"Equipment {self.device.id} not found in database")
+                return
+
+            # Prepare operating data update with timestamp
+            point_data = {
+                "value": value,
+                "timestamp": datetime.now().isoformat(),
+                "source": "mock_demo"
+            }
+
+            # Update database using repository method
+            repo.update_operating_data(
+                equipment["id"],  # Use UUID for direct update
+                {point_name: point_data}
+            )
+
+            logger.debug(f"DEMO_MODE: Synced {point_name}={value} to database for {self.device.id}")
+
+        except Exception as e:
+            # Non-blocking: If database sync fails, the write still succeeds
+            logger.warning(f"Database sync failed in DEMO_MODE (non-critical): {e}")
 
     def _validate_safety_test_conditions(self) -> bool:
         """Validate conditions for safety device testing."""

@@ -71,7 +71,10 @@ CREATE TRIGGER equipment_notes_audit
 COMMENT ON COLUMN equipment.notes IS 'User-editable free-text notes about the equipment';
 COMMENT ON COLUMN equipment.network_info IS 'Network configuration: IP, MAC, DALI address, BACnet device ID, etc.';
 COMMENT ON COLUMN equipment.device_info IS 'Device identification: GTIN, serial, manufacturer, model, firmware, hardware version';
-COMMENT ON COLUMN equipment.operating_data IS 'Operating statistics: lamp hours, power cycles, fault history';
+COMMENT ON COLUMN equipment.operating_data IS 'Real-time operating point values (JSONB).
+Structure: {"point_name": {"value": <any>, "timestamp": <iso>, "source": "mock_demo|bacnet|modbus|opc-ua"}}
+Updated by: MockDeviceAdapter (DEMO_MODE), BACnet adapter (production), background sync jobs.
+Used by: Dashboard real-time displays, health score calculations, trending analysis.';
 COMMENT ON COLUMN equipment.commissioning_date IS 'Date equipment was commissioned/installed';
 COMMENT ON COLUMN equipment.warranty_expiry IS 'Warranty expiration date';
 COMMENT ON COLUMN equipment.last_discovery IS 'Last time device info was auto-discovered from network';
