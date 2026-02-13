@@ -103,6 +103,80 @@ export interface CurrentFlowResponse {
   meter_id: string;
 }
 
+/** Zone consumption data */
+export interface ZoneConsumption {
+  zone_id: string;
+  zone_name?: string;
+  start_date: string;
+  end_date: string;
+  total_liters: number;
+  avg_flow_lpm: number;
+  peak_flow_lpm: number;
+  meter_count: number;
+  meters: Array<{
+    meter_id: string;
+    liters: number;
+    avg_flow: number;
+  }>;
+  record_count: number;
+}
+
+/** Floor consumption with zone breakdown */
+export interface FloorConsumption {
+  floor: string;
+  building_id: string;
+  start_date: string;
+  end_date: string;
+  total_liters: number;
+  avg_flow_lpm: number;
+  zone_count: number;
+  zones: Array<{
+    zone_id: string;
+    zone_name?: string;
+    liters: number;
+    avg_flow: number;
+  }>;
+  record_count: number;
+}
+
+/** Top consuming zones */
+export interface TopZone {
+  rank: number;
+  zone_id: string;
+  zone_name?: string;
+  total_liters: number;
+  avg_flow_lpm: number;
+  peak_flow_lpm: number;
+  meter_count: number;
+  days: number;
+}
+
+/** Zone consumption trend data */
+export interface ZoneTrendResponse {
+  zone_id: string;
+  zone_name?: string;
+  days: number;
+  data: Array<{
+    date: string;
+    liters: number;
+    avg_flow_lpm: number;
+  }>;
+  total_liters: number;
+  average_daily_liters: number;
+}
+
+/** Zone vs building comparison */
+export interface ZoneComparison {
+  zone_id: string;
+  zone_name?: string;
+  building_id: string;
+  zone_daily_avg: number;
+  building_daily_avg: number;
+  difference_percent: number;
+  status: "above" | "below" | "at_average";
+  days: number;
+}
+
 // ============= API Methods =============
 
 /**
@@ -200,6 +274,98 @@ export async function getMeters(site: string): Promise<WaterMeter[]> {
   return fetchJson<WaterMeter[]>(`/api/water/sites/${site}/meters`);
 }
 
+// ============= Zone Aggregation Methods =============
+
+/**
+ * Get aggregated consumption for a zone
+ * GET /api/water/zones/{zone_id}/consumption?start={start}&end={end}
+ */
+export async function getZoneConsumption(
+  zoneId: string,
+  start?: string,
+  end?: string
+): Promise<ZoneConsumption> {
+  const params = new URLSearchParams();
+  if (start) params.set("start", start);
+  if (end) params.set("end", end);
+
+  const query = params.toString() ? `?${params}` : "";
+  return fetchJson<ZoneConsumption>(`/api/water/zones/${zoneId}/consumption${query}`);
+}
+
+/**
+ * Get aggregated consumption for all zones on a floor
+ * GET /api/water/sites/{site}/zones/{floor}/consumption?start={start}&end={end}
+ */
+export async function getFloorConsumption(
+  site: string,
+  floor: string,
+  start?: string,
+  end?: string
+): Promise<FloorConsumption> {
+  const params = new URLSearchParams();
+  if (start) params.set("start", start);
+  if (end) params.set("end", end);
+
+  const query = params.toString() ? `?${params}` : "";
+  return fetchJson<FloorConsumption>(
+    `/api/water/sites/${site}/zones/${floor}/consumption${query}`
+  );
+}
+
+/**
+ * Get top consuming zones at a site
+ * GET /api/water/sites/{site}/zones/top?limit={limit}&days={days}
+ */
+export async function getTopZones(
+  site: string,
+  limit = 10,
+  days = 30
+): Promise<TopZone[]> {
+  const params = new URLSearchParams({
+    limit: limit.toString(),
+    days: days.toString(),
+  });
+  const response = await fetchJson<{ site: string; days: number; zone_count: number; zones: TopZone[] }>(
+    `/api/water/sites/${site}/zones/top?${params}`
+  );
+  return response.zones;
+}
+
+/**
+ * Get daily consumption trend for a zone
+ * GET /api/water/zones/{zone_id}/trend?days={days}
+ */
+export async function getZoneTrend(
+  zoneId: string,
+  days = 7
+): Promise<ZoneTrendResponse> {
+  const params = new URLSearchParams({
+    days: days.toString(),
+  });
+  return fetchJson<ZoneTrendResponse>(
+    `/api/water/zones/${zoneId}/trend?${params}`
+  );
+}
+
+/**
+ * Compare zone consumption to building average
+ * GET /api/water/zones/{zone_id}/comparison?building_id={site}&days={days}
+ */
+export async function getZoneComparison(
+  zoneId: string,
+  buildingId: string,
+  days = 30
+): Promise<ZoneComparison> {
+  const params = new URLSearchParams({
+    building_id: buildingId,
+    days: days.toString(),
+  });
+  return fetchJson<ZoneComparison>(
+    `/api/water/zones/${zoneId}/comparison?${params}`
+  );
+}
+
 // ============= Export API Client Object =============
 
 export const waterApi = {
@@ -210,4 +376,9 @@ export const waterApi = {
   resolveAlert,
   getTrending,
   getMeters,
+  getZoneConsumption,
+  getFloorConsumption,
+  getTopZones,
+  getZoneTrend,
+  getZoneComparison,
 };
