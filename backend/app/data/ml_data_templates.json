@@ -800,5 +800,79 @@
         "repair_action": "What was repaired/replaced?"
       }
     }
+  },
+  "water_repair": {
+    "leak_repair": {
+      "required": [
+        "leak_type",
+        "repair_method",
+        "water_loss_liters",
+        "parts_replaced",
+        "service_quality"
+      ],
+      "optional": [
+        "repair_time_hours",
+        "before_photo",
+        "after_photo",
+        "customer_satisfaction"
+      ],
+      "prompts": {
+        "leak_type": "Type of leak found? (pipe_burst, joint_failure, valve_leak, fitting_loose, unknown)",
+        "repair_method": "Repair method used? (pipe_replacement, joint_resealing, valve_replacement, patching, temporary_fix)",
+        "water_loss_liters": "Estimated water loss before repair (liters)",
+        "parts_replaced": "Parts replaced - take photo of part labels",
+        "service_quality": "Service quality? (excellent, good, acceptable, poor)",
+        "repair_time_hours": "Time spent on repair (hours)",
+        "before_photo": "Photo of leak before repair (if possible)",
+        "after_photo": "Photo of area after repair - looks good?",
+        "customer_satisfaction": "Customer satisfaction rating (1-5 stars)"
+      },
+      "audio_duration_seconds": 10,
+      "validation_rules": {
+        "water_loss_liters": {"min": 0, "max": 100000, "unit": "liters", "required": true},
+        "repair_time_hours": {"min": 0.25, "max": 24, "unit": "hours", "required": false},
+        "customer_satisfaction": {"min": 1, "max": 5, "unit": "stars", "required": false}
+      }
+    },
+    "valve_maintenance": {
+      "required": [
+        "valve_type",
+        "operation_check",
+        "seal_condition",
+        "service_quality"
+      ],
+      "optional": [
+        "valve_position_percent",
+        "actuator_test"
+      ],
+      "prompts": {
+        "valve_type": "Valve type? (ball, gate, check, relief, solenoid)",
+        "operation_check": "Valve operates smoothly at 0%, 50%, 100% positions?",
+        "seal_condition": "Seal condition - any weeping/leaking?",
+        "service_quality": "Service quality assessment",
+        "valve_position_percent": "Current valve position (%)",
+        "actuator_test": "Actuator test - responds to commands?"
+      }
+    },
+    "meter_replacement": {
+      "required": [
+        "old_meter_reading",
+        "new_meter_reading",
+        "meter_type",
+        "installation_check"
+      ],
+      "optional": [
+        "old_meter_photo",
+        "new_meter_photo"
+      ],
+      "prompts": {
+        "old_meter_reading": "Old meter final reading before replacement",
+        "new_meter_reading": "New meter initial reading after installation",
+        "meter_type": "Meter type installed? (magnetic, ultrasonic, turbine)",
+        "installation_check": "Installation looks secure? Connections tight?",
+        "old_meter_photo": "Photo of old meter for records",
+        "new_meter_photo": "Photo of newly installed meter"
+      }
+    }
   }
 }

@@ -632,6 +632,134 @@ class FeedbackCollectionService:
             "completed_at": session.completed_at.isoformat() if session.completed_at else None
         }
 
+    def get_water_repair_template(self) -> Optional[Dict[str, Any]]:
+        """Get water repair feedback template.
+
+        Returns:
+            Dictionary with water repair template data or None if not found
+        """
+        templates = self._templates.get("water_repair", {})
+        if not templates:
+            logger.warning("No water_repair templates found")
+            return None
+
+        # Return all water repair service types as a single template
+        return {
+            "equipment_type": "water_repair",
+            "service_types": list(templates.keys()),
+            "templates": templates,
+        }
+
+    async def process_water_repair_feedback(
+        self,
+        work_order_id: str,
+        feedback: Dict[str, Any],
+        technician_id: str,
+    ) -> Dict[str, Any]:
+        """Process water repair feedback and calculate health impact.
+
+        Args:
+            work_order_id: Work order ID for the repair
+            feedback: Feedback dictionary with repair details
+            technician_id: Technician who performed the repair
+
+        Returns:
+            Dictionary with work_order_id, health_impact, recorded_at, summary
+        """
+        try:
+            recorded_at = datetime.now().isoformat()
+
+            # Extract and validate feedback fields
+            repair_method = feedback.get("repair_method", "unknown")
+            service_quality = feedback.get("service_quality", "acceptable")
+            customer_satisfaction = feedback.get("customer_satisfaction", 3)
+            water_loss = feedback.get("water_loss_liters", 0)
+
+            # Calculate health impact based on repair quality and outcomes
+            health_impact = 0
+
+            # Repair method impact: +2 for permanent fixes, 0 for temporary, -1 for partial
+            if repair_method == "pipe_replacement":
+                health_impact += 2  # Excellent permanent fix
+            elif repair_method == "joint_resealing":
+                health_impact += 2
+            elif repair_method == "valve_replacement":
+                health_impact += 2
+            elif repair_method == "patching":
+                health_impact += 0  # Neutral - acceptable fix
+            elif repair_method == "temporary_fix":
+                health_impact -= 1  # Needs follow-up
+
+            # Service quality impact
+            if service_quality == "excellent":
+                health_impact += 1
+            elif service_quality == "good":
+                health_impact += 0
+            elif service_quality == "acceptable":
+                health_impact += 0
+            elif service_quality == "poor":
+                health_impact -= 3  # Reflects poorly on technician
+
+            # Customer satisfaction impact
+            if customer_satisfaction and customer_satisfaction < 3:
+                health_impact -= 2  # Escalate low satisfaction
+            elif customer_satisfaction >= 4:
+                health_impact += 1  # Bonus for high satisfaction
+
+            # Water loss severity - estimate equipment wear
+            if water_loss > 10000:  # >10,000 liters lost
+                health_impact -= 2  # Indicates serious leak, equipment damage
+            elif water_loss > 1000:
+                health_impact -= 1
+
+            # Clamp health impact to range
+            health_impact = max(-5, min(2, health_impact))
+
+            result = {
+                "work_order_id": work_order_id,
+                "health_impact": health_impact,
+                "recorded_at": recorded_at,
+                "technician_id": technician_id,
+                "repair_method": repair_method,
+                "service_quality": service_quality,
+                "water_loss_liters": water_loss,
+                "customer_satisfaction": customer_satisfaction,
+                "summary": self._build_water_feedback_summary(feedback, health_impact),
+            }
+
+            logger.info(
+                f"Water repair feedback processed: WO {work_order_id}, "
+                f"health_impact={health_impact:+d}, quality={service_quality}"
+            )
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Failed to process water repair feedback: {e}")
+            return {
+                "work_order_id": work_order_id,
+                "status": "error",
+                "message": str(e),
+            }
+
+    def _build_water_feedback_summary(self, feedback: Dict[str, Any], health_impact: int) -> Dict[str, Any]:
+        """Build summary of water repair feedback."""
+        return {
+            "leak_type": feedback.get("leak_type", "unknown"),
+            "repair_method": feedback.get("repair_method", "unknown"),
+            "water_loss_liters": feedback.get("water_loss_liters", 0),
+            "parts_replaced": feedback.get("parts_replaced", "none"),
+            "service_quality": feedback.get("service_quality", "unknown"),
+            "repair_time_hours": feedback.get("repair_time_hours", 0),
+            "customer_satisfaction": feedback.get("customer_satisfaction", 0),
+            "health_impact_rating": "positive" if health_impact > 0 else (
+                "neutral" if health_impact == 0 else "negative"
+            ),
+            "follow_up_needed": "temporary_fix" in str(feedback.get("repair_method", "")).lower() or (
+                feedback.get("customer_satisfaction", 5) < 3
+            ),
+        }
+
 
 # Singleton instance
 _feedback_service: Optional[FeedbackCollectionService] = None
