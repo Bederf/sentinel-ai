@@ -109,6 +109,23 @@ export {
   type SolarSiteResponse,
   type ValidationResult,
 } from './solar_config';
+export {
+  pricingApi,
+  formatZAR,
+  parseZAR,
+  formatPercent,
+  type SLATier,
+  type QuoteRequest,
+  type QuoteResponse,
+  type EquipmentType,
+  type SLATierInfo,
+  type EquipmentTypesResponse,
+  type SLATiersResponse,
+  type PriceRangeResponse,
+  type WhatIfScenario,
+  type WhatIfRequest,
+  type WhatIfResponse,
+} from './pricing';
 
 // Desk positioning data types
 export {

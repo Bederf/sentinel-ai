@@ -11,6 +11,31 @@ from app.services.prediction_generator import get_prediction_generator
 router = APIRouter()
 
 
+def _normalize_prediction_severity(value: Optional[str]) -> Optional[str]:
+    """Normalize prediction severity to canonical states.
+
+    Canonical values:
+    - critical
+    - warning
+    - healthy
+
+    Legacy values are mapped for backwards compatibility:
+    - high, medium -> warning
+    - low -> healthy
+    """
+    if value is None:
+        return None
+
+    normalized = value.strip().lower()
+    if normalized in ("high", "medium"):
+        return "warning"
+    if normalized == "low":
+        return "healthy"
+    if normalized in ("critical", "warning", "healthy"):
+        return normalized
+    return None
+
+
 def _parse_json_field(value, default):
     """Parse a field that might be a JSON string or already an object.
 
@@ -143,7 +168,13 @@ async def list_predictions(
             }
 
     if severity:
-        query = query.eq('severity', severity)
+        normalized_severity = _normalize_prediction_severity(severity)
+        if not normalized_severity:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid severity. Use critical, warning, or healthy."
+            )
+        query = query.eq('severity', normalized_severity)
 
     if min_probability is not None:
         query = query.gte('probability_percent', min_probability)
