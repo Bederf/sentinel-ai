@@ -24,7 +24,12 @@ from app.models.pricing import (
     WhatIfScenarioResult,
     RenewalPricingRequest,
     RenewalPricingResponse,
-    PricingBenchmarkResponse
+    PricingBenchmarkResponse,
+    RenewalQuote,
+    ContractComparable,
+    RenegotiationOptions,
+    RenegotiationAnalysis,
+    RenegotiationOption
 )
 from app.database.repositories.sla_repository import get_sla_repository
 from app.services.profitability_service import get_profitability_service
@@ -276,6 +281,265 @@ class PricingEngine:
             delta_pct=delta_pct,
             notes=notes
         )
+
+    def calculate_renewal_price(self, contract_id: str) -> RenewalQuote:
+        """
+        Calculate renewal pricing for an existing contract.
+
+        Retrieves contract, recalculates pricing based on current condition,
+        and compares to original quoted fee.
+
+        Args:
+            contract_id: ID of contract to renew
+
+        Returns:
+            RenewalQuote with recommended fee, drivers, and confidence level
+        """
+        contract = self.contract_repo.get_by_id(contract_id)
+        if not contract:
+            raise ValueError(f"Contract {contract_id} not found")
+
+        original_fee = Decimal(str(contract.get("monthly_fee_zar") or 0))
+        equipment_codes = self._get_contract_equipment_codes(contract_id)
+        sla_tier = SLATier(contract.get("sla_tier", "standard"))
+
+        # Build quote request for current conditions
+        quote_request = QuoteRequest(
+            building_id=contract.get("building_id", ""),
+            equipment_codes=equipment_codes,
+            sla_tier=sla_tier,
+            contract_months=contract.get("contract_months", 12),
+            include_benchmarks=True
+        )
+
+        # Calculate current pricing
+        current_quote = self.calculate_price(quote_request)
+        recommended_fee = current_quote.recommended_fee_zar
+
+        # Calculate drivers
+        drivers = []
+        fee_change = recommended_fee - original_fee
+        fee_change_pct = (fee_change / original_fee * Decimal("100")) if original_fee > 0 else Decimal("0")
+
+        # Analyze what changed
+        if "condition" in current_quote.cost_breakdown and current_quote.cost_breakdown.get("condition_adjustment", 0) != 0:
+            drivers.append("Equipment condition deteriorated")
+
+        if "age" in current_quote.cost_breakdown and current_quote.cost_breakdown.get("age_adjustment", 0) != 0:
+            drivers.append("Equipment aging impact")
+
+        if len(current_quote.risk_factors) > 0:
+            drivers.append("Increased failure risk from ML predictions")
+
+        if not drivers:
+            if fee_change_pct > Decimal("5"):
+                drivers.append("Market rate adjustment")
+            elif fee_change_pct < Decimal("-5"):
+                drivers.append("Competitive market pricing")
+            else:
+                drivers.append("Standard cost of living adjustment")
+
+        # Determine confidence
+        if len(equipment_codes) >= 3 and current_quote.cost_breakdown:
+            confidence = "high"
+        elif len(equipment_codes) >= 1:
+            confidence = "medium"
+        else:
+            confidence = "low"
+
+        return RenewalQuote(
+            original_monthly_fee=original_fee,
+            recommended_monthly_fee=recommended_fee,
+            fee_change_pct=fee_change_pct,
+            drivers=drivers,
+            confidence=confidence,
+            assumptions=current_quote.assumptions
+        )
+
+    def get_comparable_contracts(
+        self,
+        equipment_types: List[str],
+        sla_tier: SLATier,
+        limit: int = 10
+    ) -> List[ContractComparable]:
+        """
+        Find similar contracts in portfolio for benchmarking.
+
+        Args:
+            equipment_types: List of equipment types to match
+            sla_tier: SLA tier to match
+            limit: Maximum number of comparables to return
+
+        Returns:
+            List of comparable contracts with fees and profitability
+        """
+        try:
+            similar = self.contract_repo.find_similar_contracts(
+                equipment_types=equipment_types,
+                sla_tier=sla_tier,
+                limit=limit
+            )
+
+            comparables = []
+            for contract in similar:
+                try:
+                    profitability_service = get_profitability_service()
+                    profit_data = profitability_service.get_contract_profitability(contract.get("id"))
+                    profitability_pct = Decimal(str(profit_data.get("margin_pct", 0)))
+                except Exception:
+                    profitability_pct = None
+
+                comparable = ContractComparable(
+                    contract_id=contract.get("id", ""),
+                    equipment_types=equipment_types,
+                    monthly_fee=Decimal(str(contract.get("monthly_fee_zar", 0))),
+                    sla_tier=SLATier(contract.get("sla_tier", "standard")),
+                    profitability=profitability_pct
+                )
+                comparables.append(comparable)
+
+            return comparables
+        except Exception:
+            return []
+
+    def calculate_renegotiation_terms(
+        self,
+        contract_id: str,
+        options_requested: Optional[str] = None
+    ) -> RenegotiationAnalysis:
+        """
+        Analyze renegotiation options for contract renewal.
+
+        Options:
+        1. Maintain margin: Raise fee to cover increased costs
+        2. Invest in maintenance: Reduce risk buffer, maintain fee
+        3. Add services: Justify higher fee with expanded scope
+
+        Args:
+            contract_id: ID of contract to analyze
+            options_requested: Optional filter (maintain|invest|expand)
+
+        Returns:
+            RenegotiationAnalysis with NPV analysis for each option
+        """
+        contract = self.contract_repo.get_by_id(contract_id)
+        if not contract:
+            raise ValueError(f"Contract {contract_id} not found")
+
+        current_fee = Decimal(str(contract.get("monthly_fee_zar", 0)))
+        equipment_codes = self._get_contract_equipment_codes(contract_id)
+        sla_tier = SLATier(contract.get("sla_tier", "standard"))
+
+        # Calculate base scenario
+        quote_request = QuoteRequest(
+            building_id=contract.get("building_id", ""),
+            equipment_codes=equipment_codes,
+            sla_tier=sla_tier,
+            contract_months=12,
+            include_benchmarks=False
+        )
+        base_quote = self.calculate_price(quote_request)
+
+        options = []
+
+        # Option 1: Maintain margin (raise fee)
+        if options_requested is None or options_requested == "maintain":
+            margin_pct = self._get_target_margin(sla_tier)
+            base_cost = base_quote.recommended_fee_zar - (base_quote.recommended_fee_zar * (margin_pct / Decimal("100")))
+            new_fee = base_cost * (Decimal("1") + (margin_pct / Decimal("100")))
+            fee_increase = new_fee - current_fee
+            npv = fee_increase * Decimal("12") * Decimal("3")  # 3-year horizon
+
+            options.append(RenegotiationOption(
+                option_type="maintain",
+                description="Increase contract fee to maintain current margin %",
+                recommended_fee=new_fee,
+                estimated_npv_zar=npv,
+                roi_pct=(fee_increase / current_fee * Decimal("100")) if current_fee > 0 else Decimal("0"),
+                implementation_notes=[
+                    "Present to client as cost passthrough for inflation",
+                    "Minimal service changes needed",
+                    "Higher acceptance risk if market rates are stable"
+                ]
+            ))
+
+        # Option 2: Invest in maintenance (reduce risk, maintain fee)
+        if options_requested is None or options_requested == "invest":
+            # Assume 20% reduction in risk buffer through preventive maintenance
+            risk_reduction = Decimal("0.2")
+            cost_reduction = base_quote.cost_breakdown.get("risk_buffer", Decimal("0")) * risk_reduction
+            maintenance_investment = cost_reduction * Decimal("0.5")  # 50% of savings goes to maintenance
+            net_improvement = cost_reduction - maintenance_investment
+            npv = net_improvement * Decimal("12") * Decimal("3")  # 3-year horizon
+
+            options.append(RenegotiationOption(
+                option_type="invest",
+                description="Invest 50% of risk reduction in preventive maintenance",
+                recommended_fee=current_fee,  # Keep fee same
+                estimated_npv_zar=npv,
+                roi_pct=(net_improvement / maintenance_investment * Decimal("100")) if maintenance_investment > 0 else Decimal("0"),
+                implementation_notes=[
+                    "Fee remains unchanged from client perspective",
+                    "Requires new preventive maintenance program",
+                    "Builds customer loyalty and longer-term relationship",
+                    "Risk reduction improves service quality metrics"
+                ]
+            ))
+
+        # Option 3: Add services (justify higher fee)
+        if options_requested is None or options_requested == "expand":
+            # Assume adding monitoring services at 15% of current fee
+            service_addition = current_fee * Decimal("0.15")
+            new_fee = current_fee + service_addition
+            new_value_delivered = service_addition * Decimal("12") * Decimal("3")
+            npv = new_value_delivered
+
+            options.append(RenegotiationOption(
+                option_type="expand",
+                description="Add predictive maintenance and real-time monitoring services",
+                recommended_fee=new_fee,
+                estimated_npv_zar=npv,
+                roi_pct=Decimal("150"),  # 15% fee increase with 100% uptake of new services
+                implementation_notes=[
+                    "Requires deployment of monitoring infrastructure",
+                    "Enables data-driven preventive maintenance",
+                    "Justifies 15% fee increase with clear ROI to client",
+                    "Highest revenue but requires service capability investment"
+                ]
+            ))
+
+        # Recommend best option (usually maintain for steady state)
+        recommended_option = "maintain"
+        if options:
+            # If risk buffer is high, recommend invest; if services needed, recommend expand
+            if base_quote.cost_breakdown.get("risk_buffer", Decimal("0")) > base_quote.recommended_fee_zar * Decimal("0.2"):
+                recommended_option = "invest"
+            elif "High failure risk" in base_quote.risk_factors:
+                recommended_option = "expand"
+
+        return RenegotiationAnalysis(
+            contract_id=contract_id,
+            options=options,
+            recommended_option=recommended_option,
+            market_context={
+                "current_fee": float(current_fee),
+                "base_cost": float(base_quote.recommended_fee_zar),
+                "margin_pct": float(self._get_target_margin(sla_tier))
+            }
+        )
+
+    def _get_contract_equipment_codes(self, contract_id: str) -> List[str]:
+        """Get equipment codes for a contract."""
+        try:
+            assets = self.contract_repo.get_contract_assets(contract_id)
+            equipment_codes = []
+            for asset in assets:
+                eq_code = asset.get("equipment_code") or asset.get("code")
+                if eq_code:
+                    equipment_codes.append(eq_code)
+            return equipment_codes if equipment_codes else ["unknown"]
+        except Exception:
+            return ["unknown"]
 
     def get_benchmarks_for_contract(
         self,

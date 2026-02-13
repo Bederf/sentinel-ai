@@ -211,3 +211,46 @@ class PricingConfig(BaseModel):
             MarginTarget(sla_tier=SLATier.enterprise, margin_pct=Decimal("35"), multiplier=Decimal("1.5"))
         ]
     )
+
+
+class RenewalQuote(BaseModel):
+    """Renewal quote with fee recommendations and drivers."""
+    original_monthly_fee: Decimal
+    recommended_monthly_fee: Decimal
+    fee_change_pct: Decimal
+    drivers: List[str] = Field(default_factory=list, description="Factors driving price change")
+    confidence: str = Field(..., description="Confidence level: high, medium, low")
+    assumptions: List[str] = Field(default_factory=list, description="Key assumptions for renewal")
+
+
+class ContractComparable(BaseModel):
+    """Comparable contract for benchmarking."""
+    contract_id: str
+    equipment_types: List[str]
+    monthly_fee: Decimal
+    sla_tier: SLATier
+    profitability: Optional[Decimal] = None
+
+
+class RenegotiationOption(BaseModel):
+    """Single renegotiation option analysis."""
+    option_type: str = Field(..., description="maintain|invest|expand")
+    description: str
+    recommended_fee: Decimal
+    estimated_npv_zar: Decimal
+    roi_pct: Decimal
+    implementation_notes: List[str] = Field(default_factory=list)
+
+
+class RenegotiationOptions(BaseModel):
+    """Request for renegotiation analysis."""
+    contract_id: str
+    option_type: str = Field(..., description="maintain|invest|expand")
+
+
+class RenegotiationAnalysis(BaseModel):
+    """Comprehensive renegotiation analysis."""
+    contract_id: str
+    options: List[RenegotiationOption]
+    recommended_option: str
+    market_context: Dict[str, Any] = Field(default_factory=dict)
