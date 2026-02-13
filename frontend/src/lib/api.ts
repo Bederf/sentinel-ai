@@ -2364,6 +2364,40 @@ export const api = {
     });
   },
 
+  /**
+   * Update safety boundary configuration for a device
+   * @param deviceId - Device ID
+   * @param config - Boundary configuration
+   */
+  async updateBoundary(
+    deviceId: string,
+    config: any
+  ): Promise<{ success: boolean; message: string }> {
+    return fetchApi(`/api/autonomous/boundaries/update`, {
+      method: "POST",
+      body: JSON.stringify({
+        device_id: deviceId,
+        ...config,
+      }),
+    });
+  },
+
+  /**
+   * Toggle autonomous mode on/off
+   * @param enabled - Whether to enable or disable autonomous mode
+   */
+  async toggleAutonomousMode(enabled: boolean): Promise<{
+    success: boolean;
+    message: string;
+    mode: string;
+  }> {
+    if (enabled) {
+      return this.enableAutonomousMode();
+    } else {
+      return this.disableAutonomousMode();
+    }
+  },
+
   // ============= Equipment Lookup API Methods (Phase 19) =============
 
   /**
