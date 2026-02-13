@@ -12,6 +12,11 @@ interface BuildingSelectorProps {
   onChange: (value: string) => void;
   sites: Array<{ id: string; name: string }>;
   disabled?: boolean;
+  /**
+   * Show optional "All Buildings" option for filtering use cases.
+   * When enabled, user can select empty string to show all sites.
+   */
+  allowAllOption?: boolean;
 }
 
 export function BuildingSelector({
@@ -19,6 +24,7 @@ export function BuildingSelector({
   onChange,
   sites,
   disabled = false,
+  allowAllOption = false,
 }: BuildingSelectorProps) {
   return (
     <div className="relative w-full">
@@ -43,6 +49,9 @@ export function BuildingSelector({
           cursor: disabled ? "not-allowed" : "pointer",
         }}
       >
+        {allowAllOption && (
+          <option value="">All Buildings</option>
+        )}
         {sites.map((site) => (
           <option key={site.id} value={site.id}>
             {site.name}

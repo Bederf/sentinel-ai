@@ -12,8 +12,6 @@ import {
   ChevronRight,
   ArrowLeft,
   RefreshCw,
-  Building2,
-  ChevronDown,
 } from 'lucide-react';
 import {
   api,
@@ -23,6 +21,7 @@ import {
   type Site,
 } from '@/lib/api';
 import { PageLoading } from "./PageLoading";
+import BuildingSelector from "./BuildingSelector";
 
 // Re-export types from API for local use
 type Equipment = WorkflowEquipmentItem;
@@ -216,30 +215,13 @@ export function AssetWorkflowDashboard() {
               >
                 Filter by Building
               </label>
-              <div className="relative">
-                <select
-                  value={selectedSiteId}
-                  onChange={(e) => setSelectedSiteId(e.target.value)}
-                  disabled={loadingSites}
-                  className="w-full px-3 py-2 text-sm rounded appearance-none cursor-pointer"
-                  style={{
-                    background: 'var(--color-sentinel-bg-secondary)',
-                    border: '1px solid var(--color-sentinel-border)',
-                    color: 'var(--color-sentinel-text-primary)',
-                  }}
-                >
-                  <option value="">All Buildings</option>
-                  {sites.map((site) => (
-                    <option key={site.id} value={site.id}>
-                      {site.name}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 pointer-events-none"
-                  style={{ color: 'var(--color-sentinel-text-secondary)' }}
-                />
-              </div>
+              <BuildingSelector
+                value={selectedSiteId}
+                onChange={setSelectedSiteId}
+                sites={sites}
+                disabled={loadingSites}
+                allowAllOption={true}
+              />
             </div>
             <div className="flex items-center gap-2">
               <span
