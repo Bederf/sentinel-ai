@@ -175,6 +175,18 @@ export {
   type EventsResponse,
   type AlertsResponse,
 } from './security';
+export {
+  sustainabilityApi,
+  type MonthlyEmission,
+  type EmissionsSummary,
+  type EmissionsBySource,
+  type Benchmark,
+  type ESGMetrics,
+  type Certification,
+  type Certifications,
+  type ForecastData,
+  type Forecast,
+} from './sustainability';
 
 // Desk positioning data types
 export {
