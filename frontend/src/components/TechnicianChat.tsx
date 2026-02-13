@@ -15,6 +15,18 @@ import { Send, Wrench, Search, AlertTriangle, CheckCircle, Info, ChevronDown, Ch
 import { authorizedFetch } from '../lib/api/client';
 import DiagnosisFlow from './DiagnosisFlow';
 import PhotoCapture from './PhotoCapture';
+import OfflineIndicator from './OfflineIndicator';
+import {
+  isOnline,
+  setupOfflineListeners,
+  getCachedFaultCodes,
+  getCachedRepairProcedures,
+  cacheEquipment,
+  getOfflineWorkOrders,
+  saveWorkOrderOffline,
+  queueForSync,
+  clearSyncQueue,
+} from '../lib/offlineStorage';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
@@ -131,16 +143,51 @@ export default function TechnicianChat() {
   const [isTyping, setIsTyping] = useState(false);
   const [showQuickActions, setShowQuickActions] = useState(true);
   const [activeFlowId, setActiveFlowId] = useState<string | null>(null);
+  const [isOnlineMode, setIsOnlineMode] = useState(isOnline());
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Generate unique message ID
+  const generateId = () => `msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Generate unique message ID
-  const generateId = () => `msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  // Setup offline/online listeners and cache initial data
+  useEffect(() => {
+    // Setup event listeners for online/offline
+    const cleanup = setupOfflineListeners(
+      () => {
+        setIsOnlineMode(true);
+        // Trigger sync of queued operations
+        const message: Message = {
+          id: generateId(),
+          role: 'assistant',
+          content: 'Back online - syncing changes...',
+          timestamp: new Date(),
+          type: 'text'
+        };
+        setMessages(prev => [...prev, message]);
+        clearSyncQueue();
+      },
+      () => {
+        setIsOnlineMode(false);
+        // Notify user they're offline
+        const message: Message = {
+          id: generateId(),
+          role: 'assistant',
+          content: 'You are offline - using cached data. Work orders will sync when you\'re back online.',
+          timestamp: new Date(),
+          type: 'text'
+        };
+        setMessages(prev => [...prev, message]);
+      }
+    );
+
+    return cleanup;
+  }, []);
 
   // Start guided diagnosis flow
   const startGuidedDiagnosis = (query: string) => {
@@ -258,50 +305,99 @@ export default function TechnicianChat() {
     setShowQuickActions(false);
 
     try {
-      // Call equipment lookup search endpoint
-      const params = new URLSearchParams({ query: text });
-      const response = await authorizedFetch(`/api/equipment-lookup/search?${params}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      });
+      // Check if offline
+      if (!isOnlineMode) {
+        // Try to use cached data
+        const cachedCodes = await getCachedFaultCodes();
+        const cachedProcedures = await getCachedRepairProcedures();
 
-      if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
+        // Simple offline search in cached data
+        const searchLower = text.toLowerCase();
+        const matchedCodes = Object.entries(cachedCodes).filter(
+          ([code, data]) =>
+            code.toLowerCase().includes(searchLower) ||
+            String(data.name || '').toLowerCase().includes(searchLower)
+        );
+
+        if (matchedCodes.length > 0) {
+          const [code, data] = matchedCodes[0];
+          const offlineMessage: Message = {
+            id: generateId(),
+            role: 'assistant',
+            content: `(Offline) Found in cached data: ${code}`,
+            timestamp: new Date(),
+            type: 'diagnosis',
+            data: {
+              fault: {
+                code,
+                name: data.name || code,
+                severity: data.severity || 'medium',
+                description: data.description || 'No description available offline',
+                probable_causes: data.probable_causes || [],
+                recommended_fix: data.recommended_fix || { immediate: [], scenarios: {} }
+              },
+              parts: data.parts || []
+            }
+          };
+          setMessages(prev => [...prev, offlineMessage]);
+        } else {
+          const offlineMessage: Message = {
+            id: generateId(),
+            role: 'assistant',
+            content: 'Offline mode: No matching fault codes in cache. Please reconnect to search the full database.',
+            timestamp: new Date(),
+            type: 'text'
+          };
+          setMessages(prev => [...prev, offlineMessage]);
+        }
+      } else {
+        // Call equipment lookup search endpoint (online)
+        const params = new URLSearchParams({ query: text });
+        const response = await authorizedFetch(`/api/equipment-lookup/search?${params}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        // Determine message type based on response
+        let messageType: Message['type'] = 'text';
+        let assistantData: DiagnosisData | SuggestionsData | undefined;
+
+        if (data.fault) {
+          messageType = 'diagnosis';
+          assistantData = data as DiagnosisData;
+        } else if (data.suggestions && data.suggestions.length > 0) {
+          messageType = 'suggestions';
+          assistantData = data as SuggestionsData;
+        } else if (data.query_type === 'keyword') {
+          messageType = 'suggestions';
+          assistantData = data as SuggestionsData;
+        }
+
+        const assistantMessage: Message = {
+          id: generateId(),
+          role: 'assistant',
+          content: formatResponse(data),
+          timestamp: new Date(),
+          type: messageType,
+          data: assistantData
+        };
+
+        setMessages(prev => [...prev, assistantMessage]);
       }
-
-      const data = await response.json();
-
-      // Determine message type based on response
-      let messageType: Message['type'] = 'text';
-      let assistantData: DiagnosisData | SuggestionsData | undefined;
-
-      if (data.fault) {
-        messageType = 'diagnosis';
-        assistantData = data as DiagnosisData;
-      } else if (data.suggestions && data.suggestions.length > 0) {
-        messageType = 'suggestions';
-        assistantData = data as SuggestionsData;
-      } else if (data.query_type === 'keyword') {
-        messageType = 'suggestions';
-        assistantData = data as SuggestionsData;
-      }
-
-      const assistantMessage: Message = {
-        id: generateId(),
-        role: 'assistant',
-        content: formatResponse(data),
-        timestamp: new Date(),
-        type: messageType,
-        data: assistantData
-      };
-
-      setMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
       console.error('Chat error:', error);
       const errorMessage: Message = {
         id: generateId(),
         role: 'assistant',
-        content: 'Sorry, I encountered an error connecting to the equipment database. Please check your connection and try again.',
+        content: isOnlineMode
+          ? 'Sorry, I encountered an error connecting to the equipment database. Please check your connection and try again.'
+          : 'You are offline. Please reconnect to search the equipment database.',
         timestamp: new Date(),
         type: 'error'
       };
@@ -356,6 +452,9 @@ export default function TechnicianChat() {
 
   return (
     <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-900">
+      {/* Offline Indicator */}
+      <OfflineIndicator />
+
       {/* Header */}
       <div className="flex-none bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
         <div className="flex items-center justify-between">
