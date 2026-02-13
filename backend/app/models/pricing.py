@@ -254,3 +254,47 @@ class RenegotiationAnalysis(BaseModel):
     options: List[RenegotiationOption]
     recommended_option: str
     market_context: Dict[str, Any] = Field(default_factory=dict)
+
+
+class PricingHistory(BaseModel):
+    """Track all quotes generated."""
+    id: Optional[str] = None
+    contract_id: str
+    quote_fee_zar: Decimal = Field(..., description="Quote amount in ZAR")
+    accepted_fee_zar: Optional[Decimal] = Field(None, description="Accepted amount if different")
+    quote_date: date = Field(default_factory=date.today)
+    decision_date: Optional[date] = None
+    status: str = Field(default="draft", description="draft|sent|accepted|rejected|expired")
+    created_by: Optional[str] = None
+
+
+class QuotePerformance(BaseModel):
+    """Track actual vs quoted costs."""
+    id: Optional[str] = None
+    quote_id: str
+    actual_costs_zar: Optional[Decimal] = None
+    variance_pct: Optional[Decimal] = None
+    outcome: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class WinLossAnalysis(BaseModel):
+    """Track quote acceptance/rejection."""
+    id: Optional[str] = None
+    quote_id: str
+    outcome: str = Field(..., description="won|lost|pending")
+    reason: Optional[str] = None
+    client_feedback: Optional[str] = None
+    lost_to_competitor: Optional[str] = None
+
+
+class BenchmarkData(BaseModel):
+    """Market benchmark data for comparables."""
+    id: Optional[str] = None
+    equipment_type: str
+    sla_tier: str
+    avg_fee_zar: Decimal
+    min_fee_zar: Optional[Decimal] = None
+    max_fee_zar: Optional[Decimal] = None
+    market_sample_size: int = 0
+    confidence_pct: int = 0
