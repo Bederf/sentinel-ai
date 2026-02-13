@@ -35,7 +35,6 @@ import {
   calculateInverterCoverage,
   suggestEquipmentId,
 } from '@/lib/api';
-import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 interface SolarWizardState {
@@ -74,8 +73,11 @@ const MANUFACTURERS = {
 
 const TARIFFS = ['City Power 2026', 'Eskom 2026', 'Custom'];
 
-export function SolarConfigWizard() {
-  const navigate = useNavigate();
+interface SolarConfigWizardProps {
+  onComplete?: () => void;
+}
+
+export function SolarConfigWizard({ onComplete }: SolarConfigWizardProps = {}) {
   const [state, setState] = useState<SolarWizardState>({
     step: 1,
     siteId: '',
@@ -285,9 +287,9 @@ export function SolarConfigWizard() {
       setState((s) => ({ ...s, success: true, loading: false }));
       toast.success('Solar site configured successfully!');
 
-      // Redirect to modules dashboard after short delay
+      // Call completion callback after short delay
       setTimeout(() => {
-        navigate('/?view=modules', { replace: true });
+        onComplete?.();
       }, 2000);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to create solar site';
@@ -813,7 +815,7 @@ export function SolarConfigWizard() {
             <p className="text-sm">{totalCapacity} kWp • {state.plants.length} plant(s)</p>
           </div>
           <button
-            onClick={() => navigate('/?view=modules', { replace: true })}
+            onClick={() => onComplete?.()}
             className="w-full px-4 py-2 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 transition"
           >
             View Dashboard
