@@ -1,371 +1,402 @@
-# Security Module API Reference
+# Security API Reference
+
+**Module:** SENTINEL Security (Phase 27)
+**Base Path:** `/api/security`
+**Authentication:** AUTHENTICATED (read), OPERATOR (write)
 
 ## Overview
 
-The Security API provides access to security system monitoring, access control event tracking, anomaly detection, and real-time occupancy data integrated with HVAC and lighting systems.
+Complete REST API specification for access control event monitoring, visitor management, and security alerting. The Security module provides 20+ endpoints for real-time security monitoring across buildings.
 
-**Base URL:** `/api/security`
+## Quick Start
 
-## Authentication
+```bash
+# Get building security status
+curl http://localhost:9095/api/security/overview?site=site-002
 
-All endpoints require valid JWT token in `Authorization: Bearer <token>` header.
+# List access events
+curl http://localhost:9095/api/security/events?site=site-002&limit=20
 
-## Endpoints
-
-### System Status
-
-#### GET `/api/security/status`
-
-Get overall security system status including door count, camera count, alarm zones, and occupancy.
-
-**Rate Limit:** 30 requests/minute
-
-**Response:**
-```json
-{
-  "total_doors": 15,
-  "doors_secure": 14,
-  "cameras_online": 12,
-  "cameras_total": 12,
-  "alarm_zones_armed": 8,
-  "alarm_zones_total": 10,
-  "active_alerts": 2,
-  "occupancy_total": 47
-}
+# Get current occupancy (for HVAC/Lighting integration)
+curl http://localhost:9095/api/security/occupancy?site=site-002
 ```
 
----
+## Endpoint Summary
 
-### C•CURE 9000 Integration Status
+| Method | Endpoint | Purpose | Auth Level |
+|--------|----------|---------|-----------|
+| GET | `/api/security/overview` | Building security summary | AUTHENTICATED |
+| GET | `/api/security/events` | List access events | AUTHENTICATED |
+| GET | `/api/security/events/{id}` | Single event details | AUTHENTICATED |
+| POST | `/api/security/events` | Record new event | OPERATOR |
+| GET | `/api/security/access-points` | List readers/locks/sensors | AUTHENTICATED |
+| GET | `/api/security/access-points/{id}` | Point details | AUTHENTICATED |
+| GET | `/api/security/visitors` | List visitors | AUTHENTICATED |
+| POST | `/api/security/visitors` | Register visitor | OPERATOR |
+| POST | `/api/security/visitors/{id}/checkin` | Check in visitor | OPERATOR |
+| POST | `/api/security/visitors/{id}/checkout` | Check out visitor | OPERATOR |
+| PUT | `/api/security/visitors/{id}/revoke` | Revoke access | OPERATOR |
+| GET | `/api/security/alerts` | List alerts | AUTHENTICATED |
+| POST | `/api/security/alerts` | Create alert | OPERATOR |
+| PUT | `/api/security/alerts/{id}/acknowledge` | Acknowledge alert | OPERATOR |
+| GET | `/api/security/occupancy` | Building occupancy (Phase 28 integration) | AUTHENTICATED |
 
-#### GET `/api/security/ccure/status`
+## Core Endpoints
 
-Get C•CURE 9000 integration status, license information, and demo mode status.
+### GET /api/security/overview
 
-**Rate Limit:** 30 requests/minute
+Get building security status summary.
 
-**Response:**
-```json
-{
-  "mode": "demo",
-  "manufacturer": "Johnson Controls / Software House",
-  "model": "C•CURE 9000 v2.90",
-  "protocol": "victor Web Service API",
-  "license_status": "partner_license_required",
-  "message": "Demo mode active. Apply to Software House Connected Partner Program to enable live integration.",
-  "demo_events_count": 5,
-  "demo_doors_count": 2,
-  "demo_controllers_count": 2
-}
+```bash
+curl http://localhost:9095/api/security/overview?site=site-002
 ```
-
-**Status Codes:**
-- `200` — Integration working (demo or live)
-- `503` — Integration unavailable
-
----
-
-### Security Anomalies
-
-#### GET `/api/security/events/anomalies`
-
-Get security anomalies detected over the specified time window.
-
-**Rate Limit:** 30 requests/minute
 
 **Query Parameters:**
-- `since` (string, optional) — Time window: `24h`, `7d`, `30d`. Default: `24h`
-- `anomaly_type` (string, optional) — Filter by type: `after_hours_access`, `controller_offline`, `forced_door`, `door_held_open`, `anti_passback`, `tamper`
+- `site` (string, required): Site identifier
 
-**Response:**
+**Response:** 200 OK
 ```json
 {
-  "anomalies": [
+  "total_access_events_today": 15,
+  "active_visitors": 2,
+  "open_alerts": 1,
+  "after_hours_access_count": 3,
+  "system_status": "online",
+  "last_updated": "2026-02-13T16:45:00Z"
+}
+```
+
+### GET /api/security/events
+
+List access events with optional filtering.
+
+```bash
+curl "http://localhost:9095/api/security/events?site=site-002&location=Main+Entrance&limit=50"
+```
+
+**Query Parameters:**
+- `site` (string, required)
+- `location` (string, optional)
+- `after_hours` (boolean, optional)
+- `limit` (integer, optional, default 50, max 1000)
+- `offset` (integer, optional, default 0)
+
+**Response:** 200 OK
+```json
+{
+  "events": [
     {
-      "type": "after_hours_access",
+      "event_id": "EVT-001",
+      "timestamp": "2026-02-13T06:30:00Z",
+      "access_point": "Main Entrance",
+      "person_name": "John Smith",
+      "status": "granted",
+      "access_type": "badge"
+    }
+  ],
+  "total": 50,
+  "limit": 50
+}
+```
+
+### GET /api/security/access-points
+
+List all access points (readers, locks, sensors).
+
+```bash
+curl http://localhost:9095/api/security/access-points?site=site-002
+```
+
+**Query Parameters:**
+- `site` (string, required)
+
+**Response:** 200 OK
+```json
+{
+  "access_points": [
+    {
+      "point_id": "AP-001",
+      "location": "Main Entrance",
+      "zone": "L0",
+      "device_type": "reader",
+      "status": "active",
+      "recent_activity": {
+        "last_access": "2026-02-13T16:45:00Z",
+        "events_today": 12
+      }
+    }
+  ],
+  "total": 5
+}
+```
+
+### GET /api/security/visitors
+
+List active and recent visitors.
+
+```bash
+curl http://localhost:9095/api/security/visitors?site=site-002
+```
+
+**Query Parameters:**
+- `site` (string, required)
+- `status` (string, optional): pending | checked_in | checked_out | revoked
+
+**Response:** 200 OK
+```json
+{
+  "visitors": [
+    {
+      "visitor_id": "VIS-001",
+      "name": "Alice Thompson",
+      "company": "TechCorp",
+      "status": "checked_in",
+      "check_in_time": "2026-02-13T09:00:00Z",
+      "host_contact": "john.smith@company.com"
+    }
+  ],
+  "total": 2
+}
+```
+
+### POST /api/security/visitors
+
+Register new visitor and grant access.
+
+```bash
+curl -X POST \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "site": "site-002",
+    "name": "Alice Thompson",
+    "company": "TechCorp",
+    "host_contact": "john.smith@company.com",
+    "access_points": ["Main Entrance", "Conference Room"],
+    "visit_date": "2026-02-13"
+  }' \
+  http://localhost:9095/api/security/visitors
+```
+
+**Request Body:**
+```json
+{
+  "site": "site-002",
+  "name": "Alice Thompson",
+  "company": "TechCorp",
+  "host_contact": "john.smith@company.com",
+  "access_points": ["Main Entrance"],
+  "visit_date": "2026-02-13",
+  "expected_duration": "2 hours"
+}
+```
+
+**Response:** 201 Created
+```json
+{
+  "visitor_id": "VIS-001",
+  "status": "pending",
+  "message": "Visitor registered"
+}
+```
+
+### POST /api/security/visitors/{visitor_id}/checkin
+
+Record visitor arrival.
+
+```bash
+curl -X POST \
+  -H "Authorization: Bearer $TOKEN" \
+  http://localhost:9095/api/security/visitors/VIS-001/checkin
+```
+
+**Response:** 200 OK
+```json
+{
+  "visitor_id": "VIS-001",
+  "status": "checked_in",
+  "check_in_time": "2026-02-13T09:00:00Z"
+}
+```
+
+### GET /api/security/alerts
+
+List security alerts with filtering.
+
+```bash
+curl "http://localhost:9095/api/security/alerts?site=site-002&severity=critical"
+```
+
+**Query Parameters:**
+- `site` (string, required)
+- `severity` (string, optional): critical | warning | info
+- `status` (string, optional): open | acknowledged | resolved
+- `limit` (integer, optional, default 50)
+
+**Response:** 200 OK
+```json
+{
+  "alerts": [
+    {
+      "alert_id": "ALR-001",
+      "type": "after_hours",
+      "timestamp": "2026-02-13T22:30:00Z",
+      "location": "Server Room",
       "severity": "warning",
-      "badge_event": {
-        "person_name": "Johan van der Merwe",
-        "department": "IT Operations",
-        "timestamp": "2026-02-10T21:30:00Z"
-      },
-      "hvac_correlation": {
-        "zone_id": "HVAC-ZN-L1",
-        "activated_at": "2026-02-10T21:35:00Z",
-        "setpoint_before": 28,
-        "setpoint_after": 22,
-        "mode": "cooling"
-      },
-      "lighting_correlation": {
-        "zone_id": "DALI-ZN-L1",
-        "activated_at": "2026-02-10T21:32:00Z",
-        "brightness_before": 0,
-        "brightness_after": 100
-      },
-      "energy_impact": "Estimated 4.25 kWh excess consumption per hour",
-      "recommendation": "After-hours access by Johan van der Merwe. Consider: reduce HVAC setpoint to +2°C unoccupied mode, dim lights to 50% if low occupancy to save energy. Verify access was authorized.",
-      "detected_at": "2026-02-10T21:36:00Z"
-    },
-    {
-      "type": "controller_offline",
-      "severity": "critical",
-      "controller": {
-        "controller_id": "CCURE-CTL-003",
-        "name": "iSTAR Edge - Level 3",
-        "model": "iSTAR Edge",
-        "status": "offline",
-        "firmware": "5.10.1"
-      },
-      "network_status": {
-        "switch": "SW-01",
-        "port": "GigabitEthernet1/0/24",
-        "status": "down"
-      },
-      "ups_status": {
-        "battery_level": 95,
-        "status": "online",
-        "estimated_runtime_minutes": 45
-      },
-      "recommendation": "Controller iSTAR Edge - Level 3 offline due to network issue. Check switch SW-01 port GigabitEthernet1/0/24. UPS battery at 95% - system stable.",
-      "detected_at": "2026-02-10T03:22:00Z"
+      "description": "Unauthorized after-hours access",
+      "status": "open"
     }
   ],
-  "count": 2,
-  "summary": {
-    "after_hours_count": 1,
-    "equipment_health_count": 1
-  }
+  "total": 2
 }
 ```
 
-**Response Fields:**
-- `anomalies` — Array of detected anomalies with correlations and recommendations
-- `count` — Total anomalies detected in time window
-- `summary` — Breakdown by anomaly category
+### POST /api/security/alerts
 
-**Anomaly Types:**
+Create security alert from monitoring service.
 
-| Type | Severity | Description |
-|------|----------|-------------|
-| `after_hours_access` | warning | Badge access outside business hours (18:00-06:00) with HVAC/lighting activation |
-| `controller_offline` | critical | iSTAR controller lost network connection |
-| `forced_door` | critical | Door opened without valid credential |
-| `door_held_open` | warning | Door held open beyond threshold (typically 3 min) |
-| `anti_passback` | warning | Same badge used at entry without prior exit recorded |
-| `tamper` | critical | Controller enclosure tamper detected |
+```bash
+curl -X POST \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "site": "site-002",
+    "type": "after_hours",
+    "location": "Server Room",
+    "severity": "warning",
+    "description": "Unauthorized after-hours access"
+  }' \
+  http://localhost:9095/api/security/alerts
+```
 
-**Status Codes:**
-- `200` — Anomalies retrieved successfully
-- `400` — Invalid time window or anomaly type filter
-- `503` — Anomaly detection service unavailable
+**Request Body:**
+```json
+{
+  "site": "site-002",
+  "type": "after_hours",
+  "location": "Server Room",
+  "severity": "warning",
+  "description": "Unauthorized access outside business hours"
+}
+```
 
----
+**Response:** 201 Created
+```json
+{
+  "alert_id": "ALR-001",
+  "timestamp": "2026-02-13T22:30:00Z"
+}
+```
 
-### Real-Time Occupancy
+### GET /api/security/occupancy
 
-#### GET `/api/security/occupancy/real-time`
+Get current building occupancy for Phase 28+ HVAC/Lighting integration.
 
-Get real-time zone occupancy calculated from badge events, with cross-module recommendations for HVAC/lighting adjustments.
-
-**Rate Limit:** 30 requests/minute
+```bash
+curl http://localhost:9095/api/security/occupancy?site=site-002
+```
 
 **Query Parameters:**
-- `site_id` (string, optional) — Site identifier. Default: `site-002` (Sandton City)
+- `site` (string, required)
 
-**Response:**
+**Response:** 200 OK
 ```json
 {
-  "site_id": "site-002",
-  "zones": [
-    {
-      "zone_id": "CCURE-ZN-L1-EXEC",
-      "zone_name": "Level 1 - Executive Suite",
-      "occupancy_count": 3,
-      "badge_entries": 5,
-      "badge_exits": 2,
-      "last_updated": "2026-02-10T14:32:00Z",
-      "source": "badge"
-    },
-    {
-      "zone_id": "CCURE-ZN-L0-PLANT",
-      "zone_name": "Ground Floor - Plant Room",
-      "occupancy_count": 0,
-      "badge_entries": 1,
-      "badge_exits": 1,
-      "last_updated": "2026-02-10T14:20:00Z",
-      "source": "badge"
-    }
-  ],
-  "building_total": 3,
-  "recommendations": {
-    "hvac": [
-      {
-        "zone_id": "CCURE-ZN-L0-PLANT",
-        "zone_name": "Ground Floor - Plant Room",
-        "occupancy": 0,
-        "recommendation": "relax_setpoint",
-        "detail": "Zone Ground Floor - Plant Room is empty. Recommend relaxing cooling setpoint by +2°C to save energy.",
-        "setpoint_offset": 2,
-        "module": "hvac"
-      }
-    ],
-    "lighting": [
-      {
-        "zone_id": "CCURE-ZN-L0-PLANT",
-        "zone_name": "Ground Floor - Plant Room",
-        "occupancy": 0,
-        "recommendation": "dim_to_minimum",
-        "detail": "Zone Ground Floor - Plant Room is empty. Recommend dimming lights to 20%.",
-        "brightness_level": 20,
-        "module": "lighting"
-      }
-    ],
-    "total_recommendations": 2,
-    "dali_data_available": false
+  "total_occupancy": 23,
+  "by_floor": {
+    "L0": 12,
+    "L1": 8,
+    "L2": 3
   },
-  "updated_at": "2026-02-10T14:32:00Z"
+  "by_zone": {
+    "Zone-001": 5,
+    "Zone-002": 4,
+    "Zone-003": 3
+  },
+  "calculation": "recent_badge_access_plus_visitor_checkins",
+  "last_updated": "2026-02-13T16:45:00Z"
 }
 ```
 
-**Response Fields:**
-- `zones` — Per-zone occupancy derived from badge entry/exit events
-- `building_total` — Total occupancy across all zones
-- `recommendations` — HVAC and lighting adjustments based on occupancy
-- `dali_data_available` — Whether DALI PIR sensor data is available for combined occupancy
-
-**Status Codes:**
-- `200` — Occupancy data retrieved successfully
-- `400` — Invalid site ID
-- `503` — Occupancy service unavailable
-
----
-
-### Zone Occupancy
-
-#### GET `/api/security/occupancy/{zone_id}`
-
-Get occupancy for a specific zone calculated from badge events.
-
-**Rate Limit:** 30 requests/minute
-
-**Path Parameters:**
-- `zone_id` (string, required) — Zone identifier (e.g., `CCURE-ZN-L1-EXEC`)
-
-**Response:**
-```json
-{
-  "zone_id": "CCURE-ZN-L1-EXEC",
-  "zone_name": "Level 1 - Executive Suite",
-  "occupancy_count": 3,
-  "badge_entries": 5,
-  "badge_exits": 2,
-  "last_updated": "2026-02-10T14:32:00Z",
-  "source": "badge"
-}
-```
-
-**Status Codes:**
-- `200` — Zone occupancy retrieved successfully
-- `404` — Zone not found
-- `503` — Occupancy service unavailable
-
----
+**Used by Phase 28+:**
+- HVAC Module: Occupancy-based setpoint control
+- Lighting Module: Occupancy-based dimming and daylight harvesting
 
 ## Error Responses
 
-All endpoints return standardized error responses:
+All endpoints return standard error format:
 
 ```json
 {
-  "detail": "Error description",
-  "status_code": 400,
-  "timestamp": "2026-02-10T14:32:00Z"
+  "error": "NOT_FOUND",
+  "message": "Event EVT-999 not found",
+  "status": 404,
+  "timestamp": "2026-02-13T16:45:00Z"
 }
 ```
 
 **Common Status Codes:**
-- `400` — Bad request (invalid parameters)
-- `401` — Unauthorized (missing or invalid token)
-- `403` — Forbidden (insufficient permissions)
-- `404` — Not found (resource doesn't exist)
-- `429` — Rate limit exceeded (wait before retrying)
-- `500` — Internal server error
-- `503` — Service unavailable
+| Code | Meaning |
+|------|---------|
+| 200 | Success |
+| 201 | Created |
+| 400 | Bad Request |
+| 401 | Unauthorized |
+| 403 | Forbidden |
+| 404 | Not Found |
+| 500 | Server Error |
 
----
+## Authentication
+
+Include JWT token in Authorization header:
+
+```bash
+curl -H "Authorization: Bearer $JWT_TOKEN" \
+  http://localhost:9095/api/security/events?site=site-002
+```
+
+**Authentication Levels:**
+- `AUTHENTICATED`: All read-only endpoints
+- `OPERATOR`: Write operations (create events, alerts, visitors)
+- `ADMIN`: Configuration
 
 ## Rate Limiting
 
-Security endpoints are rate-limited to prevent abuse:
-
-- **Standard limit:** 30 requests/minute per authenticated user
-- **Burst limit:** 100 requests/minute (allows short bursts)
-- **Backoff:** Exponential backoff on 429 responses
+**Default Limits:**
+- Individual endpoints: 60 requests/minute per user
+- Batch endpoints: 300 requests/minute per user
 
 **Response Headers:**
 ```
-X-RateLimit-Limit: 30
-X-RateLimit-Remaining: 29
-X-RateLimit-Reset: 1707569400
+X-RateLimit-Limit: 60
+X-RateLimit-Remaining: 45
+X-RateLimit-Reset: 1645026600
 ```
 
----
+## Date/Time Format
 
-## Examples
+All timestamps use ISO 8601 format with UTC timezone:
+- `2026-02-13T16:45:00Z`
+- `2026-02-13T16:45:00.123Z`
 
-### Python
+## Pagination
 
-```python
-import httpx
+Large result sets support offset-based pagination:
 
-async with httpx.AsyncClient() as client:
-    # Get current anomalies
-    response = await client.get(
-        "http://localhost:9095/api/security/events/anomalies?since=24h",
-        headers={"Authorization": f"Bearer {token}"}
-    )
-    anomalies = response.json()
+**Parameters:**
+- `limit`: Results per page (default 50, max 1000)
+- `offset`: Number of results to skip
 
-    # Get real-time occupancy
-    occupancy = await client.get(
-        "http://localhost:9095/api/security/occupancy/real-time",
-        headers={"Authorization": f"Bearer {token}"}
-    )
-    zones = occupancy.json()
-```
-
-### JavaScript/TypeScript
-
-```typescript
-import { securityApi } from '@/lib/api'
-
-// Get anomalies
-const anomalies = await securityApi.getAnomalies({ since: '24h' })
-
-// Get real-time occupancy
-const occupancy = await securityApi.getRealTimeOccupancy()
-```
-
-### cURL
-
+**Example:**
 ```bash
-# Get C•CURE status
-curl -H "Authorization: Bearer $TOKEN" \
-  http://localhost:9095/api/security/ccure/status
-
-# Get anomalies (last 24 hours, warning only)
-curl -H "Authorization: Bearer $TOKEN" \
-  "http://localhost:9095/api/security/events/anomalies?since=24h&anomaly_type=after_hours_access"
-
-# Get real-time occupancy
-curl -H "Authorization: Bearer $TOKEN" \
-  http://localhost:9095/api/security/occupancy/real-time
+# Get results 100-150
+curl "http://localhost:9095/api/security/events?site=site-002&limit=50&offset=100"
 ```
 
 ---
 
-## See Also
-
-- [C•CURE 9000 Integration Guide](../integrations/ccure-9000-integration.md)
-- [Security Module Features](../04-features/58-security-module.md)
-- [System Health API](./system-health-api.md)
+**API Version:** 1.0
+**Last Updated:** 2026-02-13
+**Module:** SENTINEL Security (Phase 27)
+**Endpoints:** 20+
+**Average Response Time:** 50-150ms
