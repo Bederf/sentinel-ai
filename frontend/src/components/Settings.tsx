@@ -312,6 +312,26 @@ export function Settings({ onError }: SettingsProps) {
           </div>
 
           <div className="p-6">
+            <div
+              className="mb-5 rounded-lg p-3"
+              style={{
+                background: "rgba(59, 130, 246, 0.08)",
+                border: "1px solid rgba(59, 130, 246, 0.25)",
+              }}
+            >
+              <p
+                className="text-sm font-medium mb-2"
+                style={{ color: "var(--color-sentinel-text-primary)" }}
+              >
+                Navigation features controlled by module toggles
+              </p>
+              <div className="grid gap-1 text-xs sm:grid-cols-2" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                <div>AI Chat: <span style={{ color: "var(--color-sentinel-text-primary)" }}>notifications</span></div>
+                <div>Control Audit: <span style={{ color: "var(--color-sentinel-text-primary)" }}>control</span></div>
+                <div>3D Digital Twin: <span style={{ color: "var(--color-sentinel-text-primary)" }}>simbiot</span></div>
+                <div>Simulation (admin): <span style={{ color: "var(--color-sentinel-text-primary)" }}>ml</span></div>
+              </div>
+            </div>
             <style>{`
               .module-selector-wrapper .bg-gray-50 {
                 background: var(--color-sentinel-bg-secondary) !important;

@@ -37,7 +37,7 @@ import { SolarConfigWizard } from "./components/wizards/SolarConfigWizard";
 import { DigitalTwin } from "./components/digital-twin/DigitalTwin";
 import { ModuleProvider } from "./contexts/ModuleContext";
 import { useModules } from "./contexts/ModuleHooks";
-import { type View, VIEW_TITLES, isModuleGatedView, getRequiredModule, ALL_NAV_ITEMS } from "./lib/navigation";
+import { type View, VIEW_TITLES, ALL_NAV_ITEMS } from "./lib/navigation";
 import { canAccessView, getDefaultView } from "./lib/access-control";
 
 interface HealthStatus {
@@ -63,8 +63,9 @@ function ViewGuard({
   const { isModuleActive, loading, siteId } = useModules();
 
   useEffect(() => {
-    if (!loading && siteId && isModuleGatedView(currentView)) {
-      const requiredModule = getRequiredModule(currentView);
+    const currentNavItem = ALL_NAV_ITEMS.find((item) => item.id === currentView);
+    if (!loading && siteId && currentNavItem?.requiredModule) {
+      const requiredModule = currentNavItem.requiredModule;
       if (requiredModule && !isModuleActive(requiredModule)) {
         toast.info(`The "${VIEW_TITLES[currentView]}" module is not active for this site.`);
         onRedirect("dashboard");

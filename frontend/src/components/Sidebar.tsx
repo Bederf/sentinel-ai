@@ -83,9 +83,11 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
   // Compute visible internal items, filtered by role
   const visibleInternal = useMemo(() => {
     return INTERNAL_NAV_ITEMS.filter(
-      (item) => !item.requiredRole || userRole === item.requiredRole
+      (item) =>
+        (!item.requiredRole || userRole === item.requiredRole) &&
+        (!item.requiredModule || isModuleActive(item.requiredModule))
     );
-  }, [userRole]);
+  }, [userRole, isModuleActive]);
 
   // Apply access control based on user email (company demo restrictions)
   const allowedBaseItems = useMemo(() => {
