@@ -10,18 +10,16 @@ import { SolarConfigWizard } from '../SolarConfigWizard';
 import * as api from '@/lib/api';
 import { vi } from 'vitest';
 
-// Mock the API
-vi.mock('@/lib/api', async () => {
-  const actual = await vi.importActual('@/lib/api');
-  return {
-    ...actual,
-    solarConfigApi: {
-      createSolarSite: vi.fn(),
-      getSolarConfig: vi.fn(),
-      validateConfig: vi.fn(),
-    },
-  };
-});
+// Mock the HTTP client used by solar_config.ts API methods
+// This preserves all utility functions while mocking API calls
+vi.mock('@/lib/api/client', () => ({
+  client: {
+    post: vi.fn(),
+    get: vi.fn(),
+    put: vi.fn(),
+    delete: vi.fn(),
+  },
+}));
 
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom');

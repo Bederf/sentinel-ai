@@ -44,17 +44,6 @@ export function ModuleProvider({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const isAdminUser = useCallback(() => {
-    try {
-      const raw = localStorage.getItem("sentinel_user");
-      if (!raw) return false;
-      const user = JSON.parse(raw) as { email?: string; role?: string };
-      return user?.role === "admin" || user?.email?.toLowerCase() === "bederf@gmail.com";
-    } catch {
-      return false;
-    }
-  }, []);
-
   // Define loaders as useCallback to satisfy exhaustive-deps
   const loadAvailableModules = useCallback(async () => {
     try {
@@ -196,9 +185,8 @@ export function ModuleProvider({
   }, [siteId]);
 
   const isModuleActive = useCallback((moduleType: ModuleType): boolean => {
-    if (isAdminUser()) return true;
     return activeModules.some(m => m.module_type === moduleType && m.status === 'active');
-  }, [activeModules, isAdminUser]);
+  }, [activeModules]);
 
   const addRecommendation = useCallback((
     recommendation: Omit<AIRecommendation, 'recommendation_id' | 'timestamp' | 'acknowledged' | 'resolved'>
