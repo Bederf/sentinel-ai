@@ -209,7 +209,10 @@ export function useServerEvents(
     }
 
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:9095'
-    const eventSourceUrl = `${apiUrl}/api/events/stream`
+    const token = localStorage.getItem('sentinel_token')
+    const eventSourceUrl = token
+      ? `${apiUrl}/api/events/stream?access_token=${encodeURIComponent(token)}`
+      : `${apiUrl}/api/events/stream`
 
     try {
       const eventSource = new EventSource(eventSourceUrl)

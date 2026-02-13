@@ -483,4 +483,79 @@ describe('useServerEvents', () => {
       expect(onEvent).not.toHaveBeenCalled();
     });
   });
+
+  describe('Edge Cases - Phase 68-03', () => {
+    it('should handle rapid reconnection scenarios', async () => {
+      const onEvent = vi.fn();
+      const wrapper = createQueryWrapper();
+      renderHook(() => useServerEvents(onEvent), { wrapper });
+
+      await waitFor(() => {
+        expect(getEventSource().readyState).toBe(1);
+      });
+
+      // Simulate rapid disconnect/reconnect
+      dispatchErrorEvent(new Event('error'));
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      // Should reconnect automatically
+      await waitFor(() => {
+        expect(getEventSource().readyState).toBe(1);
+      });
+    });
+
+    it('should handle null/undefined event data gracefully', async () => {
+      const onEvent = vi.fn();
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const wrapper = createQueryWrapper();
+      renderHook(() => useServerEvents(onEvent), { wrapper });
+
+      await waitFor(() => {
+        expect(getEventSource().readyState).toBe(1);
+      });
+
+      // Send event with missing data field
+      dispatchMessageEvent(JSON.stringify({
+        type: 'alert_created',
+        timestamp: new Date().toISOString(),
+      }));
+
+      // Should handle gracefully
+      await new Promise(resolve => setTimeout(resolve, 100));
+      expect(onEvent).toHaveBeenCalled();
+
+      consoleSpy.mockRestore();
+    });
+
+    it('should handle rapid message bursts without dropping events', async () => {
+      const onEvent = vi.fn();
+      const wrapper = createQueryWrapper();
+      renderHook(() => useServerEvents(onEvent), { wrapper });
+
+      await waitFor(() => {
+        expect(getEventSource().readyState).toBe(1);
+      });
+
+      // Send 10 messages rapidly
+      for (let i = 0; i < 10; i++) {
+        dispatchMessageEvent(JSON.stringify({
+          type: 'alert_created',
+          data: {
+            alert_id: `alert-${i}`,
+            equipment_id: `eq-${i}`,
+            equipment_code: `S002-CHI-B1-00${i}`,
+            equipment_name: `Equipment ${i}`,
+            severity: 'warning',
+            health_score: 60,
+          },
+          timestamp: new Date().toISOString(),
+        }));
+      }
+
+      // All messages should be processed
+      await waitFor(() => {
+        expect(onEvent).toHaveBeenCalledTimes(10);
+      });
+    });
+  });
 });
