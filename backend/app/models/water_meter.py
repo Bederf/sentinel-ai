@@ -11,6 +11,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Dict, Any, Optional, List
 from decimal import Decimal
+from uuid import uuid4
 
 
 class MeterType(Enum):
@@ -124,6 +125,10 @@ class WaterConsumption:
         pressure: Water pressure (optional)
         zone_id: Zone identifier for zone-aware consumption tracking (optional)
         zone_name: Zone display name (optional)
+        unit_cost_per_liter: Tariff rate at time of reading (optional)
+        total_cost: Consumption volume * unit_cost_per_liter (optional)
+        cost_center: For accounting attribution (optional)
+        billing_period_id: Links to billing cycle (optional)
     """
     meter_id: str
     timestamp: datetime
@@ -134,6 +139,10 @@ class WaterConsumption:
     pressure: Optional[float] = None
     zone_id: Optional[str] = None
     zone_name: Optional[str] = None
+    unit_cost_per_liter: Optional[float] = None
+    total_cost: Optional[float] = None
+    cost_center: Optional[str] = None
+    billing_period_id: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
@@ -147,6 +156,10 @@ class WaterConsumption:
             "pressure": self.pressure,
             "zone_id": self.zone_id,
             "zone_name": self.zone_name,
+            "unit_cost_per_liter": self.unit_cost_per_liter,
+            "total_cost": round(self.total_cost, 2) if self.total_cost else None,
+            "cost_center": self.cost_center,
+            "billing_period_id": self.billing_period_id,
         }
 
     @classmethod
@@ -162,6 +175,10 @@ class WaterConsumption:
             pressure=data.get("pressure"),
             zone_id=data.get("zone_id"),
             zone_name=data.get("zone_name"),
+            unit_cost_per_liter=data.get("unit_cost_per_liter"),
+            total_cost=data.get("total_cost"),
+            cost_center=data.get("cost_center"),
+            billing_period_id=data.get("billing_period_id"),
         )
 
 
@@ -278,3 +295,141 @@ class WaterTrend:
             "baseline_comparison_percent": round(self.baseline_comparison_percent, 1),
             "trend_direction": self.trend_direction,
         }
+
+
+@dataclass
+class WaterTariff:
+    """Water tariff configuration with tiered pricing.
+
+    Attributes:
+        id: Unique tariff identifier
+        site: Building site code
+        name: Tariff name (e.g., "Q1 2026 Summer Rate")
+        effective_date: Date tariff becomes active
+        end_date: Optional date tariff expires
+        tier_1_liters: Free/included consumption threshold
+        tier_1_rate_per_liter: Rate for tier 1 consumption
+        tier_2_liters: Overage threshold for tier 2
+        tier_2_rate_per_liter: Rate for tier 2 consumption
+        tier_3_rate_per_liter: Rate for consumption beyond tier 2
+        fixed_monthly_charge: Fixed monthly charge
+        notes: Additional notes about tariff
+    """
+    id: str = field(default_factory=lambda: str(uuid4()))
+    site: str = ""
+    name: str = ""
+    effective_date: datetime = field(default_factory=datetime.now)
+    end_date: Optional[datetime] = None
+    tier_1_liters: float = 0.0
+    tier_1_rate_per_liter: float = 0.0
+    tier_2_liters: float = 1000.0
+    tier_2_rate_per_liter: float = 0.0
+    tier_3_rate_per_liter: float = 0.0
+    fixed_monthly_charge: float = 0.0
+    notes: str = ""
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "id": self.id,
+            "site": self.site,
+            "name": self.name,
+            "effective_date": self.effective_date.isoformat(),
+            "end_date": self.end_date.isoformat() if self.end_date else None,
+            "tier_1_liters": round(self.tier_1_liters, 2),
+            "tier_1_rate_per_liter": round(self.tier_1_rate_per_liter, 4),
+            "tier_2_liters": round(self.tier_2_liters, 2),
+            "tier_2_rate_per_liter": round(self.tier_2_rate_per_liter, 4),
+            "tier_3_rate_per_liter": round(self.tier_3_rate_per_liter, 4),
+            "fixed_monthly_charge": round(self.fixed_monthly_charge, 2),
+            "notes": self.notes,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "WaterTariff":
+        """Create instance from dictionary."""
+        return cls(
+            id=data.get("id", str(uuid4())),
+            site=data["site"],
+            name=data["name"],
+            effective_date=datetime.fromisoformat(data["effective_date"]) if isinstance(data["effective_date"], str) else data["effective_date"],
+            end_date=datetime.fromisoformat(data["end_date"]) if data.get("end_date") and isinstance(data["end_date"], str) else data.get("end_date"),
+            tier_1_liters=data.get("tier_1_liters", 0.0),
+            tier_1_rate_per_liter=data.get("tier_1_rate_per_liter", 0.0),
+            tier_2_liters=data.get("tier_2_liters", 1000.0),
+            tier_2_rate_per_liter=data.get("tier_2_rate_per_liter", 0.0),
+            tier_3_rate_per_liter=data.get("tier_3_rate_per_liter", 0.0),
+            fixed_monthly_charge=data.get("fixed_monthly_charge", 0.0),
+            notes=data.get("notes", ""),
+        )
+
+
+@dataclass
+class WaterCost:
+    """Water cost breakdown by tariff tier.
+
+    Attributes:
+        id: Unique cost record identifier
+        site: Building site code
+        consumption_id: Reference to consumption record
+        zone_id: Zone identifier for attribution
+        period_date: Date for cost period
+        consumption_liters: Total consumption for period
+        tariff_id: Reference to tariff used
+        tier_1_cost: Cost for tier 1 consumption
+        tier_2_cost: Cost for tier 2 consumption
+        tier_3_cost: Cost for tier 3 consumption
+        fixed_charge: Fixed monthly charge
+        total_cost: Total cost (tier costs + fixed charge)
+        calculated_at: Timestamp of calculation
+    """
+    id: str = field(default_factory=lambda: str(uuid4()))
+    site: str = ""
+    consumption_id: str = ""
+    zone_id: Optional[str] = None
+    period_date: datetime = field(default_factory=datetime.now)
+    consumption_liters: float = 0.0
+    tariff_id: str = ""
+    tier_1_cost: float = 0.0
+    tier_2_cost: float = 0.0
+    tier_3_cost: float = 0.0
+    fixed_charge: float = 0.0
+    total_cost: float = 0.0
+    calculated_at: datetime = field(default_factory=datetime.now)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "id": self.id,
+            "site": self.site,
+            "consumption_id": self.consumption_id,
+            "zone_id": self.zone_id,
+            "period_date": self.period_date.isoformat(),
+            "consumption_liters": round(self.consumption_liters, 2),
+            "tariff_id": self.tariff_id,
+            "tier_1_cost": round(self.tier_1_cost, 4),
+            "tier_2_cost": round(self.tier_2_cost, 4),
+            "tier_3_cost": round(self.tier_3_cost, 4),
+            "fixed_charge": round(self.fixed_charge, 2),
+            "total_cost": round(self.total_cost, 2),
+            "calculated_at": self.calculated_at.isoformat(),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "WaterCost":
+        """Create instance from dictionary."""
+        return cls(
+            id=data.get("id", str(uuid4())),
+            site=data["site"],
+            consumption_id=data["consumption_id"],
+            zone_id=data.get("zone_id"),
+            period_date=datetime.fromisoformat(data["period_date"]) if isinstance(data["period_date"], str) else data["period_date"],
+            consumption_liters=data.get("consumption_liters", 0.0),
+            tariff_id=data["tariff_id"],
+            tier_1_cost=data.get("tier_1_cost", 0.0),
+            tier_2_cost=data.get("tier_2_cost", 0.0),
+            tier_3_cost=data.get("tier_3_cost", 0.0),
+            fixed_charge=data.get("fixed_charge", 0.0),
+            total_cost=data.get("total_cost", 0.0),
+            calculated_at=datetime.fromisoformat(data["calculated_at"]) if isinstance(data.get("calculated_at"), str) else data.get("calculated_at", datetime.now()),
+        )
