@@ -418,6 +418,203 @@ async def get_site_ingestion_status(request: Request, site: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# === Zone aggregation endpoints ===
+
+
+@limiter.limit("30/minute")
+@router.get("/water/zones/{zone_id}/consumption")
+async def get_zone_consumption(
+    request: Request,
+    zone_id: str,
+    start: Optional[str] = Query(None, description="Start date (ISO format)"),
+    end: Optional[str] = Query(None, description="End date (ISO format)"),
+):
+    """Get aggregated consumption for a zone.
+
+    Args:
+        zone_id: Zone identifier (e.g., "L2-A", "101")
+        start: Optional start date
+        end: Optional end date
+
+    Returns:
+        Zone consumption totals, per-meter breakdown, and statistics
+    """
+    try:
+        from app.services.water_aggregation_service import get_water_aggregation_service
+
+        agg_svc = get_water_aggregation_service()
+
+        # Parse dates
+        start_date = datetime.fromisoformat(start).date() if start else None
+        end_date = datetime.fromisoformat(end).date() if end else None
+
+        result = agg_svc.get_consumption_by_zone(zone_id, start_date, end_date)
+
+        if not result or result["meter_count"] == 0:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No consumption data found for zone '{zone_id}'"
+            )
+
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching zone consumption for {zone_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@limiter.limit("30/minute")
+@router.get("/water/sites/{site}/zones/{floor}/consumption")
+async def get_floor_consumption(
+    request: Request,
+    site: str,
+    floor: str,
+    start: Optional[str] = Query(None, description="Start date (ISO format)"),
+    end: Optional[str] = Query(None, description="End date (ISO format)"),
+):
+    """Get aggregated consumption for all zones on a floor.
+
+    Args:
+        site: Building site code (e.g., "site-002")
+        floor: Floor identifier (e.g., "L2", "100-199")
+        start: Optional start date
+        end: Optional end date
+
+    Returns:
+        Floor consumption totals with per-zone breakdown
+    """
+    try:
+        from app.services.water_aggregation_service import get_water_aggregation_service
+
+        agg_svc = get_water_aggregation_service()
+
+        # Parse dates
+        start_date = datetime.fromisoformat(start).date() if start else None
+        end_date = datetime.fromisoformat(end).date() if end else None
+
+        result = agg_svc.get_consumption_by_floor(site, floor, start_date, end_date)
+
+        if not result or result["zone_count"] == 0:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No consumption data found for floor '{floor}' at site '{site}'"
+            )
+
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching floor consumption for {site}/{floor}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@limiter.limit("30/minute")
+@router.get("/water/sites/{site}/zones/top")
+async def get_top_consuming_zones(
+    request: Request,
+    site: str,
+    limit: int = Query(10, ge=1, le=100, description="Number of top zones to return"),
+    days: int = Query(30, ge=1, le=365, description="Look-back period in days"),
+):
+    """Get top consuming zones at a site.
+
+    Args:
+        site: Building site code
+        limit: Number of top zones to return
+        days: Look-back period
+
+    Returns:
+        List of top zones ranked by consumption
+    """
+    try:
+        from app.services.water_aggregation_service import get_water_aggregation_service
+
+        agg_svc = get_water_aggregation_service()
+        zones = agg_svc.get_top_consuming_zones(site, limit=limit, days=days)
+
+        return {
+            "site": site,
+            "days": days,
+            "zone_count": len(zones),
+            "zones": zones,
+        }
+
+    except Exception as e:
+        logger.error(f"Error fetching top zones for {site}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@limiter.limit("30/minute")
+@router.get("/water/zones/{zone_id}/trend")
+async def get_zone_trend(
+    request: Request,
+    zone_id: str,
+    days: int = Query(7, ge=1, le=365, description="Number of days to analyze"),
+):
+    """Get daily consumption trend for a zone.
+
+    Args:
+        zone_id: Zone identifier
+        days: Number of days to analyze
+
+    Returns:
+        Daily consumption data for charting
+    """
+    try:
+        from app.services.water_aggregation_service import get_water_aggregation_service
+
+        agg_svc = get_water_aggregation_service()
+        result = agg_svc.zone_consumption_trend(zone_id, days=days)
+
+        if not result or not result["data"]:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No trend data found for zone '{zone_id}'"
+            )
+
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching zone trend for {zone_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@limiter.limit("30/minute")
+@router.get("/water/zones/{zone_id}/comparison")
+async def get_zone_vs_building(
+    request: Request,
+    zone_id: str,
+    building_id: str = Query(..., description="Building/site identifier"),
+    days: int = Query(30, ge=1, le=365, description="Analysis period in days"),
+):
+    """Compare zone consumption to building average.
+
+    Args:
+        zone_id: Zone identifier
+        building_id: Building/site identifier
+        days: Analysis period
+
+    Returns:
+        Zone vs building comparison metrics
+    """
+    try:
+        from app.services.water_aggregation_service import get_water_aggregation_service
+
+        agg_svc = get_water_aggregation_service()
+        result = agg_svc.zone_vs_building_average(zone_id, building_id, days=days)
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Error comparing zone {zone_id} to building: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # === Advanced alert filtering and threshold management ===
 
 
