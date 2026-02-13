@@ -8,6 +8,9 @@
  * - Individual promise resolution
  * - Error handling per item
  * - Recursive flush for accumulated requests
+ *
+ * NOTE: All timing tests use controlled Promise resolution (NOT vi.useFakeTimers)
+ * This prevents timing-dependent flakiness and provides clearer async semantics.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -31,6 +34,18 @@ import { apiFetch } from '../fetchClient';
 interface MockBatchItem {
   id: string;
   value: string;
+}
+
+/**
+ * Helper: Create a mock batch response with deduplication support
+ * Ensures duplicate request IDs all receive the same response
+ */
+function createBatchResponse(deviceIds: string[]): Record<string, MockBatchItem> {
+  const response: Record<string, MockBatchItem> = {};
+  for (const id of deviceIds) {
+    response[id] = { id, value: `test-${id}` };
+  }
+  return response;
 }
 
 describe('BatchAggregator - Initialization', () => {
@@ -129,68 +144,67 @@ describe('BatchAggregator - Basic Operation', () => {
 describe('BatchAggregator - Batch Window Aggregation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.useFakeTimers();
   });
 
   afterEach(() => {
-    vi.clearAllTimers();
-    vi.useRealTimers();
+    // Clean up
   });
 
   it('should send batch after window expires', async () => {
-    (apiFetch as any).mockImplementation(async (endpoint, options) => {
+    let flushPromiseResolve: (() => void) | null = null;
+    const flushPromise = new Promise<void>((resolve) => {
+      flushPromiseResolve = resolve;
+    });
+
+    (apiFetch as any).mockImplementation(async (endpoint: string, options: any) => {
       const body = JSON.parse(options.body);
-      const response: Record<string, any> = {};
-      for (const id of body.device_ids) {
-        response[id] = { id, value: `test-${id}` };
-      }
-      return response;
+      flushPromiseResolve?.();
+      return createBatchResponse(body.device_ids);
     });
 
     const batcher = createBatchAggregator<MockBatchItem>({
       endpoint: '/api/batch',
-      windowMs: 50,
+      windowMs: 5, // Very short window for testing
     });
 
     const p1 = batcher('id-1');
 
-    // Before window expires
+    // Initially API not called
     expect(apiFetch).not.toHaveBeenCalled();
 
-    // Trigger window expiration and run all async operations
-    vi.advanceTimersByTime(60);
-    await vi.runAllTimersAsync();
+    // Wait for flush to complete
+    await flushPromise;
+    const result = await p1;
 
     expect(apiFetch).toHaveBeenCalled();
-    await Promise.allSettled([p1]);
+    expect(result.id).toBe('id-1');
   });
 
-  it('should respect custom window size', async () => {
-    (apiFetch as any).mockImplementation(async (endpoint, options) => {
+  it('should aggregate multiple requests in single batch', async () => {
+    let flushCount = 0;
+    (apiFetch as any).mockImplementation(async (endpoint: string, options: any) => {
+      flushCount++;
       const body = JSON.parse(options.body);
-      const response: Record<string, any> = {};
-      for (const id of body.device_ids) {
-        response[id] = { id, value: `test-${id}` };
-      }
-      return response;
+      return createBatchResponse(body.device_ids);
     });
 
     const batcher = createBatchAggregator<MockBatchItem>({
       endpoint: '/api/batch',
-      windowMs: 100,
+      windowMs: 10,
     });
 
+    // Queue 3 requests quickly
     const p1 = batcher('id-1');
+    const p2 = batcher('id-2');
+    const p3 = batcher('id-3');
 
-    // 50ms should not trigger (window is 100ms)
-    vi.advanceTimersByTime(50);
-    expect(apiFetch).not.toHaveBeenCalled();
+    // All should resolve after single batch call
+    const [r1, r2, r3] = await Promise.all([p1, p2, p3]);
 
-    // 100ms should trigger
-    vi.advanceTimersByTime(60);
-    await vi.runAllTimersAsync();
-    expect(apiFetch).toHaveBeenCalled();
-    await Promise.allSettled([p1]);
+    expect(flushCount).toBe(1);
+    expect(r1.id).toBe('id-1');
+    expect(r2.id).toBe('id-2');
+    expect(r3.id).toBe('id-3');
   });
 
   it('should use default 50ms window', () => {
@@ -205,22 +219,23 @@ describe('BatchAggregator - Batch Window Aggregation', () => {
 describe('BatchAggregator - ID Deduplication', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.useFakeTimers();
   });
 
   afterEach(() => {
-    vi.clearAllTimers();
-    vi.useRealTimers();
+    // Clean up
   });
 
   it('should deduplicate identical IDs in batch', async () => {
-    (apiFetch as any).mockResolvedValueOnce({
-      'id-1': { id: 'id-1', value: 'test' },
+    const batchedIds: string[] = [];
+    (apiFetch as any).mockImplementation(async (endpoint: string, options: any) => {
+      const body = JSON.parse(options.body);
+      batchedIds.push(...body.device_ids);
+      return createBatchResponse(body.device_ids);
     });
 
     const batcher = createBatchAggregator<MockBatchItem>({
       endpoint: '/api/batch',
-      windowMs: 50,
+      windowMs: 5,
     });
 
     // Queue same ID three times
@@ -233,77 +248,78 @@ describe('BatchAggregator - ID Deduplication', () => {
     expect(p2).toBeInstanceOf(Promise);
     expect(p3).toBeInstanceOf(Promise);
 
-    // Trigger window expiration and wait for results
-    vi.advanceTimersByTime(60);
-    await vi.runAllTimersAsync();
-    await Promise.allSettled([p1, p2, p3]);
+    // Wait for all to settle
+    const [r1, r2, r3] = await Promise.all([p1, p2, p3]);
+
+    // All should have same value (deduplicated to single request)
+    expect(r1.id).toBe('id-1');
+    expect(r2.id).toBe('id-1');
+    expect(r3.id).toBe('id-1');
+
+    // Only one unique ID should have been sent to API
+    expect(new Set(batchedIds).size).toBe(1);
   });
 
-  it.skip('should include only unique IDs in batch request', async () => {
-    // Mock the response to handle all deduped requests
-    (apiFetch as any).mockImplementationOnce(async (endpoint, options) => {
+  it('should include only unique IDs in batch request', async () => {
+    const capturedBodies: any[] = [];
+    (apiFetch as any).mockImplementation(async (endpoint: string, options: any) => {
       const body = JSON.parse(options.body);
-      // Return matching responses for whatever IDs were sent
-      const response: Record<string, any> = {};
-      for (const id of body.device_ids) {
-        response[id] = { id, value: `test-${id}` };
-      }
-      return response;
+      capturedBodies.push(body);
+      return createBatchResponse(body.device_ids);
     });
 
     const batcher = createBatchAggregator<MockBatchItem>({
       endpoint: '/api/batch',
-      windowMs: 50,
+      windowMs: 5,
     });
 
+    // Queue: id-1, id-2, id-1 (duplicate), id-2 (duplicate)
     const p1 = batcher('id-1');
     const p2 = batcher('id-2');
     const p3 = batcher('id-1'); // Duplicate
     const p4 = batcher('id-2'); // Duplicate
 
-    vi.advanceTimersByTime(60);
-    await vi.runAllTimersAsync();
-
     // Wait for all promises to settle
     const results = await Promise.allSettled([p1, p2, p3, p4]);
-    
+
     // All should succeed
-    results.forEach(r => expect(r.status).toBe('fulfilled'));
-    
+    results.forEach((r) => expect(r.status).toBe('fulfilled'));
+
     // Check that the batch request was made
-    expect((apiFetch as any).mock.calls.length).toBeGreaterThan(0);
-    
-    const call = (apiFetch as any).mock.calls[0];
-    const body = JSON.parse(call[1].body);
+    expect(capturedBodies.length).toBeGreaterThan(0);
+
+    const body = capturedBodies[0];
 
     // Should only have 2 unique IDs in the batch request
     expect(new Set(body.device_ids).size).toBe(2);
+    expect(body.device_ids).toContain('id-1');
+    expect(body.device_ids).toContain('id-2');
   });
 
   it('should use custom deduplication function if provided', async () => {
-    (apiFetch as any).mockResolvedValueOnce({
-      'id-1': { id: 'id-1', value: 'test' },
-    });
-
     const customDeduplicate = vi.fn((ids: string[]) => {
       // Custom deduplication: keep only first occurrence
       return Array.from(new Set(ids));
     });
 
+    (apiFetch as any).mockImplementation(async (endpoint: string, options: any) => {
+      const body = JSON.parse(options.body);
+      return createBatchResponse(body.device_ids);
+    });
+
     const batcher = createBatchAggregator<MockBatchItem>({
       endpoint: '/api/batch',
-      windowMs: 50,
+      windowMs: 5,
       deduplicateIds: customDeduplicate,
     });
 
     const p1 = batcher('id-1');
     const p2 = batcher('id-1');
 
-    vi.advanceTimersByTime(60);
-    await vi.runAllTimersAsync();
+    await Promise.all([p1, p2]);
 
-    await Promise.allSettled([p1, p2]);
     expect(customDeduplicate).toHaveBeenCalled();
+    expect(customDeduplicate).toHaveBeenCalledWith(['id-1', 'id-1']);
   });
 });
 
@@ -325,13 +341,59 @@ describe('BatchAggregator - Max Batch Size', () => {
     expect(typeof batcher).toBe('function');
   });
 
-  it('should accept custom maxBatchSize value', () => {
-    const batcher = createBatchAggregator<MockBatchItem>({
-      endpoint: '/api/batch',
-      maxBatchSize: 75,
+  it('should flush immediately when batch reaches maxBatchSize', async () => {
+    let flushCount = 0;
+    (apiFetch as any).mockImplementation(async (endpoint: string, options: any) => {
+      flushCount++;
+      const body = JSON.parse(options.body);
+      return createBatchResponse(body.device_ids);
     });
 
-    expect(typeof batcher).toBe('function');
+    const batcher = createBatchAggregator<MockBatchItem>({
+      endpoint: '/api/batch',
+      windowMs: 1000, // Long window (shouldn't matter)
+      maxBatchSize: 3,
+    });
+
+    // Add 3 requests
+    const p1 = batcher('id-1');
+    const p2 = batcher('id-2');
+    const p3 = batcher('id-3');
+
+    // Should flush immediately on 3rd request
+    await Promise.all([p1, p2, p3]);
+
+    expect(flushCount).toBe(1);
+  });
+
+  it('should continue to next batch after maxBatchSize flush', async () => {
+    let flushCount = 0;
+    const capturedBodies: any[] = [];
+
+    (apiFetch as any).mockImplementation(async (endpoint: string, options: any) => {
+      flushCount++;
+      const body = JSON.parse(options.body);
+      capturedBodies.push(body);
+      return createBatchResponse(body.device_ids);
+    });
+
+    const batcher = createBatchAggregator<MockBatchItem>({
+      endpoint: '/api/batch',
+      windowMs: 1000,
+      maxBatchSize: 2,
+    });
+
+    // First batch: 2 items (flushes immediately)
+    const p1 = batcher('id-1');
+    const p2 = batcher('id-2');
+
+    // Second batch: 1 item (will flush on window)
+    const p3 = batcher('id-3');
+
+    await Promise.all([p1, p2, p3]);
+
+    // Should have at least 2 flushes
+    expect(flushCount).toBeGreaterThanOrEqual(2);
   });
 })
 
@@ -344,17 +406,69 @@ describe('BatchAggregator - Error Handling', () => {
     // Clean up
   });
 
-  it('should accept onError callback configuration', () => {
-    const errorHandler = vi.fn();
+  it('should reject promises when batch API call fails', async () => {
+    (apiFetch as any).mockRejectedValueOnce(
+      new ApiError(500, 'Server error'),
+    );
+
     const batcher = createBatchAggregator<MockBatchItem>({
       endpoint: '/api/batch',
+      windowMs: 5,
+    });
+
+    const p1 = batcher('id-1');
+    const p2 = batcher('id-2');
+
+    const results = await Promise.allSettled([p1, p2]);
+
+    expect(results[0].status).toBe('rejected');
+    expect(results[1].status).toBe('rejected');
+  });
+
+  it('should call onError callback for each failed item', async () => {
+    const errorHandler = vi.fn();
+
+    (apiFetch as any).mockRejectedValueOnce(
+      new ApiError(500, 'Server error'),
+    );
+
+    const batcher = createBatchAggregator<MockBatchItem>({
+      endpoint: '/api/batch',
+      windowMs: 5,
       onError: errorHandler,
     });
 
-    expect(typeof batcher).toBe('function');
+    const p1 = batcher('id-1');
+    const p2 = batcher('id-2');
+
+    await Promise.allSettled([p1, p2]);
+
+    expect(errorHandler).toHaveBeenCalledTimes(2);
+    expect(errorHandler).toHaveBeenCalledWith('id-1', expect.any(ApiError));
+    expect(errorHandler).toHaveBeenCalledWith('id-2', expect.any(ApiError));
   });
 
-  it('should support error handler in batch configuration', () => {
+  it('should reject missing items with 404 error', async () => {
+    (apiFetch as any).mockImplementation(async (endpoint: string, options: any) => {
+      // Only return id-1, not id-2
+      return { 'id-1': { id: 'id-1', value: 'test' } };
+    });
+
+    const batcher = createBatchAggregator<MockBatchItem>({
+      endpoint: '/api/batch',
+      windowMs: 5,
+    });
+
+    const p1 = batcher('id-1');
+    const p2 = batcher('id-2');
+
+    const [r1, r2] = await Promise.allSettled([p1, p2]);
+
+    expect(r1.status).toBe('fulfilled');
+    expect(r2.status).toBe('rejected');
+  });
+
+  it('should support custom error handler', () => {
     const errorHandler = vi.fn();
     const batcher = createBatchAggregator<MockBatchItem>({
       endpoint: '/api/batch',
@@ -375,52 +489,125 @@ describe('BatchAggregator - Recursive Flush', () => {
     // Clean up
   });
 
-  it('should support custom batch endpoint configuration', () => {
+  it('should handle requests arriving during flush', async () => {
+    let flushCount = 0;
+    let resolveFirstFlush: (() => void) | null = null;
+
+    (apiFetch as any).mockImplementation(async (endpoint: string, options: any) => {
+      flushCount++;
+      const body = JSON.parse(options.body);
+
+      // On first flush, hold until we've queued more requests
+      if (flushCount === 1) {
+        await new Promise<void>((resolve) => {
+          resolveFirstFlush = resolve;
+        });
+      }
+
+      return createBatchResponse(body.device_ids);
+    });
+
+    const batcher = createBatchAggregator<MockBatchItem>({
+      endpoint: '/api/batch',
+      windowMs: 5,
+    });
+
+    // First request triggers flush
+    const p1 = batcher('id-1');
+
+    // Give flush time to start
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    // Queue more requests while first flush is in progress
+    const p2 = batcher('id-2');
+    const p3 = batcher('id-3');
+
+    // Complete first flush
+    resolveFirstFlush?.();
+
+    // All should eventually resolve
+    const results = await Promise.all([p1, p2, p3]);
+
+    expect(results.length).toBe(3);
+    expect(flushCount).toBeGreaterThan(1); // Should have recursive flushes
+  });
+
+  it('should not flush empty queue', async () => {
+    (apiFetch as any).mockImplementation(async (endpoint: string, options: any) => {
+      const body = JSON.parse(options.body);
+      return createBatchResponse(body.device_ids);
+    });
+
     const batcher = createBatchAggregator<MockBatchItem>({
       endpoint: '/api/batch',
       maxBatchSize: 1,
-      windowMs: 50,
+      windowMs: 5,
     });
 
-    expect(typeof batcher).toBe('function');
+    // Just create batcher, don't queue anything
+    expect((apiFetch as any).mock.calls.length).toBe(0);
+  });
+
+  it('should handle multiple sequential batches', async () => {
+    let flushCount = 0;
+
+    (apiFetch as any).mockImplementation(async (endpoint: string, options: any) => {
+      flushCount++;
+      const body = JSON.parse(options.body);
+      return createBatchResponse(body.device_ids);
+    });
+
+    const batcher = createBatchAggregator<MockBatchItem>({
+      endpoint: '/api/batch',
+      windowMs: 5,
+      maxBatchSize: 2,
+    });
+
+    // Batch 1: 2 items (flushes immediately)
+    const p1 = batcher('id-1');
+    const p2 = batcher('id-2');
+
+    // Batch 2: 2 items (flushes immediately)
+    const p3 = batcher('id-3');
+    const p4 = batcher('id-4');
+
+    const results = await Promise.all([p1, p2, p3, p4]);
+
+    expect(results.length).toBe(4);
+    expect(flushCount).toBeGreaterThanOrEqual(2);
   });
 })
 
 describe('BatchAggregator - Request Payload', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.useFakeTimers();
   });
 
   afterEach(() => {
-    vi.useRealTimers();
+    // Clean up
   });
 
   it('should send device_ids array in request body', async () => {
-    (apiFetch as any).mockImplementation(async (endpoint, options) => {
+    const capturedBodies: any[] = [];
+
+    (apiFetch as any).mockImplementation(async (endpoint: string, options: any) => {
       const body = JSON.parse(options.body);
-      const response: Record<string, any> = {};
-      for (const id of body.device_ids) {
-        response[id] = { id, value: `test-${id}` };
-      }
-      return response;
+      capturedBodies.push(body);
+      return createBatchResponse(body.device_ids);
     });
 
     const batcher = createBatchAggregator<MockBatchItem>({
       endpoint: '/api/batch',
-      windowMs: 50,
+      windowMs: 5,
     });
 
     const p1 = batcher('id-1');
     const p2 = batcher('id-2');
 
-    vi.advanceTimersByTime(60);
-    await vi.runAllTimersAsync();
+    await Promise.all([p1, p2]);
 
-    await Promise.allSettled([p1, p2]);
-
-    const call = (apiFetch as any).mock.calls[0];
-    const body = JSON.parse(call[1].body);
+    expect(capturedBodies.length).toBeGreaterThan(0);
+    const body = capturedBodies[0];
 
     expect(body.device_ids).toBeDefined();
     expect(Array.isArray(body.device_ids)).toBe(true);
@@ -429,22 +616,45 @@ describe('BatchAggregator - Request Payload', () => {
   });
 
   it('should use POST method for batch requests', async () => {
-    (apiFetch as any).mockResolvedValueOnce({
-      'id-1': { id: 'id-1', value: 'test' },
+    const capturedOptions: any[] = [];
+
+    (apiFetch as any).mockImplementation(async (endpoint: string, options: any) => {
+      capturedOptions.push(options);
+      const body = JSON.parse(options.body);
+      return createBatchResponse(body.device_ids);
     });
 
     const batcher = createBatchAggregator<MockBatchItem>({
       endpoint: '/api/batch',
-      windowMs: 50,
+      windowMs: 5,
     });
 
     const p1 = batcher('id-1');
-    vi.advanceTimersByTime(60);
-    await vi.runAllTimersAsync();
 
     await p1;
 
-    const call = (apiFetch as any).mock.calls[0];
-    expect(call[1].method).toBe('POST');
+    expect(capturedOptions.length).toBeGreaterThan(0);
+    expect(capturedOptions[0].method).toBe('POST');
+  });
+
+  it('should call correct endpoint', async () => {
+    const capturedEndpoints: string[] = [];
+
+    (apiFetch as any).mockImplementation(async (endpoint: string, options: any) => {
+      capturedEndpoints.push(endpoint);
+      const body = JSON.parse(options.body);
+      return createBatchResponse(body.device_ids);
+    });
+
+    const batcher = createBatchAggregator<MockBatchItem>({
+      endpoint: '/api/devices/batch/safety',
+      windowMs: 5,
+    });
+
+    const p1 = batcher('id-1');
+
+    await p1;
+
+    expect(capturedEndpoints).toContain('/api/devices/batch/safety');
   });
 });

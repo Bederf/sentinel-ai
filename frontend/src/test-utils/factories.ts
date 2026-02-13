@@ -487,3 +487,44 @@ export function createMockModuleContext(overrides?: Partial<ModuleContextValue>)
     ...overrides,
   };
 }
+
+/**
+ * Batch Response Factory - Creates mock batch API responses for batch aggregator tests
+ *
+ * Generates device responses for batch endpoints (/api/devices/batch/safety, etc.)
+ * Each device ID maps to a mock item of type T with id and appropriate fields
+ *
+ * @param endpoint - Batch endpoint name (e.g., 'safety', 'readings', 'conditions')
+ * @param items - Object mapping device IDs to item data, or undefined for default items
+ * @returns Record<string, T> suitable for mocking batch API responses
+ *
+ * @example
+ * // Mock safety status batch response
+ * const response = createBatchResponse('safety', {
+ *   'device-1': { status: 'safe' },
+ *   'device-2': { status: 'warning' }
+ * });
+ *
+ * // Mock with default items
+ * const response = createBatchResponse('readings', {
+ *   'device-1': undefined,  // Will get default { id: 'device-1', value: 'mock' }
+ *   'device-2': undefined
+ * });
+ */
+export function createBatchResponse<T extends { id: string }>(
+  endpoint: string,
+  items?: Record<string, Partial<T> | undefined>,
+): Record<string, T> {
+  const response: Record<string, T> = {};
+
+  if (items) {
+    for (const [id, itemData] of Object.entries(items)) {
+      response[id] = {
+        id,
+        ...(itemData || { value: `mock-${id}` }),
+      } as T;
+    }
+  }
+
+  return response;
+}
