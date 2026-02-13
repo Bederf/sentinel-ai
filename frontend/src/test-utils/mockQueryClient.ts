@@ -92,3 +92,30 @@ export async function invalidateQuery(
 ) {
   await queryClient.invalidateQueries({ queryKey });
 }
+
+/**
+ * Create a wrapper component that provides both QueryClient AND ModuleContext
+ * Use with render(component, { wrapper: createModuleContextWrapper() })
+ *
+ * This enables testing of module-dependent components without context errors
+ */
+export function createModuleContextWrapper(
+  moduleContextValue?: React.ComponentProps<
+    typeof import('../contexts/ModuleContext').ModuleProvider
+  >
+) {
+  const queryClient = createTestQueryClient();
+  const { ModuleProvider } = require('../contexts/ModuleContext');
+
+  return function Wrapper({ children }: { children: ReactNode }) {
+    return React.createElement(
+      QueryClientProvider,
+      { client: queryClient },
+      React.createElement(
+        ModuleProvider,
+        { initialSiteId: 'test-site', initialSiteName: 'Test Site', ...moduleContextValue },
+        children
+      )
+    );
+  };
+}

@@ -36,8 +36,10 @@ _PUBLIC_PATHS = {
     "/redoc",
     "/health",
     "/api/health",
+    "/api/clawd/work-order/pending",  # Clawd bot polling endpoint
 }
 _PUBLIC_PREFIXES = (
+    "/api/clawd",  # Clawd bot endpoints (work order polling, OCR, equipment reset, etc.)
     "/api/clawd-webhooks",  # Telegram bot callbacks (authenticated via webhook secret)
     "/api/mcp/sse",  # MCP SSE transport for Claude Desktop (authenticated at MCP layer)
     "/api/mcp/openai",  # MCP OpenAI endpoints for ChatGPT/M365 Copilot (authenticated at MCP layer)

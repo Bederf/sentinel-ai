@@ -19,27 +19,14 @@ vi.mock('@/lib/api/client', () => ({
   authorizedFetch: vi.fn(),
 }));
 
-// Simplified Tremor component mocks
+// Import and use unified Tremor mocking strategy
+import { createTremorMocks } from '@/test-utils/mockTremor';
 vi.mock('@tremor/react', () => ({
-  TabGroup: ({ children }: any) => <div data-testid="tab-group">{children}</div>,
-  TabList: ({ children }: any) => <div data-testid="tab-list">{children}</div>,
-  Tab: ({ children }: any) => <button>{children}</button>,
-  TabPanels: ({ children }: any) => <div data-testid="tab-panels">{children}</div>,
-  TabPanel: ({ children }: any) => <div data-testid="tab-panel">{children}</div>,
-  Card: ({ children }: any) => <div data-testid="card">{children}</div>,
+  ...createTremorMocks(),
+  // Additional components specific to SystemHealthPage
   Text: ({ children }: any) => <div data-testid="text">{children}</div>,
-  Metric: ({ children }: any) => <div data-testid="metric">{children}</div>,
   ProgressBar: ({ value, color }: any) => (
     <div data-testid={`progress-bar-${color}`}>{value}%</div>
-  ),
-  LineChart: ({ data }: any) => (
-    <div data-testid="line-chart">{data?.length || 0} points</div>
-  ),
-  BarChart: ({ data }: any) => (
-    <div data-testid="bar-chart">{data?.length || 0} points</div>
-  ),
-  Badge: ({ children, color }: any) => (
-    <div data-testid={`badge-${color}`}>{children}</div>
   ),
 }));
 

@@ -14,7 +14,7 @@ import logging
 from typing import Optional, Dict, Any, List
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, Path
 
 from app.middleware.auth_middleware import require_auth, require_operator
 from app.models.auth import AuthContext
@@ -98,7 +98,7 @@ async def list_decisions(
     summary="Get single decision with full context"
 )
 async def get_decision(
-    decision_id: str = Query(..., description="ID of decision to retrieve"),
+    decision_id: str = Path(..., description="ID of decision to retrieve"),
     auth: AuthContext = Depends(require_auth)
 ) -> Dict[str, Any]:
     """Get a single PARASITE decision with complete context.

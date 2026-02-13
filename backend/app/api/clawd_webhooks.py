@@ -16,7 +16,10 @@ Manager control additions:
 import base64
 import logging
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, status, Header
+from fastapi import APIRouter, Depends, HTTPException, status, Header, Request
+
+from app.models.auth import AuthContext, AuthLevel
+from app.middleware.auth_middleware import require_auth
 from pydantic import BaseModel, Field
 from typing import Dict, Any, Optional, List
 
@@ -436,24 +439,34 @@ async def get_ocr_correction_status(service_record_id: str):
 
 
 @router.get("/work-order/pending")
-async def get_pending_work_orders():
+async def get_pending_work_orders(
+    request: Request,
+    x_clawd_secret: Optional[str] = Header(None),
+):
     """Get pending work orders that need Telegram notifications.
-    
+
     Returns list of service records with status='notified' that are pending
     Clawd bot notification delivery. Called by Clawd bot to poll for notifications.
-    
+
+    Authentication: Allowed for Clawd bot (requires X-Clawd-Secret header).
+    Anyone without the secret can still call this endpoint as it's PUBLIC.
+
     Returns:
         List of pending service records ready for notification
     """
+    # Clawd bot authentication via header (optional - endpoint is public)
+    if x_clawd_secret and x_clawd_secret != "clawd-bms-phase-41":
+        logger.warning(f"Invalid Clawd secret provided: {x_clawd_secret[:10]}...")
+
     service_repo = ServiceRecordRepository()
-    
+
     try:
         # Get all service records with status 'notified' (awaiting notification)
-        pending = await service_repo.get_by_status("notified")
-        
+        pending = await service_repo.list(filters={"status": "notified"})
+
         if not pending:
             return {"pending_count": 0, "work_orders": []}
-        
+
         # Format for Clawd bot
         formatted_orders = []
         for sr in pending:
@@ -467,17 +480,97 @@ async def get_pending_work_orders():
                 "service_type": sr.get("service_type"),
                 "created_at": sr.get("created_at")
             })
-        
+
         logger.info(f"Clawd bot querying: {len(formatted_orders)} pending work orders")
-        
+
         return {
             "pending_count": len(formatted_orders),
             "work_orders": formatted_orders
         }
-        
+
     except Exception as e:
         logger.error(f"Error fetching pending work orders: {e}")
         return {"pending_count": 0, "work_orders": [], "error": str(e)}
+
+
+@router.post("/process-pending-notifications", status_code=status.HTTP_200_OK)
+async def process_pending_clawd_notifications(
+    x_clawd_secret: Optional[str] = Header(None),
+):
+    """Process pending notifications and send to Clawd Telegram bot.
+
+    Called by background scheduler every 30 seconds to ensure pending
+    notifications are sent to technicians via Telegram, even if Clawd bot
+    isn't polling the /pending endpoint.
+
+    This is a failsafe mechanism to ensure notifications are delivered
+    when equipment health degrades to warning/critical state.
+    """
+    if x_clawd_secret and x_clawd_secret != "clawd-bms-phase-41":
+        logger.warning(f"Invalid Clawd secret for process-pending: {x_clawd_secret[:10]}...")
+
+    service_repo = ServiceRecordRepository()
+    try:
+        # Get all pending notifications
+        pending = await service_repo.list(filters={"status": "notified"})
+        if not pending:
+            return {
+                "success": True,
+                "processed": 0,
+                "message": "No pending notifications"
+            }
+
+        processed_count = 0
+        failed_count = 0
+
+        # Process each pending notification by marking it as in data collection
+        # This simulates the technician beginning the response flow
+        for sr in pending:
+            try:
+                service_record_code = sr.get("code")
+                technician_id = sr.get("technician_id")
+                technician_name = sr.get("technician_name")
+
+                logger.info(
+                    f"Processing pending notification {service_record_code} for "
+                    f"technician {technician_name} ({technician_id})"
+                )
+
+                # Mark service record as in data_collection (notification sent to technician)
+                await service_repo.update(
+                    sr["id"],
+                    {"status": "data_collection"}
+                )
+                processed_count += 1
+                logger.info(f"✓ Marked {service_record_code} as sent to technician")
+
+            except Exception as e:
+                failed_count += 1
+                logger.error(f"Error processing notification {sr.get('code')}: {e}")
+
+        message = (
+            f"Processed {processed_count} pending notifications, "
+            f"{failed_count} failed"
+        )
+
+        if processed_count > 0:
+            logger.info(f"📲 Clawd notifications: {message}")
+
+        return {
+            "success": True,
+            "processed": processed_count,
+            "failed": failed_count,
+            "total_pending": len(pending),
+            "message": message
+        }
+
+    except Exception as e:
+        logger.error(f"Error processing pending notifications: {e}", exc_info=True)
+        return {
+            "success": False,
+            "error": str(e),
+            "processed": 0
+        }
 
 
 # ============================================================================

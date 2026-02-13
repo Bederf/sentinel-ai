@@ -884,6 +884,64 @@ class BackgroundSchedulerService:
         except Exception as e:
             logger.error(f"Failed to run ML model retraining check: {e}", exc_info=True)
 
+    def add_clawd_notification_job(self, interval_seconds: int = 30):
+        """
+        Add a job to process pending Clawd notifications periodically.
+
+        Ensures that when equipment health degrades to warning/critical,
+        technicians receive Telegram notifications promptly.
+
+        Args:
+            interval_seconds: How often to check pending notifications (default: 30 seconds)
+        """
+        # Remove existing job if it exists
+        if self.scheduler.get_job('process_clawd_notifications'):
+            self.scheduler.remove_job('process_clawd_notifications')
+            logger.info("Removed existing Clawd notification job")
+
+        # Add new job
+        self.scheduler.add_job(
+            func=self._process_clawd_notifications,
+            trigger=IntervalTrigger(seconds=interval_seconds),
+            id='process_clawd_notifications',
+            name='Process Clawd Notifications',
+            replace_existing=True
+        )
+        logger.info(f"Added Clawd notification job with {interval_seconds}s interval")
+
+    def _process_clawd_notifications(self):
+        """Wrapper to process pending Clawd notifications (runs in background)."""
+        try:
+            import asyncio
+            import httpx
+
+            logger.debug("Processing pending Clawd notifications...")
+
+            # Call the endpoint to process pending notifications
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+            async def process():
+                async with httpx.AsyncClient(timeout=10) as client:
+                    response = await client.post(
+                        "http://localhost:9095/api/clawd/process-pending-notifications",
+                        headers={"X-Clawd-Secret": "clawd-bms-phase-41"}
+                    )
+                    return response.json()
+
+            result = loop.run_until_complete(process())
+            loop.close()
+
+            if result.get("success"):
+                processed = result.get("processed", 0)
+                if processed > 0:
+                    logger.info(f"📲 Sent {processed} Telegram notifications to technicians")
+            else:
+                logger.warning(f"Failed to process notifications: {result.get('error')}")
+
+        except Exception as e:
+            logger.error(f"Failed to process Clawd notifications: {e}", exc_info=True)
+
 
 # Global scheduler instance
 scheduler_service = BackgroundSchedulerService()

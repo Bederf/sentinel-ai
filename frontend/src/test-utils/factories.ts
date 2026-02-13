@@ -22,6 +22,7 @@ import type {
   Equipment,
   Alert,
 } from '@/lib/api';
+import type { ModuleContextValue } from '@/contexts/moduleContextStore';
 
 /**
  * Optimization Scenario Factory
@@ -441,6 +442,48 @@ export function createMockLossLeader(overrides?: any) {
     loss_amount_zar: 125000,
     loss_percentage: 12.5,
     root_causes: ['High labor costs', 'Scope creep'],
+    ...overrides,
+  };
+}
+
+/**
+ * Module Context Factory - Creates mock ModuleContext for testing module-dependent components
+ *
+ * Provides:
+ * - Default state with all modules disabled
+ * - Async methods for module activation/deactivation
+ * - Mock API responses
+ */
+export function createMockModuleContext(overrides?: Partial<ModuleContextValue>): ModuleContextValue {
+  return {
+    siteId: 'test-site',
+    siteName: 'Test Site',
+    activeModules: [],
+    availableModules: [
+      { module_type: 'hvac', name: 'HVAC', description: 'HVAC system', integrates_with: [] },
+      { module_type: 'energy', name: 'Energy', description: 'Energy management', integrates_with: [] },
+      { module_type: 'security', name: 'Security', description: 'Security systems', integrates_with: [] },
+      { module_type: 'lighting', name: 'Lighting', description: 'Lighting control', integrates_with: [] },
+      { module_type: 'solar', name: 'Solar', description: 'Solar management', integrates_with: [] },
+      { module_type: 'water', name: 'Water', description: 'Water management', integrates_with: [] },
+      { module_type: 'fire', name: 'Fire', description: 'Fire safety', integrates_with: [] },
+      { module_type: 'access', name: 'Access', description: 'Access control', integrates_with: [] },
+    ],
+    recommendations: [],
+    integrationSummary: null,
+    loading: false,
+    error: null,
+    setSite: async () => {},
+    activateModule: async () => {},
+    deactivateModule: async () => {},
+    isModuleActive: () => false,
+    addRecommendation: () => {},
+    acknowledgeRecommendation: async () => {},
+    resolveRecommendation: async () => {},
+    refreshIntegration: async () => {},
+    refreshRecommendations: async () => {},
+    getActiveIntegrations: () => [],
+    canIntegrateWith: () => [],
     ...overrides,
   };
 }

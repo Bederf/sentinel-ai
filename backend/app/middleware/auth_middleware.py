@@ -781,3 +781,7 @@ def get_current_auth(request: Request) -> Optional[AuthContext]:
         AuthContext if authenticated, None otherwise
     """
     return getattr(request.state, "auth", None)
+
+# Convenience dependency for OPERATOR-level auth requirement
+require_operator = require_auth(AuthLevel.OPERATOR)
+

@@ -1,0 +1,35 @@
+bms.aimthelaw.co.za {
+    # Serve frontend static files from dist
+    root * /opt/bms-intelligence/frontend/dist
+
+    # API requests go to backend
+    reverse_proxy /api/* localhost:9095 {
+        # CORS headers for API
+        header_up Origin "https://bms.aimthelaw.co.za"
+        header_down Access-Control-Allow-Origin "https://bms.aimthelaw.co.za"
+        header_down Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+        header_down Access-Control-Allow-Headers "Content-Type, Authorization"
+        header_down Access-Control-Allow-Credentials "true"
+    }
+
+    # Handle OPTIONS requests for CORS preflight
+    @options {
+        method OPTIONS
+    }
+    respond @options 204
+
+    # SPA fallback - route all non-API requests to index.html
+    try_files {path} /index.html
+
+    # File serving
+    file_server
+
+    # Security headers
+    header X-Frame-Options "DENY"
+    header X-Content-Type-Options "nosniff"
+    header X-XSS-Protection "1; mode=block"
+    header Referrer-Policy "strict-origin-when-cross-origin"
+
+    # Enable gzip compression
+    encode gzip
+}

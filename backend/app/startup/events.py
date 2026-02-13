@@ -111,6 +111,12 @@ async def startup_event(app: FastAPI) -> None:
     # Monitors NMD headroom and coordinates HVAC + BESS + energy actions for shaving
     scheduler_service.add_demand_aware_coordination_job(interval_seconds=300)  # 5 minutes
 
+    # Start Clawd notification processing (runs every 30 seconds)
+    # When equipment health drops to warning/critical, technicians receive Telegram notifications
+    # This background job ensures notifications are sent promptly even if Clawd bot polling is delayed
+    if hasattr(scheduler_service, "add_clawd_notification_job"):
+        scheduler_service.add_clawd_notification_job(interval_seconds=30)  # 30 seconds
+
     # Start model freshness check (runs daily)
     # Phase 45-01: Checks model age and R² score, auto-retrains stale models
     if hasattr(scheduler_service, "add_model_check_job"):
