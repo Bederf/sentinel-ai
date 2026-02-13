@@ -8,10 +8,13 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime, date, timedelta
 import json
 import os
+import logging
 from pathlib import Path
 
 from app.database.supabase_client import get_supabase_client
 from app.models.water_meter import WaterConsumption, WaterAlert, WaterMeter
+
+logger = logging.getLogger(__name__)
 
 
 class WaterConsumptionRepository:
@@ -458,6 +461,122 @@ class WaterConsumptionRepository:
                     self._save_json_backup(site_dir.name, backup_data)
                     return alert
         return None
+
+    def get_zone_historical_flow(
+        self,
+        zone_id: str,
+        lookback_hours: int = 24,
+    ) -> List[float]:
+        """Get historical flow data for a zone.
+
+        Args:
+            zone_id: Zone identifier
+            lookback_hours: Number of hours to look back
+
+        Returns:
+            List of flow rates in LPM sorted by timestamp
+        """
+        cutoff_time = datetime.now() - timedelta(hours=lookback_hours)
+
+        try:
+            response = (
+                self.client.table("water_consumption")
+                .select("flow_rate_lpm")
+                .eq("zone_id", zone_id)
+                .gte("timestamp", cutoff_time.isoformat())
+                .order("timestamp", desc=False)
+                .execute()
+            )
+            flows = [r["flow_rate_lpm"] for r in response.data if r.get("flow_rate_lpm")]
+            return flows
+
+        except Exception:
+            # Fallback to JSON
+            site_key = zone_id.split("-")[0] if "-" in zone_id else "site-001"
+            backup_data = self._load_json_backup(site_key)
+            records = backup_data.get("consumption", [])
+
+            flows = []
+            for record in records:
+                if record.get("zone_id") == zone_id:
+                    record_time = datetime.fromisoformat(record.get("timestamp", ""))
+                    if record_time >= cutoff_time:
+                        flow = record.get("flow_rate_lpm")
+                        if flow:
+                            flows.append(flow)
+
+            flows.sort()
+            return flows
+
+    def get_alert_thresholds(self, site: str) -> Dict[str, float]:
+        """Get alert thresholds for a site.
+
+        Args:
+            site: Building site code
+
+        Returns:
+            Dictionary of threshold values, or defaults if not configured
+        """
+        try:
+            response = (
+                self.client.table("alert_settings")
+                .select("*")
+                .eq("site", site)
+                .eq("setting_type", "water_thresholds")
+                .single()
+                .execute()
+            )
+            if response.data:
+                return response.data.get("settings", self._get_default_thresholds())
+            return self._get_default_thresholds()
+
+        except Exception:
+            # Return defaults if not found or Supabase error
+            return self._get_default_thresholds()
+
+    def _get_default_thresholds(self) -> Dict[str, float]:
+        """Get default threshold values."""
+        return {
+            "continuous_flow_lpm": 10.0,
+            "night_flow_lpm": 5.0,
+            "statistical_sensitivity": 2.0,
+            "statistical_critical_sensitivity": 3.0,
+            "temperature_min_celsius": 4.0,
+            "temperature_max_celsius": 60.0,
+        }
+
+    async def set_alert_thresholds(self, site: str, thresholds: Dict[str, float]) -> bool:
+        """Save alert thresholds for a site.
+
+        Args:
+            site: Building site code
+            thresholds: Dictionary of threshold values
+
+        Returns:
+            True if successful
+        """
+        setting_data = {
+            "site": site,
+            "setting_type": "water_thresholds",
+            "settings": thresholds,
+            "updated_at": datetime.now().isoformat(),
+        }
+
+        try:
+            # Try to update existing
+            self.client.table("alert_settings").update(setting_data).eq("site", site).eq(
+                "setting_type", "water_thresholds"
+            ).execute()
+            return True
+
+        except Exception:
+            try:
+                # Try to insert if update failed
+                self.client.table("alert_settings").insert(setting_data).execute()
+                return True
+            except Exception as e:
+                logger.warning(f"Could not save alert thresholds: {e}")
+                return False
 
     def get_daily_summary(
         self,

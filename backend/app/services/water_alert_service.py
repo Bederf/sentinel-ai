@@ -14,8 +14,20 @@ from statistics import mean, stdev
 
 from app.models.water_meter import WaterAlert, AlertType, AlertSeverity, AlertStatus
 from app.database.repositories.water_consumption_repository import WaterConsumptionRepository
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
+
+
+class WaterAlertThresholds(BaseModel):
+    """Configuration model for water alert thresholds."""
+
+    continuous_flow_lpm: float = 10.0
+    night_flow_lpm: float = 5.0
+    statistical_sensitivity: float = 2.0
+    statistical_critical_sensitivity: float = 3.0
+    temperature_min_celsius: float = 4.0
+    temperature_max_celsius: float = 60.0
 
 # Lazy import to avoid circular dependencies
 _occupancy_service = None
@@ -363,6 +375,130 @@ class WaterAlertService:
                 f"with zero occupancy. Possible leak or equipment malfunction in unoccupied area."
             ),
         )
+
+    def calculate_statistical_baseline(self, flows: List[float]) -> Dict[str, float]:
+        """Calculate statistical baseline metrics from flow data.
+
+        Args:
+            flows: List of flow rate values in LPM
+
+        Returns:
+            Dictionary with mean, std_dev, min, max, median, and percentile_95
+        """
+        if not flows:
+            return {
+                "mean": 0.0,
+                "std_dev": 0.0,
+                "min": 0.0,
+                "max": 0.0,
+                "median": 0.0,
+                "percentile_95": 0.0,
+            }
+
+        sorted_flows = sorted(flows)
+        mean_val = mean(flows)
+        std_dev_val = stdev(flows) if len(flows) > 1 else 0.0
+
+        # Calculate median
+        n = len(sorted_flows)
+        median_val = (
+            sorted_flows[n // 2]
+            if n % 2 == 1
+            else (sorted_flows[n // 2 - 1] + sorted_flows[n // 2]) / 2
+        )
+
+        # Calculate 95th percentile
+        percentile_95_idx = int(0.95 * (len(sorted_flows) - 1))
+        percentile_95_val = sorted_flows[percentile_95_idx]
+
+        return {
+            "mean": round(mean_val, 2),
+            "std_dev": round(std_dev_val, 2),
+            "min": round(min(flows), 2),
+            "max": round(max(flows), 2),
+            "median": round(median_val, 2),
+            "percentile_95": round(percentile_95_val, 2),
+        }
+
+    async def check_zone_statistical_anomaly(
+        self,
+        zone_id: str,
+        current_flow: float,
+        lookback_hours: int = 24,
+        sensitivity: float = 2.0,
+    ) -> Optional[WaterAlert]:
+        """Check for zone-based statistical anomaly.
+
+        Detects abnormal flow by comparing current flow to historical baseline
+        using statistical deviation (standard deviation multiplier).
+
+        Args:
+            zone_id: Zone identifier
+            current_flow: Current flow rate in LPM
+            lookback_hours: Number of hours to look back for baseline (default 24)
+            sensitivity: Standard deviation multiplier for thresholds (default 2.0)
+
+        Returns:
+            WaterAlert if anomaly detected, None otherwise
+        """
+        # Get historical flow data for zone
+        historical_flows = await self._repository.get_zone_historical_flow(
+            zone_id=zone_id,
+            lookback_hours=lookback_hours,
+        )
+
+        if not historical_flows or len(historical_flows) < 5:
+            # Insufficient data for statistical analysis
+            return None
+
+        # Calculate baseline statistics
+        baseline = self.calculate_statistical_baseline(historical_flows)
+
+        # Check for anomaly
+        mean_flow = baseline["mean"]
+        std_dev = baseline["std_dev"]
+
+        if std_dev == 0:
+            return None
+
+        # Calculate deviation from baseline
+        deviation = (current_flow - mean_flow) / std_dev
+
+        # Check thresholds
+        if deviation > 3.0:
+            # Critical anomaly (> 3 std dev)
+            return self._generate_alert(
+                meter_id=f"{zone_id}-meter",
+                site="",  # Site will be determined from zone_id
+                alert_type=AlertType.UNUSUAL_PATTERN,
+                severity=AlertSeverity.CRITICAL,
+                flow_rate=current_flow,
+                threshold=mean_flow,
+                duration_minutes=0,
+                description=(
+                    f"Critical anomaly in zone {zone_id}: Current flow {current_flow:.1f} LPM is "
+                    f"{deviation:.1f} standard deviations from baseline {mean_flow:.1f} LPM. "
+                    f"Possible severe leak or major equipment malfunction."
+                ),
+            )
+        elif deviation > sensitivity:
+            # Warning anomaly (> sensitivity std dev)
+            return self._generate_alert(
+                meter_id=f"{zone_id}-meter",
+                site="",  # Site will be determined from zone_id
+                alert_type=AlertType.UNUSUAL_PATTERN,
+                severity=AlertSeverity.MEDIUM,
+                flow_rate=current_flow,
+                threshold=mean_flow,
+                duration_minutes=0,
+                description=(
+                    f"Abnormal flow in zone {zone_id}: Current flow {current_flow:.1f} LPM is "
+                    f"{deviation:.1f} standard deviations from baseline {mean_flow:.1f} LPM. "
+                    f"Possible leak or unusual equipment usage."
+                ),
+            )
+
+        return None
 
     def check_all_alerts(
         self,

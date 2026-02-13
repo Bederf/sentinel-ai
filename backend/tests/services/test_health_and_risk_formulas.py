@@ -120,6 +120,7 @@ def test_prediction_calculator_probability_increases_with_risk_factors(monkeypat
     assert elevated_prediction is not None
     assert elevated_prediction["probability_percent"] > base_probability
     assert 50 <= elevated_prediction["probability_percent"] <= 95
+    assert elevated_prediction["severity"] in {"healthy", "warning", "critical"}
 
 
 def test_prediction_generator_probability_bounds_and_severity(monkeypatch):
@@ -152,6 +153,53 @@ def test_prediction_generator_probability_bounds_and_severity(monkeypatch):
     assert critical["severity"] == "critical"
     assert warning["probability_percent"] == 60  # floor for degraded equipment
     assert warning["severity"] == "warning"
+
+
+def test_prediction_calculator_severity_uses_normalized_states(monkeypatch):
+    monkeypatch.setattr(
+        prediction_calculator_module,
+        "get_health_thresholds",
+        lambda: {"healthy": 90, "warning": 70, "critical": 50},
+    )
+
+    # Low degraded probability path
+    pred_low = PredictionCalculator._calculate_prediction_from_health(
+        equipment={"id": "eqp-a", "name": "Eq A", "type": "generator", "health_score": 88},
+        asset=None,
+        work_orders=[],
+        alarms=[],
+        site={},
+        site_name="Site A",
+    )
+    assert pred_low is not None
+    assert pred_low["severity"] == "healthy"
+
+    now = datetime.now()
+
+    # Warning path (probability uplift via evidence)
+    pred_warn = PredictionCalculator._calculate_prediction_from_health(
+        equipment={"id": "eqp-b", "name": "Eq B", "type": "generator", "health_score": 65},
+        asset=None,
+        work_orders=[
+            {
+                "reported_date": now - timedelta(days=5),
+                "repeat_call": True,
+                "fault_code": "bearing",
+                "technician_notes": "urgent replacement needed",
+            },
+            {
+                "reported_date": now - timedelta(days=10),
+                "repeat_call": True,
+                "fault_code": "bearing",
+                "technician_notes": "failing and deteriorating",
+            },
+        ],
+        alarms=[],
+        site={},
+        site_name="Site A",
+    )
+    assert pred_warn is not None
+    assert pred_warn["severity"] == "warning"
 
 
 def test_condition_scorer_rms_monotonicity_and_score_bounds():

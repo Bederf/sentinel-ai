@@ -34,8 +34,9 @@ def format_prediction_for_frontend(pred: dict) -> dict:
 
     Maps database severity values to frontend states:
     - critical → critical
-    - warning → warning (also maps 'high' for backwards compatibility)
-    - healthy → healthy (also maps 'low', 'medium' for backwards compatibility)
+    - warning → warning
+    - healthy → healthy
+    Legacy values (high/medium/low) are still mapped for backwards compatibility.
     """
     # Extract related data
     building = pred.get('building', {})
@@ -100,7 +101,7 @@ def format_prediction_for_frontend(pred: dict) -> dict:
 async def list_predictions(
     building_code: Optional[str] = Query(None, description="Filter by building code (e.g., site-002)"),
     equipment_type: Optional[str] = Query(None, description="Filter by equipment type"),
-    severity: Optional[str] = Query(None, description="Filter by severity (critical/high/medium/low)"),
+    severity: Optional[str] = Query(None, description="Filter by severity (critical/warning/healthy)"),
     min_probability: Optional[int] = Query(None, description="Minimum probability percentage"),
 ) -> dict:
     """
@@ -111,7 +112,7 @@ async def list_predictions(
     Query Parameters:
     - building_code: Filter by building code (e.g., site-002)
     - equipment_type: Filter by equipment type (chiller, ahu, ups, etc.)
-    - severity: Filter by severity level (critical, high, medium, low)
+    - severity: Filter by severity level (critical, warning, healthy)
     - min_probability: Show only predictions above this probability
 
     Returns:

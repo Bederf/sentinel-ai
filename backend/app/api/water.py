@@ -14,10 +14,11 @@ from datetime import datetime, date, timedelta
 from typing import Optional, List
 
 from fastapi import APIRouter, HTTPException, Query, Request
+from pydantic import BaseModel
 from app.middleware.rate_limiter import limiter
 
 from app.services.water_ingestion_service import get_water_ingestion_service
-from app.services.water_alert_service import get_water_alert_service
+from app.services.water_alert_service import get_water_alert_service, WaterAlertThresholds
 from app.database.repositories.water_consumption_repository import WaterConsumptionRepository
 from app.models.water_meter import WaterAlert, WaterTrend
 
@@ -414,4 +415,211 @@ async def get_site_ingestion_status(request: Request, site: str):
         raise
     except Exception as e:
         logger.error(f"Error fetching ingestion status for {site}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# === Advanced alert filtering and threshold management ===
+
+
+@limiter.limit("30/minute")
+@router.get("/water/alerts/advanced")
+async def get_advanced_alerts(
+    request: Request,
+    site: str = Query(..., description="Building site code"),
+    alert_type: Optional[str] = Query(None, description="Filter by alert type"),
+    severity: Optional[str] = Query(None, description="Filter by severity"),
+    zone_id: Optional[str] = Query(None, description="Filter by zone ID"),
+    start: Optional[str] = Query(None, description="Start date (ISO format)"),
+    end: Optional[str] = Query(None, description="End date (ISO format)"),
+    status: Optional[str] = Query(None, description="Filter by status"),
+    limit: int = Query(100, ge=1, le=1000, description="Maximum records to return"),
+):
+    """Get advanced water alerts with filtering by type, severity, zone, and time range.
+
+    Args:
+        site: Building site code
+        alert_type: Optional alert type filter
+        severity: Optional severity filter
+        zone_id: Optional zone filter
+        start: Optional start date
+        end: Optional end date
+        status: Optional status filter
+        limit: Maximum records to return
+
+    Returns:
+        Filtered list of water alerts with metadata
+    """
+    try:
+        repo = WaterConsumptionRepository()
+
+        # Parse dates
+        start_date = datetime.fromisoformat(start).date() if start else None
+        end_date = datetime.fromisoformat(end).date() if end else None
+
+        # Get alerts
+        alerts = repo.get_alerts(
+            site=site,
+            severity=severity,
+            start_date=start_date,
+            end_date=end_date,
+            status=status,
+        )
+
+        # Additional filtering by alert_type and zone_id
+        if alert_type:
+            alerts = [a for a in alerts if a.get("alert_type") == alert_type]
+        if zone_id:
+            alerts = [a for a in alerts if zone_id in a.get("meter_id", "")]
+
+        # Apply limit
+        alerts = alerts[:limit]
+
+        return {
+            "site": site,
+            "filters": {
+                "alert_type": alert_type,
+                "severity": severity,
+                "zone_id": zone_id,
+                "start": start,
+                "end": end,
+                "status": status,
+            },
+            "alert_count": len(alerts),
+            "alerts": alerts,
+        }
+
+    except Exception as e:
+        logger.error(f"Error fetching advanced alerts for {site}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@limiter.limit("30/minute")
+@router.post("/water/alerts/thresholds/{site}")
+async def set_alert_thresholds(
+    request: Request,
+    site: str,
+    thresholds: WaterAlertThresholds,
+):
+    """Set custom alert thresholds for a site.
+
+    Args:
+        site: Building site code
+        thresholds: Threshold configuration
+
+    Returns:
+        Confirmation with updated thresholds
+    """
+    try:
+        repo = WaterConsumptionRepository()
+        threshold_dict = thresholds.dict()
+
+        success = await repo.set_alert_thresholds(site, threshold_dict)
+
+        if not success:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to save thresholds for site {site}"
+            )
+
+        return {
+            "site": site,
+            "thresholds": threshold_dict,
+            "updated_at": datetime.now().isoformat(),
+            "default": False,
+        }
+
+    except Exception as e:
+        logger.error(f"Error setting alert thresholds for {site}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@limiter.limit("30/minute")
+@router.get("/water/alerts/thresholds/{site}")
+async def get_alert_thresholds(request: Request, site: str):
+    """Get current alert thresholds for a site.
+
+    Args:
+        site: Building site code
+
+    Returns:
+        Current threshold configuration (default or custom)
+    """
+    try:
+        repo = WaterConsumptionRepository()
+        thresholds = repo.get_alert_thresholds(site)
+
+        return {
+            "site": site,
+            "thresholds": thresholds,
+            "default": all(
+                thresholds.get(k) == v
+                for k, v in repo._get_default_thresholds().items()
+            ),
+        }
+
+    except Exception as e:
+        logger.error(f"Error fetching alert thresholds for {site}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@limiter.limit("30/minute")
+@router.get("/water/zones/{zone_id}/anomaly-history")
+async def get_zone_anomaly_history(
+    request: Request,
+    zone_id: str,
+    days: int = Query(7, ge=1, le=90, description="Number of days to analyze"),
+):
+    """Get anomaly history and statistical baseline for a zone.
+
+    Args:
+        zone_id: Zone identifier
+        days: Number of days to analyze
+
+    Returns:
+        Historical anomalies and statistical baseline metrics
+    """
+    try:
+        repo = WaterConsumptionRepository()
+        alert_svc = get_water_alert_service()
+
+        # Get historical flow data
+        cutoff_date = date.today() - timedelta(days=days)
+        records = repo.get_consumption_by_meter(
+            meter_id=f"{zone_id}-meter",
+            start_date=cutoff_date,
+            end_date=date.today(),
+            limit=10000,
+        )
+
+        if not records:
+            return {
+                "zone_id": zone_id,
+                "days": days,
+                "anomalies": [],
+                "baseline": None,
+                "count": 0,
+            }
+
+        # Extract flows and calculate baseline
+        flows = [r.get("flow_rate_lpm", 0) for r in records if r.get("flow_rate_lpm")]
+        baseline = alert_svc.calculate_statistical_baseline(flows)
+
+        # Get anomalous alerts for this zone
+        all_alerts = repo.get_alerts(
+            site="",  # Will search all sites
+            start_date=cutoff_date,
+            end_date=date.today(),
+        )
+        zone_anomalies = [a for a in all_alerts if zone_id in a.get("meter_id", "")]
+
+        return {
+            "zone_id": zone_id,
+            "days": days,
+            "baseline": baseline,
+            "anomalies": zone_anomalies[:100],
+            "count": len(zone_anomalies),
+        }
+
+    except Exception as e:
+        logger.error(f"Error fetching anomaly history for zone {zone_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))

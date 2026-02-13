@@ -261,12 +261,11 @@ class PredictionGeneratorService:
             "default": {"repair": 20000, "replacement": 200000, "downtime": 5000},
         }
 
-        # Severity multipliers
+        # Severity multipliers (normalized severity states only)
         severity_multipliers = {
             "critical": 1.5,
-            "high": 1.2,
-            "medium": 1.0,
-            "low": 0.8,
+            "warning": 1.0,
+            "healthy": 0.8,
         }
 
         # Get costs for equipment type
@@ -284,7 +283,7 @@ class PredictionGeneratorService:
         downtime_cost = int(costs["downtime"] * multiplier)
 
         # Estimate potential loss (downtime * estimated hours)
-        estimated_hours = {"critical": 48, "high": 24, "medium": 8, "low": 4}.get(severity, 8)
+        estimated_hours = {"critical": 48, "warning": 8, "healthy": 4}.get(severity, 8)
         potential_loss = downtime_cost * estimated_hours + repair_cost
 
         return {
@@ -360,7 +359,7 @@ class PredictionGeneratorService:
 
         if severity == "critical":
             return f"URGENT: {base_action}. Immediate attention required."
-        elif severity == "high":
+        elif severity == "warning":
             return f"{base_action}. Schedule within 7 days."
         else:
             return f"{base_action}. Schedule at next maintenance window."

@@ -297,15 +297,14 @@ class PredictionCalculator:
         else:
             confidence = "low"
 
-        # Determine severity
+        # Determine severity using normalized system states only
+        # (healthy / warning / critical)
         if probability >= 85:
             severity = "critical"
-        elif probability >= 75:
-            severity = "high"
         elif probability >= 65:
-            severity = "medium"
+            severity = "warning"
         else:
-            severity = "low"
+            severity = "healthy"
 
         # Calculate predicted failure date (based on probability and health score)
         # Lower health score = sooner failure
@@ -454,7 +453,7 @@ class PredictionCalculator:
             "recommended_action": f"Schedule preventive maintenance within {timeframe_days} days to prevent failure",
             "parts_required": parts_required,
             "cost_impact": cost_impact,
-            "urgency": "high" if probability >= 85 else "medium",
+            "urgency": "critical" if probability >= 85 else "warning",
         }
 
     @staticmethod
@@ -633,4 +632,3 @@ class PredictionCalculator:
             notes.append(f"Equipment health at {health_score}%. Routine monitoring in progress.")
 
         return notes[:5]  # Limit to 5 notes
-
