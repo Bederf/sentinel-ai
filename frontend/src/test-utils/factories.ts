@@ -528,3 +528,92 @@ export function createBatchResponse<T extends { id: string }>(
 
   return response;
 }
+
+/**
+ * Work Order Factory
+ */
+export function createMockWorkOrder(overrides?: any) {
+  return {
+    id: 'wo-001',
+    code: 'WO-2026-001',
+    work_type: 'maintenance',
+    status: 'scheduled',
+    priority: 'medium',
+    equipment_id: 'equipment-001',
+    assigned_to: 'technician@example.com',
+    created_at: new Date().toISOString(),
+    ...overrides,
+  };
+}
+
+/**
+ * Building Factory
+ */
+export function createMockBuilding(overrides?: any) {
+  return {
+    id: 'building-001',
+    code: 'S002-B1',
+    name: 'Test Building',
+    type: 'office',
+    site_id: 'site-002',
+    floors: 3,
+    equipment_count: 42,
+    ...overrides,
+  };
+}
+
+/**
+ * Solar Data Factory (for solar dashboard hooks)
+ */
+export function createMockSolarData(overrides?: any) {
+  return {
+    site_id: 'site-002',
+    current_generation_kw: 150,
+    peak_generation_kw: 250,
+    generation_percent: 60,
+    bess_soc_percent: 65,
+    bess_discharge_available_kw: 100,
+    forecast_24h: [
+      { hour: 0, generation_kw: 0 },
+      { hour: 6, generation_kw: 50 },
+      { hour: 12, generation_kw: 250 },
+      { hour: 18, generation_kw: 100 },
+    ],
+    ...overrides,
+  };
+}
+
+/**
+ * BESS Status Factory
+ */
+export function createMockBESSStatus(overrides?: any) {
+  return {
+    site_id: 'site-002',
+    soc_percent: 65,
+    discharge_power_kw: 50,
+    charge_power_kw: 0,
+    status: 'idle',
+    health_percent: 95,
+    ...overrides,
+  };
+}
+
+/**
+ * Peak Demand Status Factory
+ */
+export function createMockPeakDemandStatus(overrides?: any) {
+  return {
+    site_id: 'site-002',
+    current_demand_kw: 5500,
+    nmd_limit_kva: 6000,
+    headroom_kw: 500,
+    headroom_percent: 8.3,
+    headroom_level: 'critical',
+    active_modules: ['solar', 'hvac'],
+    available_reductions: {
+      solar: { max_reduction_kw: 200, method: 'bess_discharge' },
+      hvac: { max_reduction_kw: 50, method: 'setpoint_increase' },
+    },
+    ...overrides,
+  };
+}
