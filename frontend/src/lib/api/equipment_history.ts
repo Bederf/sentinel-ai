@@ -1,85 +1,70 @@
 /**
  * Equipment History API Client
  *
- * Handles work order and alert history queries for equipment.
+ * Fetches equipment maintenance and alert history.
  */
 
-import { fetchApi } from './client';
+import { authorizedFetch } from './client';
 
-// ============= Equipment History Types =============
+const API_BASE = import.meta.env.VITE_API_URL || '';
 
-export interface WorkOrder {
-  id: string;
-  code: string;               // e.g., WO-2026-0001
-  title: string;
-  description?: string;
-  priority: "low" | "medium" | "high" | "urgent";
-  status: "scheduled" | "assigned" | "in_progress" | "completed" | "cancelled";
-  assigned_to?: string;
-  technician_name?: string;
-  created_at: string;
-  completed_at?: string;
-  updated_at?: string;
-}
-
+/**
+ * Alert with status and severity
+ */
 export interface EquipmentAlert {
   id: string;
   title: string;
   message: string;
-  severity: "critical" | "warning" | "medium" | "low";
-  status: "active" | "acknowledged" | "resolved";
+  severity: 'critical' | 'warning' | 'medium' | 'low';
+  status: 'active' | 'acknowledged' | 'resolved';
   created_at: string;
   acknowledged_at?: string;
   resolved_at?: string;
 }
 
-// ============= Equipment History API Methods =============
+/**
+ * Work order with status and priority
+ */
+export interface WorkOrder {
+  id: string;
+  code: string;
+  work_type: string;
+  status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  title: string;
+  assigned_to?: string;
+  created_at: string;
+  completed_at?: string;
+}
 
 export const equipmentHistoryApi = {
   /**
-   * Get work orders for equipment by equipment UUID
-   *
-   * @param equipmentId - Equipment UUID
-   * @param limit - Maximum number of work orders to return (default: 10)
+   * Fetch work orders for specific equipment
    */
-  getWorkOrders: async (equipmentId: string, limit: number = 10): Promise<WorkOrder[]> => {
-    try {
-      const response = await fetchApi<{ data?: WorkOrder[]; work_orders?: WorkOrder[] }>(
-        `/api/work-orders/supabase?limit=${limit}&equipment_id=${equipmentId}`
-      );
-
-      // Handle both response formats
-      const workOrders = response?.data || response?.work_orders || [];
-      return Array.isArray(workOrders) ? workOrders : [];
-    } catch (error) {
-      console.error('Failed to fetch work orders:', error);
-      return [];
+  async getWorkOrders(equipmentId: string, limit: number = 10): Promise<WorkOrder[]> {
+    const response = await authorizedFetch(
+      `${API_BASE}/api/work-orders/supabase?equipment_id=${equipmentId}&limit=${limit}`
+    );
+    if (!response.ok) {
+      throw new Error(`Failed to fetch work orders: ${response.statusText}`);
     }
+    const data = await response.json();
+    // Handle both array and object with work_orders property
+    return Array.isArray(data) ? data : (data.work_orders || []);
   },
 
   /**
-   * Get alerts for equipment by equipment UUID
-   *
-   * @param equipmentId - Equipment UUID
-   * @param limit - Maximum number of alerts to return (default: 10)
+   * Fetch alerts for specific equipment
    */
-  getAlerts: async (equipmentId: string, limit: number = 10): Promise<EquipmentAlert[]> => {
-    try {
-      const response = await fetchApi<EquipmentAlert[] | { data: EquipmentAlert[] }>(
-        `/api/alerts?equipment_id=${equipmentId}&limit=${limit}`
-      );
-
-      // Handle both response formats
-      if (Array.isArray(response)) {
-        return response;
-      }
-      if (response?.data && Array.isArray(response.data)) {
-        return response.data;
-      }
-      return [];
-    } catch (error) {
-      console.error('Failed to fetch alerts:', error);
-      return [];
+  async getAlerts(equipmentId: string, limit: number = 10): Promise<EquipmentAlert[]> {
+    const response = await authorizedFetch(
+      `${API_BASE}/api/alerts?equipment_id=${equipmentId}&limit=${limit}`
+    );
+    if (!response.ok) {
+      throw new Error(`Failed to fetch alerts: ${response.statusText}`);
     }
+    const data = await response.json();
+    // Handle both array and object with alerts property
+    return Array.isArray(data) ? data : (data.alerts || []);
   },
 };

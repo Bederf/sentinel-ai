@@ -18,7 +18,6 @@ import { SplashScreen } from "./components/SplashScreen";
 import { EmailEntry } from "./components/EmailEntry";
 import { AlertFeed } from "./components/AlertFeed";
 import { CalendarPicker } from "./components/CalendarPicker";
-import { IntegrationMonitoringPage } from "./components/IntegrationMonitoringPage";
 import SystemHealthPage from "./components/SystemHealthPage";
 import { AssetWorkflowDashboard } from "./components/AssetWorkflowDashboard";
 import { OccupancyPanel } from "./components/OccupancyPanel";
@@ -683,7 +682,7 @@ function App() {
               <TechnicianChat />
             </div>
           ) : currentView === "integrations" ? (
-            <IntegrationMonitoringPage />
+            <SystemHealthPage />
           ) : currentView === "occupancy" ? (
             <div className="h-full overflow-y-auto p-4 md:p-6">
               <OccupancyPanel compact={false} />

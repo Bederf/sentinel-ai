@@ -12,11 +12,42 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { ReactNode } from 'react';
+import React from 'react';
 import SystemHealthPage from '../SystemHealthPage';
+
+// Create test QueryClient
+function createTestQueryClient() {
+  return new QueryClient({
+    defaultOptions: {
+      queries: { retry: 0, gcTime: Infinity },
+    },
+  });
+}
+
+// Wrapper with QueryClientProvider
+function createWrapper(queryClient: QueryClient) {
+  return ({ children }: { children: ReactNode }) =>
+    React.createElement(QueryClientProvider, { client: queryClient }, children);
+}
 
 // Mock API client
 vi.mock('@/lib/api/client', () => ({
   authorizedFetch: vi.fn(),
+}));
+
+// Mock API modules
+vi.mock('@/lib/api', () => ({
+  monitoringApi: {
+    getIntegrationHealth: vi.fn(() =>
+      Promise.resolve({
+        status: 'healthy',
+        services: [],
+        last_check: new Date().toISOString(),
+      })
+    ),
+  },
 }));
 
 // Mock Tremor components - import function directly into factory
@@ -59,8 +90,9 @@ function setupHealthMocks(healthData?: any, historyData?: any) {
     snapshots: [],
   };
 
-  vi.mocked(authorizedFetch).mockImplementation((url: string) => {
-    if (typeof url === 'string' && url.includes('/api/system/health/history')) {
+  vi.mocked(authorizedFetch).mockImplementation((url: any) => {
+    const urlString = typeof url === 'string' ? url : url.toString ? url.toString() : String(url);
+    if (urlString.includes('/api/system/health/history')) {
       return Promise.resolve({
         ok: true,
         json: async () => historyData || defaultHistory,
@@ -74,25 +106,29 @@ function setupHealthMocks(healthData?: any, historyData?: any) {
 }
 
 describe('SystemHealthPage', () => {
+  let queryClient: QueryClient;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    queryClient = createTestQueryClient();
   });
 
   afterEach(() => {
     vi.clearAllMocks();
+    queryClient.clear();
   });
 
   // ===== LOADING & ERROR STATES =====
   describe('Loading and Error States', () => {
     it('should display loading message initially', () => {
       vi.mocked(authorizedFetch).mockImplementation(() => new Promise(() => {})); // Never resolves
-      render(<SystemHealthPage />);
+      render(<SystemHealthPage />, { wrapper: createWrapper(queryClient) });
       expect(screen.getByText('Loading system health data...')).toBeInTheDocument();
     });
 
     it('should display error message on API failure', async () => {
       vi.mocked(authorizedFetch).mockRejectedValue(new Error('Network error'));
-      render(<SystemHealthPage />);
+      render(<SystemHealthPage />, { wrapper: createWrapper(queryClient) });
       await waitFor(() => {
         expect(screen.getByText(/Error:/)).toBeInTheDocument();
       }, { timeout: 2000 });
@@ -100,7 +136,7 @@ describe('SystemHealthPage', () => {
 
     it('should render page title after data loads', async () => {
       setupHealthMocks();
-      render(<SystemHealthPage />);
+      render(<SystemHealthPage />, { wrapper: createWrapper(queryClient) });
       await waitFor(() => {
         expect(screen.getByText('System Health Dashboard')).toBeInTheDocument();
       }, { timeout: 2000 });
@@ -116,7 +152,7 @@ describe('SystemHealthPage', () => {
         components: {},
       });
 
-      render(<SystemHealthPage />);
+      render(<SystemHealthPage />, { wrapper: createWrapper(queryClient) });
 
       await waitFor(() => {
         expect(screen.getByText('85')).toBeInTheDocument();
@@ -130,7 +166,7 @@ describe('SystemHealthPage', () => {
         components: {},
       });
 
-      render(<SystemHealthPage />);
+      render(<SystemHealthPage />, { wrapper: createWrapper(queryClient) });
 
       await waitFor(() => {
         expect(screen.getByText('Overall Health Status')).toBeInTheDocument();
@@ -144,7 +180,7 @@ describe('SystemHealthPage', () => {
         components: {},
       });
 
-      render(<SystemHealthPage />);
+      render(<SystemHealthPage />, { wrapper: createWrapper(queryClient) });
 
       await waitFor(() => {
         // Find the green badge that says HEALTHY (not Improving)
@@ -162,7 +198,7 @@ describe('SystemHealthPage', () => {
         components: {},
       });
 
-      render(<SystemHealthPage />);
+      render(<SystemHealthPage />, { wrapper: createWrapper(queryClient) });
 
       await waitFor(() => {
         expect(screen.getByTestId('badge-yellow')).toBeInTheDocument();
@@ -177,7 +213,7 @@ describe('SystemHealthPage', () => {
         components: {},
       });
 
-      render(<SystemHealthPage />);
+      render(<SystemHealthPage />, { wrapper: createWrapper(queryClient) });
 
       await waitFor(() => {
         expect(screen.getByTestId('badge-red')).toBeInTheDocument();
@@ -196,7 +232,7 @@ describe('SystemHealthPage', () => {
         },
       });
 
-      render(<SystemHealthPage />);
+      render(<SystemHealthPage />, { wrapper: createWrapper(queryClient) });
 
       await waitFor(() => {
         expect(screen.getByText('hvac')).toBeInTheDocument();
@@ -215,7 +251,7 @@ describe('SystemHealthPage', () => {
         },
       });
 
-      render(<SystemHealthPage />);
+      render(<SystemHealthPage />, { wrapper: createWrapper(queryClient) });
 
       await waitFor(() => {
         const metrics = screen.getAllByTestId('metric');
@@ -230,7 +266,7 @@ describe('SystemHealthPage', () => {
         components: {},
       });
 
-      render(<SystemHealthPage />);
+      render(<SystemHealthPage />, { wrapper: createWrapper(queryClient) });
 
       await waitFor(() => {
         expect(screen.getByTestId('progress-bar-green')).toBeInTheDocument();
@@ -246,7 +282,7 @@ describe('SystemHealthPage', () => {
         },
       });
 
-      render(<SystemHealthPage />);
+      render(<SystemHealthPage />, { wrapper: createWrapper(queryClient) });
 
       await waitFor(() => {
         expect(screen.getByTestId('progress-bar-yellow')).toBeInTheDocument();
@@ -269,7 +305,7 @@ describe('SystemHealthPage', () => {
         snapshots: [],
       });
 
-      render(<SystemHealthPage />);
+      render(<SystemHealthPage />, { wrapper: createWrapper(queryClient) });
 
       await waitFor(() => {
         expect(screen.getByText('Average Health Score')).toBeInTheDocument();
@@ -290,7 +326,7 @@ describe('SystemHealthPage', () => {
         snapshots: [],
       });
 
-      render(<SystemHealthPage />);
+      render(<SystemHealthPage />, { wrapper: createWrapper(queryClient) });
 
       await waitFor(() => {
         expect(screen.getByText('Uptime (24h)')).toBeInTheDocument();
@@ -311,7 +347,7 @@ describe('SystemHealthPage', () => {
         snapshots: [],
       });
 
-      render(<SystemHealthPage />);
+      render(<SystemHealthPage />, { wrapper: createWrapper(queryClient) });
 
       await waitFor(() => {
         expect(screen.getByText('Min Score')).toBeInTheDocument();
@@ -334,7 +370,7 @@ describe('SystemHealthPage', () => {
         snapshots: [],
       });
 
-      render(<SystemHealthPage />);
+      render(<SystemHealthPage />, { wrapper: createWrapper(queryClient) });
 
       await waitFor(() => {
         // Find the green badge that says Improving
@@ -358,7 +394,7 @@ describe('SystemHealthPage', () => {
         snapshots: [],
       });
 
-      render(<SystemHealthPage />);
+      render(<SystemHealthPage />, { wrapper: createWrapper(queryClient) });
 
       await waitFor(() => {
         expect(screen.getByText('Degrading')).toBeInTheDocument();
@@ -379,7 +415,7 @@ describe('SystemHealthPage', () => {
         snapshots: [],
       });
 
-      render(<SystemHealthPage />);
+      render(<SystemHealthPage />, { wrapper: createWrapper(queryClient) });
 
       await waitFor(() => {
         expect(screen.getByText('Stable')).toBeInTheDocument();
@@ -404,7 +440,7 @@ describe('SystemHealthPage', () => {
         ],
       });
 
-      render(<SystemHealthPage />);
+      render(<SystemHealthPage />, { wrapper: createWrapper(queryClient) });
 
       await waitFor(() => {
         expect(screen.getByTestId('line-chart')).toBeInTheDocument();
@@ -417,7 +453,7 @@ describe('SystemHealthPage', () => {
   describe('Auto-Refresh', () => {
     it('should refetch health data every 30 seconds', async () => {
       setupHealthMocks();
-      render(<SystemHealthPage />);
+      render(<SystemHealthPage />, { wrapper: createWrapper(queryClient) });
 
       await waitFor(() => {
         expect(screen.getByText('System Health Dashboard')).toBeInTheDocument();
@@ -444,7 +480,7 @@ describe('SystemHealthPage', () => {
   describe('Page Structure', () => {
     it('should display page title and subtitle', async () => {
       setupHealthMocks();
-      render(<SystemHealthPage />);
+      render(<SystemHealthPage />, { wrapper: createWrapper(queryClient) });
 
       await waitFor(() => {
         expect(screen.getByText('System Health Dashboard')).toBeInTheDocument();
@@ -454,7 +490,7 @@ describe('SystemHealthPage', () => {
 
     it('should display all three tabs', async () => {
       setupHealthMocks();
-      render(<SystemHealthPage />);
+      render(<SystemHealthPage />, { wrapper: createWrapper(queryClient) });
 
       await waitFor(() => {
         expect(screen.getByText('Realtime Status')).toBeInTheDocument();
@@ -474,7 +510,7 @@ describe('SystemHealthPage', () => {
         },
       });
 
-      render(<SystemHealthPage />);
+      render(<SystemHealthPage />, { wrapper: createWrapper(queryClient) });
 
       await waitFor(() => {
         const cards = screen.getAllByTestId('card');
@@ -493,7 +529,7 @@ describe('SystemHealthPage', () => {
         components: {},
       });
 
-      render(<SystemHealthPage />);
+      render(<SystemHealthPage />, { wrapper: createWrapper(queryClient) });
 
       await waitFor(() => {
         expect(screen.getByText('System Health Dashboard')).toBeInTheDocument();
@@ -514,7 +550,7 @@ describe('SystemHealthPage', () => {
         snapshots: [],
       });
 
-      render(<SystemHealthPage />);
+      render(<SystemHealthPage />, { wrapper: createWrapper(queryClient) });
 
       await waitFor(() => {
         expect(screen.getByText('Average Health Score')).toBeInTheDocument();

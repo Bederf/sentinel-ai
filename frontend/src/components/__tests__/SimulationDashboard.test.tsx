@@ -15,7 +15,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import SimulationDashboard from '../SimulationDashboard';
+import { SimulationDashboard } from '../SimulationDashboard';
 
 // Mock simulation API
 vi.mock('../../lib/simulationApi', () => ({
@@ -49,10 +49,10 @@ vi.mock('../../lib/simulationApi', () => ({
   fetchRuns: vi.fn(() => Promise.resolve([])),
   fetchRunAnalysis: vi.fn(() => Promise.resolve({})),
   fetchRunEvents: vi.fn(() => Promise.resolve([])),
-  fetchModelStatus: vi.fn(() => Promise.resolve({})),
-  fetchModelHealth: vi.fn(() => Promise.resolve({})),
-  fetchPerformance: vi.fn(() => Promise.resolve({})),
-  fetchABTests: vi.fn(() => Promise.resolve([])),
+  fetchModelStatus: vi.fn(() => Promise.resolve({ models: [] })),
+  fetchModelHealth: vi.fn(() => Promise.resolve({ health: {} })),
+  fetchPerformance: vi.fn(() => Promise.resolve({ accuracy: 0, precision: 0, recall: 0, f1_score: 0 })),
+  fetchABTests: vi.fn(() => Promise.resolve({ tests: [] })),
 }));
 
 // Mock API client

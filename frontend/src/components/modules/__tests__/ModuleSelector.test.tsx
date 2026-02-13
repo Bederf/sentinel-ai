@@ -18,11 +18,44 @@ import type { ModuleDefinition } from '../../../contexts/moduleRegistry';
 const mockUseModules = vi.fn(() => ({
   activeModules: [],
   availableModules: [
-    { module_type: 'hvac', name: 'HVAC', description: 'HVAC control', integrates_with: [] },
-    { module_type: 'energy', name: 'Energy', description: 'Energy management', integrates_with: [] },
-    { module_type: 'security', name: 'Security', description: 'Security', integrates_with: [] },
-    { module_type: 'lighting', name: 'Lighting', description: 'Lighting control', integrates_with: [] },
+    {
+      module_type: 'hvac',
+      name: 'HVAC',
+      version: '1.0.0',
+      description: 'HVAC control',
+      capabilities: [{ id: 'cap-1', name: 'Temperature Control', description: 'Control temperature' }],
+      integrates_with: [],
+      ai_features: ['optimization'],
+    },
+    {
+      module_type: 'energy',
+      name: 'Energy',
+      version: '1.0.0',
+      description: 'Energy management',
+      capabilities: [{ id: 'cap-2', name: 'Demand Tracking', description: 'Track demand' }],
+      integrates_with: [],
+      ai_features: ['forecasting'],
+    },
+    {
+      module_type: 'security',
+      name: 'Security',
+      version: '1.0.0',
+      description: 'Security',
+      capabilities: [{ id: 'cap-3', name: 'Access Control', description: 'Control access' }],
+      integrates_with: [],
+      ai_features: ['monitoring'],
+    },
+    {
+      module_type: 'lighting',
+      name: 'Lighting',
+      version: '1.0.0',
+      description: 'Lighting control',
+      capabilities: [{ id: 'cap-4', name: 'Brightness Control', description: 'Control brightness' }],
+      integrates_with: [],
+      ai_features: ['scheduling'],
+    },
   ],
+  integrationSummary: null,
   siteId: 'test-site',
   activateModule: vi.fn(),
   deactivateModule: vi.fn(),
@@ -35,17 +68,60 @@ vi.mock('../../../contexts/ModuleHooks', () => ({
   useModules: () => mockUseModules(),
 }));
 
+const createMockModule = (type: string, name: string, description: string) => ({
+  module_type: type,
+  name,
+  version: '1.0.0',
+  description,
+  capabilities: [{ id: `cap-${type}`, name: `${name} Feature`, description: `${name} capability` }],
+  integrates_with: [] as any[],
+  ai_features: ['optimization'],
+});
+
 describe('ModuleSelector', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUseModules.mockReturnValue({
       activeModules: [],
       availableModules: [
-        { module_type: 'hvac', name: 'HVAC', description: 'HVAC control', integrates_with: [] },
-        { module_type: 'energy', name: 'Energy', description: 'Energy management', integrates_with: [] },
-        { module_type: 'security', name: 'Security', description: 'Security', integrates_with: [] },
-        { module_type: 'lighting', name: 'Lighting', description: 'Lighting control', integrates_with: [] },
+        {
+          module_type: 'hvac',
+          name: 'HVAC',
+          version: '1.0.0',
+          description: 'HVAC control',
+          capabilities: [{ id: 'cap-1', name: 'Temperature Control', description: 'Control temperature' }],
+          integrates_with: [],
+          ai_features: ['optimization'],
+        },
+        {
+          module_type: 'energy',
+          name: 'Energy',
+          version: '1.0.0',
+          description: 'Energy management',
+          capabilities: [{ id: 'cap-2', name: 'Demand Tracking', description: 'Track demand' }],
+          integrates_with: [],
+          ai_features: ['forecasting'],
+        },
+        {
+          module_type: 'security',
+          name: 'Security',
+          version: '1.0.0',
+          description: 'Security',
+          capabilities: [{ id: 'cap-3', name: 'Access Control', description: 'Control access' }],
+          integrates_with: [],
+          ai_features: ['monitoring'],
+        },
+        {
+          module_type: 'lighting',
+          name: 'Lighting',
+          version: '1.0.0',
+          description: 'Lighting control',
+          capabilities: [{ id: 'cap-4', name: 'Brightness Control', description: 'Control brightness' }],
+          integrates_with: [],
+          ai_features: ['scheduling'],
+        },
       ] as ModuleDefinition[],
+      integrationSummary: null,
       siteId: 'test-site',
       activateModule: vi.fn(),
       deactivateModule: vi.fn(),
@@ -76,7 +152,7 @@ describe('ModuleSelector', () => {
     it('should display toggle switches for each module', () => {
       render(<ModuleSelector />);
 
-      const switches = screen.getAllByRole('checkbox');
+      const switches = screen.getAllByRole('switch');
       expect(switches.length).toBeGreaterThanOrEqual(4);
     });
 
@@ -84,6 +160,7 @@ describe('ModuleSelector', () => {
       mockUseModules.mockReturnValueOnce({
         activeModules: [],
         availableModules: [] as ModuleDefinition[],
+        integrationSummary: null,
         siteId: 'test-site',
         activateModule: vi.fn(),
         deactivateModule: vi.fn(),
@@ -94,8 +171,8 @@ describe('ModuleSelector', () => {
 
       render(<ModuleSelector />);
 
-      // Should not crash
-      expect(screen.getByText('Available Modules')).toBeInTheDocument();
+      // Should not crash - renders empty grid
+      expect(screen.queryByRole('switch')).not.toBeInTheDocument();
     });
   });
 
@@ -106,9 +183,8 @@ describe('ModuleSelector', () => {
 
       mockUseModules.mockReturnValueOnce({
         activeModules: [],
-        availableModules: [
-          { module_type: 'hvac', name: 'HVAC', description: 'HVAC control', integrates_with: [] },
-        ] as ModuleDefinition[],
+        availableModules: [createMockModule('hvac', 'HVAC', 'HVAC control')] as ModuleDefinition[],
+        integrationSummary: null,
         siteId: 'test-site',
         activateModule: mockActivate,
         deactivateModule: vi.fn(),
@@ -119,11 +195,10 @@ describe('ModuleSelector', () => {
 
       render(<ModuleSelector />);
 
-      const hvacSwitch = screen.getByRole('checkbox', { name: /hvac/i });
+      const hvacSwitch = screen.getByRole('switch', { name: /hvac/i });
       await user.click(hvacSwitch);
 
-      expect(mockActivate).toHaveBeenCalledWith('hvac', expect.any(Object));
-    });
+      expect(mockActivate).toHaveBeenCalledWith('hvac');
 
     it('should call deactivateModule when toggling module off', async () => {
       const user = userEvent.setup();
@@ -138,9 +213,8 @@ describe('ModuleSelector', () => {
             last_telemetry: new Date().toISOString(),
           },
         ] as any,
-        availableModules: [
-          { module_type: 'hvac', name: 'HVAC', description: 'HVAC control', integrates_with: [] },
-        ] as ModuleDefinition[],
+        availableModules: [createMockModule('hvac', 'HVAC', 'HVAC control')] as ModuleDefinition[],
+        integrationSummary: null,
         siteId: 'test-site',
         activateModule: vi.fn(),
         deactivateModule: mockDeactivate,
@@ -151,7 +225,7 @@ describe('ModuleSelector', () => {
 
       render(<ModuleSelector />);
 
-      const hvacSwitch = screen.getByRole('checkbox', { name: /hvac/i });
+      const hvacSwitch = screen.getByRole('switch', { name: /hvac/i });
       await user.click(hvacSwitch);
 
       expect(mockDeactivate).toHaveBeenCalledWith('hvac');
@@ -163,9 +237,8 @@ describe('ModuleSelector', () => {
 
       mockUseModules.mockReturnValueOnce({
         activeModules: [],
-        availableModules: [
-          { module_type: 'hvac', name: 'HVAC', description: 'HVAC control', integrates_with: [] },
-        ] as ModuleDefinition[],
+        availableModules: [createMockModule('hvac', 'HVAC', 'HVAC control')] as ModuleDefinition[],
+        integrationSummary: null,
         siteId: 'test-site',
         activateModule: mockActivate,
         deactivateModule: vi.fn(),
@@ -176,7 +249,7 @@ describe('ModuleSelector', () => {
 
       render(<ModuleSelector />);
 
-      const hvacSwitch = screen.getByRole('checkbox', { name: /hvac/i });
+      const hvacSwitch = screen.getByRole('switch', { name: /hvac/i });
 
       // Should not crash when activation fails
       await user.click(hvacSwitch);
@@ -197,9 +270,10 @@ describe('ModuleSelector', () => {
           },
         ] as any,
         availableModules: [
-          { module_type: 'hvac', name: 'HVAC', description: 'HVAC control', integrates_with: [] },
-          { module_type: 'energy', name: 'Energy', description: 'Energy management', integrates_with: [] },
+          createMockModule('hvac', 'HVAC', 'HVAC control'),
+          createMockModule('energy', 'Energy', 'Energy management'),
         ] as ModuleDefinition[],
+        integrationSummary: null,
         siteId: 'test-site',
         activateModule: vi.fn(),
         deactivateModule: vi.fn(),
@@ -211,12 +285,12 @@ describe('ModuleSelector', () => {
       render(<ModuleSelector />);
 
       // HVAC should show as checked/active
-      const hvacSwitch = screen.getByRole('checkbox', { name: /hvac/i });
-      expect(hvacSwitch).toBeChecked();
+      const hvacSwitch = screen.getByRole('switch', { name: /hvac/i });
+      expect(hvacSwitch).toHaveAttribute('aria-checked', 'true');
 
       // Energy should show as unchecked/inactive
-      const energySwitch = screen.getByRole('checkbox', { name: /energy/i });
-      expect(energySwitch).not.toBeChecked();
+      const energySwitch = screen.getByRole('switch', { name: /energy/i });
+      expect(energySwitch).toHaveAttribute('aria-checked', 'false');
     });
 
     it('should display health scores for active modules', () => {
@@ -229,9 +303,8 @@ describe('ModuleSelector', () => {
             last_telemetry: new Date().toISOString(),
           },
         ] as any,
-        availableModules: [
-          { module_type: 'hvac', name: 'HVAC', description: 'HVAC control', integrates_with: [] },
-        ] as ModuleDefinition[],
+        availableModules: [createMockModule('hvac', 'HVAC', 'HVAC control')] as ModuleDefinition[],
+        integrationSummary: null,
         siteId: 'test-site',
         activateModule: vi.fn(),
         deactivateModule: vi.fn(),
@@ -242,7 +315,7 @@ describe('ModuleSelector', () => {
 
       render(<ModuleSelector />);
 
-      expect(screen.getByText(/75/)).toBeInTheDocument();
+      expect(screen.getByText('75%')).toBeInTheDocument();
     });
   });
 
@@ -254,9 +327,10 @@ describe('ModuleSelector', () => {
       mockUseModules.mockReturnValueOnce({
         activeModules: [],
         availableModules: [
-          { module_type: 'hvac', name: 'HVAC', description: 'HVAC control', integrates_with: [] },
-          { module_type: 'energy', name: 'Energy', description: 'Energy management', integrates_with: [] },
+          createMockModule('hvac', 'HVAC', 'HVAC control'),
+          createMockModule('energy', 'Energy', 'Energy management'),
         ] as ModuleDefinition[],
+        integrationSummary: null,
         siteId: 'test-site',
         activateModule: mockActivate,
         deactivateModule: vi.fn(),
@@ -267,15 +341,15 @@ describe('ModuleSelector', () => {
 
       render(<ModuleSelector />);
 
-      const hvacSwitch = screen.getByRole('checkbox', { name: /hvac/i });
-      const energySwitch = screen.getByRole('checkbox', { name: /energy/i });
+      const hvacSwitch = screen.getByRole('switch', { name: /hvac/i });
+      const energySwitch = screen.getByRole('switch', { name: /energy/i });
 
       await user.click(hvacSwitch);
       await user.click(energySwitch);
 
       expect(mockActivate).toHaveBeenCalledTimes(2);
-      expect(mockActivate).toHaveBeenNthCalledWith(1, 'hvac', expect.any(Object));
-      expect(mockActivate).toHaveBeenNthCalledWith(2, 'energy', expect.any(Object));
+      expect(mockActivate).toHaveBeenNthCalledWith(1, 'hvac');
+      expect(mockActivate).toHaveBeenNthCalledWith(2, 'energy');
     });
   });
 
@@ -283,9 +357,8 @@ describe('ModuleSelector', () => {
     it('should handle missing siteId gracefully', () => {
       mockUseModules.mockReturnValueOnce({
         activeModules: [],
-        availableModules: [
-          { module_type: 'hvac', name: 'HVAC', description: 'HVAC control', integrates_with: [] },
-        ] as ModuleDefinition[],
+        availableModules: [createMockModule('hvac', 'HVAC', 'HVAC control')] as ModuleDefinition[],
+        integrationSummary: null,
         siteId: null as any,
         activateModule: vi.fn(),
         deactivateModule: vi.fn(),

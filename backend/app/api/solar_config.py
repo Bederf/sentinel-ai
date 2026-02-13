@@ -36,7 +36,6 @@ class SolarInverter(BaseModel):
     equipment_id: str = Field(
         ...,
         description="Equipment code (e.g., S002-INV-R-001)",
-        pattern=r"^S\d{3}-INV-[A-Z]-\d{3}$",
     )
     manufacturer: str = Field(..., description="Inverter manufacturer")
     model: str = Field(..., description="Inverter model")
@@ -123,11 +122,17 @@ def validate_equipment_code(code: str, expected_type: str) -> None:
     Raises:
         ValueError: If code format is invalid
     """
-    pattern = r"^S\d{3}-[A-Z]+-[A-Z]-\d{3}$"
+    # Pattern: S{3digits}-{type}-{location}-{sequence or identifier}
+    # Location: Letters and/or digits (e.g., R, B1, L2, G)
+    # Sequence/ID: Either 3 digits (e.g., 001) or text identifier (e.g., GRID)
+    if not code:
+        raise ValueError("Equipment code is required")
+    
+    pattern = r"^S\d{3}-[A-Z]+-[A-Z0-9]{1,2}-(?:\d{3}|[A-Z]+)$"
     if not re.match(pattern, code):
         raise ValueError(f"Invalid equipment code format: {code}")
 
-    if expected_type not in code:
+    if expected_type and expected_type not in code:
         raise ValueError(f"Code {code} does not match expected type {expected_type}")
 
 
@@ -165,15 +170,13 @@ def validate_solar_config(request: SolarSiteRequest) -> list[str]:
 
     Returns:
         List of validation errors (empty if valid)
-
-    Raises:
-        ValueError: If validation fails
     """
     errors = []
 
     # Validate plants exist
     if not request.config.plants:
-        raise ValueError("At least one solar plant is required")
+        errors.append("At least one solar plant is required")
+        return errors
 
     # Validate each plant
     for plant in request.config.plants:

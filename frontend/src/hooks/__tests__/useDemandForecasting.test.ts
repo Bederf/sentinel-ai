@@ -44,26 +44,15 @@ interface DemandForecastResponse {
 }
 
 // Mock the API module
-vi.mock('@/lib/api/peakDemand', () => ({
-  peakDemandApi: {
-    getDemandForecast: vi.fn(),
+vi.mock('@/lib/api/demand_forecasting', () => ({
+  demandForecastingApi: {
+    getForecast: vi.fn(),
+    getStatus: vi.fn(),
   },
 }));
 
-import { peakDemandApi } from '@/lib/api/peakDemand';
-
-// Create a mock useDemandForecasting hook for testing
-function useDemandForecasting(siteId: string | undefined) {
-  const { useQuery } = require('@tanstack/react-query');
-  return useQuery({
-    queryKey: ['demandForecasting', siteId],
-    queryFn: () => (siteId ? peakDemandApi.getDemandForecast(siteId) : null),
-    enabled: !!siteId,
-    staleTime: 60 * 1000, // 60 seconds for ML predictions
-    gcTime: 10 * 60 * 1000, // 10 minutes
-    retry: 1,
-  });
-}
+import { demandForecastingApi } from '@/lib/api/demand_forecasting';
+import { useDemandForecasting } from '../useDemandForecastingHook';
 
 // Test utilities
 function createTestQueryClient() {
@@ -166,7 +155,7 @@ describe('useDemandForecasting', () => {
   describe('Basic Forecast Fetching', () => {
     it('should fetch ML demand forecast successfully', async () => {
       const mockForecast = createMockDemandForecast();
-      vi.mocked(peakDemandApi.getDemandForecast).mockResolvedValueOnce(
+      vi.mocked(demandForecastingApi.getForecast).mockResolvedValueOnce(
         mockForecast
       );
 
@@ -189,7 +178,7 @@ describe('useDemandForecasting', () => {
 
     it('should parse hourly predictions correctly', async () => {
       const mockForecast = createMockDemandForecast();
-      vi.mocked(peakDemandApi.getDemandForecast).mockResolvedValueOnce(
+      vi.mocked(demandForecastingApi.getForecast).mockResolvedValueOnce(
         mockForecast
       );
 
@@ -219,7 +208,7 @@ describe('useDemandForecasting', () => {
 
     it('should include confidence intervals in forecast', async () => {
       const mockForecast = createMockDemandForecast();
-      vi.mocked(peakDemandApi.getDemandForecast).mockResolvedValueOnce(
+      vi.mocked(demandForecastingApi.getForecast).mockResolvedValueOnce(
         mockForecast
       );
 
@@ -249,7 +238,7 @@ describe('useDemandForecasting', () => {
     it('should identify peak demand hour correctly', async () => {
       const peakHour = 14;
       const mockForecast = createMockDemandForecast('site-002', peakHour, 5500);
-      vi.mocked(peakDemandApi.getDemandForecast).mockResolvedValueOnce(
+      vi.mocked(demandForecastingApi.getForecast).mockResolvedValueOnce(
         mockForecast
       );
 
@@ -271,7 +260,7 @@ describe('useDemandForecasting', () => {
 
     it('should include trend indicators for each hour', async () => {
       const mockForecast = createMockDemandForecast();
-      vi.mocked(peakDemandApi.getDemandForecast).mockResolvedValueOnce(
+      vi.mocked(demandForecastingApi.getForecast).mockResolvedValueOnce(
         mockForecast
       );
 
@@ -298,7 +287,7 @@ describe('useDemandForecasting', () => {
   describe('Load Shedding Suggestions', () => {
     it('should suggest load shedding for critical risk hours', async () => {
       const mockForecast = createMockDemandForecast('site-002', 14, 5800); // High demand
-      vi.mocked(peakDemandApi.getDemandForecast).mockResolvedValueOnce(
+      vi.mocked(demandForecastingApi.getForecast).mockResolvedValueOnce(
         mockForecast
       );
 
@@ -336,7 +325,7 @@ describe('useDemandForecasting', () => {
           })),
         }
       );
-      vi.mocked(peakDemandApi.getDemandForecast).mockResolvedValueOnce(
+      vi.mocked(demandForecastingApi.getForecast).mockResolvedValueOnce(
         mockForecast
       );
 
@@ -364,7 +353,7 @@ describe('useDemandForecasting', () => {
   describe('ML Model Unavailable State', () => {
     it('should handle model unavailable gracefully', async () => {
       const error = new Error('ML model not available');
-      vi.mocked(peakDemandApi.getDemandForecast).mockRejectedValueOnce(error);
+      vi.mocked(demandForecastingApi.getForecast).mockRejectedValueOnce(error);
 
       const { result } = renderHook(
         () => useDemandForecasting('site-002'),
@@ -383,7 +372,7 @@ describe('useDemandForecasting', () => {
 
     it('should fallback to conservative estimates when unavailable', async () => {
       // First call fails
-      vi.mocked(peakDemandApi.getDemandForecast)
+      vi.mocked(demandForecastingApi.getForecast)
         .mockRejectedValueOnce(new Error('ML unavailable'))
         .mockResolvedValueOnce(createMockDemandForecast()); // Second call succeeds
 
@@ -414,7 +403,7 @@ describe('useDemandForecasting', () => {
       const forecast1 = createMockDemandForecast('site-001');
       const forecast2 = createMockDemandForecast('site-002');
 
-      vi.mocked(peakDemandApi.getDemandForecast)
+      vi.mocked(demandForecastingApi.getForecast)
         .mockResolvedValueOnce(forecast1)
         .mockResolvedValueOnce(forecast2);
 
@@ -431,7 +420,7 @@ describe('useDemandForecasting', () => {
       });
 
       expect(result.current.data?.site_id).toBe('site-001');
-      expect(vi.mocked(peakDemandApi.getDemandForecast)).toHaveBeenCalledTimes(
+      expect(vi.mocked(demandForecastingApi.getForecast)).toHaveBeenCalledTimes(
         1
       );
 
@@ -442,14 +431,14 @@ describe('useDemandForecasting', () => {
         expect(result.current.data?.site_id).toBe('site-002');
       });
 
-      expect(vi.mocked(peakDemandApi.getDemandForecast)).toHaveBeenCalledTimes(
+      expect(vi.mocked(demandForecastingApi.getForecast)).toHaveBeenCalledTimes(
         2
       );
     });
 
     it('should use cache within stale time (60s)', async () => {
       const mockForecast = createMockDemandForecast();
-      vi.mocked(peakDemandApi.getDemandForecast).mockResolvedValueOnce(
+      vi.mocked(demandForecastingApi.getForecast).mockResolvedValueOnce(
         mockForecast
       );
 
@@ -474,7 +463,7 @@ describe('useDemandForecasting', () => {
       );
 
       expect(result2.current.data).toEqual(mockForecast);
-      expect(vi.mocked(peakDemandApi.getDemandForecast)).toHaveBeenCalledTimes(
+      expect(vi.mocked(demandForecastingApi.getForecast)).toHaveBeenCalledTimes(
         1
       ); // Only called once due to cache
     });
@@ -487,7 +476,7 @@ describe('useDemandForecasting', () => {
         5200 // Different demand
       );
 
-      vi.mocked(peakDemandApi.getDemandForecast)
+      vi.mocked(demandForecastingApi.getForecast)
         .mockResolvedValueOnce(forecast1)
         .mockResolvedValueOnce(forecast2);
 
@@ -516,7 +505,7 @@ describe('useDemandForecasting', () => {
   describe('Error Handling', () => {
     it('should handle network errors', async () => {
       const error = new Error('Network error');
-      vi.mocked(peakDemandApi.getDemandForecast).mockRejectedValueOnce(error);
+      vi.mocked(demandForecastingApi.getForecast).mockRejectedValueOnce(error);
 
       const { result } = renderHook(
         () => useDemandForecasting('site-002'),
@@ -542,12 +531,12 @@ describe('useDemandForecasting', () => {
 
       expect(result.current.isLoading).toBe(false);
       expect(result.current.data).toBeUndefined();
-      expect(vi.mocked(peakDemandApi.getDemandForecast)).not.toHaveBeenCalled();
+      expect(vi.mocked(demandForecastingApi.getForecast)).not.toHaveBeenCalled();
     });
 
     it('should handle invalid site ID gracefully', async () => {
       const error = new Error('Site not found');
-      vi.mocked(peakDemandApi.getDemandForecast).mockRejectedValueOnce(error);
+      vi.mocked(demandForecastingApi.getForecast).mockRejectedValueOnce(error);
 
       const { result } = renderHook(
         () => useDemandForecasting('invalid-site'),
@@ -568,7 +557,7 @@ describe('useDemandForecasting', () => {
     it('should handle empty forecast (24 hours of data missing)', async () => {
       const mockForecast = createMockDemandForecast();
       mockForecast.forecast_hours = [];
-      vi.mocked(peakDemandApi.getDemandForecast).mockResolvedValueOnce(
+      vi.mocked(demandForecastingApi.getForecast).mockResolvedValueOnce(
         mockForecast
       );
 
@@ -588,7 +577,7 @@ describe('useDemandForecasting', () => {
 
     it('should validate confidence intervals are properly ordered', async () => {
       const mockForecast = createMockDemandForecast();
-      vi.mocked(peakDemandApi.getDemandForecast).mockResolvedValueOnce(
+      vi.mocked(demandForecastingApi.getForecast).mockResolvedValueOnce(
         mockForecast
       );
 
@@ -616,7 +605,7 @@ describe('useDemandForecasting', () => {
 
     it('should handle peak demand hour at edge of day (hour 23)', async () => {
       const mockForecast = createMockDemandForecast('site-002', 23, 5500);
-      vi.mocked(peakDemandApi.getDemandForecast).mockResolvedValueOnce(
+      vi.mocked(demandForecastingApi.getForecast).mockResolvedValueOnce(
         mockForecast
       );
 
@@ -636,7 +625,7 @@ describe('useDemandForecasting', () => {
 
     it('should calculate headroom percent correctly', async () => {
       const mockForecast = createMockDemandForecast();
-      vi.mocked(peakDemandApi.getDemandForecast).mockResolvedValueOnce(
+      vi.mocked(demandForecastingApi.getForecast).mockResolvedValueOnce(
         mockForecast
       );
 

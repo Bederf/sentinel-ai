@@ -27,9 +27,13 @@ import {
   AlertCircle,
   CheckCircle,
   Clock,
+  Link as LinkIcon,
+  Server,
   TrendingUp,
   TrendingDown,
 } from 'lucide-react';
+import type { IntegrationHealthSummary } from '@/lib/api';
+import { monitoringApi } from '@/lib/api';
 import { authorizedFetch } from '../lib/api/client';
 import { PageLoading } from './PageLoading';
 
@@ -52,6 +56,7 @@ export default function SystemHealthPage() {
   const [selectedTab, setSelectedTab] = useState(0);
   const [currentHealth, setCurrentHealth] = useState<any>(null);
   const [history, setHistory] = useState<any>(null);
+  const [integrationHealth, setIntegrationHealth] = useState<IntegrationHealthSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -67,17 +72,20 @@ export default function SystemHealthPage() {
       setLoading(true);
       setError(null);
 
-      // Fetch current health with authentication
-      const healthRes = await authorizedFetch('/api/system/health');
+      const [healthRes, historyRes, integration] = await Promise.all([
+        authorizedFetch('/api/system/health'),
+        authorizedFetch('/api/system/health/history?range=24h'),
+        monitoringApi.getIntegrationHealth(),
+      ]);
+
       if (!healthRes.ok) throw new Error('Failed to fetch health');
       const health = await healthRes.json();
       setCurrentHealth(health);
 
-      // Fetch history with authentication
-      const historyRes = await authorizedFetch('/api/system/health/history?range=24h');
       if (!historyRes.ok) throw new Error('Failed to fetch history');
       const hist = await historyRes.json();
       setHistory(hist);
+      setIntegrationHealth(integration);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
       console.error('Health data load error:', err);
@@ -110,6 +118,19 @@ export default function SystemHealthPage() {
       default:
         return <Clock className="w-5 h-5 text-gray-500" />;
     }
+  };
+
+  const formatRelativeTime = (dateStr: string | null) => {
+    if (!dateStr) return 'No sync recorded';
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return 'Unknown';
+    const diffMs = Date.now() - date.getTime();
+    const diffMinutes = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMinutes / 60);
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffMinutes < 60) return `${diffMinutes}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    return `${diffDays}d ago`;
   };
 
   if (loading && !currentHealth) {
@@ -170,6 +191,49 @@ export default function SystemHealthPage() {
                     color={getStatusColor(currentHealth.overall_status)}
                     className="mt-4"
                   />
+                </Card>
+
+                {/* Integration Status */}
+                <Card>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <Text>Integration Status</Text>
+                      <div className="mt-2 flex items-center gap-2">
+                        <Badge color={integrationHealth?.active_sources ? 'green' : 'yellow'}>
+                          {integrationHealth?.active_sources || 0} active source(s)
+                        </Badge>
+                        <Text>
+                          Last sync: {formatRelativeTime(integrationHealth?.last_sync || null)}
+                        </Text>
+                      </div>
+                    </div>
+                    <Server className="w-5 h-5 text-blue-500" />
+                  </div>
+                  <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div>
+                      <Text>Sources</Text>
+                      <Metric>{integrationHealth?.sources_count || 0}</Metric>
+                    </div>
+                    <div>
+                      <Text>Records</Text>
+                      <Metric>{integrationHealth?.total_records_ingested || 0}</Metric>
+                    </div>
+                    <div>
+                      <Text>Mapped Points</Text>
+                      <Metric>{integrationHealth?.total_points_mapped || 0}</Metric>
+                    </div>
+                    <div>
+                      <Text>Unmatched</Text>
+                      <Metric>{integrationHealth?.unmatched_points || 0}</Metric>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <LinkIcon className="w-4 h-4 text-amber-500" />
+                      <Text>Active alerts: {integrationHealth?.alerts?.length || 0}</Text>
+                    </div>
+                    <Text>Recent errors: {integrationHealth?.recent_errors_count || 0}</Text>
+                  </div>
                 </Card>
 
                 {/* Component Status Grid */}

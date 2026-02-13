@@ -122,7 +122,10 @@ export const solarConfigApi = {
  * @returns True if code format is valid
  */
 export function isValidEquipmentCode(code: string): boolean {
-  const pattern = /^S\d{3}-[A-Z]+-[A-Z]-\d{3}$/;
+  // Pattern: S{3digits}-{type}-{location}-{sequence or identifier}
+  // Location: Letters and/or digits (e.g., R, B1, L2, G)
+  // Sequence/ID: Either 3 digits (e.g., 001) or text identifier (e.g., GRID)
+  const pattern = /^S\d{3}-[A-Z]+-[A-Z0-9]{1,2}-(?:\d{3}|[A-Z]+)$/;
   return pattern.test(code);
 }
 

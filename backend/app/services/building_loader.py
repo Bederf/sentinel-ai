@@ -264,25 +264,29 @@ class BuildingDataLoader:
         return all_desks
 
     def get_zones(self, building_id: str) -> List[dict]:
-        """Get HVAC zones for a building.
+        """Get zones for a building (from zones table, not hvac_zones).
 
         Tries Supabase first, then falls back to JSON files.
+        Uses ZoneRepository for the modern zones table which has multi-site support.
         """
         self.load()
 
         # Try Supabase first
         if _is_supabase_available():
             try:
-                from app.database.repositories import HVACZoneRepository
-                repo = HVACZoneRepository()
-                supabase_zones = repo.get_by_building_code(building_id)
+                from app.database.repositories import ZoneRepository
+                repo = ZoneRepository()
+                supabase_zones = repo.get_by_building(
+                    # Get building UUID from building code
+                    self._get_building_uuid(building_id)
+                )
                 if supabase_zones:
                     # Add building name to each zone
                     building = self._buildings.get(building_id)
                     if building:
                         for zone in supabase_zones:
                             zone["building"] = building.name
-                    logger.debug(f"Loaded {len(supabase_zones)} zones from Supabase for {building_id}")
+                    logger.debug(f"Loaded {len(supabase_zones)} zones from Supabase zones table for {building_id}")
                     return supabase_zones
             except Exception as e:
                 logger.debug(f"Supabase zone query failed, using JSON: {e}")
@@ -294,6 +298,28 @@ class BuildingDataLoader:
             for zone in zones:
                 zone["building"] = building.name
         return zones
+
+    def _get_building_uuid(self, building_id: str) -> Optional[str]:
+        """Get building UUID from building ID using Supabase.
+
+        Args:
+            building_id: Building code (e.g., 'sandton')
+
+        Returns:
+            Building UUID or None
+        """
+        if not _is_supabase_available():
+            return None
+
+        try:
+            from app.database.supabase_client import get_supabase_client
+            client = get_supabase_client()
+            response = client.table("buildings").select("id").eq("code", building_id).execute()
+            if response.data:
+                return response.data[0]["id"]
+        except Exception as e:
+            logger.debug(f"Failed to get building UUID for {building_id}: {e}")
+        return None
 
     def get_all_zones(self) -> List[dict]:
         """Get all zones across all active buildings."""

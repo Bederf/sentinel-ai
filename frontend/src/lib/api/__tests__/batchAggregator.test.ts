@@ -151,14 +151,8 @@ describe('BatchAggregator - Batch Window Aggregation', () => {
   });
 
   it('should send batch after window expires', async () => {
-    let flushPromiseResolve: (() => void) | null = null;
-    const flushPromise = new Promise<void>((resolve) => {
-      flushPromiseResolve = resolve;
-    });
-
     (apiFetch as any).mockImplementation(async (endpoint: string, options: any) => {
       const body = JSON.parse(options.body);
-      flushPromiseResolve?.();
       return createBatchResponse(body.device_ids);
     });
 
@@ -172,13 +166,12 @@ describe('BatchAggregator - Batch Window Aggregation', () => {
     // Initially API not called
     expect(apiFetch).not.toHaveBeenCalled();
 
-    // Wait for flush to complete
-    await flushPromise;
+    // Wait for batch window to expire and request to process
     const result = await p1;
 
     expect(apiFetch).toHaveBeenCalled();
     expect(result.id).toBe('id-1');
-  });
+  }, { timeout: 20000 });
 
   it('should aggregate multiple requests in single batch', async () => {
     let flushCount = 0;

@@ -19,6 +19,22 @@ const DEFAULT_RATE_LIMIT_COOLDOWN_MS = 30000;
 const DEFAULT_GET_CACHE_TTL_MS = 30000;
 const SITES_CACHE_KEY = "sentinel_cached_sites";
 
+// Re-export solar configuration API/types for legacy imports.
+export type {
+  SolarPlant,
+  SolarInverter,
+  BESSConfig,
+  GridMeterConfig,
+  SolarConfig,
+  SolarSiteRequest,
+} from "./api/solar_config";
+export {
+  solarConfigApi,
+  isValidEquipmentCode,
+  calculateInverterCoverage,
+  suggestEquipmentId,
+} from "./api/solar_config";
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }

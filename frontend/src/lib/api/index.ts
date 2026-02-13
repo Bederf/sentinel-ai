@@ -74,12 +74,19 @@ export {
 } from './approvals';
 export {
   peakDemandApi,
-  type DemandStatusResponse,
   type DemandForecastResponse,
-  type MultiModuleRecommendation,
-  type ModuleAction,
-  type DemandSummary,
+  type DemandStatus,
+  type PeakDemandRecommendation,
+  type ForecastInterval,
 } from './peakDemand';
+export {
+  modulesApi,
+  type IntegrationHealthStatus,
+  type IntegrationStatusResponse,
+  type ModuleDefinition,
+  type ModuleActivationRequest,
+  type ModuleActivationResponse,
+} from './modules';
 export {
   zoneIngestionApi,
   type ZoneConfig,

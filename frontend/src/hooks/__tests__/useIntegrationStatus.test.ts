@@ -31,29 +31,11 @@ interface IntegrationStatusResponse {
   last_updated: string;
 }
 
-// Mock the integration API module
-vi.mock('../../lib/api/modules', () => ({
-  modulesApi: {
-    getIntegrationStatus: vi.fn(),
-  },
-}));
+// Mock global fetch
+vi.stubGlobal('fetch', vi.fn());
 
-// Create a mock hook for testing
-function useIntegrationStatus(siteId: string | undefined) {
-  const { useQuery } = require('@tanstack/react-query');
-  const { modulesApi } = require('../../lib/api/modules');
-
-  return useQuery<IntegrationStatusResponse, Error>({
-    queryKey: ['integration', 'status', siteId],
-    queryFn: () => modulesApi.getIntegrationStatus(siteId!),
-    enabled: !!siteId,
-    staleTime: 30 * 1000,
-    gcTime: 5 * 60 * 1000,
-    retry: 1,
-  });
-}
-
-import { modulesApi } from '../../lib/api/modules';
+// Import the real hook
+import { useIntegrationStatus } from '../useIntegrationStatus';
 
 // Test utilities
 function createTestQueryClient() {
@@ -70,6 +52,15 @@ function createTestQueryClient() {
 function createWrapper(queryClient: QueryClient) {
   return ({ children }: { children: ReactNode }) =>
     React.createElement(QueryClientProvider, { client: queryClient }, children);
+}
+
+// Mock fetch helper
+function mockFetchResponse(data: any) {
+  const fetchMock = vi.mocked(global.fetch as any);
+  fetchMock.mockResolvedValueOnce({
+    ok: true,
+    json: async () => data,
+  } as Response);
 }
 
 // Mock data factories
@@ -116,7 +107,7 @@ describe('useIntegrationStatus', () => {
   describe('Successful Data Fetching', () => {
     it('should fetch integration status successfully', async () => {
       const mockData = createMockIntegrationStatusResponse();
-      vi.mocked(modulesApi.getIntegrationStatus).mockResolvedValueOnce(mockData);
+      mockFetchResponse(mockData);
 
       const { result } = renderHook(() => useIntegrationStatus('site-002'), {
         wrapper: createWrapper(queryClient),
@@ -151,7 +142,7 @@ describe('useIntegrationStatus', () => {
           }),
         ],
       });
-      vi.mocked(modulesApi.getIntegrationStatus).mockResolvedValueOnce(mockData);
+      mockFetchResponse(mockData);
 
       const { result } = renderHook(() => useIntegrationStatus('site-002'), {
         wrapper: createWrapper(queryClient),
@@ -172,7 +163,7 @@ describe('useIntegrationStatus', () => {
       const mockData = createMockIntegrationStatusResponse({
         active_modules: ['solar', 'hvac', 'energy', 'security'],
       });
-      vi.mocked(modulesApi.getIntegrationStatus).mockResolvedValueOnce(mockData);
+      mockFetchResponse(mockData);
 
       const { result } = renderHook(() => useIntegrationStatus('site-002'), {
         wrapper: createWrapper(queryClient),
@@ -189,7 +180,7 @@ describe('useIntegrationStatus', () => {
       const mockData = createMockIntegrationStatusResponse({
         coordinator_active: true,
       });
-      vi.mocked(modulesApi.getIntegrationStatus).mockResolvedValueOnce(mockData);
+      mockFetchResponse(mockData);
 
       const { result } = renderHook(() => useIntegrationStatus('site-002'), {
         wrapper: createWrapper(queryClient),
@@ -207,7 +198,7 @@ describe('useIntegrationStatus', () => {
         coordinator_active: false,
         active_modules: [],
       });
-      vi.mocked(modulesApi.getIntegrationStatus).mockResolvedValueOnce(mockData);
+      mockFetchResponse(mockData);
 
       const { result } = renderHook(() => useIntegrationStatus('site-002'), {
         wrapper: createWrapper(queryClient),
@@ -233,7 +224,7 @@ describe('useIntegrationStatus', () => {
           }),
         ],
       });
-      vi.mocked(modulesApi.getIntegrationStatus).mockResolvedValueOnce(mockData);
+      mockFetchResponse(mockData);
 
       const { result } = renderHook(() => useIntegrationStatus('site-002'), {
         wrapper: createWrapper(queryClient),
@@ -263,7 +254,7 @@ describe('useIntegrationStatus', () => {
           }),
         ],
       });
-      vi.mocked(modulesApi.getIntegrationStatus).mockResolvedValueOnce(mockData);
+      mockFetchResponse(mockData);
 
       const { result } = renderHook(() => useIntegrationStatus('site-002'), {
         wrapper: createWrapper(queryClient),
@@ -288,7 +279,7 @@ describe('useIntegrationStatus', () => {
           }),
         ],
       });
-      vi.mocked(modulesApi.getIntegrationStatus).mockResolvedValueOnce(mockData);
+      mockFetchResponse(mockData);
 
       const { result } = renderHook(() => useIntegrationStatus('site-002'), {
         wrapper: createWrapper(queryClient),
@@ -305,7 +296,7 @@ describe('useIntegrationStatus', () => {
   describe('Caching Behavior', () => {
     it('should respect 30s staleTime', async () => {
       const mockData = createMockIntegrationStatusResponse();
-      vi.mocked(modulesApi.getIntegrationStatus).mockResolvedValueOnce(mockData);
+      mockFetchResponse(mockData);
 
       const { result } = renderHook(() => useIntegrationStatus('site-002'), {
         wrapper: createWrapper(queryClient),
@@ -317,13 +308,13 @@ describe('useIntegrationStatus', () => {
 
       // Verify query was cached
       const queries = queryClient.getQueryCache().getAll();
-      const query = queries.find((q) => q.queryKey[0] === 'integration');
+      const query = queries.find((q) => q.queryKey[0] === 'integrations');
       expect(query).toBeDefined();
     });
 
     it('should reuse cache for duplicate requests', async () => {
       const mockData = createMockIntegrationStatusResponse();
-      vi.mocked(modulesApi.getIntegrationStatus).mockResolvedValueOnce(mockData);
+      mockFetchResponse(mockData);
 
       // First render
       const { result: result1 } = renderHook(() => useIntegrationStatus('site-002'), {
@@ -340,14 +331,17 @@ describe('useIntegrationStatus', () => {
       });
 
       expect(result2.current.data).toEqual(mockData);
-      expect(vi.mocked(modulesApi.getIntegrationStatus)).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(global.fetch as any)).toHaveBeenCalledTimes(1);
     });
   });
 
   describe('Error Handling', () => {
     it('should handle network errors', async () => {
-      const error = new Error('Network error');
-      vi.mocked(modulesApi.getIntegrationStatus).mockRejectedValueOnce(error);
+      const fetchMock = vi.mocked(global.fetch as any);
+      fetchMock.mockResolvedValueOnce({
+        ok: false,
+        statusText: 'Network error',
+      } as Response);
 
       const { result } = renderHook(() => useIntegrationStatus('site-002'), {
         wrapper: createWrapper(queryClient),
@@ -367,14 +361,14 @@ describe('useIntegrationStatus', () => {
 
       expect(result.current.isLoading).toBe(false);
       expect(result.current.data).toBeUndefined();
-      expect(vi.mocked(modulesApi.getIntegrationStatus)).not.toHaveBeenCalled();
+      expect(vi.mocked(global.fetch as any)).not.toHaveBeenCalled();
     });
 
     it('should handle empty integrations list', async () => {
       const mockData = createMockIntegrationStatusResponse({
         integrations: [],
       });
-      vi.mocked(modulesApi.getIntegrationStatus).mockResolvedValueOnce(mockData);
+      mockFetchResponse(mockData);
 
       const { result } = renderHook(() => useIntegrationStatus('site-002'), {
         wrapper: createWrapper(queryClient),
