@@ -497,7 +497,7 @@ async def get_dashboard_equipment(
 
             # Get baseline summary
             try:
-                baseline_summary = await baseline_repo.get_baseline_summary(eq_uuid) if eq_uuid else {}
+                baseline_summary = baseline_repo.get_baseline_summary(eq_uuid) if eq_uuid else {}
             except Exception:
                 baseline_summary = {}
 
@@ -506,21 +506,21 @@ async def get_dashboard_equipment(
 
             # Get recent inspections
             try:
-                recent_tasks = await inspection_repo.get_tasks_by_equipment(eq_uuid, limit=1) if eq_uuid else []
+                recent_tasks = inspection_repo.get_tasks_by_equipment(eq_uuid, limit=1) if eq_uuid else []
             except Exception:
                 recent_tasks = []
 
-            has_pending_inspection = any(t.status in ("scheduled", "in_progress") for t in recent_tasks)
+            has_pending_inspection = any(t.get("status") in ("scheduled", "in_progress") for t in recent_tasks)
             last_inspection = recent_tasks[0] if recent_tasks else None
 
             inspection_status = {
-                "last_inspection": last_inspection.scheduled_date if last_inspection else None,
-                "status": last_inspection.status if last_inspection else "none",
-                "findings": last_inspection.completion_notes if last_inspection else ""
+                "last_inspection": last_inspection.get("scheduled_date") if last_inspection else None,
+                "status": last_inspection.get("status") if last_inspection else "none",
+                "findings": last_inspection.get("completion_notes") if last_inspection else ""
             }
 
             # Get active work orders
-            work_orders = await work_order_repo.get_work_orders_for_equipment(
+            work_orders = work_order_repo.get_work_orders_for_equipment(
                 eq_uuid, status="in_progress", limit=5
             ) if eq_uuid else []
             has_active_work_order = len(work_orders) > 0
@@ -569,7 +569,7 @@ async def get_dashboard_equipment(
                 state_history.append({
                     "from": "anomaly_detected" if has_active_prediction else "monitoring",
                     "to": "inspection_pending",
-                    "timestamp": last_inspection.created_at,
+                    "timestamp": last_inspection.get("created_at", ""),
                     "trigger": "automated_task"
                 })
 

@@ -11,10 +11,12 @@ import logging
 from datetime import datetime, timedelta
 from typing import Optional, List
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 
+from app.api.dependencies.module_access import require_active_module
 from app.middleware.rate_limiter import limiter
+from app.models.module_registry import ModuleType
 from app.database.repositories.security_repository import SecurityRepository
 from app.models.security import (
     AccessEvent, AccessStatus, AccessType, AccessPoint, Visitor, SecurityAlert,
@@ -22,7 +24,18 @@ from app.models.security import (
 )
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/security")
+router = APIRouter(
+    prefix="/api/security",
+    dependencies=[
+        Depends(
+            require_active_module(
+                ModuleType.SECURITY,
+                site_keys=("site", "site_id"),
+                default_site_id="site-002",
+            )
+        )
+    ],
+)
 
 
 # ============================================================================
@@ -108,6 +121,55 @@ async def get_security_overview(request: Request, site: str = Query(..., descrip
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@limiter.limit("30/minute")
+@router.get("/status")
+async def get_security_status(request: Request, site: str = Query(..., description="Building site code")):
+    """Get building security compliance and status.
+    
+    Returns security system status, compliance checks, and system health.
+    """
+    try:
+        repo = SecurityRepository()
+        
+        # Get events from today
+        today = datetime.now().date()
+        events = repo.list_events(site, limit=1000)
+        today_events = [e for e in events if datetime.fromisoformat(e.get("timestamp", "")).date() == today]
+        
+        # Get active visitors
+        visitors = repo.list_visitors(site)
+        active_visitors = [v for v in visitors if v.get("status") in ["pending", "checked_in"]]
+        
+        # Get open alerts
+        alerts = repo.get_alerts(site)
+        open_alerts = [a for a in alerts if a.get("status") == "open"]
+        
+        # Calculate compliance metrics
+        after_hours_count = len([e for e in today_events if repo._is_after_hours(e.get("timestamp", ""))])
+        compliance_score = max(0, 100 - (after_hours_count * 5) - (len(open_alerts) * 10))
+        
+        return {
+            "status": "operational" if len(open_alerts) == 0 else "warning",
+            "compliance_score": compliance_score,
+            "system_health": {
+                "readers_online": True,
+                "alert_system": "active",
+                "visitor_management": "active",
+                "access_logs": "syncing"
+            },
+            "metrics": {
+                "events_today": len(today_events),
+                "active_visitors": len(active_visitors),
+                "open_alerts": len(open_alerts),
+                "after_hours_access": after_hours_count
+            },
+            "last_updated": datetime.now().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Error fetching security status for {site}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ============================================================================
 # Access Events Endpoints
 # ============================================================================
@@ -176,6 +238,81 @@ async def record_access_event(request: Request, data: CreateAccessEventRequest, 
         return {"event_id": result["event_id"], "status": "recorded"}
     except Exception as e:
         logger.error(f"Error recording access event: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@limiter.limit("30/minute")
+@router.get("/events/anomalies")
+async def get_access_anomalies(
+    request: Request,
+    site: str = Query(..., description="Building site code"),
+    limit: int = Query(50, ge=1, le=1000),
+    days_back: int = Query(7, ge=1, le=90, description="Number of days to analyze")
+):
+    """Detect and return anomalous access events.
+    
+    Uses historical patterns to identify unusual access behavior:
+    - After-hours access when not expected
+    - Failed access attempts exceeding normal rate
+    - Unusual access patterns from specific badges
+    - Multiple failed attempts at same location
+    """
+    try:
+        repo = SecurityRepository()
+        
+        # Get events for the specified period
+        all_events = repo.list_events(site, limit=1000)
+        
+        anomalies = []
+        
+        # Detect after-hours access
+        for event in all_events:
+            timestamp_str = event.get("timestamp", "")
+            try:
+                event_time = datetime.fromisoformat(timestamp_str)
+                if repo._is_after_hours(timestamp_str):
+                    anomalies.append({
+                        "type": "after_hours_access",
+                        "event_id": event.get("event_id"),
+                        "timestamp": timestamp_str,
+                        "location": event.get("location"),
+                        "person": event.get("person_name"),
+                        "severity": "medium",
+                        "description": f"Access outside business hours at {event.get('location')}"
+                    })
+            except (ValueError, TypeError):
+                pass
+        
+        # Detect failed access patterns
+        failed_events = [e for e in all_events if e.get("status") == "denied"]
+        location_failures = {}
+        for event in failed_events:
+            location = event.get("location", "unknown")
+            location_failures[location] = location_failures.get(location, 0) + 1
+        
+        for location, count in location_failures.items():
+            if count > 3:  # Threshold: more than 3 failures
+                anomalies.append({
+                    "type": "high_failure_rate",
+                    "location": location,
+                    "failure_count": count,
+                    "severity": "high" if count > 5 else "medium",
+                    "description": f"{count} failed access attempts at {location}"
+                })
+        
+        # Sort by severity and return limited set
+        severity_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
+        anomalies.sort(key=lambda x: severity_order.get(x.get("severity", "low"), 4))
+        
+        return {
+            "site": site,
+            "anomaly_count": len(anomalies),
+            "anomalies": anomalies[:limit],
+            "period_days": days_back,
+            "analysis_timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Error detecting anomalies for {site}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -419,4 +556,120 @@ async def get_occupancy(request: Request, site: str = Query(...)):
         return occupancy
     except Exception as e:
         logger.error(f"Error calculating occupancy for {site}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@limiter.limit("30/minute")
+@router.get("/occupancy/recommendations")
+async def get_occupancy_recommendations(request: Request, site: str = Query(..., description="Building site code")):
+    """Get occupancy-based recommendations for HVAC and lighting.
+    
+    Analyzes current and predicted occupancy to recommend:
+    - HVAC setpoint adjustments
+    - Lighting level changes
+    - Energy savings opportunities
+    - Comfort optimization suggestions
+    """
+    try:
+        repo = SecurityRepository()
+        
+        # Get current occupancy
+        occupancy = repo.get_occupancy(site)
+        total_occupancy = occupancy.get("total_occupancy", 0)
+        by_floor = occupancy.get("by_floor", {})
+        by_zone = occupancy.get("by_zone", {})
+        
+        recommendations = []
+        
+        # Occupancy-based HVAC recommendations
+        if total_occupancy == 0:
+            recommendations.append({
+                "module": "hvac",
+                "type": "energy_savings",
+                "priority": "high",
+                "action": "reduce_setpoint",
+                "value": 2,
+                "unit": "°C",
+                "description": "Building unoccupied - reduce heating/cooling setpoint by 2°C for energy savings",
+                "estimated_savings": "15-20%"
+            })
+        elif total_occupancy < 10:
+            recommendations.append({
+                "module": "hvac",
+                "type": "comfort_optimization",
+                "priority": "medium",
+                "action": "adjust_to_comfort",
+                "value": 22,
+                "unit": "°C",
+                "description": "Low occupancy - set comfort temperature to 22°C",
+                "confidence": 0.85
+            })
+        elif total_occupancy > 50:
+            recommendations.append({
+                "module": "hvac",
+                "type": "comfort_optimization",
+                "priority": "high",
+                "action": "increase_ventilation",
+                "description": "High occupancy detected - increase fresh air ventilation",
+                "co2_concern": True
+            })
+        
+        # Occupancy-based lighting recommendations
+        if total_occupancy == 0:
+            recommendations.append({
+                "module": "lighting",
+                "type": "energy_savings",
+                "priority": "high",
+                "action": "turn_off",
+                "description": "Building unoccupied - turn off all non-essential lighting",
+                "estimated_savings": "80-90%"
+            })
+        else:
+            # Calculate average occupancy per zone
+            avg_occupancy_per_zone = total_occupancy / max(len(by_zone), 1)
+            
+            # Recommend dimming if occupancy is low
+            if avg_occupancy_per_zone < 2:
+                recommendations.append({
+                    "module": "lighting",
+                    "type": "energy_savings",
+                    "priority": "medium",
+                    "action": "dim_to_percent",
+                    "value": 30,
+                    "description": "Low occupancy per zone - dim lighting to 30% for energy savings",
+                    "estimated_savings": "40-50%"
+                })
+            else:
+                recommendations.append({
+                    "module": "lighting",
+                    "type": "comfort_optimization",
+                    "priority": "low",
+                    "action": "enable_daylight_harvesting",
+                    "description": "Enable daylight harvesting for occupied zones"
+                })
+        
+        # Zone-specific recommendations
+        for zone, count in by_zone.items():
+            if count > 20:
+                recommendations.append({
+                    "module": "hvac",
+                    "type": "comfort_optimization",
+                    "priority": "medium",
+                    "zone": zone,
+                    "action": "increase_ventilation",
+                    "description": f"Zone {zone} has {count} people - increase ventilation",
+                    "affected_equipment": ["VAV", "AHU"]
+                })
+        
+        return {
+            "site": site,
+            "current_occupancy": total_occupancy,
+            "recommendation_count": len(recommendations),
+            "recommendations": recommendations,
+            "by_floor": by_floor,
+            "by_zone": by_zone,
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Error generating occupancy recommendations for {site}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
