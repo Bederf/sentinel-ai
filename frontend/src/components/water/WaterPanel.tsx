@@ -1,12 +1,13 @@
 /**
  * WaterPanel - Water Consumption Dashboard
  *
- * Displays real-time water monitoring with:
- * - KPI cards: Current flow, today's volume, monthly volume
- * - Consumption trend chart (LineChart - last 7 days)
- * - Daily comparison chart (BarChart - this week vs last week)
- * - Active leak alerts with severity color coding
- * - Alert resolution functionality
+ * Integrated water monitoring with:
+ * - Quick stats: Current flow, today's volume, monthly cost, efficiency
+ * - 4 main tabs:
+ *   - Overview: Anomaly chart + real-time alerts
+ *   - Zones: Zone breakdown by consumption/cost
+ *   - Costs: Cost tracking, forecasting, scenario analysis
+ *   - Alerts: Real-time alert feed with work order integration
  * - Site selector for multi-site support
  */
 
@@ -19,8 +20,13 @@ import {
   Flex,
   Button,
   Badge,
+  Tab,
+  TabGroup,
+  TabList,
+  TabPanels,
+  TabPanel,
 } from "@tremor/react";
-import { Droplets, Building2, ChevronDown, AlertTriangle, CheckCircle, XCircle } from "lucide-react";
+import { Droplets, Building2, ChevronDown, AlertTriangle, CheckCircle } from "lucide-react";
 import { waterApi } from "../../lib/waterApi";
 import type {
   WaterAlert,
@@ -28,6 +34,10 @@ import type {
   WaterTrending,
   CurrentFlowResponse,
 } from "../../lib/waterApi";
+import { WaterZoneBreakdown } from "./WaterZoneBreakdown";
+import { WaterCostAnalysis } from "./WaterCostAnalysis";
+import { WaterAnomalyChart } from "./WaterAnomalyChart";
+import { WaterAlertPanel } from "./WaterAlertPanel";
 
 interface WaterPanelProps {
   siteId?: string;
@@ -35,6 +45,7 @@ interface WaterPanelProps {
 
 export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
   const [selectedSiteId, setSelectedSiteId] = useState<string>(propSiteId || "site-002");
+  const [activeTabIndex, setActiveTabIndex] = useState<number>(0);
   const [currentFlow, setCurrentFlow] = useState<CurrentFlowResponse | null>(null);
   const [consumptionData, setConsumptionData] = useState<WaterConsumption[]>([]);
   const [alerts, setAlerts] = useState<WaterAlert[]>([]);
@@ -270,167 +281,95 @@ export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
         </div>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      {/* Quick Stats KPI Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <Card>
           <Flex justifyContent="between" alignItems="center">
-            <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>Current Flow</Text>
+            <Text style={{ color: "var(--color-sentinel-text-secondary)" }} className="text-xs">
+              Today's Consumption
+            </Text>
             <Droplets className="h-4 w-4" style={{ color: "var(--color-sentinel-blue)" }} />
           </Flex>
-          <Metric>{currentFlow?.flow_rate_lpm.toFixed(1)} LPM</Metric>
+          <Metric className="text-xl">{todayVolume.toLocaleString()}</Metric>
           <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-            Real-time flow rate
+            Liters
           </Text>
         </Card>
 
         <Card>
           <Flex justifyContent="between" alignItems="center">
-            <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>Today</Text>
-            <Droplets className="h-4 w-4" style={{ color: "var(--color-sentinel-cyan)" }} />
+            <Text style={{ color: "var(--color-sentinel-text-secondary)" }} className="text-xs">
+              Monthly Cost
+            </Text>
+            <Droplets className="h-4 w-4" style={{ color: "var(--color-sentinel-amber)" }} />
           </Flex>
-          <Metric>{todayVolume.toLocaleString()} L</Metric>
+          <Metric className="text-xl">R2,480</Metric>
           <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-            Volume consumed today
+            Feb estimate
           </Text>
         </Card>
 
         <Card>
           <Flex justifyContent="between" alignItems="center">
-            <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>This Month</Text>
-            <Droplets className="h-4 w-4" style={{ color: "var(--color-sentinel-teal)" }} />
+            <Text style={{ color: "var(--color-sentinel-text-secondary)" }} className="text-xs">
+              Active Alerts
+            </Text>
+            <AlertTriangle className="h-4 w-4" style={{ color: "var(--color-sentinel-red)" }} />
           </Flex>
-          <Metric>{monthlyVolume.toLocaleString()} L</Metric>
+          <Metric className="text-xl">{alerts.length}</Metric>
           <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-            Last 7 days total
+            {alerts.some((a) => a.severity === "critical" || a.severity === "high")
+              ? "Critical"
+              : "Check required"}
+          </Text>
+        </Card>
+
+        <Card>
+          <Flex justifyContent="between" alignItems="center">
+            <Text style={{ color: "var(--color-sentinel-text-secondary)" }} className="text-xs">
+              Efficiency
+            </Text>
+            <Droplets className="h-4 w-4" style={{ color: "var(--color-sentinel-green)" }} />
+          </Flex>
+          <Metric className="text-xl">
+            {trending ? `${Math.abs(trending.baseline_comparison_percent).toFixed(1)}%` : "---"}
+          </Metric>
+          <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+            {trending && trending.baseline_comparison_percent > 0 ? "Above" : "Below"} baseline
           </Text>
         </Card>
       </div>
 
-      {/* Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-        {/* Consumption Trend */}
-        <Card>
-          <Title>Consumption Trend (Last 7 Days)</Title>
-          <Text className="text-xs mb-4" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-            Daily water consumption in liters
-          </Text>
-          <div className="h-64 flex items-center justify-center" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-            <div className="text-center">
-              <LineChartPlaceholder data={consumptionChartData} />
+      {/* Tab Navigation and Content */}
+      <TabGroup index={activeTabIndex} onIndexChange={setActiveTabIndex}>
+        <TabList className="mb-6">
+          <Tab>Overview</Tab>
+          <Tab>Zones</Tab>
+          <Tab>Costs & Forecast</Tab>
+          <Tab>Alerts & Work Orders</Tab>
+        </TabList>
+
+        <TabPanels>
+          <TabPanel>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <WaterAnomalyChart zoneId={selectedSiteId} days={7} />
+              <WaterAlertPanel buildingId={selectedSiteId} />
             </div>
-          </div>
-        </Card>
+          </TabPanel>
 
-        {/* Daily Comparison */}
-        <Card>
-          <Title>Daily Comparison</Title>
-          <Text className="text-xs mb-4" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-            This week vs last week (liters)
-          </Text>
-          <div className="h-64 flex items-center justify-center" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-            <div className="text-center">
-              {trending && (
-                <div>
-                  <Text className="text-sm">
-                    {trending.baseline_comparison_percent > 0 ? "+" : ""}
-                    {trending.baseline_comparison_percent.toFixed(1)}% vs baseline
-                  </Text>
-                  <Text className="text-xs mt-2" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                    Volume: {(trending.total_volume_liters / 1000).toFixed(1)}k L
-                  </Text>
-                  <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                    Avg flow: {trending.average_flow_rate_lpm.toFixed(1)} LPM
-                  </Text>
-                </div>
-              )}
-            </div>
-          </div>
-        </Card>
-      </div>
+          <TabPanel>
+            <WaterZoneBreakdown buildingId={selectedSiteId} days={30} />
+          </TabPanel>
 
-      {/* Active Alerts */}
-      <Card>
-        <Flex justifyContent="between" alignItems="center" className="mb-4">
-          <Title>Active Leak Alerts ({alerts.length})</Title>
-          {alerts.length > 0 && (
-            <Badge color={alerts.some((a) => a.severity === "critical" || a.severity === "high") ? "red" : "yellow"}>
-              {alerts.some((a) => a.severity === "critical" || a.severity === "high") ? "Critical" : "Warning"}
-            </Badge>
-          )}
-        </Flex>
+          <TabPanel>
+            <WaterCostAnalysis buildingId={selectedSiteId} />
+          </TabPanel>
 
-        {alerts.length === 0 ? (
-          <div className="text-center py-8" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-            <CheckCircle className="h-12 w-12 mx-auto mb-3" style={{ color: "var(--color-sentinel-green)" }} />
-            <Text>No active leaks detected</Text>
-            <Text className="text-xs">All systems operating normally</Text>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {alerts.map((alert) => (
-              <div
-                key={alert.alert_id}
-                className="p-4 rounded border"
-                style={{
-                  background: `var(--color-sentinel-${severityColors[alert.severity]})`,
-                  borderColor: `var(--color-sentinel-${severityColors[alert.severity]}-border)`,
-                }}
-              >
-                <Flex justifyContent="between" alignItems="start" className="mb-2">
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle className="h-4 w-4" />
-                    <Text className="font-semibold">
-                      {alert.alert_type.replace(/_/g, " ").toUpperCase()}
-                    </Text>
-                    <Badge color={severityColors[alert.severity]}>{alert.severity}</Badge>
-                  </div>
-                  <Text className="text-xs">
-                    {new Date(alert.timestamp).toLocaleString()}
-                  </Text>
-                </Flex>
-
-                <div className="mb-3">
-                  {alert.details?.flow_rate_lpm && (
-                    <Text className="text-sm">
-                      Flow: {alert.details.flow_rate_lpm} LPM
-                    </Text>
-                  )}
-                  {alert.details?.duration_minutes && (
-                    <Text className="text-sm ml-3">
-                      Duration: {Math.floor(alert.details.duration_minutes / 60)}h {alert.details.duration_minutes % 60}m
-                    </Text>
-                  )}
-                  {alert.details?.percent_above_baseline && (
-                    <Text className="text-sm">
-                      {alert.details.percent_above_baseline}% above baseline
-                    </Text>
-                  )}
-                  {alert.details?.location && (
-                    <Text className="text-sm ml-3">
-                      Location: {alert.details.location}
-                    </Text>
-                  )}
-                </div>
-
-                <div className="flex gap-2">
-                  <Button
-                    size="xs"
-                    color={severityColors[alert.severity]}
-                    onClick={() => handleResolveAlert(alert.alert_id)}
-                  >
-                    <CheckCircle className="h-3 w-3 mr-1" />
-                    Resolve
-                  </Button>
-                  <Button size="xs" variant="secondary">
-                    <XCircle className="h-3 w-3 mr-1" />
-                    Details
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
+          <TabPanel>
+            <WaterAlertPanel buildingId={selectedSiteId} />
+          </TabPanel>
+        </TabPanels>
+      </TabGroup>
     </div>
   );
 }
