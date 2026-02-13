@@ -32,7 +32,9 @@ export interface WorkOrder {
   status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
   priority: 'low' | 'medium' | 'high' | 'urgent';
   title: string;
+  description?: string;
   assigned_to?: string;
+  technician_name?: string;
   created_at: string;
   completed_at?: string;
 }

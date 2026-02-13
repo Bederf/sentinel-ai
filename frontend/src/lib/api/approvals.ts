@@ -39,6 +39,13 @@ export interface ApprovalStatus {
   approved_at?: string
   executed_at?: string
   rejection_reason?: string
+  cov_verified?: boolean
+  execution_result?: {
+    success: boolean
+    device_write: { success: boolean }
+    cov_verified: boolean
+    timestamp: string
+  }
 }
 
 export const approvalsApi = {

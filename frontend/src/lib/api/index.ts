@@ -76,7 +76,10 @@ export {
   peakDemandApi,
   type DemandForecastResponse,
   type DemandStatus,
+  type DemandStatusResponse,
   type PeakDemandRecommendation,
+  type MultiModuleRecommendation,
+  type DemandSummary,
   type ForecastInterval,
 } from './peakDemand';
 export {

@@ -18,9 +18,9 @@ import type { DemandStatusResponse, MultiModuleRecommendation } from '../lib/api
 export interface DecisionRequest {
   site_id: string;
   current_headroom_kw: number;
-  headroom_level: 'normal' | 'caution' | 'warning' | 'critical';
+  headroom_level: 'normal' | 'caution' | 'warning' | 'critical' | 'emergency';
   active_modules: string[];
-  available_reductions: Record<string, any>;
+  available_reductions?: Record<string, any>;
   cost_per_kwh_r?: number; // Tariff in Rands per kWh
 }
 

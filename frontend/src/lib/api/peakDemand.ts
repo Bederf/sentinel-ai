@@ -45,10 +45,13 @@ export interface DemandStatus {
   nmd_limit_kva: number;
   headroom_kw: number;
   headroom_percent: number;
-  headroom_level: 'normal' | 'warning' | 'critical' | 'emergency';
+  headroom_level: 'normal' | 'warning' | 'caution' | 'critical' | 'emergency';
   active_modules: string[];  // Which modules are active at this site
   available_reductions?: Record<string, any>;  // Module-specific reduction options
 }
+
+/** Alias for backward compatibility with hooks */
+export type DemandStatusResponse = DemandStatus;
 
 /**
  * Multi-module recommendation from coordinator
@@ -68,6 +71,20 @@ export interface PeakDemandRecommendation {
   estimated_reduction_kw: number;
   estimated_savings_r: number;
   reasoning: string;
+}
+
+/** Alias for backward compatibility with hooks */
+export type MultiModuleRecommendation = PeakDemandRecommendation;
+
+/**
+ * Summary of demand status for dashboard display
+ */
+export interface DemandSummary {
+  current_demand_kw: number;
+  headroom_percent: number;
+  headroom_level: 'normal' | 'warning' | 'caution' | 'critical' | 'emergency';
+  peak_hour_forecast?: number;
+  peak_demand_forecast_kw?: number;
 }
 
 /**
@@ -156,5 +173,24 @@ export const peakDemandApi = {
       );
     }
     return response.json();
+  },
+
+  /**
+   * Get demand summary for dashboard display
+   * @param siteId Site identifier
+   * @returns DemandSummary with current status and peak forecast
+   */
+  async getDemandSummary(siteId: string): Promise<DemandSummary> {
+    const [status, forecast] = await Promise.all([
+      this.getDemandStatus(siteId),
+      this.getDemandForecast(siteId),
+    ]);
+    return {
+      current_demand_kw: status.current_demand_kw,
+      headroom_percent: status.headroom_percent,
+      headroom_level: status.headroom_level,
+      peak_hour_forecast: forecast.peak_hour,
+      peak_demand_forecast_kw: forecast.peak_demand_kw,
+    };
   },
 };
