@@ -235,14 +235,21 @@ class BuildingDataLoader:
                 from app.database.repositories import DeskRepository
                 repo = DeskRepository()
                 supabase_desks = repo.get_by_building_code(building_id)
-                if supabase_desks:
-                    # Add building name to each desk
+                if supabase_desks and isinstance(supabase_desks, list):
+                    # Add building name to each desk (ensure each item is a dict)
                     building = self._buildings.get(building_id)
-                    if building:
-                        for desk in supabase_desks:
-                            desk["building"] = building.name
-                    logger.debug(f"Loaded {len(supabase_desks)} desks from Supabase for {building_id}")
-                    return supabase_desks
+                    desks_with_building = []
+                    for desk in supabase_desks:
+                        if isinstance(desk, dict):
+                            desk_copy = dict(desk)  # Copy to avoid modifying cached data
+                            if building:
+                                desk_copy["building"] = building.name
+                            desks_with_building.append(desk_copy)
+                        else:
+                            logger.warning(f"Skipping non-dict desk record: {type(desk).__name__}")
+                    if desks_with_building:
+                        logger.debug(f"Loaded {len(desks_with_building)} desks from Supabase for {building_id}")
+                        return desks_with_building
             except Exception as e:
                 logger.debug(f"Supabase desk query failed, using JSON: {e}")
 
@@ -250,10 +257,14 @@ class BuildingDataLoader:
         desks = self._desks.get(building_id, [])
         # Add building name to each desk for display
         building = self._buildings.get(building_id)
-        if building:
-            for desk in desks:
-                desk["building"] = building.name
-        return desks
+        desks_with_building = []
+        for desk in desks:
+            if isinstance(desk, dict):
+                desk_copy = dict(desk)
+                if building:
+                    desk_copy["building"] = building.name
+                desks_with_building.append(desk_copy)
+        return desks_with_building
 
     def get_all_desks(self) -> List[dict]:
         """Get all desks across all active buildings."""
@@ -280,24 +291,35 @@ class BuildingDataLoader:
                     # Get building UUID from building code
                     self._get_building_uuid(building_id)
                 )
-                if supabase_zones:
-                    # Add building name to each zone
+                if supabase_zones and isinstance(supabase_zones, list):
+                    # Add building name to each zone (ensure each item is a dict)
                     building = self._buildings.get(building_id)
-                    if building:
-                        for zone in supabase_zones:
-                            zone["building"] = building.name
-                    logger.debug(f"Loaded {len(supabase_zones)} zones from Supabase zones table for {building_id}")
-                    return supabase_zones
+                    zones_with_building = []
+                    for zone in supabase_zones:
+                        if isinstance(zone, dict):
+                            zone_copy = dict(zone)
+                            if building:
+                                zone_copy["building"] = building.name
+                            zones_with_building.append(zone_copy)
+                        else:
+                            logger.warning(f"Skipping non-dict zone record: {type(zone).__name__}")
+                    if zones_with_building:
+                        logger.debug(f"Loaded {len(zones_with_building)} zones from Supabase zones table for {building_id}")
+                        return zones_with_building
             except Exception as e:
                 logger.debug(f"Supabase zone query failed, using JSON: {e}")
 
         # Fall back to JSON
         zones = self._zones.get(building_id, [])
         building = self._buildings.get(building_id)
-        if building:
-            for zone in zones:
-                zone["building"] = building.name
-        return zones
+        zones_with_building = []
+        for zone in zones:
+            if isinstance(zone, dict):
+                zone_copy = dict(zone)
+                if building:
+                    zone_copy["building"] = building.name
+                zones_with_building.append(zone_copy)
+        return zones_with_building
 
     def _get_building_uuid(self, building_id: str) -> Optional[str]:
         """Get building UUID from building ID using Supabase.
