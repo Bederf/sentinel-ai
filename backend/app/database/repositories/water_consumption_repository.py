@@ -616,6 +616,166 @@ class WaterConsumptionRepository:
         }
 
 
+    def get_consumption_by_zone(
+        self,
+        zone_id: str,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        limit: int = 10000,
+    ) -> List[Dict[str, Any]]:
+        """Get consumption records for a specific zone.
+
+        Args:
+            zone_id: Zone identifier
+            start_date: Start date (default: 30 days ago)
+            end_date: End date (default: today)
+            limit: Maximum records to return
+
+        Returns:
+            List of consumption records with matching zone_id
+        """
+        if end_date is None:
+            end_date = date.today()
+        if start_date is None:
+            start_date = end_date - timedelta(days=30)
+
+        try:
+            response = (
+                self.client.table("water_consumption")
+                .select("*")
+                .eq("zone_id", zone_id)
+                .gte("timestamp", start_date.isoformat())
+                .lte("timestamp", end_date.isoformat())
+                .order("timestamp", desc=False)
+                .limit(limit)
+                .execute()
+            )
+            return response.data
+
+        except Exception:
+            # Fallback to JSON
+            return self._get_consumption_by_zone_json(zone_id, start_date, end_date)
+
+    def _get_consumption_by_zone_json(
+        self,
+        zone_id: str,
+        start_date: date,
+        end_date: date,
+    ) -> List[Dict[str, Any]]:
+        """Get consumption by zone from JSON backup."""
+        results = []
+        # Search all sites for this zone
+        for site_dir in self.json_backup_dir.iterdir():
+            if not site_dir.is_dir() or not site_dir.name.startswith("site-"):
+                continue
+            try:
+                backup_data = self._load_json_backup(site_dir.name)
+                records = backup_data.get("consumption", [])
+
+                # Filter by zone and date range
+                for record in records:
+                    if record.get("zone_id") != zone_id:
+                        continue
+                    record_date = datetime.fromisoformat(record["timestamp"]).date()
+                    if start_date <= record_date <= end_date:
+                        results.append(record)
+            except Exception:
+                pass
+
+        results.sort(key=lambda x: x["timestamp"])
+        return results
+
+    def get_zones_for_site(
+        self,
+        site: str,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        limit: int = 100000,
+    ) -> List[str]:
+        """Get list of unique zones with consumption data at a site.
+
+        Args:
+            site: Building site code
+            start_date: Start date
+            end_date: End date
+            limit: Maximum records to scan
+
+        Returns:
+            List of zone_ids with consumption data (sorted)
+        """
+        records = self.get_consumption_by_site(site, start_date, end_date, limit=limit)
+        zones = set()
+        for record in records:
+            zone_id = record.get("zone_id")
+            if zone_id:
+                zones.add(zone_id)
+        return sorted(list(zones))
+
+    def get_top_consuming_zones(
+        self,
+        building_id: str,
+        limit: int = 10,
+        days: int = 30,
+    ) -> List[Dict[str, Any]]:
+        """Get top N zones by consumption for a building.
+
+        Args:
+            building_id: Building/site identifier
+            limit: Number of top zones to return
+            days: Look-back period (default: 30 days)
+
+        Returns:
+            List of top consuming zones with consumption data
+        """
+        end_date = date.today()
+        start_date = end_date - timedelta(days=days)
+
+        # Get all consumption records for building
+        records = self.get_consumption_by_site(
+            building_id,
+            start_date,
+            end_date,
+            limit=100000,
+        )
+
+        # Group by zone_id and sum consumption
+        zone_consumption: Dict[str, Dict[str, Any]] = {}
+        for record in records:
+            zone_id = record.get("zone_id")
+            if not zone_id:
+                continue
+            if zone_id not in zone_consumption:
+                zone_consumption[zone_id] = {
+                    "zone_id": zone_id,
+                    "zone_name": record.get("zone_name"),
+                    "total_liters": 0,
+                    "meter_count": 0,
+                }
+            zone_consumption[zone_id]["total_liters"] = max(
+                zone_consumption[zone_id]["total_liters"],
+                record.get("volume_liters", 0)
+            )
+            zone_consumption[zone_id]["meter_count"] += 1
+
+        # Sort by consumption and limit
+        sorted_zones = sorted(
+            zone_consumption.values(),
+            key=lambda z: z["total_liters"],
+            reverse=True,
+        )
+
+        return [
+            {
+                "zone_id": z["zone_id"],
+                "zone_name": z["zone_name"],
+                "total_liters": round(z["total_liters"], 2),
+                "meter_count": z["meter_count"],
+                "rank": idx + 1,
+            }
+            for idx, z in enumerate(sorted_zones[:limit])
+        ]
+
+
 def get_water_consumption_repository() -> WaterConsumptionRepository:
     """Get singleton instance of WaterConsumptionRepository."""
     return WaterConsumptionRepository()
