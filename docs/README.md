@@ -75,10 +75,11 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 
 #### Asset Management Workflow
 - **[Asset Baseline Assessment](04-features/44-asset-baseline-assessment.md)** - Asset condition scoring and maintenance cost modeling (Phase 44)
+- **[Equipment Baseline Capture & Comparison](04-features/54-equipment-baseline-assessment.md)** - Multi-source baseline capture (manual, BMS, mobile), intelligent tolerances, deviation detection with automatic alerts (Phase 54)
 - **[Routine Inspection & Maintenance](04-features/45-routine-inspection-maintenance.md)** - Field inspection workflow with baseline tracking (Phase 45)
 - **[OEM-Specific Checklist Generation](04-features/66-oem-checklist-generation.md)** - AI-generated manufacturer-specific inspection checklists with Supabase storage (Phase 66)
 - **[Repair Effectiveness & ML Feedback Loop](04-features/46-repair-effectiveness-ml-feedback.md)** - Post-repair validation, ML feedback, follow-up scheduling, cost-benefit analysis (Phase 57)
-- **[Phases 44-46 Integration: Complete Asset Management Workflow](04-features/44-46-integration-workflow.md)** - Unified workflow from baseline to repair validation
+- **[Phases 44-46-54 Integration: Complete Asset Management Workflow](04-features/44-46-54-integration-workflow.md)** - Unified workflow integrating baseline capture, multi-source comparison, inspection, and repair validation (Phases 44, 45, 46, 54)
 - **[Service Feedback System](04-features/service-feedback-system.md)** - Equipment-type specific feedback from technicians with health score updates
 
 #### Remote Operations
