@@ -30,11 +30,14 @@ import {
   BarChart3,
   Plus,
   ChevronLeft,
+  TrendingUp,
 } from 'lucide-react'
 import type { QuoteResponse, SLATier } from '@/lib/api/pricing'
 import QuoteGenerator from './QuoteGenerator'
 import SensitivityAnalysis from './SensitivityAnalysis'
 import QuotePreview from './QuotePreview'
+import { RenewalPricingDashboard } from './RenewalPricingDashboard'
+import { BenchmarkingAnalysis } from './BenchmarkingAnalysis'
 
 interface CommercialIntelligenceDashboardProps {
   buildingId: string
@@ -42,16 +45,20 @@ interface CommercialIntelligenceDashboardProps {
   onClose?: () => void
 }
 
+type ViewMode = 'quote-tools' | 'renewal-pipeline' | 'renewal-analysis' | 'benchmarks' | 'win-loss'
+
 export default function CommercialIntelligenceDashboard({
   buildingId,
   buildingName = 'Building',
   onClose,
 }: CommercialIntelligenceDashboardProps) {
+  const [viewMode, setViewMode] = useState<ViewMode>('quote-tools')
   const [activeTab, setActiveTab] = useState(0)
   const [currentQuote, setCurrentQuote] = useState<QuoteResponse | null>(null)
   const [equipmentCodes, setEquipmentCodes] = useState<string[]>([])
   const [slaTier, setSlaTier] = useState<string>('standard')
   const [contractMonths, setContractMonths] = useState(12)
+  const [selectedContractId, setSelectedContractId] = useState<string | undefined>()
 
   // Handle quote generation
   const handleQuoteGenerated = (quote: QuoteResponse, codes: string[], tier: string, months: number) => {
@@ -90,11 +97,11 @@ export default function CommercialIntelligenceDashboard({
           <div>
             <Title>Commercial Intelligence Tools</Title>
             <Text className="text-tremor-content-subtitle mt-2">
-              Generate professional quotes, analyze pricing scenarios, and
-              manage commercial agreements
+              Generate professional quotes, analyze pricing scenarios, manage renewals,
+              and benchmark contract performance
             </Text>
           </div>
-          {currentQuote && (
+          {currentQuote && viewMode === 'quote-tools' && (
             <Button
               icon={Plus}
               onClick={handleNewQuote}
@@ -106,86 +113,122 @@ export default function CommercialIntelligenceDashboard({
         </div>
       </Card>
 
-      {/* Tab Navigation */}
-      {currentQuote ? (
-        // After quote generation: show generator, analysis, and preview tabs
-        <TabGroup index={activeTab} onIndexChange={setActiveTab}>
-          <TabList>
-            <Tab icon={FileText}>Quote Details</Tab>
-            <Tab icon={BarChart3}>What-If Analysis</Tab>
-            <Tab icon={FileText}>Preview & Export</Tab>
-          </TabList>
-          <TabPanels>
-            <TabPanel>
-              <Card>
-                <QuoteGenerator
-                  buildingId={buildingId}
-                  onQuoteGenerated={() => {}} // Already generated
-                />
-              </Card>
-            </TabPanel>
-            <TabPanel>
-              <SensitivityAnalysis
-                quote={currentQuote}
-                onCopyToNegotiation={(range) => {
-                  console.log('Range copied:', range)
-                }}
-              />
-            </TabPanel>
-            <TabPanel>
-              <QuotePreview
-                quote={currentQuote}
-                buildingName={buildingName}
-                clientName="Client Name"
-                equipmentCodes={equipmentCodes}
-                slaTier={slaTier}
-                contractMonths={contractMonths}
-                onEdit={handleNewQuote}
-              />
-            </TabPanel>
-          </TabPanels>
-        </TabGroup>
-      ) : (
-        // Before quote generation: show only the generator
-        <Card>
-          <QuoteGenerator
-            buildingId={buildingId}
-            onQuoteGenerated={(quote) => {
-              // Note: We need to pass additional data. This component
-              // would need to be extended to track form state for this.
-              handleQuoteGenerated(quote, [], 'standard', 12)
-            }}
-          />
-        </Card>
-      )}
+      {/* Main Navigation Tabs */}
+      <TabGroup index={viewMode === 'quote-tools' ? 0 : viewMode === 'renewal-analysis' ? 1 : viewMode === 'benchmarks' ? 2 : 3}>
+        <TabList>
+          <Tab icon={FileText} onClick={() => { setViewMode('quote-tools'); setActiveTab(0) }}>
+            Quote Generator
+          </Tab>
+          <Tab icon={FileText} onClick={() => { setViewMode('renewal-analysis'); setActiveTab(0) }}>
+            Renewal Analysis
+          </Tab>
+          <Tab icon={BarChart3} onClick={() => { setViewMode('benchmarks'); setActiveTab(0) }}>
+            Market Benchmarks
+          </Tab>
+          <Tab icon={TrendingUp} onClick={() => { setViewMode('win-loss'); setActiveTab(0) }}>
+            Win/Loss Analysis
+          </Tab>
+        </TabList>
+        <TabPanels>
+          {/* Quote Tools Tab */}
+          <TabPanel>
+            {currentQuote ? (
+              // After quote generation: show generator, analysis, and preview tabs
+              <TabGroup index={activeTab} onIndexChange={setActiveTab}>
+                <TabList>
+                  <Tab icon={FileText}>Quote Details</Tab>
+                  <Tab icon={BarChart3}>What-If Analysis</Tab>
+                  <Tab icon={FileText}>Preview & Export</Tab>
+                </TabList>
+                <TabPanels>
+                  <TabPanel>
+                    <Card>
+                      <QuoteGenerator
+                        buildingId={buildingId}
+                        onQuoteGenerated={() => {}} // Already generated
+                      />
+                    </Card>
+                  </TabPanel>
+                  <TabPanel>
+                    <SensitivityAnalysis
+                      quote={currentQuote}
+                      onCopyToNegotiation={(range) => {
+                        console.log('Range copied:', range)
+                      }}
+                    />
+                  </TabPanel>
+                  <TabPanel>
+                    <QuotePreview
+                      quote={currentQuote}
+                      buildingName={buildingName}
+                      clientName="Client Name"
+                      equipmentCodes={equipmentCodes}
+                      slaTier={slaTier}
+                      contractMonths={contractMonths}
+                      onEdit={handleNewQuote}
+                    />
+                  </TabPanel>
+                </TabPanels>
+              </TabGroup>
+            ) : (
+              // Before quote generation: show only the generator
+              <>
+                <Card>
+                  <QuoteGenerator
+                    buildingId={buildingId}
+                    onQuoteGenerated={(quote) => {
+                      handleQuoteGenerated(quote, [], 'standard', 12)
+                    }}
+                  />
+                </Card>
 
-      {/* Quick Start Tips */}
-      {!currentQuote && (
-        <Card className="bg-blue-50 border border-blue-200">
-          <Title className="text-blue-900">Getting Started</Title>
-          <div className="mt-4 space-y-3 text-blue-800 text-sm">
-            <p>
-              1. Select one or more equipment types to include in the quote
-            </p>
-            <p>
-              2. Choose an SLA tier that matches your service level commitment
-            </p>
-            <p>
-              3. Set the contract duration in months (1-60)
-            </p>
-            <p>
-              4. Click "Generate Quote" to see the pricing calculation
-            </p>
-            <p>
-              5. Use the What-If analysis tab to explore different pricing
-              scenarios
-            </p>
-            <p>
-              6. Export your final quote as PDF from the Preview tab
-            </p>
-          </div>
-        </Card>
-      )}
+                {/* Quick Start Tips */}
+                <Card className="bg-blue-50 border border-blue-200">
+                  <Title className="text-blue-900">Getting Started with Quotes</Title>
+                  <div className="mt-4 space-y-3 text-blue-800 text-sm">
+                    <p>
+                      1. Select one or more equipment types to include in the quote
+                    </p>
+                    <p>
+                      2. Choose an SLA tier that matches your service level commitment
+                    </p>
+                    <p>
+                      3. Set the contract duration in months (1-60)
+                    </p>
+                    <p>
+                      4. Click "Generate Quote" to see the pricing calculation
+                    </p>
+                    <p>
+                      5. Use the What-If analysis tab to explore different pricing scenarios
+                    </p>
+                    <p>
+                      6. Export your final quote as PDF from the Preview tab
+                    </p>
+                  </div>
+                </Card>
+              </>
+            )}
+          </TabPanel>
+
+          {/* Renewal Analysis Tab */}
+          <TabPanel>
+            <RenewalPricingDashboard selectedContractId={selectedContractId} />
+          </TabPanel>
+
+          {/* Benchmarks Tab */}
+          <TabPanel>
+            <BenchmarkingAnalysis />
+          </TabPanel>
+
+          {/* Win/Loss Analysis Tab */}
+          <TabPanel>
+            <Card>
+              <Title>Win/Loss Analysis</Title>
+              <Text className="mt-2">Integrated in the Benchmarking Analysis tab with market insights</Text>
+            </Card>
+          </TabPanel>
+        </TabPanels>
+      </TabGroup>
     </div>
   )
 }
