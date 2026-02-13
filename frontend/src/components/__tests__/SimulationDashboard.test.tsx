@@ -249,7 +249,7 @@ describe('SimulationDashboard', () => {
 
   describe('Error Handling', () => {
     it('should display error when scenario fetch fails', async () => {
-      const { fetchScenarios } = await import('../lib/simulationApi');
+      const { fetchScenarios } = await import('../../lib/simulationApi');
       vi.mocked(fetchScenarios).mockRejectedValue(new Error('API Error'));
 
       render(<SimulationDashboard />);
@@ -261,7 +261,7 @@ describe('SimulationDashboard', () => {
     });
 
     it('should display error message when simulation fails to start', async () => {
-      const { startSimulation } = await import('../lib/simulationApi');
+      const { startSimulation } = await import('../../lib/simulationApi');
       vi.mocked(startSimulation).mockRejectedValue(new Error('Start failed'));
 
       render(<SimulationDashboard />);

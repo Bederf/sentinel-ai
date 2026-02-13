@@ -40,17 +40,20 @@ export function createTremorMocks() {
         {children}
       </div>
     ),
-    Tab: ({ children, value, onClick }: any) => (
-      <button
-        data-testid={`tab-${value}`}
-        role="tab"
-        onClick={(e) => {
-          onClick?.(e);
-        }}
-      >
-        {children}
-      </button>
-    ),
+    Tab: ({ children, value, onClick }: any) => {
+      const handleClick = (e: any) => {
+        onClick?.(e);
+      };
+      return (
+        <button
+          data-testid={`tab-${value}`}
+          role="tab"
+          onClick={handleClick}
+        >
+          {children}
+        </button>
+      );
+    },
     TabPanels: ({ children }: any) => (
       <div data-testid="tab-panels">
         {children}
