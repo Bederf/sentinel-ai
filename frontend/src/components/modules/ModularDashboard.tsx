@@ -30,15 +30,9 @@ const SolarDashboard = lazy(() =>
   import('../solar/SolarDashboard').then(m => ({ default: m.SolarDashboard }))
 );
 
-const SecurityDashboard = lazy(() =>
-  Promise.resolve({
-    default: () => (
-      <Card>
-        <Title>Security Module</Title>
-        <Text className="text-gray-500">Security dashboard will be loaded here when available</Text>
-      </Card>
-    )
-  })
+// Security Module Dashboard
+const SecurityPanel = lazy(() =>
+  import('./SecurityPanel').then(m => ({ default: m.SecurityPanel }))
 );
 
 const LightingDashboard = lazy(() =>
@@ -125,7 +119,7 @@ export function ModularDashboard({
       case 'solar':
         return <SolarDashboard />;
       case 'security':
-        return <SecurityDashboard />;
+        return <SecurityPanel siteId={siteId} />;
       case 'lighting':
         return <LightingDashboard />;
       default:
