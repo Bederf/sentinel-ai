@@ -124,6 +124,97 @@ export interface WhatIfResponse {
 }
 
 /**
+ * Renewal quote with fee recommendations and drivers
+ */
+export interface RenewalQuote {
+  original_monthly_fee: number | string
+  recommended_monthly_fee: number | string
+  fee_change_pct: number | string
+  drivers: string[]
+  confidence: 'high' | 'medium' | 'low'
+  assumptions: string[]
+}
+
+/**
+ * Comparable contract for benchmarking
+ */
+export interface ContractComparable {
+  contract_id: string
+  equipment_types: string[]
+  monthly_fee: number | string
+  sla_tier: SLATier
+  profitability?: number | string
+}
+
+/**
+ * Renegotiation option analysis
+ */
+export interface RenegotiationOption {
+  option_type: 'maintain' | 'invest' | 'expand'
+  description: string
+  recommended_fee: number | string
+  estimated_npv_zar: number | string
+  roi_pct: number | string
+  implementation_notes: string[]
+}
+
+/**
+ * Renegotiation analysis response
+ */
+export interface RenegotiationAnalysis {
+  contract_id: string
+  options: RenegotiationOption[]
+  recommended_option: string
+  market_context: {
+    [key: string]: any
+  }
+}
+
+/**
+ * Equipment benchmark response
+ */
+export interface EquipmentBenchmarkResponse {
+  equipment_type: string
+  sla_tier: string
+  avg_fee_zar?: number | string
+  min_fee_zar?: number | string
+  max_fee_zar?: number | string
+  sample_size: number
+  confidence_pct: number
+  note?: string
+}
+
+/**
+ * Win/loss analysis response
+ */
+export interface WinLossAnalysisResponse {
+  total_quotes: number
+  total_won: number
+  total_lost: number
+  total_pending: number
+  win_rate_pct: number
+  avg_negotiation_days: number
+  lost_reasons: { [key: string]: number }
+  avg_discount_pct: number
+  note?: string
+}
+
+/**
+ * Portfolio benchmark response
+ */
+export interface PortfolioBenchmarkResponse {
+  portfolio_size: number
+  above_market: Array<{ contract_id: string; variance_pct: number }>
+  below_market: Array<{ contract_id: string; variance_pct: number }>
+  at_market: Array<{ contract_id: string; variance_pct: number }>
+  avg_variance_pct: number
+  top_underpriced: Array<{ contract_id: string; opportunity_zar: number }>
+  top_overpriced: Array<{ contract_id: string; risk_zar: number }>
+  market_opportunities: string[]
+  note?: string
+}
+
+/**
  * Format a Decimal amount as ZAR currency string
  * E.g., 12345.67 → "R12,345.67"
  */
@@ -239,5 +330,66 @@ export const pricingApi = {
         method: 'POST',
         body: JSON.stringify(request),
       }
+    ),
+
+  /**
+   * Get renewal price recommendation for an existing contract.
+   *
+   * Compares original quoted fee to current recommended renewal fee,
+   * showing drivers for change and confidence level.
+   */
+  getRenewalPrice: (contractId: string) =>
+    fetchApi<RenewalQuote>(
+      `/api/pricing/renewal/${contractId}`
+    ),
+
+  /**
+   * Get market comparable pricing for equipment type and SLA tier.
+   *
+   * Returns average, min, and max fees from similar contracts.
+   */
+  getEquipmentBenchmarks: (equipmentType: string, slaTier: SLATier = 'standard') =>
+    fetchApi<EquipmentBenchmarkResponse>(
+      `/api/pricing/benchmarks-equipment/${equipmentType}?sla_tier=${slaTier}`
+    ),
+
+  /**
+   * Analyze renegotiation options for contract renewal.
+   *
+   * Returns analysis of three options:
+   * 1. Maintain margin - Raise fee to cover increased costs
+   * 2. Invest in maintenance - Reduce risk buffer, maintain fee
+   * 3. Add services - Justify higher fee with expanded scope
+   */
+  analyzeRenegotiation: (contractId: string, optionType?: string) =>
+    fetchApi<RenegotiationAnalysis>(
+      optionType
+        ? `/api/pricing/renegotiation/${contractId}?option_type=${optionType}`
+        : `/api/pricing/renegotiation/${contractId}`,
+      {
+        method: 'POST',
+      }
+    ),
+
+  /**
+   * Get portfolio-level win/loss statistics.
+   *
+   * Returns aggregate win rate, average negotiation time,
+   * lost reasons, and negotiation discount analysis.
+   */
+  getWinLossAnalysis: () =>
+    fetchApi<WinLossAnalysisResponse>(
+      '/api/pricing/win-loss-analysis'
+    ),
+
+  /**
+   * Compare all contracts in portfolio to market benchmarks.
+   *
+   * Returns list of contracts with variance from market average,
+   * highlighting over/underpriced contracts.
+   */
+  getPortfolioBenchmarks: (includeDetails: boolean = false) =>
+    fetchApi<PortfolioBenchmarkResponse>(
+      `/api/pricing/portfolio-benchmarks?include_details=${includeDetails}`
     ),
 }
