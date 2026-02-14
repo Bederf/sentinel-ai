@@ -108,7 +108,8 @@ class ScenarioConfig:
     repair_delay_hours: int = 2  # Hours after fault before repair
     optimization_enabled: bool = True
     clawd_notifications: bool = True
-    operation_mode: Optional[OperationMode] = None  # Building operation mode for demos
+    operation_mode: Optional[OperationMode] = None
+    demo_mode: bool = False  # Enable continuous AI recommendations (lower thresholds, BESS arbitrage)  # Building operation mode for demos
 
 
 # Predefined scenarios
@@ -194,6 +195,17 @@ SCENARIOS = {
         auto_repair=True,
         repair_delay_hours=4,
         optimization_enabled=True,
+        demo_mode=True,  # Enable continuous AI recommendations for demo (lower thresholds, BESS arbitrage)
+    ),
+    "grant_solar_bess_ai_annual": ScenarioConfig(
+        name="Grant Demo: Solar + BESS + Sentinel AI (365 days)",
+        description="Full-year simulation with 3.9 MWp solar + 5 MWh BESS, City Power TOU arbitrage, demand management, and South African seasonal variations",
+        operation_mode=OperationMode.SOLAR_BESS_SENTINEL,
+        fault_probability=0.03,
+        auto_repair=True,
+        repair_delay_hours=6,
+        optimization_enabled=True,
+        demo_mode=True,  # Enable continuous AI recommendations for demo
     ),
 }
 
@@ -211,7 +223,8 @@ class LifecycleOrchestrator:
     - Service feedback
     """
 
-    def __init__(self):
+    def __init__(self, task_id: Optional[str] = None):
+        self.task_id = task_id  # For database task tracking
         self.running = False
         self.paused = False
         self.current_scenario: Optional[ScenarioConfig] = None
@@ -279,7 +292,8 @@ class LifecycleOrchestrator:
         self,
         scenario: str = "fault_day",
         duration_minutes: float = 24.0,
-        start_hour: int = 0
+        start_hour: int = 0,
+        task_id: str = None,  # For checkpoint recovery
     ) -> Dict[str, Any]:
         """
         Start the 24-hour simulation.
@@ -288,11 +302,26 @@ class LifecycleOrchestrator:
             scenario: Scenario name from SCENARIOS
             duration_minutes: Real-time duration (24 = 1 min per hour)
             start_hour: Simulated hour to start (0-23)
+            task_id: Optional task_id for checkpoint recovery
 
         Returns:
             Status dict with session info
         """
-        if self.running:
+        # FIRST: Check for existing checkpoint to recover from
+        checkpoint = None
+        if task_id and scenario == "grant_hvac_dali_ai_annual":
+            try:
+                from app.database.supabase_client import get_supabase_client
+                supabase = get_supabase_client()
+                response = supabase.table("solar_annual_tasks").select("state_snapshot").eq("task_id", task_id).execute()
+                if response.data and response.data[0].get("state_snapshot"):
+                    checkpoint = response.data[0]["state_snapshot"]
+                    logger.info(f"✅ Found checkpoint for task {task_id}, recovering from day {checkpoint.get('days_simulated', 0)}/365")
+            except Exception as e:
+                logger.warning(f"Could not load checkpoint: {e}")
+
+        # If already running, only allow if we have a checkpoint to recover (fresh start, not overlay)
+        if self.running and not checkpoint:
             return {"success": False, "error": "Simulation already running"}
 
         # Get scenario config
@@ -306,7 +335,37 @@ class LifecycleOrchestrator:
 
         # Check if this is an annual scenario
         is_annual = scenario == "grant_hvac_dali_ai_annual"
-        
+
+        # RECOVERY PATH: If we have a checkpoint, restore ALL state BEFORE starting loop
+        if checkpoint and is_annual:
+            logger.info("🔄 RECOVERY PATH: Restoring checkpoint state...")
+            self.simulated_time = datetime.fromisoformat(checkpoint.get("simulated_time", datetime.now().isoformat()))
+            self.days_simulated = checkpoint.get("days_simulated", 0)
+            self.time_multiplier = checkpoint.get("time_multiplier", 60.0)
+            self.active_faults = checkpoint.get("active_faults", {})
+            self.pending_repairs = checkpoint.get("pending_repairs", {})
+            self.events = checkpoint.get("events", [])
+
+            # Restore seasonal modeler for annual sims
+            if self.days_simulated > 0:
+                self.seasonal_modeler = SeasonalModeler(seed=self._occupancy_seed)
+                logger.info(f"✅ Restored checkpoint: day {self.days_simulated}/365, time={self.simulated_time.strftime('%Y-%m-%d %H:%M')}")
+
+            self.real_start_time = datetime.now()
+            self.running = True
+            self.paused = False
+
+            # Start loop directly with restored state (NO fresh init)
+            self._task = asyncio.create_task(self._run_simulation())
+            return {
+                "success": True,
+                "scenario": self.current_scenario.name,
+                "recovered_from_checkpoint": True,
+                "days_simulated": self.days_simulated,
+                "started_at": self.real_start_time.isoformat()
+            }
+
+        # FRESH START PATH: Initialize fresh (no checkpoint)
         if is_annual:
             # Annual simulation: 365 days × 24 hours = 8760 hours total
             self.seasonal_modeler = SeasonalModeler(seed=self._occupancy_seed)
@@ -410,6 +469,7 @@ class LifecycleOrchestrator:
         """Main simulation loop."""
         try:
             last_hour = -1
+            last_checkpoint_hour = -1
             is_annual = self.seasonal_modeler is not None
 
             while self.running:
@@ -423,6 +483,12 @@ class LifecycleOrchestrator:
                 if current_hour != last_hour:
                     await self._process_hour(current_hour)
                     last_hour = current_hour
+                    
+                    # Save checkpoint every 6 simulated hours for crash recovery
+                    if is_annual and (current_hour % 6 == 0):
+                        if current_hour != last_checkpoint_hour:
+                            await self.save_checkpoint()
+                            last_checkpoint_hour = current_hour
 
                 # Advance time
                 await asyncio.sleep(self.time_multiplier / 60)  # Sleep for 1 simulated minute
@@ -433,6 +499,10 @@ class LifecycleOrchestrator:
                     self.days_simulated += 1
                     season = self.seasonal_modeler.get_season_name(self.simulated_time.date()) if is_annual else None
                     logger.info(f"Day {self.days_simulated}/365 complete{f' ({season})' if is_annual else ''}...")
+                    
+                    # Save checkpoint on day boundary
+                    if is_annual:
+                        await self.save_checkpoint()
                     
                     # For annual simulation, stop after 365 days
                     if is_annual and self.days_simulated >= 365:
@@ -706,6 +776,43 @@ class LifecycleOrchestrator:
                         except Exception as e:
                             logger.warning(f"Failed to create DALI recommendation for {eq_code}: {e}")
 
+            # ========== DEMO MODE: BESS TOU ARBITRAGE ==========
+            if self.current_scenario and self.current_scenario.demo_mode:
+                # BESS TOU arbitrage: charge during off-peak, discharge during peak
+                if current_hour in [7, 8, 9, 18, 19]:  # Peak hours (R 3.45/kWh)
+                    bess_rec = {
+                        "equipment": "S002-BESS-001",
+                        "control_point": "discharge_power",
+                        "target_value": 500,  # kW
+                        "reason": "Peak tariff arbitrage - discharge BESS to grid",
+                        "description": "Discharge 500kW during peak hours to reduce grid purchase",
+                        "savings": 15
+                    }
+                    recommendations_created.append(bess_rec)
+                elif current_hour in [0, 1, 2, 3, 4, 5]:  # Off-peak (R 1.05/kWh)
+                    bess_rec = {
+                        "equipment": "S002-BESS-001",
+                        "control_point": "charge_power",
+                        "target_value": 300,  # kW
+                        "reason": "Off-peak charging - cheap grid power",
+                        "description": "Charge 300kW during off-peak hours",
+                        "savings": 12
+                    }
+                    recommendations_created.append(bess_rec)
+
+                # ========== DEMO MODE: GENERATOR LOAD SHEDDING ==========
+                # 5% chance per hour to simulate load shedding event
+                if random.random() < 0.05:
+                    gen_rec = {
+                        "equipment": "S002-GEN-B1-001",
+                        "control_point": "start",
+                        "target_value": 1,
+                        "reason": "Simulated load shedding event from grid operator",
+                        "description": "Start backup generator due to grid demand response",
+                        "savings": 8
+                    }
+                    recommendations_created.append(gen_rec)
+
             # Emit comprehensive optimization event
             self._emit_event(LifecycleEvent(
                 timestamp=datetime.now(),
@@ -727,25 +834,33 @@ class LifecycleOrchestrator:
             logger.warning(f"AI optimization error: {e}")
     
     def _calculate_occupancy(self, hour: int) -> int:
-        """Calculate occupancy percent based on hour of day."""
+        """Calculate occupancy percent based on hour of day, with demo mode drift."""
+        # Base occupancy from time of day
         if hour < 6 or hour >= 22:
-            return 0  # Night: 0%
+            base = 0  # Night: 0%
         elif hour < 8:
-            return 10  # Early morning: arriving
+            base = 10  # Early morning: arriving
         elif hour < 11:
-            return 70  # Morning: ramping up
+            base = 70  # Morning: ramping up
         elif hour < 12:
-            return 90  # Pre-peak: approaching peak
+            base = 90  # Pre-peak: approaching peak
         elif hour < 13:
-            return 95  # Peak: lunch time, still high
+            base = 95  # Peak: lunch time, still high
         elif hour < 17:
-            return 80  # Afternoon: peak declining
+            base = 80  # Afternoon: peak declining
         elif hour < 18:
-            return 60  # Late afternoon: people leaving
+            base = 60  # Late afternoon: people leaving
         elif hour < 20:
-            return 30  # Evening: mostly gone
+            base = 30  # Evening: mostly gone
         else:
-            return 5  # Late evening: security/cleaning only
+            base = 5  # Late evening: security/cleaning only
+        
+        # Demo mode: add occupancy drift (±15%) to keep rules triggering
+        if self.current_scenario and self.current_scenario.demo_mode:
+            drift = self._scenario_rng.uniform(0.85, 1.15)
+            base = int(max(0, min(100, base * drift)))
+        
+        return base  # Late evening: security/cleaning only
     
     def _calculate_daylight(self, hour: int) -> int:
         """Calculate available natural daylight as percentage (0-100%)."""
@@ -794,7 +909,12 @@ class LifecycleOrchestrator:
     def _generate_hvac_recommendation(self, eq_code: str, eq_type: str, context: str, 
                                       occupancy_percent: int, hour: int) -> Optional[Dict[str, Any]]:
         """Generate occupancy-aware HVAC recommendation."""
-        if occupancy_percent < 20:
+        # Demo mode: lower thresholds for continuous recommendations (2x more sensitive)
+        is_demo = self.current_scenario and self.current_scenario.demo_mode
+        low_occupancy_threshold = 30 if is_demo else 20
+        high_occupancy_threshold = 70 if is_demo else 80
+        
+        if occupancy_percent < low_occupancy_threshold:
             # Low occupancy: reduce cooling, increase setpoint
             return {
                 "equipment": eq_code,
@@ -804,7 +924,7 @@ class LifecycleOrchestrator:
                 "description": "Increase setpoint to 24°C for energy efficiency",
                 "savings": 8
             }
-        elif occupancy_percent >= 80 and hour >= 10 and hour <= 12:
+        elif occupancy_percent >= high_occupancy_threshold and hour >= 10 and hour <= 12:
             # Peak occupancy during peak solar hours: pre-cool
             return {
                 "equipment": eq_code,
@@ -1188,14 +1308,128 @@ class LifecycleOrchestrator:
         except Exception as e:
             logger.error(f"Service feedback submission error: {e}")
 
+    def serialize_state(self) -> Dict[str, Any]:
+        """
+        Serialize orchestrator state to JSON-serializable dict for database storage.
+        Enables crash recovery by preserving simulation state.
+        
+        Returns:
+            Dict with: simulated_time, days_simulated, active_faults, pending_repairs, recent_events, time_multiplier, occupancy_seed
+        """
+        return {
+            "simulated_time": self.simulated_time.isoformat(),
+            "days_simulated": self.days_simulated,
+            "active_faults": self.active_faults,
+            "pending_repairs": self.pending_repairs,
+            "recent_events": [
+                {
+                    "timestamp": e.timestamp.isoformat(),
+                    "event_type": e.event_type.value,
+                    "equipment_id": e.equipment_id,
+                    "message": e.message,
+                }
+                for e in self.events[-50:]  # Keep last 50 events for display
+            ],
+            "time_multiplier": self.time_multiplier,
+            "occupancy_seed": self._occupancy_seed,
+        }
 
-# Singleton instance
-_orchestrator: Optional[LifecycleOrchestrator] = None
+    @staticmethod
+    def deserialize_state(state_dict: Dict[str, Any]) -> "LifecycleOrchestrator":
+        """
+        Restore orchestrator from serialized state (crash recovery).
+        Creates new instance and restores state from checkpoint.
+        
+        Args:
+            state_dict: Dict from serialize_state()
+            
+        Returns:
+            LifecycleOrchestrator instance with restored state
+        """
+        orchestrator = LifecycleOrchestrator()
+        
+        # Restore time and simulation progress
+        orchestrator.simulated_time = datetime.fromisoformat(state_dict["simulated_time"])
+        orchestrator.days_simulated = state_dict["days_simulated"]
+        orchestrator.time_multiplier = state_dict["time_multiplier"]
+        orchestrator._occupancy_seed = state_dict["occupancy_seed"]
+        
+        # Restore faults and repairs
+        orchestrator.active_faults = state_dict.get("active_faults", {})
+        orchestrator.pending_repairs = state_dict.get("pending_repairs", {})
+        
+        # Restore occupancy randomness (deterministic for same seed)
+        if orchestrator._occupancy_seed is not None:
+            orchestrator._scenario_rng.seed(orchestrator._occupancy_seed)
+        
+        logger.info(
+            f"Restored orchestrator state: day {orchestrator.days_simulated}, "
+            f"{len(orchestrator.active_faults)} active faults, "
+            f"{len(orchestrator.pending_repairs)} pending repairs"
+        )
+        
+        return orchestrator
+
+    async def save_checkpoint(self) -> bool:
+        """
+        Save current state to database (called every 6 simulated hours).
+        Enables resumption from checkpoint if server crashes.
+        
+        Returns:
+            True if saved successfully, False otherwise
+        """
+        if not self.task_id:
+            return False  # No task_id means not a queued task
+            
+        try:
+            from app.database.supabase_client import Supabase
+            
+            state_snapshot = self.serialize_state()
+            
+            # Update task in database with checkpoint
+            result = await Supabase.instance().client.table("solar_annual_tasks") \
+                .update({
+                    "state_snapshot": state_snapshot,
+                    "progress_pct": int((self.days_simulated / 365) * 100) if self.seasonal_modeler else 0,
+                    "days_completed": self.days_simulated,
+                }) \
+                .eq("task_id", str(self.task_id)) \
+                .execute()
+            
+            logger.info(f"Checkpoint saved for task {self.task_id}: day {self.days_simulated}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to save checkpoint: {e}")
+            return False
+
+
+def create_lifecycle_orchestrator(task_id: Optional[str] = None) -> LifecycleOrchestrator:
+    """
+    Create a new lifecycle orchestrator instance.
+
+    Args:
+        task_id: Optional task ID for database-backed task tracking
+
+    Returns:
+        New LifecycleOrchestrator instance
+    """
+    return LifecycleOrchestrator(task_id=task_id)
+
+
+# Global singleton instance
+_orchestrator_instance: Optional[LifecycleOrchestrator] = None
 
 
 def get_lifecycle_orchestrator() -> LifecycleOrchestrator:
-    """Get singleton lifecycle orchestrator."""
-    global _orchestrator
-    if _orchestrator is None:
-        _orchestrator = LifecycleOrchestrator()
-    return _orchestrator
+    """
+    Get or create the global lifecycle orchestrator singleton.
+
+    Returns:
+        Singleton LifecycleOrchestrator instance
+    """
+    global _orchestrator_instance
+    if _orchestrator_instance is None:
+        _orchestrator_instance = LifecycleOrchestrator()
+        logger.info("Created lifecycle orchestrator singleton")
+    return _orchestrator_instance

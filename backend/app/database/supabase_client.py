@@ -51,3 +51,16 @@ def reset_supabase_client():
     """Reset the Supabase client (useful for testing)."""
     global _supabase_client
     _supabase_client = None
+
+
+class Supabase:
+    """Singleton wrapper for Supabase client."""
+
+    @staticmethod
+    def instance():
+        """Get or create the Supabase client singleton.
+
+        Returns:
+            Supabase client instance
+        """
+        return get_supabase_client()

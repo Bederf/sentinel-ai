@@ -84,20 +84,14 @@ async def startup_event(app: FastAPI) -> None:
     from app.api.devices import startup_event as devices_startup
     await devices_startup()
 
-    # Initialize Clawd bot JWT authentication
+    # Initialize Clawd bot JWT authentication (non-blocking)
     from app.services.clawd_auth_service import initialize_clawd_auth, get_clawd_auth_service
 
     clawd_auth = initialize_clawd_auth(api_url=settings.backend_url or "http://localhost:9095")
-    
-    # Attempt initial login
-    if await clawd_auth.login():
-        # Start background token refresh (hourly)
-        await clawd_auth.start_background_refresh()
-        _logger.info("✓ Clawd bot JWT authentication active (auto-refresh enabled)")
-    else:
-        _logger.warning(
-            "⚠ Clawd bot JWT login failed - check CLAWD_BOT_USERNAME and CLAWD_BOT_PASSWORD in .env"
-        )
+
+    # Skip Clawd login during startup to avoid blocking
+    # Clawd will attempt login on first use via get_token_or_refresh()
+    _logger.info("ℹ Clawd bot JWT authentication deferred to first use")
 
     # Start background scheduler for demo data generation
     scheduler_service.start()
@@ -170,6 +164,96 @@ async def startup_event(app: FastAPI) -> None:
         _logger.info("✅ Drift detection job initialized - monitors hourly for model/data drift")
     except Exception as e:
         _logger.warning(f"⚠️ Drift detection job initialization failed: {e}")
+
+    # Phase 083: Recover crashed simulations from database
+    # Queries for any tasks marked as 'running' and resumes from checkpoint
+    async def recover_crashed_simulations():
+        """
+        Recover any simulations that were running when server crashed.
+        Deserializes state from database and resumes from checkpoint.
+        """
+        try:
+            from app.database.supabase_client import Supabase
+            from app.services.simulation_orchestrator import (
+                create_orchestrator,
+                register_simulation,
+            )
+
+            supabase = Supabase.instance()
+
+            # Query for any crashed tasks (status='running')
+            response = await supabase.client.table("solar_annual_tasks") \
+                .select("*") \
+                .eq("status", "running") \
+                .eq("simulation_type", "lifecycle") \
+                .execute()
+
+            if not response.data:
+                _logger.info("✅ No crashed simulations to recover")
+                return
+
+            _logger.info(f"🔄 Found {len(response.data)} crashed simulation(s) to recover...")
+
+            # Recover each crashed simulation
+            for task in response.data:
+                task_id = str(task["task_id"])
+                state_snapshot = task.get("state_snapshot", {})
+
+                if not state_snapshot:
+                    _logger.warning(f"⚠️ Task {task_id} has no state snapshot - cannot recover")
+                    # Mark as failed since we can't resume
+                    await supabase.client.table("solar_annual_tasks") \
+                        .update({
+                            "status": "failed",
+                            "error_message": "No checkpoint state available for recovery"
+                        }) \
+                        .eq("task_id", task_id) \
+                        .execute()
+                    continue
+
+                try:
+                    # Mark task as "queued" so queue processor will resume it
+                    # Queue processor will deserialize state and continue from checkpoint
+                    await supabase.client.table("solar_annual_tasks") \
+                        .update({
+                            "status": "queued",
+                            "error_message": None
+                        }) \
+                        .eq("task_id", task_id) \
+                        .execute()
+
+                    # Extract checkpoint details for logging
+                    simulated_time = state_snapshot.get("simulated_time", "unknown")
+                    days_simulated = state_snapshot.get("days_simulated", 0)
+
+                    _logger.info(
+                        f"✅ Queued recovery for task {task_id}: "
+                        f"day {days_simulated}/365, "
+                        f"time {simulated_time}"
+                    )
+
+                except Exception as e:
+                    _logger.error(f"❌ Failed to queue recovery for task {task_id}: {e}")
+
+        except Exception as e:
+            _logger.error(f"Crash recovery initialization failed: {e}")
+
+    # Run crash recovery on startup
+    if not testing_mode:
+        import asyncio
+        try:
+            await recover_crashed_simulations()
+        except Exception as e:
+            _logger.error(f"Error during crash recovery: {e}")
+
+    # Start simulation queue processor job (runs every 10 seconds)
+    # Phase 083: Process queued lifecycle simulations from database
+    # Enables concurrent simulations and crash recovery via task queue
+    try:
+        scheduler_service.add_simulation_queue_processor_job(interval_seconds=10)
+        _logger.info("✅ Simulation queue processor initialized - checks every 10s for queued simulations")
+    except Exception as e:
+        _logger.warning(f"⚠️ Simulation queue processor initialization failed: {e}")
 
     # Start system health snapshot job (runs every 5 minutes)
     # Stores point-in-time health snapshots for trend analysis and historical reporting
