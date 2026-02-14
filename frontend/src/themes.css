@@ -1,0 +1,359 @@
+/* ═══════════════════════════════════════════════════════════════ */
+/* DARK OPS THEME — Command Center / Bloomberg aesthetic          */
+/* Applied via .ops-theme class on <html> or data-theme="ops"     */
+/* ═══════════════════════════════════════════════════════════════ */
+
+/* Ops Theme — CSS Variable Overrides */
+.ops-theme,
+[data-theme="ops"] {
+  /* Override SENTINEL base colors */
+  --color-sentinel-bg-canvas: #0a0f1a;
+  --color-sentinel-bg-primary: #0f1422;
+  --color-sentinel-bg-secondary: #111827;
+  --color-sentinel-bg-panel: #111827;
+  --color-sentinel-border: #1e2d42;
+  --color-sentinel-border-strong: #2a3a55;
+
+  /* Override text colors */
+  --color-sentinel-text-primary: #e2e8f0;
+  --color-sentinel-text-secondary: #64748b;
+  --color-sentinel-text-disabled: #475569;
+  --color-sentinel-text-link: #00d2ff;
+
+  /* Override accent — Cyan replaces Amber as primary accent */
+  --color-sentinel-amber: #00d2ff;
+  --color-sentinel-amber-light: #33ddff;
+  --color-sentinel-amber-dark: #0099cc;
+
+  /* Chart palette — Ops-specific vibrant set */
+  --color-chart-1: #00d2ff;
+  --color-chart-2: #00e676;
+  --color-chart-3: #ffd700;
+  --color-chart-4: #ff6b6b;
+  --color-chart-5: #a855f7;
+  --color-chart-6: #ff9f43;
+
+  /* Ops panel styling */
+  --radius-panel: 12px;
+  --shadow-panel: 0 4px 24px rgba(0, 0, 0, 0.4), 0 1px 4px rgba(0, 0, 0, 0.3);
+
+  /* Glass overrides for ops */
+  --glass-bg: rgba(15, 20, 34, 0.85);
+  --glass-bg-light: rgba(15, 20, 34, 0.6);
+  --glass-bg-heavy: rgba(10, 15, 26, 0.92);
+  --glass-border: rgba(30, 45, 66, 0.8);
+  --glass-border-strong: rgba(42, 58, 85, 0.9);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  --radius-glass: 12px;
+}
+
+@layer components {
+  /* Ops Panel — gradient background with subtle glow */
+  .ops-theme .panel,
+  .ops-theme .card,
+  [data-theme="ops"] .panel,
+  [data-theme="ops"] .card {
+    background: linear-gradient(135deg, #111827 0%, #0f172a 100%);
+    border: 1px solid var(--color-sentinel-border);
+    border-radius: 12px;
+    box-shadow: var(--shadow-panel);
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Ops corner glow — generic accent glow in top-right */
+  .ops-theme .panel::before,
+  .ops-theme .card::before,
+  [data-theme="ops"] .panel::before,
+  [data-theme="ops"] .card::before {
+    content: '';
+    position: absolute;
+    top: -40px;
+    right: -40px;
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background: var(--color-sentinel-amber);
+    opacity: 0.04;
+    filter: blur(40px);
+    pointer-events: none;
+  }
+
+  /* Ops sidebar active item — cyan accent */
+  .ops-theme .sidebar-item-active,
+  [data-theme="ops"] .sidebar-item-active {
+    background: rgba(0, 210, 255, 0.08);
+    border-left-color: #00d2ff;
+  }
+
+  .ops-theme .sidebar-item-active:hover,
+  [data-theme="ops"] .sidebar-item-active:hover {
+    background: rgba(0, 210, 255, 0.12);
+  }
+
+  /* Ops tab active — cyan underline */
+  .ops-theme .tab-item-active,
+  [data-theme="ops"] .tab-item-active {
+    color: #00d2ff;
+    border-bottom-color: #00d2ff;
+  }
+
+  /* Ops metric values — tabular nums, cyan highlights */
+  .ops-theme .metric-value,
+  [data-theme="ops"] .metric-value {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+
+  /* Ops metric labels — uppercase letterspaced */
+  .ops-theme .metric-label,
+  [data-theme="ops"] .metric-label {
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: #64748b;
+  }
+
+  /* Ops button primary — cyan gradient */
+  .ops-theme .btn-primary,
+  [data-theme="ops"] .btn-primary {
+    background: linear-gradient(135deg, #00d2ff 0%, #0099cc 100%);
+    color: #0a0f1a;
+    font-weight: 600;
+    border: none;
+    border-radius: 8px;
+  }
+
+  .ops-theme .btn-primary:hover,
+  [data-theme="ops"] .btn-primary:hover {
+    background: linear-gradient(135deg, #33ddff 0%, #00bbee 100%);
+    box-shadow: 0 0 16px rgba(0, 210, 255, 0.3);
+  }
+
+  /* Ops sentinel shield — cyan glow */
+  .ops-theme .sentinel-shield,
+  [data-theme="ops"] .sentinel-shield {
+    border-color: #00d2ff;
+    background: linear-gradient(135deg, #0a0f1a 0%, #111827 100%);
+  }
+
+  .ops-theme .sentinel-shield-active,
+  [data-theme="ops"] .sentinel-shield-active {
+    box-shadow: 0 0 20px rgba(0, 210, 255, 0.3);
+  }
+
+  /* Ops status dots — enhanced glow */
+  .ops-theme .status-dot-success,
+  [data-theme="ops"] .status-dot-success {
+    box-shadow: 0 0 6px rgba(0, 230, 118, 0.5);
+  }
+
+  .ops-theme .status-dot-error,
+  [data-theme="ops"] .status-dot-error {
+    box-shadow: 0 0 6px rgba(255, 107, 107, 0.5);
+  }
+
+  .ops-theme .status-dot-warning,
+  [data-theme="ops"] .status-dot-warning {
+    box-shadow: 0 0 6px rgba(255, 215, 0, 0.5);
+  }
+
+  /* Ops tooltip — frosted glass */
+  .ops-theme .tooltip,
+  [data-theme="ops"] .tooltip {
+    background: rgba(15, 20, 30, 0.95);
+    border: 1px solid #2a3a55;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  }
+
+  /* Ops chart container */
+  .ops-theme .chart-container,
+  [data-theme="ops"] .chart-container {
+    background: linear-gradient(135deg, #111827 0%, #0f172a 100%);
+    border: 1px solid #1e2d42;
+    border-radius: 12px;
+  }
+
+  /* Ops data table — clean lines, muted headers */
+  .ops-theme .data-table th,
+  [data-theme="ops"] .data-table th {
+    background: rgba(0, 0, 0, 0.2);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    color: #64748b;
+    border-bottom-color: #1e2d42;
+  }
+
+  .ops-theme .data-table td,
+  [data-theme="ops"] .data-table td {
+    border-bottom-color: rgba(30, 45, 66, 0.5);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .ops-theme .data-table tr:hover td,
+  [data-theme="ops"] .data-table tr:hover td {
+    background: rgba(0, 210, 255, 0.03);
+  }
+
+  /* Ops badge overrides — cyan info badge */
+  .ops-theme .badge-info,
+  [data-theme="ops"] .badge-info {
+    background: rgba(0, 210, 255, 0.12);
+    color: #00d2ff;
+    border: 1px solid rgba(0, 210, 255, 0.3);
+  }
+
+  /* Ops input — darker background */
+  .ops-theme .input-dark,
+  [data-theme="ops"] .input-dark {
+    background: #0a0f1a;
+    border-color: #1e2d42;
+    border-radius: 8px;
+  }
+
+  .ops-theme .input-dark:focus,
+  [data-theme="ops"] .input-dark:focus {
+    border-color: #00d2ff;
+    box-shadow: 0 0 0 1px rgba(0, 210, 255, 0.2);
+  }
+
+  /* Ops skeleton — darker */
+  .ops-theme .skeleton,
+  [data-theme="ops"] .skeleton {
+    background: linear-gradient(
+      90deg,
+      #111827 0%,
+      #1e2d42 50%,
+      #111827 100%
+    );
+    background-size: 200% 100%;
+    border-radius: 8px;
+  }
+
+  /* Ops glow effects — enhanced */
+  .ops-theme .glow-green,
+  [data-theme="ops"] .glow-green {
+    box-shadow: 0 0 16px rgba(0, 230, 118, 0.4);
+  }
+
+  .ops-theme .glow-blue,
+  [data-theme="ops"] .glow-blue {
+    box-shadow: 0 0 16px rgba(0, 210, 255, 0.4);
+  }
+
+  .ops-theme .glow-amber,
+  .ops-theme .glow-orange,
+  [data-theme="ops"] .glow-amber,
+  [data-theme="ops"] .glow-orange {
+    box-shadow: 0 0 16px rgba(255, 215, 0, 0.4);
+  }
+}
+
+/* Ops Recharts overrides */
+.ops-theme .recharts-cartesian-grid-horizontal line,
+.ops-theme .recharts-cartesian-grid-vertical line,
+[data-theme="ops"] .recharts-cartesian-grid-horizontal line,
+[data-theme="ops"] .recharts-cartesian-grid-vertical line {
+  stroke: #1e2d42 !important;
+}
+
+/* Ops body background — deep navy with subtle radials */
+.ops-theme body,
+[data-theme="ops"] body {
+  background: #0a0f1a;
+  background-image:
+    radial-gradient(ellipse at 20% 50%, rgba(0, 210, 255, 0.03) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, rgba(0, 230, 118, 0.02) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 80%, rgba(255, 215, 0, 0.01) 0%, transparent 50%);
+}
+
+/* Ops scrollbar — cyan tint */
+.ops-theme ::-webkit-scrollbar-thumb,
+[data-theme="ops"] ::-webkit-scrollbar-thumb {
+  background: rgba(0, 210, 255, 0.15);
+}
+
+.ops-theme ::-webkit-scrollbar-thumb:hover,
+[data-theme="ops"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 210, 255, 0.25);
+}
+
+
+/* ═══════════════════════════════════════════════════════════════ */
+/* GLASS THEME WRAPPER — System-wide glass theme activation       */
+/* Applied via .glass-theme class on <html> or data-theme="glass" */
+/* ═══════════════════════════════════════════════════════════════ */
+
+.glass-theme,
+[data-theme="glass"] {
+  /* Softer, more translucent panels */
+  --color-sentinel-bg-panel: var(--glass-bg);
+  --color-sentinel-border: var(--glass-border);
+  --color-sentinel-border-strong: var(--glass-border-strong);
+  --radius-panel: var(--radius-glass);
+  --shadow-panel: var(--glass-shadow);
+}
+
+@layer components {
+  /* Glass theme — all panels become frosted */
+  .glass-theme .panel,
+  .glass-theme .card,
+  [data-theme="glass"] .panel,
+  [data-theme="glass"] .card {
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-glass);
+    box-shadow: var(--glass-shadow);
+  }
+
+  /* Glass inner highlight */
+  .glass-theme .panel::after,
+  .glass-theme .card::after,
+  [data-theme="glass"] .panel::after,
+  [data-theme="glass"] .card::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent);
+    pointer-events: none;
+  }
+
+  /* Glass sidebar */
+  .glass-theme .sidebar,
+  [data-theme="glass"] .sidebar {
+    background: var(--glass-bg-heavy);
+    backdrop-filter: blur(var(--glass-blur-lg)) saturate(180%);
+    -webkit-backdrop-filter: blur(var(--glass-blur-lg)) saturate(180%);
+    border-right-color: var(--glass-border);
+  }
+
+  /* Glass tooltip */
+  .glass-theme .tooltip,
+  [data-theme="glass"] .tooltip {
+    background: var(--glass-bg-heavy);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border-color: var(--glass-border);
+    border-radius: var(--radius-glass);
+  }
+}
+
+/* Glass mobile — reduced blur for performance */
+@media (max-width: 768px) {
+  .glass-theme .panel,
+  .glass-theme .card,
+  [data-theme="glass"] .panel,
+  [data-theme="glass"] .card {
+    backdrop-filter: blur(var(--glass-blur-sm)) saturate(150%);
+    -webkit-backdrop-filter: blur(var(--glass-blur-sm)) saturate(150%);
+  }
+}
