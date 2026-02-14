@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { X } from 'lucide-react';
 import type { Equipment } from '@/lib/api/sites';
 
 interface EquipmentDetailPanelProps {
@@ -28,9 +27,10 @@ export function EquipmentDetailPanel({ equipment, onClose }: EquipmentDetailPane
 
   return (
     <div
-      className="h-full w-full flex flex-col"
+      className="h-full w-full flex flex-col matrix-panel"
       style={{
-        background: 'var(--color-sentinel-bg-panel)',
+        background: 'rgba(6, 14, 24, 0.95)',
+        borderRadius: 0,
       }}
     >
       {/* Header */}
@@ -65,42 +65,46 @@ export function EquipmentDetailPanel({ equipment, onClose }: EquipmentDetailPane
         </div>
         <button
           onClick={onClose}
-          className="p-1 rounded hover:brightness-110 transition-colors flex-none"
+          className="matrix-btn flex-none px-2 py-1"
           style={{
-            background: 'var(--color-sentinel-bg-secondary)',
+            fontSize: '16px',
+            minWidth: 'auto',
+            padding: '4px 8px',
           }}
           aria-label="Close"
         >
-          <X className="h-5 w-5" style={{ color: 'var(--color-sentinel-text-secondary)' }} />
+          ✕
         </button>
       </div>
 
       {/* Tabs */}
       <div
         className="flex-none flex border-b"
-        style={{ borderColor: 'var(--color-sentinel-border)' }}
+        style={{ borderColor: 'rgba(0, 255, 65, 0.2)' }}
       >
         {(['live', 'controls', 'alerts', 'maintenance'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className="flex-1 px-3 py-2 text-xs font-medium uppercase tracking-wide transition-colors border-b-2 -mb-px"
+            className="flex-1 px-3 py-2 text-xs font-medium uppercase tracking-widest transition-colors border-b-2 -mb-px"
             style={{
+              fontFamily: 'Orbitron, monospace',
               color:
                 activeTab === tab
-                  ? 'var(--color-sentinel-accent)'
-                  : 'var(--color-sentinel-text-secondary)',
-              borderColor: activeTab === tab ? 'var(--color-sentinel-accent)' : 'transparent',
+                  ? '#00FF41'
+                  : 'rgba(0, 255, 65, 0.4)',
+              borderColor: activeTab === tab ? '#00FF41' : 'transparent',
               background:
                 activeTab === tab
-                  ? 'var(--color-sentinel-bg-secondary)'
+                  ? 'rgba(0, 255, 65, 0.08)'
                   : 'transparent',
+              textShadow: activeTab === tab ? '0 0 8px rgba(0, 255, 65, 0.4)' : 'none',
             }}
           >
-            {tab === 'live' && 'Live'}
-            {tab === 'controls' && 'Controls'}
-            {tab === 'alerts' && 'Alerts'}
-            {tab === 'maintenance' && 'Maintenance'}
+            {tab === 'live' && 'LIVE'}
+            {tab === 'controls' && 'CTRL'}
+            {tab === 'alerts' && 'ALERTS'}
+            {tab === 'maintenance' && 'SVC'}
           </button>
         ))}
       </div>
@@ -112,10 +116,11 @@ export function EquipmentDetailPanel({ equipment, onClose }: EquipmentDetailPane
             {/* Zone & Desk Info for DALI Sensors */}
             {((equipment as any).equipment_type || 'unknown').toLowerCase() === 'dali' && (
               <div
-                className="p-3 rounded"
+                className="p-3"
                 style={{
-                  background: 'var(--color-sentinel-bg-secondary)',
-                  border: '1px solid var(--color-sentinel-border)',
+                  background: 'rgba(0, 255, 65, 0.08)',
+                  border: '1px solid rgba(0, 255, 65, 0.3)',
+                  boxShadow: '0 0 8px rgba(0, 255, 65, 0.2)',
                 }}
               >
                 <div className="text-xs font-medium mb-2" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
@@ -154,10 +159,11 @@ export function EquipmentDetailPanel({ equipment, onClose }: EquipmentDetailPane
             )}
 
             <div
-              className="p-3 rounded"
+              className="p-3"
               style={{
-                background: 'var(--color-sentinel-bg-secondary)',
-                border: '1px solid var(--color-sentinel-border)',
+                background: 'rgba(0, 255, 65, 0.08)',
+                border: '1px solid rgba(0, 255, 65, 0.3)',
+                boxShadow: '0 0 8px rgba(0, 255, 65, 0.2)',
               }}
             >
               <div className="text-xs font-medium mb-2" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
@@ -172,10 +178,11 @@ export function EquipmentDetailPanel({ equipment, onClose }: EquipmentDetailPane
             </div>
 
             <div
-              className="p-3 rounded"
+              className="p-3"
               style={{
-                background: 'var(--color-sentinel-bg-secondary)',
-                border: '1px solid var(--color-sentinel-border)',
+                background: 'rgba(0, 255, 65, 0.08)',
+                border: '1px solid rgba(0, 255, 65, 0.3)',
+                boxShadow: '0 0 8px rgba(0, 255, 65, 0.2)',
               }}
             >
               <div className="text-xs font-medium mb-2" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
@@ -190,10 +197,11 @@ export function EquipmentDetailPanel({ equipment, onClose }: EquipmentDetailPane
             </div>
 
             <div
-              className="p-3 rounded"
+              className="p-3"
               style={{
-                background: 'var(--color-sentinel-bg-secondary)',
-                border: '1px solid var(--color-sentinel-border)',
+                background: 'rgba(0, 255, 65, 0.08)',
+                border: '1px solid rgba(0, 255, 65, 0.3)',
+                boxShadow: '0 0 8px rgba(0, 255, 65, 0.2)',
               }}
             >
               <div className="text-xs font-medium mb-2" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
@@ -209,10 +217,11 @@ export function EquipmentDetailPanel({ equipment, onClose }: EquipmentDetailPane
         {activeTab === 'controls' && (
           <div className="space-y-4">
             <div
-              className="p-3 rounded"
+              className="p-3"
               style={{
-                background: 'var(--color-sentinel-bg-secondary)',
-                border: '1px solid var(--color-sentinel-border)',
+                background: 'rgba(0, 255, 65, 0.08)',
+                border: '1px solid rgba(0, 255, 65, 0.3)',
+                boxShadow: '0 0 8px rgba(0, 255, 65, 0.2)',
               }}
             >
               <div className="text-xs font-medium mb-3" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
@@ -242,10 +251,11 @@ export function EquipmentDetailPanel({ equipment, onClose }: EquipmentDetailPane
             </div>
 
             <div
-              className="p-3 rounded"
+              className="p-3"
               style={{
-                background: 'var(--color-sentinel-bg-secondary)',
-                border: '1px solid var(--color-sentinel-border)',
+                background: 'rgba(0, 255, 65, 0.08)',
+                border: '1px solid rgba(0, 255, 65, 0.3)',
+                boxShadow: '0 0 8px rgba(0, 255, 65, 0.2)',
               }}
             >
               <div className="text-xs font-medium mb-3" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
@@ -303,10 +313,11 @@ export function EquipmentDetailPanel({ equipment, onClose }: EquipmentDetailPane
         {activeTab === 'maintenance' && (
           <div className="space-y-3">
             <div
-              className="p-3 rounded"
+              className="p-3"
               style={{
-                background: 'var(--color-sentinel-bg-secondary)',
-                border: '1px solid var(--color-sentinel-border)',
+                background: 'rgba(0, 255, 65, 0.08)',
+                border: '1px solid rgba(0, 255, 65, 0.3)',
+                boxShadow: '0 0 8px rgba(0, 255, 65, 0.2)',
               }}
             >
               <div className="text-xs font-medium mb-2" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
@@ -321,10 +332,11 @@ export function EquipmentDetailPanel({ equipment, onClose }: EquipmentDetailPane
             </div>
 
             <div
-              className="p-3 rounded"
+              className="p-3"
               style={{
-                background: 'var(--color-sentinel-bg-secondary)',
-                border: '1px solid var(--color-sentinel-border)',
+                background: 'rgba(0, 255, 65, 0.08)',
+                border: '1px solid rgba(0, 255, 65, 0.3)',
+                boxShadow: '0 0 8px rgba(0, 255, 65, 0.2)',
               }}
             >
               <div className="text-xs font-medium mb-2" style={{ color: 'var(--color-sentinel-text-secondary)' }}>

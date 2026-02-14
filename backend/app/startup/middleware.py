@@ -27,6 +27,7 @@ _logger = logging.getLogger("sentinel.security")
 # Paths that do not require authentication
 _PUBLIC_PATHS = {
     "/api/auth/login",
+    "/api/auth/access-request",
     "/api/auth/login/mfa-complete",
     "/api/auth/refresh",
     "/api/auth/register",

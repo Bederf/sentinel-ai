@@ -29,5 +29,6 @@ def register_core_routers(app: FastAPI) -> None:
     # Authentication and authorization
     app.include_router(auth.router, tags=["auth"])
     app.include_router(user_access.router, tags=["user-access"])
+    app.include_router(user_access.self_service_router, tags=["user-access"])
     app.include_router(login_audit.router, tags=["login-audit"])
     app.include_router(mfa.router, tags=["mfa"])

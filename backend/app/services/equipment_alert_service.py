@@ -61,7 +61,11 @@ class EquipmentAlertService:
         building = self._get_building(building_id)
         building_name = building.get("name", "Unknown") if building else "Unknown"
 
-        # Create alert record
+        # Use equipment code as primary identifier
+        equipment_code = equipment.get("code", "UNKNOWN")
+        equipment_type = equipment.get("type", "equipment").upper()
+
+        # Create alert record with equipment code in title
         alert_id = str(uuid.uuid4())
         alert_data = {
             "id": alert_id,
@@ -70,7 +74,7 @@ class EquipmentAlertService:
             "type": alert_type,
             "severity": severity,
             "status": "active",
-            "title": f"{severity.upper()}: {equipment.get('name', 'Equipment')} Health Alert",
+            "title": f"{severity.upper()}: {equipment_code} ({equipment_type}) - {equipment.get('name', 'Equipment')}",
             "message": message,
         }
 
@@ -105,7 +109,9 @@ class EquipmentAlertService:
         return {
             "alert": created_alert,
             "telegram_sent": telegram_sent,
+            "equipment_code": equipment_code,
             "equipment_name": equipment.get("name"),
+            "equipment_type": equipment_type,
             "building_name": building_name,
         }
 

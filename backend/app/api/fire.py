@@ -5,17 +5,31 @@ stairwell pressurization, and cause-effect matrix. Plus coordination
 endpoints for HVAC shutdown, smoke management, and alarm lifecycle.
 """
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from typing import List, Optional
 import logging
 
+from app.api.dependencies.module_access import require_active_module
+from app.models.module_registry import ModuleType
 from app.services.fire_system_service import get_fire_system_service
 from app.services.fire_hvac_coordinator import get_fire_hvac_coordinator
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/fire", tags=["fire"])
+router = APIRouter(
+    prefix="/api/fire",
+    tags=["fire"],
+    dependencies=[
+        Depends(
+            require_active_module(
+                ModuleType.FIRE,
+                site_keys=("site_id", "site"),
+                default_site_id="site-002",
+            )
+        )
+    ],
+)
 
 
 # --- Request/Response models ---

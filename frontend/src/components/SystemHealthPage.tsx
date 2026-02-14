@@ -107,6 +107,35 @@ export default function SystemHealthPage() {
     }
   };
 
+  const getStatusTone = (status: string) => {
+    switch (status) {
+      case 'healthy':
+        return {
+          accent: 'var(--color-sentinel-green)',
+          bg: 'rgba(16, 185, 129, 0.15)',
+          border: 'rgba(16, 185, 129, 0.35)',
+        };
+      case 'degraded':
+        return {
+          accent: 'var(--color-sentinel-amber)',
+          bg: 'rgba(245, 158, 11, 0.15)',
+          border: 'rgba(245, 158, 11, 0.35)',
+        };
+      case 'critical':
+        return {
+          accent: 'var(--color-sentinel-red)',
+          bg: 'rgba(220, 38, 38, 0.15)',
+          border: 'rgba(220, 38, 38, 0.35)',
+        };
+      default:
+        return {
+          accent: 'var(--color-sentinel-text-secondary)',
+          bg: 'rgba(148, 163, 184, 0.12)',
+          border: 'rgba(148, 163, 184, 0.25)',
+        };
+    }
+  };
+
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'healthy':
@@ -140,7 +169,7 @@ export default function SystemHealthPage() {
   if (error && !currentHealth) {
     return (
       <div className="p-6">
-        <Card>
+        <Card className="glass-panel" style={{ border: "1px solid rgba(220, 38, 38, 0.35)" }}>
           <div className="flex items-center gap-2">
             <AlertCircle className="w-5 h-5 text-red-500" />
             <Text className="text-red-500">Error: {error}</Text>
@@ -150,17 +179,30 @@ export default function SystemHealthPage() {
     );
   }
 
+  const overallStatus = currentHealth?.overall_status || 'healthy';
+  const overallTone = getStatusTone(overallStatus);
+
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6" style={{ background: "var(--color-sentinel-bg-canvas)" }}>
       {/* Page Header */}
-      <div>
-        <h1 className="text-3xl font-bold">System Health Dashboard</h1>
-        <Text className="text-gray-500">Real-time monitoring and diagnostics</Text>
+      <div
+        className="glass-panel rounded-lg p-5"
+        style={{ border: "1px solid var(--glass-border)" }}
+      >
+        <h1
+          className="text-2xl font-semibold tracking-tight"
+          style={{ color: "var(--color-sentinel-text-primary)" }}
+        >
+          System Health Dashboard
+        </h1>
+        <p className="text-sm mt-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+          Real-time monitoring and diagnostics
+        </p>
       </div>
 
       {/* Tab Interface */}
       <TabGroup defaultIndex={selectedTab} onIndexChange={setSelectedTab}>
-        <TabList>
+        <TabList className="glass-subtle rounded-md p-1" style={{ border: "1px solid var(--glass-border)" }}>
           <Tab>Realtime Status</Tab>
           <Tab>Historical Insights</Tab>
           <Tab>Diagnostics</Tab>
@@ -172,67 +214,116 @@ export default function SystemHealthPage() {
             {currentHealth && (
               <>
                 {/* Overall Health Card */}
-                <Card>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Text>Overall Health Status</Text>
-                      <Metric>{currentHealth.overall_score}</Metric>
-                    </div>
-                    <div className="text-right">
-                      <Badge
-                        color={getStatusColor(currentHealth.overall_status)}
+                <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
+                  <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+                    <div className="space-y-2">
+                      <p
+                        className="text-xs uppercase tracking-wider font-medium"
+                        style={{ color: "var(--color-sentinel-text-secondary)" }}
                       >
-                        {currentHealth.overall_status.toUpperCase()}
-                      </Badge>
+                        Overall Health Status
+                      </p>
+                      <div className="flex items-end gap-3">
+                        <span
+                          className="text-6xl font-semibold leading-none"
+                          style={{ color: "var(--color-sentinel-text-primary)" }}
+                        >
+                          {currentHealth.overall_score}
+                        </span>
+                        <span
+                          className="text-sm pb-1"
+                          style={{ color: "var(--color-sentinel-text-secondary)" }}
+                        >
+                          /100
+                        </span>
+                      </div>
+                    </div>
+                    <div
+                      className="inline-flex items-center gap-2 rounded-md px-3 py-2 h-fit"
+                      style={{
+                        background: overallTone.bg,
+                        border: `1px solid ${overallTone.border}`,
+                      }}
+                    >
+                      <span
+                        className="inline-block h-2.5 w-2.5 rounded-full"
+                        style={{ background: overallTone.accent }}
+                      />
+                      <span
+                        className="text-xs font-semibold tracking-wide"
+                        style={{ color: overallTone.accent }}
+                      >
+                        {overallStatus.toUpperCase()}
+                      </span>
                     </div>
                   </div>
                   <ProgressBar
                     value={currentHealth.overall_score}
-                    color={getStatusColor(currentHealth.overall_status)}
+                    color={getStatusColor(overallStatus)}
                     className="mt-4"
                   />
                 </Card>
 
                 {/* Integration Status */}
-                <Card>
+                <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
                   <div className="flex items-start justify-between">
                     <div>
-                      <Text>Integration Status</Text>
-                      <div className="mt-2 flex items-center gap-2">
-                        <Badge color={integrationHealth?.active_sources ? 'green' : 'yellow'}>
+                      <p
+                        className="text-xs uppercase tracking-wider font-medium"
+                        style={{ color: "var(--color-sentinel-text-secondary)" }}
+                      >
+                        Integration Status
+                      </p>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <span
+                          className="inline-flex items-center rounded px-2 py-1 text-xs font-medium"
+                          style={{
+                            background: integrationHealth?.active_sources ? "rgba(16, 185, 129, 0.15)" : "rgba(245, 158, 11, 0.15)",
+                            border: integrationHealth?.active_sources ? "1px solid rgba(16, 185, 129, 0.35)" : "1px solid rgba(245, 158, 11, 0.35)",
+                            color: integrationHealth?.active_sources ? "var(--color-sentinel-green)" : "var(--color-sentinel-amber)",
+                          }}
+                        >
                           {integrationHealth?.active_sources || 0} active source(s)
-                        </Badge>
-                        <Text>
-                          Last sync: {formatRelativeTime(integrationHealth?.last_sync || null)}
-                        </Text>
+                        </span>
+                        <span style={{ color: "var(--color-sentinel-text-disabled)", fontSize: "0.75rem" }}>•</span>
+                        <span
+                          className="inline-flex items-center rounded px-2 py-1 text-xs"
+                          style={{
+                            background: "var(--color-sentinel-bg-secondary)",
+                            border: "1px solid var(--glass-border)",
+                            color: "var(--color-sentinel-text-secondary)",
+                          }}
+                        >
+                          Sync age: {formatRelativeTime(integrationHealth?.last_sync || null)}
+                        </span>
                       </div>
                     </div>
-                    <Server className="w-5 h-5 text-blue-500" />
+                    <Server className="w-5 h-5" style={{ color: "var(--color-sentinel-blue)" }} />
                   </div>
                   <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <div>
-                      <Text>Sources</Text>
-                      <Metric>{integrationHealth?.sources_count || 0}</Metric>
+                    <div className="rounded-md p-2.5" style={{ background: "var(--color-sentinel-bg-secondary)", border: "1px solid var(--glass-border)" }}>
+                      <Text style={{ color: "var(--color-sentinel-text-secondary)" }} className="uppercase text-[10px] tracking-wide">Sources</Text>
+                      <Metric style={{ color: "var(--color-sentinel-text-primary)" }}>{integrationHealth?.sources_count || 0}</Metric>
                     </div>
-                    <div>
-                      <Text>Records</Text>
-                      <Metric>{integrationHealth?.total_records_ingested || 0}</Metric>
+                    <div className="rounded-md p-2.5" style={{ background: "var(--color-sentinel-bg-secondary)", border: "1px solid var(--glass-border)" }}>
+                      <Text style={{ color: "var(--color-sentinel-text-secondary)" }} className="uppercase text-[10px] tracking-wide">Records</Text>
+                      <Metric style={{ color: "var(--color-sentinel-text-primary)" }}>{integrationHealth?.total_records_ingested || 0}</Metric>
                     </div>
-                    <div>
-                      <Text>Mapped Points</Text>
-                      <Metric>{integrationHealth?.total_points_mapped || 0}</Metric>
+                    <div className="rounded-md p-2.5" style={{ background: "var(--color-sentinel-bg-secondary)", border: "1px solid var(--glass-border)" }}>
+                      <Text style={{ color: "var(--color-sentinel-text-secondary)" }} className="uppercase text-[10px] tracking-wide">Mapped Points</Text>
+                      <Metric style={{ color: "var(--color-sentinel-text-primary)" }}>{integrationHealth?.total_points_mapped || 0}</Metric>
                     </div>
-                    <div>
-                      <Text>Unmatched</Text>
-                      <Metric>{integrationHealth?.unmatched_points || 0}</Metric>
+                    <div className="rounded-md p-2.5" style={{ background: "var(--color-sentinel-bg-secondary)", border: "1px solid var(--glass-border)" }}>
+                      <Text style={{ color: "var(--color-sentinel-text-secondary)" }} className="uppercase text-[10px] tracking-wide">Unmatched</Text>
+                      <Metric style={{ color: "var(--color-sentinel-text-primary)" }}>{integrationHealth?.unmatched_points || 0}</Metric>
                     </div>
                   </div>
                   <div className="mt-3 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <LinkIcon className="w-4 h-4 text-amber-500" />
-                      <Text>Active alerts: {integrationHealth?.alerts?.length || 0}</Text>
+                      <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>Active alerts: {integrationHealth?.alerts?.length || 0}</Text>
                     </div>
-                    <Text>Recent errors: {integrationHealth?.recent_errors_count || 0}</Text>
+                    <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>Recent errors: {integrationHealth?.recent_errors_count || 0}</Text>
                   </div>
                 </Card>
 
@@ -240,11 +331,11 @@ export default function SystemHealthPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {Object.entries(currentHealth.components || {}).map(
                     ([key, component]: [string, any]) => (
-                      <Card key={key}>
+                      <Card key={key} className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
-                            <Text className="capitalize">{key}</Text>
-                            <Metric>{component.score}</Metric>
+                            <Text className="capitalize" style={{ color: "var(--color-sentinel-text-secondary)" }}>{key}</Text>
+                            <Metric style={{ color: "var(--color-sentinel-text-primary)" }}>{component.score}</Metric>
                           </div>
                           {getStatusIcon(component.status)}
                         </div>
@@ -267,29 +358,29 @@ export default function SystemHealthPage() {
               <>
                 {/* Uptime Metrics */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <Card>
-                    <Text>Average Health Score</Text>
-                    <Metric>{history.metrics?.avg_score || 0}</Metric>
+                  <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
+                    <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>Average Health Score</Text>
+                    <Metric style={{ color: "var(--color-sentinel-text-primary)" }}>{history.metrics?.avg_score || 0}</Metric>
                   </Card>
-                  <Card>
-                    <Text>Uptime ({history.range})</Text>
-                    <Metric>
+                  <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
+                    <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>Uptime ({history.range})</Text>
+                    <Metric style={{ color: "var(--color-sentinel-text-primary)" }}>
                       {history.metrics?.uptime_percentage || 0}%
                     </Metric>
                   </Card>
-                  <Card>
-                    <Text>Min Score</Text>
-                    <Metric>{history.metrics?.min_score || 0}</Metric>
+                  <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
+                    <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>Min Score</Text>
+                    <Metric style={{ color: "var(--color-sentinel-text-primary)" }}>{history.metrics?.min_score || 0}</Metric>
                   </Card>
-                  <Card>
-                    <Text>Max Score</Text>
-                    <Metric>{history.metrics?.max_score || 0}</Metric>
+                  <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
+                    <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>Max Score</Text>
+                    <Metric style={{ color: "var(--color-sentinel-text-primary)" }}>{history.metrics?.max_score || 0}</Metric>
                   </Card>
                 </div>
 
                 {/* Trend Analysis */}
-                <Card>
-                  <Text>Trend</Text>
+                <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
+                  <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>Trend</Text>
                   <div className="flex items-center gap-2 mt-2">
                     {history.metrics?.trend === 'improving' && (
                       <>
@@ -314,8 +405,8 @@ export default function SystemHealthPage() {
 
                 {/* Health Score Chart */}
                 {history.snapshots && history.snapshots.length > 0 && (
-                  <Card>
-                    <Text>Health Score Trend</Text>
+                  <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
+                    <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>Health Score Trend</Text>
                     <LineChart
                       className="mt-6"
                       data={history.snapshots.map((s: any) => ({
@@ -334,12 +425,12 @@ export default function SystemHealthPage() {
 
           {/* TAB 3: DIAGNOSTICS */}
           <TabPanel className="space-y-6">
-            <Card>
+            <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
               <div className="text-center py-8">
-                <Text className="text-gray-500">
+                <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>
                   Diagnostics tools coming soon
                 </Text>
-                <p className="text-sm text-gray-400 mt-2">
+                <p className="text-sm mt-2" style={{ color: "var(--color-sentinel-text-disabled)" }}>
                   Run SIMBIOT diagnostics to analyze system components
                 </p>
               </div>

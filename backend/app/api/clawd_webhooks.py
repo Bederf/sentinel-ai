@@ -28,6 +28,7 @@ from app.services.ocr_service import get_ocr_service
 from app.services.clawd_integration.ocr_correction_handler import get_ocr_correction_handler
 from app.models.service_record import ServiceStatus
 from app.database.repositories.service_record_repository import ServiceRecordRepository
+from app.services.clawd_auth_service import get_clawd_jwt_headers
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/clawd", tags=["clawd"])
@@ -225,14 +226,18 @@ async def reset_equipment_fault(
     previous_health = None
     try:
         async with httpx.AsyncClient(timeout=5) as client:
+            headers = get_clawd_jwt_headers()
             resp = await client.get(
-                f"http://localhost:9095/api/work-orders/equipment-info/{equipment_code}"
+                f"http://localhost:9095/api/work-orders/equipment-info/{equipment_code}",
+                headers=headers,
             )
             if resp.status_code == 200:
                 equipment_info = resp.json()
                 previous_health = equipment_info.get("health_score") or equipment_info.get("health")
-    except Exception:
-        pass
+            elif resp.status_code == 401:
+                logger.warning("Clawd JWT auth failed when fetching equipment info")
+    except Exception as e:
+        logger.debug(f"Error fetching equipment info: {e}")
 
     # Execute fault reset via RemoteCommandService
     try:
@@ -253,13 +258,17 @@ async def reset_equipment_fault(
             new_health = None
             try:
                 async with httpx.AsyncClient(timeout=5) as client:
+                    headers = get_clawd_jwt_headers()
                     resp = await client.get(
-                        f"http://localhost:9095/api/work-orders/equipment-info/{equipment_code}"
+                        f"http://localhost:9095/api/work-orders/equipment-info/{equipment_code}",
+                        headers=headers,
                     )
                     if resp.status_code == 200:
                         new_health = resp.json().get("health_score") or resp.json().get("health")
-            except Exception:
-                pass
+                    elif resp.status_code == 401:
+                        logger.warning("Clawd JWT auth failed when fetching updated equipment info")
+            except Exception as e:
+                logger.debug(f"Error fetching updated equipment info: {e}")
 
             return {
                 "success": True,

@@ -7,9 +7,11 @@ Pattern follows solar.py and devices.py routers.
 """
 
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from app.middleware.rate_limiter import limiter
 
+from app.api.dependencies.module_access import require_active_module
+from app.models.module_registry import ModuleType
 from app.services.grid_parameters import get_grid_parameters_service
 from app.services.grid_compliance_service import (
     get_monitoring_engine,
@@ -18,7 +20,17 @@ from app.services.grid_compliance_service import (
 )
 from app.database.supabase_client import get_supabase_client
 
-router = APIRouter()
+router = APIRouter(
+    dependencies=[
+        Depends(
+            require_active_module(
+                ModuleType.SOLAR,
+                site_keys=("site_id", "site"),
+                default_site_id="site-002",
+            )
+        )
+    ]
+)
 
 
 # === Grid Compliance Status Endpoints ===

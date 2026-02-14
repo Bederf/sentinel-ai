@@ -14,8 +14,10 @@ Module: 34-05 (Energy Arbitrage & BESS Dispatch Optimization)
 import time
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from app.middleware.rate_limiter import limiter
+from app.api.dependencies.module_access import require_active_module
+from app.models.module_registry import ModuleType
 from app.services.arbitrage_optimizer import (
     get_price_forecaster,
     get_arbitrage_analyzer,
@@ -26,7 +28,17 @@ from app.services.bess_dispatch_engine import (
 )
 from app.ml.models.dispatch_predictor import get_dispatch_predictor
 
-router = APIRouter()
+router = APIRouter(
+    dependencies=[
+        Depends(
+            require_active_module(
+                ModuleType.SOLAR,
+                site_keys=("site_id", "site"),
+                default_site_id="site-002",
+            )
+        )
+    ]
+)
 
 
 # === Price Forecasting Endpoints (Task 1) ===

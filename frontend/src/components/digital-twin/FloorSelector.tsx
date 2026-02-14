@@ -24,19 +24,26 @@ export function FloorSelector({
 
   return (
     <div
-      className="absolute left-4 top-4 rounded-lg shadow-lg p-3 max-w-xs z-10"
+      className="absolute left-4 top-4 p-3 max-w-xs z-10 matrix-panel"
       style={{
-        background: 'var(--color-sentinel-bg-panel)',
-        border: '1px solid var(--color-sentinel-border)',
+        background: 'rgba(6, 14, 24, 0.95)',
       }}
     >
       {/* Header */}
       <button
         onClick={() => setExpanded(!expanded)}
         className="w-full flex items-center justify-between mb-3"
-        style={{ color: 'var(--color-sentinel-text-primary)' }}
+        style={{ 
+          color: '#00FF41',
+          fontFamily: 'Orbitron, monospace',
+          fontSize: '12px',
+          fontWeight: 700,
+          letterSpacing: '0.15em',
+          textTransform: 'uppercase',
+          textShadow: '0 0 8px rgba(0, 255, 65, 0.3)',
+        }}
       >
-        <h3 className="font-bold text-sm">Floors</h3>
+        <h3 className="font-bold text-sm">FLOORS</h3>
         {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
       </button>
 
@@ -52,19 +59,20 @@ export function FloorSelector({
                   type="checkbox"
                   checked={isSelected}
                   onChange={() => onToggle(floor.id)}
-                  className="w-4 h-4 rounded cursor-pointer"
+                  className="matrix-checkbox"
                   style={{
-                    accentColor: 'var(--color-sentinel-accent)',
+                    width: '16px',
+                    height: '16px',
                   }}
                 />
 
                 {/* Label */}
                 <label
-                  className="flex-1 cursor-pointer hover:opacity-80 transition-opacity"
+                  className="flex-1 cursor-pointer transition-opacity"
                   style={{
-                    color: isSelected
-                      ? 'var(--color-sentinel-text-primary)'
-                      : 'var(--color-sentinel-text-disabled)',
+                    color: isSelected ? '#00FF41' : 'rgba(0, 255, 65, 0.4)',
+                    fontSize: '12px',
+                    fontFamily: 'Share Tech Mono, monospace',
                   }}
                 >
                   {floor.label}
@@ -73,18 +81,15 @@ export function FloorSelector({
                 {/* Isolate button */}
                 <button
                   onClick={() => onIsolate(floor.id)}
-                  className="px-2 py-1 rounded text-xs transition-colors"
+                  className="matrix-btn text-xs px-2 py-1"
                   style={{
-                    background: isSelected
-                      ? 'var(--color-sentinel-accent)'
-                      : 'var(--color-sentinel-bg-secondary)',
-                    color:
-                      isSelected ? 'white' : 'var(--color-sentinel-text-secondary)',
-                    border: '1px solid var(--color-sentinel-border)',
+                    fontSize: '10px',
+                    fontWeight: 600,
+                    minWidth: '40px',
                   }}
                   title="Show only this floor"
                 >
-                  Show
+                  {isSelected ? 'VIEW' : 'SHOW'}
                 </button>
               </div>
             );
@@ -96,11 +101,13 @@ export function FloorSelector({
       <div
         className="text-xs mt-3 pt-3 border-t"
         style={{
-          color: 'var(--color-sentinel-text-disabled)',
-          borderColor: 'var(--color-sentinel-border)',
+          color: 'rgba(0, 255, 65, 0.5)',
+          borderColor: 'rgba(0, 255, 65, 0.2)',
+          fontFamily: 'Share Tech Mono, monospace',
+          fontSize: '10px',
         }}
       >
-        {selectedFloors.size} / {floors.length} floors selected
+        [{selectedFloors.size}/{floors.length} ACTIVE]
       </div>
     </div>
   );

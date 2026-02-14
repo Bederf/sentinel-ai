@@ -14,11 +14,11 @@ import type { View } from './navigation';
 export const COMPANY_DEMO_CONFIGS: Record<string, CompanyDemoConfig> = {
   'wardew.co.za': {
     companyName: 'Wardew',
-    demoFocus: 'desigo-tridonic',
-    allowedViews: ['dashboard', 'chat', 'control', 'occupancy', 'digital-twin'],
-    defaultView: 'dashboard',
-    viewMode: 'auditor', // read-only
-    description: 'Desigo-Tridonic Integration Demo',
+    demoFocus: 'dali-lighting',
+    allowedViews: ['dashboard', 'occupancy'],  // Settings removed - admin only
+    defaultView: 'occupancy',
+    viewMode: 'auditor', // read-only, no control access
+    description: 'DALI Lighting Occupancy Control Demo',
   },
 };
 

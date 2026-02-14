@@ -15,11 +15,13 @@ from app.models.auth import AuthContext, AuthLevel, SentinelRole
 from app.database.repositories.user_site_access_repository import (
     get_user_site_access_repository,
 )
+from app.database.repositories.module_access_repository import get_module_access_repository
 from app.database.repositories import BuildingRepository
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/admin/user-access", tags=["user-access"])
+self_service_router = APIRouter(prefix="/api/user-access", tags=["user-access"])
 
 
 # =====================================================
@@ -59,6 +61,20 @@ class BuildingUsersResponse(BaseModel):
     """Response with users who have access to a building."""
     building_code: str
     users: List[dict]
+
+
+class ModuleGrantRequest(BaseModel):
+    """Admin request to set module grants for a user and site."""
+    user_email: EmailStr
+    site_code: str
+    modules: List[str]
+
+
+class AccessRequestDecisionRequest(BaseModel):
+    """Admin approval/rejection decision for a pending access request."""
+    approve: bool = True
+    granted_modules: Optional[List[str]] = None
+    review_notes: Optional[str] = None
 
 
 # =====================================================
@@ -230,3 +246,188 @@ async def get_building_users(
         building_code=building_code,
         users=users,
     )
+
+
+@router.get("/requests")
+async def list_access_requests(
+    status: Optional[str] = None,
+    auth: AuthContext = Depends(require_auth(AuthLevel.ADMIN)),
+):
+    """List module access requests submitted from the frontend."""
+    repo = get_module_access_repository()
+    requests = repo.list_access_requests(status=status)
+    return {
+        "count": len(requests),
+        "requests": requests,
+    }
+
+
+@router.post("/requests/{request_id}/decision")
+async def decide_access_request(
+    request_id: str,
+    decision: AccessRequestDecisionRequest,
+    auth: AuthContext = Depends(require_auth(AuthLevel.ADMIN)),
+):
+    """Approve or reject a pending access request and assign modules."""
+    module_repo = get_module_access_repository()
+    access_request = module_repo.get_access_request(request_id)
+    if not access_request:
+        raise HTTPException(status_code=404, detail="Access request not found")
+
+    user_email = access_request.get("user_email", "").strip().lower()
+    site_code = access_request.get("site_code", "").strip().lower()
+    if not user_email or not site_code:
+        raise HTTPException(status_code=400, detail="Access request is missing required fields")
+
+    reviewer = auth.email or auth.user_id
+    if decision.approve:
+        granted_modules = decision.granted_modules or access_request.get("requested_modules", [])
+
+        # Ensure user can access the site itself
+        building_repo = BuildingRepository()
+        building = building_repo.get_by_id(site_code)
+        if not building:
+            raise HTTPException(status_code=404, detail=f"Building '{site_code}' not found")
+
+        access_repo = get_user_site_access_repository()
+        access_repo.grant_access(
+            user_email=user_email,
+            building_id=building.get("id"),
+            granted_by=reviewer,
+        )
+
+        if not module_repo.set_user_modules(
+            user_email=user_email,
+            site_code=site_code,
+            module_types=granted_modules,
+            granted_by=reviewer,
+            replace_existing=False,
+        ):
+            raise HTTPException(status_code=500, detail="Failed to grant module access")
+
+        updated = module_repo.set_access_request_decision(
+            request_id=request_id,
+            status="approved",
+            reviewed_by=reviewer,
+            review_notes=decision.review_notes,
+            granted_modules=granted_modules,
+        )
+        if not updated:
+            raise HTTPException(status_code=500, detail="Failed to update access request status")
+
+        return {
+            "success": True,
+            "status": "approved",
+            "request_id": request_id,
+            "user_email": user_email,
+            "site_code": site_code,
+            "granted_modules": granted_modules,
+        }
+
+    updated = module_repo.set_access_request_decision(
+        request_id=request_id,
+        status="rejected",
+        reviewed_by=reviewer,
+        review_notes=decision.review_notes,
+        granted_modules=[],
+    )
+    if not updated:
+        raise HTTPException(status_code=500, detail="Failed to update access request status")
+    return {
+        "success": True,
+        "status": "rejected",
+        "request_id": request_id,
+        "user_email": user_email,
+        "site_code": site_code,
+    }
+
+
+@router.post("/module-grants")
+async def set_user_module_grants(
+    request: ModuleGrantRequest,
+    auth: AuthContext = Depends(require_auth(AuthLevel.ADMIN)),
+):
+    """Set module grants for a user at a given site."""
+    reviewer = auth.email or auth.user_id
+    site_code = request.site_code.strip().lower()
+    user_email = request.user_email.strip().lower()
+
+    # Ensure building access exists
+    building_repo = BuildingRepository()
+    building = building_repo.get_by_id(site_code)
+    if not building:
+        raise HTTPException(status_code=404, detail=f"Building '{site_code}' not found")
+
+    access_repo = get_user_site_access_repository()
+    access_repo.grant_access(
+        user_email=user_email,
+        building_id=building.get("id"),
+        granted_by=reviewer,
+    )
+
+    module_repo = get_module_access_repository()
+    ok = module_repo.set_user_modules(
+        user_email=user_email,
+        site_code=site_code,
+        module_types=request.modules,
+        granted_by=reviewer,
+        replace_existing=True,
+    )
+    if not ok:
+        raise HTTPException(status_code=500, detail="Failed to save module grants")
+
+    effective = module_repo.get_effective_modules(
+        user_email=user_email,
+        user_role=SentinelRole.AUDITOR,
+        site_code=site_code,
+    )
+    return {
+        "success": True,
+        "user_email": user_email,
+        "site_code": site_code,
+        "effective_modules": effective,
+    }
+
+
+@router.get("/module-grants/{email}")
+async def get_user_module_grants(
+    email: str,
+    site_code: str,
+    auth: AuthContext = Depends(require_auth(AuthLevel.ADMIN)),
+):
+    """Get explicit and effective module grants for a user/site."""
+    user_email = email.strip().lower()
+    normalized_site = site_code.strip().lower()
+    module_repo = get_module_access_repository()
+    explicit = module_repo.get_user_modules(user_email=user_email, site_code=normalized_site)
+    effective = module_repo.get_effective_modules(
+        user_email=user_email,
+        user_role=SentinelRole.AUDITOR,
+        site_code=normalized_site,
+    )
+    return {
+        "user_email": user_email,
+        "site_code": normalized_site,
+        "explicit_modules": explicit,
+        "effective_modules": effective,
+    }
+
+
+@self_service_router.get("/me/modules")
+async def get_my_effective_modules(
+    site_code: str,
+    auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED)),
+):
+    """Get effective module access for the current user/site."""
+    module_repo = get_module_access_repository()
+    effective = module_repo.get_effective_modules(
+        user_email=auth.email,
+        user_role=auth.role,
+        site_code=site_code.strip().lower(),
+    )
+    return {
+        "user_email": auth.email,
+        "site_code": site_code.strip().lower(),
+        "role": auth.role.value,
+        "effective_modules": effective,
+    }

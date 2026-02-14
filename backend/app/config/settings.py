@@ -122,6 +122,17 @@ class Settings(BaseSettings):
     allowed_document_types: list[str] = [".pdf", ".docx", ".txt"]
     supabase_storage_bucket: str = "building-documents"
 
+    @property
+    def recommendation_interval(self) -> int:
+        """Recommendation generation interval in seconds.
+
+        Returns 2 minutes (120s) in DEMO_MODE for faster iteration during demos.
+        Returns 10 minutes (600s) in production for realistic operation.
+        """
+        if self.demo_mode:
+            return 120  # 2 minutes for demos
+        return 600  # 10 minutes for production
+
     model_config = ConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

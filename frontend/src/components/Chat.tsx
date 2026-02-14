@@ -14,7 +14,7 @@ import type { FormEvent, KeyboardEvent } from "react";
 import { Send, MessageSquare, Bot, BookOpen } from "lucide-react";
 import { ChatMessage } from "./ChatMessage";
 import { DocumentUpload } from "./DocumentUpload";
-import BuildingSelector from "./BuildingSelector";
+import { BuildingSelector } from "./BuildingSelector";
 import api, { isExpectedApiError, streamChat } from '@/lib/api';
 import type { Site } from '@/lib/api';
 

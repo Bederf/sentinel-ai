@@ -23,11 +23,11 @@ export function BuildingModel({
   const floorRefs = useRef<any[]>([]);
 
   const floors: Floor[] = [
-    { id: 0, y: 0, width: 30, depth: 20, color: '#8b5cf6' },    // Basement - purple
-    { id: 1, y: 3, width: 30, depth: 20, color: '#06b6d4' },    // Ground - cyan
-    { id: 2, y: 6, width: 30, depth: 20, color: '#0ea5e9' },    // L1 - blue
-    { id: 3, y: 9, width: 30, depth: 20, color: '#3b82f6' },    // L2 - indigo
-    { id: 4, y: 12, width: 25, depth: 15, color: '#6366f1' },   // Roof - indigo
+    { id: 0, y: 0, width: 30, depth: 20, color: '#003d1a' },    // Basement - Dark forest green
+    { id: 1, y: 3, width: 30, depth: 20, color: '#005723' },    // Ground - Medium forest green
+    { id: 2, y: 6, width: 30, depth: 20, color: '#00712d' },    // L1 - Emerald green
+    { id: 3, y: 9, width: 30, depth: 20, color: '#008b37' },    // L2 - Bright emerald
+    { id: 4, y: 12, width: 25, depth: 15, color: '#00a541' },   // Roof - Matrix neon green
   ];
 
   const handleFloorClick = (e: any, floor: number) => {
@@ -57,6 +57,8 @@ export function BuildingModel({
             <boxGeometry args={[floor.width, 0.4, floor.depth]} />
             <meshStandardMaterial
               color={floor.color}
+              emissive={floor.color}
+              emissiveIntensity={0.3}
               transparent
               opacity={0.6}
               metalness={0.3}
@@ -80,10 +82,10 @@ export function BuildingModel({
               />
               <lineBasicMaterial
                 attach="material"
-                color="#fff"
+                color="#00FF41"
                 linewidth={1}
                 transparent
-                opacity={0.3}
+                opacity={0.4}
               />
             </lineSegments>
           </group>
@@ -96,13 +98,16 @@ export function BuildingModel({
           <edgesGeometry args={[new BoxGeometry(30, 15, 20)]} attach="geometry" />
           <lineBasicMaterial
             attach="material"
-            color="#666"
+            color="#00FF41"
             linewidth={1}
             transparent
             opacity={0.2}
           />
         </lineSegments>
       </group>
+      
+      {/* Ambient green light for Matrix theme */}
+      <pointLight position={[15, 8, 15]} color="#00FF41" intensity={0.3} distance={50} />
     </group>
   );
 }

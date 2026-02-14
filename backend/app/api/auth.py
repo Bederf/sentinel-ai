@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 
 from app.config.settings import settings
 from app.middleware.auth_middleware import create_jwt_token, validate_jwt_token, _extract_ip_address
@@ -24,6 +24,9 @@ from app.database.supabase_client import get_supabase_client
 from app.services.mfa_service import get_mfa_service
 from app.services.session_service import session_service
 from app.services.token_blacklist_service import token_blacklist
+from app.database.repositories.module_access_repository import get_module_access_repository
+from app.models.module_registry import ModuleType
+from app.services.lifecycle_orchestrator import get_lifecycle_orchestrator
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
@@ -48,6 +51,17 @@ class ApiKeyCreateRequest(BaseModel):
 class RefreshTokenRequest(BaseModel):
     """SECURITY: Refresh token must be in request body, not URL (Phase 75-07)"""
     refresh_token: str = Field(..., description="Valid refresh token")
+
+
+class AccessRequestCreateRequest(BaseModel):
+    """Public access request submitted from the login screen."""
+    email: EmailStr
+    full_name: Optional[str] = None
+    company: Optional[str] = None
+    phone: Optional[str] = None
+    site_code: str = Field(default="site-002")
+    requested_modules: list[str] = Field(default_factory=list)
+    notes: Optional[str] = None
 
 
 def _get_current_user_from_request(request: Request) -> dict:
@@ -130,6 +144,13 @@ _DEMO_USERS = {
         "email": "auditor@sentinel.bms",
         "full_name": "Compliance Auditor",
         "role": SentinelRole.AUDITOR,
+    },
+    # Wardew Automation Specialist
+    "grant@wardew.co.za": {
+        "user_id": "wardew-grant-001",
+        "email": "grant@wardew.co.za",
+        "full_name": "Grant - Wardew",
+        "role": SentinelRole.AUDITOR,  # Read-only access for Wardew demo
     },
 }
 
@@ -321,11 +342,99 @@ async def login_with_email(request: Request, email: str):
         "session_id": session_id,
     }
 
+    # Auto-start demo for Grant (grant@wardew.co.za)
+    if email == "grant@wardew.co.za":
+        try:
+            # Reset orchestrator for fresh demo on login
+            orchestrator = get_lifecycle_orchestrator()
+            orchestrator.reset()
+            
+            # Auto-start Grant's primary scenario: HVAC+DALI+Sentinel AI (365-day annual)
+            # This demonstrates full predictive AI control with seasonal variations
+            orchestrator.run_scenario(
+                scenario_name="grant_hvac_dali_ai_annual",
+                duration_minutes=240.0  # 365 days compressed to 4 hours real time
+            )
+            
+            response["demo_auto_start"] = True
+            response["demo_type"] = "annual-demonstration"
+            response["demo_description"] = "HVAC + DALI + Sentinel AI (365-day full-year with seasonal variations)"
+            response["demo_scenario"] = "grant_hvac_dali_ai_annual"
+            response["demo_status"] = "running"
+            logger.info(f"Auto-started Grant demo scenario: grant_hvac_dali_ai_annual (365 days, ~4 hours real time)")
+        except Exception as e:
+            logger.error(f"Error auto-starting Grant demo: {e}")
+            response["demo_auto_start"] = True
+            response["demo_type"] = "three-method-comparison"
+            response["demo_error"] = str(e)
+    
+    # Auto-start demo for Solar/BESS client (bederf@protonmail.com)
+    if email == "bederf@protonmail.com":
+        # Reset orchestrator for fresh demo on login
+        orchestrator = get_lifecycle_orchestrator()
+        orchestrator.reset()
+        response["demo_auto_start"] = True
+        response["demo_type"] = "solar-bess-comparison"
+        response["demo_description"] = "Solar+BESS Baseline vs Solar+BESS with Sentinel AI optimization"
+
     # Add enrollment prompt for admins who haven't enrolled yet
     if mfa_required and not mfa_enrolled:
         response["message"] = "MFA enrollment required for admin users. Please set up MFA."
 
     return response
+
+
+@router.post("/access-request")
+@limiter.limit("20/hour")
+async def create_access_request(request: Request, payload: AccessRequestCreateRequest):
+    """Submit an access request for module grants before first login."""
+    email = payload.email.strip().lower()
+    site_code = payload.site_code.strip().lower()
+
+    # Validate requested modules against known module registry types
+    valid_module_values = {module.value for module in ModuleType}
+    requested_modules = [
+        module.strip().lower()
+        for module in payload.requested_modules
+        if module.strip().lower() in valid_module_values
+    ]
+
+    try:
+        client = get_supabase_client()
+        building = client.table("buildings").select("id, code").eq("code", site_code).limit(1).execute()
+        if not building.data:
+            raise HTTPException(status_code=404, detail=f"Unknown site code: {site_code}")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("Access request validation failed for %s: %s", email, exc)
+        raise HTTPException(status_code=500, detail="Unable to submit access request")
+
+    repo = get_module_access_repository()
+    created = repo.submit_access_request(
+        user_email=email,
+        site_code=site_code,
+        requested_modules=requested_modules,
+        full_name=payload.full_name,
+        company=payload.company,
+        phone=payload.phone,
+        request_notes=payload.notes,
+    )
+    if not created:
+        raise HTTPException(status_code=500, detail="Failed to save access request")
+
+    logger.info(
+        "Access request submitted email=%s site=%s modules=%s",
+        email,
+        site_code,
+        ",".join(requested_modules),
+    )
+    return {
+        "success": True,
+        "request_id": created.get("id"),
+        "status": created.get("status", "pending"),
+        "message": "Access request submitted. Admin approval is required before module access is granted.",
+    }
 
 
 @router.post("/login/mfa-complete")
@@ -420,7 +529,7 @@ async def complete_mfa_login(request: Request, email: str, mfa_code: str):
     except Exception as e:
         logger.warning(f"Failed to audit log MFA login for {email}: {e}")
 
-    return {
+    response = {
         "access_token": access_token,
         "refresh_token": refresh_token,
         "token_type": "bearer",
@@ -434,6 +543,43 @@ async def complete_mfa_login(request: Request, email: str, mfa_code: str):
         "mfa_verified": True,
         "session_id": session_id,
     }
+
+    # Auto-start demo for Grant (grant@wardew.co.za)
+    if email == "grant@wardew.co.za":
+        try:
+            # Reset orchestrator for fresh demo on login
+            orchestrator = get_lifecycle_orchestrator()
+            orchestrator.reset()
+            
+            # Auto-start Grant's primary scenario: HVAC+DALI+Sentinel AI (365-day annual)
+            # This demonstrates full predictive AI control with seasonal variations
+            orchestrator.run_scenario(
+                scenario_name="grant_hvac_dali_ai_annual",
+                duration_minutes=240.0  # 365 days compressed to 4 hours real time
+            )
+            
+            response["demo_auto_start"] = True
+            response["demo_type"] = "annual-demonstration"
+            response["demo_description"] = "HVAC + DALI + Sentinel AI (365-day full-year with seasonal variations)"
+            response["demo_scenario"] = "grant_hvac_dali_ai_annual"
+            response["demo_status"] = "running"
+            logger.info(f"Auto-started Grant demo scenario: grant_hvac_dali_ai_annual (365 days, ~4 hours real time)")
+        except Exception as e:
+            logger.error(f"Error auto-starting Grant demo: {e}")
+            response["demo_auto_start"] = True
+            response["demo_type"] = "three-method-comparison"
+            response["demo_error"] = str(e)
+    
+    # Auto-start demo for Solar/BESS client (bederf@protonmail.com)
+    if email == "bederf@protonmail.com":
+        # Reset orchestrator for fresh demo on login
+        orchestrator = get_lifecycle_orchestrator()
+        orchestrator.reset()
+        response["demo_auto_start"] = True
+        response["demo_type"] = "solar-bess-comparison"
+        response["demo_description"] = "Solar+BESS Baseline vs Solar+BESS with Sentinel AI optimization"
+
+    return response
 
 
 @router.post("/verify")

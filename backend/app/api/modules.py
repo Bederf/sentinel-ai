@@ -4,16 +4,19 @@ Module Registry API - Bolt-on Module System Endpoints
 Manages module activation, integration, and AI recommendations.
 """
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from typing import List, Optional
 from pydantic import BaseModel
 from datetime import datetime
 
 from app.services.module_registry_service import module_registry
+from app.database.repositories.module_access_repository import get_module_access_repository
 from app.models.module_registry import (
     ModuleType, ModuleStatus, RecommendationPriority, RecommendationType,
     AIRecommendation, MODULE_DEFINITIONS
 )
+from app.middleware.auth_middleware import require_auth
+from app.models.auth import AuthContext, AuthLevel
 from app.database.supabase_client import get_supabase_client
 import logging
 
@@ -139,9 +142,22 @@ async def get_module_definition(module_type: str):
 
 
 @router.get("/site/{site_id}/active", response_model=List[ModuleResponse])
-async def get_active_modules(site_id: str):
+async def get_active_modules(site_id: str, request: Request):
     """Get all active modules for a site."""
     modules = module_registry.get_active_modules(site_id)
+    auth_ctx = getattr(request.state, "auth", None)
+    if auth_ctx and getattr(auth_ctx, "email", None):
+        repo = get_module_access_repository()
+        modules = [
+            module
+            for module in modules
+            if repo.has_module_access(
+                user_email=auth_ctx.email,
+                user_role=auth_ctx.role,
+                site_code=site_id,
+                module_type=module.module_type,
+            )
+        ]
     return [
         ModuleResponse(
             instance_id=m.instance_id,
@@ -157,7 +173,10 @@ async def get_active_modules(site_id: str):
 
 
 @router.post("/activate", response_model=ModuleResponse)
-async def activate_module(request: ActivateModuleRequest):
+async def activate_module(
+    request: ActivateModuleRequest,
+    auth: AuthContext = Depends(require_auth(AuthLevel.ADMIN)),
+):
     """Activate a module for a site."""
     try:
         mt = ModuleType(request.module_type)
@@ -183,14 +202,22 @@ async def activate_module(request: ActivateModuleRequest):
 
 
 @router.post("/site/{site_id}/deactivate/{module_type}")
-async def deactivate_module(site_id: str, module_type: str):
+async def deactivate_module(
+    site_id: str,
+    module_type: str,
+    auth: AuthContext = Depends(require_auth(AuthLevel.ADMIN)),
+):
     """Deactivate a module for a site."""
     try:
         mt = ModuleType(module_type)
     except ValueError:
         raise HTTPException(status_code=400, detail=f"Invalid module type: {module_type}")
 
-    success = module_registry.deactivate_module(site_id, mt)
+    try:
+        success = module_registry.deactivate_module(site_id, mt)
+    except ValueError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+
     if not success:
         raise HTTPException(status_code=404, detail="Module not found or not active")
 
@@ -198,7 +225,7 @@ async def deactivate_module(site_id: str, module_type: str):
 
 
 @router.get("/site/{site_id}/check/{module_type}")
-async def check_module_active(site_id: str, module_type: str):
+async def check_module_active(site_id: str, module_type: str, request: Request):
     """Check if a specific module is active for a site."""
     try:
         mt = ModuleType(module_type)
@@ -206,6 +233,16 @@ async def check_module_active(site_id: str, module_type: str):
         raise HTTPException(status_code=400, detail=f"Invalid module type: {module_type}")
 
     is_active = module_registry.is_module_active(site_id, mt)
+    if is_active:
+        auth_ctx = getattr(request.state, "auth", None)
+        if auth_ctx and getattr(auth_ctx, "email", None):
+            repo = get_module_access_repository()
+            is_active = repo.has_module_access(
+                user_email=auth_ctx.email,
+                user_role=auth_ctx.role,
+                site_code=site_id,
+                module_type=mt,
+            )
     return {"site_id": site_id, "module_type": module_type, "active": is_active}
 
 
@@ -233,7 +270,8 @@ async def get_unified_telemetry(site_id: str):
 async def update_module_health(
     site_id: str,
     module_type: str,
-    health_score: float = Query(..., ge=0, le=100)
+    health_score: float = Query(..., ge=0, le=100),
+    auth: AuthContext = Depends(require_auth(AuthLevel.ADMIN)),
 ):
     """Update health score for a module."""
     try:

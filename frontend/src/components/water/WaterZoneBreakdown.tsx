@@ -26,7 +26,6 @@ import {
 } from "@tremor/react";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { waterApi } from "../../lib/waterApi";
 
 interface ZoneBreakdown {
   zone_id: string;
@@ -120,7 +119,7 @@ export const WaterZoneBreakdown: React.FC<WaterZoneBreakdownProps> = ({
 
   if (isLoading || !zones) {
     return (
-      <Card>
+      <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
         <div className="flex items-center justify-center h-64">
           <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>
             Loading zone data...
@@ -152,7 +151,7 @@ export const WaterZoneBreakdown: React.FC<WaterZoneBreakdownProps> = ({
   return (
     <div className="space-y-6">
       {/* Highest Cost Zone Card */}
-      <Card>
+      <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
         <Flex justifyContent="between" alignItems="center">
           <div>
             <Text
@@ -205,7 +204,7 @@ export const WaterZoneBreakdown: React.FC<WaterZoneBreakdownProps> = ({
       </Card>
 
       {/* Consumption Chart */}
-      <Card>
+      <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
         <Flex justifyContent="between" alignItems="center" className="mb-4">
           <Title>Consumption by Zone</Title>
           <div className="flex gap-2">
@@ -247,7 +246,7 @@ export const WaterZoneBreakdown: React.FC<WaterZoneBreakdownProps> = ({
       </Card>
 
       {/* Zones Table */}
-      <Card>
+      <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
         <Title className="mb-4">Zone Details</Title>
         <div className="overflow-x-auto">
           <Table>

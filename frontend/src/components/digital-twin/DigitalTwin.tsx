@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
 import { X } from 'lucide-react';
-import BuildingSelector from '@/components/BuildingSelector';
+import { BuildingSelector } from '@/components/BuildingSelector';
 import type { ZoneCentroid, Site } from '@/lib/api/sites';
 import { sitesApi } from '@/lib/api/sites';
 import { BuildingModel } from './BuildingModel';
@@ -241,12 +241,12 @@ export function DigitalTwin() {
   }
 
   return (
-    <div className="h-full flex flex-col" style={{ background: 'var(--color-sentinel-bg-canvas)' }}>
+    <div className="matrix-theme h-full flex flex-col bg-gradient-to-br from-[#060E18] via-[#0a1420] to-[#060E18]">
       {/* Alert Banner */}
       <AlertBanner equipment={equipment} />
 
       {/* Site Selector and Equipment Filter */}
-      <div className="px-6 py-4 border-b" style={{ borderColor: 'var(--color-sentinel-border)' }}>
+      <div className="px-6 py-4 border-b" style={{ borderColor: 'var(--color-matrix-green)', opacity: 0.3 }}>
         <div className="flex items-center justify-between gap-4 mb-4">
           <div className="flex items-center gap-3">
             <label className="text-sm font-medium" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
@@ -264,20 +264,16 @@ export function DigitalTwin() {
             <div className="flex items-center gap-2 ml-4 pl-4 border-l" style={{ borderColor: 'var(--color-sentinel-border)' }}>
               <button
                 onClick={() => setViewMode('3D')}
-                className={`px-3 py-1.5 text-sm font-medium rounded transition ${
-                  viewMode === '3D'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                className={`matrix-btn ${
+                  viewMode === '3D' ? 'matrix-btn-active' : ''
                 }`}
               >
                 3D
               </button>
               <button
                 onClick={() => setViewMode('2D')}
-                className={`px-3 py-1.5 text-sm font-medium rounded transition ${
-                  viewMode === '2D'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                className={`matrix-btn ${
+                  viewMode === '2D' ? 'matrix-btn-active' : ''
                 }`}
               >
                 2D
@@ -289,29 +285,24 @@ export function DigitalTwin() {
           <div className="text-sm font-medium" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
             Total Equipment: <span style={{ color: 'var(--color-sentinel-text-primary)' }}>{filteredEquipment.length}</span>
           </div>
-        </div>
 
         {/* Equipment Type Filter - Professional HUD-style buttons */}
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setEquipmentTypeFilter(null)}
-            className={`px-3 py-1.5 text-sm font-medium rounded transition ${
-              !equipmentTypeFilter
-                ? 'bg-blue-600 text-white'
-                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+            className={`matrix-btn ${
+              !equipmentTypeFilter ? 'matrix-btn-active' : ''
             }`}
           >
-            All ({equipment.length})
+            ALL ({equipment.length})
           </button>
 
           {equipmentTypes.map((type) => (
             <button
               key={type}
               onClick={() => setEquipmentTypeFilter(equipmentTypeFilter === type ? null : type)}
-              className={`px-3 py-1.5 text-sm font-medium rounded transition flex items-center gap-2 ${
-                equipmentTypeFilter === type
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+              className={`matrix-btn ${
+                equipmentTypeFilter === type ? 'matrix-btn-active' : ''
               }`}
             >
               <span>{EQUIPMENT_ICONS[type] || '🏗️'}</span>

@@ -5,10 +5,17 @@
  * Navy (#1A2B4C), Amber (#F59E0B), Green (#10B981), Red (#DC2626), Blue (#3B82F6)
  */
 
-/* Google Fonts - Inter & JetBrains Mono */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+/* Google Fonts - Inter, JetBrains Mono, Matrix Theme Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Share+Tech+Mono&family=Orbitron:wght@400;500;600;700;800;900&display=swap');
 
 @theme {
+  /* Matrix Cyberpunk Theme Colors */
+  --color-matrix-green: #00FF41;
+  --color-matrix-dark: #060E18;
+  --color-matrix-dark-light: #0a1420;
+  --color-matrix-green-dim: rgba(0, 255, 65, 0.2);
+  --color-matrix-green-glow: rgba(0, 255, 65, 0.5);
+
   /* SENTINEL Dark Theme Colors */
   --color-sentinel-bg-canvas: #0d1117;
   --color-sentinel-bg-primary: #161b22;
@@ -594,6 +601,176 @@
     border: 1px solid rgba(16, 185, 129, 0.3);
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════ */
+/* MATRIX CYBERPUNK THEME - Digital Twin Aesthetic */
+/* ═══════════════════════════════════════════════════════════════ */
+@layer components {
+  /* Matrix Theme Wrapper */
+  .matrix-theme {
+    font-family: 'Share Tech Mono', 'JetBrains Mono', monospace;
+    position: relative;
+  }
+
+  /* Matrix scanline effect */
+  .matrix-theme::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: repeating-linear-gradient(
+      0deg,
+      rgba(0, 0, 0, 0.15),
+      rgba(0, 0, 0, 0.15) 1px,
+      transparent 1px,
+      transparent 2px
+    );
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.03;
+  }
+
+  /* Matrix label - Terminal-style text */
+  .matrix-label {
+    font-family: 'Orbitron', 'Share Tech Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--color-matrix-green);
+    text-shadow: 0 0 4px var(--color-matrix-green-glow);
+  }
+
+  /* Matrix panel - HUD-style border with corner brackets */
+  .matrix-panel {
+    position: relative;
+    background: rgba(6, 14, 24, 0.85);
+    border: 1px solid var(--color-matrix-green);
+    box-shadow: 0 0 10px var(--color-matrix-green-dim), inset 0 0 10px var(--color-matrix-green-dim);
+    border-radius: 0;
+  }
+
+  /* Top-left corner bracket */
+  .matrix-panel::before {
+    content: '';
+    position: absolute;
+    top: -8px;
+    left: -8px;
+    width: 20px;
+    height: 20px;
+    border-left: 2px solid var(--color-matrix-green);
+    border-top: 2px solid var(--color-matrix-green);
+    border-radius: 2px 0 0 0;
+    box-shadow: 0 0 8px var(--color-matrix-green-glow);
+  }
+
+  /* Top-right corner bracket */
+  .matrix-panel::after {
+    content: '';
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    width: 20px;
+    height: 20px;
+    border-right: 2px solid var(--color-matrix-green);
+    border-top: 2px solid var(--color-matrix-green);
+    border-radius: 0 2px 0 0;
+    box-shadow: 0 0 8px var(--color-matrix-green-glow);
+  }
+
+  /* Matrix button - Neon green with glow */
+  .matrix-btn {
+    background: transparent;
+    color: var(--color-matrix-green);
+    border: 1px solid var(--color-matrix-green);
+    padding: 8px 16px;
+    font-family: 'Orbitron', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 0 8px rgba(0, 255, 65, 0.2);
+    border-radius: 0;
+  }
+
+  .matrix-btn:hover {
+    background: rgba(0, 255, 65, 0.1);
+    box-shadow: 0 0 16px rgba(0, 255, 65, 0.5), inset 0 0 8px rgba(0, 255, 65, 0.1);
+    text-shadow: 0 0 8px var(--color-matrix-green);
+  }
+
+  .matrix-btn-active {
+    background: rgba(0, 255, 65, 0.2);
+    box-shadow: 0 0 16px rgba(0, 255, 65, 0.6), inset 0 0 12px rgba(0, 255, 65, 0.15);
+    text-shadow: 0 0 10px var(--color-matrix-green);
+  }
+
+  /* Matrix pulsing glow animation */
+  @keyframes matrix-pulse {
+    0%, 100% { 
+      box-shadow: 0 0 8px rgba(0, 255, 65, 0.3), inset 0 0 10px rgba(0, 255, 65, 0.1);
+      opacity: 0.85;
+    }
+    50% { 
+      box-shadow: 0 0 20px rgba(0, 255, 65, 0.6), inset 0 0 15px rgba(0, 255, 65, 0.2);
+      opacity: 1;
+    }
+  }
+
+  .matrix-pulse {
+    animation: matrix-pulse 2s ease-in-out infinite;
+  }
+
+  /* Matrix alert pill - Pulsing glow */
+  @keyframes matrix-alert-pulse {
+    0%, 100% { 
+      box-shadow: 0 0 12px rgba(239, 68, 68, 0.4);
+      border-color: rgba(239, 68, 68, 0.6);
+    }
+    50% { 
+      box-shadow: 0 0 24px rgba(239, 68, 68, 0.8), inset 0 0 10px rgba(239, 68, 68, 0.2);
+      border-color: rgba(239, 68, 68, 1);
+    }
+  }
+
+  .matrix-alert {
+    animation: matrix-alert-pulse 1.5s ease-in-out infinite;
+  }
+
+  /* Matrix checkbox - Green when active */
+  .matrix-checkbox {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border: 1px solid var(--color-matrix-green);
+    background: transparent;
+    cursor: pointer;
+    position: relative;
+    box-shadow: 0 0 6px rgba(0, 255, 65, 0.3);
+  }
+
+  .matrix-checkbox:checked {
+    background: var(--color-matrix-green);
+    box-shadow: 0 0 12px rgba(0, 255, 65, 0.6), inset 0 0 8px rgba(0, 255, 65, 0.2);
+  }
+
+  .matrix-checkbox:checked::after {
+    content: '✓';
+    position: absolute;
+    top: -2px;
+    left: 1px;
+    color: var(--color-matrix-dark);
+    font-size: 14px;
+    font-weight: bold;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════ */
 
 /* Tremor component overrides for dark theme */
 @layer utilities {

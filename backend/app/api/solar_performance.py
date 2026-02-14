@@ -9,15 +9,27 @@ Endpoints for:
 
 from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from app.middleware.rate_limiter import limiter
 
+from app.api.dependencies.module_access import require_active_module
+from app.models.module_registry import ModuleType
 from app.models.solar import SolarInverter, SolarString
 from app.services.solar_ingestion_service import get_solar_ingestion_service
 from app.services.solar_performance_analyzer import get_solar_performance_analyzer
 from app.ml.solar_anomaly_detector import get_string_analyzer
 
-router = APIRouter()
+router = APIRouter(
+    dependencies=[
+        Depends(
+            require_active_module(
+                ModuleType.SOLAR,
+                site_keys=("site_id", "site"),
+                default_site_id="site-002",
+            )
+        )
+    ]
+)
 
 
 # === Performance Summary ===

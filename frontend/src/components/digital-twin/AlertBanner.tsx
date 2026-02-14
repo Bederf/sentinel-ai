@@ -1,4 +1,4 @@
-import { AlertTriangle, X } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 import { useState } from 'react';
 import type { Equipment } from '@/lib/api/sites';
 
@@ -24,10 +24,11 @@ export function AlertBanner({ equipment }: AlertBannerProps) {
 
   return (
     <div
-      className="flex-none px-4 py-3 flex items-center justify-between gap-4"
+      className="flex-none px-4 py-3 flex items-center justify-between gap-4 matrix-alert"
       style={{
-        background: 'rgba(239, 68, 68, 0.1)',
-        borderBottom: '2px solid rgba(239, 68, 68, 0.3)',
+        background: 'rgba(239, 68, 68, 0.12)',
+        borderBottom: '2px solid rgba(239, 68, 68, 0.6)',
+        borderLeft: '3px solid rgba(239, 68, 68, 0.8)',
       }}
     >
       <div className="flex items-center gap-3">
@@ -45,14 +46,17 @@ export function AlertBanner({ equipment }: AlertBannerProps) {
       </div>
       <button
         onClick={() => setDismissed(true)}
-        className="p-1 flex-none hover:brightness-110 transition-colors"
+        className="px-2 py-1 flex-none text-xs font-bold transition-colors"
         style={{
           background: 'rgba(239, 68, 68, 0.2)',
-          borderRadius: '0.375rem',
+          color: '#EF4444',
+          border: '1px solid rgba(239, 68, 68, 0.5)',
+          borderRadius: 0,
+          fontSize: '14px',
         }}
         aria-label="Dismiss alert"
       >
-        <X className="h-4 w-4 text-red-500" />
+        ✕
       </button>
     </div>
   );

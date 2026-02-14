@@ -15,7 +15,6 @@ import {
   Title,
   Text,
   Metric,
-  Flex,
   LineChart,
   BarChart,
   Tab,
@@ -25,7 +24,6 @@ import {
   TabPanel,
 } from "@tremor/react";
 import { useQuery } from "@tanstack/react-query";
-import { waterApi } from "../../lib/waterApi";
 
 interface CostAnalysis {
   period: string;
@@ -134,7 +132,7 @@ export const WaterCostAnalysis: React.FC<WaterCostAnalysisProps> = ({
 
   if (isLoading || !costData) {
     return (
-      <Card>
+      <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
         <div className="flex items-center justify-center h-64">
           <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>
             Loading cost analysis...
@@ -185,7 +183,10 @@ export const WaterCostAnalysis: React.FC<WaterCostAnalysisProps> = ({
 
   return (
     <TabGroup index={activeTabIndex} onIndexChange={setActiveTabIndex}>
-      <TabList className="mb-6">
+      <TabList
+        className="mb-6 glass-subtle rounded-md p-1"
+        style={{ border: "1px solid var(--glass-border)" }}
+      >
         <Tab>Current Period</Tab>
         <Tab>Forecast</Tab>
         <Tab>Tariff</Tab>
@@ -197,7 +198,7 @@ export const WaterCostAnalysis: React.FC<WaterCostAnalysisProps> = ({
           <div className="space-y-6">
             {/* KPI Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Card>
+              <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
                 <Text
                   style={{ color: "var(--color-sentinel-text-secondary)" }}
                   className="text-xs"
@@ -212,7 +213,7 @@ export const WaterCostAnalysis: React.FC<WaterCostAnalysisProps> = ({
                 </Text>
               </Card>
 
-              <Card>
+              <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
                 <Text
                   style={{ color: "var(--color-sentinel-text-secondary)" }}
                   className="text-xs"
@@ -227,7 +228,7 @@ export const WaterCostAnalysis: React.FC<WaterCostAnalysisProps> = ({
                 </Text>
               </Card>
 
-              <Card>
+              <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
                 <Text
                   style={{ color: "var(--color-sentinel-text-secondary)" }}
                   className="text-xs"
@@ -244,7 +245,7 @@ export const WaterCostAnalysis: React.FC<WaterCostAnalysisProps> = ({
             </div>
 
             {/* Cost Breakdown Chart */}
-            <Card>
+            <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
               <Title>Cost Breakdown by Tier</Title>
               <BarChart
                 data={costBreakdownData}
@@ -256,7 +257,7 @@ export const WaterCostAnalysis: React.FC<WaterCostAnalysisProps> = ({
 
             {/* Monthly & Annual Projections */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Card>
+              <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
                 <Text
                   style={{ color: "var(--color-sentinel-text-secondary)" }}
                   className="text-xs"
@@ -271,7 +272,7 @@ export const WaterCostAnalysis: React.FC<WaterCostAnalysisProps> = ({
                 </Text>
               </Card>
 
-              <Card>
+              <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
                 <Text
                   style={{ color: "var(--color-sentinel-text-secondary)" }}
                   className="text-xs"
@@ -293,7 +294,7 @@ export const WaterCostAnalysis: React.FC<WaterCostAnalysisProps> = ({
         <TabPanel>
           <div className="space-y-6">
             {/* Forecast Chart */}
-            <Card>
+            <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
               <Title>30-Day Cost Forecast</Title>
               <Text className="text-xs mb-4" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                 Projected daily costs with confidence band
@@ -308,7 +309,7 @@ export const WaterCostAnalysis: React.FC<WaterCostAnalysisProps> = ({
             </Card>
 
             {/* Scenario Analysis */}
-            <Card>
+            <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
               <Title className="mb-4">Scenario Analysis: Consumption Reduction</Title>
 
               <div className="space-y-4">
@@ -378,7 +379,7 @@ export const WaterCostAnalysis: React.FC<WaterCostAnalysisProps> = ({
 
         {/* Tariff Tab */}
         <TabPanel>
-          <Card>
+          <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
             <Title className="mb-4">Current Tariff Structure</Title>
 
             <div className="mb-6 p-4 rounded border border-gray-200 dark:border-gray-800">

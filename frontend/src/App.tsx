@@ -135,7 +135,7 @@ function App() {
   useEffect(() => {
     const checkSimulationStatus = async () => {
       try {
-        const response = await fetch('/api/lifecycle/status/site-002');
+        const response = await fetch('/api/lifecycle/status');
         const data = await response.json();
         setSimulationRunning(data.running === true);
       } catch (error) {
@@ -363,6 +363,16 @@ function App() {
   const handleEmailEntrySuccess = useCallback((user: AuthUser) => {
     console.log('Login success:', user);
     setCurrentUser(user);
+
+    // Auto-redirect Grant to Digital Twin when demo scenario auto-starts
+    if ((user as any).demo_auto_start === true) {
+      console.log('Auto-starting demo scenario:', (user as any).demo_scenario);
+      toast.success(`Demo scenario started: ${(user as any).demo_scenario}`);
+      // Delay to allow user state to be set before changing view
+      setTimeout(() => {
+        setCurrentView('digital-twin');
+      }, 500);
+    }
   }, []);
 
   // Show splash screen on initial load

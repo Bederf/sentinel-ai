@@ -247,12 +247,272 @@ curl http://localhost:9095/api/lifecycle/status | jq
 - Technician assigned based on equipment type
 - Work order status tracked through completion
 
+## Creating New Demos
+
+### Overview
+
+You can create custom demo scenarios for different users, roles, or use cases. Each demo can have:
+- **Auto-start on login** - Automatically trigger when a specific user logs in
+- **Custom scenario** - Define fault timing, equipment types, and repair delays
+- **Time compression** - Control demo speed (5 min, 24 min, etc.)
+- **Response flags** - Backend signals frontend to auto-redirect to specific views
+
+### Step 1: Create Demo Scenario
+
+Scenarios are defined in `backend/app/services/lifecycle_orchestrator.py`:
+
+```python
+# In SCENARIOS dict, add new scenario:
+SCENARIOS = {
+    "your_demo_name": ScenarioConfig(
+        name="Your Demo Name",
+        description="Description of what this demo shows",
+        fault_probability=1.0,  # 0.0 to 1.0 (1.0 = guaranteed)
+        fault_hour=11,  # Simulated hour when fault occurs (0-23)
+        fault_equipment_type="CHILLER",  # Equipment to fault (or None for random)
+        auto_repair=True,  # Auto-repair after fault
+        repair_delay_hours=3,  # How long before repair completes
+        optimization_enabled=True,  # Run AI optimization
+        clawd_notifications=True,  # Send Telegram alerts
+    ),
+}
+```
+
+### Step 2: Configure Auto-Start
+
+Add auto-start logic in `backend/app/api/auth.py` in the `login` endpoint:
+
+```python
+# After successful login, check for demo users:
+if email == "grant@wardew.co.za":
+    try:
+        orchestrator = get_lifecycle_orchestrator()
+        orchestrator.reset()
+        orchestrator.run_scenario(
+            scenario_name="grant_hvac_dali_ai_7day",
+            duration_minutes=7.0
+        )
+
+        # Return flags for frontend auto-redirect
+        response["demo_auto_start"] = True
+        response["demo_scenario"] = "grant_hvac_dali_ai_7day"
+        response["demo_status"] = "running"
+        response["demo_description"] = "HVAC + DALI + AI predictive control"
+    except Exception as e:
+        logger.error(f"Error auto-starting demo: {e}")
+        response["demo_auto_start"] = False
+        response["demo_error"] = str(e)
+```
+
+### Step 3: Configure Frontend Auto-Redirect
+
+Update `frontend/src/App.tsx` in the `handleEmailEntrySuccess` callback:
+
+```typescript
+const handleEmailEntrySuccess = useCallback((user: AuthUser) => {
+  setCurrentUser(user);
+
+  // Auto-redirect to specific view if demo scenario starts
+  if ((user as any).demo_auto_start === true) {
+    console.log('Auto-starting demo:', (user as any).demo_scenario);
+    toast.success(`Demo scenario started: ${(user as any).demo_scenario}`);
+
+    // 500ms delay to allow user state to set
+    setTimeout(() => {
+      setCurrentView('digital-twin');  // or 'dashboard', 'optimization', etc.
+    }, 500);
+  }
+}, []);
+```
+
+### Example: Grant's HVAC+DALI+AI Demo
+
+Here's how Grant's 7-day demo is configured:
+
+**Scenario Definition** (lifecycle_orchestrator.py):
+```python
+"grant_hvac_dali_ai_7day": ScenarioConfig(
+    name="HVAC + DALI + AI (7-day)",
+    description="Demonstrates predictive HVAC control with DALI lighting integration",
+    fault_probability=0.0,  # No random faults - manual control
+    fault_hour=None,  # Override with manual injection
+    auto_repair=False,  # Manual repair demonstration
+    optimization_enabled=True,  # Show AI recommendations
+    clawd_notifications=True,  # Send FM team alerts
+),
+```
+
+**Auto-Start Configuration** (auth.py):
+```python
+if email == "grant@wardew.co.za":
+    orchestrator = get_lifecycle_orchestrator()
+    orchestrator.reset()
+    orchestrator.run_scenario(
+        scenario_name="grant_hvac_dali_ai_7day",
+        duration_minutes=7.0  # 7 real minutes = 24 simulated hours
+    )
+    response["demo_auto_start"] = True
+    response["demo_scenario"] = "grant_hvac_dali_ai_7day"
+    response["demo_status"] = "running"
+    response["demo_description"] = "HVAC + DALI + Sentinel AI (7-day predictive control)"
+```
+
+**Frontend Redirect** (App.tsx):
+```typescript
+if ((user as any).demo_auto_start === true) {
+  toast.success(`Demo scenario started: ${(user as any).demo_scenario}`);
+  setTimeout(() => {
+    setCurrentView('digital-twin');  // Show 3D visualization
+  }, 500);
+}
+```
+
+### Custom Demo Examples
+
+#### Demo 1: Quick 5-Minute Chiller Failure
+
+For a facilities manager who wants to see chiller fault workflow:
+
+```python
+"fm_chiller_fault_5min": ScenarioConfig(
+    name="Chiller Failure - 5 Min",
+    fault_probability=1.0,  # Guaranteed fault
+    fault_hour=11,
+    fault_equipment_type="CHILLER",
+    auto_repair=False,  # Let FM manually trigger repair
+    optimization_enabled=False,  # Keep focused on fault
+),
+```
+
+**Login trigger** (auth.py):
+```python
+if email == "facilities-manager@bidvest.co.za":
+    orchestrator.run_scenario("fm_chiller_fault_5min", duration_minutes=5.0)
+    response["demo_auto_start"] = True
+    response["demo_scenario"] = "fm_chiller_fault_5min"
+    response["demo_view"] = "workflow"  # Go to work order dashboard
+```
+
+#### Demo 2: Multi-Site Portfolio Overview
+
+For executives reviewing portfolio-wide optimization:
+
+```python
+"executive_portfolio_day": ScenarioConfig(
+    name="Multi-Site Portfolio (24 hours)",
+    fault_probability=0.05,  # Random low probability
+    auto_repair=True,  # Auto-repair to show full lifecycle
+    optimization_enabled=True,  # Show all AI recommendations
+    clawd_notifications=True,
+),
+```
+
+**Login trigger** (auth.py):
+```python
+if email in ["cto@bidvest.co.za", "sustainability@bidvest.co.za"]:
+    orchestrator.run_scenario("executive_portfolio_day", duration_minutes=24.0)
+    response["demo_auto_start"] = True
+    response["demo_scenario"] = "executive_portfolio_day"
+    response["demo_view"] = "sustainability"  # Show ESG/optimization impact
+```
+
+#### Demo 3: Stress Test - Multiple Faults
+
+For testing team validating alert handling:
+
+```python
+"stress_multi_fault": ScenarioConfig(
+    name="Stress Test - Multiple Faults",
+    fault_probability=0.8,  # 80% chance per hour
+    auto_repair=True,
+    repair_delay_hours=1,  # Quick repairs
+    optimization_enabled=True,
+),
+```
+
+### Step 4: Test Your Demo
+
+#### Local Testing
+```bash
+# Start backend
+cd backend && python -m uvicorn app.main:app --host 0.0.0.0 --port 9095
+
+# Start frontend
+cd frontend && npm run dev  # or npm run preview
+
+# Test login in browser
+# Navigate to http://localhost:9096
+# Enter email: <your_demo_email>
+# Watch auto-start and redirect
+```
+
+#### Watch Simulation Events
+```bash
+# Monitor in real-time
+watch -n 2 'curl -s http://localhost:9095/api/lifecycle/events | jq ".events[-3:]"'
+
+# Or check status
+curl http://localhost:9095/api/lifecycle/status | jq
+```
+
+#### Check Systemd Logs
+```bash
+# View production logs
+journalctl -u sentinel-backend -f | grep "demo\|scenario"
+journalctl -u sentinel-frontend -f | grep "Demo\|redirect"
+```
+
+### Step 5: Deploy to Production
+
+Once tested locally:
+
+1. **Update auth.py** with your demo email/scenario logic
+2. **Update lifecycle_orchestrator.py** with new scenario definition
+3. **Test on staging** via `bms.aimthelaw.co.za`
+4. **Systemd auto-restart** handles deployment:
+   ```bash
+   sudo systemctl restart sentinel-backend
+   # Changes picked up on next login
+   ```
+
+### Best Practices
+
+✅ **Do:**
+- Use realistic scenario names (`grant_hvac_dali_7day` not `demo123`)
+- Test locally first before production
+- Document your scenario in a comment
+- Use specific equipment types for focused demos
+- Include scenario description for logging
+
+❌ **Don't:**
+- Hard-code user emails in multiple places (use environment variables for production)
+- Set fault_probability > 1.0 or < 0.0
+- Set repair_delay_hours < 0.5 (unrealistic)
+- Auto-start multiple scenarios for same user (confusing)
+- Change demo scenarios during active user session (restart needed)
+
+### Testing Checklist
+
+- [ ] Scenario runs without errors
+- [ ] Auto-start triggered on login with correct email
+- [ ] Frontend receives demo_auto_start flag
+- [ ] Auto-redirect to correct view happens (500ms delay)
+- [ ] Toast notification shows scenario name
+- [ ] Simulation progresses through hours correctly
+- [ ] Events visible in `/api/lifecycle/events`
+- [ ] Faults generated at expected hour
+- [ ] AI optimization runs if enabled
+- [ ] Alerts/notifications sent if enabled
+- [ ] Dashboard updates in real-time
+
 ## Files
 
 | File | Purpose |
 |------|---------|
-| `services/lifecycle_orchestrator.py` | Core orchestrator with time engine, event processing |
-| `api/lifecycle_simulation.py` | REST API endpoints |
+| `services/lifecycle_orchestrator.py` | Core orchestrator with time engine, scenario definitions |
+| `api/lifecycle_simulation.py` | REST API endpoints for simulation control |
+| `api/auth.py` | Login logic with demo auto-start configuration |
+| `frontend/src/App.tsx` | Frontend auto-redirect logic in handleEmailEntrySuccess |
 
 ## Related Documentation
 

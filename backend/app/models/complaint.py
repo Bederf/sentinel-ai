@@ -111,14 +111,14 @@ class HVACZone(BaseModel):
     Links to FCUs, VAVs, AHUs, and sensors for complete BMS context.
     """
     zone_id: str  # e.g., "Zone-L2-C"
-    zone_name: str  # e.g., "Level 2 Zone C"
-    floor: str
-    fcu_id: str  # e.g., "S002-FCU-L2-C"
+    zone_name: Optional[str] = None  # e.g., "Level 2 Zone C"
+    floor: Optional[str] = None
+    fcu_id: Optional[str] = None  # e.g., "S002-FCU-L2-C"
     vav_id: Optional[str] = None
     ahu_id: Optional[str] = None
-    temp_sensor: str  # e.g., "S002-TS-L2-C"
+    temp_sensor: Optional[str] = None  # e.g., "S002-TS-L2-C"
     co2_sensor: Optional[str] = None
-    typical_occupancy: int
+    typical_occupancy: Optional[int] = None
     area_sqm: Optional[float] = None
     setpoint: float = 22.0
     current_temp: float = 22.0

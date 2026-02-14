@@ -103,6 +103,10 @@ class RecommendationRepository:
             logger.error(f"Error fetching recommendation {rec_id}: {e}")
             return None
 
+    async def get_by_id(self, rec_id: str) -> Optional[Recommendation]:
+        """Alias for get() for consistency with other repositories."""
+        return await self.get(rec_id)
+
     async def get_by_status(
         self,
         site_id: str,

@@ -7,17 +7,87 @@ import { ThresholdEditor } from "./ThresholdEditor";
 import { SafetyRulesEditor } from "./SafetyRulesEditor";
 import { PasswordModal } from "./PasswordModal";
 import { NotificationSettings } from "./NotificationSettings";
-import { ModuleSelector } from "./modules/ModuleSelector";
+import { useModules } from "../contexts/ModuleHooks";
+import type { ModuleType } from "../lib/moduleRegistry";
 
 interface SettingsProps {
   onError?: (error: string) => void;
 }
 
+interface FeatureToggleCard {
+  id: string;
+  label: string;
+  moduleType: ModuleType;
+  description: string;
+  note?: string;
+}
+
+const BASE_PACK_LOCKED_MODULES: ModuleType[] = ["hvac", "energy"];
+
+const FEATURE_TOGGLE_CARDS: FeatureToggleCard[] = [
+  { id: "building-controls", label: "Building Controls", moduleType: "control", description: "Core control dashboard and automation orchestration." },
+  { id: "ai-recommendations", label: "AI Recommendations", moduleType: "energy", description: "Core AI recommendation feed used across base dashboards.", note: "Base pack module (linked to Energy Centre)" },
+  { id: "asset-workflow", label: "Asset Workflow", moduleType: "assets", description: "Lifecycle, maintenance workflows, and asset tracking." },
+  { id: "simbiot", label: "SIMBIOT", moduleType: "simbiot", description: "Integration setup and onboarding tools, including Solar setup flow." },
+  { id: "tech-chat", label: "Tech Chat", moduleType: "notifications", description: "Technician chat workflows and messaging-assisted diagnostics." },
+  { id: "loadshedding", label: "Loadshedding", moduleType: "solar", description: "Loadshedding planning and response workflows.", note: "Linked to Solar & BESS module" },
+  { id: "occupancy", label: "Occupancy", moduleType: "lighting", description: "Occupancy and lighting behavior controls." },
+  { id: "security", label: "Security", moduleType: "security", description: "Access and security monitoring pages." },
+  { id: "solar-bess", label: "Solar & BESS", moduleType: "solar", description: "Solar PV and battery storage monitoring." },
+  { id: "water", label: "Water", moduleType: "water", description: "Water usage analytics and anomaly monitoring." },
+  { id: "esg", label: "ESG", moduleType: "sustainability", description: "Sustainability and ESG dashboards." },
+  { id: "contract", label: "Contract", moduleType: "contracts", description: "Contract management features and lifecycle." },
+  { id: "profitability", label: "Profitability", moduleType: "contracts", description: "Profitability analytics views.", note: "Linked to Contract module" },
+  { id: "budget-reports", label: "Budget Reports", moduleType: "contracts", description: "Budget and forecasting report views.", note: "Linked to Contract module" },
+  { id: "fleet-ml", label: "Fleet ML", moduleType: "ml", description: "Cross-site ML insights and fleet analytics." },
+  { id: "ml-metrics", label: "ML Metrics", moduleType: "ml", description: "MLOps and model monitoring metrics.", note: "Linked to ML module" },
+  { id: "simulation", label: "Simulation", moduleType: "ml", description: "Simulation view for admin users.", note: "Linked to ML module" },
+];
+
 export function Settings({ onError }: SettingsProps) {
   const { thresholds, loading, error, updateThresholds } = useHealthThresholds();
+  const { isModuleActive, activateModule, deactivateModule } = useModules();
+  const currentUserRole = (() => {
+    try {
+      const raw = localStorage.getItem("sentinel_user");
+      if (!raw) return "auditor";
+      const parsed = JSON.parse(raw) as { role?: string };
+      return parsed.role || "auditor";
+    } catch {
+      return "auditor";
+    }
+  })();
+  const canManageFeatureAccess = currentUserRole === "admin";
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [safetyRulesUnlocked, setSafetyRulesUnlocked] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [togglingCardId, setTogglingCardId] = useState<string | null>(null);
+
+  const handleFeatureToggle = async (card: FeatureToggleCard) => {
+    if (!canManageFeatureAccess) {
+      onError?.("Only admins can change feature access.");
+      return;
+    }
+    const currentlyActive = isModuleActive(card.moduleType);
+    const locked = currentlyActive && BASE_PACK_LOCKED_MODULES.includes(card.moduleType);
+    if (locked) return;
+
+    setTogglingCardId(card.id);
+    try {
+      if (currentlyActive) {
+        await deactivateModule(card.moduleType);
+      } else {
+        await activateModule(card.moduleType);
+      }
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 2000);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to update feature toggle";
+      onError?.(message);
+    } finally {
+      setTogglingCardId(null);
+    }
+  };
 
   const handleSaveThresholds = async (newThresholds: {
     healthy: number;
@@ -302,67 +372,83 @@ export function Settings({ onError }: SettingsProps) {
                   className="text-lg font-semibold"
                   style={{ color: "var(--color-sentinel-text-primary)" }}
                 >
-                  Building Modules
+                  Feature Access
                 </h2>
                 <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                  Activate or deactivate feature modules for this site
+                  Toggle these pages and capabilities for this site
                 </p>
               </div>
             </div>
           </div>
 
           <div className="p-6">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              {FEATURE_TOGGLE_CARDS.map((card) => {
+                const active = isModuleActive(card.moduleType);
+                const loadingCard = togglingCardId === card.id;
+                const locked = active && BASE_PACK_LOCKED_MODULES.includes(card.moduleType);
+                return (
+                  <div
+                    key={card.id}
+                    className="rounded-lg p-4"
+                    style={{
+                      background: "var(--color-sentinel-bg-secondary)",
+                      border: "1px solid var(--glass-border)",
+                      opacity: loadingCard ? 0.75 : 1,
+                    }}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h3 className="text-sm font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                          {card.label}
+                        </h3>
+                        <p className="mt-1 text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                          {card.description}
+                        </p>
+                        {card.note && (
+                          <p className="mt-1 text-xs" style={{ color: "var(--color-sentinel-blue)" }}>
+                            {card.note}
+                          </p>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => void handleFeatureToggle(card)}
+                        disabled={loadingCard || locked || !canManageFeatureAccess}
+                        className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
+                        style={{
+                          background: active ? "var(--color-sentinel-green)" : "var(--color-sentinel-bg-hover)",
+                          border: `1px solid ${active ? "var(--color-sentinel-green)" : "var(--glass-border)"}`,
+                          cursor: loadingCard || locked || !canManageFeatureAccess ? "not-allowed" : "pointer",
+                          opacity: loadingCard || locked || !canManageFeatureAccess ? 0.6 : 1,
+                        }}
+                        aria-label={`Toggle ${card.label}`}
+                        type="button"
+                      >
+                        <span
+                          className="inline-block h-4 w-4 rounded-full bg-white transition-transform"
+                          style={{ transform: active ? "translateX(22px)" : "translateX(2px)" }}
+                        />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
             <div
-              className="mb-5 rounded-lg p-3"
+              className="mt-4 rounded-lg p-3"
               style={{
                 background: "rgba(59, 130, 246, 0.08)",
                 border: "1px solid rgba(59, 130, 246, 0.25)",
               }}
             >
-              <p
-                className="text-sm font-medium mb-2"
-                style={{ color: "var(--color-sentinel-text-primary)" }}
-              >
-                Navigation features controlled by module toggles
+              <p className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                Solar Setup is managed in the SIMBIOT flow. Module management is handled on this Settings page.
               </p>
-              <div className="grid gap-1 text-xs sm:grid-cols-2" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                <div>AI Chat: <span style={{ color: "var(--color-sentinel-text-primary)" }}>notifications</span></div>
-                <div>Control Audit: <span style={{ color: "var(--color-sentinel-text-primary)" }}>control</span></div>
-                <div>3D Digital Twin: <span style={{ color: "var(--color-sentinel-text-primary)" }}>simbiot</span></div>
-                <div>Simulation (admin): <span style={{ color: "var(--color-sentinel-text-primary)" }}>ml</span></div>
-              </div>
-            </div>
-            <style>{`
-              .module-selector-wrapper .bg-gray-50 {
-                background: var(--color-sentinel-bg-secondary) !important;
-                border-color: var(--glass-border) !important;
-              }
-              .module-selector-wrapper .bg-purple-50 {
-                background: rgba(99, 102, 241, 0.1) !important;
-                border-color: rgba(99, 102, 241, 0.3) !important;
-              }
-              .module-selector-wrapper .text-gray-500 {
-                color: var(--color-sentinel-text-secondary) !important;
-              }
-              .module-selector-wrapper .text-gray-700 {
-                color: var(--color-sentinel-text-primary) !important;
-              }
-              .module-selector-wrapper .text-gray-600 {
-                color: var(--color-sentinel-text-secondary) !important;
-              }
-              .module-selector-wrapper .text-purple-700 {
-                color: rgba(99, 102, 241, 0.8) !important;
-              }
-              .module-selector-wrapper .text-gray-400 {
-                color: var(--color-sentinel-text-disabled) !important;
-              }
-              .module-selector-wrapper > div {
-                background: transparent !important;
-                border: none !important;
-              }
-            `}</style>
-            <div className="module-selector-wrapper">
-              <ModuleSelector />
+              {!canManageFeatureAccess && (
+                <p className="text-xs mt-2" style={{ color: "var(--color-sentinel-amber)" }}>
+                  You have read-only access. Contact an administrator to request module changes.
+                </p>
+              )}
             </div>
           </div>
         </div>

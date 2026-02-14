@@ -5,7 +5,7 @@
  * including plants, inverters, BESS, and grid meter setup.
  */
 
-import { client } from "./client";
+import { fetchApi } from "./client";
 
 // ============================================================================
 // Type Definitions
@@ -90,7 +90,11 @@ export const solarConfigApi = {
    * @returns Success response with site ID
    */
   createSolarSite: (request: SolarSiteRequest): Promise<SolarSiteResponse> =>
-    client.post("/api/solar-config/sites", request),
+    fetchApi<SolarSiteResponse>("/api/solar-config/sites", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(request),
+    }),
 
   /**
    * Retrieve existing solar configuration for editing.
@@ -99,7 +103,7 @@ export const solarConfigApi = {
    * @returns Solar configuration for the site
    */
   getSolarConfig: (siteId: string): Promise<SolarConfig> =>
-    client.get(`/api/solar-config/sites/${siteId}`),
+    fetchApi<SolarConfig>(`/api/solar-config/sites/${siteId}`),
 
   /**
    * Validate solar configuration without saving.
@@ -108,7 +112,11 @@ export const solarConfigApi = {
    * @returns Validation result with errors (if any)
    */
   validateConfig: (request: SolarSiteRequest): Promise<ValidationResult> =>
-    client.post("/api/solar-config/validate", request),
+    fetchApi<ValidationResult>("/api/solar-config/validate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(request),
+    }),
 };
 
 // ============================================================================

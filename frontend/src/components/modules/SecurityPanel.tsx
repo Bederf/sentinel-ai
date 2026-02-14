@@ -52,7 +52,7 @@ import {
   type SecurityAlert,
   type Visitor,
   type AccessPoint,
-} from '@/lib/api';
+} from '@/lib/api/index';
 
 interface SecurityPanelProps {
   siteId?: string;
@@ -180,7 +180,7 @@ export function SecurityPanel({ siteId: propSiteId }: SecurityPanelProps): React
             <Tab>Access Points</Tab>
           </TabList>
 
-          <TabPanels as="div">
+          <TabPanels>
             {/* Tab 1: Overview */}
             <TabPanel>
               <div className="mt-6 space-y-4">

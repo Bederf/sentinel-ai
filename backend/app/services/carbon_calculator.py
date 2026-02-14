@@ -18,7 +18,7 @@ import logging
 from datetime import date, timedelta
 from typing import Dict, List, Optional, Tuple
 
-from app.database.repositories.base_repository import get_supabase_client
+from app.database.supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
 

@@ -10,19 +10,21 @@ interface EquipmentMarkerProps {
   onClick: () => void;
 }
 
-// ─── Landing page TYPE_COLORS (exact match) ──────────────────────────
+// ─── Matrix Cyberpunk Color Palette ──────────────────────────────────────
 const TYPE_COLORS: Record<string, string> = {
-  ahu: '#2E86AB', vav: '#3AAFDE', fcu: '#6366F1', fcuventilation: '#6366F1',
-  mcc: '#E8913A', db: '#F59E0B', distribution_board: '#F59E0B',
-  ups: '#D97706', dali: '#FBBF24', luminaire: '#FBBF24', lum: '#FBBF24',
-  sensor: '#10B981', solar: '#F97316', bess: '#22C55E',
-  chiller: '#0EA5E9', cooling_tower: '#0EA5E9', ct: '#0EA5E9',
-  pump: '#06B6D4', fire_panel: '#DC2626', fire: '#DC2626', sprinkler: '#DC2626',
-  cctv: '#6B7280', access: '#7C3AED', acc: '#7C3AED',
-  generator: '#E8913A', gen: '#E8913A',
-  transformer: '#D97706', tx: '#D97706', ats: '#D97706',
-  meter: '#78909C', mtr: '#78909C', switch: '#F59E0B',
-  boiler: '#FF5722', hvac_zone: '#26C6DA',
+  // HVAC - Various green shades
+  ahu: '#00A541', vav: '#008B37', fcu: '#00712D', fcuventilation: '#00712D',
+  // Power/Electrical - Bright green/emerald
+  mcc: '#00C852', db: '#00E676', distribution_board: '#00E676',
+  ups: '#1DE9B6', dali: '#00FF41', luminaire: '#00FF41', lum: '#00FF41',
+  sensor: '#69F0AE', solar: '#00C853', bess: '#00E676',
+  chiller: '#00897B', cooling_tower: '#00897B', ct: '#00897B',
+  pump: '#009688', fire_panel: '#DC2626', fire: '#EF4444', sprinkler: '#EF4444',
+  cctv: '#424242', access: '#7C3AED', acc: '#7C3AED',
+  generator: '#00C853', gen: '#00C853',
+  transformer: '#00A541', tx: '#00A541', ats: '#00A541',
+  meter: '#00897B', mtr: '#00897B', switch: '#00E676',
+  boiler: '#FF5722', hvac_zone: '#009688',
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -109,16 +111,16 @@ export function EquipmentMarker({ equipment, position, onClick }: EquipmentMarke
 
   const geometry = useEquipmentGeometry(eqType);
 
-  // Material (matches landing page: MeshPhongMaterial with emissive)
+  // Material (Matrix Cyberpunk: Enhanced glow effect)
   const material = useMemo(() => {
     return new THREE.MeshPhongMaterial({
       color: new THREE.Color(typeColor),
       emissive: new THREE.Color(statusColor),
-      emissiveIntensity: isFault ? 0.5 : 0.12,
+      emissiveIntensity: isFault ? 0.8 : isWarning ? 0.6 : 0.4,
       transparent: true,
       opacity: 0.85,
     });
-  }, [typeColor, statusColor, isFault]);
+  }, [typeColor, statusColor, isFault, isWarning]);
 
   // Animate: pulse for fault/warning, subtle bob for online
   useFrame((_, delta) => {
@@ -155,11 +157,17 @@ export function EquipmentMarker({ equipment, position, onClick }: EquipmentMarke
       {/* Main equipment mesh */}
       <mesh ref={meshRef} geometry={geometry} material={material} castShadow />
 
-      {/* Equipment ID Label */}
+      {/* Equipment ID Label - Matrix Cyberpunk Style */}
       <Html position={[0, 0.6, 0]} scale={0.3} distanceFactor={8}>
         <div
-          className="bg-black/70 text-white px-2 py-1 rounded text-xs whitespace-nowrap font-mono"
-          style={{ pointerEvents: 'none', textShadow: '0 0 2px rgba(0,0,0,0.8)' }}
+          className="matrix-label px-2 py-1 text-xs whitespace-nowrap font-mono"
+          style={{
+            pointerEvents: 'none',
+            background: 'rgba(0, 255, 65, 0.15)',
+            border: '1px solid rgba(0, 255, 65, 0.4)',
+            boxShadow: '0 0 10px rgba(0, 255, 65, 0.3)',
+            color: '#00FF41',
+          }}
         >
           {(equipment as any).code || equipment.id}
         </div>

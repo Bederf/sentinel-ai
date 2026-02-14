@@ -22,7 +22,7 @@ from app.api.dependencies.module_access import require_active_module
 from app.models.module_registry import ModuleType
 from app.services.sustainability_service import sustainability_service
 from app.services.carbon_calculator import get_carbon_calculator
-from app.database.repositories.base_repository import get_supabase_client
+from app.database.supabase_client import get_supabase_client
 
 router = APIRouter(
     prefix="/api/sustainability",

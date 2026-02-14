@@ -13,10 +13,12 @@ import logging
 from datetime import datetime, date, timedelta
 from typing import Optional, List, Dict
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 from app.middleware.rate_limiter import limiter
 
+from app.api.dependencies.module_access import require_active_module
+from app.models.module_registry import ModuleType
 from app.services.water_ingestion_service import get_water_ingestion_service
 from app.services.water_alert_service import get_water_alert_service, WaterAlertThresholds
 from app.services.water_cost_service import get_water_cost_service
@@ -28,7 +30,17 @@ import uuid
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+router = APIRouter(
+    dependencies=[
+        Depends(
+            require_active_module(
+                ModuleType.WATER,
+                site_keys=("site", "site_id"),
+                default_site_id="site-002",
+            )
+        )
+    ]
+)
 
 
 # === Consumption endpoints ===

@@ -2255,7 +2255,7 @@ export const api = {
   /**
    * Enable autonomous mode
    */
-  async enableAutonomousMode(): Promise<{ success: boolean; message: string }> {
+  async enableAutonomousMode(): Promise<{ success: boolean; message: string; mode?: string }> {
     return fetchApi(`/api/autonomous/enable`, {
       method: "POST",
     });
@@ -2319,7 +2319,7 @@ export const api = {
     escalationId: string,
     acknowledgedBy: string,
     comment?: string
-  ): Promise<{ success: boolean; message: string }> {
+  ): Promise<{ success: boolean; message: string; mode?: string }> {
     return fetchApi(`/api/safety/escalation/acknowledge`, {
       method: "POST",
       body: JSON.stringify({
@@ -2372,7 +2372,7 @@ export const api = {
   async updateBoundary(
     deviceId: string,
     config: any
-  ): Promise<{ success: boolean; message: string }> {
+  ): Promise<{ success: boolean; message: string; cancelled_decisions?: number; mode?: string }> {
     return fetchApi(`/api/autonomous/boundaries/update`, {
       method: "POST",
       body: JSON.stringify({
@@ -2389,7 +2389,6 @@ export const api = {
   async toggleAutonomousMode(enabled: boolean): Promise<{
     success: boolean;
     message: string;
-    mode: string;
   }> {
     if (enabled) {
       return this.enableAutonomousMode();

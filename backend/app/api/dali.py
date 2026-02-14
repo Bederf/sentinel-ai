@@ -6,14 +6,28 @@ REST endpoints for Tridonic Scenecom DALI-2 lighting system.
 
 import logging
 from datetime import datetime
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List, Optional
 
+from app.api.dependencies.module_access import require_active_module
+from app.models.module_registry import ModuleType
 from app.services.dali_service import get_dali_service
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/dali", tags=["DALI Lighting"])
+router = APIRouter(
+    prefix="/api/dali",
+    tags=["DALI Lighting"],
+    dependencies=[
+        Depends(
+            require_active_module(
+                ModuleType.LIGHTING,
+                site_keys=("site_id", "site"),
+                default_site_id="site-002",
+            )
+        )
+    ],
+)
 
 
 # === Controllers ===

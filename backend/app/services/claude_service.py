@@ -8,8 +8,9 @@ from typing import AsyncGenerator, Any
 from anthropic import Anthropic, APIError, AuthenticationError, RateLimitError
 
 from app.config.settings import settings
+from app.models.auth import SentinelRole
 from app.services.fm_context import fm_context_service
-from app.services.chat_tools import CHAT_TOOLS, execute_tool
+from app.services.chat_tools import execute_tool, get_chat_tools
 from app.services.cross_system_analyzer import get_cross_system_analyzer
 
 logger = logging.getLogger(__name__)
@@ -373,6 +374,9 @@ class ClaudeService:
         messages: list[dict],
         system_prompt: str | None = None,
         include_building_context: bool = True,
+        site_id: str | None = None,
+        user_email: str | None = None,
+        user_role: SentinelRole | None = None,
     ) -> AsyncGenerator[str, None]:
         """
         Stream a response from Claude with tool calling support.
@@ -387,6 +391,9 @@ class ClaudeService:
             messages: List of message dicts with 'role' and 'content'
             system_prompt: Optional custom system prompt
             include_building_context: Whether to include building data context
+            site_id: Site/building code used to filter module-gated tools
+            user_email: Authenticated user email for per-user module grants
+            user_role: Authenticated role for per-user grant checks
 
         Yields:
             Text chunks as they arrive from Claude's final response
@@ -398,6 +405,12 @@ class ClaudeService:
             system = build_system_prompt_with_context()
         else:
             system = FM_SYSTEM_PROMPT_BASE
+
+        available_tools = get_chat_tools(
+            site_id,
+            user_email=user_email,
+            user_role=user_role,
+        )
 
         # Keep track of conversation with tool calls
         conversation = list(messages)
@@ -413,7 +426,7 @@ class ClaudeService:
                     max_tokens=self._max_tokens,
                     system=system,
                     messages=conversation,
-                    tools=CHAT_TOOLS,
+                    tools=available_tools,
                 )
 
                 # Check stop reason
@@ -439,7 +452,13 @@ class ClaudeService:
                             logger.info(f"Executing tool: {tool_name} with input: {tool_input}")
 
                             # Execute the tool
-                            result = await execute_tool(tool_name, tool_input)
+                            result = await execute_tool(
+                                tool_name,
+                                tool_input,
+                                site_id=site_id,
+                                user_email=user_email,
+                                user_role=user_role,
+                            )
 
                             logger.debug(f"Tool {tool_name} result: {result}")
 

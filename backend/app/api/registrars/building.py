@@ -13,6 +13,7 @@ from app.api import hvac, fire, security
 from app.api import niagara, niagara_bacnet, niagara_discovery
 from app.api import buildings_3d, digital_twin
 from app.api import zone_ingestion, desks, documents
+from app.api import device_controls
 
 
 def register_building_routers(app: FastAPI) -> None:
@@ -24,6 +25,7 @@ def register_building_routers(app: FastAPI) -> None:
     app.include_router(sensors.router, prefix="/api", tags=["sensors"])
     app.include_router(devices.router, prefix="/api", tags=["devices"])
     app.include_router(devices_batch.router, prefix="/api", tags=["devices-batch"])
+    app.include_router(device_controls.router, prefix="/api", tags=["device-controls"])
     app.include_router(equipment_metadata.router, prefix="/api", tags=["equipment-metadata"])
     
     # Building 3D configuration (structure + equipment placement)

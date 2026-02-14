@@ -6,10 +6,25 @@ including inverters, BESS, grid meters, and tariff information.
 
 import re
 from typing import Optional
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
-router = APIRouter(prefix="/api/solar-config", tags=["solar-config"])
+from app.api.dependencies.module_access import require_active_module
+from app.models.module_registry import ModuleType
+
+router = APIRouter(
+    prefix="/api/solar-config",
+    tags=["solar-config"],
+    dependencies=[
+        Depends(
+            require_active_module(
+                ModuleType.SOLAR,
+                site_keys=("site_id", "site"),
+                default_site_id="site-002",
+            )
+        )
+    ],
+)
 
 
 # ============================================================================

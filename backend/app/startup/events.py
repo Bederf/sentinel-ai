@@ -84,6 +84,21 @@ async def startup_event(app: FastAPI) -> None:
     from app.api.devices import startup_event as devices_startup
     await devices_startup()
 
+    # Initialize Clawd bot JWT authentication
+    from app.services.clawd_auth_service import initialize_clawd_auth, get_clawd_auth_service
+
+    clawd_auth = initialize_clawd_auth(api_url=settings.backend_url or "http://localhost:9095")
+    
+    # Attempt initial login
+    if await clawd_auth.login():
+        # Start background token refresh (hourly)
+        await clawd_auth.start_background_refresh()
+        _logger.info("✓ Clawd bot JWT authentication active (auto-refresh enabled)")
+    else:
+        _logger.warning(
+            "⚠ Clawd bot JWT login failed - check CLAWD_BOT_USERNAME and CLAWD_BOT_PASSWORD in .env"
+        )
+
     # Start background scheduler for demo data generation
     scheduler_service.start()
 
@@ -100,11 +115,11 @@ async def startup_event(app: FastAPI) -> None:
     # When equipment health drops below 90%, a prediction is auto-generated
     scheduler_service.add_prediction_generation_job(interval_seconds=300)  # 5 minutes
 
-    # Start AI recommendation generation job (runs every 10 minutes)
+    # Start AI recommendation generation job (runs every 10 minutes, or 2 minutes in DEMO_MODE)
     # Scans ALL equipment and generates recommendations:
     # - Healthy equipment (>=90%): Optimization & preventive maintenance
     # - At-risk equipment (<90%): Maintenance & repair recommendations
-    scheduler_service.add_recommendation_generation_job(interval_seconds=600)  # 10 minutes
+    scheduler_service.add_recommendation_generation_job(interval_seconds=settings.recommendation_interval)
 
     # Start demand-aware coordinator (runs every 5 minutes)
     # Phase 081: Cross-module peak demand management
@@ -134,18 +149,27 @@ async def startup_event(app: FastAPI) -> None:
     # Start Clawd notification processing (runs every 30 seconds)
     # When equipment health drops to warning/critical, technicians receive Telegram notifications
     # This background job ensures notifications are sent promptly even if Clawd bot polling is delayed
-    if hasattr(scheduler_service, "add_clawd_notification_job"):
-        scheduler_service.add_clawd_notification_job(interval_seconds=30)  # 30 seconds
+    # TEMPORARILY DISABLED for testing - uncomment to re-enable
+    # if hasattr(scheduler_service, "add_clawd_notification_job"):
+    #     scheduler_service.add_clawd_notification_job(interval_seconds=30)  # 30 seconds
 
-    # Start model freshness check (runs daily)
-    # Phase 45-01: Checks model age and R² score, auto-retrains stale models
-    if hasattr(scheduler_service, "add_model_check_job"):
-        scheduler_service.add_model_check_job(interval_seconds=86400)  # 24 hours
+    # Start ML model retraining job (runs daily)
+    # Phase 45-01: Checks model age (>30 days) and R² score (<0.65), auto-retrains stale models
+    # Retrains ONE model per cycle to avoid system overload. Models prioritized by age and performance.
+    try:
+        scheduler_service.add_ml_retraining_job(interval_seconds=86400)  # 24 hours
+        _logger.info("✅ ML model retraining job initialized - checks daily for stale/underperforming models")
+    except Exception as e:
+        _logger.warning(f"⚠️ ML retraining job initialization failed: {e}")
 
-    # Start performance monitor (runs hourly)
-    # Phase 45-01: Evaluates prediction accuracy against actual alerts
-    if hasattr(scheduler_service, "add_performance_monitor_job"):
-        scheduler_service.add_performance_monitor_job(interval_seconds=3600)  # 1 hour
+    # Start drift detection job (runs hourly)
+    # Phase 45-03: Monitors for data/model drift, auto-triggers retraining when patterns change
+    # Detects when 3+ features drift or prediction accuracy drops >10%
+    try:
+        scheduler_service.add_drift_detection_job(interval_seconds=3600)  # 1 hour
+        _logger.info("✅ Drift detection job initialized - monitors hourly for model/data drift")
+    except Exception as e:
+        _logger.warning(f"⚠️ Drift detection job initialization failed: {e}")
 
     # Start system health snapshot job (runs every 5 minutes)
     # Stores point-in-time health snapshots for trend analysis and historical reporting
@@ -233,6 +257,12 @@ async def shutdown_event(app: FastAPI) -> None:
     This function is called when the FastAPI application shuts down.
     It stops background services and closes connections.
     """
+    # Stop Clawd JWT token refresh
+    from app.services.clawd_auth_service import get_clawd_auth_service
+    clawd_auth = get_clawd_auth_service()
+    if clawd_auth:
+        await clawd_auth.stop_background_refresh()
+    
     scheduler_service.stop()
     await health_simulation_service.stop()
     await simbiot_service.shutdown()

@@ -14,19 +14,16 @@
 import { useState, useEffect } from "react";
 import {
   Card,
-  Title,
-  Text,
   Metric,
   Flex,
-  Button,
-  Badge,
   Tab,
   TabGroup,
   TabList,
   TabPanels,
   TabPanel,
+  Text,
 } from "@tremor/react";
-import { Droplets, Building2, ChevronDown, AlertTriangle, CheckCircle } from "lucide-react";
+import { Droplets, Building2, ChevronDown, AlertTriangle } from "lucide-react";
 import { waterApi } from "../../lib/waterApi";
 import type {
   WaterAlert,
@@ -207,26 +204,16 @@ export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
     }
   };
 
-  // Format chart data
-  const consumptionChartData = consumptionData.map((d) => ({
-    date: new Date(d.timestamp).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-    volume: d.volume_liters,
-  }));
-
-  const severityColors: Record<string, "red" | "yellow" | "blue" | "green"> = {
-    critical: "red",
-    high: "red",
-    medium: "yellow",
-    low: "blue",
-  };
-
   return (
     <div
       className="h-full overflow-y-auto p-4 md:p-6"
       style={{ background: "var(--color-sentinel-bg-canvas)" }}
     >
       {/* Header */}
-      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+      <div
+        className="glass-panel rounded-lg p-4 md:p-5 mb-6 flex items-center justify-between flex-wrap gap-3"
+        style={{ border: "1px solid var(--glass-border)" }}
+      >
         <div className="flex items-center gap-3">
           <div
             className="p-2 rounded"
@@ -283,7 +270,7 @@ export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
 
       {/* Quick Stats KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <Card>
+        <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
           <Flex justifyContent="between" alignItems="center">
             <Text style={{ color: "var(--color-sentinel-text-secondary)" }} className="text-xs">
               Today's Consumption
@@ -296,7 +283,7 @@ export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
           </Text>
         </Card>
 
-        <Card>
+        <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
           <Flex justifyContent="between" alignItems="center">
             <Text style={{ color: "var(--color-sentinel-text-secondary)" }} className="text-xs">
               Monthly Cost
@@ -309,7 +296,7 @@ export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
           </Text>
         </Card>
 
-        <Card>
+        <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
           <Flex justifyContent="between" alignItems="center">
             <Text style={{ color: "var(--color-sentinel-text-secondary)" }} className="text-xs">
               Active Alerts
@@ -324,7 +311,7 @@ export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
           </Text>
         </Card>
 
-        <Card>
+        <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
           <Flex justifyContent="between" alignItems="center">
             <Text style={{ color: "var(--color-sentinel-text-secondary)" }} className="text-xs">
               Efficiency
@@ -342,7 +329,10 @@ export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
 
       {/* Tab Navigation and Content */}
       <TabGroup index={activeTabIndex} onIndexChange={setActiveTabIndex}>
-        <TabList className="mb-6">
+        <TabList
+          className="mb-6 glass-subtle rounded-md p-1"
+          style={{ border: "1px solid var(--glass-border)" }}
+        >
           <Tab>Overview</Tab>
           <Tab>Zones</Tab>
           <Tab>Costs & Forecast</Tab>
@@ -350,53 +340,26 @@ export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
         </TabList>
 
         <TabPanels>
-          <TabPanel>
+          <TabPanel className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <WaterAnomalyChart zoneId={selectedSiteId} days={7} />
               <WaterAlertPanel buildingId={selectedSiteId} />
             </div>
           </TabPanel>
 
-          <TabPanel>
+          <TabPanel className="space-y-6">
             <WaterZoneBreakdown buildingId={selectedSiteId} days={30} />
           </TabPanel>
 
-          <TabPanel>
+          <TabPanel className="space-y-6">
             <WaterCostAnalysis buildingId={selectedSiteId} />
           </TabPanel>
 
-          <TabPanel>
+          <TabPanel className="space-y-6">
             <WaterAlertPanel buildingId={selectedSiteId} />
           </TabPanel>
         </TabPanels>
       </TabGroup>
-    </div>
-  );
-}
-
-// Placeholder for LineChart (would import from @tremor/react in production)
-function LineChartPlaceholder({ data }: { data: Array<{ date: string; volume: number }> }) {
-  const maxValue = Math.max(...data.map((d) => d.volume));
-
-  return (
-    <div className="w-full h-full flex flex-col justify-end">
-      <div className="flex items-end justify-between gap-1 h-48">
-        {data.map((d, i) => (
-          <div key={i} className="flex-1 flex flex-col items-center">
-            <div
-              className="w-full rounded-t transition-all"
-              style={{
-                height: `${(d.volume / maxValue) * 100}%`,
-                background: "var(--color-sentinel-blue)",
-                minHeight: "4px",
-              }}
-            />
-            <Text className="text-xs mt-1" style={{ fontSize: "9px" }}>
-              {d.date}
-            </Text>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }

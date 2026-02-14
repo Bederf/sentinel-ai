@@ -21,7 +21,7 @@ import {
   type Site,
 } from '@/lib/api';
 import { PageLoading } from "./PageLoading";
-import BuildingSelector from "./BuildingSelector";
+import { BuildingSelector } from "./BuildingSelector";
 
 // Re-export types from API for local use
 type Equipment = WorkflowEquipmentItem;

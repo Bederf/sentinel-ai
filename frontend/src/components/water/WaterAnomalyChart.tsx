@@ -18,13 +18,9 @@ import {
   Metric,
   Flex,
   LineChart,
-  AreaChart,
-  Tab,
-  TabList,
 } from "@tremor/react";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle } from "lucide-react";
-import { waterApi } from "../../lib/waterApi";
 
 interface AnomalyData {
   timestamp: string;
@@ -85,7 +81,7 @@ export const WaterAnomalyChart: React.FC<WaterAnomalyChartProps> = ({
 
   if (isLoading || !anomalies) {
     return (
-      <Card>
+      <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
         <div className="flex items-center justify-center h-64">
           <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>
             Loading anomaly data...
@@ -115,7 +111,7 @@ export const WaterAnomalyChart: React.FC<WaterAnomalyChartProps> = ({
   return (
     <div className="space-y-6">
       {/* Time Range Selector */}
-      <Card>
+      <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
         <Flex justifyContent="between" alignItems="center">
           <Title>Flow Rate Anomaly Detection</Title>
           <div className="flex gap-2">
@@ -143,7 +139,7 @@ export const WaterAnomalyChart: React.FC<WaterAnomalyChartProps> = ({
       </Card>
 
       {/* Main Chart */}
-      <Card>
+      <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
         <Text className="text-xs mb-4" style={{ color: "var(--color-sentinel-text-secondary)" }}>
           Flow rate in liters per minute with baseline and threshold indicators
         </Text>
@@ -171,7 +167,7 @@ export const WaterAnomalyChart: React.FC<WaterAnomalyChartProps> = ({
 
       {/* Statistics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
+        <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
           <Text
             style={{ color: "var(--color-sentinel-text-secondary)" }}
             className="text-xs"
@@ -186,7 +182,7 @@ export const WaterAnomalyChart: React.FC<WaterAnomalyChartProps> = ({
           </Text>
         </Card>
 
-        <Card>
+        <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
           <Text
             style={{ color: "var(--color-sentinel-text-secondary)" }}
             className="text-xs"
@@ -201,7 +197,7 @@ export const WaterAnomalyChart: React.FC<WaterAnomalyChartProps> = ({
           </Text>
         </Card>
 
-        <Card>
+        <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
           <Text
             style={{ color: "var(--color-sentinel-text-secondary)" }}
             className="text-xs"
@@ -216,7 +212,7 @@ export const WaterAnomalyChart: React.FC<WaterAnomalyChartProps> = ({
       </div>
 
       {/* Threshold Information */}
-      <Card>
+      <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
         <Title className="mb-4">Threshold Configuration</Title>
         <div className="space-y-3">
           <div className="flex items-center justify-between p-3 rounded" style={{background: "rgba(34, 197, 94, 0.1)"}}>
@@ -258,7 +254,7 @@ export const WaterAnomalyChart: React.FC<WaterAnomalyChartProps> = ({
       </Card>
 
       {/* Detected Anomalies List */}
-      <Card>
+      <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
         <Title className="mb-4">Detected Anomalies</Title>
         {anomalies.data.filter((d) => d.is_anomaly).length === 0 ? (
           <div className="text-center py-6">

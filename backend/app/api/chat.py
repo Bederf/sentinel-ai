@@ -17,6 +17,7 @@ from app.services.doc_rag_service import search_documentation, get_doc_rag_syste
 from app.services.feature_request_logger import log_chat_query
 from app.services.prompt_injection_guard import check_query_safety
 from app.config.settings import settings
+from app.middleware.auth_middleware import get_current_auth
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -68,7 +69,13 @@ def format_sse_chunk(chunk: str) -> str:
     return '\n'.join(sse_lines) + '\n\n'
 
 
-async def generate_sse_stream(user_message: str, use_tools: bool = True, site_id: str | None = None) -> AsyncGenerator[str, None]:
+async def generate_sse_stream(
+    user_message: str,
+    use_tools: bool = True,
+    site_id: str | None = None,
+    user_email: str | None = None,
+    user_role: str | None = None,
+) -> AsyncGenerator[str, None]:
     """
     Generate SSE-formatted stream from Claude response.
 
@@ -92,7 +99,12 @@ async def generate_sse_stream(user_message: str, use_tools: bool = True, site_id
     try:
         if use_tools:
             # Use tool-enabled streaming for device control capabilities
-            async for chunk in claude_service.stream_response_with_tools(messages):
+            async for chunk in claude_service.stream_response_with_tools(
+                messages,
+                site_id=site_id,
+                user_email=user_email,
+                user_role=user_role,
+            ):
                 # Format as SSE data with proper newline handling
                 yield format_sse_chunk(chunk)
         else:
@@ -321,8 +333,15 @@ async def chat(request: FastAPIRequest, chat_request: ChatRequest) -> StreamingR
             detail="Claude AI is not configured. Set ANTHROPIC_API_KEY in environment.",
         )
 
+    auth_ctx = get_current_auth(request)
     return StreamingResponse(
-        generate_sse_stream(user_message, use_tools=True, site_id=chat_request.site_id),
+        generate_sse_stream(
+            user_message,
+            use_tools=True,
+            site_id=chat_request.site_id,
+            user_email=getattr(auth_ctx, "email", None),
+            user_role=getattr(auth_ctx, "role", None),
+        ),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

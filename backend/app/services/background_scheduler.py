@@ -815,6 +815,62 @@ class BackgroundSchedulerService:
         )
         logger.info(f"Added ML retraining job with {interval_seconds}s interval (checks daily for stale models)")
 
+
+    def add_drift_detection_job(self, interval_seconds: int = 3600):
+        """
+        Add a job to monitor for data/model drift and trigger retraining if detected.
+
+        Detects when incoming data patterns have changed significantly from training data,
+        or when model predictions are degrading. Automatically triggers retraining when:
+        - 3+ features show statistical drift
+        - Prediction accuracy drops >10%
+        
+        Runs every hour to catch drift early before models become stale.
+
+        Args:
+            interval_seconds: How often to check for drift (default: 3600 = 1 hour)
+        """
+        # Remove existing job if it exists
+        if self.scheduler.get_job('drift_detection_monitor'):
+            self.scheduler.remove_job('drift_detection_monitor')
+            logger.info("Removed existing drift detection job")
+
+        # Add new job
+        self.scheduler.add_job(
+            func=self._run_drift_detection,
+            trigger=IntervalTrigger(seconds=interval_seconds),
+            id='drift_detection_monitor',
+            name='Drift Detection & Auto-Retrain Monitor',
+            replace_existing=True
+        )
+        logger.info(f"Added drift detection job with {interval_seconds}s interval (monitors for data/model drift)")
+
+    def _run_drift_detection(self):
+        """
+        Check for data/model drift and trigger retraining if thresholds exceeded.
+
+        Runs as background job - automatically triggers retraining when drift detected.
+        Helps system adapt to changing building behaviors and conditions.
+        """
+        try:
+            from ml.monitoring.triggers import RetrainingTrigger
+
+            logger.debug("Running drift detection check...")
+
+            trigger = RetrainingTrigger()
+            result = trigger.evaluate_and_trigger()
+
+            if result.get("triggers_fired", 0) > 0:
+                logger.info(
+                    f"🔄 Drift detected! Triggered {result['triggers_fired']} retraining job(s). "
+                    f"Skipped {result.get('triggers_skipped', 0)} (in cooldown)"
+                )
+            else:
+                logger.debug("No drift detected - models performing normally")
+
+        except Exception as e:
+            logger.error(f"Failed to run drift detection check: {e}", exc_info=True)
+
     def _run_ml_retraining(self):
         """
         Check for stale ML models and trigger retraining if needed.

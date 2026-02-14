@@ -55,38 +55,34 @@ export function StatsBar({ equipment, selectedFloors }: StatsBarProps) {
     <div
       className="flex-none px-4 py-3 flex items-center gap-4 border-b"
       style={{
-        background: 'var(--color-sentinel-bg-secondary)',
-        borderColor: 'var(--color-sentinel-border)',
+        background: 'rgba(6, 14, 24, 0.7)',
+        borderColor: 'rgba(0, 255, 65, 0.2)',
       }}
     >
       {/* Total equipment */}
       <div className="flex items-center gap-2">
-        <Activity className="h-5 w-5" style={{ color: 'var(--color-sentinel-text-secondary)' }} />
+        <Activity className="h-5 w-5" style={{ color: '#00FF41' }} />
         <div>
-          <div className="text-xs" style={{ color: 'var(--color-sentinel-text-disabled)' }}>
-            Equipment
-          </div>
-          <div className="text-lg font-bold" style={{ color: 'var(--color-sentinel-text-primary)' }}>
+          <div className="matrix-label text-xs">UNITS</div>
+          <div className="text-lg font-bold" style={{ color: '#00FF41', textShadow: '0 0 8px rgba(0, 255, 65, 0.3)' }}>
             {totalEquipment}
           </div>
         </div>
       </div>
 
       {/* Average health */}
-      <div className="flex items-center gap-2 pl-4" style={{ borderLeft: '1px solid var(--color-sentinel-border)' }}>
-        <Zap className="h-5 w-5" style={{ color: 'var(--color-sentinel-accent)' }} />
+      <div className="flex items-center gap-2 pl-4" style={{ borderLeft: '1px solid rgba(0, 255, 65, 0.2)' }}>
+        <Zap className="h-5 w-5" style={{ color: '#00FF41' }} />
         <div>
-          <div className="text-xs" style={{ color: 'var(--color-sentinel-text-disabled)' }}>
-            Avg Health
-          </div>
-          <div className="text-lg font-bold" style={{ color: 'var(--color-sentinel-text-primary)' }}>
+          <div className="matrix-label text-xs">SYS HEALTH</div>
+          <div className="text-lg font-bold" style={{ color: '#00FF41', textShadow: '0 0 8px rgba(0, 255, 65, 0.3)' }}>
             {avgHealth}%
           </div>
         </div>
       </div>
 
       {/* Status breakdown */}
-      <div className="flex items-center gap-2 pl-4" style={{ borderLeft: '1px solid var(--color-sentinel-border)' }}>
+      <div className="flex items-center gap-2 pl-4" style={{ borderLeft: '1px solid rgba(0, 255, 65, 0.2)' }}>
         <div
           className="h-5 w-5 rounded flex items-center justify-center text-xs font-bold"
           style={{ background: 'rgba(16, 185, 129, 0.2)', color: '#10b981' }}
@@ -109,7 +105,7 @@ export function StatsBar({ equipment, selectedFloors }: StatsBarProps) {
 
       {/* Active alerts */}
       {faultCount > 0 && (
-        <div className="flex items-center gap-2 pl-4" style={{ borderLeft: '1px solid var(--color-sentinel-border)' }}>
+        <div className="flex items-center gap-2 pl-4" style={{ borderLeft: '1px solid rgba(0, 255, 65, 0.2)' }}>
           <AlertTriangle className="h-5 w-5 text-red-500" />
           <div>
             <div className="text-xs" style={{ color: 'var(--color-sentinel-text-disabled)' }}>

@@ -144,7 +144,7 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
   }, [allowedAddonItems]);
 
   // Items to hide on mobile by default (less frequently used)
-  const MOBILE_HIDDEN_ITEMS = ['control-audit', 'integrations', 'simbiot', 'fleet', 'mlops'];
+  const MOBILE_HIDDEN_ITEMS = ['simbiot', 'fleet', 'mlops'];
   const [showMobileMore, setShowMobileMore] = useState(false);
 
   const renderNavItem = (item: NavItem, isActive: boolean, showReorder?: { index: number; total: number }) => {
@@ -373,6 +373,37 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
             renderNavItem(item, currentView === item.id)
           )}
 
+          {/* Customize Dashboard Button - base section */}
+          {onCustomizeDashboard && (
+            <div className="mt-2 mx-3">
+              <button
+                onClick={() => {
+                  onCustomizeDashboard();
+                  setIsMobileOpen(false);
+                }}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 hover:brightness-125 hover:scale-[1.02] ${
+                  isCollapsed ? 'md:justify-center lg:justify-center' : 'md:justify-center lg:justify-start'
+                }`}
+                style={{
+                  background: "rgba(245, 158, 11, 0.1)",
+                  border: "1px solid rgba(245, 158, 11, 0.3)",
+                  color: "var(--color-sentinel-amber)",
+                }}
+              >
+                <SlidersHorizontal className="h-5 w-5 flex-shrink-0" />
+                <div className={`flex flex-col items-start md:hidden ${isCollapsed ? 'lg:hidden' : 'lg:flex'}`}>
+                  <span className="font-medium text-sm">Customize</span>
+                  <span
+                    className="text-xs"
+                    style={{ color: "var(--color-grafana-text-disabled)" }}
+                  >
+                    Dashboard Cards
+                  </span>
+                </div>
+              </button>
+            </div>
+          )}
+
           {/* Addon section - only shown if there are active add-on modules */}
           {allowedAddonItems.length > 0 && (
             <>
@@ -446,37 +477,6 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
               </div>
             </button>
           </div>
-
-          {/* Customize Dashboard Button - hidden on mobile */}
-          {onCustomizeDashboard && (
-            <div className="mt-4 mx-3">
-              <button
-                onClick={() => {
-                  onCustomizeDashboard();
-                  setIsMobileOpen(false);
-                }}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 hover:brightness-125 hover:scale-[1.02] ${
-                  isCollapsed ? 'md:justify-center lg:justify-center' : 'md:justify-center lg:justify-start'
-                }`}
-                style={{
-                  background: "rgba(245, 158, 11, 0.1)",
-                  border: "1px solid rgba(245, 158, 11, 0.3)",
-                  color: "var(--color-sentinel-amber)",
-                }}
-              >
-                <SlidersHorizontal className="h-5 w-5 flex-shrink-0" />
-                <div className={`flex flex-col items-start md:hidden ${isCollapsed ? 'lg:hidden' : 'lg:flex'}`}>
-                  <span className="font-medium text-sm">Customize</span>
-                  <span
-                    className="text-xs"
-                    style={{ color: "var(--color-grafana-text-disabled)" }}
-                  >
-                    Dashboard Cards
-                  </span>
-                </div>
-              </button>
-            </div>
-          )}
 
           {/* About Section */}
           <div

@@ -26,6 +26,9 @@ from app.services.health_threshold_service import get_health_thresholds
 
 logger = logging.getLogger(__name__)
 
+# Base-pack modules that must remain enabled once activated.
+NON_DEACTIVATABLE_MODULES = {ModuleType.HVAC, ModuleType.ENERGY}
+
 
 class ModuleRegistryService:
     """
@@ -216,6 +219,9 @@ class ModuleRegistryService:
 
     def deactivate_module(self, site_id: str, module_type: ModuleType) -> bool:
         """Deactivate a module for a site."""
+        if module_type in NON_DEACTIVATABLE_MODULES:
+            raise ValueError(f"{module_type.value} is part of the base pack and cannot be deactivated")
+
         config = self._site_configs.get(site_id)
         if not config:
             return False

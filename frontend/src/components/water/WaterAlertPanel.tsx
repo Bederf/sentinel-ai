@@ -9,10 +9,9 @@
  * - Acknowledge/Resolve actions
  */
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   Card,
-  Title,
   Text,
   Badge,
   Button,
@@ -20,8 +19,6 @@ import {
   Tab,
   TabGroup,
   TabList,
-  TabPanels,
-  TabPanel,
 } from "@tremor/react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -30,17 +27,9 @@ import {
   Clock,
   AlertTriangle,
   Info,
-  User,
 } from "lucide-react";
 import { waterApi } from "../../lib/waterApi";
 import type { WaterAlert } from "../../lib/waterApi";
-
-interface WorkOrderStatus {
-  wo_id: string;
-  status: "dispatched" | "in_progress" | "completed";
-  assigned_to: string;
-  created_at: string;
-}
 
 interface WaterAlertPanelProps {
   buildingId: string;
@@ -59,7 +48,7 @@ export const WaterAlertPanel: React.FC<WaterAlertPanelProps> = ({
   const activeFilter = FILTER_OPTIONS[activeTabIndex];
 
   // Fetch water alerts
-  const { data: alerts, isLoading, refetch } = useQuery({
+  const { data: alerts, isLoading } = useQuery({
     queryKey: ["water", "alerts", buildingId],
     queryFn: async () => {
       try {
@@ -183,7 +172,7 @@ export const WaterAlertPanel: React.FC<WaterAlertPanelProps> = ({
     <div className="space-y-4">
       {/* Alert Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <Card className="p-3">
+        <Card className="glass-panel p-3" style={{ border: "1px solid var(--glass-border)" }}>
           <Flex justifyContent="between" alignItems="start">
             <div>
               <Text
@@ -198,7 +187,7 @@ export const WaterAlertPanel: React.FC<WaterAlertPanelProps> = ({
           </Flex>
         </Card>
 
-        <Card className="p-3">
+        <Card className="glass-panel p-3" style={{ border: "1px solid var(--glass-border)" }}>
           <Flex justifyContent="between" alignItems="start">
             <div>
               <Text
@@ -215,7 +204,7 @@ export const WaterAlertPanel: React.FC<WaterAlertPanelProps> = ({
           </Flex>
         </Card>
 
-        <Card className="p-3">
+        <Card className="glass-panel p-3" style={{ border: "1px solid var(--glass-border)" }}>
           <Flex justifyContent="between" alignItems="start">
             <div>
               <Text
@@ -235,7 +224,10 @@ export const WaterAlertPanel: React.FC<WaterAlertPanelProps> = ({
 
       {/* Filter Tabs */}
       <TabGroup index={activeTabIndex} onIndexChange={setActiveTabIndex}>
-        <TabList>
+        <TabList
+          className="glass-subtle rounded-md p-1"
+          style={{ border: "1px solid var(--glass-border)" }}
+        >
           <Tab>All ({stats.total})</Tab>
           <Tab>Unacknowledged ({stats.unacknowledged})</Tab>
           <Tab>Critical ({stats.critical})</Tab>
@@ -245,7 +237,7 @@ export const WaterAlertPanel: React.FC<WaterAlertPanelProps> = ({
       </TabGroup>
 
       {/* Alert List */}
-      <Card>
+      <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
         {isLoading ? (
           <div className="flex items-center justify-center h-40">
             <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>

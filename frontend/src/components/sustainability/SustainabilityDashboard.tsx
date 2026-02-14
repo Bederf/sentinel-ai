@@ -123,7 +123,7 @@ export function SustainabilityDashboard({
 
   if (error) {
     return (
-      <Card>
+      <Card className="glass-panel" style={{ border: "1px solid rgba(220, 38, 38, 0.35)" }}>
         <Title>Sustainability & ESG</Title>
         <Text className="text-red-500 mt-2">{error}</Text>
       </Card>
@@ -157,9 +157,12 @@ export function SustainabilityDashboard({
   ] : [];
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6 p-4 md:p-6" style={{ background: "var(--color-sentinel-bg-canvas)" }}>
       {/* Header with Building Selector */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div
+        className="glass-panel rounded-lg p-4 md:p-5 flex items-center justify-between flex-wrap gap-3"
+        style={{ border: "1px solid var(--glass-border)" }}
+      >
         <div className="flex items-center gap-3">
           <div
             className="p-2 rounded"
@@ -201,41 +204,41 @@ export function SustainabilityDashboard({
 
       {/* KPI Row */}
       <Grid numItems={2} numItemsLg={4} className="gap-4">
-        <Card decoration="top" decorationColor="emerald">
-          <Text>Total CO2 YTD</Text>
+        <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
+          <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>Total CO2 YTD</Text>
           <Metric>{summary?.ytd.total_co2_tonnes.toFixed(1) ?? '—'} t</Metric>
           <Flex className="mt-2">
             <Badge color={trendColor} size="xs">{trendLabel}</Badge>
-            <Text className="text-xs text-gray-500">
+            <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
               Target: -{summary?.target_reduction_pct ?? 10}% YoY
             </Text>
           </Flex>
         </Card>
 
-        <Card decoration="top" decorationColor="blue">
-          <Text>Carbon Intensity</Text>
+        <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
+          <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>Carbon Intensity</Text>
           <Metric>
             {summary?.carbon_intensity_kg_per_sqm
               ? summary.carbon_intensity_kg_per_sqm.toFixed(1)
               : '—'}{' '}
             <span className="text-sm font-normal">kg/sqm</span>
           </Metric>
-          <Text className="text-xs text-gray-500 mt-2">Current month</Text>
+          <Text className="text-xs mt-2" style={{ color: "var(--color-sentinel-text-secondary)" }}>Current month</Text>
         </Card>
 
-        <Card decoration="top" decorationColor="amber">
-          <Text>Energy Intensity</Text>
+        <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
+          <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>Energy Intensity</Text>
           <Metric>
             {summary?.energy_intensity_kwh_per_sqm
               ? summary.energy_intensity_kwh_per_sqm.toFixed(1)
               : '—'}{' '}
             <span className="text-sm font-normal">kWh/sqm</span>
           </Metric>
-          <Text className="text-xs text-gray-500 mt-2">Current month</Text>
+          <Text className="text-xs mt-2" style={{ color: "var(--color-sentinel-text-secondary)" }}>Current month</Text>
         </Card>
 
-        <Card decoration="top" decorationColor="violet">
-          <Text>Green Star Progress</Text>
+        <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
+          <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>Green Star Progress</Text>
           <Metric>
             {summary?.green_star.total_achieved ?? 0}
             <span className="text-sm font-normal">
@@ -249,9 +252,9 @@ export function SustainabilityDashboard({
       </Grid>
 
       {/* Emissions Chart */}
-      <Card>
+      <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
         <Title>Monthly Emissions by Scope (tonnes CO2)</Title>
-        <Text className="text-gray-500 mb-4">
+        <Text className="mb-4" style={{ color: "var(--color-sentinel-text-secondary)" }}>
           Scope 1: Diesel generators | Scope 2: Grid electricity | Scope 3: Water, waste, commuting
         </Text>
         {chartData.length > 0 ? (
@@ -265,18 +268,18 @@ export function SustainabilityDashboard({
             className="h-72"
           />
         ) : (
-          <Text className="text-gray-400">No emissions data available</Text>
+          <Text style={{ color: "var(--color-sentinel-text-disabled)" }}>No emissions data available</Text>
         )}
       </Card>
 
       {/* Efficiency vs Benchmarks */}
       <Grid numItems={1} numItemsLg={2} className="gap-4">
-        <Card>
+        <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
           <Title>Energy Intensity vs SA Benchmarks</Title>
-          <Text className="text-gray-500 mb-3">kWh per sqm per year</Text>
+          <Text className="mb-3" style={{ color: "var(--color-sentinel-text-secondary)" }}>kWh per sqm per year</Text>
           <BarList data={energyBars} color="amber" className="mt-2" />
           {efficiency?.vs_typical && (
-            <Text className="text-xs mt-3 text-gray-500">
+            <Text className="text-xs mt-3" style={{ color: "var(--color-sentinel-text-secondary)" }}>
               {efficiency.vs_typical.energy_pct > 0
                 ? `${efficiency.vs_typical.energy_pct}% above typical`
                 : `${Math.abs(efficiency.vs_typical.energy_pct)}% below typical`}
@@ -284,12 +287,12 @@ export function SustainabilityDashboard({
           )}
         </Card>
 
-        <Card>
+        <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
           <Title>Carbon Intensity vs SA Benchmarks</Title>
-          <Text className="text-gray-500 mb-3">kg CO2 per sqm per year</Text>
+          <Text className="mb-3" style={{ color: "var(--color-sentinel-text-secondary)" }}>kg CO2 per sqm per year</Text>
           <BarList data={carbonBars} color="emerald" className="mt-2" />
           {efficiency?.vs_typical && (
-            <Text className="text-xs mt-3 text-gray-500">
+            <Text className="text-xs mt-3" style={{ color: "var(--color-sentinel-text-secondary)" }}>
               {efficiency.vs_typical.carbon_pct > 0
                 ? `${efficiency.vs_typical.carbon_pct}% above typical`
                 : `${Math.abs(efficiency.vs_typical.carbon_pct)}% below typical`}
@@ -299,17 +302,17 @@ export function SustainabilityDashboard({
       </Grid>
 
       {/* Green Star Tracker */}
-      <Card>
+      <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
         <Flex justifyContent="between" alignItems="center" className="mb-4">
           <div>
             <Title>Green Star SA Self-Assessment</Title>
-            <Text className="text-gray-500">{greenStar?.tool_version ?? 'Green Star SA Office v1.1'}</Text>
+            <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>{greenStar?.tool_version ?? 'Green Star SA Office v1.1'}</Text>
           </div>
           <div className="text-right">
             <Badge color="violet" size="lg">
               {greenStar?.estimated_star_rating ?? '—'}
             </Badge>
-            <Text className="text-xs text-gray-500 mt-1">
+            <Text className="text-xs mt-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
               Target: {greenStar?.target_rating ?? '5-Star'}
             </Text>
           </div>
@@ -323,11 +326,11 @@ export function SustainabilityDashboard({
             const color = pct >= 75 ? 'emerald' : pct >= 50 ? 'amber' : 'red';
 
             return (
-              <Card key={cat.category_id} className="p-3">
+              <Card key={cat.category_id} className="glass-panel p-3" style={{ border: "1px solid var(--glass-border)" }}>
                 <Flex justifyContent="between" alignItems="center">
                   <div>
                     <Text className="font-semibold text-sm">{cat.name}</Text>
-                    <Text className="text-xs text-gray-400">{cat.category_id}</Text>
+                    <Text className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>{cat.category_id}</Text>
                   </div>
                   <Badge color={color} size="xs">
                     {cat.achieved_points}/{cat.max_points}
@@ -335,12 +338,12 @@ export function SustainabilityDashboard({
                 </Flex>
                 <ProgressBar value={pct} color={color} className="mt-2" />
                 {cat.target_points > 0 && (
-                  <Text className="text-xs text-gray-500 mt-1">
+                  <Text className="text-xs mt-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                     Target: {cat.target_points} pts
                   </Text>
                 )}
                 {cat.notes && (
-                  <Text className="text-xs text-gray-400 mt-1 line-clamp-2">
+                  <Text className="text-xs mt-1 line-clamp-2" style={{ color: "var(--color-sentinel-text-disabled)" }}>
                     {cat.notes}
                   </Text>
                 )}
@@ -355,7 +358,7 @@ export function SustainabilityDashboard({
               Total: <span className="font-bold">{greenStar.total_achieved}</span>
               /{greenStar.total_max} pts
               {greenStar.total_target > 0 && (
-                <span className="text-gray-500"> (target: {greenStar.total_target})</span>
+                <span style={{ color: "var(--color-sentinel-text-secondary)" }}> (target: {greenStar.total_target})</span>
               )}
             </Text>
           </Flex>

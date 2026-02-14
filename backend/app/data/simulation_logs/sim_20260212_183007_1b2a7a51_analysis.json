@@ -1,0 +1,85 @@
+{
+  "run_id": "sim_20260212_183007_1b2a7a51",
+  "scenario": "fault_day",
+  "building_code": "site-002",
+  "analyzed_at": "2026-02-13T14:54:05.686383",
+  "metrics": {
+    "total_events": 87,
+    "total_faults": 5,
+    "faults_repaired": 5,
+    "mean_time_to_repair_hours": 0.01,
+    "alerts_generated": 0,
+    "work_orders_created": 5,
+    "ai_optimizations": 14,
+    "setpoint_changes": 20,
+    "comfort_deviations": [],
+    "equipment_runtime_hours": {
+      "site-005-UMH-AHU-L3-TH2.room": 2.0,
+      "site-005-UMH-BOILER-B1-001.hw": 2.0,
+      "site-005-UMH-CT-R-001.cw": 2.0,
+      "site-005-UMH-GEN-B1-002.fuel": 2.0,
+      "site-005-UMH-AHU-L3-TH1.fan": 2.0
+    },
+    "energy_events": 0,
+    "fault_types": {
+      "Filter differential high": 2,
+      "Current draw elevated": 2,
+      "High vibration detected": 1
+    },
+    "events_by_hour": {
+      "8": 15,
+      "10": 5,
+      "11": 15,
+      "13": 20,
+      "14": 5,
+      "18": 15,
+      "6": 8,
+      "22": 4
+    }
+  },
+  "profile_results": {
+    "asset_sweating": {
+      "profile_name": "Asset Sweating",
+      "overall_score": 54.4,
+      "component_scores": {
+        "runtime": 12.5,
+        "comfort": 100.0,
+        "cost": 100.0,
+        "maintenance": 99.8,
+        "energy": 50.0
+      },
+      "recommendations": [
+        "Increase equipment scheduling density"
+      ],
+      "flags": [
+        "Runtime utilization 12% below threshold 85.0%"
+      ]
+    },
+    "comfort_first": {
+      "profile_name": "Comfort First",
+      "overall_score": 81.2,
+      "component_scores": {
+        "runtime": 12.5,
+        "comfort": 100.0,
+        "cost": 100.0,
+        "maintenance": 99.8,
+        "energy": 50.0
+      },
+      "recommendations": [],
+      "flags": []
+    },
+    "cost_saving": {
+      "profile_name": "Cost Saving",
+      "overall_score": 76.2,
+      "component_scores": {
+        "runtime": 12.5,
+        "comfort": 100.0,
+        "cost": 100.0,
+        "maintenance": 99.8,
+        "energy": 50.0
+      },
+      "recommendations": [],
+      "flags": []
+    }
+  }
+}

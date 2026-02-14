@@ -108,7 +108,10 @@ export const VIEW_TITLES: Record<View, string> = {
  */
 export const BASE_NAV_ITEMS: NavItem[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, description: "System overview", category: "base" },
+  { id: "chat", label: "AI Chat", icon: MessageSquare, description: "AI Assistant", category: "base" },
   { id: "integrations", label: "System Health", icon: Activity, description: "Real-time Health Monitoring", category: "base" },
+  { id: "control-audit", label: "Control Audit", icon: ClipboardList, description: "Control System Logs", category: "base" },
+  { id: "digital-twin", label: "Digital Twin", icon: Box, description: "3D Building Visualization", category: "base" },
   { id: "settings", label: "Settings", icon: SettingsIcon, description: "System Configuration", category: "base" },
 ];
 
@@ -121,13 +124,10 @@ export const BASE_NAV_ITEMS: NavItem[] = [
  */
 export const ADDON_NAV_ITEMS: NavItem[] = [
   // Core operations modules
-  { id: "chat", label: "Chat", icon: MessageSquare, description: "AI Assistant", category: "addon", requiredModule: "notifications", defaultOrder: 0 },
   { id: "control", label: "Control", icon: Shield, description: "Building Controls", category: "addon", requiredModule: "control", defaultOrder: 0 },
-  { id: "control-audit", label: "Control Audit", icon: ClipboardList, description: "Control System Logs", category: "addon", requiredModule: "control", defaultOrder: 1 },
   { id: "workflow", label: "Asset Workflow", icon: GitBranch, description: "Lifecycle Management", category: "addon", requiredModule: "assets", defaultOrder: 2 },
   { id: "simbiot", label: "SIMBIOT", icon: Plug, description: "BMS Connection Wizard", category: "addon", requiredModule: "simbiot", defaultOrder: 3 },
   // Visualization and analytics
-  { id: "digital-twin", label: "Digital Twin", icon: Box, description: "3D Building Visualization", category: "addon", requiredModule: "simbiot", defaultOrder: 5 },
   // Building system modules
   { id: "technician", label: "Tech Chat", icon: Wrench, description: "Fault Diagnosis", category: "addon", requiredModule: "hvac", defaultOrder: 10 },
   { id: "optimization", label: "Optimization", icon: Zap, description: "Load Shedding AI", category: "addon", requiredModule: "energy", defaultOrder: 11 },
@@ -149,8 +149,6 @@ export const ADDON_NAV_ITEMS: NavItem[] = [
  */
 export const INTERNAL_NAV_ITEMS: NavItem[] = [
   { id: "simulation", label: "Simulation", icon: FlaskConical, description: "Lifecycle & Analytics", category: "internal", requiredRole: "admin", requiredModule: "ml" },
-  { id: "solar-config", label: "Solar Setup", icon: Sun, description: "Configure Solar Sites", category: "internal", requiredRole: "admin" },
-  { id: "modules", label: "Modules", icon: Box, description: "Module Configuration", category: "internal", requiredRole: "admin" },
 ];
 
 /** All nav items combined (for lookup) */

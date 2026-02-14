@@ -48,27 +48,38 @@ class ComfortComplaintHandler:
         self._load_data()
 
     def _load_data(self):
-        """Load desk and zone data using BuildingDataLoader."""
-        loader = get_building_loader()
-
-        # Load desks from all active buildings
-        all_desks = loader.get_all_desks()
-        for d in all_desks:
-            desk = Desk.from_dict(d)
-            self._desks[desk.desk_id] = desk
-            # Create normalized ID mappings for flexible lookup
-            self._create_desk_id_mappings(desk)
-        logger.info(f"Loaded {len(self._desks)} desks from {len(loader.get_active_building_ids())} building(s)")
-
-        # Load zones from all active buildings
-        all_zones = loader.get_all_zones()
-        for z in all_zones:
-            zone = HVACZone.from_dict(z)
-            self._zones[zone.zone_id] = zone
-        logger.info(f"Loaded {len(self._zones)} zones")
-
-        # Store loader reference for building lookups
-        self._loader = loader
+        """Load desk and zone data directly from Supabase."""
+        try:
+            from app.database.repositories.desk_repository import DeskRepository
+            from app.database.repositories.zone_repository import ZoneRepository
+            
+            # Load desks from Supabase
+            desk_repo = DeskRepository()
+            all_desks = desk_repo.get_all()
+            if all_desks:
+                for d in all_desks:
+                    desk = Desk.from_dict(d)
+                    self._desks[desk.desk_id] = desk
+                    # Create normalized ID mappings for flexible lookup
+                    self._create_desk_id_mappings(desk)
+                logger.info(f"Loaded {len(self._desks)} desks from Supabase")
+            else:
+                logger.warning("No desks found in Supabase")
+            
+            # Load zones from Supabase
+            zone_repo = ZoneRepository()
+            all_zones = zone_repo.get_all()
+            if all_zones:
+                for z in all_zones:
+                    zone = HVACZone.from_dict(z)
+                    self._zones[zone.zone_id] = zone
+                logger.info(f"Loaded {len(self._zones)} zones from Supabase")
+            else:
+                logger.warning("No zones found in Supabase")
+            
+        except Exception as e:
+            logger.error(f"Error loading data from Supabase: {e}")
+            logger.warning("Complaint handler will have no desk/zone data available")
 
     def _create_desk_id_mappings(self, desk: Desk):
         """Create multiple ID mappings for flexible desk lookup."""
@@ -426,12 +437,9 @@ def get_complaint_handler() -> ComfortComplaintHandler:
 
 
 def reload_complaint_handler() -> ComfortComplaintHandler:
-    """Force reload of complaint handler with fresh data."""
+    """Force reload of complaint handler with fresh data from Supabase."""
     global _handler
-    # Force building loader to reload
-    loader = get_building_loader()
-    loader.load(force=True)
-    # Recreate handler
+    # Recreate handler to reload from Supabase
     _handler = ComfortComplaintHandler()
-    logger.info("Complaint handler reloaded with fresh data")
+    logger.info("Complaint handler reloaded with fresh data from Supabase")
     return _handler

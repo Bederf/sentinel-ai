@@ -12,11 +12,15 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
+from app.database.repositories.module_access_repository import get_module_access_repository
+from app.models.auth import SentinelRole
 from app.services.device_abstraction import device_manager
 from app.models.device import DeviceStatus
+from app.models.module_registry import ModuleType
 from app.services.health_threshold_service import get_health_thresholds
+from app.services.module_registry_service import module_registry
 from app.database.supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
@@ -2422,6 +2426,93 @@ CHAT_TOOLS = [
 ]
 
 
+# Tool-level module requirements for site-aware access control.
+TOOL_MODULE_REQUIREMENTS: dict[str, ModuleType] = {
+    # SIMBIOT / onboarding workflows
+    "discover_niagara_points": ModuleType.SIMBIOT,
+    "review_point_mapping": ModuleType.SIMBIOT,
+    "approve_point_mapping": ModuleType.SIMBIOT,
+    "correct_point_classification": ModuleType.SIMBIOT,
+    # Security & life safety workflows
+    "get_security_status": ModuleType.SECURITY,
+    "get_fire_system_status": ModuleType.FIRE,
+    # Solar / BESS workflows
+    "get_solar_overview": ModuleType.SOLAR,
+    "get_bess_status": ModuleType.SOLAR,
+    "get_solar_savings": ModuleType.SOLAR,
+    "get_solar_diagnostics": ModuleType.SOLAR,
+    "get_solar_forecast": ModuleType.SOLAR,
+}
+
+
+def get_chat_tools(
+    site_id: str | None = None,
+    *,
+    user_email: Optional[str] = None,
+    user_role: Optional[SentinelRole] = None,
+) -> list[dict[str, Any]]:
+    """Return chat tools filtered by active modules for a site.
+
+    If no site is provided, return the full tool list.
+    """
+    if not site_id:
+        return CHAT_TOOLS
+
+    filtered: list[dict[str, Any]] = []
+    for tool in CHAT_TOOLS:
+        tool_name = tool.get("name")
+        required_module = TOOL_MODULE_REQUIREMENTS.get(tool_name)
+        if required_module is None:
+            filtered.append(tool)
+            continue
+
+        if not module_registry.is_module_active(site_id, required_module):
+            continue
+
+        if user_email and user_role:
+            repo = get_module_access_repository()
+            if not repo.has_module_access(
+                user_email=user_email,
+                user_role=user_role,
+                site_code=site_id,
+                module_type=required_module,
+            ):
+                continue
+
+        filtered.append(tool)
+    return filtered
+
+
+def _is_tool_allowed_for_site(
+    tool_name: str,
+    site_id: str | None,
+    *,
+    user_email: Optional[str] = None,
+    user_role: Optional[SentinelRole] = None,
+) -> bool:
+    """Check whether a tool is allowed for the given site/module state."""
+    if not site_id:
+        return True
+
+    required_module = TOOL_MODULE_REQUIREMENTS.get(tool_name)
+    if required_module is None:
+        return True
+
+    if not module_registry.is_module_active(site_id, required_module):
+        return False
+
+    if user_email and user_role:
+        repo = get_module_access_repository()
+        return repo.has_module_access(
+            user_email=user_email,
+            user_role=user_role,
+            site_code=site_id,
+            module_type=required_module,
+        )
+
+    return True
+
+
 # Tool handler dispatch
 TOOL_HANDLERS = {
     "list_devices": list_devices,
@@ -2450,7 +2541,13 @@ TOOL_HANDLERS = {
 }
 
 
-async def execute_tool(tool_name: str, tool_input: dict) -> dict[str, Any]:
+async def execute_tool(
+    tool_name: str,
+    tool_input: dict,
+    site_id: str | None = None,
+    user_email: Optional[str] = None,
+    user_role: Optional[SentinelRole] = None,
+) -> dict[str, Any]:
     """
     Execute a tool by name with given input.
 
@@ -2461,6 +2558,22 @@ async def execute_tool(tool_name: str, tool_input: dict) -> dict[str, Any]:
     Returns:
         Tool execution result
     """
+    effective_site_id = site_id or tool_input.get("site_id")
+    if not _is_tool_allowed_for_site(
+        tool_name,
+        effective_site_id,
+        user_email=user_email,
+        user_role=user_role,
+    ):
+        required_module = TOOL_MODULE_REQUIREMENTS.get(tool_name)
+        return {
+            "error": (
+                f"Tool '{tool_name}' is unavailable because module "
+                f"'{required_module.value if required_module else 'unknown'}' "
+                f"is not active for site '{effective_site_id}'"
+            )
+        }
+
     handler = TOOL_HANDLERS.get(tool_name)
     if not handler:
         return {"error": f"Unknown tool: {tool_name}"}

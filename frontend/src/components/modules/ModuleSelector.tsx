@@ -15,6 +15,8 @@ import {
   Brain, Leaf, FileText, Gamepad2, Package, Plug, Link2, Bell
 } from 'lucide-react';
 
+const NON_DEACTIVATABLE_MODULES: ModuleType[] = ['hvac', 'energy'];
+
 interface ModuleSelectorProps {
   onModuleActivated?: (moduleType: ModuleType) => void;
   onModuleDeactivated?: (moduleType: ModuleType) => void;
@@ -33,6 +35,9 @@ export function ModuleSelector({ onModuleActivated, onModuleDeactivated }: Modul
   const [activating, setActivating] = useState<ModuleType | null>(null);
 
   async function handleToggle(moduleType: ModuleType, currentlyActive: boolean) {
+    if (currentlyActive && NON_DEACTIVATABLE_MODULES.includes(moduleType)) {
+      return;
+    }
     setActivating(moduleType);
     try {
       if (currentlyActive) {
@@ -103,6 +108,7 @@ export function ModuleSelector({ onModuleActivated, onModuleDeactivated }: Modul
       <Grid numItems={2} className="gap-4">
         {availableModules.map(moduleDef => {
           const isActive = isModuleActive(moduleDef.module_type);
+          const isProtectedBasePack = NON_DEACTIVATABLE_MODULES.includes(moduleDef.module_type);
           const isActivatingThis = activating === moduleDef.module_type;
           const potentialIntegrations = getPotentialIntegrations(moduleDef.module_type);
           const activeInstance = activeModules.find(m => m.module_type === moduleDef.module_type);
@@ -113,6 +119,7 @@ export function ModuleSelector({ onModuleActivated, onModuleDeactivated }: Modul
               module={moduleDef}
               isActive={isActive}
               isLoading={isActivatingThis}
+              isProtectedBasePack={isProtectedBasePack}
               healthScore={activeInstance?.health_score}
               potentialIntegrations={potentialIntegrations}
               onToggle={() => handleToggle(moduleDef.module_type, isActive)}
@@ -184,6 +191,7 @@ interface ModuleCardProps {
   module: ModuleDefinition;
   isActive: boolean;
   isLoading: boolean;
+  isProtectedBasePack: boolean;
   healthScore?: number;
   potentialIntegrations: string[];
   onToggle: () => void;
@@ -193,6 +201,7 @@ function ModuleCard({
   module,
   isActive,
   isLoading,
+  isProtectedBasePack,
   healthScore,
   potentialIntegrations,
   onToggle,
@@ -280,6 +289,18 @@ function ModuleCard({
               >
                 {isActive ? 'Active' : 'Inactive'}
               </Badge>
+              {isProtectedBasePack && (
+                <Badge
+                  color="blue"
+                  size="xs"
+                  style={{
+                    background: 'rgba(59, 130, 246, 0.15)',
+                    color: 'var(--color-sentinel-blue)',
+                  }}
+                >
+                  Base Pack
+                </Badge>
+              )}
             </Flex>
             <Text
               className="text-xs mt-1"
@@ -289,7 +310,11 @@ function ModuleCard({
             </Text>
           </div>
         </div>
-        <SentinelSwitch checked={isActive} onChange={onToggle} disabled={isLoading} />
+        <SentinelSwitch
+          checked={isActive}
+          onChange={onToggle}
+          disabled={isLoading || (isActive && isProtectedBasePack)}
+        />
       </Flex>
 
       {/* Health Score */}
@@ -380,6 +405,12 @@ function ModuleCard({
             Integrates with: {module.integrates_with.join(', ')}
           </Text>
         </div>
+      )}
+
+      {isActive && isProtectedBasePack && (
+        <Text className="text-xs mt-2" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
+          Base pack module: cannot be deactivated.
+        </Text>
       )}
     </Card>
   );

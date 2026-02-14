@@ -24,9 +24,19 @@ from app.database.supabase_client import get_supabase_client
 from app.database.repositories.equipment_repository import EquipmentRepository
 from app.database.repositories.prediction_repository import PredictionRepository
 from app.database.repositories.work_order_repository import get_work_order_repository
+from app.database.repositories.recommendation_repository import (
+    get_recommendation_repository,
+)
 from app.services.feedback_collection_service import (
     get_feedback_collection_service,
     FeedbackItemType,
+)
+from app.services.device_control_service import get_device_control_service
+from app.services.seasonal_modeler import SeasonalModeler
+from app.models.recommendation import (
+    Recommendation,
+    RecommendationStatus,
+    ActionRiskLevel,
 )
 
 logger = logging.getLogger(__name__)
@@ -64,6 +74,15 @@ class EventType(str, Enum):
     SETPOINT_CHANGE = "setpoint_change"
 
 
+
+class OperationMode(str, Enum):
+    """Building operation modes for comparison."""
+    HVAC_ONLY = "hvac_only"
+    HVAC_DALI = "hvac_dali"
+    HVAC_DALI_SENTINEL = "hvac_dali_sentinel"
+    SOLAR_BESS_BASELINE = "solar_bess_baseline"
+    SOLAR_BESS_SENTINEL = "solar_bess_sentinel"
+
 @dataclass
 class LifecycleEvent:
     """A single event in the building lifecycle."""
@@ -89,6 +108,7 @@ class ScenarioConfig:
     repair_delay_hours: int = 2  # Hours after fault before repair
     optimization_enabled: bool = True
     clawd_notifications: bool = True
+    operation_mode: Optional[OperationMode] = None  # Building operation mode for demos
 
 
 # Predefined scenarios
@@ -131,6 +151,50 @@ SCENARIOS = {
         auto_repair=False,
         optimization_enabled=True,
     ),
+    "grant_hvac_only_7day": ScenarioConfig(
+        name="Grant Demo: HVAC Only (7 days)",
+        description="7-day HVAC baseline for Grant demo - AC runs all day",
+        operation_mode=OperationMode.HVAC_ONLY,
+        fault_probability=0.0,
+        optimization_enabled=False,
+    ),
+    "grant_hvac_dali_7day": ScenarioConfig(
+        name="Grant Demo: HVAC + DALI (7 days)",
+        description="7-day reactive occupancy control for Grant demo",
+        operation_mode=OperationMode.HVAC_DALI,
+        fault_probability=0.0,
+        optimization_enabled=False,
+    ),
+    "grant_hvac_dali_ai_7day": ScenarioConfig(
+        name="Grant Demo: HVAC + DALI + Sentinel AI (7 days)",
+        description="7-day predictive AI control for Grant demo",
+        operation_mode=OperationMode.HVAC_DALI_SENTINEL,
+        fault_probability=0.0,
+        optimization_enabled=True,
+    ),
+    "solar_bess_baseline_7day": ScenarioConfig(
+        name="Solar + BESS: Baseline (7 days)",
+        description="7-day building with 40kWp solar + 50kWh battery, reactive control",
+        operation_mode=OperationMode.SOLAR_BESS_BASELINE,
+        fault_probability=0.0,
+        optimization_enabled=False,
+    ),
+    "solar_bess_sentinel_7day": ScenarioConfig(
+        name="Solar + BESS: Sentinel AI (7 days)",
+        description="7-day building with solar + BESS + Sentinel AI optimization",
+        operation_mode=OperationMode.SOLAR_BESS_SENTINEL,
+        fault_probability=0.0,
+        optimization_enabled=True,
+    ),
+    "grant_hvac_dali_ai_annual": ScenarioConfig(
+        name="Grant Demo: HVAC + DALI + Sentinel AI (365 days)",
+        description="Full-year simulation with South African seasonal variations - temperature cycles, rainfall patterns, occupancy variations, and seasonal fault probabilities",
+        operation_mode=OperationMode.HVAC_DALI_SENTINEL,
+        fault_probability=0.05,
+        auto_repair=True,
+        repair_delay_hours=4,
+        optimization_enabled=True,
+    ),
 }
 
 
@@ -161,8 +225,41 @@ class LifecycleOrchestrator:
         self.prediction_repo = PredictionRepository()
         self.work_order_repo = get_work_order_repository()
         self.feedback_service = get_feedback_collection_service()
+        self.recommendation_repo = get_recommendation_repository()
+        self.device_control_service = get_device_control_service()
         self._task: Optional[asyncio.Task] = None
         self._callbacks: List[Callable[[LifecycleEvent], None]] = []
+        
+        # Seeded random for reproducible but realistic variation
+        # Same scenario always produces same results, but with day-to-day variation
+        self._scenario_rng = random.Random()
+        self._occupancy_seed: Optional[int] = None
+        
+        # Seasonal modeler for annual simulations
+        self.seasonal_modeler: Optional[SeasonalModeler] = None
+        self.days_simulated: int = 0  # Track days for annual simulations
+
+    def reset(self):
+        """Reset orchestrator state for a fresh demo.
+        
+        Clears all simulation state so the next start() call begins fresh.
+        Called when a user logs in to ensure demo restarts clean each time.
+        """
+        self.running = False
+        self.paused = False
+        self.current_scenario = None
+        self.simulated_time = datetime.now().replace(hour=0, minute=0, second=0)
+        self.real_start_time = None
+        self.time_multiplier = 60.0
+        self.events = []
+        self.active_faults = {}
+        self.pending_repairs = {}
+        self._task = None
+        self._scenario_rng = random.Random()
+        self._occupancy_seed = None
+        self.seasonal_modeler = None
+        self.days_simulated = 0
+        logger.info("Orchestrator reset: Ready for fresh demo")
 
     def add_event_callback(self, callback: Callable[[LifecycleEvent], None]):
         """Add callback to be notified of events."""
@@ -201,15 +298,37 @@ class LifecycleOrchestrator:
         # Get scenario config
         self.current_scenario = SCENARIOS.get(scenario, SCENARIOS["fault_day"])
 
-        # Calculate time multiplier
-        # duration_minutes for full 24 hours
-        # So 1 simulated hour = duration_minutes / 24 real minutes
-        self.time_multiplier = (duration_minutes / 24.0) * 60.0  # seconds per simulated hour
+        # Initialize seeded random for reproducible occupancy variation
+        # Hash scenario name to get consistent seed for same demo
+        self._occupancy_seed = hash(scenario) % (2**32)
+        self._scenario_rng.seed(self._occupancy_seed)
+        logger.info(f"Seeded occupancy randomness for scenario '{scenario}' (seed={self._occupancy_seed})")
 
-        # Initialize time
-        self.simulated_time = datetime.now().replace(
-            hour=start_hour, minute=0, second=0, microsecond=0
-        )
+        # Check if this is an annual scenario
+        is_annual = scenario == "grant_hvac_dali_ai_annual"
+        
+        if is_annual:
+            # Annual simulation: 365 days × 24 hours = 8760 hours total
+            self.seasonal_modeler = SeasonalModeler(seed=self._occupancy_seed)
+            self.days_simulated = 0
+            # Calculate time multiplier for 365-day simulation
+            # Default: 240 minutes = 4 hours real time for full year (1 day per ~20 real seconds)
+            total_hours_annual = 365 * 24
+            self.time_multiplier = (duration_minutes / total_hours_annual) * 60.0  # seconds per simulated hour
+            # Start on January 1st, 6am (year is arbitrary - Python will handle date math)
+            self.simulated_time = datetime(2024, 1, 1, start_hour, 0, 0)
+            logger.info(f"Annual simulation initialized: {duration_minutes} min for full year (365 days)")
+        else:
+            # Daily simulation: just 24 hours
+            self.seasonal_modeler = None
+            # Calculate time multiplier for 24-hour simulation
+            # duration_minutes for full 24 hours
+            # So 1 simulated hour = duration_minutes / 24 real minutes
+            self.time_multiplier = (duration_minutes / 24.0) * 60.0  # seconds per simulated hour
+            self.simulated_time = datetime.now().replace(
+                hour=start_hour, minute=0, second=0, microsecond=0
+            )
+
         self.real_start_time = datetime.now()
         self.events = []
         self.active_faults = {}
@@ -291,6 +410,7 @@ class LifecycleOrchestrator:
         """Main simulation loop."""
         try:
             last_hour = -1
+            is_annual = self.seasonal_modeler is not None
 
             while self.running:
                 if self.paused:
@@ -310,8 +430,14 @@ class LifecycleOrchestrator:
 
                 # Check for day rollover
                 if self.simulated_time.hour == 0 and last_hour == 23:
-                    logger.info("24-hour cycle complete, continuing...")
-                    # Could stop here or continue cycling
+                    self.days_simulated += 1
+                    season = self.seasonal_modeler.get_season_name(self.simulated_time.date()) if is_annual else None
+                    logger.info(f"Day {self.days_simulated}/365 complete{f' ({season})' if is_annual else ''}...")
+                    
+                    # For annual simulation, stop after 365 days
+                    if is_annual and self.days_simulated >= 365:
+                        logger.info("Annual simulation complete (365 days)")
+                        self.running = False
 
         except asyncio.CancelledError:
             logger.info("Simulation cancelled")
@@ -321,7 +447,22 @@ class LifecycleOrchestrator:
 
     async def _process_hour(self, hour: int):
         """Process events for the given simulated hour."""
-        logger.info(f"Processing simulated hour: {hour:02d}:00")
+        logger.info(f"Processing simulated hour: {hour:02d}:00 (Day {self.days_simulated + 1}/365)" if self.seasonal_modeler else f"Processing simulated hour: {hour:02d}:00")
+
+        # Midnight: daily summary for annual simulations
+        if hour == 0 and self.seasonal_modeler:
+            season = self.seasonal_modeler.get_season_name(self.simulated_time.date())
+            self._emit_event(LifecycleEvent(
+                timestamp=datetime.now(),
+                simulated_hour=0,
+                event_type=EventType.BUILDING_WAKE,
+                description=f"Day {self.days_simulated + 1}: {season.capitalize()} - Building daily cycle begins",
+                details={
+                    "day_of_year": self.days_simulated + 1,
+                    "season": season,
+                    "month": self.simulated_time.strftime("%B")
+                }
+            ))
 
         # Morning startup
         if hour == 6:
@@ -359,10 +500,13 @@ class LifecycleOrchestrator:
         elif hour == 22:
             await self._night_mode()
 
-        # Check for random faults based on probability
-        if self.current_scenario and random.random() < (self.current_scenario.fault_probability / 24):
-            if not self.current_scenario.fault_hour:  # Only if not scheduled
-                await self._inject_fault()
+        # Check for random faults based on probability (with seasonal adjustment)
+        if self.current_scenario:
+            base_probability = self.current_scenario.fault_probability / 24
+            seasonal_probability = self._get_seasonal_fault_probability(base_probability)
+            if random.random() < seasonal_probability:
+                if not self.current_scenario.fault_hour:  # Only if not scheduled
+                    await self._inject_fault()
 
         # Check pending repairs every hour
         await self._check_pending_repairs()
@@ -381,18 +525,33 @@ class LifecycleOrchestrator:
         await self._ai_optimization("pre_cooling")
 
     async def _occupancy_increase(self):
-        """Simulate morning occupancy increase."""
+        """Simulate morning occupancy increase with realistic day-to-day variation."""
+        # Day-of-week variation (Monday=100%, Friday=80%, realistic WFH/hybrid patterns)
+        day_of_week = self.simulated_time.weekday()  # 0=Monday, 6=Sunday
+        day_factor = [1.0, 0.95, 0.90, 0.88, 0.80, 0.3, 0.2][day_of_week]  # Mon-Sun
+        
+        # Seeded random variation (±10% reproducible)
+        occupancy_variance = self._scenario_rng.uniform(0.90, 1.10)
+        occupancy_percent = int(60 * day_factor * occupancy_variance)
+        
+        # Apply seasonal occupancy factor if in annual simulation
+        if self.seasonal_modeler:
+            seasonal_factor = self._get_seasonal_occupancy_factor(8)
+            occupancy_percent = int(occupancy_percent * seasonal_factor)
+        
+        zones_active = max(2, int(12 * day_factor * occupancy_variance / 100) * 100 // 100)
+        
         self._emit_event(LifecycleEvent(
             timestamp=datetime.now(),
             simulated_hour=8,
             event_type=EventType.OCCUPANCY_INCREASE,
-            description="Occupancy increasing - staff arriving",
-            details={"occupancy_percent": 60, "zones_active": 12}
+            description=f"Occupancy increasing - staff arriving (~{occupancy_percent}%)",
+            details={"occupancy_percent": occupancy_percent, "zones_active": zones_active}
         ))
 
         # Adjust setpoints for occupancy
         await self._setpoint_change("cooling_setpoint", 22.0, "Occupied mode")
-        await self._setpoint_change("lighting_level", 80, "Occupied mode")
+        await self._setpoint_change("lighting_level", int(80 * day_factor), "Occupied mode")
 
     async def _peak_load(self):
         """Simulate peak load period."""
@@ -405,18 +564,27 @@ class LifecycleOrchestrator:
         ))
 
     async def _occupancy_decrease(self):
-        """Simulate evening occupancy decrease."""
+        """Simulate evening occupancy decrease with realistic variation."""
+        # Day-of-week variation (some people leave early Friday, more people Friday night)
+        day_of_week = self.simulated_time.weekday()
+        day_factor = [0.9, 0.85, 0.85, 0.88, 1.2, 0.1, 0.05][day_of_week]  # Mon-Sun
+        
+        # Seeded random variation (±15% reproducible)
+        occupancy_variance = self._scenario_rng.uniform(0.85, 1.15)
+        occupancy_percent = max(5, int(20 * day_factor * occupancy_variance))
+        zones_active = max(1, int(occupancy_percent / 5))
+        
         self._emit_event(LifecycleEvent(
             timestamp=datetime.now(),
             simulated_hour=18,
             event_type=EventType.OCCUPANCY_DECREASE,
-            description="Occupancy decreasing - staff leaving",
-            details={"occupancy_percent": 20, "zones_active": 4}
+            description=f"Occupancy decreasing - staff leaving (~{occupancy_percent}%)",
+            details={"occupancy_percent": occupancy_percent, "zones_active": zones_active}
         ))
 
         # Adjust setpoints for reduced occupancy
         await self._setpoint_change("cooling_setpoint", 25.0, "Unoccupied mode")
-        await self._setpoint_change("lighting_level", 30, "Unoccupied mode")
+        await self._setpoint_change("lighting_level", int(30 * day_factor), "Unoccupied mode")
 
     async def _night_mode(self):
         """Simulate night mode."""
@@ -429,38 +597,273 @@ class LifecycleOrchestrator:
         ))
 
     async def _ai_optimization(self, context: str):
-        """Simulate AI optimization cycle."""
-        # Get a sample of equipment to "optimize"
+        """Simulate AI optimization cycle - generates occupancy-aware + daylight-aware recommendations."""
         try:
-            equipment_list = self.equipment_repo.get_all()[:5]
-            optimized = []
+            # Get current building state
+            current_hour = self.simulated_time.hour
+            
+            # Calculate occupancy based on hour
+            occupancy_percent = self._calculate_occupancy(current_hour)
+            
+            # Calculate daylight factor (0-100%, peaks at noon)
+            daylight_factor = self._calculate_daylight(current_hour)
+            
+            # Determine zones that should be active
+            zones_active = max(1, int(occupancy_percent / 8)) if occupancy_percent > 10 else 0
+            
+            logger.info(f"AI Optimization ({context}): hour={current_hour}, occupancy={occupancy_percent}%, daylight={daylight_factor}%, zones={zones_active}")
+            
+            equipment_list = self.equipment_repo.get_all()
+            if not equipment_list:
+                return
+            
+            # Filter to site-002 if available
+            site_002_equipment = [eq for eq in equipment_list if eq.get("code", "").startswith("S002-")]
+            if not site_002_equipment:
+                site_002_equipment = equipment_list[:5]
+            else:
+                site_002_equipment = site_002_equipment[:5]
+            
+            recommendations_created = []
+            hvac_recs = []
+            dali_recs = []
 
-            for eq in equipment_list:
-                if random.random() < 0.3:  # 30% chance to optimize each
-                    optimized.append({
-                        "equipment": eq.get("code", eq.get("id")),
-                        "adjustment": random.choice([
-                            "Reduced fan speed 10%",
-                            "Adjusted setpoint +0.5°C",
-                            "Optimized staging",
-                            "Enabled economizer"
-                        ])
-                    })
+            for eq in site_002_equipment:
+                eq_code = eq.get("code", eq.get("id"))
+                eq_type = eq.get("type", "unknown").upper()
+                
+                # Skip if not controllable
+                if not self.device_control_service.is_controllable(eq_code):
+                    continue
+                
+                # ========== HVAC OPTIMIZATION ==========
+                if eq_type in ["FCU", "VAV", "AHU", "CHILLER"]:
+                    hvac_recommendation = self._generate_hvac_recommendation(
+                        eq_code, eq_type, context, occupancy_percent, current_hour
+                    )
+                    if hvac_recommendation:
+                        recommendations_created.append(hvac_recommendation)
+                        hvac_recs.append(hvac_recommendation["equipment"])
+                        
+                        # Create control recommendation
+                        try:
+                            rec = Recommendation(
+                                site_id="S002",
+                                timestamp=datetime.utcnow(),
+                                action_type="ai_optimization",
+                                risk_level=ActionRiskLevel.LOW,
+                                target_equipment=eq_code,
+                                action={
+                                    "point": hvac_recommendation["control_point"],
+                                    "value": hvac_recommendation["target_value"],
+                                },
+                                reason=hvac_recommendation["reason"],
+                                expected_impact={
+                                    "description": hvac_recommendation["description"],
+                                    "energy_savings_percent": hvac_recommendation.get("savings", 5),
+                                },
+                                confidence="high",
+                                profile=context,
+                                status=RecommendationStatus.PENDING,
+                                requires_approval=True,
+                            )
+                            await self.recommendation_repo.create(rec)
+                        except Exception as e:
+                            logger.warning(f"Failed to create HVAC recommendation for {eq_code}: {e}")
+                
+                # ========== DALI OPTIMIZATION ==========
+                if eq_type in ["DALI", "LUM"]:
+                    dali_recommendation = self._generate_dali_recommendation(
+                        eq_code, eq_type, context, occupancy_percent, daylight_factor, zones_active, current_hour
+                    )
+                    if dali_recommendation:
+                        recommendations_created.append(dali_recommendation)
+                        dali_recs.append(dali_recommendation["equipment"])
+                        
+                        # Create control recommendation
+                        try:
+                            rec = Recommendation(
+                                site_id="S002",
+                                timestamp=datetime.utcnow(),
+                                action_type="ai_optimization",
+                                risk_level=ActionRiskLevel.LOW,
+                                target_equipment=eq_code,
+                                action={
+                                    "point": dali_recommendation["control_point"],
+                                    "value": dali_recommendation["target_value"],
+                                },
+                                reason=dali_recommendation["reason"],
+                                expected_impact={
+                                    "description": dali_recommendation["description"],
+                                    "energy_savings_percent": dali_recommendation.get("savings", 3),
+                                },
+                                confidence="high",
+                                profile=context,
+                                status=RecommendationStatus.PENDING,
+                                requires_approval=True,
+                            )
+                            await self.recommendation_repo.create(rec)
+                        except Exception as e:
+                            logger.warning(f"Failed to create DALI recommendation for {eq_code}: {e}")
 
+            # Emit comprehensive optimization event
             self._emit_event(LifecycleEvent(
                 timestamp=datetime.now(),
-                simulated_hour=self.simulated_time.hour,
+                simulated_hour=current_hour,
                 event_type=EventType.AI_OPTIMIZATION,
-                description=f"AI optimization cycle ({context})",
+                description=f"AI optimization ({context}) - Occupancy {occupancy_percent}%, Daylight {daylight_factor}%, {len(recommendations_created)} recommendations pending",
                 details={
                     "context": context,
-                    "equipment_analyzed": len(equipment_list),
-                    "optimizations_applied": len(optimized),
-                    "changes": optimized
+                    "occupancy_percent": occupancy_percent,
+                    "daylight_factor": daylight_factor,
+                    "zones_active": zones_active,
+                    "hvac_recommendations": len(hvac_recs),
+                    "dali_recommendations": len(dali_recs),
+                    "total_recommendations": len(recommendations_created),
+                    "recommendations": recommendations_created
                 }
             ))
         except Exception as e:
             logger.warning(f"AI optimization error: {e}")
+    
+    def _calculate_occupancy(self, hour: int) -> int:
+        """Calculate occupancy percent based on hour of day."""
+        if hour < 6 or hour >= 22:
+            return 0  # Night: 0%
+        elif hour < 8:
+            return 10  # Early morning: arriving
+        elif hour < 11:
+            return 70  # Morning: ramping up
+        elif hour < 12:
+            return 90  # Pre-peak: approaching peak
+        elif hour < 13:
+            return 95  # Peak: lunch time, still high
+        elif hour < 17:
+            return 80  # Afternoon: peak declining
+        elif hour < 18:
+            return 60  # Late afternoon: people leaving
+        elif hour < 20:
+            return 30  # Evening: mostly gone
+        else:
+            return 5  # Late evening: security/cleaning only
+    
+    def _calculate_daylight(self, hour: int) -> int:
+        """Calculate available natural daylight as percentage (0-100%)."""
+        if hour < 6 or hour >= 20:
+            return 0  # Night: 0% daylight
+        elif hour < 8:
+            return int((hour - 6) * 25)  # 0-50% (sunrise ramp)
+        elif hour < 12:
+            return int(50 + (hour - 8) * 10)  # 50-90% (morning increase)
+        elif hour < 13:
+            return 100  # Peak: full daylight at noon
+        elif hour < 16:
+            return int(100 - (hour - 13) * 10)  # 100-70% (afternoon decline)
+        elif hour < 18:
+            return int(70 - (hour - 16) * 20)  # 70-30% (sunset ramp down)
+        else:
+            return int(max(0, 30 - (hour - 18) * 10))  # 30-0% (sunset finish)
+    
+    def _get_seasonal_occupancy_factor(self, hour: int) -> float:
+        """Get occupancy factor with seasonal adjustments for annual simulations."""
+        if not self.seasonal_modeler:
+            # No seasonal modeler: return 1.0 (no adjustment)
+            return 1.0
+        
+        # Get seasonal occupancy factor from modeler
+        rain_today = self.seasonal_modeler.should_rain_today(self.simulated_time.date())
+        seasonal_factor = self.seasonal_modeler.get_occupancy_factor(
+            self.simulated_time.date(), hour, rain_today
+        )
+        return seasonal_factor
+    
+    def _get_seasonal_fault_probability(self, base_probability: float) -> float:
+        """Get fault probability adjusted for seasonal stress."""
+        if not self.seasonal_modeler:
+            # No seasonal modeler: use base probability
+            return base_probability
+        
+        # Get seasonal multiplier from modeler
+        rain_today = self.seasonal_modeler.should_rain_today(self.simulated_time.date())
+        multiplier = self.seasonal_modeler.get_fault_probability_multiplier(
+            self.simulated_time.date(), rain_today
+        )
+        # Apply multiplier to base probability (capped at 1.0 for daily chance)
+        return min(1.0, base_probability * multiplier)
+    
+    def _generate_hvac_recommendation(self, eq_code: str, eq_type: str, context: str, 
+                                      occupancy_percent: int, hour: int) -> Optional[Dict[str, Any]]:
+        """Generate occupancy-aware HVAC recommendation."""
+        if occupancy_percent < 20:
+            # Low occupancy: reduce cooling, increase setpoint
+            return {
+                "equipment": eq_code,
+                "control_point": "cooling_setpoint",
+                "target_value": 24.0,  # Relax setpoint when unoccupied
+                "reason": f"Low occupancy ({occupancy_percent}%) - reduce active cooling",
+                "description": "Increase setpoint to 24°C for energy efficiency",
+                "savings": 8
+            }
+        elif occupancy_percent >= 80 and hour >= 10 and hour <= 12:
+            # Peak occupancy during peak solar hours: pre-cool
+            return {
+                "equipment": eq_code,
+                "control_point": "cooling_setpoint",
+                "target_value": 20.5,  # Pre-cool during peak demand
+                "reason": f"High occupancy ({occupancy_percent}%) + peak demand - anticipatory pre-cooling",
+                "description": "Reduce setpoint to 20.5°C for peak demand management",
+                "savings": 5
+            }
+        elif context == "afternoon":
+            # Afternoon: moderate adjustment
+            return {
+                "equipment": eq_code,
+                "control_point": "cooling_setpoint",
+                "target_value": 21.5,
+                "reason": f"Afternoon optimization at {occupancy_percent}% occupancy",
+                "description": "Adjust setpoint to 21.5°C for afternoon efficiency",
+                "savings": 3
+            }
+        
+        return None
+    
+    def _generate_dali_recommendation(self, eq_code: str, eq_type: str, context: str,
+                                     occupancy_percent: int, daylight_factor: int, 
+                                     zones_active: int, hour: int) -> Optional[Dict[str, Any]]:
+        """Generate occupancy-aware + daylight-aware DALI recommendation (Tridonic luminaire control)."""
+        
+        if occupancy_percent < 10:
+            # Night/security: minimal lighting
+            brightness = 20
+            reason = "Unoccupied - security lighting only"
+        elif daylight_factor > 80:
+            # Bright daylight (10am-2pm): minimize artificial lighting
+            brightness = max(20, 100 - daylight_factor)  # 20-100% inverse to daylight
+            reason = f"High daylight ({daylight_factor}%) - Tridonic harvesting reduces artificial light"
+        elif daylight_factor > 50:
+            # Good daylight: supplement with some artificial
+            brightness = 40 + (occupancy_percent / 100 * 40)  # 40-80% based on occupancy
+            reason = f"Moderate daylight ({daylight_factor}%) + occupancy {occupancy_percent}% - supplement lighting"
+        elif daylight_factor > 20:
+            # Twilight: use more artificial
+            brightness = 60 + (occupancy_percent / 100 * 30)  # 60-90%
+            reason = f"Low daylight ({daylight_factor}%) - increase artificial lighting"
+        else:
+            # Night: full artificial
+            brightness = 80 + (occupancy_percent / 100 * 20)  # 80-100%
+            reason = "Night - full artificial lighting required"
+        
+        # Round to nearest 5%
+        brightness = int((brightness + 2.5) / 5) * 5
+        
+        return {
+            "equipment": eq_code,
+            "control_point": "brightness_level",
+            "target_value": brightness,
+            "reason": reason,
+            "description": f"Set Tridonic brightness to {brightness}% (daylight {daylight_factor}%, occupancy {occupancy_percent}%)",
+            "savings": max(2, int(100 - brightness) / 10)  # Energy savings from dimming
+        }
 
     async def _setpoint_change(self, point: str, value: float, reason: str):
         """Simulate a setpoint change."""
@@ -475,8 +878,8 @@ class LifecycleOrchestrator:
     async def _inject_fault(self):
         """Inject a fault into equipment."""
         try:
-            # Get equipment to fault
-            equipment_list = self.equipment_repo.get_all()
+            # Get equipment to fault (site-002 only)
+            equipment_list = self.equipment_repo.get_all(building_id="site-002")
             if not equipment_list:
                 logger.warning("No equipment available to fault")
                 return

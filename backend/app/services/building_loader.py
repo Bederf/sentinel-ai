@@ -125,9 +125,27 @@ class BuildingDataLoader:
         if file_path.exists():
             with open(file_path) as f:
                 data = json.load(f)
+                # Handle both formats: direct array or wrapped in object
+                if isinstance(data, dict):
+                    # If it's a dict, look for common keys that contain the array
+                    if "zones" in data:
+                        data = data["zones"]
+                    elif "desks" in data:
+                        data = data["desks"]
+                    elif "devices" in data:
+                        data = data["devices"]
+                    else:
+                        # If it's a dict but no known array key, return empty
+                        return []
+
+                # Now ensure data is a list
+                if not isinstance(data, list):
+                    return []
+
                 # Add building_id to each record
                 for record in data:
-                    record["building_id"] = building_id
+                    if isinstance(record, dict):
+                        record["building_id"] = building_id
                 return data
         return []
 
