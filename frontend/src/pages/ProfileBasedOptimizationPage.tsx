@@ -12,6 +12,7 @@
 
 import { useState, useEffect } from 'react'
 import { TabGroup, TabList, Tab, TabPanels, TabPanel } from '@tremor/react'
+import { Settings, TrendingUp } from 'lucide-react'
 import { PageLoading } from '../components/PageLoading'
 import { ProfileSettings } from '../components/optimization/ProfileSettings'
 import { RecommendationsDashboard } from '../components/optimization/RecommendationsDashboard'
@@ -45,13 +46,20 @@ export const ProfileBasedOptimizationPage: React.FC<
   }
 
   return (
-    <div className="h-full overflow-y-auto p-4 md:p-6">
+    <div className="h-full overflow-y-auto p-4 md:p-6" style={{ background: "var(--color-sentinel-bg-canvas)" }}>
       <div className="max-w-7xl mx-auto space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold mb-2">Profile-Based Optimization</h1>
-          <p className="text-gray-600">
-            Manage optimization profiles, review recommendations, and track execution outcomes
-          </p>
+        <div className="flex items-start gap-4">
+          <div className="p-3 rounded" style={{ background: "rgba(245, 158, 11, 0.15)" }}>
+            <Settings className="h-6 w-6" style={{ color: "var(--color-sentinel-amber)" }} />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold mb-2" style={{ color: "var(--color-sentinel-text-primary)" }}>
+              Profile-Based Optimization
+            </h1>
+            <p style={{ color: "var(--color-sentinel-text-secondary)" }}>
+              Manage optimization profiles, review recommendations, and track execution outcomes
+            </p>
+          </div>
         </div>
 
         <TabGroup>
@@ -63,7 +71,20 @@ export const ProfileBasedOptimizationPage: React.FC<
 
           <TabPanels>
             <TabPanel>
-              <div className="mt-6">
+              <div className="mt-6 space-y-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="p-2 rounded" style={{ background: "rgba(245, 158, 11, 0.15)" }}>
+                    <Settings className="h-4 w-4" style={{ color: "var(--color-sentinel-amber)" }} />
+                  </div>
+                  <div>
+                    <h3 className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                      Optimization Profile Settings
+                    </h3>
+                    <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                      Select profile and configure business priorities
+                    </span>
+                  </div>
+                </div>
                 <ProfileSettings
                   siteId={siteId}
                   onProfileChange={handleProfileChange}
@@ -72,13 +93,39 @@ export const ProfileBasedOptimizationPage: React.FC<
             </TabPanel>
 
             <TabPanel>
-              <div className="mt-6">
+              <div className="mt-6 space-y-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="p-2 rounded" style={{ background: "rgba(59, 130, 246, 0.15)" }}>
+                    <TrendingUp className="h-4 w-4" style={{ color: "var(--color-sentinel-blue)" }} />
+                  </div>
+                  <div>
+                    <h3 className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                      Pending Recommendations
+                    </h3>
+                    <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                      Review and approve optimization actions
+                    </span>
+                  </div>
+                </div>
                 <RecommendationsDashboard siteId={siteId} />
               </div>
             </TabPanel>
 
             <TabPanel>
-              <div className="mt-6">
+              <div className="mt-6 space-y-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="p-2 rounded" style={{ background: "rgba(16, 185, 129, 0.15)" }}>
+                    <TrendingUp className="h-4 w-4" style={{ color: "var(--color-sentinel-green)" }} />
+                  </div>
+                  <div>
+                    <h3 className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                      Execution History
+                    </h3>
+                    <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                      Track recommendation outcomes and accuracy
+                    </span>
+                  </div>
+                </div>
                 <RecommendationHistory siteId={siteId} />
               </div>
             </TabPanel>
