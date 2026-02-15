@@ -48,6 +48,16 @@ const FEATURE_TOGGLE_CARDS: FeatureToggleCard[] = [
 export function Settings({ onError }: SettingsProps) {
   const { thresholds, loading, error, updateThresholds } = useHealthThresholds();
   const { isModuleActive, activateModule, deactivateModule } = useModules();
+  const currentUserEmail = (() => {
+    try {
+      const raw = localStorage.getItem("sentinel_user");
+      if (!raw) return "";
+      const parsed = JSON.parse(raw) as { email?: string };
+      return parsed.email || "";
+    } catch {
+      return "";
+    }
+  })();
   const currentUserRole = (() => {
     try {
       const raw = localStorage.getItem("sentinel_user");
@@ -58,14 +68,24 @@ export function Settings({ onError }: SettingsProps) {
       return "auditor";
     }
   })();
+  const demoUserEmails = ['grant@wardew.co.za', 'bederf@protonmail.com'];
+  const isDemoUser = currentUserEmail && demoUserEmails.includes(currentUserEmail.toLowerCase());
   const canManageFeatureAccess = currentUserRole === "admin";
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [safetyRulesUnlocked, setSafetyRulesUnlocked] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordModalFor, setPasswordModalFor] = useState<"safety" | "feature">("safety");
+  const [featureAccessUnlocked, setFeatureAccessUnlocked] = useState(false);
   const [togglingCardId, setTogglingCardId] = useState<string | null>(null);
 
   const handleFeatureToggle = async (card: FeatureToggleCard) => {
-    if (!canManageFeatureAccess) {
+    // Demo users need to unlock Feature Access first
+    if (isDemoUser && !featureAccessUnlocked) {
+      onError?.("Feature Access is locked. Click 'Unlock to Edit' to make changes.");
+      return;
+    }
+
+    if (!canManageFeatureAccess && !isDemoUser) {
       onError?.("Only admins can change feature access.");
       return;
     }
@@ -252,6 +272,7 @@ export function Settings({ onError }: SettingsProps) {
                   if (safetyRulesUnlocked) {
                     setSafetyRulesUnlocked(false);
                   } else {
+                    setPasswordModalFor("safety");
                     setShowPasswordModal(true);
                   }
                 }}
@@ -354,33 +375,87 @@ export function Settings({ onError }: SettingsProps) {
           className="glass-panel overflow-hidden"
           style={{
             background: "var(--glass-bg)",
-            border: "1px solid var(--glass-border)",
+            border: featureAccessUnlocked ? `1px solid var(--color-sentinel-amber)` : "1px solid var(--glass-border)",
           }}
         >
           <div className="p-4 border-b" style={{ borderColor: "var(--color-sentinel-border)" }}>
-            <div className="flex items-center gap-3">
-              <div
-                className="p-2 rounded-lg"
-                style={{
-                  background: "rgba(245, 158, 11, 0.15)",
-                  color: "var(--color-sentinel-amber)",
-                }}
-              >
-                <Zap className="h-5 w-5" />
-              </div>
-              <div>
-                <h2
-                  className="text-lg font-semibold"
-                  style={{ color: "var(--color-sentinel-text-primary)" }}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div
+                  className="p-2 rounded-lg"
+                  style={{
+                    background: "rgba(245, 158, 11, 0.15)",
+                    color: "var(--color-sentinel-amber)",
+                  }}
                 >
-                  Feature Access
-                </h2>
-                <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                  Toggle these pages and capabilities for this site
-                </p>
+                  <Zap className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2
+                    className="text-lg font-semibold"
+                    style={{ color: "var(--color-sentinel-text-primary)" }}
+                  >
+                    Feature Access
+                  </h2>
+                  <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                    Toggle these pages and capabilities for this site
+                  </p>
+                </div>
               </div>
+
+              {/* Lock/Unlock button for demo users */}
+              {isDemoUser && (
+                <button
+                  onClick={() => {
+                    if (featureAccessUnlocked) {
+                      setFeatureAccessUnlocked(false);
+                    } else {
+                      setPasswordModalFor("feature");
+                      setShowPasswordModal(true);
+                    }
+                  }}
+                  className="flex items-center gap-2 px-3 py-2 rounded text-sm font-medium transition-colors hover:brightness-110"
+                  style={{
+                    background: featureAccessUnlocked
+                      ? "rgba(245, 158, 11, 0.15)"
+                      : "rgba(220, 38, 38, 0.15)",
+                    color: featureAccessUnlocked
+                      ? "var(--color-sentinel-amber)"
+                      : "var(--color-sentinel-red)",
+                    border: `1px solid ${featureAccessUnlocked ? "rgba(245, 158, 11, 0.3)" : "rgba(220, 38, 38, 0.3)"}`,
+                  }}
+                >
+                  {featureAccessUnlocked ? (
+                    <>
+                      <Unlock className="h-4 w-4" />
+                      Lock Access
+                    </>
+                  ) : (
+                    <>
+                      <Lock className="h-4 w-4" />
+                      Unlock to Edit
+                    </>
+                  )}
+                </button>
+              )}
             </div>
           </div>
+
+          {/* Unlocked warning banner for demo users */}
+          {isDemoUser && featureAccessUnlocked && (
+            <div
+              className="px-4 py-2 flex items-center gap-2"
+              style={{
+                background: "rgba(245, 158, 11, 0.15)",
+                borderBottom: "1px solid rgba(245, 158, 11, 0.3)",
+              }}
+            >
+              <Unlock className="h-4 w-4" style={{ color: "var(--color-sentinel-amber)" }} />
+              <span className="text-sm" style={{ color: "var(--color-sentinel-amber)" }}>
+                Module access is unlocked. Click "Lock Access" when finished making changes.
+              </span>
+            </div>
+          )}
 
           <div className="p-6">
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -510,13 +585,22 @@ export function Settings({ onError }: SettingsProps) {
         </div>
       </div>
 
-      {/* Password Modal for Safety Rules */}
+      {/* Password Modal */}
       <PasswordModal
         isOpen={showPasswordModal}
         onClose={() => setShowPasswordModal(false)}
-        onSuccess={() => setSafetyRulesUnlocked(true)}
-        title="Unlock Safety Rules"
-        description="Safety rules control critical device limits. Enter the admin password to modify these settings."
+        onSuccess={() => {
+          if (passwordModalFor === "safety") {
+            setSafetyRulesUnlocked(true);
+          } else if (passwordModalFor === "feature") {
+            setFeatureAccessUnlocked(true);
+          }
+        }}
+        title={passwordModalFor === "safety" ? "Unlock Safety Rules" : "Unlock Module Management"}
+        description={passwordModalFor === "safety"
+          ? "Safety rules control critical device limits. Enter the admin password to modify these settings."
+          : "Module management controls which features are available. Enter the admin password to make changes."
+        }
       />
     </div>
   );

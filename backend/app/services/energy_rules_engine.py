@@ -264,11 +264,12 @@ class EnergyRulesEngine:
         """Rule 4: Daylight harvesting (4% max, DALI-only).
         
         Reduces artificial lighting when daylight is sufficient.
-        Only activates if DALI module is installed and active.
+        Only activates if DALI/Lighting module is installed and active.
         """
         # Normalize module names to lowercase
         active_modules_lower = [m.lower() for m in active_modules]
-        dali_active = "dali" in active_modules_lower
+        # Check for either "dali" or "lighting" (lighting module includes DALI)
+        dali_active = "dali" in active_modules_lower or "lighting" in active_modules_lower
         
         # Check DALI module first
         if not dali_active:

@@ -77,7 +77,7 @@ type TimePeriod = (typeof TIME_PERIODS)[number];
 type DashboardSectionId =
   | 'kpi-row'
   | 'site-protection'
-  | 'dali-intelligence'
+  | 'lighting-intelligence'
   | 'energy-analytics'
   | 'risk-predictions'
   | 'comfort-assistant'
@@ -134,7 +134,7 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
   const [sectionOrder, setSectionOrder] = useState<DashboardSectionId[]>([
     'kpi-row',
     'site-protection',
-    'dali-intelligence',
+    'lighting-intelligence',
     'solar-bess',
     'solar-annual',
     'energy-analytics',
@@ -1062,14 +1062,14 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
     );
   };
 
-  // Render DALI Intelligence section
-  const renderDaliIntelligence = () => {
+  // Render Lighting Intelligence section
+  const renderLightingIntelligence = () => {
     const { isModuleActive } = useModules();
     if (!isModuleActive('lighting')) {
       return null;
     }
     return (
-      <DashboardSection id="dali-intelligence">
+      <DashboardSection id="lighting-intelligence">
         <div className="mt-6">
           <LightingIntelligencePanel siteId="site-002" />
         </div>
@@ -1180,7 +1180,7 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
   const sectionRenderers: Record<DashboardSectionId, () => JSX.Element | null> = {
     'kpi-row': renderKPIRow,
     'site-protection': renderSiteProtection,
-    'dali-intelligence': renderDaliIntelligence,
+    'lighting-intelligence': renderLightingIntelligence,
     'energy-analytics': renderEnergyAnalytics,
     'risk-predictions': renderRiskPredictions,
     'comfort-assistant': renderComfortAssistant,

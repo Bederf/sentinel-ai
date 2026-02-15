@@ -147,9 +147,11 @@ export const ADDON_NAV_ITEMS: NavItem[] = [
 
 /**
  * Internal navigation items - visible only to users with matching role.
+ * Settings is password-protected and visible to both admin and demo users.
  */
 export const INTERNAL_NAV_ITEMS: NavItem[] = [
   { id: "simulation", label: "Simulation", icon: FlaskConical, description: "Lifecycle & Analytics", category: "internal", requiredRole: "admin", requiredModule: "ml" },
+  { id: "settings", label: "Settings", icon: SettingsIcon, description: "Admin Settings (Password Protected)", category: "internal", requiredRole: "admin" },
 ];
 
 /** All nav items combined (for lookup) */

@@ -257,6 +257,62 @@ async def startup_event(app: FastAPI) -> None:
         except Exception as e:
             _logger.error(f"Crash recovery initialization failed: {e}")
 
+    # DEACTIVATE ALL SIMULATIONS ON STARTUP
+    # Ensures clean state: no simulations auto-running after restart
+    # Explicitly stop any running simulations and mark queued ones as inactive
+    async def deactivate_all_simulations():
+        """
+        Deactivate all running and queued simulations on startup.
+        This ensures clean state and prevents auto-resuming of simulations.
+        """
+        try:
+            from app.database.supabase_client import Supabase
+
+            supabase = Supabase.instance()
+
+            # Stop any running simulations (set status to 'stopped')
+            running_tasks = await supabase.client.table("solar_annual_tasks") \
+                .select("task_id") \
+                .eq("status", "running") \
+                .execute()
+
+            if running_tasks.data:
+                _logger.info(f"🛑 Stopping {len(running_tasks.data)} running simulation(s)...")
+                for task in running_tasks.data:
+                    await supabase.client.table("solar_annual_tasks") \
+                        .update({"status": "stopped"}) \
+                        .eq("task_id", task["task_id"]) \
+                        .execute()
+                _logger.info(f"✅ Stopped {len(running_tasks.data)} running simulation(s)")
+
+            # Mark any queued simulations as 'inactive' (don't auto-start)
+            queued_tasks = await supabase.client.table("solar_annual_tasks") \
+                .select("task_id") \
+                .eq("status", "queued") \
+                .execute()
+
+            if queued_tasks.data:
+                _logger.info(f"⏸️  Deactivating {len(queued_tasks.data)} queued simulation(s)...")
+                for task in queued_tasks.data:
+                    await supabase.client.table("solar_annual_tasks") \
+                        .update({"status": "inactive"}) \
+                        .eq("task_id", task["task_id"]) \
+                        .execute()
+                _logger.info(f"✅ Deactivated {len(queued_tasks.data)} queued simulation(s)")
+
+            if not running_tasks.data and not queued_tasks.data:
+                _logger.info("✅ No active simulations to deactivate")
+
+        except Exception as e:
+            _logger.error(f"⚠️ Failed to deactivate simulations on startup: {e}")
+
+    # Run deactivation on startup
+    if not testing_mode:
+        try:
+            await deactivate_all_simulations()
+        except Exception as e:
+            _logger.error(f"Error during simulation deactivation: {e}")
+
     # Run crash recovery on startup - DISABLED to prevent auto-start of simulations
     # if not testing_mode:
     #     import asyncio

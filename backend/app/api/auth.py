@@ -571,15 +571,15 @@ async def complete_mfa_login(request: Request, email: str, mfa_code: str):
             # This demonstrates full predictive AI control with seasonal variations
             orchestrator.run_scenario(
                 scenario_name="grant_hvac_dali_ai_annual",
-                duration_minutes=240.0  # 365 days compressed to 4 hours real time
+                duration_minutes=30.0  # 365 days compressed to 30 minutes real time
             )
-            
+
             response["demo_auto_start"] = True
             response["demo_type"] = "annual-demonstration"
             response["demo_description"] = "HVAC + DALI + Sentinel AI (365-day full-year with seasonal variations)"
             response["demo_scenario"] = "grant_hvac_dali_ai_annual"
             response["demo_status"] = "running"
-            logger.info(f"Auto-started Grant demo scenario: grant_hvac_dali_ai_annual (365 days, ~4 hours real time)")
+            logger.info(f"Auto-started Grant demo scenario: grant_hvac_dali_ai_annual (365 days, ~30 minutes real time)")
         except Exception as e:
             logger.error(f"Error auto-starting Grant demo: {e}")
             response["demo_auto_start"] = True
@@ -588,12 +588,29 @@ async def complete_mfa_login(request: Request, email: str, mfa_code: str):
     
     # Auto-start demo for Solar/BESS client (bederf@protonmail.com)
     if email == "bederf@protonmail.com":
-        # Reset orchestrator for fresh demo on login
-        orchestrator = get_lifecycle_orchestrator()
-        orchestrator.reset()
-        response["demo_auto_start"] = True
-        response["demo_type"] = "solar-bess-comparison"
-        response["demo_description"] = "Solar+BESS Baseline vs Solar+BESS with Sentinel AI optimization"
+        try:
+            # Reset orchestrator for fresh demo on login
+            orchestrator = get_lifecycle_orchestrator()
+            orchestrator.reset()
+
+            # Auto-start Solar + BESS annual simulation (365 days)
+            # Demonstrates full-year solar generation with AI-optimized BESS arbitrage
+            orchestrator.run_scenario(
+                scenario_name="grant_solar_bess_ai_annual",
+                duration_minutes=30.0  # 365 days compressed to 30 minutes real time
+            )
+
+            response["demo_auto_start"] = True
+            response["demo_type"] = "solar-bess-annual"
+            response["demo_description"] = "Solar+BESS with Sentinel AI (365-day full-year with City Power TOU arbitrage)"
+            response["demo_scenario"] = "grant_solar_bess_ai_annual"
+            response["demo_status"] = "running"
+            logger.info(f"Auto-started Bederf demo scenario: grant_solar_bess_ai_annual (365 days, ~30 minutes real time)")
+        except Exception as e:
+            logger.error(f"Error auto-starting Bederf demo: {e}")
+            response["demo_auto_start"] = True
+            response["demo_type"] = "solar-bess-annual"
+            response["demo_error"] = str(e)
 
     return response
 

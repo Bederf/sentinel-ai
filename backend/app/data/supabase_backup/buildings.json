@@ -1,0 +1,349 @@
+[
+  {
+    "id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "code": "site-005",
+    "name": "Busamed Gateway Private Hospital",
+    "address": "36-38 Aurora Dr, Umhlanga Rocks, uMhlanga, 4319",
+    "region": "KwaZulu-Natal",
+    "type": "hospital",
+    "sqm": 25000,
+    "floors": 3,
+    "year_built": null,
+    "operating_hours": null,
+    "occupancy_pattern": null,
+    "latitude": null,
+    "longitude": null,
+    "contact_email": null,
+    "contact_phone": null,
+    "optimization_enabled": true,
+    "optimization_status": "unknown",
+    "optimization_settings": {},
+    "last_optimization": null,
+    "optimization_history": [],
+    "last_recommendation": null,
+    "created_at": "2026-02-05T10:11:44.716059+00:00",
+    "updated_at": "2026-02-11T09:39:37.654931+00:00",
+    "equipment_count": 90,
+    "control_enabled": true,
+    "control_note": null
+  },
+  {
+    "id": "5a73f160-4c52-4005-b3b5-a3a67aa3fd6f",
+    "code": "site-012",
+    "name": "Canal Walk Tech Store",
+    "address": "Canal Walk Shopping Centre, Century City, Cape Town, 7441",
+    "region": "Western Cape",
+    "type": "retail",
+    "sqm": 450,
+    "floors": 1,
+    "year_built": null,
+    "operating_hours": null,
+    "occupancy_pattern": null,
+    "latitude": null,
+    "longitude": null,
+    "contact_email": null,
+    "contact_phone": null,
+    "optimization_enabled": true,
+    "optimization_status": "unknown",
+    "optimization_settings": {
+      "profile": "retail",
+      "control_tier": "standard"
+    },
+    "last_optimization": null,
+    "optimization_history": [],
+    "last_recommendation": null,
+    "created_at": "2026-02-09T14:16:16.368907+00:00",
+    "updated_at": "2026-02-11T09:39:37.719637+00:00",
+    "equipment_count": 19,
+    "control_enabled": true,
+    "control_note": null
+  },
+  {
+    "id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "code": "site-002",
+    "name": "Sandton City Office Tower",
+    "address": "83 Rivonia Road, Sandton",
+    "region": "Gauteng",
+    "type": "regional_office",
+    "sqm": 4500,
+    "floors": 3,
+    "year_built": null,
+    "operating_hours": null,
+    "occupancy_pattern": null,
+    "latitude": null,
+    "longitude": null,
+    "contact_email": null,
+    "contact_phone": null,
+    "optimization_enabled": false,
+    "optimization_status": "unknown",
+    "optimization_settings": {
+      "mode": "supervised",
+      "last_analysis": null,
+      "analysis_interval_minutes": 15
+    },
+    "last_optimization": "2026-02-05T19:23:55.723406+00:00",
+    "optimization_history": [
+      {
+        "user": "system",
+        "action": "analyzed",
+        "result": "warning",
+        "details": {
+          "mode": "automatic",
+          "confidence": 0.92,
+          "auto_applied": false,
+          "validation_passed": false,
+          "hvac_recommendations": 10,
+          "lighting_recommendations": 3,
+          "cross_system_recommendations": 0
+        },
+        "timestamp": "2026-02-05T13:53:16.203061"
+      },
+      {
+        "user": "system",
+        "action": "analyzed",
+        "result": "success",
+        "details": {
+          "mode": "automatic",
+          "confidence": 0.92,
+          "auto_applied": false,
+          "validation_passed": true,
+          "hvac_recommendations": 10,
+          "lighting_recommendations": 2,
+          "cross_system_recommendations": 0,
+          "projected_savings_zar_per_hour": 0
+        },
+        "timestamp": "2026-02-05T18:25:24.842923"
+      },
+      {
+        "user": "system",
+        "action": "analyzed",
+        "result": "success",
+        "details": {
+          "mode": "automatic",
+          "confidence": 0.88,
+          "auto_applied": false,
+          "validation_passed": true,
+          "hvac_recommendations": 12,
+          "lighting_recommendations": 1,
+          "cross_system_recommendations": 0,
+          "projected_savings_zar_per_hour": 0
+        },
+        "timestamp": "2026-02-05T18:26:06.793650"
+      },
+      {
+        "user": "system",
+        "action": "analyzed",
+        "result": "success",
+        "details": {
+          "mode": "automatic",
+          "confidence": 0.92,
+          "auto_applied": false,
+          "validation_passed": true,
+          "hvac_recommendations": 14,
+          "lighting_recommendations": 1,
+          "cross_system_recommendations": 0,
+          "projected_savings_zar_per_hour": 0
+        },
+        "timestamp": "2026-02-05T18:26:51.130588"
+      },
+      {
+        "user": "system",
+        "action": "analyzed",
+        "result": "success",
+        "details": {
+          "mode": "automatic",
+          "confidence": 0.92,
+          "auto_applied": false,
+          "validation_passed": true,
+          "hvac_recommendations": 15,
+          "lighting_recommendations": 2,
+          "cross_system_recommendations": 0,
+          "projected_savings_zar_per_hour": 0
+        },
+        "timestamp": "2026-02-05T18:43:14.652398"
+      },
+      {
+        "user": "system",
+        "action": "analyzed",
+        "result": "success",
+        "details": {
+          "mode": "automatic",
+          "confidence": 0.92,
+          "auto_applied": false,
+          "validation_passed": true,
+          "hvac_recommendations": 12,
+          "lighting_recommendations": 2,
+          "cross_system_recommendations": 0,
+          "projected_savings_zar_per_hour": 0
+        },
+        "timestamp": "2026-02-05T18:43:58.191344"
+      },
+      {
+        "user": "system",
+        "action": "analyzed",
+        "result": "success",
+        "details": {
+          "mode": "automatic",
+          "confidence": 0.92,
+          "auto_applied": false,
+          "validation_passed": true,
+          "hvac_recommendations": 11,
+          "lighting_recommendations": 2,
+          "cross_system_recommendations": 0,
+          "projected_savings_zar_per_hour": 0
+        },
+        "timestamp": "2026-02-05T18:47:19.759532"
+      },
+      {
+        "user": "system",
+        "action": "analyzed",
+        "result": "success",
+        "details": {
+          "mode": "automatic",
+          "confidence": 0.88,
+          "auto_applied": false,
+          "validation_passed": true,
+          "hvac_recommendations": 10,
+          "lighting_recommendations": 1,
+          "cross_system_recommendations": 0,
+          "projected_savings_zar_per_hour": 0
+        },
+        "timestamp": "2026-02-05T18:50:47.101161"
+      },
+      {
+        "user": "system",
+        "action": "analyzed",
+        "result": "success",
+        "details": {
+          "mode": "automatic",
+          "confidence": 0.92,
+          "auto_applied": false,
+          "validation_passed": true,
+          "hvac_recommendations": 13,
+          "lighting_recommendations": 2,
+          "cross_system_recommendations": 0,
+          "projected_savings_zar_per_hour": 0
+        },
+        "timestamp": "2026-02-05T18:53:19.813999"
+      },
+      {
+        "user": "system",
+        "action": "analyzed",
+        "result": "success",
+        "details": {
+          "mode": "automatic",
+          "confidence": 0.88,
+          "auto_applied": false,
+          "validation_passed": true,
+          "hvac_recommendations": 14,
+          "lighting_recommendations": 1,
+          "cross_system_recommendations": 0,
+          "projected_savings_zar_per_hour": 0
+        },
+        "timestamp": "2026-02-05T18:58:21.312606"
+      },
+      {
+        "user": "system",
+        "action": "analyzed",
+        "result": "success",
+        "details": {
+          "mode": "automatic",
+          "confidence": 0.92,
+          "auto_applied": false,
+          "validation_passed": true,
+          "hvac_recommendations": 14,
+          "lighting_recommendations": 1,
+          "cross_system_recommendations": 0,
+          "projected_savings_zar_per_hour": 0
+        },
+        "timestamp": "2026-02-05T19:00:03.978051"
+      },
+      {
+        "user": "system",
+        "action": "analyzed",
+        "result": "success",
+        "details": {
+          "mode": "automatic",
+          "confidence": 0.92,
+          "auto_applied": false,
+          "validation_passed": true,
+          "hvac_recommendations": 14,
+          "lighting_recommendations": 2,
+          "cross_system_recommendations": 0,
+          "projected_savings_zar_per_hour": 0
+        },
+        "timestamp": "2026-02-05T19:00:59.089562"
+      },
+      {
+        "user": "SENTINEL",
+        "action": "auto_applied",
+        "result": "success",
+        "details": {
+          "mode": "automatic",
+          "confidence": 0.92,
+          "auto_applied": true,
+          "validation_passed": true,
+          "hvac_recommendations": 14,
+          "lighting_recommendations": 1,
+          "cross_system_recommendations": 0,
+          "projected_savings_zar_per_hour": 52
+        },
+        "timestamp": "2026-02-05T19:03:02.541146"
+      },
+      {
+        "user": "SENTINEL",
+        "action": "auto_applied",
+        "result": "success",
+        "details": {
+          "mode": "automatic",
+          "confidence": 0.92,
+          "auto_applied": true,
+          "validation_passed": true,
+          "hvac_recommendations": 10,
+          "lighting_recommendations": 1,
+          "cross_system_recommendations": 0,
+          "projected_savings_zar_per_hour": 40.76
+        },
+        "timestamp": "2026-02-05T19:03:38.500182"
+      },
+      {
+        "user": "SENTINEL",
+        "action": "auto_applied",
+        "result": "success",
+        "details": {
+          "mode": "automatic",
+          "confidence": 0.88,
+          "auto_applied": true,
+          "validation_passed": true,
+          "hvac_recommendations": 11,
+          "lighting_recommendations": 1,
+          "cross_system_recommendations": 0,
+          "projected_savings_zar_per_hour": 51.5
+        },
+        "timestamp": "2026-02-05T19:23:17.626595"
+      },
+      {
+        "user": "SENTINEL",
+        "action": "auto_applied",
+        "result": "success",
+        "details": {
+          "mode": "automatic",
+          "confidence": 0.92,
+          "auto_applied": true,
+          "validation_passed": true,
+          "hvac_recommendations": 11,
+          "lighting_recommendations": 1,
+          "cross_system_recommendations": 0,
+          "projected_savings_zar_per_hour": 51.5
+        },
+        "timestamp": "2026-02-05T19:23:55.723451"
+      }
+    ],
+    "last_recommendation": null,
+    "created_at": "2026-02-05T05:31:52.636117+00:00",
+    "updated_at": "2026-02-14T11:35:32.922541+00:00",
+    "equipment_count": 433,
+    "control_enabled": false,
+    "control_note": null
+  }
+]

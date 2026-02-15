@@ -81,13 +81,25 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
   }, [isModuleActive, addonOrder]);
 
   // Compute visible internal items, filtered by role
+  // Settings is password-protected and visible to admin + demo users
   const visibleInternal = useMemo(() => {
+    const demoUserEmails = ['grant@wardew.co.za', 'bederf@protonmail.com'];
+    const isDemoUser = userEmail && demoUserEmails.includes(userEmail.toLowerCase());
+
     return INTERNAL_NAV_ITEMS.filter(
-      (item) =>
-        (!item.requiredRole || userRole === item.requiredRole) &&
-        (!item.requiredModule || isModuleActive(item.requiredModule))
+      (item) => {
+        const passesModuleCheck = !item.requiredModule || isModuleActive(item.requiredModule);
+
+        // Settings is visible to admin OR demo users
+        if (item.id === 'settings') {
+          return passesModuleCheck && (userRole === 'admin' || isDemoUser);
+        }
+
+        // Other internal items require matching role
+        return passesModuleCheck && (!item.requiredRole || userRole === item.requiredRole);
+      }
     );
-  }, [userRole, isModuleActive]);
+  }, [userRole, userEmail, isModuleActive]);
 
   // Apply access control based on user email (company demo restrictions)
   const allowedBaseItems = useMemo(() => {

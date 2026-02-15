@@ -60,6 +60,15 @@ export function getAllowedViews(email: string, allViews: View[]): View[] {
   const config = getCompanyDemoConfig(email);
   if (!config) return allViews;
 
+  // Special case: Demo users can always see Settings for password-protected module management
+  const demoUserEmails = ['grant@wardew.co.za', 'bederf@protonmail.com'];
+  if (demoUserEmails.includes(email.toLowerCase())) {
+    // Add Settings to allowed views for demo users
+    const allowedWithSettings = new Set(config.allowedViews);
+    allowedWithSettings.add('settings');
+    return allViews.filter(view => allowedWithSettings.has(view));
+  }
+
   // Filter to only allowed views
   return allViews.filter(view => config.allowedViews.includes(view));
 }
