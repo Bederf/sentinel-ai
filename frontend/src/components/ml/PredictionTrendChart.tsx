@@ -160,7 +160,7 @@ export function PredictionTrendChart({
       />
 
       {/* Prediction cards */}
-      <Grid numItems={4} className="gap-4 mt-4">
+      <Grid className="grid grid-cols-4 gap-4 mt-4">
         <Card decoration="top" decorationColor="gray">
           <Text>Current</Text>
           <Metric>{formatPrediction(currentValue, unit)}</Metric>

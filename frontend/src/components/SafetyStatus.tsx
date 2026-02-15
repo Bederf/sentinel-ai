@@ -178,7 +178,7 @@ export const SafetyStatusPanel: React.FC<SafetyStatusPanelProps> = ({
       ) : (
         <>
           {/* Statistics */}
-          <Grid numItems={5} className="gap-4 mb-6">
+          <Grid className="grid grid-cols-5 gap-4 mb-6">
             <div className="text-center">
               <div className="text-2xl font-bold text-gray-900">{stats.total}</div>
               <Text className="text-gray-600">Total</Text>

@@ -137,7 +137,7 @@ export function ZoneOverviewPanel({ siteId, compact = false, onZoneSelect }: Zon
           {!compact && (
             <Text className="font-medium text-sm mb-2 text-gray-400">Floor {floor}</Text>
           )}
-          <Grid numItems={compact ? 2 : 3} className="gap-3">
+          <Grid className={`grid ${compact ? 'grid-cols-2' : 'grid-cols-3'} gap-3`}>
             {floorZones.map((zone) => (
               <Card
                 key={zone.zone_id}

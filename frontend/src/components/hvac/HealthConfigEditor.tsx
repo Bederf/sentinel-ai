@@ -245,7 +245,7 @@ export function HealthConfigEditor({ onConfigChange }: HealthConfigEditorProps) 
             {/* General Settings */}
             <TabPanel>
               <Card>
-                <Grid numItems={2} className="gap-6">
+                <Grid className="grid grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-medium mb-2">
                       Expected Life (Years)
@@ -357,7 +357,7 @@ export function HealthConfigEditor({ onConfigChange }: HealthConfigEditorProps) 
               <Card>
                 <Text className="font-medium mb-4">Warning & Critical Thresholds</Text>
 
-                <Grid numItems={2} className="gap-6">
+                <Grid className="grid grid-cols-2 gap-6">
                   {editedConfig.thresholds &&
                     Object.entries(editedConfig.thresholds).map(([key, value]) => {
                       const isWarning = key.includes("warning");

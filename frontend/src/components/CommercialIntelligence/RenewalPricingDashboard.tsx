@@ -133,7 +133,7 @@ export function RenewalPricingDashboard({ selectedContractId }: RenewalPricingDa
                 </Badge>
               </Flex>
             </CardHeader>
-            <Grid numItems={1} numItemsSm={2} numItemsLg={3} className="gap-4">
+            <Grid className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               <Card>
                 <Text className="text-gray-600">Original Monthly Fee</Text>
                 <Title className="text-2xl">

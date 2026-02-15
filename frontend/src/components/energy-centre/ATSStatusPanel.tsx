@@ -186,7 +186,7 @@ export function ATSStatusPanel({ siteId, compact = false, onTransferEvent }: ATS
       </div>
 
       {/* Status Details */}
-      <Grid numItems={3} className="gap-4 mt-4">
+      <Grid className="grid grid-cols-3 gap-4 mt-4">
         <Card>
           <Text className="text-xs text-gray-500">Interlocks</Text>
           <div className="flex gap-1 mt-1">

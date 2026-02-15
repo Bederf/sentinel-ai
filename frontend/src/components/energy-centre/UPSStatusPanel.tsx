@@ -135,7 +135,7 @@ export function UPSStatusPanel({ siteId, compact = false, onBatteryAlert }: UPSS
               )}
             </Flex>
 
-            <Grid numItems={3} className="gap-4 mt-3">
+            <Grid className="grid grid-cols-3 gap-4 mt-3">
               <div>
                 <Text className="text-xs text-gray-500">Load</Text>
                 <Text className={ups.load_percent > 80 ? 'text-amber-500 font-bold' : ''}>

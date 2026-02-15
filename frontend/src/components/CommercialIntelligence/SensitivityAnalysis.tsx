@@ -195,7 +195,7 @@ export default function SensitivityAnalysis({
       {/* Price Range Summary */}
       <Card>
         <Title className="text-base">Price Range Summary</Title>
-        <Grid numItems={3} className="gap-4 mt-4">
+        <Grid className="grid grid-cols-3 gap-4 mt-4">
           <Col>
             <div className="space-y-2 p-3 rounded-lg bg-red-50 border border-red-100">
               <Text className="text-tremor-label font-medium text-red-900">
@@ -257,7 +257,7 @@ export default function SensitivityAnalysis({
       {/* Cost Impact Analysis */}
       <Card>
         <Title className="text-base">Financial Impact Analysis</Title>
-        <Grid numItems={2} className="gap-4 mt-4">
+        <Grid className="grid grid-cols-2 gap-4 mt-4">
           <Col>
             <div className="space-y-3">
               <div className="flex items-center gap-2">

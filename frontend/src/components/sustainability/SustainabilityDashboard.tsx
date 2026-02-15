@@ -203,7 +203,7 @@ export function SustainabilityDashboard({
       </div>
 
       {/* KPI Row */}
-      <Grid numItems={2} numItemsLg={4} className="gap-4">
+      <Grid className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
           <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>Total CO2 YTD</Text>
           <Metric>{summary?.ytd.total_co2_tonnes.toFixed(1) ?? '—'} t</Metric>
@@ -273,7 +273,7 @@ export function SustainabilityDashboard({
       </Card>
 
       {/* Efficiency vs Benchmarks */}
-      <Grid numItems={1} numItemsLg={2} className="gap-4">
+      <Grid className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
           <Title>Energy Intensity vs SA Benchmarks</Title>
           <Text className="mb-3" style={{ color: "var(--color-sentinel-text-secondary)" }}>kWh per sqm per year</Text>
@@ -318,7 +318,7 @@ export function SustainabilityDashboard({
           </div>
         </Flex>
 
-        <Grid numItems={1} numItemsSm={2} numItemsLg={3} className="gap-3">
+        <Grid className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {(greenStar?.categories || []).map(cat => {
             const pct = cat.max_points > 0
               ? Math.round((cat.achieved_points / cat.max_points) * 100)

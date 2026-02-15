@@ -223,7 +223,7 @@ export function HVACDashboard({
     <TabPanel key="overview">
       <div className="space-y-4">
         {/* Status Cards */}
-        <Grid numItems={4} className="gap-4">
+        <Grid className="grid grid-cols-4 gap-4">
           <Card decoration="top" decorationColor="green">
             <Flex alignItems="center" className="gap-2 mb-2">
               <Thermometer className="w-5 h-5 text-blue-400" />
@@ -317,7 +317,7 @@ export function HVACDashboard({
         )}
 
         {/* Compact Panels */}
-        <Grid numItems={2} className="gap-4">
+        <Grid className="grid grid-cols-2 gap-4">
           <div className="space-y-4">
             <ZoneOverviewPanel siteId={siteId} compact />
           </div>

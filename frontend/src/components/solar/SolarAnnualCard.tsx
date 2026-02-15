@@ -116,7 +116,7 @@ export function SolarAnnualCard({ siteId, onSimulationComplete }: SolarAnnualCar
         </Flex>
 
         {/* Key Metrics Grid */}
-        <Grid numColsSm={2} numColsLg={4} className="gap-4">
+        <Grid className="grid grid-cols-2 lg:grid-cols-4" className="gap-4">
           {/* Annual Savings */}
           <div className="bg-white rounded-lg p-4 border border-green-100">
             <Flex alignItems="end" justifyContent="start" className="gap-2">
@@ -173,7 +173,7 @@ export function SolarAnnualCard({ siteId, onSimulationComplete }: SolarAnnualCar
             <Text className="text-xs font-semibold text-gray-700 mb-3">
               AI Learning Progression
             </Text>
-            <Grid numColsSm={3} numColsLg={3} className="gap-3">
+            <Grid className="grid grid-cols-3 gap-3">
               <div>
                 <Text className="text-xs text-gray-500">Month 1-2</Text>
                 <Text className="text-sm font-semibold text-blue-600">
@@ -204,7 +204,7 @@ export function SolarAnnualCard({ siteId, onSimulationComplete }: SolarAnnualCar
           <Text className="text-xs font-semibold text-gray-700 mb-3">
             Seasonal Breakdown
           </Text>
-          <Grid numColsSm={2} numColsLg={4} className="gap-3">
+          <Grid className="grid grid-cols-2 lg:grid-cols-4" className="gap-3">
             {summary.seasonal_data.map((season) => (
               <div key={season.season}>
                 <Text className="text-xs text-gray-500 capitalize">

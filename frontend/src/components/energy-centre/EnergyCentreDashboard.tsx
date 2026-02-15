@@ -238,7 +238,7 @@ export function EnergyCentreDashboard({ siteId, onAIRecommendation, enabledModul
         <TabPanels>
           {/* Overview Tab */}
           <TabPanel>
-            <Grid numItems={2} className="gap-4">
+            <Grid className="grid grid-cols-2 gap-4">
               <SingleLineDiagram siteId={siteId} />
               <div className="space-y-4">
                 <ATSStatusPanel siteId={siteId} compact />

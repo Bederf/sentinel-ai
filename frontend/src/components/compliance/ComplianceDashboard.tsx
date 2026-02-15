@@ -56,7 +56,7 @@ export function ComplianceDashboard({ siteCode }: ComplianceDashboardProps) {
   const tabPanels = [
     // Overview Tab
     <TabPanel key="overview">
-      <Grid numColsSm={1} numColsMd={3} className="gap-4">
+      <Grid className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <Title>Compliance Score</Title>
           <div className="text-3xl font-bold mt-2">
@@ -80,7 +80,7 @@ export function ComplianceDashboard({ siteCode }: ComplianceDashboardProps) {
       {/* Compliance Status Summary */}
       <Card className="mt-6">
         <Title>Compliance Status Summary</Title>
-        <Grid numColsSm={1} numColsMd={2} className="gap-4 mt-4">
+        <Grid className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
           <div className="space-y-2">
             <div className="flex justify-between items-center">
               <Text>OHS Compliance</Text>

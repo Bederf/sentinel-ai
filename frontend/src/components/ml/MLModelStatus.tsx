@@ -132,7 +132,7 @@ export function MLModelStatus({ onModelTrained }: MLModelStatusProps) {
       {/* Training Panel */}
       <Card>
         <Title>Train New Model</Title>
-        <Grid numItems={1} numItemsSm={4} className="gap-4 mt-4">
+        <Grid className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-4">
           <div>
             <Text className="mb-1">Model Type</Text>
             <Select

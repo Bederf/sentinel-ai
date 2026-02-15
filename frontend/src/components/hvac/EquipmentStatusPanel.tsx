@@ -255,7 +255,7 @@ export function EquipmentStatusPanel({ siteId, compact = false, onEquipmentSelec
           <Text className="font-medium">Equipment</Text>
           <Badge color="gray">{equipment.length} total</Badge>
         </Flex>
-        <Grid numItems={2} className="gap-2">
+        <Grid className="grid grid-cols-2 gap-2">
           {equipment.slice(0, 4).map((eq) => (
             <EquipmentCard key={eq.id} eq={eq} />
           ))}
@@ -297,7 +297,7 @@ export function EquipmentStatusPanel({ siteId, compact = false, onEquipmentSelec
         {(() => {
           const allTabs = [
             <TabPanel key="all">
-              <Grid numItems={3} className="gap-4">
+              <Grid className="grid grid-cols-3 gap-4">
                 {equipment.map((eq) => (
                   <EquipmentCard key={eq.id} eq={eq} />
                 ))}
@@ -305,7 +305,7 @@ export function EquipmentStatusPanel({ siteId, compact = false, onEquipmentSelec
             </TabPanel>,
             ...types.map((type) => (
               <TabPanel key={type}>
-                <Grid numItems={3} className="gap-4">
+                <Grid className="grid grid-cols-3 gap-4">
                   {equipmentByType[type].map((eq) => (
                     <EquipmentCard key={eq.id} eq={eq} />
                   ))}

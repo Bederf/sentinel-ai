@@ -130,7 +130,7 @@ export function GeneratorSynoptic({ siteId, groupId, onHealthAlert }: GeneratorS
           </Badge>
         </Flex>
 
-        <Grid numItems={4} className="gap-4 mt-4">
+        <Grid className="grid grid-cols-4 gap-4 mt-4">
           <Card decoration="top" decorationColor="green">
             <Text>Running</Text>
             <Metric>{groupStatus.generators.running}</Metric>
@@ -160,7 +160,7 @@ export function GeneratorSynoptic({ siteId, groupId, onHealthAlert }: GeneratorS
       </Card>
 
       {/* Generator Cards */}
-      <Grid numItems={2} className="gap-4">
+      <Grid className="grid grid-cols-2 gap-4">
         {groupStatus.generator_details.map((gen) => {
           const health = healthData[gen.generator_id];
           return (
@@ -182,7 +182,7 @@ export function GeneratorSynoptic({ siteId, groupId, onHealthAlert }: GeneratorS
                 </div>
               </Flex>
 
-              <Grid numItems={3} className="gap-2 mt-3">
+              <Grid className="grid grid-cols-3 gap-2 mt-3">
                 <div>
                   <Text className="text-xs text-gray-500">Battery</Text>
                   <Text className={gen.battery_voltage < 25.5 ? 'text-red-500 font-bold' : ''}>

@@ -34,7 +34,7 @@ export function OHSPanel({ siteCode }: OHSPanelProps) {
         <Title>OHS Act Compliance Checklists</Title>
         <Text className="mt-2 mb-4">Generate and track safety compliance across zones</Text>
 
-        <Grid numColsSm={1} numColsMd={2} className="gap-4">
+        <Grid className="grid grid-cols-1 md:grid-cols-2" className="gap-4">
           {zones.map((zone) => (
             <Card key={zone} className="border border-gray-200">
               <div className="flex justify-between items-center">

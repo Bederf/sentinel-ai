@@ -102,7 +102,7 @@ export function PowerMeteringCard({ siteId, compact = false }: PowerMeteringCard
         )}
       </Flex>
 
-      <Grid numItems={4} className="gap-4 mt-4">
+      <Grid className="grid grid-cols-4 gap-4 mt-4">
         <Card decoration="top" decorationColor="blue">
           <Text>Active Power</Text>
           <Metric>{meter.active_power_kw.toFixed(0)}</Metric>
@@ -159,7 +159,7 @@ export function PowerMeteringCard({ siteId, compact = false }: PowerMeteringCard
       {(meter.thd_voltage_pct || meter.thd_current_pct) && (
         <div className="mt-4 pt-4 border-t border-gray-200">
           <Text className="text-xs text-gray-500 mb-2">Power Quality</Text>
-          <Grid numItems={3} className="gap-2">
+          <Grid className="grid grid-cols-3 gap-2">
             {meter.thd_voltage_pct !== undefined && (
               <div>
                 <Text className="text-xs">THD-V</Text>

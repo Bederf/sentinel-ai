@@ -156,7 +156,7 @@ export function BenchmarkingAnalysis() {
         <CardHeader>
           <Title>Portfolio Overview</Title>
         </CardHeader>
-        <Grid numItems={1} numItemsSm={2} numItemsLg={4} className="gap-4">
+        <Grid className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card>
             <Text className="text-gray-600">Total Contracts</Text>
             <Metric>{portfolioData?.portfolio_size || 0}</Metric>
@@ -207,7 +207,7 @@ export function BenchmarkingAnalysis() {
 
         {benchmarkData && (
           <>
-            <Grid numItems={1} numItemsSm={3} className="gap-4 mb-6">
+            <Grid className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
               <Card>
                 <Text className="text-gray-600">Market Average Fee</Text>
                 <Metric>
@@ -269,7 +269,7 @@ export function BenchmarkingAnalysis() {
           </div>
 
           {/* Top Opportunities */}
-          <Grid numItems={1} numItemsSm={2} className="gap-4">
+          <Grid className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Card>
               <CardHeader>
                 <Title>Top Underpriced Contracts</Title>

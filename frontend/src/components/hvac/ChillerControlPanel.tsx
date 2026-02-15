@@ -160,7 +160,7 @@ export function ChillerControlPanel({ siteId, compact = false, onChillerChange }
         </Flex>
       )}
 
-      <Grid numItems={compact ? 2 : 2} className="gap-4">
+      <Grid className="grid grid-cols-2 gap-4">
         {chillers.map((chiller) => {
           const isControlling = controllingChiller === chiller.id;
           const isAdjusting = adjustingSetpoint === chiller.id;

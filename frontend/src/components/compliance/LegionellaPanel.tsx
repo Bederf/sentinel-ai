@@ -44,7 +44,7 @@ export function LegionellaPanel({ siteCode }: LegionellaPanelProps) {
         <Title>Legionella Risk Assessment</Title>
         <Text className="text-sm mt-2 mb-4">SABS standard - Water temperature monitoring and control measures</Text>
 
-        <Grid numColsSm={1} numColsMd={3} className="gap-4">
+        <Grid className="grid grid-cols-1 md:grid-cols-3" className="gap-4">
           <div>
             <label className="text-sm font-medium">Cooling Tower Code</label>
             <input
@@ -87,7 +87,7 @@ export function LegionellaPanel({ siteCode }: LegionellaPanelProps) {
         <Title>Risk Assessment Matrix</Title>
         <Text className="text-sm mt-2 mb-4">Assessment based on water temperature and treatment history</Text>
 
-        <Grid numColsSm={1} numColsMd={3} className="gap-4 mt-4">
+        <Grid className="grid grid-cols-1 md:grid-cols-3" className="gap-4 mt-4">
           <Card className="border-l-4 border-red-500 bg-red-50">
             <div className="flex items-center justify-between">
               <div>

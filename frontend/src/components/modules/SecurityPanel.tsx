@@ -126,7 +126,7 @@ export function SecurityPanel({ siteId: propSiteId }: SecurityPanelProps): React
     <div className="space-y-6">
       {/* Quick Stats */}
       {overview && (
-        <Grid numItemsSm={2} numItemsLg={4} className="gap-4">
+        <Grid className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card>
             <Flex alignItems="center" justifyContent="between">
               <div>
@@ -186,7 +186,7 @@ export function SecurityPanel({ siteId: propSiteId }: SecurityPanelProps): React
               <div className="mt-6 space-y-4">
                 <Title>Security Status Summary</Title>
                 {overview && (
-                  <Grid numItemsSm={2} numItemsLg={2} className="gap-4">
+                  <Grid className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4">
                     <Card>
                       <Text>System Status</Text>
                       <Flex alignItems="center" justifyContent="between" className="mt-2">

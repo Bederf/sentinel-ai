@@ -192,7 +192,7 @@ Valid until: ${quote.valid_until}
             </div>
           </div>
 
-          <Grid numItems={2} className="gap-4">
+          <Grid className="grid grid-cols-2 gap-4">
             <Col>
               <div className="space-y-2">
                 <Text className="font-medium text-tremor-label">Client</Text>
@@ -207,7 +207,7 @@ Valid until: ${quote.valid_until}
             </Col>
           </Grid>
 
-          <Grid numItems={2} className="gap-4">
+          <Grid className="grid grid-cols-2 gap-4">
             <Col>
               <div className="space-y-2">
                 <Text className="font-medium text-tremor-label flex items-center gap-2">
@@ -241,7 +241,7 @@ Valid until: ${quote.valid_until}
         {/* Pricing Summary */}
         <div className="space-y-4">
           <Title className="text-base">Pricing Summary</Title>
-          <Grid numItems={3} className="gap-4">
+          <Grid className="grid grid-cols-3 gap-4">
             <Col>
               <Card>
                 <Text className="text-tremor-label text-tremor-content-subtitle">
@@ -277,7 +277,7 @@ Valid until: ${quote.valid_until}
         {quote.fee_range_zar && Object.keys(quote.fee_range_zar).length > 0 && (
           <div className="space-y-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
             <Title className="text-base text-blue-900">Negotiation Range</Title>
-            <Grid numItems={3} className="gap-3">
+            <Grid className="grid grid-cols-3 gap-3">
               {quote.fee_range_zar.min && (
                 <Col>
                   <div>
@@ -356,7 +356,7 @@ Valid until: ${quote.valid_until}
           <Title className="text-base text-green-900">
             SLA Tier: {slaTier.toUpperCase()}
           </Title>
-          <Grid numItems={3} className="gap-3">
+          <Grid className="grid grid-cols-3 gap-3">
             <Col>
               <div>
                 <Text className="text-tremor-label text-green-700">Uptime Target</Text>
@@ -418,7 +418,7 @@ Valid until: ${quote.valid_until}
         {quote.market_comparison && (
           <div className="space-y-4 bg-purple-50 border border-purple-200 rounded-lg p-4">
             <Title className="text-base text-purple-900">Market Benchmark</Title>
-            <Grid numItems={2} className="gap-3">
+            <Grid className="grid grid-cols-2 gap-3">
               {Object.entries(quote.market_comparison).map(([key, value]) => (
                 <Col key={key}>
                   <div>

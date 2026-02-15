@@ -221,7 +221,7 @@ export function ModularDashboard({
   const buildPanels = () => {
     const panels: React.ReactElement[] = [
       <TabPanel key="overview">
-        <Grid numItems={2} className="gap-4">
+        <Grid className="grid grid-cols-2 gap-4">
           <div className="col-span-2 lg:col-span-1">
             <AIRecommendationsPanel maxItems={5} />
           </div>

@@ -94,7 +94,7 @@ export function ThermalOptimizationPanel({ siteId, compact = false }: ThermalOpt
           </Badge>
         </Flex>
 
-        <Grid numItems={2} className="gap-4">
+        <Grid className="grid grid-cols-2 gap-4">
           <div
             className="p-3 rounded-lg"
             style={{ background: "var(--color-sentinel-bg-secondary)" }}
@@ -142,7 +142,7 @@ export function ThermalOptimizationPanel({ siteId, compact = false }: ThermalOpt
 
       {/* Key Metrics Summary */}
       <Card>
-        <Grid numItems={4} className="gap-4">
+        <Grid className="grid grid-cols-4 gap-4">
           <div
             className="p-4 rounded-lg text-center"
             style={{ background: "var(--color-sentinel-bg-secondary)" }}

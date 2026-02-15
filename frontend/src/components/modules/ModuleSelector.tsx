@@ -105,7 +105,7 @@ export function ModuleSelector({ onModuleActivated, onModuleDeactivated }: Modul
       )}
 
       {/* Module Grid */}
-      <Grid numItems={2} className="gap-4">
+      <Grid className="grid grid-cols-2 gap-4">
         {availableModules.map(moduleDef => {
           const isActive = isModuleActive(moduleDef.module_type);
           const isProtectedBasePack = NON_DEACTIVATABLE_MODULES.includes(moduleDef.module_type);

@@ -203,7 +203,7 @@ export default function QuoteGenerator({
 
         <Card>
           <Title>Quote Summary</Title>
-          <Grid numItems={2} className="gap-4 mt-4">
+          <Grid className="grid grid-cols-2 gap-4 mt-4">
             <Col>
               <div className="space-y-2">
                 <Text className="text-tremor-label text-tremor-content-subtitle">
@@ -227,7 +227,7 @@ export default function QuoteGenerator({
             </Col>
           </Grid>
 
-          <Grid numItems={2} className="gap-4 mt-6">
+          <Grid className="grid grid-cols-2 gap-4 mt-6">
             <Col>
               <div className="space-y-2">
                 <Text className="text-tremor-label text-tremor-content-subtitle">

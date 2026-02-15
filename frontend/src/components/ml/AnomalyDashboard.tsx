@@ -96,7 +96,7 @@ export function AnomalyDashboard({ refreshInterval = 30000 }: AnomalyDashboardPr
   return (
     <div className="space-y-6">
       {/* Summary Cards */}
-      <Grid numItems={1} numItemsSm={2} numItemsLg={4} className="gap-4">
+      <Grid className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card decoration="top" decorationColor="green">
           <Flex justifyContent="start" className="space-x-4">
             <Icon icon={CheckCircle} color="green" size="lg" />
