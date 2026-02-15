@@ -17,6 +17,7 @@ import {
   RefreshCw,
   ArrowUp,
   ArrowDown,
+  DollarSign,
 } from "lucide-react";
 import {
   Card,
@@ -664,6 +665,21 @@ export function ProfitabilityDashboardPage() {
       </div>
 
       {/* Section 1: Portfolio Overview KPI Cards */}
+      <div>
+        <div className="flex items-center gap-2 mb-4">
+          <div className="p-2 rounded" style={{ background: "rgba(59, 130, 246, 0.15)" }}>
+            <DollarSign className="h-5 w-5" style={{ color: "var(--color-sentinel-blue)" }} />
+          </div>
+          <div>
+            <h3 className="font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>
+              Portfolio Overview
+            </h3>
+            <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+              Key metrics and contract status
+            </span>
+          </div>
+        </div>
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <KPICard
           title="Total Revenue"
@@ -784,17 +800,27 @@ export function ProfitabilityDashboardPage() {
       {/* Section 3: Contract Profitability Table */}
       <div className="glass-panel overflow-hidden">
         <div
-          className="px-4 py-3 flex items-center justify-between"
+          className="px-4 py-4 flex items-center justify-between"
           style={{
             borderBottom: "1px solid var(--color-sentinel-border)",
           }}
         >
-          <h3
-            className="text-sm font-medium"
-            style={{ color: "var(--color-sentinel-text-primary)" }}
-          >
-            Contract Profitability
-          </h3>
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded" style={{ background: "rgba(245, 158, 11, 0.15)" }}>
+              <AlertTriangle className="h-5 w-5" style={{ color: "var(--color-sentinel-amber)" }} />
+            </div>
+            <div>
+              <h3
+                className="text-sm font-medium"
+                style={{ color: "var(--color-sentinel-text-primary)" }}
+              >
+                Contract Profitability
+              </h3>
+              <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                Sortable contract details with margins and status
+              </span>
+            </div>
+          </div>
 
           {/* Search */}
           <input
