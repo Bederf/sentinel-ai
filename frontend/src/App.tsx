@@ -23,6 +23,7 @@ import { CalendarPicker } from "./components/CalendarPicker";
 import SystemHealthPage from "./components/SystemHealthPage";
 import { AssetWorkflowDashboard } from "./components/AssetWorkflowDashboard";
 import { OccupancyPanel } from "./components/OccupancyPanel";
+import { LightingPage } from "./components/lighting/LightingPage";
 import { SecurityDashboard } from "./components/SecurityDashboard";
 import { SimbiotPage } from "./components/SimbiotPage";
 import { SimulationDashboard } from "./components/SimulationDashboard";
@@ -39,6 +40,8 @@ import { SolarConfigWizard } from "./components/wizards/SolarConfigWizard";
 import { DigitalTwin } from "./components/digital-twin/DigitalTwin";
 import { ModuleProvider } from "./contexts/ModuleContext";
 import { useModules } from "./contexts/ModuleHooks";
+import { ThemeProvider } from "./contexts/ThemeContext";
+import { ThemeSwitcher } from "./components/ThemeSwitcher";
 import { type View, VIEW_TITLES, ALL_NAV_ITEMS } from "./lib/navigation";
 import { canAccessView, getDefaultView } from "./lib/access-control";
 
@@ -103,10 +106,10 @@ function App() {
         const user = JSON.parse(storedUser);
         return getDefaultView(user.email);
       } catch {
-        return "chat";
+        return "dashboard";
       }
     }
-    return "chat";
+    return "dashboard";
   });
   const [viewRefreshKey, setViewRefreshKey] = useState(0);
   const [showCardLibrary, setShowCardLibrary] = useState(false);
@@ -387,6 +390,7 @@ function App() {
   }
 
   return (
+    <ThemeProvider>
     <ModuleProvider initialSiteId="site-002" initialSiteName="Sandton City Office Tower">
     <div
       className="h-screen flex"
@@ -455,6 +459,7 @@ function App() {
 
           {/* Right side - Status and time */}
           <div className="flex items-center gap-4 relative">
+            <ThemeSwitcher />
             {/* Alerts Button */}
             <button
               onClick={handleAlertsPanelOpen}
@@ -729,6 +734,8 @@ function App() {
             <div className="h-full overflow-y-auto p-4 md:p-6">
               <OccupancyPanel compact={false} />
             </div>
+          ) : currentView === "lighting" ? (
+            <LightingPage />
           ) : currentView === "workflow" ? (
             <div className="h-full overflow-y-auto">
               <AssetWorkflowDashboard />
@@ -790,6 +797,7 @@ function App() {
       />
     </div>
     </ModuleProvider>
+    </ThemeProvider>
   );
 }
 

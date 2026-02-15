@@ -136,20 +136,38 @@ class BuildingUpdate(BaseModel):
 
 
 @router.get("")
-async def list_buildings() -> dict:
+async def list_buildings(current_user: dict = None) -> dict:
     """
-    List all buildings (active and inactive).
+    List buildings accessible to the current user.
 
     Returns:
-        - active: List of active buildings
+        - active: List of active buildings user has access to
         - inactive: List of inactive buildings (folders exist but not in registry)
         - default_building: The default building ID
     """
+    from app.services.supabase_service import Supabase
+
     loader = get_building_loader()
     loader.load(force=True)  # Refresh
 
     registry = loader.get_registry()
     active_ids = set(registry.get("active_buildings", []))
+
+    # Get user's accessible sites from database
+    accessible_building_ids = set()
+    if current_user and current_user.get("email"):
+        try:
+            supabase = Supabase.instance()
+            response = supabase.table("user_site_access").select(
+                "building_id"
+            ).eq("user_email", current_user["email"]).execute()
+
+            if response.data:
+                accessible_building_ids = set(str(row["building_id"]) for row in response.data)
+        except Exception as e:
+            logger.warning(f"Could not fetch user site access: {e}")
+            # Fall back to showing all buildings if DB query fails
+            accessible_building_ids = None
 
     # Find all building folders
     all_building_folders = []
@@ -165,6 +183,10 @@ async def list_buildings() -> dict:
     for building_id in all_building_folders:
         building = loader.get_building(building_id)
         if building:
+            # Check if user has access to this building
+            if accessible_building_ids is not None and building_id not in accessible_building_ids:
+                continue  # Skip buildings user doesn't have access to
+
             info = building.to_dict()
             info["status"] = "active" if building_id in active_ids else "inactive"
             if building_id in active_ids:
