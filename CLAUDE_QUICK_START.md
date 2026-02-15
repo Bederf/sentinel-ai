@@ -91,6 +91,21 @@ curl -X POST http://localhost:9095/api/lifecycle/demo/quick-cycle \
   -H "Content-Type: application/json" \
   -d '{"site_id": "site-002", "scenario": "fault_day"}'
 
+# Test annual solar/BESS simulation (365 days - Phase 082)
+# 1. Start background simulation (returns immediately with task_id)
+curl -X POST http://localhost:9095/api/solar/annual/site-002/simulate \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"scenario": "grant_solar_bess_ai_annual", "duration_minutes": 240.0}'
+
+# 2. Poll progress (0-100%)
+curl http://localhost:9095/api/solar/annual/site-002/status/{task_id} \
+  -H "Authorization: Bearer $TOKEN"
+
+# 3. Fetch cached results (< 100ms, or 404 if not ready)
+curl http://localhost:9095/api/solar/annual/site-002/summary \
+  -H "Authorization: Bearer $TOKEN" | jq '.'
+
 # Check MFA status
 curl http://localhost:9095/api/mfa/status \
   -H "Authorization: Bearer $TOKEN"

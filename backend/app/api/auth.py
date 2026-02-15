@@ -152,6 +152,13 @@ _DEMO_USERS = {
         "full_name": "Grant - Wardew",
         "role": SentinelRole.AUDITOR,  # Read-only access for Wardew demo
     },
+    # Solar/BESS Demo User
+    "bederf@protonmail.com": {
+        "user_id": "bederf-solar-001",
+        "email": "bederf@protonmail.com",
+        "full_name": "Bederf - Solar Demo",
+        "role": SentinelRole.AUDITOR,  # Read-only for demo
+    },
 }
 
 
@@ -199,46 +206,116 @@ async def login_with_email(request: Request, email: str):
     Returns:
         LoginResponse with JWT token, user info, role, and MFA status
     """
-    email = email.strip().lower()
+    try:
 
-    # Brute-force check (Phase 58-04 M-5) — keyed by email
-    _check_brute_force(email)
+        email = email.strip().lower()
 
-    # Look up user in demo store
-    user_data = _DEMO_USERS.get(email)
+        # Brute-force check (Phase 58-04 M-5) — keyed by email
+        _check_brute_force(email)
 
-    is_new_user = False
-    if user_data:
-        # Known demo user
-        user_info = user_data.copy()
-        logger.info(f"Demo user login: {email} as {user_data['role'].value}")
-    else:
-        # Unknown email - create a new AUDITOR (read-only) user
-        # In production, this would require proper user registration
-        user_info = {
-            "user_id": f"user-{email[:8]}",
-            "email": email,
-            "full_name": email.split("@")[0].title(),
-            "role": SentinelRole.AUDITOR,  # Read-only by default
-        }
-        is_new_user = True
-        logger.info(f"New user login: {email} as AUDITOR (read-only)")
+        # Look up user in demo store
+        user_data = _DEMO_USERS.get(email)
 
-    # Check MFA status for the user (FSR 4.6.3 - MFA for privileged access)
-    mfa_service = get_mfa_service()
-    mfa_required = mfa_service.is_mfa_required(user_info["role"])
-    mfa_enrolled = mfa_service.is_mfa_enrolled(email)
-    mfa_enabled = mfa_service.is_mfa_enabled(email)
+        is_new_user = False
+        if user_data:
+            # Known demo user
+            user_info = user_data.copy()
+            logger.info(f"Demo user login: {email} as {user_data['role'].value}")
+        else:
+            # Unknown email - create a new AUDITOR (read-only) user
+            # In production, this would require proper user registration
+            user_info = {
+                "user_id": f"user-{email[:8]}",
+                "email": email,
+                "full_name": email.split("@")[0].title(),
+                "role": SentinelRole.AUDITOR,  # Read-only by default
+            }
+            is_new_user = True
+            logger.info(f"New user login: {email} as AUDITOR (read-only)")
 
-    # Get client IP
-    source_ip = _extract_ip_address(request)
-    user_agent = request.headers.get("User-Agent")
+        # Check MFA status for the user (FSR 4.6.3 - MFA for privileged access)
+        mfa_service = get_mfa_service()
+        mfa_required = mfa_service.is_mfa_required(user_info["role"])
+        mfa_enrolled = mfa_service.is_mfa_enrolled(email)
+        mfa_enabled = mfa_service.is_mfa_enabled(email)
 
-    # If MFA is required and enabled, don't issue token yet - require MFA challenge
-    if mfa_required and mfa_enabled:
-        logger.info(f"MFA challenge required for {email} (admin with MFA enabled)")
+        # Get client IP
+        source_ip = _extract_ip_address(request)
+        user_agent = request.headers.get("User-Agent")
 
-        # Log partial login (awaiting MFA)
+        # If MFA is required and enabled, don't issue token yet - require MFA challenge
+        if mfa_required and mfa_enabled:
+            logger.info(f"MFA challenge required for {email} (admin with MFA enabled)")
+
+            # Log partial login (awaiting MFA)
+            try:
+                from app.database.repositories.login_audit_repository import (
+                    get_login_audit_repository,
+                )
+                audit_repo = get_login_audit_repository()
+                audit_repo.log_login(
+                    user_email=email,
+                    user_id=user_info["user_id"],
+                    user_role=user_info["role"].value,
+                    source_ip=source_ip,
+                    user_agent=user_agent,
+                    is_new_user=is_new_user,
+                    success=True,  # Auth succeeded, MFA pending
+                    failure_reason="mfa_challenge_pending",
+                )
+            except Exception as e:
+                logger.warning(f"Failed to audit log login for {email}: {e}")
+
+            # Return partial auth response - frontend must complete MFA challenge
+            return {
+                "token": None,  # No token until MFA verified
+                "user": {
+                    "id": user_info["user_id"],
+                    "email": user_info["email"],
+                    "full_name": user_info["full_name"],
+                    "role": user_info["role"].value,
+                },
+                "expires_at": None,
+                "mfa_required": True,
+                "mfa_enrolled": True,
+                "mfa_challenge_pending": True,
+                "message": "MFA verification required. Please enter your TOTP code.",
+            }
+
+        # If MFA is required but not enrolled, issue token but flag enrollment needed
+        # This allows the user to access the MFA enrollment endpoints
+        # Phase 65-02: Issue both access and refresh tokens
+        access_token = _create_jwt_token(user_info, token_type="access")
+        refresh_token = _create_jwt_token(user_info, token_type="refresh")
+        refresh_payload = validate_jwt_token(refresh_token, required_token_type="refresh") or {}
+        refresh_jti = refresh_payload.get("jti", "")
+        session_id = session_service.create_session(
+            user_id=user_info["user_id"],
+            ip=source_ip,
+            user_agent=user_agent,
+            token_jti=refresh_jti,
+        ) if refresh_jti else None
+
+        # Grant default building access for new users
+        if is_new_user:
+            try:
+                from app.database.repositories.user_site_access_repository import (
+                    get_user_site_access_repository,
+                )
+                access_repo = get_user_site_access_repository()
+                if access_repo.grant_default_access(email, granted_by="system"):
+                    logger.info(f"Granted default building access to new user: {email}")
+            except Exception as e:
+                # Non-critical, user can be granted access later by admin
+                logger.warning(f"Failed to grant default access to {email}: {e}")
+
+        # Log the login
+        logger.info(
+            f"Login success: email={email} user_id={user_info['user_id']} "
+            f"role={user_info['role'].value} ip={source_ip}"
+        )
+
+        # Audit log the login to database
         try:
             from app.database.repositories.login_audit_repository import (
                 get_login_audit_repository,
@@ -251,137 +328,76 @@ async def login_with_email(request: Request, email: str):
                 source_ip=source_ip,
                 user_agent=user_agent,
                 is_new_user=is_new_user,
-                success=True,  # Auth succeeded, MFA pending
-                failure_reason="mfa_challenge_pending",
+                success=True,
             )
         except Exception as e:
+            # Non-critical, don't fail login if audit fails
             logger.warning(f"Failed to audit log login for {email}: {e}")
 
-        # Return partial auth response - frontend must complete MFA challenge
-        return {
-            "token": None,  # No token until MFA verified
+        response = {
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "token_type": "bearer",
             "user": {
                 "id": user_info["user_id"],
                 "email": user_info["email"],
                 "full_name": user_info["full_name"],
                 "role": user_info["role"].value,
             },
-            "expires_at": None,
-            "mfa_required": True,
-            "mfa_enrolled": True,
-            "mfa_challenge_pending": True,
-            "message": "MFA verification required. Please enter your TOTP code.",
+            "expires_at": (datetime.utcnow() + timedelta(minutes=settings.jwt_access_token_ttl_minutes)).isoformat(),
+            "mfa_required": mfa_required,
+            "mfa_enrolled": mfa_enrolled,
+            "mfa_challenge_pending": False,
+            "session_id": session_id,
         }
 
-    # If MFA is required but not enrolled, issue token but flag enrollment needed
-    # This allows the user to access the MFA enrollment endpoints
-    # Phase 65-02: Issue both access and refresh tokens
-    access_token = _create_jwt_token(user_info, token_type="access")
-    refresh_token = _create_jwt_token(user_info, token_type="refresh")
-    refresh_payload = validate_jwt_token(refresh_token, required_token_type="refresh") or {}
-    refresh_jti = refresh_payload.get("jti", "")
-    session_id = session_service.create_session(
-        user_id=user_info["user_id"],
-        ip=source_ip,
-        user_agent=user_agent,
-        token_jti=refresh_jti,
-    ) if refresh_jti else None
-
-    # Grant default building access for new users
-    if is_new_user:
-        try:
-            from app.database.repositories.user_site_access_repository import (
-                get_user_site_access_repository,
-            )
-            access_repo = get_user_site_access_repository()
-            if access_repo.grant_default_access(email, granted_by="system"):
-                logger.info(f"Granted default building access to new user: {email}")
-        except Exception as e:
-            # Non-critical, user can be granted access later by admin
-            logger.warning(f"Failed to grant default access to {email}: {e}")
-
-    # Log the login
-    logger.info(
-        f"Login success: email={email} user_id={user_info['user_id']} "
-        f"role={user_info['role'].value} ip={source_ip}"
-    )
-
-    # Audit log the login to database
-    try:
-        from app.database.repositories.login_audit_repository import (
-            get_login_audit_repository,
-        )
-        audit_repo = get_login_audit_repository()
-        audit_repo.log_login(
-            user_email=email,
-            user_id=user_info["user_id"],
-            user_role=user_info["role"].value,
-            source_ip=source_ip,
-            user_agent=user_agent,
-            is_new_user=is_new_user,
-            success=True,
-        )
-    except Exception as e:
-        # Non-critical, don't fail login if audit fails
-        logger.warning(f"Failed to audit log login for {email}: {e}")
-
-    response = {
-        "access_token": access_token,
-        "refresh_token": refresh_token,
-        "token_type": "bearer",
-        "user": {
-            "id": user_info["user_id"],
-            "email": user_info["email"],
-            "full_name": user_info["full_name"],
-            "role": user_info["role"].value,
-        },
-        "expires_at": (datetime.utcnow() + timedelta(minutes=settings.jwt_access_token_ttl_minutes)).isoformat(),
-        "mfa_required": mfa_required,
-        "mfa_enrolled": mfa_enrolled,
-        "mfa_challenge_pending": False,
-        "session_id": session_id,
-    }
-
-    # Auto-start demo for Grant (grant@wardew.co.za)
-    if email == "grant@wardew.co.za":
-        try:
+        # Auto-start demo for Grant (grant@wardew.co.za)
+        # DISABLED: Comment out to prevent auto-start during testing
+        # if email == "grant@wardew.co.za":
+        #     try:
+        #         # Reset orchestrator for fresh demo on login
+        #         orchestrator = get_lifecycle_orchestrator()
+        #         orchestrator.reset()
+        #     
+        #         # Auto-start Grant's primary scenario: HVAC+DALI+Sentinel AI (365-day annual)
+        #         # This demonstrates full predictive AI control with seasonal variations
+        #         orchestrator.run_scenario(
+        #             scenario_name="grant_hvac_dali_ai_annual",
+        #             duration_minutes=240.0  # 365 days compressed to 4 hours real time
+        #         )
+        #     
+        #         response["demo_auto_start"] = True
+        #         response["demo_type"] = "annual-demonstration"
+        #         response["demo_description"] = "HVAC + DALI + Sentinel AI (365-day full-year with seasonal variations)"
+        #         response["demo_scenario"] = "grant_hvac_dali_ai_annual"
+        #         response["demo_status"] = "running"
+        #         logger.info(f"Auto-started Grant demo scenario: grant_hvac_dali_ai_annual (365 days, ~4 hours real time)")
+        #     except Exception as e:
+        #         logger.error(f"Error auto-starting Grant demo: {e}")
+        #         response["demo_auto_start"] = True
+        #         response["demo_type"] = "three-method-comparison"
+        #         response["demo_error"] = str(e)
+    
+        # Auto-start demo for Solar/BESS client (bederf@protonmail.com)
+        if email == "bederf@protonmail.com":
             # Reset orchestrator for fresh demo on login
             orchestrator = get_lifecycle_orchestrator()
             orchestrator.reset()
-            
-            # Auto-start Grant's primary scenario: HVAC+DALI+Sentinel AI (365-day annual)
-            # This demonstrates full predictive AI control with seasonal variations
-            orchestrator.run_scenario(
-                scenario_name="grant_hvac_dali_ai_annual",
-                duration_minutes=240.0  # 365 days compressed to 4 hours real time
-            )
-            
             response["demo_auto_start"] = True
-            response["demo_type"] = "annual-demonstration"
-            response["demo_description"] = "HVAC + DALI + Sentinel AI (365-day full-year with seasonal variations)"
-            response["demo_scenario"] = "grant_hvac_dali_ai_annual"
-            response["demo_status"] = "running"
-            logger.info(f"Auto-started Grant demo scenario: grant_hvac_dali_ai_annual (365 days, ~4 hours real time)")
-        except Exception as e:
-            logger.error(f"Error auto-starting Grant demo: {e}")
-            response["demo_auto_start"] = True
-            response["demo_type"] = "three-method-comparison"
-            response["demo_error"] = str(e)
-    
-    # Auto-start demo for Solar/BESS client (bederf@protonmail.com)
-    if email == "bederf@protonmail.com":
-        # Reset orchestrator for fresh demo on login
-        orchestrator = get_lifecycle_orchestrator()
-        orchestrator.reset()
-        response["demo_auto_start"] = True
-        response["demo_type"] = "solar-bess-comparison"
-        response["demo_description"] = "Solar+BESS Baseline vs Solar+BESS with Sentinel AI optimization"
+            response["demo_type"] = "solar-bess-comparison"
+            response["demo_description"] = "Solar+BESS Baseline vs Solar+BESS with Sentinel AI optimization"
 
-    # Add enrollment prompt for admins who haven't enrolled yet
-    if mfa_required and not mfa_enrolled:
-        response["message"] = "MFA enrollment required for admin users. Please set up MFA."
+        # Add enrollment prompt for admins who haven't enrolled yet
+        if mfa_required and not mfa_enrolled:
+            response["message"] = "MFA enrollment required for admin users. Please set up MFA."
 
-    return response
+        return response
+
+
+
+    except Exception as e:
+        logger.error(f"Login failed for {email}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Login failed: {str(e)}")
 
 
 @router.post("/access-request")

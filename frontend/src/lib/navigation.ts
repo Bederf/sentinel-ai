@@ -32,12 +32,12 @@ import {
   DollarSign,
   Brain,
   Box,
+  Lightbulb,
 } from "lucide-react";
 import type { ModuleType } from "./moduleRegistry";
 
 export type View =
   | "dashboard"
-  | "chat"
   | "technician"
   | "control"
   | "control-audit"
@@ -45,11 +45,11 @@ export type View =
   | "settings"
   | "integrations"
   | "occupancy"
+  | "lighting"
   | "workflow"
   | "security"
   | "simbiot"
   | "simulation"
-  | "digital-twin"
   | "sustainability"
   | "solar"
   | "solar-config"
@@ -77,7 +77,6 @@ export interface NavItem {
 /** View title mapping used by the header */
 export const VIEW_TITLES: Record<View, string> = {
   dashboard: "Dashboard",
-  chat: "AI Assistant",
   technician: "Technician Chat",
   control: "Control Dashboard",
   "control-audit": "Control Audit Trail",
@@ -85,11 +84,11 @@ export const VIEW_TITLES: Record<View, string> = {
   settings: "Settings",
   integrations: "System Health",
   occupancy: "DALI Occupancy",
+  lighting: "DALI Lighting Control",
   workflow: "Asset Workflow",
   security: "Security",
   simbiot: "SIMBIOT",
   simulation: "Simulation",
-  "digital-twin": "3D Digital Twin",
   sustainability: "Sustainability & ESG",
   solar: "Solar & BESS",
   "solar-config": "Solar Setup Wizard",
@@ -104,15 +103,16 @@ export const VIEW_TITLES: Record<View, string> = {
 
 /**
  * Base navigation items - always visible, cannot be disabled.
- * These are essential for platform operation.
+ * FREE BASIC PACKAGE PAGES:
+ * - Dashboard: view equipment and AI recommendations
+ * - HVAC: monitor building systems (no control)
+ * - ML: feedback loop for recommendation improvement
+ * 
+ * Additional pages (AI Chat, Digital Twin, System Health, Settings) are add-ons or admin-only.
  */
 export const BASE_NAV_ITEMS: NavItem[] = [
-  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, description: "System overview", category: "base" },
-  { id: "chat", label: "AI Chat", icon: MessageSquare, description: "AI Assistant", category: "base" },
+  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, description: "Equipment overview & AI recommendations", category: "base" },
   { id: "integrations", label: "System Health", icon: Activity, description: "Real-time Health Monitoring", category: "base" },
-  { id: "control-audit", label: "Control Audit", icon: ClipboardList, description: "Control System Logs", category: "base" },
-  { id: "digital-twin", label: "Digital Twin", icon: Box, description: "3D Building Visualization", category: "base" },
-  { id: "settings", label: "Settings", icon: SettingsIcon, description: "System Configuration", category: "base" },
 ];
 
 /**
@@ -130,8 +130,9 @@ export const ADDON_NAV_ITEMS: NavItem[] = [
   // Visualization and analytics
   // Building system modules
   { id: "technician", label: "Tech Chat", icon: Wrench, description: "Fault Diagnosis", category: "addon", requiredModule: "hvac", defaultOrder: 10 },
-  { id: "optimization", label: "Optimization", icon: Zap, description: "Load Shedding AI", category: "addon", requiredModule: "energy", defaultOrder: 11 },
+  { id: "optimization", label: "Load Shedding Optimization", icon: Zap, description: "Load Shedding AI", category: "addon", requiredModule: "energy", defaultOrder: 11 },
   { id: "occupancy", label: "Occupancy", icon: Users, description: "DALI Lighting", category: "addon", requiredModule: "lighting", defaultOrder: 12 },
+  { id: "lighting", label: "DALI Control", icon: Lightbulb, description: "Tridonic DALI Lighting", category: "addon", requiredModule: "lighting", defaultOrder: 12.5 },
   { id: "security", label: "Security", icon: ShieldCheck, description: "Access & CCTV", category: "addon", requiredModule: "security", defaultOrder: 13 },
   { id: "solar", label: "Solar & BESS", icon: Sun, description: "PV & Battery Storage", category: "addon", requiredModule: "solar", defaultOrder: 14 },
   { id: "water", label: "Water", icon: Droplets, description: "Water Consumption", category: "addon", requiredModule: "water", defaultOrder: 15 },

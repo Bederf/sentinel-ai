@@ -15,7 +15,7 @@ from app.api import rag, ml_retraining, fleet_learning, mlops
 from app.api import mcp, mcp_sse, mcp_openai
 from app.api import recommendations, simulation_analytics
 from app.api import system_health, solar, solar_grid, solar_performance, solar_arbitrage
-from app.api import solar_config, peak_demand
+from app.api import solar_config, peak_demand, solar_annual
 
 
 def register_analytics_routers(app: FastAPI) -> None:
@@ -66,6 +66,7 @@ def register_analytics_routers(app: FastAPI) -> None:
     app.include_router(solar_grid.router, prefix="/api", tags=["solar-grid"])
     app.include_router(solar_performance.router, prefix="/api", tags=["solar-performance"])
     app.include_router(solar_arbitrage.router, prefix="/api", tags=["solar-arbitrage"])
+    app.include_router(solar_annual.router, tags=["solar-annual"])
 
     # Peak Demand Management (Phase 081: Cross-module coordination)
     app.include_router(peak_demand.router, tags=["peak-demand"])

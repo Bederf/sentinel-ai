@@ -10,12 +10,12 @@ from typing import Optional, List
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from app.services.lifecycle_orchestrator import (
-    get_lifecycle_orchestrator,
-    SCENARIOS,
-    EventType,
+from app.services.lifecycle_orchestrator import SCENARIOS, EventType
+from app.services.simulation_orchestrator import (
+    get_simulation_by_task_id,
 )
 from app.services.simulation_logger import SimulationLogger
+from app.database.supabase_client import Supabase
 from datetime import datetime
 import uuid
 
@@ -92,11 +92,15 @@ class EventResponse(BaseModel):
 @router.post("/start")
 async def start_simulation(request: StartSimulationRequest):
     """
-    Start a 24-hour building lifecycle simulation.
+    Start a 24-hour building lifecycle simulation (task-queued).
 
-    The simulation compresses 24 hours into the specified duration,
-    running through building wake, occupancy cycles, peak load,
-    potential faults, repairs, and AI optimizations.
+    Creates a task in the database and returns immediately.
+    Background processor picks up queued tasks and runs simulations sequentially.
+    
+    This enables:
+    - Multiple users to start simulations without conflicts
+    - Crash recovery (simulation resumes from checkpoint)
+    - Progress tracking via polling /status/{task_id}
 
     **Scenarios:**
     - `normal_day`: Typical operations, 10% fault chance
@@ -104,11 +108,13 @@ async def start_simulation(request: StartSimulationRequest):
     - `chiller_failure`: Chiller fault scenario
     - `multi_fault`: Multiple equipment issues
     - `maintenance_day`: Scheduled maintenance, no faults
+    - `grant_hvac_dali_ai_annual`: 365-day annual simulation (demo mode with continuous AI)
 
     **Time Compression:**
     - `duration_minutes=24`: 1 real minute = 1 simulated hour
     - `duration_minutes=12`: 30 real seconds = 1 simulated hour
     - `duration_minutes=2.4`: 6 real seconds = 1 simulated hour (fast demo)
+    - `duration_minutes=240`: 4 hours real time for 365-day simulation (default)
     """
     if request.scenario not in SCENARIOS:
         raise HTTPException(
@@ -116,95 +122,217 @@ async def start_simulation(request: StartSimulationRequest):
             detail=f"Unknown scenario: {request.scenario}. Available: {list(SCENARIOS.keys())}"
         )
 
-    orchestrator = get_lifecycle_orchestrator()
-    
-    # Set up event logging
-    run_id = f"sim_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{str(uuid.uuid4())[:8]}"
-    logger_service = SimulationLogger()
-    logger_service.start_run(
-        run_id=run_id,
-        scenario=request.scenario,
-        building_code="site-002",
-        config={
-            "duration_minutes": request.duration_minutes,
+    try:
+        supabase = Supabase.instance()
+        task_id = str(uuid.uuid4())
+        
+        # Create task in database (status='queued')
+        response = await supabase.client.table("solar_annual_tasks").insert({
+            "task_id": task_id,
+            "site_id": "site-002",  # Default to site-002 (can be parameterized later)
             "scenario": request.scenario,
-            "start_hour": request.start_hour,
-        },
-    )
-    orchestrator.add_event_callback(logger_service.on_event)
-    
-    result = await orchestrator.start(
-        scenario=request.scenario,
-        duration_minutes=request.duration_minutes,
-        start_hour=request.start_hour
-    )
-
-    if not result.get("success"):
-        raise HTTPException(status_code=400, detail=result.get("error"))
-
-    # Add run_id to response
-    result["run_id"] = run_id
-    
-    # Schedule finalization after simulation completes
-    async def finalize_log():
-        import asyncio
-        # Wait for simulation to complete (estimated based on duration_minutes)
-        await asyncio.sleep((request.duration_minutes * 60) + 5)
-        logger_service.end_run()
-    
-    # Start finalization task in background
-    import asyncio
-    asyncio.create_task(finalize_log())
-
-    return result
+            "simulation_type": "lifecycle",
+            "status": "queued",
+            "progress_pct": 0,
+            "days_completed": 0,
+            "duration_minutes": request.duration_minutes,
+        }).execute()
+        
+        logger.info(f"Created lifecycle simulation task {task_id}: {request.scenario}")
+        
+        return {
+            "success": True,
+            "task_id": task_id,
+            "status": "queued",
+            "scenario": request.scenario,
+            "duration_minutes": request.duration_minutes,
+            "message": "Simulation queued. Poll /status/{task_id} to track progress."
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to create simulation task: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to create task: {str(e)}")
 
 
-@router.post("/stop")
-async def stop_simulation():
-    """Stop the running simulation."""
-    orchestrator = get_lifecycle_orchestrator()
-    result = await orchestrator.stop()
-
-    if not result.get("success"):
-        raise HTTPException(status_code=400, detail=result.get("error"))
-
-    return result
-
-
-@router.post("/pause")
-async def pause_simulation():
-    """Pause the simulation (can be resumed)."""
-    orchestrator = get_lifecycle_orchestrator()
-
-    if not orchestrator.running:
-        raise HTTPException(status_code=400, detail="Simulation not running")
-
-    orchestrator.pause()
-    return {"success": True, "status": "paused"}
-
-
-@router.post("/resume")
-async def resume_simulation():
-    """Resume a paused simulation."""
-    orchestrator = get_lifecycle_orchestrator()
-
-    if not orchestrator.running:
-        raise HTTPException(status_code=400, detail="Simulation not running")
-
-    orchestrator.resume()
-    return {"success": True, "status": "running"}
-
-
-@router.get("/status", response_model=SimulationStatusResponse)
-async def get_simulation_status():
+@router.post("/cancel/{task_id}")
+async def stop_simulation(task_id: str):
     """
-    Get the current status of the lifecycle simulation.
-
-    Returns simulated time, events count, active faults, and recent events.
+    Cancel a queued or running simulation task.
+    
+    Args:
+        task_id: Task identifier from /start endpoint
+        
+    Returns:
+        Success response confirming cancellation
     """
-    orchestrator = get_lifecycle_orchestrator()
-    status = orchestrator.get_status()
-    return SimulationStatusResponse(**status)
+    try:
+        orchestrator = get_simulation_by_task_id(task_id)
+        
+        if orchestrator:
+            # Simulation is running - stop it
+            result = await orchestrator.stop()
+            return {
+                "success": True,
+                "status": "cancelled",
+                "message": "Simulation stopped successfully"
+            }
+        else:
+            # Simulation not running - try to update database status to cancelled
+            supabase = Supabase.instance()
+            await supabase.client.table("solar_annual_tasks") \
+                .update({"status": "failed", "error_message": "Cancelled by user"}) \
+                .eq("task_id", task_id) \
+                .execute()
+            
+            return {
+                "success": True,
+                "status": "cancelled",
+                "message": "Task cancelled"
+            }
+    except Exception as e:
+        logger.error(f"Failed to cancel simulation {task_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to cancel: {str(e)}")
+
+
+@router.post("/pause/{task_id}")
+async def pause_simulation(task_id: str):
+    """
+    Pause a running simulation (can be resumed).
+    
+    Args:
+        task_id: Task identifier from /start endpoint
+        
+    Returns:
+        Success response confirming pause
+    """
+    try:
+        orchestrator = get_simulation_by_task_id(task_id)
+        
+        if not orchestrator or not orchestrator.running:
+            raise HTTPException(status_code=400, detail="Simulation not running")
+        
+        orchestrator.pause()
+        return {"success": True, "status": "paused", "message": "Simulation paused"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to pause simulation {task_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to pause: {str(e)}")
+
+
+@router.post("/resume/{task_id}")
+async def resume_simulation(task_id: str):
+    """
+    Resume a paused simulation.
+    
+    Args:
+        task_id: Task identifier from /start endpoint
+        
+    Returns:
+        Success response confirming resume
+    """
+    try:
+        orchestrator = get_simulation_by_task_id(task_id)
+        
+        if not orchestrator or not orchestrator.running:
+            raise HTTPException(status_code=400, detail="Simulation not running")
+        
+        orchestrator.resume()
+        return {"success": True, "status": "running", "message": "Simulation resumed"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to resume simulation {task_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to resume: {str(e)}")
+
+
+@router.get("/status/{task_id}", response_model=SimulationStatusResponse)
+async def get_simulation_status(task_id: str):
+    """
+    Get the current status of a lifecycle simulation task.
+
+    Queries database for task status and state snapshot.
+    Returns simulated time, progress, events count, active faults, and recent events.
+    
+    Args:
+        task_id: Task identifier from /start endpoint
+        
+    Returns:
+        SimulationStatusResponse with status, progress, and recent events
+    """
+    try:
+        supabase = Supabase.instance()
+        
+        # Query task from database
+        response = await supabase.client.table("solar_annual_tasks") \
+            .select("*") \
+            .eq("task_id", task_id) \
+            .execute()
+        
+        if not response.data:
+            raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
+        
+        task = response.data[0]
+        
+        # Check if running orchestrator (for real-time event updates)
+        orchestrator = get_simulation_by_task_id(task_id)
+        
+        if orchestrator and orchestrator.running:
+            # Simulation is running - get live status from orchestrator
+            status = orchestrator.get_status()
+            return SimulationStatusResponse(
+                running=True,
+                paused=orchestrator.paused,
+                scenario=orchestrator.current_scenario.name if orchestrator.current_scenario else None,
+                simulated_time=orchestrator.simulated_time.isoformat(),
+                simulated_hour=orchestrator.simulated_time.hour,
+                real_elapsed_seconds=(datetime.now() - orchestrator.real_start_time).total_seconds() if orchestrator.real_start_time else 0,
+                events_count=len(orchestrator.events),
+                active_faults=len(orchestrator.active_faults),
+                pending_repairs=len(orchestrator.pending_repairs),
+                recent_events=[
+                    {
+                        "timestamp": e.timestamp.isoformat(),
+                        "event_type": e.event_type.value,
+                        "equipment_id": e.equipment_id,
+                        "message": e.message,
+                    }
+                    for e in orchestrator.events[-10:]
+                ]
+            )
+        else:
+            # Simulation not running - get status from database
+            state_snapshot = task.get("state_snapshot", {})
+            recent_events = state_snapshot.get("recent_events", [])[-10:]
+            
+            # Extract simulated_hour from ISO format datetime string (YYYY-MM-DDTHH:MM:SS)
+            simulated_hour = None
+            simulated_time_str = state_snapshot.get("simulated_time")
+            if simulated_time_str:
+                try:
+                    dt = datetime.fromisoformat(simulated_time_str.replace('Z', '+00:00'))
+                    simulated_hour = dt.hour
+                except:
+                    simulated_hour = None
+            
+            return SimulationStatusResponse(
+                running=task["status"] == "running",
+                paused=False,
+                scenario=task["scenario"],
+                simulated_time=simulated_time_str,
+                simulated_hour=simulated_hour,
+                real_elapsed_seconds=0,
+                events_count=len(state_snapshot.get("recent_events", [])),
+                active_faults=len(state_snapshot.get("active_faults", {})),
+                pending_repairs=len(state_snapshot.get("pending_repairs", {})),
+                recent_events=recent_events
+            )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get simulation status: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get status: {str(e)}")
 
 
 # ============================================================================

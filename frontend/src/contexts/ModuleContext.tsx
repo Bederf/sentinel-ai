@@ -14,6 +14,7 @@ import {
   moduleRegistryApi,
 } from '../lib/moduleRegistry';
 import { isExpectedApiError } from '@/lib/api';
+import { isMandatoryModule as checkMandatoryModule, getMandatoryModuleErrorMessage } from '../lib/mandatoryModules';
 import type {
   AIRecommendation,
   ModuleType,
@@ -176,6 +177,13 @@ export function ModuleProvider({
   const deactivateModule = useCallback(async (moduleType: ModuleType) => {
     if (!siteId) return;
 
+    // Prevent deactivation of mandatory base modules
+    if (checkMandatoryModule(moduleType)) {
+      const errorMessage = getMandatoryModuleErrorMessage(moduleType);
+      console.warn(errorMessage);
+      throw new Error(errorMessage);
+    }
+
     await moduleRegistryApi.deactivateModule(siteId, moduleType);
     setActiveModules(prev => prev.filter(m => m.module_type !== moduleType));
 
@@ -187,6 +195,10 @@ export function ModuleProvider({
   const isModuleActive = useCallback((moduleType: ModuleType): boolean => {
     return activeModules.some(m => m.module_type === moduleType && m.status === 'active');
   }, [activeModules]);
+
+  const isMandatory = useCallback((moduleType: ModuleType): boolean => {
+    return checkMandatoryModule(moduleType);
+  }, []);
 
   const addRecommendation = useCallback((
     recommendation: Omit<AIRecommendation, 'recommendation_id' | 'timestamp' | 'acknowledged' | 'resolved'>
@@ -276,6 +288,7 @@ export function ModuleProvider({
     activateModule,
     deactivateModule,
     isModuleActive,
+    isMandatory,
     addRecommendation,
     acknowledgeRecommendation,
     resolveRecommendation,

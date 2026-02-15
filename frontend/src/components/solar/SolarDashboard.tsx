@@ -22,6 +22,7 @@ import { InverterStatusMatrix } from "./InverterStatusMatrix";
 import { EnergyFlowDiagram } from "./EnergyFlowDiagram";
 import { SolarFinancialReport } from "./SolarFinancialReport";
 import { ForecastActualChart } from "./ForecastActualChart";
+import { SolarAnnualCard } from "./SolarAnnualCard";
 
 /**
  * SolarDashboard - Main solar & BESS monitoring view
@@ -193,7 +194,7 @@ export function SolarDashboard() {
       </div>
 
       {/* Row 3: Financial Report + Forecast Chart */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
         <div
           className="glass-panel overflow-hidden"
         >
@@ -203,6 +204,15 @@ export function SolarDashboard() {
           className="glass-panel overflow-hidden"
         >
           <ForecastActualChart siteId={selectedSiteId} />
+        </div>
+      </div>
+
+      {/* Row 4: Annual Simulation Results (365 days) */}
+      <div className="mb-4">
+        <div
+          className="glass-panel overflow-hidden"
+        >
+          <SolarAnnualCard siteId={selectedSiteId} />
         </div>
       </div>
       </>

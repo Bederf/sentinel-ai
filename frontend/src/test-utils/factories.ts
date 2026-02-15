@@ -476,6 +476,7 @@ export function createMockModuleContext(overrides?: Partial<ModuleContextValue>)
     setSite: async () => {},
     activateModule: async () => {},
     deactivateModule: async () => {},
+    isMandatory: () => false,
     isModuleActive: () => false,
     addRecommendation: () => {},
     acknowledgeRecommendation: async () => {},

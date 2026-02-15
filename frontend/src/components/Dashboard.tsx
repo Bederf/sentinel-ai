@@ -56,13 +56,17 @@ import { RiskDetailModal } from "./RiskDetailModal";
 import { ROISummaryCard } from "./ROISummaryCard";
 import { OccupancyPanel } from "./OccupancyPanel";
 import ComfortComplaintPanel from "./ComfortComplaintPanel";
+import { EnergyComparisonPanel } from "./EnergyComparisonPanel";
 import { SolarOverviewPanel } from "./solar/SolarOverviewPanel";
 import { BESSStatusPanel } from "./solar/BESSStatusPanel";
 import { InverterStatusMatrix } from "./solar/InverterStatusMatrix";
 import { EnergyFlowDiagram } from "./solar/EnergyFlowDiagram";
+import { SolarAnnualCard } from "./solar/SolarAnnualCard";
+import { DaliIntelligencePanel } from "./DaliIntelligencePanel";
 import { type View } from "./Sidebar";
 import CardLibrary from "./CardLibrary";
 import { DEFAULT_KPI_CARDS, DEFAULT_SECTIONS } from "../lib/cardDefinitions";
+import { useModules } from "@/contexts/ModuleHooks";
 
 // Time period options for energy chart
 const TIME_PERIODS = [7, 30, 90] as const;
@@ -72,11 +76,14 @@ type TimePeriod = (typeof TIME_PERIODS)[number];
 type DashboardSectionId =
   | 'kpi-row'
   | 'site-protection'
+  | 'dali-intelligence'
   | 'energy-analytics'
   | 'risk-predictions'
   | 'comfort-assistant'
   | 'occupancy-dashboard'
-  | 'solar-bess';
+  | 'energy-comparison'
+  | 'solar-bess'
+  | 'solar-annual';
 
 type KPICardId =
   | 'kpi-protected-sites'
@@ -125,8 +132,11 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
   const [sectionOrder, setSectionOrder] = useState<DashboardSectionId[]>([
     'kpi-row',
     'site-protection',
+    'dali-intelligence',
     'solar-bess',
+    'solar-annual',
     'energy-analytics',
+    'energy-comparison',
     'risk-predictions',
     'comfort-assistant',
     'occupancy-dashboard',
@@ -674,12 +684,17 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
 
 
   // Render Energy Analytics section
-  const renderEnergyAnalytics = () => (
-    <DashboardSection id="energy-analytics">
-      <div className="mt-6">
-        <div
-          className="rounded-md overflow-hidden glass-panel"
-        >
+  const renderEnergyAnalytics = () => {
+    const { isModuleActive } = useModules();
+    if (!isModuleActive('energy')) {
+      return null;
+    }
+    return (
+      <DashboardSection id="energy-analytics">
+        <div className="mt-6">
+          <div
+            className="rounded-md overflow-hidden glass-panel"
+          >
           {/* Panel Header with Filters */}
           <div
             className="p-4 flex flex-wrap items-center justify-between gap-4"
@@ -757,6 +772,10 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
 
   // Render Risk Predictions section
   const renderRiskPredictions = () => {
+    const { isModuleActive } = useModules();
+    if (!isModuleActive('ml')) {
+      return null;
+    }
     // Find highest risk prediction (critical first, then by probability)
     const sortedPredictions = [...predictions].sort((a, b) => {
       // Critical comes before warning
@@ -973,34 +992,79 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
         </div>
       </div>
     </DashboardSection>
-  );
+    );
   };
 
   // Render Comfort Assistant section
-  const renderComfortAssistant = () => (
-    <DashboardSection id="comfort-assistant">
-      <div className="mt-6">
-        <ComfortComplaintPanel compact={true} />
-      </div>
-    </DashboardSection>
-  );
+  const renderComfortAssistant = () => {
+    const { isModuleActive } = useModules();
+    if (!isModuleActive('hvac')) {
+      return null;
+    }
+    return (
+      <DashboardSection id="comfort-assistant">
+        <div className="mt-6">
+          <ComfortComplaintPanel compact={true} />
+        </div>
+      </DashboardSection>
+    );
+  };
 
   // Render Occupancy Dashboard section
-  const renderOccupancyDashboard = () => (
-    <DashboardSection id="occupancy-dashboard">
-      <div className="mt-6">
-        <OccupancyPanel
-          compact={true}
-          onViewDetails={() => onViewChange("occupancy")}
-        />
-      </div>
-    </DashboardSection>
-  );
+  const renderOccupancyDashboard = () => {
+    const { isModuleActive } = useModules();
+    if (!isModuleActive('lighting')) {
+      return null;
+    }
+    return (
+      <DashboardSection id="occupancy-dashboard">
+        <div className="mt-6">
+          <OccupancyPanel
+            compact={true}
+            onViewDetails={() => onViewChange("occupancy")}
+          />
+        </div>
+      </DashboardSection>
+    );
+  };
+
+  // Render Energy Comparison section
+  const renderEnergyComparison = () => {
+    const { isModuleActive } = useModules();
+    if (!isModuleActive('energy')) {
+      return null;
+    }
+    return (
+      <DashboardSection id="energy-comparison">
+        <div className="mt-6">
+          <EnergyComparisonPanel siteId="site-002" />
+        </div>
+      </DashboardSection>
+    );
+  };
+
+  // Render DALI Intelligence section
+  const renderDaliIntelligence = () => {
+    const { isModuleActive } = useModules();
+    if (!isModuleActive('lighting')) {
+      return null;
+    }
+    return (
+      <DashboardSection id="dali-intelligence">
+        <div className="mt-6">
+          <DaliIntelligencePanel siteId="site-002" />
+        </div>
+      </DashboardSection>
+    );
+  };
 
   // Render Solar & BESS section (conditionally shown when solar module active)
   const renderSolarBess = () => {
-    // Check if any site has the solar module active
-    // For now, always show for the demo site (sandton)
+    const { isModuleActive } = useModules();
+    // Only show if solar module is active
+    if (!isModuleActive('solar')) {
+      return null;
+    }
     const solarSiteId = "site-002";
 
     return (
@@ -1049,15 +1113,62 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
     );
   };
 
+  const renderSolarAnnual = () => {
+    const { isModuleActive } = useModules();
+    // Only show if solar module is active
+    if (!isModuleActive('solar')) {
+      return null;
+    }
+    const solarSiteId = 'site-002';
+    return (
+      <DashboardSection id="solar-annual">
+        <div className="mt-6 space-y-4">
+          {/* Section Header */}
+          <div className="flex items-center gap-3 mb-2">
+            <div
+              className="p-2 rounded"
+              style={{ background: "rgba(250, 204, 21, 0.15)" }}
+            >
+              <Sun
+                className="h-5 w-5"
+                style={{ color: "#FACC15" }}
+              />
+            </div>
+            <div>
+              <h3
+                className="font-medium text-sm"
+                style={{ color: "var(--color-sentinel-text-primary)" }}
+              >
+                Solar Annual Summary
+              </h3>
+              <span
+                className="text-xs"
+                style={{ color: "var(--color-sentinel-text-secondary)" }}
+              >
+                365-day simulation with AI savings progression
+              </span>
+            </div>
+          </div>
+
+          {/* Solar Annual Card */}
+          <SolarAnnualCard siteId={solarSiteId} />
+        </div>
+      </DashboardSection>
+    );
+  };
+
   // Section renderer map
   const sectionRenderers: Record<DashboardSectionId, () => JSX.Element | null> = {
     'kpi-row': renderKPIRow,
     'site-protection': renderSiteProtection,
-    'solar-bess': renderSolarBess,
+    'dali-intelligence': renderDaliIntelligence,
     'energy-analytics': renderEnergyAnalytics,
     'risk-predictions': renderRiskPredictions,
     'comfort-assistant': renderComfortAssistant,
     'occupancy-dashboard': renderOccupancyDashboard,
+    'energy-comparison': renderEnergyComparison,
+    'solar-bess': renderSolarBess,
+    'solar-annual': renderSolarAnnual,
   };
 
   // Filter to only visible sections

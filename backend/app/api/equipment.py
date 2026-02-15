@@ -81,9 +81,22 @@ async def load_equipment() -> list[dict]:
             for eq in equipment_data:
                 # Transform Supabase equipment to API response format
                 # Ensure all string fields have non-null defaults
+                # Extract site_id from code (e.g., S002-GEN-B1-005 → site-002)
+                code = eq.get("code", "")
+                extracted_site = ""
+                if code:
+                    # Handle both S002 and site-002 formats
+                    first_part = code.split("-")[0].lower()
+                    if first_part.startswith("s"):
+                        # S002 → site-002
+                        extracted_site = f"site-{first_part[1:]}"
+                    elif first_part.startswith("site"):
+                        # site-002 → site-002
+                        extracted_site = first_part
+
                 equipment_list.append({
                     "id": eq.get("id") or "",
-                    "site_id": (eq.get("code", "").split("-")[0].lower() if eq.get("code") else "") or "unknown",
+                    "site_id": extracted_site or "unknown",
                     "site_name": eq.get("site_name") or "",
                     "type": eq.get("type") or "unknown",
                     "name": eq.get("name") or "Unknown Equipment",

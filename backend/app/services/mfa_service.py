@@ -60,8 +60,13 @@ class MFAService:
         Returns:
             True if user has MFA enabled
         """
-        record = self.repository.get_mfa_secret(user_email)
-        return record is not None and record.get("enabled", False)
+        try:
+            record = self.repository.get_mfa_secret(user_email)
+            return record is not None and record.get("enabled", False)
+        except Exception as e:
+            # Table doesn't exist or other database error - assume MFA not enabled
+            logger.debug(f"Could not check MFA enabled status for {user_email}: {e}")
+            return False
 
     def is_mfa_enrolled(self, user_email: str) -> bool:
         """
@@ -73,8 +78,13 @@ class MFAService:
         Returns:
             True if user has a TOTP secret (may not be enabled yet)
         """
-        record = self.repository.get_mfa_secret(user_email)
-        return record is not None
+        try:
+            record = self.repository.get_mfa_secret(user_email)
+            return record is not None
+        except Exception as e:
+            # Table doesn't exist or other database error - assume not enrolled
+            logger.debug(f"Could not check MFA enrollment status for {user_email}: {e}")
+            return False
 
     def get_mfa_status(self, user_email: str, role: SentinelRole) -> Dict[str, Any]:
         """

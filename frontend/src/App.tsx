@@ -8,7 +8,6 @@ import { useRecommendationToasts } from "./components/RecommendationToast";
 
 // Security: Prevent console logging in production (Phase 75-07)
 import { initializeSecurityProtections } from "./lib/api/security-utils";
-import { Chat } from "./components/Chat";
 import TechnicianChat from "./components/TechnicianChat";
 import { Dashboard } from "./components/Dashboard";
 import { ControlDashboard } from "./components/ControlDashboard";
@@ -37,7 +36,6 @@ import { BudgetReportPage } from "./pages/BudgetReportPage";
 import { ProfitabilityDashboardPage } from "./pages/ProfitabilityDashboardPage";
 import { ModularDashboard } from "./components/modules/ModularDashboard";
 import { SolarConfigWizard } from "./components/wizards/SolarConfigWizard";
-import { DigitalTwin } from "./components/digital-twin/DigitalTwin";
 import { ModuleProvider } from "./contexts/ModuleContext";
 import { useModules } from "./contexts/ModuleHooks";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -367,15 +365,11 @@ function App() {
     console.log('Login success:', user);
     setCurrentUser(user);
 
-    // Auto-redirect Grant to Digital Twin when demo scenario auto-starts
-    if ((user as any).demo_auto_start === true) {
-      console.log('Auto-starting demo scenario:', (user as any).demo_scenario);
-      toast.success(`Demo scenario started: ${(user as any).demo_scenario}`);
-      // Delay to allow user state to be set before changing view
-      setTimeout(() => {
-        setCurrentView('digital-twin');
-      }, 500);
-    }
+    // Demo auto-start disabled (digital-twin removed from free tier)
+    // if ((user as any).demo_auto_start === true) {
+    //   console.log('Auto-starting demo scenario:', (user as any).demo_scenario);
+    //   toast.success(`Demo scenario started: ${(user as any).demo_scenario}`);
+    // }
   }, []);
 
   // Show splash screen on initial load
@@ -718,8 +712,6 @@ function App() {
             />
           ) : currentView === "optimization" ? (
             <OptimizationPage onError={(error) => setError(error)} />
-          ) : currentView === "digital-twin" ? (
-            <DigitalTwin />
           ) : currentView === "settings" ? (
             <Settings onError={(error) => setError(error)} />
           ) : currentView === "technician" ? (
@@ -773,9 +765,10 @@ function App() {
           ) : currentView === "modules" ? (
             <ModularDashboard />
           ) : (
-            <div className="h-full p-4 md:p-6">
-              <div className="h-full max-w-4xl mx-auto">
-                <Chat />
+            // Fallback: should never reach here due to View type constraints
+            <div className="h-full flex items-center justify-center">
+              <div className="text-center">
+                <p className="text-gray-400">View not found</p>
               </div>
             </div>
           )}

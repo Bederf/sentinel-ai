@@ -20,6 +20,7 @@ export interface ModuleContextValue {
   activateModule: (moduleType: ModuleType, config?: Record<string, unknown>) => Promise<void>;
   deactivateModule: (moduleType: ModuleType) => Promise<void>;
   isModuleActive: (moduleType: ModuleType) => boolean;
+  isMandatory: (moduleType: ModuleType) => boolean;
   addRecommendation: (
     recommendation: Omit<AIRecommendation, "recommendation_id" | "timestamp" | "acknowledged" | "resolved">
   ) => void;

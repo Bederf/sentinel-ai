@@ -257,22 +257,22 @@ async def startup_event(app: FastAPI) -> None:
         except Exception as e:
             _logger.error(f"Crash recovery initialization failed: {e}")
 
-    # Run crash recovery on startup
-    if not testing_mode:
-        import asyncio
-        try:
-            await recover_crashed_simulations()
-        except Exception as e:
-            _logger.error(f"Error during crash recovery: {e}")
+    # Run crash recovery on startup - DISABLED to prevent auto-start of simulations
+    # if not testing_mode:
+    #     import asyncio
+    #     try:
+    #         await recover_crashed_simulations()
+    #     except Exception as e:
+    #         _logger.error(f"Error during crash recovery: {e}")
 
-    # Start simulation queue processor job (runs every 10 seconds)
+    # Start simulation queue processor job - DISABLED to prevent auto-start of simulations
     # Phase 083: Process queued lifecycle simulations from database
     # Enables concurrent simulations and crash recovery via task queue
-    try:
-        scheduler_service.add_simulation_queue_processor_job(interval_seconds=10)
-        _logger.info("✅ Simulation queue processor initialized - checks every 10s for queued simulations")
-    except Exception as e:
-        _logger.warning(f"⚠️ Simulation queue processor initialization failed: {e}")
+    # try:
+    #     scheduler_service.add_simulation_queue_processor_job(interval_seconds=10)
+    #     _logger.info("✅ Simulation queue processor initialized - checks every 10s for queued simulations")
+    # except Exception as e:
+    #     _logger.warning(f"⚠️ Simulation queue processor initialization failed: {e}")
 
     # Start system health snapshot job (runs every 5 minutes)
     # Stores point-in-time health snapshots for trend analysis and historical reporting

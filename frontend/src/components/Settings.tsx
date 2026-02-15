@@ -7,6 +7,7 @@ import { ThresholdEditor } from "./ThresholdEditor";
 import { SafetyRulesEditor } from "./SafetyRulesEditor";
 import { PasswordModal } from "./PasswordModal";
 import { NotificationSettings } from "./NotificationSettings";
+import { ThemeSwitcher } from "./ThemeSwitcher";
 import { useModules } from "../contexts/ModuleHooks";
 import type { ModuleType } from "../lib/moduleRegistry";
 
@@ -480,7 +481,30 @@ export function Settings({ onError }: SettingsProps) {
             </div>
           </div>
 
-          <div className="p-6">
+          <div className="p-6 space-y-6">
+            {/* Theme Switcher */}
+            <div className="space-y-3">
+              <label
+                className="block text-sm font-medium"
+                style={{ color: "var(--color-sentinel-text-primary)" }}
+              >
+                Select Theme
+              </label>
+              <p className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                Switch between Sentinel Dark, Matrix, Glass, and Dark Ops themes
+              </p>
+              <ThemeSwitcher />
+            </div>
+
+            {/* Separator */}
+            <div
+              style={{
+                height: "1px",
+                background: "var(--color-sentinel-border)",
+              }}
+            />
+
+            {/* Glass Theme Customization */}
             <GlassThemeControls />
           </div>
         </div>

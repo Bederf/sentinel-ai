@@ -15,6 +15,10 @@ import {
   BarChart3,
   Activity,
   Sun,
+  Leaf,
+  Lightbulb,
+  AlertCircle,
+  Users,
 } from 'lucide-react';
 
 // Card definition with metadata
@@ -90,6 +94,14 @@ export const SECTION_CARDS: CardDefinition[] = [
     defaultVisible: true
   },
   {
+    id: 'dali-intelligence',
+    name: 'DALI Intelligence: Wardew Tridonic',
+    description: '365-day simulation showing occupancy, daylight, and AI learning',
+    icon: <Lightbulb className="w-4 h-4" />,
+    category: 'section',
+    defaultVisible: true
+  },
+  {
     id: 'energy-analytics',
     name: 'Energy Analytics',
     description: 'Energy consumption charts and trends',
@@ -110,6 +122,38 @@ export const SECTION_CARDS: CardDefinition[] = [
     name: 'Solar & BESS',
     description: 'Solar generation, battery storage, inverter fleet, and energy flow',
     icon: <Sun className="w-4 h-4" />,
+    category: 'section',
+    defaultVisible: true
+  },
+  {
+    id: 'energy-comparison',
+    name: 'Energy Impact: Wardew Tridonic',
+    description: '3-tier energy savings comparison (Baseline vs DALI vs SENTINEL)',
+    icon: <Leaf className="w-4 h-4" />,
+    category: 'section',
+    defaultVisible: true
+  },
+  {
+    id: 'solar-annual',
+    name: 'Solar Annual Summary',
+    description: '365-day annual simulation with AI savings progression (2%-18%)',
+    icon: <Sun className="w-4 h-4" />,
+    category: 'section',
+    defaultVisible: true
+  },
+  {
+    id: 'comfort-assistant',
+    name: 'Comfort Assistant',
+    description: 'AI-powered comfort recommendations and occupancy insights',
+    icon: <Users className="w-4 h-4" />,
+    category: 'section',
+    defaultVisible: true
+  },
+  {
+    id: 'occupancy-dashboard',
+    name: 'Occupancy Dashboard',
+    description: 'Real-time occupancy tracking and patterns',
+    icon: <Users className="w-4 h-4" />,
     category: 'section',
     defaultVisible: true
   }

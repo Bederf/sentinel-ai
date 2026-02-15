@@ -79,11 +79,19 @@ class SessionService:
         }
         redis_client = self._get_redis()
         if redis_client:
-            key = self._session_key(user_id, session_id)
-            idx = self._session_index_key(user_id)
-            redis_client.setex(key, self._ttl_seconds, json.dumps(record))
-            redis_client.sadd(idx, session_id)
-            redis_client.expire(idx, self._ttl_seconds)
+            try:
+                key = self._session_key(user_id, session_id)
+                idx = self._session_index_key(user_id)
+                redis_client.setex(key, self._ttl_seconds, json.dumps(record))
+                redis_client.sadd(idx, session_id)
+                redis_client.expire(idx, self._ttl_seconds)
+            except Exception as e:
+                # Redis write failed (read-only, disconnected, etc) - fall back to memory
+                logger.warning(f"Redis session write failed ({e}), using in-memory fallback")
+                record["expires_at"] = (
+                    datetime.utcnow() + timedelta(seconds=self._ttl_seconds)
+                ).isoformat()
+                self._memory[self._session_key(user_id, session_id)] = record
         else:
             record["expires_at"] = (
                 datetime.utcnow() + timedelta(seconds=self._ttl_seconds)

@@ -81,9 +81,8 @@ def main():
         )
         print(f"\n✓ Successfully granted modules!")
         print(f"\nUser {args.email} now has access to at site {args.site_code}:")
-        print(f"  - Base modules (automatic): {', '.join(sorted([
-            'control', 'assets', 'simbiot', 'integrations', 'notifications', 'hvac', 'energy'
-        ]))}")
+        base_mods = ['control', 'assets', 'simbiot', 'integrations', 'notifications', 'hvac', 'energy']
+        print(f"  - Base modules (automatic): {', '.join(sorted(base_mods))}")
         print(f"  - Granted modules: {', '.join(sorted(args.modules))}")
         print(f"  - Total effective: {', '.join(sorted(effective_modules))}")
         return 0

@@ -20,6 +20,9 @@ export const COMPANY_DEMO_CONFIGS: Record<string, CompanyDemoConfig> = {
     viewMode: 'auditor', // read-only, no control access
     description: 'DALI Lighting Occupancy Control Demo',
   },
+  // NOTE: protonmail.com users (like bederf@protonmail.com) have no custom config
+  // They get FREE BASIC PACKAGE: Dashboard + HVAC monitoring + ML feedback
+  // and will default to 'dashboard' landing page (see getDefaultView function below)
 };
 
 export interface CompanyDemoConfig {
@@ -72,10 +75,14 @@ export function getUserViewMode(email: string): 'auditor' | 'operator' | 'admin'
 
 /**
  * Get the default view to show when user logs in.
+ * DEFAULT LANDING PAGE: 'dashboard' (not AI Chat)
+ * 
+ * Wardew (wardew.co.za) users override this and default to 'occupancy'.
+ * All other users default to 'dashboard'.
  */
 export function getDefaultView(email: string): View {
   const config = getCompanyDemoConfig(email);
-  return config?.defaultView || 'dashboard';
+  return config?.defaultView || 'dashboard'; // ← Dashboard is the default landing page
 }
 
 /**

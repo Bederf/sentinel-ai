@@ -48,7 +48,7 @@ def register_building_routers(app: FastAPI) -> None:
     app.include_router(hvac.router, prefix="/api", tags=["hvac"])
 
     # Building systems - Lighting
-    app.include_router(dali.router, tags=["dali-lighting"])
+    app.include_router(dali.router, prefix="/api/dali", tags=["dali-lighting"])
 
     # Building systems - Fire & Security
     app.include_router(fire.router, tags=["fire"])

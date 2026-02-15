@@ -4701,7 +4701,11 @@ class SIMBIOTMCPServer:
 
     def __init__(self):
         """Initialize SIMBIOT MCP server."""
-        self.tools = MCP_TOOLS
+        # Import registry tools (code search, code fetch, code_structure)
+        from app.mcp.tools.registry import get_all_tools, get_all_handlers
+        
+        # Merge MCP_TOOLS with registry tools
+        self.tools = MCP_TOOLS + get_all_tools()
         self.tool_handlers = {
             # Building/Asset tools (Plan 01)
             "get_buildings": get_buildings_tool,
@@ -4748,6 +4752,10 @@ class SIMBIOTMCPServer:
             "process_municipal_bill": process_municipal_bill_tool,
             "get_utility_costs": get_utility_costs_tool,
         }
+        
+        # Merge registry tools (code search, fetch, structure)
+        from app.mcp.tools.registry import get_all_handlers
+        self.tool_handlers.update(get_all_handlers())
         logger.info("SIMBIOTMCPServer initialized with %d tools", len(self.tools))
 
     def list_tools(self) -> List[Dict[str, Any]]:

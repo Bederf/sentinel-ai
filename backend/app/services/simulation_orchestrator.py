@@ -1,0 +1,88 @@
+"""
+Simulation Orchestrator Registry
+
+Manages active lifecycle simulations globally, enabling:
+- Concurrent simulations (multiple users)
+- Task lookup by ID
+- Crash recovery (find running tasks on startup)
+
+Pattern: Factory + Registry for instance lifecycle management
+"""
+
+import logging
+from typing import Dict, Optional
+from app.services.lifecycle_orchestrator import (
+    LifecycleOrchestrator,
+    create_lifecycle_orchestrator,
+)
+
+logger = logging.getLogger(__name__)
+
+# Global registry of active simulations
+_active_simulations: Dict[str, LifecycleOrchestrator] = {}
+
+
+def create_orchestrator(task_id: str) -> LifecycleOrchestrator:
+    """
+    Create a new orchestrator instance for a task.
+
+    Args:
+        task_id: Unique task identifier from database
+
+    Returns:
+        New LifecycleOrchestrator instance
+    """
+    return create_lifecycle_orchestrator(task_id=task_id)
+
+
+def register_simulation(task_id: str, orchestrator: LifecycleOrchestrator) -> None:
+    """
+    Register an active simulation in the global registry.
+
+    Args:
+        task_id: Unique task identifier
+        orchestrator: LifecycleOrchestrator instance
+    """
+    _active_simulations[task_id] = orchestrator
+    logger.info(f"Registered simulation task {task_id} (total active: {len(_active_simulations)})")
+
+
+def get_simulation_by_task_id(task_id: str) -> Optional[LifecycleOrchestrator]:
+    """
+    Look up a running simulation by task ID.
+
+    Args:
+        task_id: Task identifier
+
+    Returns:
+        LifecycleOrchestrator if found and running, None otherwise
+    """
+    return _active_simulations.get(task_id)
+
+
+def unregister_simulation(task_id: str) -> bool:
+    """
+    Remove a simulation from the active registry.
+    Called when simulation completes or fails.
+
+    Args:
+        task_id: Task identifier
+
+    Returns:
+        True if simulation was unregistered, False if not found
+    """
+    if task_id in _active_simulations:
+        del _active_simulations[task_id]
+        logger.info(f"Unregistered simulation task {task_id} (remaining: {len(_active_simulations)})")
+        return True
+    return False
+
+
+def get_active_simulation_count() -> int:
+    """Get count of active simulations."""
+    return len(_active_simulations)
+
+
+def get_all_active_simulations() -> Dict[str, LifecycleOrchestrator]:
+    """Get copy of all active simulations (for monitoring)."""
+    return _active_simulations.copy()
