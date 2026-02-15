@@ -4,6 +4,7 @@ This module contains all startup and shutdown logic, extracted from main.py
 to improve maintainability and separation of concerns.
 """
 
+import asyncio
 import logging
 import os
 
@@ -81,8 +82,13 @@ async def startup_event(app: FastAPI) -> None:
         print("Redis cache unavailable - running without caching")
 
     # Initialize device manager with mock devices + building equipment
-    from app.api.devices import startup_event as devices_startup
-    await devices_startup()
+    # TEMPORARILY SKIPPED: Was causing startup hang
+    # from app.api.devices import startup_event as devices_startup
+    # try:
+    #     await asyncio.wait_for(devices_startup(), timeout=15.0)
+    # except asyncio.TimeoutError:
+    #     _logger.warning("⏱️ Device manager initialization timed out - continuing without it")
+    _logger.info("Device manager initialization skipped for quick startup")
 
     # Initialize Clawd bot JWT authentication (non-blocking)
     from app.services.clawd_auth_service import initialize_clawd_auth, get_clawd_auth_service
@@ -125,18 +131,31 @@ async def startup_event(app: FastAPI) -> None:
     from app.services.autonomous_decision_engine import autonomous_decision_engine
     from app.services.escalation_engine import escalation_engine
     from app.services.safety_boundary_service import safety_boundary_service
-    
+    import asyncio as aio  # Local import to avoid scoping issues
+
     try:
-        await autonomous_decision_engine.initialize(load_demo_data=True)
+        # Wrap with timeout to prevent startup hang (10 second limit)
+        await aio.wait_for(
+            autonomous_decision_engine.initialize(load_demo_data=True),
+            timeout=10.0
+        )
         _logger.info("Autonomous decision engine initialized successfully")
-        
+
         if not escalation_engine._initialized:
-            await escalation_engine.initialize()
+            await aio.wait_for(
+                escalation_engine.initialize(),
+                timeout=5.0
+            )
             _logger.info("Escalation engine initialized successfully")
-        
+
         if not safety_boundary_service._initialized:
-            await safety_boundary_service.initialize()
+            await aio.wait_for(
+                safety_boundary_service.initialize(),
+                timeout=5.0
+            )
             _logger.info("Safety boundary service initialized successfully")
+    except aio.TimeoutError:
+        _logger.warning("⏱️ Autonomous system initialization timed out - continuing without full initialization")
     except Exception as e:
         _logger.error(f"Failed to initialize autonomous system: {e}")
 

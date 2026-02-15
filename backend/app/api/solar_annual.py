@@ -86,12 +86,12 @@ async def get_annual_summary(
 async def start_annual_simulation(
     site_id: str,
     scenario: str = "grant_solar_bess_ai_annual",
-    duration_minutes: float = 240.0,
+    duration_minutes: float = 30.0,
     background_tasks: BackgroundTasks = None,
     current_user: Dict = None,
 ) -> Dict[str, Any]:
     """
-    Start 365-day simulation in background (4 hours real-time).
+    Start 365-day simulation in background (30 minutes real-time by default).
 
     Returns immediately with task_id.
     Client should poll GET /status/{task_id} for progress.
@@ -198,9 +198,12 @@ async def _run_annual_simulation(
 
     Steps:
     1. Force-reset orchestrator singleton (in case it's stuck)
-    2. Generate 8760 hourly snapshots for 365 days
+    2. Generate 8760 hourly snapshots for 365 days (paced over duration_minutes)
     3. Aggregate via SolarAnnualAggregator
     4. Cache results in Supabase
+
+    Parameters:
+    - duration_minutes: How many real-time minutes to spend on simulation (default 30)
     """
     try:
         from datetime import datetime as dt
@@ -209,7 +212,7 @@ async def _run_annual_simulation(
         task["status"] = "running"
         task["started_at"] = dt.now().isoformat()
 
-        logger.info(f"✅ Background task started: task_id={task_id}")
+        logger.info(f"✅ Background task started: task_id={task_id}, duration={duration_minutes}min")
 
         # CRITICAL: Force-reset orchestrator singleton (may be stuck from previous tests)
         try:
@@ -226,17 +229,18 @@ async def _run_annual_simulation(
 
         # Generate synthetic hourly snapshots for 365 days
         # (In production, these would come from actual telemetry)
-        logger.info("Step 5: Generating 365 days of hourly snapshots...")
+        logger.info(f"Step 5: Generating 365 days of hourly snapshots (spread over {duration_minutes}min)...")
         try:
-            hourly_data = _generate_hourly_snapshots(None)
+            # Calculate pace: sleep between batches to spread over duration_minutes
+            hourly_data = await _generate_hourly_snapshots_paced(None, duration_minutes, task)
             logger.info(f"Step 6: ✅ Generated {len(hourly_data)} hourly snapshots")
         except Exception as gen_error:
             logger.error(f"❌ Failed during snapshot generation: {gen_error}", exc_info=True)
             raise
 
-        # Update progress as we generate data
-        task["progress_pct"] = 50
-        task["days_completed"] = 183
+        # Update progress as we enter aggregation phase
+        task["progress_pct"] = 70
+        task["days_completed"] = 256
         logger.info(f"📈 Progress: {task['progress_pct']}%, Days: {task['days_completed']}/365")
 
         logger.info("⚙️ Aggregating results...")
@@ -267,6 +271,116 @@ async def _run_annual_simulation(
         task = _simulation_tasks.get(task_id, {})
         task["status"] = "failed"
         task["error"] = str(e)
+
+
+async def _generate_hourly_snapshots_paced(orchestrator, duration_minutes: float, task: Dict) -> list:
+    """
+    Generate 8760 hourly snapshots paced over duration_minutes for realistic progress feedback.
+
+    Updates task progress as snapshots are generated.
+    """
+    from app.services.seasonal_modeler import SeasonalModeler
+    from datetime import datetime as dt, timedelta
+    import time as time_module
+
+    snapshots = []
+    modeler = SeasonalModeler(seed=42)
+
+    start_date = dt(2024, 1, 1, 6, 0, 0)
+    start_time = time_module.time()
+    total_seconds = duration_minutes * 60  # Convert to seconds
+
+    for hour in range(8760):
+        current_time = start_date + timedelta(hours=hour)
+        day_of_year = (current_time.timetuple().tm_yday - 1) % 365 + 1
+        current_hour = current_time.hour
+
+        # Solar generation (0 at night, peaks at noon)
+        solar_efficiency = modeler.get_solar_generation_factor(
+            current_time.date(),
+            cloud_cover=0.2
+        )
+        hour_factor = max(0, 1 - abs(current_hour - 12) / 6)
+        solar_gen_kw = 3900 * solar_efficiency * hour_factor * 0.8
+
+        # Building load (higher during day, occupancy-dependent)
+        occupancy_factor = modeler.get_occupancy_factor(
+            current_time.date(),
+            current_hour,
+            rain_today=False,
+        )
+        base_load = 500
+        occupancy_load = 300 * occupancy_factor
+        hvac_load = 200 * max(0, 1 - abs(current_hour - 14) / 8)
+        building_load_kw = base_load + occupancy_load + hvac_load
+
+        # BESS dynamics (charge at night, discharge during peak)
+        if current_hour < 7 or current_hour > 20:
+            bess_charge_kw = max(0, solar_gen_kw - building_load_kw)
+            bess_discharge_kw = 0
+        elif current_hour > 17:
+            bess_discharge_kw = min(500, building_load_kw - solar_gen_kw)
+            bess_charge_kw = 0
+        else:
+            bess_charge_kw = 0
+            bess_discharge_kw = 0
+
+        # BESS SOC (simple model)
+        bess_soc_pct = 50 + (bess_charge_kw - bess_discharge_kw) * 0.1
+        bess_soc_pct = max(10, min(90, bess_soc_pct))
+
+        # Grid import/export
+        net_solar = solar_gen_kw - building_load_kw - bess_charge_kw + bess_discharge_kw
+        grid_export_kw = max(0, net_solar)
+        grid_import_kw = max(0, -net_solar)
+
+        # Tariff band (peak/standard/off_peak)
+        if current_hour in [7, 8, 9, 18, 19]:
+            tariff_band = "peak"
+            rate = 3.45
+        elif current_hour in [10, 11, 12, 13, 14, 15, 16, 17]:
+            tariff_band = "standard"
+            rate = 2.12
+        else:
+            tariff_band = "off_peak"
+            rate = 1.05
+
+        snapshot = HourlySnapshot(
+            hour=hour,
+            date=current_time,
+            month=current_time.month,
+            day_of_year=day_of_year,
+            solar_gen_kw=solar_gen_kw,
+            building_load_kw=building_load_kw,
+            bess_soc_pct=bess_soc_pct,
+            bess_charge_kw=bess_charge_kw,
+            bess_discharge_kw=bess_discharge_kw,
+            grid_import_kw=grid_import_kw,
+            grid_export_kw=grid_export_kw,
+            tariff_band=tariff_band,
+            tariff_rate_c_kwh=rate,
+        )
+
+        snapshots.append(snapshot)
+
+        # Update progress and sleep to pace over duration_minutes
+        if (hour + 1) % 24 == 0:  # Every 24 hours (1 day)
+            days_done = (hour + 1) // 24
+            task["progress_pct"] = min(60, int(days_done / 365 * 50) + 10)  # 10%-60%
+            task["days_completed"] = days_done
+
+            # Calculate how long we should sleep to maintain pace
+            elapsed = time_module.time() - start_time
+            expected_time = (days_done / 365) * total_seconds
+            sleep_time = max(0, expected_time - elapsed)
+
+            if sleep_time > 0:
+                await asyncio.sleep(sleep_time)
+
+            logger.debug(f"Generated day {days_done}/365, progress {task['progress_pct']}%")
+
+    logger.info(f"Generated {len(snapshots)} hourly snapshots over {duration_minutes}min")
+    return snapshots
 
 
 def _generate_hourly_snapshots(orchestrator) -> list:
@@ -400,13 +514,13 @@ async def _cache_results(site_id: str, annual_summary: AnnualSummary, hourly_dat
                         "avg_bess_soc_pct": [],
                     }
 
-                # Sum hourly values for daily total (each hour = 1/24 of a day)
-                daily_records[day_key]["solar_gen_kwh"] += snap.solar_gen_kw / 24
-                daily_records[day_key]["building_load_kwh"] += snap.building_load_kw / 24
-                daily_records[day_key]["grid_import_kwh"] += snap.grid_import_kw / 24
-                daily_records[day_key]["grid_export_kwh"] += snap.grid_export_kw / 24
-                daily_records[day_key]["bess_charge_kwh"] += snap.bess_charge_kw / 24
-                daily_records[day_key]["bess_discharge_kwh"] += snap.bess_discharge_kw / 24
+                # Sum hourly values for daily total (kW × 1 hour = kWh)
+                daily_records[day_key]["solar_gen_kwh"] += snap.solar_gen_kw
+                daily_records[day_key]["building_load_kwh"] += snap.building_load_kw
+                daily_records[day_key]["grid_import_kwh"] += snap.grid_import_kw
+                daily_records[day_key]["grid_export_kwh"] += snap.grid_export_kw
+                daily_records[day_key]["bess_charge_kwh"] += snap.bess_charge_kw
+                daily_records[day_key]["bess_discharge_kwh"] += snap.bess_discharge_kw
                 daily_records[day_key]["peak_generation_kw"] = max(
                     daily_records[day_key]["peak_generation_kw"],
                     snap.solar_gen_kw
