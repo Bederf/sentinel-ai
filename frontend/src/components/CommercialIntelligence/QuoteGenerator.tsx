@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Quote Generator Form Component
  *

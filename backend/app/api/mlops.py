@@ -7,8 +7,9 @@ and automated reporting.
 Phase 45-03: MLOps Monitoring and Success Metrics.
 """
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from typing import Optional
+from app.middleware.rate_limiter import limiter
 
 router = APIRouter(prefix="/api/mlops", tags=["mlops"])
 
@@ -54,8 +55,10 @@ async def get_drift_history(limit: int = Query(20, description="Max results")):
 # --- ML Alerts ---
 
 
+@limiter.limit("120/minute")
 @router.get("/alerts")
 async def get_ml_alerts(
+    request: Request,
     severity: Optional[str] = Query(None, description="Filter: info, warning, critical"),
     alert_type: Optional[str] = Query(None, description="Filter by alert type"),
     acknowledged: Optional[bool] = Query(None, description="Filter by acknowledged status"),
@@ -74,8 +77,9 @@ async def get_ml_alerts(
     }
 
 
+@limiter.limit("60/minute")
 @router.post("/alerts/check")
-async def run_alert_check():
+async def run_alert_check(request: Request):
     """Run all alert checks and return new alerts generated."""
     from ml.monitoring.alerts import get_ml_alert_manager
     manager = get_ml_alert_manager()
@@ -83,8 +87,9 @@ async def run_alert_check():
     return {"new_alerts": len(new_alerts), "alerts": new_alerts}
 
 
+@limiter.limit("60/minute")
 @router.post("/alerts/{alert_id}/acknowledge")
-async def acknowledge_alert(alert_id: str):
+async def acknowledge_alert(request: Request, alert_id: str):
     """Acknowledge an ML alert."""
     from ml.monitoring.alerts import get_ml_alert_manager
     manager = get_ml_alert_manager()
@@ -94,8 +99,9 @@ async def acknowledge_alert(alert_id: str):
     return {"acknowledged": True, "alert_id": alert_id}
 
 
+@limiter.limit("120/minute")
 @router.get("/alerts/summary")
-async def get_alert_summary():
+async def get_alert_summary(request: Request):
     """Get ML alert summary with counts by severity and type."""
     from ml.monitoring.alerts import get_ml_alert_manager
     manager = get_ml_alert_manager()

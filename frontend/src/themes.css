@@ -1,4 +1,288 @@
 /* ═══════════════════════════════════════════════════════════════ */
+/* MATRIX THEME — Cyberpunk Terminal with Neon Green HUD          */
+/* Applied via .matrix-theme class on <html> or data-theme="matrix" */
+/* ═══════════════════════════════════════════════════════════════ */
+
+/* Matrix Theme — CSS Variable Overrides */
+.matrix-theme,
+[data-theme="matrix"] {
+  /* Override SENTINEL base colors with Matrix green theme */
+  --color-sentinel-bg-canvas: #060e18;
+  --color-sentinel-bg-primary: #0a1520;
+  --color-sentinel-bg-secondary: #0f1a2e;
+  --color-sentinel-bg-panel: #060e18;
+  --color-sentinel-border: #00ff41;
+  --color-sentinel-border-strong: #00ff41;
+
+  /* Override text colors — Matrix green text on dark background */
+  --color-sentinel-text-primary: #00ff41;
+  --color-sentinel-text-secondary: #66b366;
+  --color-sentinel-text-disabled: #336633;
+  --color-sentinel-text-link: #00ff41;
+
+  /* Override accent — Neon green replaces Amber */
+  --color-sentinel-amber: #00ff41;
+  --color-sentinel-amber-light: #33ff66;
+  --color-sentinel-amber-dark: #00cc33;
+
+  /* Chart palette — Matrix green variations */
+  --color-chart-1: #00ff41;
+  --color-chart-2: #33ff66;
+  --color-chart-3: #00cc33;
+  --color-chart-4: #ff3300;
+  --color-chart-5: #ffff00;
+  --color-chart-6: #ff6600;
+
+  /* Matrix panel styling */
+  --radius-panel: 0px;
+  --shadow-panel: 0 0 10px rgba(0, 255, 65, 0.3), inset 0 0 10px rgba(0, 255, 65, 0.1);
+
+  /* Glass overrides for matrix */
+  --glass-bg: rgba(6, 14, 24, 0.85);
+  --glass-bg-light: rgba(6, 14, 24, 0.6);
+  --glass-bg-heavy: rgba(6, 14, 24, 0.95);
+  --glass-border: rgba(0, 255, 65, 0.3);
+  --glass-border-strong: rgba(0, 255, 65, 0.6);
+  --glass-shadow: 0 0 16px rgba(0, 255, 65, 0.2);
+  --radius-glass: 0px;
+
+  /* Matrix-specific font */
+  font-family: 'Share Tech Mono', 'JetBrains Mono', monospace;
+}
+
+@layer components {
+  /* Matrix Panel — HUD-style with corner brackets */
+  .matrix-theme .panel,
+  .matrix-theme .card,
+  [data-theme="matrix"] .panel,
+  [data-theme="matrix"] .card {
+    background: rgba(6, 14, 24, 0.85);
+    border: 1px solid #00ff41;
+    border-radius: 0;
+    box-shadow: 0 0 10px rgba(0, 255, 65, 0.3), inset 0 0 10px rgba(0, 255, 65, 0.1);
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Matrix corner brackets — top-left */
+  .matrix-theme .panel::before,
+  .matrix-theme .card::before,
+  [data-theme="matrix"] .panel::before,
+  [data-theme="matrix"] .card::before {
+    content: '';
+    position: absolute;
+    top: -8px;
+    left: -8px;
+    width: 20px;
+    height: 20px;
+    border-left: 2px solid #00ff41;
+    border-top: 2px solid #00ff41;
+    border-radius: 2px 0 0 0;
+    box-shadow: 0 0 8px rgba(0, 255, 65, 0.6);
+    pointer-events: none;
+  }
+
+  /* Matrix corner brackets — top-right */
+  .matrix-theme .panel::after,
+  .matrix-theme .card::after,
+  [data-theme="matrix"] .panel::after,
+  [data-theme="matrix"] .card::after {
+    content: '';
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    width: 20px;
+    height: 20px;
+    border-right: 2px solid #00ff41;
+    border-top: 2px solid #00ff41;
+    border-radius: 0 2px 0 0;
+    box-shadow: 0 0 8px rgba(0, 255, 65, 0.6);
+    pointer-events: none;
+  }
+
+  /* Matrix sidebar active — neon green */
+  .matrix-theme .sidebar-item-active,
+  [data-theme="matrix"] .sidebar-item-active {
+    background: rgba(0, 255, 65, 0.1);
+    border-left-color: #00ff41;
+  }
+
+  .matrix-theme .sidebar-item-active:hover,
+  [data-theme="matrix"] .sidebar-item-active:hover {
+    background: rgba(0, 255, 65, 0.15);
+    box-shadow: 0 0 8px rgba(0, 255, 65, 0.3);
+  }
+
+  /* Matrix tab active — neon green underline */
+  .matrix-theme .tab-item-active,
+  [data-theme="matrix"] .tab-item-active {
+    color: #00ff41;
+    border-bottom-color: #00ff41;
+    text-shadow: 0 0 8px rgba(0, 255, 65, 0.4);
+  }
+
+  /* Matrix metric values — terminal font */
+  .matrix-theme .metric-value,
+  [data-theme="matrix"] .metric-value {
+    font-family: 'Share Tech Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.05em;
+    color: #00ff41;
+    text-shadow: 0 0 4px rgba(0, 255, 65, 0.3);
+  }
+
+  /* Matrix metric labels — uppercase */
+  .matrix-theme .metric-label,
+  [data-theme="matrix"] .metric-label {
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: #66b366;
+    font-family: 'Orbitron', monospace;
+  }
+
+  /* Matrix button — neon green */
+  .matrix-theme .btn-primary,
+  [data-theme="matrix"] .btn-primary {
+    background: transparent;
+    color: #00ff41;
+    border: 1px solid #00ff41;
+    font-weight: 600;
+    border-radius: 0;
+    box-shadow: 0 0 8px rgba(0, 255, 65, 0.3);
+  }
+
+  .matrix-theme .btn-primary:hover,
+  [data-theme="matrix"] .btn-primary:hover {
+    background: rgba(0, 255, 65, 0.1);
+    box-shadow: 0 0 16px rgba(0, 255, 65, 0.6), inset 0 0 8px rgba(0, 255, 65, 0.1);
+    text-shadow: 0 0 8px rgba(0, 255, 65, 0.4);
+  }
+
+  /* Matrix status dots — glowing */
+  .matrix-theme .status-dot-success,
+  [data-theme="matrix"] .status-dot-success {
+    box-shadow: 0 0 12px rgba(0, 255, 65, 0.8);
+    background: #00ff41;
+  }
+
+  .matrix-theme .status-dot-error,
+  [data-theme="matrix"] .status-dot-error {
+    box-shadow: 0 0 12px rgba(255, 51, 0, 0.8);
+  }
+
+  .matrix-theme .status-dot-warning,
+  [data-theme="matrix"] .status-dot-warning {
+    box-shadow: 0 0 12px rgba(255, 255, 0, 0.8);
+  }
+
+  /* Matrix tooltip — neon green border */
+  .matrix-theme .tooltip,
+  [data-theme="matrix"] .tooltip {
+    background: rgba(6, 14, 24, 0.95);
+    border: 1px solid #00ff41;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-radius: 0;
+    box-shadow: 0 0 16px rgba(0, 255, 65, 0.3);
+  }
+
+  /* Matrix data table — neon headers */
+  .matrix-theme .data-table th,
+  [data-theme="matrix"] .data-table th {
+    background: rgba(0, 255, 65, 0.05);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    color: #00ff41;
+    border-bottom-color: #00ff41;
+    font-family: 'Orbitron', monospace;
+    text-shadow: 0 0 4px rgba(0, 255, 65, 0.3);
+  }
+
+  .matrix-theme .data-table td,
+  [data-theme="matrix"] .data-table td {
+    border-bottom-color: rgba(0, 255, 65, 0.2);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .matrix-theme .data-table tr:hover td,
+  [data-theme="matrix"] .data-table tr:hover td {
+    background: rgba(0, 255, 65, 0.05);
+  }
+
+  /* Matrix badge — neon green info */
+  .matrix-theme .badge-info,
+  [data-theme="matrix"] .badge-info {
+    background: rgba(0, 255, 65, 0.1);
+    color: #00ff41;
+    border: 1px solid rgba(0, 255, 65, 0.5);
+    text-shadow: 0 0 4px rgba(0, 255, 65, 0.3);
+  }
+
+  /* Matrix input — dark with green border */
+  .matrix-theme .input-dark,
+  [data-theme="matrix"] .input-dark {
+    background: rgba(6, 14, 24, 0.6);
+    border-color: rgba(0, 255, 65, 0.3);
+    border-radius: 0;
+  }
+
+  .matrix-theme .input-dark:focus,
+  [data-theme="matrix"] .input-dark:focus {
+    border-color: #00ff41;
+    box-shadow: 0 0 12px rgba(0, 255, 65, 0.3), inset 0 0 4px rgba(0, 255, 65, 0.1);
+  }
+
+  /* Matrix glow effects */
+  .matrix-theme .glow-green,
+  [data-theme="matrix"] .glow-green {
+    box-shadow: 0 0 16px rgba(0, 255, 65, 0.6);
+  }
+
+  .matrix-theme .glow-blue,
+  [data-theme="matrix"] .glow-blue {
+    box-shadow: 0 0 16px rgba(0, 255, 65, 0.6);
+  }
+
+  .matrix-theme .glow-amber,
+  .matrix-theme .glow-orange,
+  [data-theme="matrix"] .glow-amber,
+  [data-theme="matrix"] .glow-orange {
+    box-shadow: 0 0 16px rgba(0, 255, 65, 0.6);
+  }
+}
+
+/* Matrix Recharts overrides — neon green grids */
+.matrix-theme .recharts-cartesian-grid-horizontal line,
+.matrix-theme .recharts-cartesian-grid-vertical line,
+[data-theme="matrix"] .recharts-cartesian-grid-horizontal line,
+[data-theme="matrix"] .recharts-cartesian-grid-vertical line {
+  stroke: rgba(0, 255, 65, 0.2) !important;
+}
+
+/* Matrix body background — deep dark with subtle glow */
+.matrix-theme body,
+[data-theme="matrix"] body {
+  background: #060e18;
+  background-image:
+    radial-gradient(ellipse at 20% 50%, rgba(0, 255, 65, 0.02) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, rgba(0, 255, 65, 0.01) 0%, transparent 50%);
+}
+
+/* Matrix scrollbar — neon green */
+.matrix-theme ::-webkit-scrollbar-thumb,
+[data-theme="matrix"] ::-webkit-scrollbar-thumb {
+  background: rgba(0, 255, 65, 0.3);
+  box-shadow: 0 0 8px rgba(0, 255, 65, 0.3);
+}
+
+.matrix-theme ::-webkit-scrollbar-thumb:hover,
+[data-theme="matrix"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 255, 65, 0.6);
+  box-shadow: 0 0 12px rgba(0, 255, 65, 0.5);
+}
+
+/* ═══════════════════════════════════════════════════════════════ */
 /* DARK OPS THEME — Command Center / Bloomberg aesthetic          */
 /* Applied via .ops-theme class on <html> or data-theme="ops"     */
 /* ═══════════════════════════════════════════════════════════════ */

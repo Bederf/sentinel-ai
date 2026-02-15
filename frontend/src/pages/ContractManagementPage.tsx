@@ -303,7 +303,11 @@ interface KPICardProps {
 function KPICard({ title, value, subtitle, icon, trend }: KPICardProps) {
   return (
     <div
-      className="glass-card p-4"
+      className="glass-card p-4 rounded-lg overflow-hidden"
+      style={{
+        border: "1px solid var(--color-sentinel-border)",
+        background: "rgba(14, 116, 144, 0.05)",
+      }}
     >
       <div className="flex items-start justify-between mb-3">
         <span
@@ -313,8 +317,8 @@ function KPICard({ title, value, subtitle, icon, trend }: KPICardProps) {
           {title}
         </span>
         <div
-          className="p-1.5 rounded"
-          style={{ background: "var(--color-sentinel-bg-secondary)" }}
+          className="p-2 rounded"
+          style={{ background: "rgba(59, 130, 246, 0.15)" }}
         >
           {icon}
         </div>
@@ -784,17 +788,25 @@ export function ContractManagementPage() {
   }
 
   return (
-    <div className="h-full overflow-y-auto p-4 md:p-6">
+    <div
+      className="h-full overflow-y-auto p-4 md:p-6"
+      style={{ background: "var(--color-sentinel-bg-canvas)" }}
+    >
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Section 1: Portfolio Overview */}
         <div>
-          <div className="flex items-center gap-2 mb-4">
-            <FileText
-              className="h-5 w-5"
-              style={{ color: "var(--color-sentinel-amber)" }}
-            />
+          <div className="flex items-center gap-3 mb-4">
+            <div
+              className="p-2 rounded"
+              style={{ background: "rgba(245, 158, 11, 0.15)" }}
+            >
+              <FileText
+                className="h-5 w-5"
+                style={{ color: "var(--color-sentinel-amber)" }}
+              />
+            </div>
             <h2
-              className="text-base font-medium"
+              className="text-lg font-semibold"
               style={{ color: "var(--color-sentinel-text-primary)" }}
             >
               Portfolio Overview
@@ -917,12 +929,23 @@ export function ContractManagementPage() {
               borderBottom: "1px solid var(--color-sentinel-border)",
             }}
           >
-            <h3
-              className="text-sm font-medium"
-              style={{ color: "var(--color-sentinel-text-primary)" }}
-            >
-              Contracts
-            </h3>
+            <div className="flex items-center gap-3">
+              <div
+                className="p-2 rounded"
+                style={{ background: "rgba(59, 130, 246, 0.15)" }}
+              >
+                <FileText
+                  className="h-4 w-4"
+                  style={{ color: "var(--color-sentinel-blue)" }}
+                />
+              </div>
+              <h3
+                className="text-sm font-medium"
+                style={{ color: "var(--color-sentinel-text-primary)" }}
+              >
+                Contract Portfolio
+              </h3>
+            </div>
             {/* Building filter + Status filter */}
             <div className="flex items-center gap-3">
               {/* Building selector */}
@@ -1223,15 +1246,20 @@ export function ContractManagementPage() {
               className="glass-panel overflow-hidden"
             >
               <div
-                className="px-4 py-3 flex items-center gap-2"
+                className="px-4 py-3 flex items-center gap-3"
                 style={{
                   borderBottom: "1px solid var(--color-sentinel-border)",
                 }}
               >
-                <Shield
-                  className="h-4 w-4"
-                  style={{ color: "var(--color-sentinel-amber)" }}
-                />
+                <div
+                  className="p-2 rounded"
+                  style={{ background: "rgba(245, 158, 11, 0.15)" }}
+                >
+                  <Shield
+                    className="h-4 w-4"
+                    style={{ color: "var(--color-sentinel-amber)" }}
+                  />
+                </div>
                 <h3
                   className="text-sm font-medium"
                   style={{ color: "var(--color-sentinel-text-primary)" }}
@@ -1523,15 +1551,20 @@ export function ContractManagementPage() {
               className="glass-panel overflow-hidden"
             >
               <div
-                className="px-4 py-3 flex items-center gap-2"
+                className="px-4 py-3 flex items-center gap-3"
                 style={{
                   borderBottom: "1px solid var(--color-sentinel-border)",
                 }}
               >
-                <DollarSign
-                  className="h-4 w-4"
-                  style={{ color: "var(--color-sentinel-amber)" }}
-                />
+                <div
+                  className="p-2 rounded"
+                  style={{ background: "rgba(34, 197, 94, 0.15)" }}
+                >
+                  <DollarSign
+                    className="h-4 w-4"
+                    style={{ color: "var(--color-sentinel-green)" }}
+                  />
+                </div>
                 <h3
                   className="text-sm font-medium"
                   style={{ color: "var(--color-sentinel-text-primary)" }}

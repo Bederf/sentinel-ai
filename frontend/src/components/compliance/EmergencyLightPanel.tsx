@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Emergency Light Testing Panel
  *

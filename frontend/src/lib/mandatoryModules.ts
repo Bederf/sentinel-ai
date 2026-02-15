@@ -8,7 +8,6 @@
 import type { ModuleType } from './moduleRegistry';
 
 export const MANDATORY_MODULES: ModuleType[] = [
-  'kpi',           // KPI Overview - Core metrics and statistics
   'ml',            // Risk Intelligence - Equipment health and predictions
 ];
 
@@ -22,8 +21,7 @@ export function isMandatoryModule(moduleType: ModuleType): boolean {
 /**
  * Get display names for mandatory modules
  */
-export const MANDATORY_MODULE_NAMES: Record<ModuleType, string> = {
-  'kpi': 'KPI Overview',
+export const MANDATORY_MODULE_NAMES: Partial<Record<ModuleType, string>> = {
   'ml': 'Risk Intelligence',
 };
 

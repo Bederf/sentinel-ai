@@ -4,7 +4,7 @@
  * Handles fetching energy comparison, actual, and prediction data
  */
 
-interface EnergyMetrics {
+export interface EnergyMetrics {
   total_kwh: number
   total_cost_zar: number
   carbon_kg: number

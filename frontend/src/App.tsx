@@ -10,6 +10,7 @@ import { useRecommendationToasts } from "./components/RecommendationToast";
 import { initializeSecurityProtections } from "./lib/api/security-utils";
 import TechnicianChat from "./components/TechnicianChat";
 import { Dashboard } from "./components/Dashboard";
+import { DigitalTwin } from "./components/digital-twin";
 import { ControlDashboard } from "./components/ControlDashboard";
 import { ControlAuditTrail } from "./components/ControlAuditTrail";
 import { OptimizationPage } from "./pages/OptimizationPage";
@@ -96,19 +97,7 @@ function App() {
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [currentView, setCurrentView] = useState<View>(() => {
-    // Get default view based on user's company if logged in
-    const storedUser = localStorage.getItem("sentinel_user");
-    if (storedUser) {
-      try {
-        const user = JSON.parse(storedUser);
-        return getDefaultView(user.email);
-      } catch {
-        return "dashboard";
-      }
-    }
-    return "dashboard";
-  });
+  const [currentView, setCurrentView] = useState<View>("dashboard");
   const [viewRefreshKey, setViewRefreshKey] = useState(0);
   const [showCardLibrary, setShowCardLibrary] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -699,6 +688,10 @@ function App() {
               openCardLibrary={showCardLibrary}
               onCardLibraryClose={() => setShowCardLibrary(false)}
             />
+          ) : currentView === "digital-twin" ? (
+            <div className="h-full overflow-hidden">
+              <DigitalTwin />
+            </div>
           ) : currentView === "control" ? (
             <ControlDashboard onError={(error) => setError(error)} />
           ) : currentView === "control-audit" ? (
@@ -742,7 +735,7 @@ function App() {
             </div>
           ) : currentView === "sustainability" ? (
             <div className="h-full overflow-y-auto">
-              <ESGPage selectedBuilding={selectedSite ? { id: selectedSite.id, name: selectedSite.name, code: selectedSite.code } : undefined} />
+              <ESGPage selectedBuilding={undefined} />
             </div>
           ) : currentView === "fleet" ? (
             <FleetInsights />

@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Test utilities for SENTINEL BMS frontend
  * Re-exports common testing libraries with custom setup

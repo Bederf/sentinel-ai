@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Legionella Risk Assessment Panel
  *

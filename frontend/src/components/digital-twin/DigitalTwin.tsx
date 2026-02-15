@@ -1,10 +1,9 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
-import { X } from 'lucide-react';
+import { X, Snowflake, Wind, Zap, BarChart3, Lightbulb, Flame, Droplet, Video, Lock, Radio, Circle, Wrench, Gauge, Thermometer } from 'lucide-react';
 import { BuildingSelector } from '@/components/BuildingSelector';
 import type { ZoneCentroid, Site } from '@/lib/api/sites';
-import { sitesApi } from '@/lib/api/sites';
 import { BuildingModel } from './BuildingModel';
 import { EquipmentMarkers } from './EquipmentMarkers';
 import { EquipmentDetailPanel } from './EquipmentDetailPanel';
@@ -27,46 +26,47 @@ import {
   generateFloorsFromEquipment,
   generateFloors,
   getFloorY,
-  getFloorId,
-  extractFloorFromCode,
 } from '@/utils/floorExtraction';
 
-// Equipment type to icon/emoji mapping
-const EQUIPMENT_ICONS: Record<string, string> = {
-  'chiller': '❄️',
-  'ahu': '🌬️',
-  'fcu': '💨',
-  'vav': '🎚️',
-  'cooling_tower': '🌊',
-  'ct': '🌊',
-  'generator': '⚡',
-  'gen': '⚡',
-  'ups': '🔋',
-  'transformer': '⚙️',
-  'tx': '⚙️',
-  'ats': '🔀',
-  'dali': '💡',
-  'luminaire': '💡',
-  'lum': '💡',
-  'meter': '📊',
-  'mtr': '📊',
-  'fire': '🔥',
-  'sprinkler': '💧',
-  'cctv': '📹',
-  'access': '🔐',
-  'acc': '🔐',
-  'sensor': '📡',
-  'pump': '🔵',
-  'boiler': '🔥',
-  'hvac_zone': '🎛️',
-  'jace': '🎛️',
-  'lift': '🛗',
-  'cold': '❄️',
-  'medgas': '🔬',
-  'msb': '⚡',
-  'kef': '💨',
-  'split': '🌡️',
+// Equipment type to icon mapping (using Lucide React for reliability)
+const EQUIPMENT_ICONS: Record<string, React.ReactNode> = {
+  'chiller': <Snowflake className="w-4 h-4" />,
+  'ahu': <Wind className="w-4 h-4" />,
+  'fcu': <Wind className="w-4 h-4" />,
+  'vav': <Wind className="w-4 h-4" />,
+  'cooling_tower': <Droplet className="w-4 h-4" />,
+  'ct': <Droplet className="w-4 h-4" />,
+  'generator': <Zap className="w-4 h-4" />,
+  'gen': <Zap className="w-4 h-4" />,
+  'ups': <Zap className="w-4 h-4" />,
+  'transformer': <Wrench className="w-4 h-4" />,
+  'tx': <Wrench className="w-4 h-4" />,
+  'ats': <Zap className="w-4 h-4" />,
+  'dali': <Lightbulb className="w-4 h-4" />,
+  'luminaire': <Lightbulb className="w-4 h-4" />,
+  'lum': <Lightbulb className="w-4 h-4" />,
+  'meter': <BarChart3 className="w-4 h-4" />,
+  'mtr': <BarChart3 className="w-4 h-4" />,
+  'fire': <Flame className="w-4 h-4" />,
+  'sprinkler': <Droplet className="w-4 h-4" />,
+  'cctv': <Video className="w-4 h-4" />,
+  'access': <Lock className="w-4 h-4" />,
+  'acc': <Lock className="w-4 h-4" />,
+  'sensor': <Radio className="w-4 h-4" />,
+  'pump': <Circle className="w-4 h-4" />,
+  'boiler': <Flame className="w-4 h-4" />,
+  'hvac_zone': <Wind className="w-4 h-4" />,
+  'jace': <Wind className="w-4 h-4" />,
+  'lift': <Zap className="w-4 h-4" />,
+  'cold': <Snowflake className="w-4 h-4" />,
+  'medgas': <Radio className="w-4 h-4" />,
+  'msb': <Zap className="w-4 h-4" />,
+  'kef': <Wind className="w-4 h-4" />,
+  'split': <Thermometer className="w-4 h-4" />,
 };
+
+// Default icon for unknown equipment types
+const DEFAULT_ICON = <Gauge className="w-4 h-4" />;
 
 export function DigitalTwin() {
   // Site selection state - auto-select first site when loaded
@@ -305,7 +305,7 @@ export function DigitalTwin() {
                 equipmentTypeFilter === type ? 'matrix-btn-active' : ''
               }`}
             >
-              <span>{EQUIPMENT_ICONS[type] || '🏗️'}</span>
+              <span className="flex items-center">{EQUIPMENT_ICONS[type] || DEFAULT_ICON}</span>
               <span>{type.toUpperCase()}</span>
               <span className="text-xs opacity-75">({equipmentCountByType[type] || 0})</span>
             </button>
@@ -377,8 +377,8 @@ export function DigitalTwin() {
         {/* Filter indicator overlay */}
         {equipmentTypeFilter && (
           <div className="absolute top-4 right-20 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2">
-            <span className="text-sm font-medium">
-              Filtering: {EQUIPMENT_ICONS[equipmentTypeFilter] || '🏗️'} {equipmentTypeFilter.toUpperCase()}
+            <span className="text-sm font-medium flex items-center gap-2">
+              Filtering: {EQUIPMENT_ICONS[equipmentTypeFilter] || DEFAULT_ICON} {equipmentTypeFilter.toUpperCase()}
             </span>
             <button
               onClick={() => setEquipmentTypeFilter(null)}

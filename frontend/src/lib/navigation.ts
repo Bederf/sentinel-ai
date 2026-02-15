@@ -38,6 +38,7 @@ import type { ModuleType } from "./moduleRegistry";
 
 export type View =
   | "dashboard"
+  | "digital-twin"
   | "technician"
   | "control"
   | "control-audit"
@@ -77,6 +78,7 @@ export interface NavItem {
 /** View title mapping used by the header */
 export const VIEW_TITLES: Record<View, string> = {
   dashboard: "Dashboard",
+  "digital-twin": "Digital Twin",
   technician: "Technician Chat",
   control: "Control Dashboard",
   "control-audit": "Control Audit Trail",
@@ -112,6 +114,7 @@ export const VIEW_TITLES: Record<View, string> = {
  */
 export const BASE_NAV_ITEMS: NavItem[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, description: "Equipment overview & AI recommendations", category: "base" },
+  { id: "digital-twin", label: "Digital Twin", icon: Box, description: "3D/2D Building Visualization", category: "base" },
   { id: "integrations", label: "System Health", icon: Activity, description: "Real-time Health Monitoring", category: "base" },
 ];
 

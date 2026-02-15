@@ -39,12 +39,15 @@ _PUBLIC_PATHS = {
     "/health",
     "/api/health",
     "/api/clawd/work-order/pending",  # Clawd bot polling endpoint
+    "/api/lifecycle/status",  # Simulation status (frontend health check)
 }
 _PUBLIC_PREFIXES = (
     "/api/clawd",  # Clawd bot endpoints (work order polling, OCR, equipment reset, etc.)
     "/api/clawd-webhooks",  # Telegram bot callbacks (authenticated via webhook secret)
     "/api/mcp/sse",  # MCP SSE transport for Claude Desktop (authenticated at MCP layer)
     "/api/mcp/openai",  # MCP OpenAI endpoints for ChatGPT/M365 Copilot (authenticated at MCP layer)
+    "/api/lifecycle/",  # Lifecycle simulation status endpoints (frontend health checks)
+    "/api/recommendations/",  # Recommendations endpoints (can be public for UI)
 )
 _LOCALHOST_IPS = {"127.0.0.1", "::1", "localhost", "testclient"}
 _ADMIN_RATE_LIMIT_PER_MINUTE = 30

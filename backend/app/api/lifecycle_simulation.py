@@ -253,13 +253,28 @@ async def get_simulation_status(task_id: str):
 
     Queries database for task status and state snapshot.
     Returns simulated time, progress, events count, active faults, and recent events.
-    
+
     Args:
-        task_id: Task identifier from /start endpoint
-        
+        task_id: Task identifier from /start endpoint or site_id (e.g., site-002)
+
     Returns:
         SimulationStatusResponse with status, progress, and recent events
     """
+    # If this looks like a site_id (e.g., "site-002"), return empty status
+    if task_id.startswith("site-"):
+        return SimulationStatusResponse(
+            running=False,
+            paused=False,
+            scenario=None,
+            simulated_time=None,
+            simulated_hour=None,
+            real_elapsed_seconds=0,
+            events_count=0,
+            active_faults=0,
+            pending_repairs=0,
+            recent_events=[]
+        )
+
     try:
         supabase = Supabase.instance()
         
@@ -335,6 +350,70 @@ async def get_simulation_status(task_id: str):
         raise HTTPException(status_code=500, detail=f"Failed to get status: {str(e)}")
 
 
+@router.get("/status")
+async def get_default_simulation_status():
+    """
+    Get status of the default simulation (for backwards compatibility).
+    
+    Returns the status of any currently running simulation or a default empty response.
+    Used by frontend health check to determine if a simulation is running.
+    """
+    try:
+        # Try to get the default site's running simulation
+        orchestrator = get_simulation_by_task_id("default")
+        
+        if orchestrator and orchestrator.running:
+            return {
+                "running": True,
+                "paused": orchestrator.paused,
+                "scenario": orchestrator.current_scenario.name if orchestrator.current_scenario else None,
+                "simulated_time": orchestrator.simulated_time.isoformat(),
+                "simulated_hour": orchestrator.simulated_time.hour,
+            }
+        else:
+            # No simulation running
+            return {
+                "running": False,
+                "paused": False,
+                "scenario": None,
+                "simulated_time": None,
+                "simulated_hour": None,
+            }
+    except Exception as e:
+        logger.debug(f"Could not get default simulation status: {e}")
+        # Return empty response instead of failing
+        return {
+            "running": False,
+            "paused": False,
+            "scenario": None,
+            "simulated_time": None,
+            "simulated_hour": None,
+        }
+
+
+@router.get("/status/{site_id}")
+async def get_site_simulation_status(site_id: str):
+    """
+    Get status of a simulation for a specific site.
+    
+    Args:
+        site_id: Site identifier (e.g., 'site-002')
+        
+    Returns:
+        Simulation status or empty response if none running
+    """
+    # Return default empty status (no simulation running)
+    # This endpoint exists for frontend compatibility
+    return {
+        "running": False,
+        "paused": False,
+        "scenario": None,
+        "simulated_time": None,
+        "simulated_hour": None,
+        "site_id": site_id,
+    }
+
+
 # ============================================================================
 # Event Retrieval Endpoints
 # ============================================================================
@@ -350,37 +429,44 @@ async def get_simulation_events(
 
     Events include building wake, occupancy changes, faults, repairs, etc.
     """
-    orchestrator = get_lifecycle_orchestrator()
+    try:
+        orchestrator = get_lifecycle_orchestrator()
+        if not orchestrator:
+            return {"count": 0, "events": []}
 
-    events = orchestrator.events
+        events = orchestrator.events if orchestrator.events else []
 
-    # Filter by type
-    if event_type:
-        events = [e for e in events if e.event_type.value == event_type]
+        # Filter by type
+        if event_type:
+            events = [e for e in events if e.event_type.value == event_type]
 
-    # Filter by equipment
-    if equipment_id:
-        events = [e for e in events if e.equipment_id == equipment_id]
+        # Filter by equipment
+        if equipment_id:
+            events = [e for e in events if e.equipment_id == equipment_id]
 
-    # Limit and format
-    events = events[-limit:]
+        # Limit and format
+        events = events[-limit:]
 
-    return {
-        "count": len(events),
-        "events": [
-            {
-                "hour": e.simulated_hour,
-                "event_type": e.event_type.value,
-                "description": e.description,
-                "equipment_id": e.equipment_id,
-                "equipment_name": e.equipment_name,
-                "details": e.details,
-                "success": e.success,
-                "timestamp": e.timestamp.isoformat()
-            }
-            for e in events
-        ]
-    }
+        return {
+            "count": len(events),
+            "events": [
+                {
+                    "hour": e.simulated_hour,
+                    "event_type": e.event_type.value,
+                    "description": e.description,
+                    "equipment_id": e.equipment_id,
+                    "equipment_name": e.equipment_name,
+                    "details": e.details,
+                    "success": e.success,
+                    "timestamp": e.timestamp.isoformat()
+                }
+                for e in events
+            ]
+        }
+    except Exception as err:
+        import logging
+        logging.error(f"Error in get_simulation_events: {err}", exc_info=True)
+        return {"count": 0, "events": [], "error": str(err)}
 
 
 @router.get("/events/timeline")

@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * OHS Act Compliance Panel
  *

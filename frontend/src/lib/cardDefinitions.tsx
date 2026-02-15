@@ -94,14 +94,6 @@ export const SECTION_CARDS: CardDefinition[] = [
     defaultVisible: true
   },
   {
-    id: 'dali-intelligence',
-    name: 'DALI Intelligence: Wardew Tridonic',
-    description: '365-day simulation showing occupancy, daylight, and AI learning',
-    icon: <Lightbulb className="w-4 h-4" />,
-    category: 'section',
-    defaultVisible: true
-  },
-  {
     id: 'energy-analytics',
     name: 'Energy Analytics',
     description: 'Energy consumption charts and trends',
@@ -127,8 +119,8 @@ export const SECTION_CARDS: CardDefinition[] = [
   },
   {
     id: 'energy-comparison',
-    name: 'Energy Impact: Wardew Tridonic',
-    description: '3-tier energy savings comparison (Baseline vs DALI vs SENTINEL)',
+    name: 'Energy Impact Comparison',
+    description: 'Multi-tier energy savings comparison (Baseline vs Lighting vs SENTINEL)',
     icon: <Leaf className="w-4 h-4" />,
     category: 'section',
     defaultVisible: true
@@ -162,6 +154,14 @@ export const SECTION_CARDS: CardDefinition[] = [
     name: 'Occupancy Dashboard',
     description: 'Real-time occupancy tracking and patterns',
     icon: <Users className="w-4 h-4" />,
+    category: 'section',
+    defaultVisible: true
+  },
+  {
+    id: 'lighting-intelligence',
+    name: 'Lighting Intelligence',
+    description: 'AI-powered lighting optimization and zone control',
+    icon: <Lightbulb className="w-4 h-4" />,
     category: 'section',
     defaultVisible: true
   }
