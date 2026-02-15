@@ -57,6 +57,7 @@ import { ROISummaryCard } from "./ROISummaryCard";
 import { OccupancyPanel } from "./OccupancyPanel";
 import ComfortComplaintPanel from "./ComfortComplaintPanel";
 import { EnergyComparisonPanel } from "./EnergyComparisonPanel";
+import { ActualVsSentinelEnergyCard } from "./ActualVsSentinelEnergyCard";
 import { SolarOverviewPanel } from "./solar/SolarOverviewPanel";
 import { BESSStatusPanel } from "./solar/BESSStatusPanel";
 import { InverterStatusMatrix } from "./solar/InverterStatusMatrix";
@@ -82,6 +83,7 @@ type DashboardSectionId =
   | 'comfort-assistant'
   | 'occupancy-dashboard'
   | 'energy-comparison'
+  | 'energy-comparison-actual-vs-sentinel'
   | 'solar-bess'
   | 'solar-annual';
 
@@ -1043,6 +1045,23 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
     );
   };
 
+  // Render Actual vs SENTINEL Energy Comparison section
+  const renderEnergyComparisonActualVsSentinel = () => {
+    const { isModuleActive } = useModules();
+    if (!isModuleActive('energy')) {
+      return null;
+    }
+    return (
+      <DashboardSection id="energy-comparison-actual-vs-sentinel">
+        <div className="mt-6">
+          <div className="glass-panel rounded-md overflow-hidden">
+            <ActualVsSentinelEnergyCard siteId={selectedSiteId || 'site-002'} />
+          </div>
+        </div>
+      </DashboardSection>
+    );
+  };
+
   // Render DALI Intelligence section
   const renderDaliIntelligence = () => {
     const { isModuleActive } = useModules();
@@ -1167,6 +1186,7 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
     'comfort-assistant': renderComfortAssistant,
     'occupancy-dashboard': renderOccupancyDashboard,
     'energy-comparison': renderEnergyComparison,
+    'energy-comparison-actual-vs-sentinel': renderEnergyComparisonActualVsSentinel,
     'solar-bess': renderSolarBess,
     'solar-annual': renderSolarAnnual,
   };

@@ -134,6 +134,14 @@ export const SECTION_CARDS: CardDefinition[] = [
     defaultVisible: true
   },
   {
+    id: 'energy-comparison-actual-vs-sentinel',
+    name: 'Actual vs SENTINEL Energy',
+    description: 'Side-by-side real energy consumption vs AI-optimized predictions',
+    icon: <BarChart3 className="w-4 h-4" />,
+    category: 'section',
+    defaultVisible: true
+  },
+  {
     id: 'solar-annual',
     name: 'Solar Annual Summary',
     description: '365-day annual simulation with AI savings progression (2%-18%)',
