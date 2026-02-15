@@ -2,7 +2,7 @@
 
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from pathlib import Path
 from typing import Optional
 import random
@@ -12,6 +12,8 @@ from pydantic import BaseModel
 
 from app.database.repositories.energy_consumption_repository import get_energy_consumption_repository
 from app.services.building_loader import BuildingDataLoader
+from app.services.energy_rules_engine import get_energy_rules_engine
+from app.models.energy_rules import BuildingState
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -149,6 +151,212 @@ class EnergyPrediction(BaseModel):
     period_start: str
     period_end: str
     model_confidence: float
+
+
+# ==================== HELPER FUNCTIONS FOR RULES ENGINE ====================
+
+
+def _estimate_occupancy(dt: datetime, site_id: str) -> int:
+    """Estimate occupancy % from live simulation first, fallback to time-based.
+    
+    Primary: Try to get from lifecycle orchestrator's simulation state
+    Fallback: Time/day-of-week heuristics
+    """
+    try:
+        from app.services.lifecycle_orchestrator import get_lifecycle_orchestrator
+        orchestrator = get_lifecycle_orchestrator()
+        if orchestrator.building_state:
+            occupancy = orchestrator.building_state.get("occupancy_percent")
+            if occupancy is not None:
+                return int(occupancy)
+    except Exception:
+        pass
+    
+    # Fallback: time-based heuristics
+    hour = dt.hour
+    day_of_week = dt.weekday()
+    is_weekend = day_of_week >= 5
+    
+    if is_weekend:
+        return 5  # Very low on weekends
+    
+    # Weekday patterns
+    if 8 <= hour < 12:
+        return 85  # Morning peak
+    elif 12 <= hour < 14:
+        return 60  # Lunch dip
+    elif 14 <= hour < 17:
+        return 90  # Afternoon peak
+    elif 17 <= hour < 18:
+        return 50  # Early evening decline
+    else:
+        return 10  # Night/early morning
+
+
+def _estimate_daylight(dt: datetime, site_id: str) -> int:
+    """Estimate daylight lux from live simulation first, fallback to seasonal.
+    
+    Primary: Try to get from lifecycle orchestrator
+    Fallback: SeasonalModeler patterns
+    """
+    try:
+        from app.services.lifecycle_orchestrator import get_lifecycle_orchestrator
+        orchestrator = get_lifecycle_orchestrator()
+        if orchestrator.building_state:
+            daylight = orchestrator.building_state.get("daylight_factor")
+            if daylight is not None:
+                return int(daylight)
+    except Exception:
+        pass
+    
+    # Fallback: seasonal + hourly pattern
+    hour = dt.hour
+    month = dt.month
+    
+    # Night hours: 0 lux
+    if hour < 7 or hour >= 18:
+        return 0
+    
+    # Peak hours (10:00-14:00): 800-1000 lux
+    if 10 <= hour < 14:
+        base = 900
+    # Shoulder hours: 400-800 lux
+    else:
+        base = 600
+    
+    # Seasonal adjustment (winter = lower, summer = higher)
+    if month in [6, 7, 8]:  # Winter
+        base = int(base * 0.7)
+    elif month in [12, 1, 2]:  # Summer
+        base = int(base * 1.1)
+    
+    return base
+
+
+def _estimate_chiller_load(site_id: str) -> int:
+    """Estimate chiller load % from live simulation first.
+    
+    Primary: Try to get from lifecycle orchestrator
+    Fallback: Temperature-based estimation
+    """
+    try:
+        from app.services.lifecycle_orchestrator import get_lifecycle_orchestrator
+        orchestrator = get_lifecycle_orchestrator()
+        if orchestrator.building_state:
+            chiller_load = orchestrator.building_state.get("chiller_load_percent")
+            if chiller_load is not None:
+                return int(chiller_load)
+    except Exception:
+        pass
+    
+    # Fallback: use ambient temperature for estimation
+    # Higher temp = higher chiller load
+    month = date.today().month
+    if month in [12, 1, 2]:  # Summer
+        ambient_temp = 24
+    elif month in [6, 7, 8]:  # Winter
+        ambient_temp = 13
+    else:
+        ambient_temp = 18
+    
+    # Scale load: 15°C=30%, 35°C=85%
+    if ambient_temp < 15:
+        return 30
+    elif ambient_temp > 35:
+        return 85
+    else:
+        # Linear scale 15->30%, 35->85%
+        return int(30 + (ambient_temp - 15) * 2.75)
+
+
+def _get_tariff_band(hour: int, month: int) -> str:
+    """Get City Power tariff band based on time and season.
+    
+    Summer (Oct-Mar): peak 07-10, 18-20
+    Winter (Apr-Sep): peak 06-09, 17-22
+    Off-peak: 21-05
+    Standard: rest
+    """
+    is_summer = month in [10, 11, 12, 1, 2, 3]
+    
+    # Off-peak: 21:00 - 05:59 (always)
+    if 21 <= hour or hour < 6:
+        return "off_peak"
+    
+    if is_summer:
+        # Summer: peak 07-10, 18-20
+        if (7 <= hour < 10) or (18 <= hour < 20):
+            return "peak"
+    else:
+        # Winter: peak 06-09, 17-22
+        if (6 <= hour < 9) or (17 <= hour < 22):
+            return "peak"
+    
+    return "standard"
+
+
+def _get_seasonal_temp(month: int) -> float:
+    """Get average ambient temperature for month (South Africa).
+    
+    Primary: Try to get from SeasonalModeler if available
+    Fallback: Hardcoded seasonal averages
+    """
+    try:
+        from app.services.seasonal_modeler import get_seasonal_modeler
+        modeler = get_seasonal_modeler()
+        if modeler:
+            return modeler.get_temperature_for_month(month)
+    except Exception:
+        pass
+    
+    # Fallback: SA seasonal averages (Johannesburg-like)
+    seasonal_temps = {
+        1: 24, 2: 24, 3: 23,  # Summer
+        4: 21, 5: 19, 6: 13,  # Autumn to winter
+        7: 13, 8: 15,          # Winter
+        9: 18, 10: 21,         # Spring
+        11: 22, 12: 24         # Early summer
+    }
+    
+    return float(seasonal_temps.get(month, 20))
+
+
+def _apply_rules_output(
+    actual_metrics: EnergyMetrics,
+    rules_output
+) -> EnergyMetrics:
+    """Apply rules output savings to actual metrics, creating sentinel metrics."""
+    # Get breakdown of savings by system
+    by_system = rules_output.by_system
+    
+    # Subtract savings from each system
+    sentinel_hvac = actual_metrics.hvac_kwh - by_system.hvac_kwh
+    sentinel_lighting = actual_metrics.lighting_kwh - by_system.lighting_kwh
+    sentinel_power = actual_metrics.power_kwh - by_system.power_kwh
+    
+    sentinel_total_kwh = sentinel_hvac + sentinel_lighting + sentinel_power
+    
+    # Recalculate percentages
+    sentinel_hvac_percent = (sentinel_hvac / sentinel_total_kwh * 100) if sentinel_total_kwh > 0 else 0
+    sentinel_lighting_percent = (sentinel_lighting / sentinel_total_kwh * 100) if sentinel_total_kwh > 0 else 0
+    sentinel_power_percent = (sentinel_power / sentinel_total_kwh * 100) if sentinel_total_kwh > 0 else 0
+    
+    # Recalculate carbon and cost
+    sentinel_carbon_kg = sentinel_total_kwh * 0.35
+    sentinel_cost_zar = sentinel_total_kwh * 5.0
+    
+    return EnergyMetrics(
+        total_kwh=round(sentinel_total_kwh, 2),
+        total_cost_zar=round(sentinel_cost_zar, 2),
+        carbon_kg=round(sentinel_carbon_kg, 2),
+        hvac_kwh=round(sentinel_hvac, 2),
+        hvac_percent=round(sentinel_hvac_percent, 1),
+        lighting_kwh=round(sentinel_lighting, 2),
+        lighting_percent=round(sentinel_lighting_percent, 1),
+        power_kwh=round(sentinel_power, 2),
+        power_percent=round(sentinel_power_percent, 1),
+        timestamp=datetime.now().isoformat(),
+    )
 
 
 def generate_energy_data(
@@ -655,6 +863,7 @@ async def get_energy_prediction(
 @router.get("/energy/comparison-summary", response_model=ComparisonSummary)
 async def get_energy_comparison_summary(
     site_id: str = Query("site-002", description="Site ID to analyze"),
+    method: str = Query("rules_based", description="rules_based | hardcoded"),
 ) -> ComparisonSummary:
     """
     Get side-by-side actual vs SENTINEL AI energy comparison.
@@ -664,6 +873,7 @@ async def get_energy_comparison_summary(
 
     Args:
         site_id: Site ID to analyze (e.g., "site-002")
+        method: Optimization method ("rules_based" or "hardcoded", default: "rules_based")
 
     Returns:
         ComparisonSummary with actual, sentinel, and savings metrics
@@ -675,7 +885,64 @@ async def get_energy_comparison_summary(
     if not actual_metrics:
         raise HTTPException(status_code=404, detail=f"No energy data found for site {site_id}")
 
-    # Get SENTINEL optimized prediction for same period
+    # Use rules-based engine if requested
+    if method == "rules_based":
+        try:
+            # Build current building state from helpers
+            now = datetime.now()
+            building_state = BuildingState(
+                current_hour=now.hour,
+                occupancy_percent=_estimate_occupancy(now, site_id),
+                daylight_lux=_estimate_daylight(now, site_id),
+                chiller_load_percent=_estimate_chiller_load(site_id),
+                peak_demand_kw=actual_metrics.total_kwh / 30 / 24,  # Average hourly demand
+                tariff_band=_get_tariff_band(now.hour, now.month),
+                ambient_temp_c=_get_seasonal_temp(now.month),
+                site_id=site_id,
+                date=now.isoformat()
+            )
+            
+            # Get active modules for conditional DALI rule
+            active_modules = []
+            try:
+                from app.services.module_registry_service import module_registry
+                modules = module_registry.get_active_modules(site_id)
+                active_modules = [m.module_type.value for m in modules] if modules else []
+            except Exception:
+                pass
+            
+            # Evaluate rules
+            engine = get_energy_rules_engine(site_id)
+            rules_output = engine.evaluate_rules(
+                building_state,
+                active_modules,
+                baseline_kwh=actual_metrics.total_kwh
+            )
+            
+            # Apply rules output to actual metrics to get sentinel metrics
+            sentinel_metrics = _apply_rules_output(actual_metrics, rules_output)
+            
+            # Calculate comparison metrics
+            daily_savings_zar = actual_metrics.total_cost_zar - sentinel_metrics.total_cost_zar
+            daily_savings_percent = rules_output.delta_percent
+            
+            # Progress to target (35% total savings target)
+            progress_to_target_percent = min(daily_savings_percent / 35.0 * 100, 100.0)
+            
+            return ComparisonSummary(
+                actual=actual_metrics,
+                sentinel=sentinel_metrics,
+                daily_savings_zar=round(daily_savings_zar, 2),
+                daily_savings_percent=round(daily_savings_percent, 1),
+                progress_to_target_percent=round(progress_to_target_percent, 1),
+                ai_confidence_percent=round(rules_output.confidence * 100, 1),
+            )
+        
+        except Exception as e:
+            logger.warning(f"Rules engine failed, falling back to hardcoded: {e}")
+            # Fall through to hardcoded method
+    
+    # Fallback: hardcoded method (original logic)
     prediction_response = await get_energy_prediction(
         site_id=site_id,
         scenario="sentinel_optimized",

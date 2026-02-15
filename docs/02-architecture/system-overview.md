@@ -162,6 +162,12 @@ backend/app/
   - Generates AI recommendations for peak shaving
   - Coordinates Solar BESS discharge with HVAC adjustments
   - Integrates with Tier 2 approval workflow
+- **Energy Rules Engine** (Phase 084) - Rule-based energy optimization
+  - 5 conditional optimization rules (Chiller Staging, Thermal Pre-Cooling, Occupancy HVAC, Daylight Harvesting, Peak Load Shaving)
+  - Dynamic savings 0-35% based on building conditions
+  - Learning curve confidence 78%→92% over 12 months
+  - Module-conditional logic (DALI rule only fires when module active)
+  - System breakdown allocating savings to HVAC/Lighting/Power
 
 ## Frontend Architecture
 
