@@ -999,5 +999,206 @@ class BackgroundSchedulerService:
             logger.error(f"Failed to process Clawd notifications: {e}", exc_info=True)
 
 
+    def add_simulation_queue_processor_job(self, interval_seconds: int = 10) -> None:
+        """
+        Add background job to process queued lifecycle simulations.
+        Runs every N seconds to start next queued simulation.
+
+        Args:
+            interval_seconds: How often to check queue (default 10s)
+        """
+        self.scheduler.add_job(
+            func=self._process_simulation_queue,
+            trigger="interval",
+            seconds=interval_seconds,
+            id="process_simulation_queue",
+            name="Process Simulation Queue",
+            replace_existing=True,
+        )
+        logger.info(f"Added simulation queue processor (interval: {interval_seconds}s)")
+
+    def _process_simulation_queue(self) -> None:
+        """
+        Poll database for queued simulations and start one.
+        Prevents multiple concurrent simulations (max 1 at a time).
+        """
+        try:
+            import asyncio
+            from app.database.supabase_client import Supabase
+
+            # Run async logic in event loop
+            asyncio.run(self._process_simulation_queue_async())
+
+        except Exception as e:
+            logger.error(f"Error processing simulation queue: {e}")
+
+    async def _process_simulation_queue_async(self) -> None:
+        """Async implementation of queue processor."""
+        try:
+            from app.database.supabase_client import Supabase
+            from app.services.simulation_orchestrator import (
+                create_orchestrator,
+                register_simulation,
+                unregister_simulation,
+                get_simulation_by_task_id,
+            )
+
+            supabase = Supabase.instance()
+
+            # Query next queued simulation (FIFO: oldest first)
+            response = supabase.table("solar_annual_tasks") \
+                .select("*") \
+                .eq("status", "queued") \
+                .eq("simulation_type", "lifecycle") \
+                .order("started_at", desc=False) \
+                .limit(1) \
+                .execute()
+
+            if not response.data:
+                return  # No queued tasks
+
+            task = response.data[0]
+            task_id = str(task["task_id"])
+
+            # Check if already running (prevent double-start)
+            if get_simulation_by_task_id(task_id):
+                logger.warning(f"Task {task_id} already running, skipping")
+                return
+
+            # Mark as running
+            supabase.table("solar_annual_tasks") \
+                .update({"status": "running"}) \
+                .eq("task_id", task_id) \
+                .execute()
+
+            logger.info(f"Started lifecycle simulation task {task_id}")
+
+            # Create orchestrator and register
+            orchestrator = create_orchestrator(task_id)
+            register_simulation(task_id, orchestrator)
+
+            # Start simulation (don't await - runs in background)
+            asyncio.create_task(
+                self._run_simulation_task(
+                    task_id,
+                    orchestrator,
+                    scenario=task["scenario"],
+                    duration_minutes=float(task.get("duration_minutes", 240.0)),
+                )
+            )
+
+        except Exception as e:
+            logger.error(f"Error in simulation queue processor: {e}")
+
+    async def _run_simulation_task(
+        self, task_id: str, orchestrator, scenario: str, duration_minutes: float
+    ) -> None:
+        """
+        Run a lifecycle simulation task and update database on completion.
+        Supports crash recovery by loading state from checkpoint if available.
+
+        Args:
+            task_id: Task identifier
+            orchestrator: LifecycleOrchestrator instance
+            scenario: Scenario name (fault_day, grant_hvac_dali_ai_annual, etc)
+            duration_minutes: Simulation duration in real minutes
+        """
+        from app.database.supabase_client import Supabase
+        from app.services.simulation_orchestrator import unregister_simulation
+        from app.services.lifecycle_orchestrator import SCENARIOS
+        from datetime import datetime
+
+        supabase = Supabase.instance()
+        is_recovery = False
+
+        try:
+            # Check if this is a crash recovery (has state_snapshot)
+            response = await supabase.client.table("solar_annual_tasks") \
+                .select("state_snapshot") \
+                .eq("task_id", task_id) \
+                .execute()
+
+            state_snapshot = None
+            if response.data and response.data[0].get("state_snapshot"):
+                state_snapshot = response.data[0]["state_snapshot"]
+                is_recovery = True
+                logger.info(f"🔄 Recovering simulation from checkpoint: task {task_id}")
+
+            if is_recovery and state_snapshot:
+                # CRASH RECOVERY PATH: Restore full orchestrator state from checkpoint
+                # Get scenario config
+                orchestrator.current_scenario = SCENARIOS.get(scenario, SCENARIOS["fault_day"])
+
+                # Restore all state from checkpoint
+                restored = orchestrator.deserialize_state(state_snapshot)
+                orchestrator.simulated_time = restored.simulated_time
+                orchestrator.days_simulated = restored.days_simulated
+                orchestrator.time_multiplier = restored.time_multiplier
+                orchestrator._occupancy_seed = restored._occupancy_seed
+                orchestrator.active_faults = restored.active_faults
+                orchestrator.pending_repairs = restored.pending_repairs
+                orchestrator.events = restored.events  # Restore event history
+                if orchestrator._occupancy_seed:
+                    orchestrator._scenario_rng.seed(orchestrator._occupancy_seed)
+
+                # For annual simulations, restore seasonal modeler
+                if orchestrator.seasonal_modeler is None and orchestrator.days_simulated > 0:
+                    from app.services.seasonal_modeler import SeasonalModeler
+                    orchestrator.seasonal_modeler = SeasonalModeler(seed=orchestrator._occupancy_seed)
+
+                # Set up for simulation restart
+                orchestrator.real_start_time = datetime.now()
+                orchestrator.running = True
+                orchestrator.paused = False
+
+                logger.info(
+                    f"✅ Restored checkpoint: day {orchestrator.days_simulated}/365, "
+                    f"time {orchestrator.simulated_time.isoformat()}"
+                )
+
+                # Start the simulation loop directly (bypasses fresh initialization)
+                orchestrator._task = asyncio.create_task(orchestrator._run_simulation())
+
+            else:
+                # FRESH START PATH: Initialize new simulation
+                await orchestrator.start(scenario=scenario, duration_minutes=duration_minutes)
+
+            # Wait for completion
+            if orchestrator._task:
+                await orchestrator._task
+
+            # Mark as completed
+            await supabase.client.table("solar_annual_tasks") \
+                .update({
+                    "status": "completed",
+                    "progress_pct": 100,
+                    "completed_at": "now()",
+                }) \
+                .eq("task_id", task_id) \
+                .execute()
+
+            logger.info(f"✅ Simulation task {task_id} completed successfully")
+
+        except Exception as e:
+            logger.error(f"❌ Simulation task {task_id} failed: {e}")
+
+            # Mark as failed with error message
+            try:
+                await supabase.client.table("solar_annual_tasks") \
+                    .update({
+                        "status": "failed",
+                        "error_message": str(e)[:500],  # Truncate long errors
+                        "completed_at": "now()",
+                    }) \
+                    .eq("task_id", task_id) \
+                    .execute()
+            except Exception as db_error:
+                logger.error(f"Failed to update task status in DB: {db_error}")
+
+        finally:
+            # Always unregister from active simulations
+            unregister_simulation(task_id)
+
+
 # Global scheduler instance
 scheduler_service = BackgroundSchedulerService()

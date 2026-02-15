@@ -27,6 +27,7 @@ from app.models.solar import (
 from app.services.solar_connector_base import SolarConnector
 from app.services.solar_connector_huawei import SimulatedHuaweiConnector
 from app.services.solar_connector_schneider import SimulatedSchneiderConnector
+from app.services.solar_connector_simulation import SimulatedSolarConnector
 from app.database.supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
@@ -369,6 +370,9 @@ class SolarIngestionService:
         for mtr_cfg in meters:
             mtr_cfg["site_id"] = site_id
 
+        # Store plant capacity for use in simulation lookups
+        reg._total_plant_capacity_kwp = sum(p.capacity_kwp for p in reg.plants.values()) or 3.875
+
         self._sites[site_id] = reg
         logger.info(
             f"Registered solar site '{site_name}' with "
@@ -448,86 +452,126 @@ class SolarIngestionService:
     # === Site overview ===
 
     async def get_site_overview(self, site_id: str) -> Optional[Dict]:
-        """Get high-level site overview: total generation, BESS SOC, grid flow."""
+        """Get high-level site overview combining annual simulation + live connectors.
+
+        Returns:
+        - Annual metrics from cached simulation (R405K savings, 5.88M kWh, learning curve)
+        - Real-time BESS/inverter status from live connectors
+        """
         site = self._sites.get(site_id)
         if not site:
             return None
 
-        # Collect all inverter readings
-        total_pv_kw = 0.0
-        total_daily_kwh = 0.0
-        inverter_count = 0
-        inverters_online = 0
-        inverters_fault = 0
+        try:
+            # === Fetch annual summary from cache ===
+            annual_data = await self._get_annual_summary(site_id)
 
-        for key, connector in site.connectors.items():
-            if not connector.is_connected():
-                try:
-                    await connector.connect()
-                except Exception:
-                    continue
+            # === Get real-time status from live connectors ===
+            # Connect all connectors
+            for key, connector in site.connectors.items():
+                if not connector.is_connected():
+                    try:
+                        await connector.connect()
+                    except Exception:
+                        continue
 
-        # Read all inverters from all connectors
-        all_inverters = await self.get_inverters(site_id)
-        for inv in all_inverters:
-            inverter_count += 1
-            total_pv_kw += inv.ac_power_kw
-            total_daily_kwh += inv.daily_yield_kwh
-            if inv.status == "online":
-                inverters_online += 1
-            elif inv.status == "fault":
-                inverters_fault += 1
+            # Read all inverters from all connectors
+            all_inverters = await self.get_inverters(site_id)
+            inverter_count = len(all_inverters)
+            inverters_online = sum(1 for i in all_inverters if i.status == "online")
+            inverters_fault = sum(1 for i in all_inverters if i.status == "fault")
+            total_pv_kw = sum(i.ac_power_kw for i in all_inverters)
+            total_daily_kwh = sum(i.daily_yield_kwh for i in all_inverters)
 
-        # BESS status
-        bess = await self.get_bess_status(site_id)
-        bess_data = bess.to_dict() if bess else None
+            # BESS status
+            bess = await self.get_bess_status(site_id)
+            bess_data = bess.to_dict() if bess else None
 
-        # Meter readings
-        meters = await self.get_meter_readings(site_id)
-        grid_import_kw = sum(m.import_kw for m in meters)
-        grid_export_kw = sum(m.export_kw for m in meters)
+            # Meter readings
+            meters = await self.get_meter_readings(site_id)
+            grid_import_kw = sum(m.import_kw for m in meters)
+            grid_export_kw = sum(m.export_kw for m in meters)
 
-        # Plant summaries
-        plant_summaries = []
-        for plant in site.plants.values():
-            plant_inverters = [i for i in all_inverters if i.plant_id == plant.plant_id]
-            plant_summaries.append({
-                "plant_id": plant.plant_id,
-                "name": plant.name,
-                "capacity_kwp": plant.capacity_kwp,
-                "current_kw": round(sum(i.ac_power_kw for i in plant_inverters), 1),
-                "inverters_online": sum(1 for i in plant_inverters if i.status == "online"),
-                "inverters_total": len(plant_inverters),
-            })
+            # Plant summaries
+            plant_summaries = []
+            for plant in site.plants.values():
+                plant_inverters = [i for i in all_inverters if i.plant_id == plant.plant_id]
+                plant_summaries.append({
+                    "plant_id": plant.plant_id,
+                    "name": plant.name,
+                    "capacity_kwp": plant.capacity_kwp,
+                    "current_kw": round(sum(i.ac_power_kw for i in plant_inverters), 1),
+                    "inverters_online": sum(1 for i in plant_inverters if i.status == "online"),
+                    "inverters_total": len(plant_inverters),
+                })
 
-        # Total plant capacity
-        total_capacity_kwp = sum(p.capacity_kwp for p in site.plants.values())
-        performance_ratio = (total_pv_kw / total_capacity_kwp * 100) if total_capacity_kwp > 0 else 0
+            # Total plant capacity
+            total_capacity_kwp = sum(p.capacity_kwp for p in site.plants.values())
+            performance_ratio = (total_pv_kw / total_capacity_kwp * 100) if total_capacity_kwp > 0 else 0
 
-        return {
-            "site_id": site_id,
-            "site_name": site.site_name,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "generation": {
-                "total_pv_kw": round(total_pv_kw, 1),
-                "total_daily_kwh": round(total_daily_kwh, 0),
-                "total_capacity_kwp": round(total_capacity_kwp, 1),
-                "performance_ratio_pct": round(performance_ratio, 1),
-            },
-            "inverters": {
-                "total": inverter_count,
-                "online": inverters_online,
-                "fault": inverters_fault,
-                "offline": inverter_count - inverters_online - inverters_fault,
-            },
-            "bess": bess_data,
-            "grid": {
-                "import_kw": round(grid_import_kw, 1),
-                "export_kw": round(grid_export_kw, 1),
-                "net_kw": round(grid_import_kw - grid_export_kw, 1),
-            },
-            "plants": plant_summaries,
-        }
+            # Build response: annual metrics + live connector data
+            response = {
+                "site_id": site_id,
+                "site_name": site.site_name,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "data_source": "annual_simulation + live_connectors",
+
+                # Real-time generation & grid
+                "generation": {
+                    "total_pv_kw": round(total_pv_kw, 1),
+                    "total_daily_kwh": round(total_daily_kwh, 0),
+                    "total_capacity_kwp": round(total_capacity_kwp, 1),
+                    "performance_ratio_pct": round(performance_ratio, 1),
+                },
+                "inverters": {
+                    "total": inverter_count,
+                    "online": inverters_online,
+                    "fault": inverters_fault,
+                    "offline": inverter_count - inverters_online - inverters_fault,
+                },
+                "bess": bess_data,
+                "grid": {
+                    "import_kw": round(grid_import_kw, 1),
+                    "export_kw": round(grid_export_kw, 1),
+                    "net_kw": round(grid_import_kw - grid_export_kw, 1),
+                },
+                "plants": plant_summaries,
+
+                # Annual simulation metrics (if available)
+                "annual_summary": annual_data,
+            }
+
+            return response
+
+        except Exception as e:
+            logger.error(f"Failed to get site overview: {e}", exc_info=True)
+            return None
+
+    async def _get_annual_summary(self, site_id: str) -> Optional[Dict]:
+        """Fetch annual simulation summary from cache."""
+        try:
+            supabase = get_supabase_client()
+            response = supabase.table("solar_annual_simulations").select("*").eq(
+                "site_id", site_id
+            ).eq("scenario", "grant_solar_bess_ai_annual").order(
+                "created_at", desc=True
+            ).limit(1).execute()
+
+            if not response.data:
+                logger.debug(f"No annual summary found for {site_id}")
+                return None
+
+            result = response.data[0]
+            annual_data = result.get("results", {})
+
+            logger.info(f"✅ Annual summary: R{annual_data.get('annual_savings_zar', 0):,.0f}, "
+                       f"{annual_data.get('annual_savings_pct', 0):.1f}% savings")
+
+            return annual_data
+
+        except Exception as e:
+            logger.debug(f"Failed to fetch annual summary: {e}")
+            return None
 
     # === Inverter detail ===
 

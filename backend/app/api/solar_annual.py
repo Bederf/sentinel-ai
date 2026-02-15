@@ -251,9 +251,9 @@ async def _run_annual_simulation(
         )
         logger.info(f"✅ Aggregation complete: {annual_summary.annual_savings_pct:.1f}% savings")
 
-        # Cache results in Supabase
+        # Cache results in Supabase (including hourly snapshots)
         logger.info("💾 Caching results...")
-        await _cache_results(site_id, annual_summary)
+        await _cache_results(site_id, annual_summary, hourly_data=hourly_data)
         logger.info("✅ Results cached in Supabase")
 
         task["status"] = "completed"
@@ -286,7 +286,8 @@ def _generate_hourly_snapshots(orchestrator) -> list:
     
     for hour in range(8760):
         current_time = start_date + timedelta(hours=hour)
-        day_of_year = current_time.timetuple().tm_yday
+        # Calculate day_of_year (1-365, even in leap years)
+        day_of_year = (current_time.timetuple().tm_yday - 1) % 365 + 1
         current_hour = current_time.hour
         
         # Solar generation (0 at night, peaks at noon)
@@ -367,12 +368,69 @@ def _generate_hourly_snapshots(orchestrator) -> list:
     return snapshots
 
 
-async def _cache_results(site_id: str, annual_summary: AnnualSummary) -> None:
-    """Cache aggregated results in Supabase."""
+async def _cache_results(site_id: str, annual_summary: AnnualSummary, hourly_data: list = None) -> None:
+    """Cache annual results and daily aggregates in Supabase."""
     try:
         supabase = get_supabase_client()
-        
-        # Prepare results JSON
+
+        # Store daily aggregates (instead of hourly snapshots)
+        if hourly_data:
+            logger.info(f"Aggregating {len(hourly_data)} hourly snapshots into daily records for {site_id}...")
+
+            # Aggregate hourly data by day (365 records instead of 8760)
+            daily_records = {}
+            for snap in hourly_data:
+                day_key = snap.date.date().isoformat()
+
+                if day_key not in daily_records:
+                    daily_records[day_key] = {
+                        "site_id": site_id,
+                        "scenario": annual_summary.scenario,
+                        "year": annual_summary.year,
+                        "date": day_key,
+                        "month": snap.month,
+                        "day_of_year": snap.day_of_year,
+                        "solar_gen_kwh": 0,
+                        "building_load_kwh": 0,
+                        "grid_import_kwh": 0,
+                        "grid_export_kwh": 0,
+                        "bess_charge_kwh": 0,
+                        "bess_discharge_kwh": 0,
+                        "peak_generation_kw": 0,
+                        "avg_bess_soc_pct": [],
+                    }
+
+                # Sum hourly values for daily total (each hour = 1/24 of a day)
+                daily_records[day_key]["solar_gen_kwh"] += snap.solar_gen_kw / 24
+                daily_records[day_key]["building_load_kwh"] += snap.building_load_kw / 24
+                daily_records[day_key]["grid_import_kwh"] += snap.grid_import_kw / 24
+                daily_records[day_key]["grid_export_kwh"] += snap.grid_export_kw / 24
+                daily_records[day_key]["bess_charge_kwh"] += snap.bess_charge_kw / 24
+                daily_records[day_key]["bess_discharge_kwh"] += snap.bess_discharge_kw / 24
+                daily_records[day_key]["peak_generation_kw"] = max(
+                    daily_records[day_key]["peak_generation_kw"],
+                    snap.solar_gen_kw
+                )
+                daily_records[day_key]["avg_bess_soc_pct"].append(snap.bess_soc_pct)
+
+            # Calculate average SOC and prepare final records
+            daily_insert_records = []
+            for day_key, daily in daily_records.items():
+                avg_soc = sum(daily.pop("avg_bess_soc_pct")) / 24 if daily.get("avg_bess_soc_pct") else 50
+                daily["avg_bess_soc_pct"] = round(avg_soc, 1)
+
+                # Round to 1 decimal place
+                for key in ["solar_gen_kwh", "building_load_kwh", "grid_import_kwh", "grid_export_kwh",
+                           "bess_charge_kwh", "bess_discharge_kwh", "peak_generation_kw"]:
+                    daily[key] = round(daily[key], 1)
+
+                daily_insert_records.append(daily)
+
+            # Insert 365 daily records (much smaller than 8760 hourly)
+            supabase.table("solar_daily_aggregates").insert(daily_insert_records).execute()
+            logger.info(f"✅ Stored {len(daily_insert_records)} daily aggregates for {site_id}")
+
+        # Prepare and cache aggregated results JSON
         results_json = {
             "site_id": annual_summary.site_id,
             "year": annual_summary.year,
@@ -402,7 +460,7 @@ async def _cache_results(site_id: str, annual_summary: AnnualSummary) -> None:
             "self_consumption_pct": annual_summary.self_consumption_pct,
         }
         
-        # Upsert into Supabase
+        # Upsert annual simulation into Supabase (replace if exists)
         response = supabase.table("solar_annual_simulations").upsert({
             "site_id": site_id,
             "year": annual_summary.year,
