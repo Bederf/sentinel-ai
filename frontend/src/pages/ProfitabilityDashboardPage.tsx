@@ -601,9 +601,9 @@ export function ProfitabilityDashboardPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-4 md:p-6" style={{ background: "var(--color-sentinel-bg-canvas)" }}>
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between mb-2">
         <div>
           <Title
             style={{ color: "var(--color-sentinel-text-primary)" }}

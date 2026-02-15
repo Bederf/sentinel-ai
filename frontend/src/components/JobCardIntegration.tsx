@@ -47,7 +47,7 @@ export default function JobCardIntegration({
   diagnosis,
   faultCode,
   equipment,
-  siteId = 'site-001',
+  siteId = 'site-002',
   onCreate,
   compact = false,
 }: JobCardProps) {

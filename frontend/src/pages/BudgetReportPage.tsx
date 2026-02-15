@@ -126,7 +126,7 @@ export function BudgetReportPage() {
   }
 
   return (
-    <div className="space-y-6 p-4 md:p-6">
+    <div className="space-y-6 p-4 md:p-6" style={{ background: "var(--color-sentinel-bg-canvas)" }}>
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <Title style={{ color: "var(--color-sentinel-text-primary)" }}>
@@ -150,6 +150,22 @@ export function BudgetReportPage() {
       </div>
 
       <Card className="glass-panel">
+        {/* Filters Header */}
+        <div className="pb-4 mb-4 border-b" style={{ borderColor: "var(--color-sentinel-border)" }}>
+          <div className="flex items-center gap-2 mb-4">
+            <div className="p-2 rounded" style={{ background: "rgba(59, 130, 246, 0.15)" }}>
+              <FileText className="h-4 w-4" style={{ color: "var(--color-sentinel-blue)" }} />
+            </div>
+            <div>
+              <h3 className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                Filter Reports
+              </h3>
+              <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                Select contract, year, and month
+              </span>
+            </div>
+          </div>
+        </div>
         <div className="flex flex-col lg:flex-row lg:items-center gap-4">
           <div className="flex-1 min-w-0">
             <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
@@ -209,37 +225,49 @@ export function BudgetReportPage() {
       {report && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <Card className="glass-panel">
-            <div className="flex items-center gap-2">
-              <FileText className="h-4 w-4" style={{ color: "var(--color-sentinel-blue)" }} />
-              <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                Total Budget
-              </Text>
+            <div className="flex items-start justify-between">
+              <div>
+                <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                  Total Budget
+                </Text>
+                <Title style={{ color: "var(--color-sentinel-text-primary)" }}>
+                  {formatZAR(report.totals.total_budget_zar)}
+                </Title>
+              </div>
+              <div className="p-2 rounded" style={{ background: "rgba(59, 130, 246, 0.15)" }}>
+                <FileText className="h-5 w-5" style={{ color: "var(--color-sentinel-blue)" }} />
+              </div>
             </div>
-            <Title style={{ color: "var(--color-sentinel-text-primary)" }}>
-              {formatZAR(report.totals.total_budget_zar)}
-            </Title>
           </Card>
           <Card className="glass-panel">
-            <div className="flex items-center gap-2">
-              <FileText className="h-4 w-4" style={{ color: "var(--color-sentinel-amber)" }} />
-              <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                Total Actual
-              </Text>
+            <div className="flex items-start justify-between">
+              <div>
+                <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                  Total Actual
+                </Text>
+                <Title style={{ color: "var(--color-sentinel-text-primary)" }}>
+                  {formatZAR(report.totals.total_actual_zar)}
+                </Title>
+              </div>
+              <div className="p-2 rounded" style={{ background: "rgba(245, 158, 11, 0.15)" }}>
+                <FileText className="h-5 w-5" style={{ color: "var(--color-sentinel-amber)" }} />
+              </div>
             </div>
-            <Title style={{ color: "var(--color-sentinel-text-primary)" }}>
-              {formatZAR(report.totals.total_actual_zar)}
-            </Title>
           </Card>
           <Card className="glass-panel">
-            <div className="flex items-center gap-2">
-              <FileText className="h-4 w-4" style={{ color: "var(--color-sentinel-green)" }} />
-              <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                Variance
-              </Text>
+            <div className="flex items-start justify-between">
+              <div>
+                <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                  Variance
+                </Text>
+                <Title style={{ color: "var(--color-sentinel-text-primary)" }}>
+                  {formatZAR(report.totals.variance_zar)}
+                </Title>
+              </div>
+              <div className="p-2 rounded" style={{ background: "rgba(16, 185, 129, 0.15)" }}>
+                <FileText className="h-5 w-5" style={{ color: "var(--color-sentinel-green)" }} />
+              </div>
             </div>
-            <Title style={{ color: "var(--color-sentinel-text-primary)" }}>
-              {formatZAR(report.totals.variance_zar)}
-            </Title>
           </Card>
         </div>
       )}
@@ -247,10 +275,20 @@ export function BudgetReportPage() {
       {report && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card className="glass-panel">
-            <Title className="text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
-              Monthly Breakdown
-            </Title>
-            <Table className="mt-3">
+            {/* Section Header */}
+            <div className="pb-3 mb-4 border-b" style={{ borderColor: "var(--color-sentinel-border)" }}>
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded" style={{ background: "rgba(59, 130, 246, 0.15)" }}>
+                  <FileText className="h-4 w-4" style={{ color: "var(--color-sentinel-blue)" }} />
+                </div>
+                <div>
+                  <h3 className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                    Monthly Breakdown
+                  </h3>
+                </div>
+              </div>
+            </div>
+            <Table>
               <TableHead>
                 <TableRow>
                   <TableHeaderCell>Month</TableHeaderCell>
@@ -273,15 +311,25 @@ export function BudgetReportPage() {
           </Card>
 
           <Card className="glass-panel">
-            <Title className="text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
-              Equipment-Type Breakdown
-            </Title>
+            {/* Section Header */}
+            <div className="pb-3 mb-4 border-b" style={{ borderColor: "var(--color-sentinel-border)" }}>
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded" style={{ background: "rgba(245, 158, 11, 0.15)" }}>
+                  <FileText className="h-4 w-4" style={{ color: "var(--color-sentinel-amber)" }} />
+                </div>
+                <div>
+                  <h3 className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                    Equipment-Type Breakdown
+                  </h3>
+                </div>
+              </div>
+            </div>
             {report.equipment_type_breakdown.length === 0 ? (
-              <Text className="text-xs mt-3" style={{ color: "var(--color-sentinel-text-disabled)" }}>
+              <Text className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>
                 No equipment-type budgets available.
               </Text>
             ) : (
-              <Table className="mt-3">
+              <Table>
                 <TableHead>
                   <TableRow>
                     <TableHeaderCell>Type</TableHeaderCell>

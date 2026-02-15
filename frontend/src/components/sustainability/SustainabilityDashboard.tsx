@@ -68,7 +68,9 @@ export function SustainabilityDashboard({
       .then((fetchedSites) => {
         setSites(fetchedSites);
         if (fetchedSites.length > 0) {
-          const initialSite = _externalSiteId || fetchedSites[0].id;
+          // Default to site-002 (Sandton), or use provided siteId, or use first site
+          const defaultSite = fetchedSites.find(s => s.id === 'site-002') || fetchedSites[0];
+          const initialSite = _externalSiteId || defaultSite.id;
           setSelectedSiteId(initialSite);
         }
       })
