@@ -3,8 +3,9 @@
 import json
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 
+from app.middleware.rate_limiter import limiter
 from app.database.repositories.prediction_repository import PredictionRepository
 from app.services.prediction_generator import get_prediction_generator
 from app.services.prediction_taxonomy import (
@@ -102,8 +103,10 @@ def format_prediction_for_frontend(pred: dict) -> dict:
     }
 
 
+@limiter.limit("120/minute")
 @router.get("/predictions")
 async def list_predictions(
+    request: Request,
     building_code: Optional[str] = Query(None, description="Filter by building code (e.g., site-002)"),
     equipment_type: Optional[str] = Query(None, description="Filter by equipment type"),
     severity: Optional[str] = Query(None, description="Filter by severity (critical/warning/healthy)"),

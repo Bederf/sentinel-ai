@@ -8,9 +8,10 @@ import logging
 from datetime import datetime
 from typing import Optional, List, Any
 
-from fastapi import APIRouter, Query, HTTPException
+from fastapi import APIRouter, Query, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from app.middleware.rate_limiter import limiter
 from app.services.audit_logger import AuditLogger
 from app.models.audit_log import AuditActionType, AuditResultType, AuditLogEntry
 
@@ -78,8 +79,10 @@ class AuditStatsResponse(BaseModel):
 
 
 # API endpoints
+@limiter.limit("120/minute")
 @router.get("/logs", response_model=AuditLogsResponse)
 async def get_audit_logs(
+    request: Request,
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(50, ge=1, le=200, description="Items per page"),
     start_time: Optional[datetime] = Query(None, description="Start time filter"),

@@ -57,7 +57,7 @@ class ConfigUpdateRequest(BaseModel):
     emission_factors: Optional[dict] = None
 
 
-@router.get("/sustainability/{site_id}/summary")
+@router.get("/{site_id}/summary")
 async def get_sustainability_summary(site_id: str):
     """Dashboard summary: current month, YTD, trend, targets, Green Star progress."""
     try:
@@ -67,7 +67,7 @@ async def get_sustainability_summary(site_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/sustainability/{site_id}/emissions")
+@router.get("/{site_id}/emissions")
 async def get_emissions_history(
     site_id: str,
     months: int = Query(default=12, ge=1, le=36),
@@ -85,7 +85,7 @@ async def get_emissions_history(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/sustainability/{site_id}/emissions/current")
+@router.get("/{site_id}/emissions/current")
 async def get_current_emissions(site_id: str):
     """Current month emissions snapshot."""
     try:
@@ -96,7 +96,7 @@ async def get_current_emissions(site_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/sustainability/{site_id}/emissions/breakdown")
+@router.get("/{site_id}/emissions/breakdown")
 async def get_emissions_breakdown(site_id: str):
     """Emissions breakdown by scope and system."""
     try:
@@ -131,7 +131,7 @@ async def get_emissions_breakdown(site_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/sustainability/{site_id}/efficiency")
+@router.get("/{site_id}/efficiency")
 async def get_efficiency_metrics(site_id: str):
     """Energy and carbon intensity with SA office benchmarks."""
     try:
@@ -141,7 +141,7 @@ async def get_efficiency_metrics(site_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/sustainability/{site_id}/green-star")
+@router.get("/{site_id}/green-star")
 async def get_green_star_assessment(site_id: str):
     """Green Star SA self-assessment tracker."""
     try:
@@ -152,7 +152,7 @@ async def get_green_star_assessment(site_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.put("/sustainability/{site_id}/green-star/{category_id}")
+@router.put("/{site_id}/green-star/{category_id}")
 async def update_green_star_score(
     site_id: str,
     category_id: str,
@@ -171,7 +171,7 @@ async def update_green_star_score(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/sustainability/{site_id}/config")
+@router.get("/{site_id}/config")
 async def get_sustainability_config(site_id: str):
     """Get site sustainability configuration."""
     try:
@@ -182,7 +182,7 @@ async def get_sustainability_config(site_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.put("/sustainability/{site_id}/config")
+@router.put("/{site_id}/config")
 async def update_sustainability_config(
     site_id: str,
     request: ConfigUpdateRequest,
