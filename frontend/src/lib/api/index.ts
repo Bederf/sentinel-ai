@@ -248,4 +248,17 @@ export {
   type DeviceCondition,
   type BatchResponse,
 } from './types';
+export {
+  fetchEnergyComparisonSummary,
+  fetchEnergyActual,
+  fetchEnergyPrediction,
+  fetchEnergyComparison,
+  calculateSavingsPercent,
+  calculateCarbonOffset,
+  formatEnergyMetrics,
+  type ComparisonSummary,
+  type EnergyActual,
+  type EnergyPrediction,
+  type EnergyMetrics,
+} from './energy';
 export { apiFetch, type ApiError } from './fetchClient';
