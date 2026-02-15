@@ -563,54 +563,64 @@ async def complete_mfa_login(request: Request, email: str, mfa_code: str):
     # Auto-start demo for Grant (grant@wardew.co.za)
     if email == "grant@wardew.co.za":
         try:
-            # Reset orchestrator for fresh demo on login
-            orchestrator = get_lifecycle_orchestrator()
-            orchestrator.reset()
-            
-            # Auto-start Grant's primary scenario: HVAC+DALI+Sentinel AI (365-day annual)
-            # This demonstrates full predictive AI control with seasonal variations
-            orchestrator.run_scenario(
-                scenario_name="grant_hvac_dali_ai_annual",
-                duration_minutes=30.0  # 365 days compressed to 30 minutes real time
-            )
+            try:
+                # Reset orchestrator for fresh demo on login
+                orchestrator = get_lifecycle_orchestrator()
+                orchestrator.reset()
+                
+                # Auto-start Grant's primary scenario: HVAC+DALI+Sentinel AI (365-day annual)
+                # This demonstrates full predictive AI control with seasonal variations
+                orchestrator.run_scenario(
+                    scenario_name="grant_hvac_dali_ai_annual",
+                    duration_minutes=30.0  # 365 days compressed to 30 minutes real time
+                )
 
-            response["demo_auto_start"] = True
-            response["demo_type"] = "annual-demonstration"
-            response["demo_description"] = "HVAC + DALI + Sentinel AI (365-day full-year with seasonal variations)"
-            response["demo_scenario"] = "grant_hvac_dali_ai_annual"
-            response["demo_status"] = "running"
-            logger.info(f"Auto-started Grant demo scenario: grant_hvac_dali_ai_annual (365 days, ~30 minutes real time)")
+                response["demo_auto_start"] = True
+                response["demo_type"] = "annual-demonstration"
+                response["demo_description"] = "HVAC + DALI + Sentinel AI (365-day full-year with seasonal variations)"
+                response["demo_scenario"] = "grant_hvac_dali_ai_annual"
+                response["demo_status"] = "running"
+                logger.info(f"Auto-started Grant demo scenario: grant_hvac_dali_ai_annual (365 days, ~30 minutes real time)")
+            except Exception as e:
+                logger.error(f"Error auto-starting Grant demo: {e}", exc_info=True)
+                response["demo_auto_start"] = False
+                response["demo_type"] = "error"
+                response["demo_error"] = str(e)
         except Exception as e:
-            logger.error(f"Error auto-starting Grant demo: {e}")
-            response["demo_auto_start"] = True
-            response["demo_type"] = "three-method-comparison"
-            response["demo_error"] = str(e)
+            # Failsafe: ensure login doesn't break even if demo setup fails
+            logger.error(f"Failsafe: Unexpected error in Grant demo setup: {e}", exc_info=True)
+            response["demo_auto_start"] = False
     
     # Auto-start demo for Solar/BESS client (bederf@protonmail.com)
     if email == "bederf@protonmail.com":
         try:
-            # Reset orchestrator for fresh demo on login
-            orchestrator = get_lifecycle_orchestrator()
-            orchestrator.reset()
+            try:
+                # Reset orchestrator for fresh demo on login
+                orchestrator = get_lifecycle_orchestrator()
+                orchestrator.reset()
 
-            # Auto-start Solar + BESS annual simulation (365 days)
-            # Demonstrates full-year solar generation with AI-optimized BESS arbitrage
-            orchestrator.run_scenario(
-                scenario_name="grant_solar_bess_ai_annual",
-                duration_minutes=30.0  # 365 days compressed to 30 minutes real time
-            )
+                # Auto-start Solar + BESS annual simulation (365 days)
+                # Demonstrates full-year solar generation with AI-optimized BESS arbitrage
+                orchestrator.run_scenario(
+                    scenario_name="grant_solar_bess_ai_annual",
+                    duration_minutes=30.0  # 365 days compressed to 30 minutes real time
+                )
 
-            response["demo_auto_start"] = True
-            response["demo_type"] = "solar-bess-annual"
-            response["demo_description"] = "Solar+BESS with Sentinel AI (365-day full-year with City Power TOU arbitrage)"
-            response["demo_scenario"] = "grant_solar_bess_ai_annual"
-            response["demo_status"] = "running"
-            logger.info(f"Auto-started Bederf demo scenario: grant_solar_bess_ai_annual (365 days, ~30 minutes real time)")
+                response["demo_auto_start"] = True
+                response["demo_type"] = "solar-bess-annual"
+                response["demo_description"] = "Solar+BESS with Sentinel AI (365-day full-year with City Power TOU arbitrage)"
+                response["demo_scenario"] = "grant_solar_bess_ai_annual"
+                response["demo_status"] = "running"
+                logger.info(f"Auto-started Bederf demo scenario: grant_solar_bess_ai_annual (365 days, ~30 minutes real time)")
+            except Exception as e:
+                logger.error(f"Error auto-starting Bederf demo: {e}", exc_info=True)
+                response["demo_auto_start"] = False
+                response["demo_type"] = "error"
+                response["demo_error"] = str(e)
         except Exception as e:
-            logger.error(f"Error auto-starting Bederf demo: {e}")
-            response["demo_auto_start"] = True
-            response["demo_type"] = "solar-bess-annual"
-            response["demo_error"] = str(e)
+            # Failsafe: ensure login doesn't break even if demo setup fails
+            logger.error(f"Failsafe: Unexpected error in Bederf demo setup: {e}", exc_info=True)
+            response["demo_auto_start"] = False
 
     return response
 
