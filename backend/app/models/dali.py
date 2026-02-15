@@ -325,3 +325,61 @@ class FloorSummary:
             "total_power_watts": self.total_power_watts,
             "zones": [z.to_dict() for z in self.zones],
         }
+
+
+@dataclass
+class BuildingOccupancy:
+    """Building-wide occupancy overview with floor and zone breakdown."""
+
+    site_id: str
+    building_name: str
+    timestamp: str
+    total_occupancy_percent: float
+    total_zones: int
+    floors: List[FloorSummary] = field(default_factory=list)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "site_id": self.site_id,
+            "building_name": self.building_name,
+            "timestamp": self.timestamp,
+            "total_occupancy_percent": self.total_occupancy_percent,
+            "total_zones": self.total_zones,
+            "floors": [f.to_dict() for f in self.floors],
+        }
+
+
+@dataclass
+class DALIStats:
+    """System-wide DALI statistics."""
+
+    site_id: str
+    timestamp: str
+    avg_occupancy_percent: float
+    avg_brightness_percent: float
+    total_zones: int
+    total_sensors: int
+    total_luminaires: int
+    daylight_hours_utilized: float
+    kwh_saved_today: float
+    energy_waste_zones: int
+    daylight_harvesting_active: bool
+    ml_effectiveness_percent: float
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "site_id": self.site_id,
+            "timestamp": self.timestamp,
+            "avg_occupancy_percent": self.avg_occupancy_percent,
+            "avg_brightness_percent": self.avg_brightness_percent,
+            "total_zones": self.total_zones,
+            "total_sensors": self.total_sensors,
+            "total_luminaires": self.total_luminaires,
+            "daylight_hours_utilized": self.daylight_hours_utilized,
+            "kwh_saved_today": self.kwh_saved_today,
+            "energy_waste_zones": self.energy_waste_zones,
+            "daylight_harvesting_active": self.daylight_harvesting_active,
+            "ml_effectiveness_percent": self.ml_effectiveness_percent,
+        }

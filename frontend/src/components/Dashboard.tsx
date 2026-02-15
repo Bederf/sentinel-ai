@@ -63,7 +63,7 @@ import { BESSStatusPanel } from "./solar/BESSStatusPanel";
 import { InverterStatusMatrix } from "./solar/InverterStatusMatrix";
 import { EnergyFlowDiagram } from "./solar/EnergyFlowDiagram";
 import { SolarAnnualCard } from "./solar/SolarAnnualCard";
-import { DaliIntelligencePanel } from "./DaliIntelligencePanel";
+import { LightingIntelligencePanel } from "./LightingIntelligencePanel";
 import { type View } from "./Sidebar";
 import CardLibrary from "./CardLibrary";
 import { DEFAULT_KPI_CARDS, DEFAULT_SECTIONS } from "../lib/cardDefinitions";
@@ -1071,7 +1071,7 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
     return (
       <DashboardSection id="dali-intelligence">
         <div className="mt-6">
-          <DaliIntelligencePanel siteId="site-002" />
+          <LightingIntelligencePanel siteId="site-002" />
         </div>
       </DashboardSection>
     );
