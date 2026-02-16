@@ -67,7 +67,7 @@ import { SolarAnnualCard } from "./solar/SolarAnnualCard";
 import { LightingIntelligencePanel } from "./LightingIntelligencePanel";
 import { type View } from "./Sidebar";
 import CardLibrary from "./CardLibrary";
-import { DEFAULT_KPI_CARDS, DEFAULT_SECTIONS } from "../lib/cardDefinitions";
+import { DEFAULT_KPI_CARDS, DEFAULT_SECTIONS, getModuleFilteredSections } from "../lib/cardDefinitions";
 import { useModules } from "@/contexts/ModuleHooks";
 
 // Time period options for energy chart
@@ -1228,8 +1228,9 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
     'solar-annual': renderSolarAnnual,
   };
 
-  // Filter to only visible sections
-  const visibleSectionOrder = sectionOrder.filter(id => visibleSections.includes(id));
+  // Filter to only visible sections AND sections with active modules
+  const moduleFilteredSections = getModuleFilteredSections(visibleSections, isModuleActive);
+  const visibleSectionOrder = sectionOrder.filter(id => moduleFilteredSections.includes(id));
 
   return (
     <DndContext

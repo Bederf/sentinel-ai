@@ -27,10 +27,8 @@ export const USER_DEMO_CONFIGS: Record<string, CompanyDemoConfig> = {
       'dashboard',           // Base: always visible
       'digital-twin',        // Base: always visible
       'integrations',        // Base: System Health
-      'solar',               // Add-on: Solar & BESS (their module)
+      'solar',               // Add-on: Solar & BESS (their focus module)
       'control',             // Add-on: Building Controls (needed for solar control)
-      'technician',          // Add-on: Tech Chat (base hvac module)
-      'fleet',               // Add-on: Fleet ML (base ml module)
       'settings',            // Internal: password-protected module management
     ],
     defaultView: 'dashboard',
@@ -55,12 +53,10 @@ export const COMPANY_DEMO_CONFIGS: Record<string, CompanyDemoConfig> = {
       'occupancy',           // Add-on: Occupancy monitoring (lighting module)
       'lighting',            // Add-on: Lighting control (lighting module)
       'control',             // Add-on: Building Controls (needed for lighting control)
-      'technician',          // Add-on: Tech Chat (base hvac module)
-      'fleet',               // Add-on: Fleet ML (base ml module)
       'settings',            // Internal: password-protected module management
     ],
     defaultView: 'occupancy',
-    viewMode: 'operator',   // Changed from 'auditor' — Grant needs to demo controls
+    viewMode: 'operator',
     description: 'DALI Lighting & Occupancy Control Demo',
   },
 };

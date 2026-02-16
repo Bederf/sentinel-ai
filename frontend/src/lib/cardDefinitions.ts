@@ -2,13 +2,16 @@
  * Card Definitions
  * 
  * Defines default KPI cards and dashboard sections visibility
+ * Sections can be filtered by module access via getModuleFilteredSections()
  */
 import type { LucideIcon } from 'lucide-react';
+import type { ModuleType } from './moduleRegistry';
 
 export interface CardDefinition {
   id: string;
   name: string;
   description?: string;
+  requiredModules?: ModuleType[];  // Optional module requirement for visibility
 }
 
 // KPI Card definitions
@@ -20,19 +23,19 @@ export const KPI_CARDS: CardDefinition[] = [
   { id: 'kpi-risk-predictions', name: 'Risk Predictions', description: 'AI-detected risk events' },
 ];
 
-// Dashboard Section definitions
+// Dashboard Section definitions with module requirements
 export const SECTION_CARDS: CardDefinition[] = [
-  { id: 'kpi-row', name: 'KPI Row', description: 'Key performance indicators' },
-  { id: 'site-protection', name: 'Site Protection', description: 'Site protection status' },
-  { id: 'lighting-intelligence', name: 'Lighting Intelligence', description: 'Lighting optimization' },
-  { id: 'solar-bess', name: 'Solar & BESS', description: 'Solar and battery status' },
-  { id: 'solar-annual', name: 'Solar Annual', description: 'Annual solar summary' },
-  { id: 'energy-analytics', name: 'Energy Analytics', description: 'Energy consumption data' },
-  { id: 'energy-comparison', name: 'Energy Comparison', description: 'Energy comparison metrics' },
-  { id: 'energy-comparison-actual-vs-sentinel', name: 'Actual vs SENTINEL', description: 'Actual vs SENTINEL energy' },
-  { id: 'risk-predictions', name: 'Risk Predictions Panel', description: 'AI risk predictions' },
-  { id: 'comfort-assistant', name: 'Comfort Assistant', description: 'Comfort optimization' },
-  { id: 'occupancy-dashboard', name: 'Occupancy', description: 'Occupancy monitoring' },
+  { id: 'kpi-row', name: 'KPI Row', description: 'Key performance indicators', requiredModules: [] },
+  { id: 'site-protection', name: 'Site Protection', description: 'Site protection status', requiredModules: [] },
+  { id: 'lighting-intelligence', name: 'Lighting Intelligence', description: 'Lighting optimization', requiredModules: ['lighting'] },
+  { id: 'solar-bess', name: 'Solar & BESS', description: 'Solar and battery status', requiredModules: ['solar'] },
+  { id: 'solar-annual', name: 'Solar Annual', description: 'Annual solar summary', requiredModules: ['solar'] },
+  { id: 'energy-analytics', name: 'Energy Analytics', description: 'Energy consumption data', requiredModules: [] },
+  { id: 'energy-comparison', name: 'Energy Comparison', description: 'Energy comparison metrics', requiredModules: [] },
+  { id: 'energy-comparison-actual-vs-sentinel', name: 'Actual vs SENTINEL', description: 'Actual vs SENTINEL energy', requiredModules: [] },
+  { id: 'risk-predictions', name: 'Risk Predictions Panel', description: 'AI risk predictions', requiredModules: [] },
+  { id: 'comfort-assistant', name: 'Comfort Assistant', description: 'Comfort optimization', requiredModules: ['hvac'] },
+  { id: 'occupancy-dashboard', name: 'Occupancy', description: 'Occupancy monitoring', requiredModules: ['lighting'] },
 ];
 
 // Default visible KPI cards on dashboard load
@@ -58,3 +61,21 @@ export const DEFAULT_SECTIONS = [
   'comfort-assistant',
   'occupancy-dashboard',
 ];
+
+/**
+ * Filter sections based on active modules
+ * Returns only sections that have no module requirement, or where the user has the required module
+ */
+export function getModuleFilteredSections(
+  sections: string[],
+  isModuleActive: (module: ModuleType) => boolean
+): string[] {
+  return sections.filter(sectionId => {
+    const section = SECTION_CARDS.find(s => s.id === sectionId);
+    if (!section || !section.requiredModules || section.requiredModules.length === 0) {
+      return true;  // No requirement = show it
+    }
+    // Show section if ANY required module is active
+    return section.requiredModules.some(module => isModuleActive(module));
+  });
+}
