@@ -391,14 +391,7 @@ async def login_with_email(request: Request, email: str):
                 response["demo_auto_start"] = False
                 response["demo_error"] = str(e)
     
-        # Auto-start demo for Solar/BESS client (bederf@protonmail.com)
-        if email == "bederf@protonmail.com":
-            # Reset orchestrator for fresh demo on login
-            orchestrator = get_lifecycle_orchestrator()
-            orchestrator.reset()
-            response["demo_auto_start"] = True
-            response["demo_type"] = "solar-bess-comparison"
-            response["demo_description"] = "Solar+BESS Baseline vs Solar+BESS with Sentinel AI optimization"
+
 
         # Add enrollment prompt for admins who haven't enrolled yet
         if mfa_required and not mfa_enrolled:
@@ -607,33 +600,37 @@ async def complete_mfa_login(request: Request, email: str, mfa_code: str):
     # Auto-start demo for Solar/BESS client (bederf@protonmail.com)
     if email == "bederf@protonmail.com":
         try:
-            try:
-                # Reset orchestrator for fresh demo on login
-                orchestrator = get_lifecycle_orchestrator()
-                orchestrator.reset()
-
-                # Auto-start Solar + BESS annual simulation (365 days)
-                # Demonstrates full-year solar generation with AI-optimized BESS arbitrage
-                orchestrator.run_scenario(
-                    scenario_name="grant_solar_bess_ai_annual",
-                    duration_minutes=30.0  # 365 days compressed to 30 minutes real time
-                )
-
-                response["demo_auto_start"] = True
-                response["demo_type"] = "solar-bess-annual"
-                response["demo_description"] = "Solar+BESS with Sentinel AI (365-day full-year with City Power TOU arbitrage)"
-                response["demo_scenario"] = "grant_solar_bess_ai_annual"
-                response["demo_status"] = "running"
-                logger.info(f"Auto-started Bederf demo scenario: grant_solar_bess_ai_annual (365 days, ~30 minutes real time)")
-            except Exception as e:
-                logger.error(f"Error auto-starting Bederf demo: {e}", exc_info=True)
-                response["demo_auto_start"] = False
-                response["demo_type"] = "error"
-                response["demo_error"] = str(e)
+            # Create simulation task in database (queued status) - same as Grant
+            task_id = str(uuid.uuid4())
+            client = Supabase.instance()
+            
+            response_data = client.table("lifecycle_simulation_tasks").insert({
+                "task_id": task_id,
+                "site_id": "site-002",
+                "scenario": "grant_solar_bess_ai_annual",
+                "simulation_type": "lifecycle",
+                "status": "queued",
+                "progress_pct": 0,
+                "days_completed": 0,
+                "duration_minutes": 30.0,  # 365 days in 30 minutes
+            }).execute()
+            
+            logger.info(f"Auto-started Bederf solar demo: task_id={task_id}, scenario=grant_solar_bess_ai_annual (365 days → 30 minutes, Solar+BESS optimization)")
+            
+            # Add simulation task info to response
+            response["demo_auto_start"] = True
+            response["demo_type"] = "solar-bess-annual"
+            response["demo_description"] = "Solar+BESS with Sentinel AI (365-day full-year with City Power TOU arbitrage)"
+            response["demo_scenario"] = "grant_solar_bess_ai_annual"
+            response["demo_status"] = "queued"
+            response["demo_task_id"] = task_id
+            response["demo_duration_minutes"] = 30.0
+            response["demo_note"] = "Solar simulation runs in background. Dashboard will update live as simulation progresses through 365 days."
+            
         except Exception as e:
-            # Failsafe: ensure login doesn't break even if demo setup fails
-            logger.error(f"Failsafe: Unexpected error in Bederf demo setup: {e}", exc_info=True)
+            logger.error(f"Error auto-starting Bederf demo: {e}", exc_info=True)
             response["demo_auto_start"] = False
+            response["demo_error"] = str(e)
 
     return response
 
