@@ -1129,17 +1129,15 @@ class BackgroundSchedulerService:
             register_simulation(task_id, orchestrator)
             logger.warning(f">>> Orchestrator registered")
 
-            # Start simulation (don't await - runs in background)
-            logger.warning(f">>> Creating asyncio task for simulation...")
-            asyncio.create_task(
-                self._run_simulation_task(
-                    task_id,
-                    orchestrator,
-                    scenario=task["scenario"],
-                    duration_minutes=float(task.get("duration_minutes", 240.0)),
-                )
+            # Start simulation and wait for completion
+            logger.warning(f">>> Starting simulation for task {task_id}...")
+            await self._run_simulation_task(
+                task_id,
+                orchestrator,
+                scenario=task["scenario"],
+                duration_minutes=float(task.get("duration_minutes", 240.0)),
             )
-            logger.warning(f">>> Asyncio task created successfully")
+            logger.warning(f">>> Simulation task completed")
 
         except Exception as e:
             logger.error(f"❌ Error in simulation queue processor: {e}", exc_info=True)

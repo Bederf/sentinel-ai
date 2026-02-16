@@ -14,6 +14,7 @@ from app.api import niagara, niagara_bacnet, niagara_discovery
 from app.api import buildings_3d, digital_twin
 from app.api import zone_ingestion, desks, documents
 from app.api import device_controls
+from app.api import occupancy_analytics
 
 
 def register_building_routers(app: FastAPI) -> None:
@@ -49,6 +50,9 @@ def register_building_routers(app: FastAPI) -> None:
 
     # Building systems - Lighting
     app.include_router(dali.router, prefix="/api/dali", tags=["dali-lighting"])
+
+    # Occupancy analytics (trends, zone utilization, peak hours)
+    app.include_router(occupancy_analytics.router, prefix="/api", tags=["occupancy-analytics"])
 
     # Building systems - Fire & Security
     app.include_router(fire.router, tags=["fire"])
