@@ -24,6 +24,7 @@ import { CalendarPicker } from "./components/CalendarPicker";
 import SystemHealthPage from "./components/SystemHealthPage";
 import { AssetWorkflowDashboard } from "./components/AssetWorkflowDashboard";
 import { OccupancyPanel } from "./components/OccupancyPanel";
+import { OccupancyAnalyticsPage } from "./pages/OccupancyAnalyticsPage";
 import { LightingPage } from "./components/lighting/LightingPage";
 import { SecurityDashboard } from "./components/SecurityDashboard";
 import { SimbiotPage } from "./components/SimbiotPage";
@@ -748,6 +749,10 @@ function App() {
           ) : currentView === "occupancy" ? (
             <div className="h-full overflow-y-auto p-4 md:p-6">
               <OccupancyPanel compact={false} />
+            </div>
+          ) : currentView === "occupancy-analytics" ? (
+            <div className="h-full overflow-y-auto">
+              <OccupancyAnalyticsPage />
             </div>
           ) : currentView === "lighting" ? (
             <LightingPage />
