@@ -283,11 +283,13 @@ async def get_simulation_status(task_id: str):
             .select("*") \
             .eq("task_id", task_id) \
             .execute()
-        
-        if not response.data:
+
+        if not response or not response.data:
             raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
-        
+
         task = response.data[0]
+        if not task:
+            raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
         
         # Check if running orchestrator (for real-time event updates)
         orchestrator = get_simulation_by_task_id(task_id)
