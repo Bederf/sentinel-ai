@@ -495,10 +495,16 @@ class LifecycleOrchestrator:
                             await self._update_progress_to_db(iteration, total_iterations)
                     
                     # Sleep for the calculated time multiplier
-                    await asyncio.sleep(self.time_multiplier / 60)
+                    sleep_duration = self.time_multiplier / 60
+                    logger.debug(f"[SLEEP] iteration={iteration}, duration={sleep_duration:.6f}s")
+                    await asyncio.sleep(sleep_duration)
+                    logger.debug(f"[AWAKE] iteration={iteration}, resuming")
                     
+                except asyncio.CancelledError:
+                    logger.warning(f"[CANCELLED] iteration={iteration}, task was cancelled")
+                    raise
                 except Exception as e:
-                    logger.error(f"[ERROR in iteration {iteration}] {e}", exc_info=True)
+                    logger.error(f"[ERROR in iteration {iteration}] {type(e).__name__}: {e}", exc_info=True)
                     raise
 
             logger.warning(f"[SIMULATION COMPLETE] Completed {iteration} iterations, days_simulated={self.days_simulated}")
