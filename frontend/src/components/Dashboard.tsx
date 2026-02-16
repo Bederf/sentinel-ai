@@ -172,6 +172,11 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose, u
     useSensor(KeyboardSensor)
   );
 
+  // Scroll to top on dashboard load
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
   useEffect(() => {
     const loadDashboardData = async () => {
       try {
