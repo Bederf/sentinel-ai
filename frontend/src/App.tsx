@@ -354,11 +354,18 @@ function App() {
     console.log('Login success:', user);
     setCurrentUser(user);
 
-    // Demo auto-start disabled (digital-twin removed from free tier)
-    // if ((user as any).demo_auto_start === true) {
-    //   console.log('Auto-starting demo scenario:', (user as any).demo_scenario);
-    //   toast.success(`Demo scenario started: ${(user as any).demo_scenario}`);
-    // }
+    // Auto-start demo simulation for demo users
+    if ((user as any).demo_auto_start === true) {
+      console.log('Auto-starting demo scenario:', (user as any).demo_scenario);
+      toast.success(`Demo scenario started: ${(user as any).demo_scenario}`);
+      
+      // Start the lifecycle simulator in the background
+      fetch('/api/lifecycle/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scenario: (user as any).demo_scenario })
+      }).catch(err => console.error('Failed to start demo scenario:', err));
+    }
   }, []);
 
   // Show splash screen on initial load
