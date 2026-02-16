@@ -96,15 +96,15 @@ export function getDemoDefaultCards(email: string): {
       kpiCards: [
         'kpi-protected-sites',
         'kpi-monitored-assets',
-        'kpi-active-risks',
-        'kpi-risk-predictions',
       ],
       sections: [
+        'kpi-row',
+        'site-protection',
         'lighting-intelligence',  // His core module
-        'occupancy-dashboard',    // PIR sensors + automation
-        'energy-comparison-actual-vs-sentinel',  // The money shot - energy savings
+        'energy-comparison',      // Energy metrics
+        'energy-comparison-actual-vs-sentinel',  // Energy savings - the money shot
         'comfort-assistant',      // Cross-module intelligence
-        'risk-predictions',       // AI predicting failures
+        'occupancy-dashboard',    // PIR sensors + automation
       ],
     };
   }
