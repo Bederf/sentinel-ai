@@ -334,11 +334,16 @@ async def startup_event(app: FastAPI) -> None:
     # Start simulation queue processor job - Phase 094 ENABLED
     # Phase 083: Process queued lifecycle simulations from database
     # Enables concurrent simulations and crash recovery via task queue
+    _logger.info("[DEBUG] About to initialize simulation queue processor...")
     try:
+        _logger.info("[DEBUG] Calling add_simulation_queue_processor_job()...")
         scheduler_service.add_simulation_queue_processor_job(interval_seconds=10)
         _logger.info("✅ Simulation queue processor initialized - checks every 10s for queued simulations")
+        _logger.info(f"[DEBUG] Scheduler status - running: {scheduler_service.scheduler.running}")
+        _logger.info(f"[DEBUG] Total jobs in scheduler: {len(scheduler_service.scheduler.get_jobs())}")
     except Exception as e:
-        _logger.warning(f"⚠️ Simulation queue processor initialization failed: {e}")
+        _logger.error(f"❌ Simulation queue processor initialization failed: {e}", exc_info=True)
+        _logger.warning(f"⚠️ Simulations will not be auto-processed. Manual intervention required.")
 
     # Start system health snapshot job (runs every 5 minutes)
     # Stores point-in-time health snapshots for trend analysis and historical reporting

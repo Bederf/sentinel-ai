@@ -1023,15 +1023,19 @@ class BackgroundSchedulerService:
         Poll database for queued simulations and start one.
         Prevents multiple concurrent simulations (max 1 at a time).
         """
+        logger.warning(">>> _process_simulation_queue() called by APScheduler")
         try:
             # Run async logic in event loop
+            logger.warning(">>> Starting asyncio.run() for queue processor async")
             asyncio.run(self._process_simulation_queue_async())
+            logger.warning(">>> asyncio.run() completed for queue processor")
 
         except Exception as e:
-            logger.error(f"Error processing simulation queue: {e}")
+            logger.error(f"❌ Error processing simulation queue: {e}", exc_info=True)
 
     async def _process_simulation_queue_async(self) -> None:
         """Async implementation of queue processor."""
+        logger.warning(">>> _process_simulation_queue_async() started")
         try:
             from app.database.supabase_client import Supabase
             from app.services.simulation_orchestrator import (
@@ -1041,41 +1045,59 @@ class BackgroundSchedulerService:
                 get_simulation_by_task_id,
             )
 
+            logger.warning(">>> Imports successful, getting Supabase client...")
             supabase = Supabase.instance()
+            logger.warning(">>> Supabase client obtained")
 
             # Query next queued simulation (FIFO: oldest first)
-            response = supabase.table("solar_annual_tasks") \
-                .select("*") \
-                .eq("status", "queued") \
-                .eq("simulation_type", "lifecycle") \
-                .order("started_at", desc=False) \
-                .limit(1) \
-                .execute()
+            logger.warning(">>> Querying for queued simulations with status='queued', simulation_type='lifecycle'")
+            try:
+                response = supabase.table("solar_annual_tasks") \
+                    .select("*") \
+                    .eq("status", "queued") \
+                    .eq("simulation_type", "lifecycle") \
+                    .order("started_at", desc=False) \
+                    .limit(1) \
+                    .execute()
+                logger.warning(">>> Query executed successfully")
+            except Exception as query_err:
+                logger.error(f">>> Query failed: {query_err}", exc_info=True)
+                raise
+
+            logger.warning(f">>> Query response type: {type(response)}, has data: {bool(response and hasattr(response, 'data'))}")
+            logger.warning(f">>> Response.data length: {len(response.data) if response and response.data else 0}")
 
             if not response.data:
+                logger.warning(">>> No queued tasks found, returning")
                 return  # No queued tasks
 
             task = response.data[0]
             task_id = str(task["task_id"])
+            logger.warning(f">>> Found queued task: {task_id}, scenario: {task.get('scenario')}")
 
             # Check if already running (prevent double-start)
             if get_simulation_by_task_id(task_id):
-                logger.warning(f"Task {task_id} already running, skipping")
+                logger.warning(f">>> Task {task_id} already running, skipping")
                 return
 
             # Mark as running
+            logger.warning(f">>> Marking task {task_id} as running in database...")
             supabase.table("solar_annual_tasks") \
                 .update({"status": "running"}) \
                 .eq("task_id", task_id) \
                 .execute()
+            logger.warning(f">>> Task marked as running")
 
-            logger.info(f"Started lifecycle simulation task {task_id}")
+            logger.warning(f">>> ✅ Starting lifecycle simulation task {task_id}")
 
             # Create orchestrator and register
+            logger.warning(f">>> Creating orchestrator for task {task_id}...")
             orchestrator = create_orchestrator(task_id)
             register_simulation(task_id, orchestrator)
+            logger.warning(f">>> Orchestrator registered")
 
             # Start simulation (don't await - runs in background)
+            logger.warning(f">>> Creating asyncio task for simulation...")
             asyncio.create_task(
                 self._run_simulation_task(
                     task_id,
@@ -1084,9 +1106,10 @@ class BackgroundSchedulerService:
                     duration_minutes=float(task.get("duration_minutes", 240.0)),
                 )
             )
+            logger.warning(f">>> Asyncio task created successfully")
 
         except Exception as e:
-            logger.error(f"Error in simulation queue processor: {e}")
+            logger.error(f"❌ Error in simulation queue processor: {e}", exc_info=True)
 
     async def _run_simulation_task(
         self, task_id: str, orchestrator, scenario: str, duration_minutes: float
