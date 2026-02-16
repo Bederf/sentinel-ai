@@ -30,7 +30,7 @@ export const SECTION_CARDS: CardDefinition[] = [
   { id: 'energy-analytics', name: 'Energy Analytics', description: 'Energy consumption data' },
   { id: 'energy-comparison', name: 'Energy Comparison', description: 'Energy comparison metrics' },
   { id: 'energy-comparison-actual-vs-sentinel', name: 'Actual vs SENTINEL', description: 'Actual vs SENTINEL energy' },
-  { id: 'risk-predictions', name: 'Risk Predictions', description: 'AI risk predictions' },
+  { id: 'risk-predictions', name: 'Risk Predictions Panel', description: 'AI risk predictions' },
   { id: 'comfort-assistant', name: 'Comfort Assistant', description: 'Comfort optimization' },
   { id: 'occupancy-dashboard', name: 'Occupancy', description: 'Occupancy monitoring' },
 ];

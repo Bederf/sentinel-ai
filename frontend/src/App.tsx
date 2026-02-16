@@ -8,6 +8,7 @@ import { useRecommendationToasts } from "./components/RecommendationToast";
 
 // Security: Prevent console logging in production (Phase 75-07)
 import { initializeSecurityProtections } from "./lib/api/security-utils";
+import { Chat } from "./components/Chat";
 import TechnicianChat from "./components/TechnicianChat";
 import { Dashboard } from "./components/Dashboard";
 import { DigitalTwin } from "./components/digital-twin";
@@ -40,7 +41,6 @@ import { SolarConfigWizard } from "./components/wizards/SolarConfigWizard";
 import { ModuleProvider } from "./contexts/ModuleContext";
 import { useModules } from "./contexts/ModuleHooks";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import { ThemeSwitcher } from "./components/ThemeSwitcher";
 import { type View, VIEW_TITLES, ALL_NAV_ITEMS } from "./lib/navigation";
 import { canAccessView, getDefaultView } from "./lib/access-control";
 
@@ -448,7 +448,6 @@ function App() {
 
           {/* Right side - Status and time */}
           <div className="flex items-center gap-4 relative">
-            <ThemeSwitcher />
             {/* Alerts Button */}
             <button
               onClick={handleAlertsPanelOpen}
@@ -713,6 +712,10 @@ function App() {
             <OptimizationPage onError={(error) => setError(error)} />
           ) : currentView === "settings" ? (
             <Settings onError={(error) => setError(error)} />
+          ) : currentView === "ai-chat" ? (
+            <div className="h-full">
+              <Chat />
+            </div>
           ) : currentView === "technician" ? (
             <div className="h-full">
               <TechnicianChat />

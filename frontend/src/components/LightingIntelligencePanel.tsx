@@ -47,7 +47,15 @@ export function LightingIntelligencePanel({ siteId }: { siteId: string }) {
   const fetchSimulation = async () => {
     try {
       const response = await fetch(`/api/dali/simulation?site_id=${siteId}`);
+      if (!response.ok) {
+        console.error('Failed to fetch DALI simulation:', response.status, response.statusText);
+        setLoading(false);
+        return;
+      }
       const json = await response.json();
+      if (!json || !json.summary) {
+        console.warn('DALI simulation response missing summary:', json);
+      }
       setData(json);
     } catch (error) {
       console.error('Failed to load DALI simulation:', error);
@@ -67,9 +75,20 @@ export function LightingIntelligencePanel({ siteId }: { siteId: string }) {
     );
   }
 
-  if (!data) return null;
+  if (!data || !data.summary) return null;
 
   const { summary, daily_data, monthly_data } = data;
+
+  // Validate required data exists
+  if (!summary.baseline_annual_cost || !summary.sentinel_annual_cost) {
+    return (
+      <div className="p-8 text-center rounded-lg" style={{ background: 'var(--color-sentinel-bg-panel)' }}>
+        <p style={{ color: 'var(--color-sentinel-text-secondary)' }}>
+          DALI simulation data is incomplete or unavailable
+        </p>
+      </div>
+    );
+  }
 
   // Format helpers
   const fmtR = (v: number) => `R ${Math.round(v).toLocaleString()}`;
@@ -127,11 +146,13 @@ export function LightingIntelligencePanel({ siteId }: { siteId: string }) {
     );
   };
 
-  // Calculate energy reduction percentage
+  // Calculate energy reduction percentage (with safety check)
   const energyReductionPct =
-    ((summary.baseline_annual_cost - summary.sentinel_annual_cost) /
-      summary.baseline_annual_cost) *
-    100;
+    summary.baseline_annual_cost > 0
+      ? ((summary.baseline_annual_cost - summary.sentinel_annual_cost) /
+          summary.baseline_annual_cost) *
+        100
+      : 0;
 
   return (
     <div

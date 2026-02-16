@@ -49,7 +49,7 @@ export function EnergyComparisonPanel({ siteId }: { siteId: string }) {
   };
 
   if (loading) return <div className="p-4">Loading...</div>;
-  if (!data) return null;
+  if (!data?.scenarios?.length) return null;
 
   const [baseline, withDali, withSentinel] = data.scenarios;
 

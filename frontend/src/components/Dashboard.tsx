@@ -214,7 +214,9 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
           const mergedOrder = [...savedOrder, ...newSections] as DashboardSectionId[];
           setSectionOrder(mergedOrder);
 
-          setKpiOrder(response.preferences.kpi_card_order as KPICardId[]);
+          if (response.preferences.kpi_card_order) {
+            setKpiOrder(response.preferences.kpi_card_order as KPICardId[]);
+          }
           if (response.preferences.default_energy_period) {
             setSelectedDays(response.preferences.default_energy_period as TimePeriod);
           }
@@ -522,52 +524,67 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
     };
   }, [stats, normalSites, warningSites, totalPotentialSavings, predictions.length]);
 
-  // Debug: trace render path
-  console.log(`[Dashboard] render loading=${loading} error=${error} siteId=${selectedSiteId} visSec=${visibleSections?.length} secOrder=${sectionOrder?.length} modules=${activeModules?.length}`);
+  // Card Library panel - open when sidebar "Customize Dashboard Cards" is clicked (openCardLibrary) or in-dashboard Customize
+  const cardLibraryPanel = (
+    <CardLibrary
+      isOpen={isCardLibraryOpen || !!openCardLibrary}
+      onClose={handleCardLibraryClose}
+      visibleKpiCards={visibleKpiCards}
+      visibleSections={visibleSections}
+      onKpiVisibilityChange={handleKpiVisibilityChange}
+      onSectionVisibilityChange={handleSectionVisibilityChange}
+      onResetToDefaults={handleResetToDefaults}
+      isSaving={isSavingPreferences}
+    />
+  );
 
-  // Loading state
+  // Loading state (still show Card Library when opened from sidebar)
   if (loading) {
     return (
-      <div
-        className="h-full flex items-center justify-center"
-        style={{ background: "var(--color-sentinel-bg-canvas)" }}
-      >
-        <div className="text-center">
-          <RefreshCw
-            className="h-8 w-8 animate-spin mx-auto mb-4"
-            style={{ color: "var(--color-sentinel-amber)" }}
-          />
-          <span style={{ color: "var(--color-sentinel-text-secondary)" }}>
-            Initializing SENTINEL protection...
-          </span>
+      <>
+        <div
+          className="h-full flex items-center justify-center"
+          style={{ background: "var(--color-sentinel-bg-canvas)" }}
+        >
+          <div className="text-center">
+            <RefreshCw
+              className="h-8 w-8 animate-spin mx-auto mb-4"
+              style={{ color: "var(--color-sentinel-amber)" }}
+            />
+            <span style={{ color: "var(--color-sentinel-text-secondary)" }}>
+              Initializing SENTINEL protection...
+            </span>
+          </div>
         </div>
-      </div>
+        {cardLibraryPanel}
+      </>
     );
   }
 
-  // Error state
+  // Error state (still show Card Library when opened from sidebar)
   if (error) {
     return (
-      <div
-        className="h-full flex items-center justify-center"
-        style={{ background: "var(--color-sentinel-bg-canvas)" }}
-      >
+      <>
         <div
-          className="p-8 rounded-md text-center glass-panel"
+          className="h-full flex items-center justify-center"
+          style={{ background: "var(--color-sentinel-bg-canvas)" }}
         >
-          <AlertTriangle
-            className="h-12 w-12 mx-auto mb-4"
-            style={{ color: "var(--color-sentinel-red)" }}
-          />
-          <h2
-            className="text-lg font-medium mb-2"
-            style={{ color: "var(--color-sentinel-text-primary)" }}
-          >
-            Error Loading Dashboard
-          </h2>
-          <p style={{ color: "var(--color-sentinel-text-secondary)" }}>{error}</p>
+          <div className="p-8 rounded-md text-center glass-panel">
+            <AlertTriangle
+              className="h-12 w-12 mx-auto mb-4"
+              style={{ color: "var(--color-sentinel-red)" }}
+            />
+            <h2
+              className="text-lg font-medium mb-2"
+              style={{ color: "var(--color-sentinel-text-primary)" }}
+            >
+              Error Loading Dashboard
+            </h2>
+            <p style={{ color: "var(--color-sentinel-text-secondary)" }}>{error}</p>
+          </div>
         </div>
-      </div>
+        {cardLibraryPanel}
+      </>
     );
   }
 
@@ -792,6 +809,7 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
       </div>
     </DashboardSection>
   );
+  };
 
   // Render Risk Predictions section
   const renderRiskPredictions = () => {
@@ -1213,12 +1231,6 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
   // Filter to only visible sections
   const visibleSectionOrder = sectionOrder.filter(id => visibleSections.includes(id));
 
-  if (loading) {
-    return <PageLoading message="Loading dashboard..." />;
-  }
-
-  console.log('[Dashboard] reaching DndContext return');
-
   return (
     <DndContext
       sensors={sensors}
@@ -1229,7 +1241,6 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
         className="h-full overflow-y-auto p-4 md:p-6"
         style={{ background: "var(--color-sentinel-bg-canvas)" }}
       >
-        {/* Customize Dashboard Button */}
         <div className="flex justify-end mb-4">
           <button
             onClick={() => setIsCardLibraryOpen(true)}
@@ -1255,7 +1266,6 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
           })}
         </SortableContext>
 
-        {/* Prediction Detail Modal */}
         {selectedPrediction && (
           <PredictionDetail
             prediction={selectedPrediction}
@@ -1265,7 +1275,6 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
           />
         )}
 
-        {/* Risk Detail Modal */}
         {showRiskModal && selectedRiskEquipment && (
           <RiskDetailModal
             isOpen={showRiskModal}
@@ -1277,21 +1286,10 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
           />
         )}
 
-        {/* Card Library Panel */}
-        <CardLibrary
-          isOpen={isCardLibraryOpen}
-          onClose={handleCardLibraryClose}
-          visibleKpiCards={visibleKpiCards}
-          visibleSections={visibleSections}
-          onKpiVisibilityChange={handleKpiVisibilityChange}
-          onSectionVisibilityChange={handleSectionVisibilityChange}
-          onResetToDefaults={handleResetToDefaults}
-          isSaving={isSavingPreferences}
-        />
+        {cardLibraryPanel}
       </div>
     </DndContext>
   );
-}
 }
 
 export default Dashboard;

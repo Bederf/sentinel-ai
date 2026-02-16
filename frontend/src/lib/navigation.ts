@@ -38,6 +38,7 @@ import type { ModuleType } from "./moduleRegistry";
 
 export type View =
   | "dashboard"
+  | "ai-chat"
   | "digital-twin"
   | "technician"
   | "control"
@@ -78,11 +79,12 @@ export interface NavItem {
 /** View title mapping used by the header */
 export const VIEW_TITLES: Record<View, string> = {
   dashboard: "Dashboard",
+  "ai-chat": "AI Chat",
   "digital-twin": "Digital Twin",
   technician: "Technician Chat",
   control: "Control Dashboard",
   "control-audit": "Control Audit Trail",
-  optimization: "Load Shedding Optimization",
+  optimization: "Loadshedding",
   settings: "Settings",
   integrations: "System Health",
   occupancy: "Occupancy",
@@ -112,7 +114,7 @@ export const VIEW_TITLES: Record<View, string> = {
  * Additional pages (Tech Chat, Digital Twin, Settings) are add-ons or admin-only.
  */
 export const BASE_NAV_ITEMS: NavItem[] = [
-  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, description: "Equipment overview & AI recommendations", category: "base" },
+  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, description: "Overview and AI recommendation", category: "base" },
   { id: "integrations", label: "System Health", icon: Activity, description: "Real-time Health Monitoring", category: "base" },
 ];
 
@@ -128,18 +130,19 @@ export const ADDON_NAV_ITEMS: NavItem[] = [
   { id: "control", label: "Control", icon: Shield, description: "Building Controls", category: "addon", requiredModule: "control", defaultOrder: 0 },
   { id: "workflow", label: "Asset Workflow", icon: GitBranch, description: "Lifecycle Management", category: "addon", requiredModule: "assets", defaultOrder: 2 },
   { id: "simbiot", label: "SIMBIOT", icon: Plug, description: "BMS Connection Wizard", category: "addon", requiredModule: "simbiot", defaultOrder: 3 },
-  // Visualization and analytics
+  // AI and visualization
+  { id: "ai-chat", label: "AI Chat", icon: MessageSquare, description: "SENTINEL AI Assistant", category: "addon", defaultOrder: 3.5 },
   { id: "digital-twin", label: "Digital Twin", icon: Box, description: "3D/2D Building Visualization", category: "addon", defaultOrder: 4 },
   // Building system modules
   { id: "technician", label: "Tech Chat", icon: Wrench, description: "Fault Diagnosis", category: "addon", requiredModule: "hvac", defaultOrder: 10 },
-  { id: "optimization", label: "Load Shedding Optimization", icon: Zap, description: "Load Shedding AI", category: "addon", requiredModule: "energy", defaultOrder: 11 },
+  { id: "optimization", label: "Loadshedding", icon: Zap, description: "Load Shedding AI", category: "addon", requiredModule: "energy", defaultOrder: 11 },
   { id: "occupancy", label: "Occupancy", icon: Users, description: "Occupancy Monitoring", category: "addon", requiredModule: "lighting", defaultOrder: 12 },
   { id: "lighting", label: "Lighting", icon: Lightbulb, description: "Lighting Control", category: "addon", requiredModule: "lighting", defaultOrder: 12.5 },
   { id: "security", label: "Security", icon: ShieldCheck, description: "Access & CCTV", category: "addon", requiredModule: "security", defaultOrder: 13 },
   { id: "solar", label: "Solar & BESS", icon: Sun, description: "PV & Battery Storage", category: "addon", requiredModule: "solar", defaultOrder: 14 },
   { id: "water", label: "Water", icon: Droplets, description: "Water Consumption", category: "addon", requiredModule: "water", defaultOrder: 15 },
   { id: "sustainability", label: "ESG", icon: Leaf, description: "Sustainability & Carbon", category: "addon", requiredModule: "sustainability", defaultOrder: 16 },
-  { id: "contracts", label: "Contracts", icon: FileText, description: "Contract & SLA Management", category: "addon", requiredModule: "contracts", defaultOrder: 17 },
+  { id: "contracts", label: "Contracts", icon: FileText, description: "Contract & SLA", category: "addon", requiredModule: "contracts", defaultOrder: 17 },
   { id: "profitability", label: "Profitability", icon: TrendingUp, description: "Profitability Analytics", category: "addon", requiredModule: "contracts", defaultOrder: 18 },
   { id: "budget-report", label: "Budget Reports", icon: DollarSign, description: "Budget Reporting", category: "addon", requiredModule: "contracts", defaultOrder: 19 },
   // Intelligence modules
@@ -153,7 +156,7 @@ export const ADDON_NAV_ITEMS: NavItem[] = [
  */
 export const INTERNAL_NAV_ITEMS: NavItem[] = [
   { id: "simulation", label: "Simulation", icon: FlaskConical, description: "Lifecycle & Analytics", category: "internal", requiredRole: "admin", requiredModule: "ml" },
-  { id: "settings", label: "Settings", icon: SettingsIcon, description: "Admin Settings (Password Protected)", category: "internal", requiredRole: "admin" },
+  { id: "settings", label: "Settings", icon: SettingsIcon, description: "Admin settings", category: "internal", requiredRole: "admin" },
 ];
 
 /** All nav items combined (for lookup) */

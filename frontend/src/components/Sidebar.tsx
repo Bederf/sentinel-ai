@@ -63,7 +63,7 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
   // Compute visible addon items, filtered by active modules and sorted by user order
   const visibleAddons = useMemo(() => {
     const active = ADDON_NAV_ITEMS.filter(
-      (item) => item.requiredModule && isModuleActive(item.requiredModule)
+      (item) => !item.requiredModule || isModuleActive(item.requiredModule)
     );
 
     // Sort by persisted order, falling back to defaultOrder
@@ -659,10 +659,17 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
           style={{ borderTop: "1px solid var(--color-sentinel-border)" }}
         >
           <div
-            className={`text-xs text-center ${isCollapsed ? 'lg:hidden' : 'lg:block'}`}
-            style={{ color: "var(--color-sentinel-text-disabled)" }}
+            className={`text-[9px] leading-tight text-center ${isCollapsed ? 'lg:block' : 'lg:block'}`}
+            style={{
+              color: "var(--color-sentinel-text-disabled)",
+              whiteSpace: 'normal',
+              wordBreak: 'break-word',
+            }}
           >
-            <span style={{ color: "var(--color-sentinel-amber)" }}>SENTINEL</span> v{version || "13.0"}
+            <span style={{ color: "var(--color-sentinel-amber)" }}>
+              SENTINEL
+              {!isCollapsed && ` v${version || "13.0"}`}
+            </span>
           </div>
           <div className="hidden md:flex lg:hidden justify-center">
             <div

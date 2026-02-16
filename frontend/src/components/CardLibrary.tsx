@@ -9,6 +9,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   X,
   LayoutGrid,
@@ -75,10 +76,9 @@ export default function CardLibrary({
     const iconColor = isVisible
       ? 'var(--color-sentinel-blue)'
       : 'var(--color-sentinel-text-secondary)';
-    // FIX: Always make button visible with better contrast
     const buttonBg = isVisible
       ? 'var(--color-sentinel-blue)'
-      : 'rgba(100, 116, 139, 0.3)';  // Slate-500 with transparency for OFF state
+      : 'rgba(100, 116, 139, 0.3)';
     const buttonColor = isVisible ? 'white' : 'var(--color-sentinel-text-primary)';
 
     return (
@@ -116,8 +116,8 @@ export default function CardLibrary({
         <button
           onClick={() => onToggle(card.id, !isVisible)}
           className="p-2 rounded-lg transition-all hover:scale-110 active:scale-95"
-          style={{ 
-            background: buttonBg, 
+          style={{
+            background: buttonBg,
             color: buttonColor,
             border: '1px solid rgba(255,255,255,0.1)',
             cursor: 'pointer'
@@ -130,18 +130,20 @@ export default function CardLibrary({
     );
   };
 
-  return (
+  const panel = (
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 transition-opacity"
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity"
+        style={{ zIndex: 9998 }}
         onClick={onClose}
       />
 
       {/* Panel */}
       <div
-        className="fixed right-0 top-0 h-full w-full max-w-md z-50 shadow-2xl overflow-hidden flex flex-col"
+        className="fixed right-0 top-0 h-full w-full max-w-md shadow-2xl overflow-hidden flex flex-col"
         style={{
+          zIndex: 9999,
           background: 'var(--glass-bg)',
           backdropFilter: 'blur(var(--glass-blur-lg)) saturate(180%)',
           WebkitBackdropFilter: 'blur(var(--glass-blur-lg)) saturate(180%)',
@@ -273,4 +275,6 @@ export default function CardLibrary({
       </div>
     </>
   );
+
+  return createPortal(panel, document.body);
 }
