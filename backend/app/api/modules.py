@@ -299,90 +299,92 @@ async def get_recommendations(
     recommendations = []
     try:
         client = get_supabase_client()
+        if not client:
+            logger.warning("Supabase client not available, skipping predictions fetch")
+        else:
+            # Get building ID from site code
+            building_response = client.table("buildings").select("id").eq("code", site_id).limit(1).execute()
+            if not building_response.data:
+                # Try with 'sandton' mapping for legacy support
+                if site_id == "site-002":
+                    building_response = client.table("buildings").select("id").ilike("name", "%sandton%").limit(1).execute()
 
-        # Get building ID from site code
-        building_response = client.table("buildings").select("id").eq("code", site_id).limit(1).execute()
-        if not building_response.data:
-            # Try with 'sandton' mapping for legacy support
-            if site_id == "site-002":
-                building_response = client.table("buildings").select("id").ilike("name", "%sandton%").limit(1).execute()
+            if building_response.data:
+                building_id = building_response.data[0]["id"]
 
-        if building_response.data:
-            building_id = building_response.data[0]["id"]
+                # Query predictions with active status
+                query = client.table("predictions").select(
+                    "id, code, equipment_id, prediction_type, probability_percent, "
+                    "recommended_action, urgency, severity, status, created_at, "
+                    "evidence, contributing_factors"
+                ).eq("building_id", building_id)
 
-            # Query predictions with active status
-            query = client.table("predictions").select(
-                "id, code, equipment_id, prediction_type, probability_percent, "
-                "recommended_action, urgency, severity, status, created_at, "
-                "evidence, contributing_factors"
-            ).eq("building_id", building_id)
+                if not include_resolved:
+                    query = query.eq("status", "active")
 
-            if not include_resolved:
-                query = query.eq("status", "active")
+                query = query.order("probability_percent", desc=True).limit(limit)
 
-            query = query.order("probability_percent", desc=True).limit(limit)
+                pred_response = query.execute()
 
-            pred_response = query.execute()
+                # Get equipment names
+                equipment_ids = [p["equipment_id"] for p in pred_response.data if p.get("equipment_id")]
+                equipment_names = {}
+                if equipment_ids:
+                    eq_response = client.table("equipment").select("id, name, type").in_("id", equipment_ids).execute()
+                    equipment_names = {e["id"]: e for e in eq_response.data}
 
-            # Get equipment names
-            equipment_ids = [p["equipment_id"] for p in pred_response.data if p.get("equipment_id")]
-            equipment_names = {}
-            if equipment_ids:
-                eq_response = client.table("equipment").select("id, name, type").in_("id", equipment_ids).execute()
-                equipment_names = {e["id"]: e for e in eq_response.data}
+                # Convert predictions to recommendations
+                for pred in pred_response.data:
+                    eq_info = equipment_names.get(pred.get("equipment_id"), {})
+                    eq_name = eq_info.get("name", "Unknown Equipment")
+                    eq_type = eq_info.get("type", "").lower()
 
-            # Convert predictions to recommendations
-            for pred in pred_response.data:
-                eq_info = equipment_names.get(pred.get("equipment_id"), {})
-                eq_name = eq_info.get("name", "Unknown Equipment")
-                eq_type = eq_info.get("type", "").lower()
+                    # Map urgency to priority
+                    urgency = pred.get("urgency", "routine")
+                    if urgency == "immediate" or pred.get("severity") == "critical":
+                        priority = "critical"
+                    elif urgency == "soon" or pred.get("severity") == "warning":
+                        priority = "high"
+                    elif urgency == "scheduled":
+                        priority = "medium"
+                    else:
+                        priority = "low"
 
-                # Map urgency to priority
-                urgency = pred.get("urgency", "routine")
-                if urgency == "immediate" or pred.get("severity") == "critical":
-                    priority = "critical"
-                elif urgency == "soon" or pred.get("severity") == "warning":
-                    priority = "high"
-                elif urgency == "scheduled":
-                    priority = "medium"
-                else:
-                    priority = "low"
+                    # Map equipment type to module
+                    if eq_type in ["chiller", "ahu", "fcu", "vav", "pump"]:
+                        source_module = "hvac"
+                    elif eq_type in ["luminaire", "lighting", "dali"]:
+                        source_module = "lighting"
+                    elif eq_type in ["generator", "ups", "transformer", "meter"]:
+                        source_module = "energy"
+                    else:
+                        source_module = "hvac"  # Default
 
-                # Map equipment type to module
-                if eq_type in ["chiller", "ahu", "fcu", "vav", "pump"]:
-                    source_module = "hvac"
-                elif eq_type in ["luminaire", "lighting", "dali"]:
-                    source_module = "lighting"
-                elif eq_type in ["generator", "ups", "transformer", "meter"]:
-                    source_module = "energy"
-                else:
-                    source_module = "hvac"  # Default
+                    # Apply filters
+                    if modules:
+                        module_list = [m.strip().lower() for m in modules.split(",")]
+                        if source_module not in module_list:
+                            continue
 
-                # Apply filters
-                if modules:
-                    module_list = [m.strip().lower() for m in modules.split(",")]
-                    if source_module not in module_list:
-                        continue
+                    if priorities:
+                        priority_list = [p.strip().lower() for p in priorities.split(",")]
+                        if priority not in priority_list:
+                            continue
 
-                if priorities:
-                    priority_list = [p.strip().lower() for p in priorities.split(",")]
-                    if priority not in priority_list:
-                        continue
-
-                recommendations.append(RecommendationResponse(
-                    recommendation_id=pred["code"],
-                    timestamp=pred.get("created_at", datetime.now().isoformat()),
-                    source_module=source_module,
-                    recommendation_type="maintenance",
-                    priority=priority,
-                    title=f"{eq_name}: {pred.get('prediction_type', 'Issue Detected')}",
-                    description=pred.get("recommended_action", "Review equipment status"),
-                    confidence=min(pred.get("probability_percent", 50) / 100, 1.0),
-                    related_modules=[],
-                    auto_actionable=False,
-                    acknowledged=False,
-                    resolved=pred.get("status") == "resolved"
-                ))
+                    recommendations.append(RecommendationResponse(
+                        recommendation_id=pred["code"],
+                        timestamp=pred.get("created_at", datetime.now().isoformat()),
+                        source_module=source_module,
+                        recommendation_type="maintenance",
+                        priority=priority,
+                        title=f"{eq_name}: {pred.get('prediction_type', 'Issue Detected')}",
+                        description=pred.get("recommended_action", "Review equipment status"),
+                        confidence=min(pred.get("probability_percent", 50) / 100, 1.0),
+                        related_modules=[],
+                        auto_actionable=False,
+                        acknowledged=False,
+                        resolved=pred.get("status") == "resolved"
+                    ))
 
     except Exception as e:
         logger.warning(f"Failed to fetch recommendations from Supabase: {e}")
