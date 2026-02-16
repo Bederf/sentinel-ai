@@ -1049,23 +1049,56 @@ class BackgroundSchedulerService:
             supabase = Supabase.instance()
             logger.warning(">>> Supabase client obtained")
 
+            # Test basic query first
+            logger.warning(">>> TEST: Trying simple count query on solar_annual_tasks...")
+            try:
+                test_response = supabase.table("solar_annual_tasks").select("count", count="exact").execute()
+                logger.warning(f">>> TEST: Count query succeeded, response: {test_response}")
+                if hasattr(test_response, 'count'):
+                    logger.warning(f">>> TEST: Total tasks in table: {test_response.count}")
+            except Exception as test_err:
+                logger.error(f">>> TEST: Count query failed: {test_err}", exc_info=True)
+
+            # Test: Get ALL tasks to see what's in the database
+            logger.warning(">>> TEST: Querying ALL tasks (no filters) to see what's in database...")
+            try:
+                all_tasks_response = supabase.table("solar_annual_tasks").select("task_id,status,simulation_type,scenario").limit(5).execute()
+                logger.warning(f">>> TEST: All tasks query returned {len(all_tasks_response.data) if all_tasks_response.data else 0} rows")
+                if all_tasks_response.data:
+                    for task in all_tasks_response.data:
+                        logger.warning(f">>>   Task: {task}")
+            except Exception as test_err:
+                logger.error(f">>> TEST: All tasks query failed: {test_err}", exc_info=True)
+
             # Query next queued simulation (FIFO: oldest first)
             logger.warning(">>> Querying for queued simulations with status='queued', simulation_type='lifecycle'")
+            logger.warning(">>> Building query...")
             try:
-                response = supabase.table("solar_annual_tasks") \
+                query_builder = supabase.table("solar_annual_tasks") \
                     .select("*") \
                     .eq("status", "queued") \
                     .eq("simulation_type", "lifecycle") \
                     .order("started_at", desc=False) \
-                    .limit(1) \
-                    .execute()
-                logger.warning(">>> Query executed successfully")
+                    .limit(1)
+                logger.warning(f">>> Query builder created: {type(query_builder)}")
+
+                logger.warning(">>> Executing query...")
+                response = query_builder.execute()
+                logger.warning(f">>> Query returned, response type: {type(response)}")
+                logger.warning(f">>> Response object: {response}")
+                logger.warning(f">>> Response has data attr: {hasattr(response, 'data')}")
+                if hasattr(response, 'data'):
+                    logger.warning(f">>> Response.data type: {type(response.data)}")
+                    logger.warning(f">>> Response.data value: {response.data}")
+                if hasattr(response, 'error'):
+                    logger.warning(f">>> Response.error: {response.error}")
             except Exception as query_err:
-                logger.error(f">>> Query failed: {query_err}", exc_info=True)
+                logger.error(f">>> Query FAILED: {query_err}", exc_info=True)
                 raise
 
-            logger.warning(f">>> Query response type: {type(response)}, has data: {bool(response and hasattr(response, 'data'))}")
-            logger.warning(f">>> Response.data length: {len(response.data) if response and response.data else 0}")
+            logger.warning(f">>> After query - response is: {response is not None}")
+            if response and hasattr(response, 'data'):
+                logger.warning(f">>> Response.data length: {len(response.data) if response.data else 0}")
 
             if not response.data:
                 logger.warning(">>> No queued tasks found, returning")
