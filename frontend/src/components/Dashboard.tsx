@@ -105,6 +105,9 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
   // React Query hooks - replaces old manual API calls (stale-while-revalidate approach via React Query)
   const { data: buildingsList = [] } = useBuildingsList();
 
+  // Module gating - called once at top level (hooks cannot be called inside render functions/map callbacks)
+  const { isModuleActive, activeModules } = useModules();
+
   // Real-time event updates from backend SSE
   useServerEvents();
 
@@ -519,6 +522,9 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
     };
   }, [stats, normalSites, warningSites, totalPotentialSavings, predictions.length]);
 
+  // Debug: trace render path
+  console.log('[Dashboard] render', { loading, error, selectedSiteId: selectedSiteId, visibleSections: visibleSections?.length, sectionOrder: sectionOrder?.length, activeModules: activeModules?.length });
+
   // Loading state
   if (loading) {
     return (
@@ -702,7 +708,6 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
 
   // Render Energy Analytics section
   const renderEnergyAnalytics = () => {
-    const { isModuleActive, activeModules } = useModules();
     // Only skip if modules loaded successfully AND energy module is not active
     if (activeModules.length > 0 && !isModuleActive('energy')) {
       return null;
@@ -790,7 +795,6 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
 
   // Render Risk Predictions section
   const renderRiskPredictions = () => {
-    const { isModuleActive, activeModules } = useModules();
     // Only skip if modules loaded successfully AND ml module is not active
     if (activeModules.length > 0 && !isModuleActive('ml')) {
       return null;
@@ -1016,7 +1020,6 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
 
   // Render Comfort Assistant section
   const renderComfortAssistant = () => {
-    const { isModuleActive, activeModules } = useModules();
     // Only skip if modules loaded successfully AND hvac module is not active
     if (activeModules.length > 0 && !isModuleActive('hvac')) {
       return null;
@@ -1032,7 +1035,6 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
 
   // Render Occupancy Dashboard section
   const renderOccupancyDashboard = () => {
-    const { isModuleActive, activeModules } = useModules();
     // Only skip if modules loaded successfully AND lighting module is not active
     if (activeModules.length > 0 && !isModuleActive('lighting')) {
       return null;
@@ -1051,7 +1053,6 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
 
   // Render Energy Comparison section
   const renderEnergyComparison = () => {
-    const { isModuleActive, activeModules } = useModules();
     // Only skip if modules loaded successfully AND energy module is not active
     if (activeModules.length > 0 && !isModuleActive('energy')) {
       return null;
@@ -1067,7 +1068,6 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
 
   // Render Actual vs SENTINEL Energy Comparison section
   const renderEnergyComparisonActualVsSentinel = () => {
-    const { isModuleActive, activeModules } = useModules();
     // Only skip if modules loaded successfully AND energy module is not active
     if (activeModules.length > 0 && !isModuleActive('energy')) {
       return null;
@@ -1085,7 +1085,6 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
 
   // Render Lighting Intelligence section
   const renderLightingIntelligence = () => {
-    const { isModuleActive, activeModules } = useModules();
     // Only skip if modules loaded successfully AND lighting module is not active
     if (activeModules.length > 0 && !isModuleActive('lighting')) {
       return null;
@@ -1101,7 +1100,6 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
 
   // Render Solar & BESS section (conditionally shown when solar module active)
   const renderSolarBess = () => {
-    const { isModuleActive, activeModules } = useModules();
     // Only show if solar module is active (or modules still loading)
     if (activeModules.length > 0 && !isModuleActive('solar')) {
       return null;
@@ -1155,7 +1153,6 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
   };
 
   const renderSolarAnnual = () => {
-    const { isModuleActive, activeModules } = useModules();
     // Only skip if modules loaded successfully AND solar module is not active
     if (activeModules.length > 0 && !isModuleActive('solar')) {
       return null;
@@ -1219,6 +1216,8 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
   if (loading) {
     return <PageLoading message="Loading dashboard..." />;
   }
+
+  console.log('[Dashboard] reaching DndContext return');
 
   return (
     <DndContext

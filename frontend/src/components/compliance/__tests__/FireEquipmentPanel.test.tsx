@@ -4,13 +4,14 @@
  * Tests for fire equipment listing, inspection scheduling, and status badges.
  */
 
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { FireEquipmentPanel } from '../FireEquipmentPanel'
 import * as complianceApi from '@/lib/api/compliance'
 
-jest.mock('@/lib/api/compliance')
+vi.mock('@/lib/api/compliance')
 
 describe('FireEquipmentPanel', () => {
   let queryClient: QueryClient
@@ -33,7 +34,7 @@ describe('FireEquipmentPanel', () => {
   }
 
   it('renders fire equipment panel title', () => {
-    jest.mocked(complianceApi.useFireEquipment).mockReturnValue({
+    vi.mocked(complianceApi.useFireEquipment).mockReturnValue({
       data: [],
       isLoading: false,
       error: null,
@@ -163,9 +164,9 @@ describe('FireEquipmentPanel', () => {
 
   it('allows scheduling new inspection', async () => {
     const user = userEvent.setup()
-    const scheduleMock = jest.fn()
+    const scheduleMock = vi.fn()
 
-    jest.mocked(complianceApi.useFireEquipment).mockReturnValue({
+    vi.mocked(complianceApi.useFireEquipment).mockReturnValue({
       data: [
         {
           id: 'equip-001',
@@ -192,7 +193,7 @@ describe('FireEquipmentPanel', () => {
       fetchStatus: 'idle',
     } as any)
 
-    jest.mocked(complianceApi.useScheduleFireInspection).mockReturnValue({
+    vi.mocked(complianceApi.useScheduleFireInspection).mockReturnValue({
       mutate: scheduleMock,
       isPending: false,
       error: null,
@@ -202,11 +203,11 @@ describe('FireEquipmentPanel', () => {
       status: 'idle',
       failureCount: 0,
       failureReason: null,
-      reset: jest.fn(),
+      reset: vi.fn(),
       context: undefined,
       data: undefined,
       variables: undefined,
-      mutateAsync: jest.fn(),
+      mutateAsync: vi.fn(),
     } as any)
 
     renderComponent()
