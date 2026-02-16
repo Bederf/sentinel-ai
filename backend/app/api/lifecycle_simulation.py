@@ -284,11 +284,11 @@ async def get_simulation_status(task_id: str):
             .eq("task_id", task_id) \
             .execute()
 
-        if not response or not response.data:
+        if not response or not response.data or len(response.data) == 0:
             raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
 
         task = response.data[0]
-        if not task:
+        if not task or not isinstance(task, dict):
             raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
         
         # Check if running orchestrator (for real-time event updates)
@@ -319,12 +319,16 @@ async def get_simulation_status(task_id: str):
             )
         else:
             # Simulation not running - get status from database
-            state_snapshot = task.get("state_snapshot", {})
-            recent_events = state_snapshot.get("recent_events", [])[-10:]
+            if not isinstance(task, dict):
+                task = {}
+            state_snapshot = task.get("state_snapshot", {}) if task else {}
+            if state_snapshot is None or not isinstance(state_snapshot, dict):
+                state_snapshot = {}
+            recent_events = state_snapshot.get("recent_events", [])[-10:] if isinstance(state_snapshot, dict) else []
             
             # Extract simulated_hour from ISO format datetime string (YYYY-MM-DDTHH:MM:SS)
             simulated_hour = None
-            simulated_time_str = state_snapshot.get("simulated_time")
+            simulated_time_str = state_snapshot.get("simulated_time") if isinstance(state_snapshot, dict) else None
             if simulated_time_str:
                 try:
                     dt = datetime.fromisoformat(simulated_time_str.replace('Z', '+00:00'))
@@ -333,15 +337,15 @@ async def get_simulation_status(task_id: str):
                     simulated_hour = None
             
             return SimulationStatusResponse(
-                running=task["status"] == "running",
+                running=task.get("status") == "running" if task else False,
                 paused=False,
-                scenario=task["scenario"],
+                scenario=task.get("scenario") if task else None,
                 simulated_time=simulated_time_str,
                 simulated_hour=simulated_hour,
                 real_elapsed_seconds=0,
-                events_count=len(state_snapshot.get("recent_events", [])),
-                active_faults=len(state_snapshot.get("active_faults", {})),
-                pending_repairs=len(state_snapshot.get("pending_repairs", {})),
+                events_count=len(state_snapshot.get("recent_events", [])) if isinstance(state_snapshot, dict) else 0,
+                active_faults=len(state_snapshot.get("active_faults", {})) if isinstance(state_snapshot, dict) else 0,
+                pending_repairs=len(state_snapshot.get("pending_repairs", {})) if isinstance(state_snapshot, dict) else 0,
                 recent_events=recent_events
             )
         

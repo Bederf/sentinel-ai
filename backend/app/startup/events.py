@@ -275,7 +275,7 @@ async def startup_event(app: FastAPI) -> None:
             client = Supabase.instance()
 
             # Stop any running simulations (set status to 'stopped')
-            running_tasks = await client.table("solar_annual_tasks") \
+            running_tasks = client.table("solar_annual_tasks") \
                 .select("task_id") \
                 .eq("status", "running") \
                 .execute()
@@ -283,14 +283,17 @@ async def startup_event(app: FastAPI) -> None:
             if running_tasks.data:
                 _logger.info(f"🛑 Stopping {len(running_tasks.data)} running simulation(s)...")
                 for task in running_tasks.data:
-                    await client.table("solar_annual_tasks") \
-                        .update({"status": "stopped"}) \
-                        .eq("task_id", task["task_id"]) \
-                        .execute()
+                    try:
+                        client.table("solar_annual_tasks") \
+                            .update({"status": "stopped"}) \
+                            .eq("task_id", task["task_id"]) \
+                            .execute()
+                    except Exception as update_err:
+                        _logger.warning(f"Could not update task {task['task_id']}: {update_err}")
                 _logger.info(f"✅ Stopped {len(running_tasks.data)} running simulation(s)")
 
             # Mark any queued simulations as 'inactive' (don't auto-start)
-            queued_tasks = await client.table("solar_annual_tasks") \
+            queued_tasks = client.table("solar_annual_tasks") \
                 .select("task_id") \
                 .eq("status", "queued") \
                 .execute()
@@ -298,10 +301,13 @@ async def startup_event(app: FastAPI) -> None:
             if queued_tasks.data:
                 _logger.info(f"⏸️  Deactivating {len(queued_tasks.data)} queued simulation(s)...")
                 for task in queued_tasks.data:
-                    await client.table("solar_annual_tasks") \
-                        .update({"status": "inactive"}) \
-                        .eq("task_id", task["task_id"]) \
-                        .execute()
+                    try:
+                        client.table("solar_annual_tasks") \
+                            .update({"status": "inactive"}) \
+                            .eq("task_id", task["task_id"]) \
+                            .execute()
+                    except Exception as update_err:
+                        _logger.warning(f"Could not deactivate task {task['task_id']}: {update_err}")
                 _logger.info(f"✅ Deactivated {len(queued_tasks.data)} queued simulation(s)")
 
             if not running_tasks.data and not queued_tasks.data:
