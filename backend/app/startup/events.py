@@ -205,7 +205,7 @@ async def startup_event(app: FastAPI) -> None:
             client = Supabase.instance()
 
             # Query for any crashed tasks (status='running')
-            response = await client.table("solar_annual_tasks") \
+            response = await client.table("lifecycle_simulation_tasks") \
                 .select("*") \
                 .eq("status", "running") \
                 .eq("simulation_type", "lifecycle") \
@@ -275,7 +275,7 @@ async def startup_event(app: FastAPI) -> None:
             client = Supabase.instance()
 
             # Stop any running simulations (set status to 'stopped')
-            running_tasks = client.table("solar_annual_tasks") \
+            running_tasks = client.table("lifecycle_simulation_tasks") \
                 .select("task_id") \
                 .eq("status", "running") \
                 .execute()
@@ -284,7 +284,7 @@ async def startup_event(app: FastAPI) -> None:
                 _logger.info(f"🛑 Stopping {len(running_tasks.data)} running simulation(s)...")
                 for task in running_tasks.data:
                     try:
-                        client.table("solar_annual_tasks") \
+                        client.table("lifecycle_simulation_tasks") \
                             .update({"status": "stopped"}) \
                             .eq("task_id", task["task_id"]) \
                             .execute()
@@ -293,7 +293,7 @@ async def startup_event(app: FastAPI) -> None:
                 _logger.info(f"✅ Stopped {len(running_tasks.data)} running simulation(s)")
 
             # Mark any queued simulations as 'inactive' (don't auto-start)
-            queued_tasks = client.table("solar_annual_tasks") \
+            queued_tasks = client.table("lifecycle_simulation_tasks") \
                 .select("task_id") \
                 .eq("status", "queued") \
                 .execute()
@@ -302,7 +302,7 @@ async def startup_event(app: FastAPI) -> None:
                 _logger.info(f"⏸️  Deactivating {len(queued_tasks.data)} queued simulation(s)...")
                 for task in queued_tasks.data:
                     try:
-                        client.table("solar_annual_tasks") \
+                        client.table("lifecycle_simulation_tasks") \
                             .update({"status": "inactive"}) \
                             .eq("task_id", task["task_id"]) \
                             .execute()

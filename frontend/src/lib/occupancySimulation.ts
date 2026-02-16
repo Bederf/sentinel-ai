@@ -154,9 +154,11 @@ export class OccupancySimulation {
   private currentTime: Date = new Date();
   private nextPersonId: number = 0;
   private zoneTargets: Map<string, ZoneTarget> = new Map();
+  private zonesArray: ZoneConfig[] = []; // For quick access by index
 
   constructor(zoneConfigs: ZoneConfig[], personas?: Record<PersonaType, PersonaConfig>) {
     this.personas = personas || PERSONAS;
+    this.zonesArray = zoneConfigs;
 
     // Index zones by ID for quick lookup
     for (const zone of zoneConfigs) {
@@ -285,50 +287,220 @@ export class OccupancySimulation {
   }
 
   /**
+   * Find multi-floor path between zones on different floors
+   * Returns waypoints including elevator/stairs transitions
+   */
+  private findMultiFloorPath(startZoneId: string, endZoneId: string): Waypoint[] {
+    const startZone = this.zones.get(startZoneId);
+    const endZone = this.zones.get(endZoneId);
+
+    if (!startZone || !endZone) return [];
+
+    const path: Waypoint[] = [];
+
+    // Same floor: direct path
+    if (startZone.floor === endZone.floor) {
+      // Simple direct path (Phase 2: within-floor corridor movement)
+      path.push({
+        x: endZone.x + endZone.w / 2,
+        y: endZone.y + endZone.h / 2,
+        floor: endZone.floor,
+        action: 'continue',
+      });
+      return path;
+    }
+
+    // Different floors: use elevator or stairs
+    const verticalTransports = [
+      // Elevator
+      { id: 'lift-1', x: -2, y: 2, type: 'elevator' as const, waitTime: 15 },
+      { id: 'lift-2', x: 2, y: 2, type: 'elevator' as const, waitTime: 15 },
+      // Stairs
+      { id: 'stairs-1', x: -6, y: 2, type: 'stairs' as const, waitTime: 0 },
+      { id: 'stairs-2', x: 6, y: 2, type: 'stairs' as const, waitTime: 0 },
+    ];
+
+    // Pick nearest elevator/stairs (slightly prefer elevators for variety)
+    const isUsingElevator = Math.random() < 0.6;
+    const transport = isUsingElevator
+      ? verticalTransports.find(t => t.type === 'elevator') || verticalTransports[0]
+      : verticalTransports.find(t => t.type === 'stairs') || verticalTransports[0];
+
+    if (!transport) return [];
+
+    // 1. Move to elevator/stairs on current floor
+    path.push({
+      x: transport.x,
+      y: transport.y,
+      floor: startZone.floor,
+      action: 'continue',
+    });
+
+    // 2. Wait for elevator/stairs (with action marker)
+    path.push({
+      x: transport.x,
+      y: transport.y,
+      floor: startZone.floor,
+      action: transport.type,
+      waitTime: transport.waitTime,
+    });
+
+    // 3. Exit on destination floor
+    path.push({
+      x: transport.x,
+      y: transport.y,
+      floor: endZone.floor,
+      action: 'continue',
+    });
+
+    // 4. Move to destination zone
+    path.push({
+      x: endZone.x + endZone.w / 2,
+      y: endZone.y + endZone.h / 2,
+      floor: endZone.floor,
+      action: 'continue',
+    });
+
+    return path;
+  }
+
+  /**
+   * Spawn person at building entrance
+   */
+  private handleArrival(persona: PersonaType, targetZoneId: string): Person {
+    const targetZone = this.zones.get(targetZoneId);
+    if (!targetZone) throw new Error(`Target zone ${targetZoneId} not found`);
+
+    const entrance = this.zonesArray[0]; // Use first zone as entrance proxy
+    const person = this.spawnPersonInZone(persona, targetZoneId);
+
+    // Set entry state for visual effect
+    person.state = 'entering';
+    person.x = entrance.x;
+    person.y = entrance.y;
+    person.floor = entrance.floor;
+
+    // Pathfind from entrance zone to target
+    if (entrance.id !== targetZoneId) {
+      person.path = this.findMultiFloorPath(entrance.id, targetZoneId);
+    }
+
+    return person;
+  }
+
+  /**
+   * Mark person as departing
+   */
+  private handleDeparture(person: Person): void {
+    person.state = 'exiting';
+    // Pathfind to nearest exit
+    const exitZone = this.zonesArray.find(z => z.type === 'entry') || this.zonesArray[0];
+    if (person.zoneId !== exitZone.id) {
+      person.path = this.findMultiFloorPath(person.zoneId, exitZone.id);
+    }
+    person.scheduledExitTime = new Date(); // Leave immediately
+  }
+
+  /**
    * Main animation tick (called at 60fps)
+   * Handles zone movement, multi-floor pathfinding, and departures
    */
   tick(deltaTime: number): Person[] {
-    // Update people
     const toRemove: string[] = [];
 
     for (const [id, person] of this.people.entries()) {
       // Check if person should exit
       if (new Date() >= person.scheduledExitTime && person.state !== 'exiting') {
-        this.exitPerson(person);
+        this.handleDeparture(person);
       }
 
-      // Remove person if exiting and path is empty
+      // Remove person if exiting and reached final destination
       if (person.state === 'exiting' && person.path.length === 0) {
         toRemove.push(id);
         continue;
       }
 
-      // Move toward target within zone (Phase 1: no multi-floor yet)
-      if (person.targetX !== person.x || person.targetY !== person.y) {
-        const dx = person.targetX - person.x;
-        const dy = person.targetY - person.y;
+      // Handle waypoint-based movement (multi-floor paths)
+      if (person.path.length > 0) {
+        const currentWaypoint = person.path[0];
+
+        // Handle elevator/stairs transitions
+        if (currentWaypoint.action === 'elevator' || currentWaypoint.action === 'stairs') {
+          // Start waiting at transport
+          person.waitTimer = (person.waitTimer || 0) + deltaTime;
+
+          // Set position to elevator/stairs
+          person.x = currentWaypoint.x;
+          person.y = currentWaypoint.y;
+
+          // Wait time elapsed: transition to destination floor
+          if (person.waitTimer >= (currentWaypoint.waitTime || 0)) {
+            person.floor = currentWaypoint.floor; // Change floor instantly
+            person.waitTimer = 0;
+            person.path.shift(); // Move to next waypoint
+            person.moving = false;
+          } else {
+            person.moving = false; // Frozen while waiting
+          }
+          continue;
+        }
+
+        // Regular waypoint movement
+        const dx = currentWaypoint.x - person.x;
+        const dy = currentWaypoint.y - person.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
 
-        if (dist > 2) {
+        if (dist < 2) {
+          // Reached waypoint
+          person.path.shift();
+          if (person.path.length === 0) {
+            // Reached final destination
+            const zone = this.zones.get(person.zoneId);
+            if (zone && person.state === 'entering') {
+              person.state = 'idle';
+            }
+          }
+          person.moving = false;
+        } else {
+          // Move toward waypoint
           const personaConfig = this.personas[person.persona];
           const speed = personaConfig.speed * deltaTime;
           person.x += (dx / dist) * speed;
           person.y += (dy / dist) * speed;
+          person.floor = currentWaypoint.floor; // Update floor during movement
           person.moving = true;
-        } else {
-          // Reached target, pick new target in zone
-          if (person.state === 'idle' && Math.random() < 0.01) {
-            const zone = this.zones.get(person.zoneId);
-            if (zone) {
-              const margin = 14;
-              person.targetX = zone.x + margin + Math.random() * (zone.w - margin * 2);
-              person.targetY = zone.y + margin + Math.random() * (zone.h - margin * 2);
+        }
+        continue;
+      }
+
+      // Zone idle: move around within zone randomly
+      if (person.state === 'idle') {
+        if (person.targetX !== person.x || person.targetY !== person.y) {
+          const dx = person.targetX - person.x;
+          const dy = person.targetY - person.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+
+          if (dist > 2) {
+            const personaConfig = this.personas[person.persona];
+            const speed = personaConfig.speed * deltaTime;
+            person.x += (dx / dist) * speed;
+            person.y += (dy / dist) * speed;
+            person.moving = true;
+          } else {
+            // Reached target, pick new random destination
+            if (Math.random() < 0.01) {
+              const zone = this.zones.get(person.zoneId);
+              if (zone) {
+                const margin = 14;
+                person.targetX = zone.x + margin + Math.random() * (zone.w - margin * 2);
+                person.targetY = zone.y + margin + Math.random() * (zone.h - margin * 2);
+              }
             }
+            person.moving = false;
           }
+        } else {
           person.moving = false;
         }
-      } else {
-        person.moving = false;
       }
     }
 

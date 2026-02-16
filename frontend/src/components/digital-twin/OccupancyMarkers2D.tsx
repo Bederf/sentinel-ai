@@ -10,7 +10,7 @@
  */
 
 import React from 'react';
-import type { Person, PersonaType } from '@/lib/occupancySimulation';
+import type { Person } from '@/lib/occupancySimulation';
 import { getPersonaColor } from '@/lib/occupancySimulation';
 
 interface OccupancyMarkers2DProps {
@@ -64,7 +64,7 @@ export const OccupancyMarkers2D: React.FC<OccupancyMarkers2DProps> = ({
             onClick={() => onPersonClick?.(person)}
           />
 
-          {/* Optional: Glow effect for entering/exiting */}
+          {/* Glow effect for entering/exiting */}
           {(person.state === 'entering' || person.state === 'exiting') && (
             <circle
               cx={person.x * scale + offsetX}
@@ -79,6 +79,33 @@ export const OccupancyMarkers2D: React.FC<OccupancyMarkers2DProps> = ({
                 animation: 'pulse 1.5s ease-in-out infinite',
               }}
             />
+          )}
+
+          {/* Elevator waiting indicator (Phase 2: when waitTimer exists) */}
+          {person.waitTimer !== undefined && person.waitTimer > 0 && (
+            <>
+              {/* Cage-like effect showing elevator is active */}
+              <rect
+                x={person.x * scale + offsetX - 3}
+                y={person.y * scale + offsetY - 3}
+                width={6}
+                height={6}
+                fill="none"
+                stroke={getPersonaColor(person.persona)}
+                strokeWidth={0.5}
+                opacity={0.6}
+              />
+              {/* Wait counter (optional) */}
+              <text
+                x={person.x * scale + offsetX + 5}
+                y={person.y * scale + offsetY - 5}
+                fontSize={0.8}
+                fill={getPersonaColor(person.persona)}
+                opacity={0.7}
+              >
+                ⏳
+              </text>
+            </>
           )}
 
           {/* Optional: Path indicator (where person is heading) */}

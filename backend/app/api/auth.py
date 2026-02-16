@@ -363,7 +363,7 @@ async def login_with_email(request: Request, email: str):
                 task_id = str(uuid.uuid4())
                 client = Supabase.instance()
                 
-                response_data = client.table("solar_annual_tasks").insert({
+                response_data = client.table("lifecycle_simulation_tasks").insert({
                     "task_id": task_id,
                     "site_id": "site-002",
                     "scenario": "grant_hvac_dali_ai_annual",
@@ -372,7 +372,6 @@ async def login_with_email(request: Request, email: str):
                     "progress_pct": 0,
                     "days_completed": 0,
                     "duration_minutes": 240.0,  # 365 days in 4 hours
-                    "created_at": datetime.utcnow().isoformat(),
                 }).execute()
                 
                 logger.info(f"Auto-started Grant demo: task_id={task_id}, scenario=grant_hvac_dali_ai_annual (365 days → 4 hours, starting from ZERO)")

@@ -1074,11 +1074,11 @@ class BackgroundSchedulerService:
             logger.warning(">>> Querying for queued simulations with status='queued', simulation_type='lifecycle'")
             logger.warning(">>> Building query...")
             try:
-                query_builder = supabase.table("solar_annual_tasks") \
+                query_builder = supabase.table("lifecycle_simulation_tasks") \
                     .select("*") \
                     .eq("status", "queued") \
                     .eq("simulation_type", "lifecycle") \
-                    .order("started_at", desc=False) \
+                    .order("created_at", desc=False) \
                     .limit(1)
                 logger.warning(f">>> Query builder created: {type(query_builder)}")
 
@@ -1115,7 +1115,7 @@ class BackgroundSchedulerService:
 
             # Mark as running
             logger.warning(f">>> Marking task {task_id} as running in database...")
-            supabase.table("solar_annual_tasks") \
+            supabase.table("lifecycle_simulation_tasks") \
                 .update({"status": "running"}) \
                 .eq("task_id", task_id) \
                 .execute()
