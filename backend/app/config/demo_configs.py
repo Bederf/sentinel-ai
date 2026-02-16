@@ -15,6 +15,7 @@ class DemoConfig(TypedDict):
     companyName: str
     demoFocus: str
     allowedModules: list[str]  # Module types visible to this user/company
+    allowedSites: list[str]  # Site codes user can access (empty = all sites)
     defaultView: str
     viewMode: str  # 'auditor', 'operator', or 'admin'
     description: str
@@ -36,6 +37,7 @@ USER_DEMO_CONFIGS: dict[str, DemoConfig] = {
             'fleet',
             'settings',
         ],
+        'allowedSites': ['site-002'],  # Restrict to site-002 only
         'defaultView': 'dashboard',
         'viewMode': 'operator',
         'description': 'Solar & BESS Demo for Bederf',
@@ -59,6 +61,7 @@ COMPANY_DEMO_CONFIGS: dict[str, DemoConfig] = {
             'fleet',
             'settings',
         ],
+        'allowedSites': ['site-002'],  # Restrict to site-002 only
         'defaultView': 'occupancy',
         'viewMode': 'operator',
         'description': 'DALI Lighting & Occupancy Control Demo',
@@ -121,3 +124,26 @@ def has_demo_module_access(email: str, module_type: str) -> bool:
 
     # Check if module is in allowed modules
     return module_type in config['allowedModules']
+
+
+def has_demo_site_access(email: str, site_code: str) -> bool:
+    """Check if user has access to a site via demo configuration.
+    
+    Restricts demo users to specific sites (e.g., site-002 only).
+    
+    Args:
+        email: User email address
+        site_code: Site code (e.g., 'site-002')
+    
+    Returns:
+        True if user's demo config includes this site, or if no restriction is set
+    """
+    config = get_demo_config_for_email(email)
+    if not config:
+        return True  # No demo config = no site restriction
+    
+    allowed_sites = config.get('allowedSites', [])
+    if not allowed_sites:
+        return True  # Empty list = no restriction
+    
+    return site_code in allowed_sites
