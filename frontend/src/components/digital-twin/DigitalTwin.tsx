@@ -14,6 +14,7 @@ import { StatsBar } from './StatsBar';
 import { AlertBanner } from './AlertBanner';
 import { Compass } from '../3d/Compass';
 import { FloorPlan2D } from './FloorPlan2D';
+import { OccupancyMarkers3DFiber } from './OccupancyMarkers3DFiber';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useEquipmentData } from '@/hooks/useEquipmentData';
 import { useSitesList } from '@/hooks/useSitesList';
@@ -524,6 +525,16 @@ export function DigitalTwin() {
               onEquipmentClick={(id) => setSelectedEquipment(id)}
               zoneCentroids={Object.keys(zoneCentroids).length > 0 ? zoneCentroids : undefined}
             />
+
+            {/* Occupancy Markers - Phase 3: 3D people visualization */}
+            {occupancyEnabled && people.length > 0 && (
+              <OccupancyMarkers3DFiber
+                people={people}
+                buildingWidth={12}
+                buildingDepth={8}
+                floorHeight={3.5}
+              />
+            )}
 
             {/* Controls */}
             <OrbitControls

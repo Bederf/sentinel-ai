@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * DIGITAL TWIN VISUALIZATION
  * ───────────────────────────
@@ -8,35 +7,16 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { devicesApi, equipmentApi } from '@/lib/api';
-import type { Device, Equipment } from '@/lib/api';
+import * as THREE from 'three';
+import { OccupancyMarkers3D, updateOccupancyMarkers3D } from './OccupancyMarkers3D';
+import type { Person } from '@/lib/occupancySimulation';
+import { getPersonaColor } from '@/lib/occupancySimulation';
 
-interface EquipmentData {
-  id: string;
-  name: string;
-  code: string;
-  type: string;
-  floor: number;
-  x: number;
-  z: number;
-  status: 'online' | 'warning' | 'fault' | 'offline';
-  readings: Record<string, number | boolean | string>;
-  alerts: Array<{
-    id: string;
-    severity: 'critical' | 'warning' | 'info';
-    text: string;
-    time: string;
-    ack: boolean;
-  }>;
-  maintenance?: {
-    last_service?: string;
-    next_service?: string;
-  };
-}
+// Note: Equipment and devices API calls are deferred to Phase 4 backend integration
+// For Phase 3, we focus on occupancy visualization (people as 3D cylinders)
 
-interface DetailedEquipment extends EquipmentData {
-  // Extended for detail panel
-}
+// Phase 3: Occupancy visualization component
+// Equipment detail panels deferred to Phase 4
 
 const TYPE_COLORS: Record<string, string> = {
   ahu: '#2E86AB',
@@ -129,6 +109,18 @@ const LABELS: Record<string, string> = {
   runtime_min: 'Runtime',
 };
 
+// Helper: Convert CSS color to THREE.js hex
+function personaColorToHex(cssColor: string): number {
+  const match = cssColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if (match) {
+    const r = parseInt(match[1]);
+    const g = parseInt(match[2]);
+    const b = parseInt(match[3]);
+    return (r << 16) | (g << 8) | b;
+  }
+  return 0xffffff;
+}
+
 const UNITS: Record<string, string> = {
   supply_temp: '°C',
   return_temp: '°C',
@@ -178,32 +170,105 @@ const UNITS: Record<string, string> = {
   runtime_min: ' min',
 };
 
-export const DigitalTwinVisualization: React.FC<{ siteId?: string }> = ({ siteId = 'site-002' }) => {
+interface DigitalTwinVisualizationProps {
+  siteId?: string;
+  occupancyEnabled?: boolean;
+  people?: Person[];
+}
+
+export const DigitalTwinVisualization: React.FC<DigitalTwinVisualizationProps> = ({
+  siteId = 'site-002',
+  occupancyEnabled = false,
+  people = [],
+}) => {
   const canvasRef = useRef<HTMLDivElement>(null);
-  const [selectedEquipment, setSelectedEquipment] = useState<DetailedEquipment | null>(null);
+  const sceneRef = useRef<any>(null);
+  const occupancyMeshesRef = useRef<Map<string, any>>(new Map());
   const [activeFloors, setActiveFloors] = useState<number[]>([0, 1, 2, 3, 4]);
-  const [typeFilter, setTypeFilter] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'live' | 'alerts' | 'maintenance'>('live');
 
-  // Fetch equipment data
-  const { data: equipment } = useQuery({
-    queryKey: ['equipment', siteId],
-    queryFn: () => equipmentApi.getAllBySite(siteId),
-  });
+  // Phase 3: Equipment data queries deferred to Phase 4 backend integration
+  // For now, focus on occupancy visualization
 
-  // Fetch device readings
-  const { data: devices } = useQuery({
-    queryKey: ['devices', siteId],
-    queryFn: () => devicesApi.getDevicesBySite(siteId),
-  });
-
-  // Initialize Three.js scene
+  // Handle occupancy marker creation and updates
   useEffect(() => {
-    if (!canvasRef.current || typeof window === 'undefined' || !(window as any).THREE) {
+    if (!occupancyEnabled || !sceneRef.current || !people || people.length === 0) {
+      // Clear meshes if occupancy disabled
+      if (!occupancyEnabled && occupancyMeshesRef.current.size > 0) {
+        occupancyMeshesRef.current.forEach((mesh: any) => {
+          sceneRef.current?.remove(mesh);
+          mesh.geometry?.dispose();
+          mesh.material?.dispose();
+        });
+        occupancyMeshesRef.current.clear();
+      }
       return;
     }
 
-    const THREE = (window as any).THREE;
+    const meshes = occupancyMeshesRef.current;
+
+    // Remove meshes for people who left
+    for (const [id, mesh] of meshes.entries()) {
+      if (!people.find(p => p.id === id)) {
+        sceneRef.current.remove(mesh);
+        mesh.geometry?.dispose();
+        mesh.material?.dispose();
+        meshes.delete(id);
+      }
+    }
+
+    // Add or update meshes for active people
+    for (const person of people) {
+      let mesh = meshes.get(person.id);
+
+      if (!mesh) {
+        // Create new person mesh (cylinder)
+        const geometry = new THREE.CylinderGeometry(0.25, 0.25, 1.7, 12);
+        const hexColor = personaColorToHex(getPersonaColor(person.persona));
+
+        const material = new THREE.MeshPhongMaterial({
+          color: hexColor,
+          emissive: hexColor,
+          emissiveIntensity: 0.2,
+          shininess: 10,
+          transparent: true,
+          opacity: 1.0,
+        });
+
+        mesh = new THREE.Mesh(geometry, material);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        mesh.userData.personId = person.id;
+        mesh.userData.persona = person.persona;
+        mesh.userData.targetX = 0;
+        mesh.userData.targetY = 0;
+        mesh.userData.targetZ = 0;
+
+        sceneRef.current.add(mesh);
+        meshes.set(person.id, mesh);
+      }
+
+      // Update target position
+      mesh.userData.targetX = (person.x - 300) / 50;
+      mesh.userData.targetZ = (person.y - 200) / 50;
+      mesh.userData.targetY = person.floor * 3.5 + 0.85;
+      mesh.userData.personId = person.id;
+      mesh.userData.persona = person.persona;
+
+      // Update opacity based on state
+      if (person.state === 'exiting') {
+        mesh.material.opacity = 0.5;
+      } else {
+        mesh.material.opacity = 1.0;
+      }
+    }
+  }, [people, occupancyEnabled]);
+
+  // Initialize Three.js scene
+  useEffect(() => {
+    if (!canvasRef.current || typeof window === 'undefined') {
+      return;
+    }
+
     const container = canvasRef.current;
     const W = container.clientWidth;
     const H = container.clientHeight;
@@ -212,6 +277,7 @@ export const DigitalTwinVisualization: React.FC<{ siteId?: string }> = ({ siteId
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x060e18);
     scene.fog = new THREE.FogExp2(0x060e18, 0.012);
+    sceneRef.current = scene;
 
     const camera = new THREE.PerspectiveCamera(50, W / H, 0.1, 200);
     const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -314,8 +380,15 @@ export const DigitalTwinVisualization: React.FC<{ siteId?: string }> = ({ siteId
 
     // Animation loop
     let time = 0;
+    let lastFrameTime = performance.now();
+
     const animate = () => {
       requestAnimationFrame(animate);
+      
+      const currentTime = performance.now();
+      const deltaTime = (currentTime - lastFrameTime) / 1000;
+      lastFrameTime = currentTime;
+      
       time += 0.016;
 
       scene.traverse((o: any) => {
@@ -326,6 +399,16 @@ export const DigitalTwinVisualization: React.FC<{ siteId?: string }> = ({ siteId
         }
       });
 
+      // Update occupancy markers with smooth animation
+      if (occupancyEnabled && occupancyMeshesRef.current.size > 0) {
+        updateOccupancyMarkers3D(
+          occupancyMeshesRef.current,
+          deltaTime,
+          time,
+          THREE
+        );
+      }
+
       renderer.render(scene, camera);
     };
 
@@ -334,9 +417,12 @@ export const DigitalTwinVisualization: React.FC<{ siteId?: string }> = ({ siteId
     // Cleanup
     return () => {
       renderer.dispose();
-      container.removeChild(renderer.domElement);
+      if (container.contains(renderer.domElement)) {
+        container.removeChild(renderer.domElement);
+      }
+      sceneRef.current = null;
     };
-  }, [equipment, devices]);
+  }, []);
 
   return (
     <div className="w-full space-y-6">
@@ -380,136 +466,14 @@ export const DigitalTwinVisualization: React.FC<{ siteId?: string }> = ({ siteId
         <div className="absolute bottom-3 left-3 right-3 font-mono text-xs text-slate-500">
           <span className="font-semibold text-slate-300">Drag</span> Rotate ·{' '}
           <span className="font-semibold text-slate-300">Scroll</span> Zoom ·{' '}
-          <span className="font-semibold text-slate-300">Click</span> Inspect
+          {occupancyEnabled && <span><span className="font-semibold text-emerald-400">●</span> People 3D visualization enabled</span>}
         </div>
 
-        {selectedEquipment && (
-          <div className="absolute top-3 right-3 w-80 bg-slate-950/97 border border-emerald-500/10 rounded overflow-hidden z-20 max-h-[calc(100%-24px)] flex flex-col font-mono text-sm">
-            <div className="px-4 py-3 border-b border-emerald-500/6">
-              <div className="text-xs font-semibold tracking-wider text-emerald-400 uppercase opacity-70">
-                {selectedEquipment.type}
-              </div>
-              <div className="font-display text-base font-bold text-slate-100 mt-1">
-                {selectedEquipment.name}
-              </div>
-              <div className="text-xs text-slate-500 mt-1">
-                {selectedEquipment.code} · {FLOOR_NAMES[selectedEquipment.floor]}
-              </div>
-              <div className="flex items-center gap-2 mt-2 text-xs px-2 py-1 rounded w-fit"
-                style={{
-                  background: `${STATUS_COLORS[selectedEquipment.status]}12`,
-                  border: `1px solid ${STATUS_COLORS[selectedEquipment.status]}25`,
-                }}>
-                <div
-                  className="w-1.5 h-1.5 rounded-full"
-                  style={{
-                    background: STATUS_COLORS[selectedEquipment.status],
-                    boxShadow: `0 0 6px ${STATUS_COLORS[selectedEquipment.status]}`,
-                  }}
-                />
-                <span style={{ color: STATUS_COLORS[selectedEquipment.status] }}>
-                  {selectedEquipment.status.toUpperCase()}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex border-b border-emerald-500/4">
-              {(['live', 'alerts', 'maintenance'] as const).map(tab => (
-                <button
-                  key={tab}
-                  className={`flex-1 px-3 py-2 text-xs uppercase tracking-wider font-semibold transition-all border-b-2 ${
-                    activeTab === tab
-                      ? 'text-blue-400 border-blue-500'
-                      : 'text-slate-500 border-transparent hover:text-slate-400'
-                  }`}
-                  onClick={() => setActiveTab(tab)}
-                >
-                  {tab}
-                </button>
-              ))}
-            </div>
-
-            <div className="flex-1 overflow-auto px-4 py-3 space-y-2 text-xs">
-              {activeTab === 'live' && selectedEquipment.readings && (
-                <div className="space-y-2">
-                  {Object.entries(selectedEquipment.readings).map(([k, v]) => {
-                    const label = LABELS[k] || k;
-                    const unit = UNITS[k] || '';
-                    const display = typeof v === 'boolean' ? (v ? '●' : '○') : typeof v === 'number' ? (Number.isInteger(v) ? v : v.toFixed(1)) : v;
-                    return (
-                      <div key={k} className="flex justify-between">
-                        <span className="text-slate-400">{label}</span>
-                        <span className="text-slate-100 font-semibold">
-                          {display}{unit}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {activeTab === 'alerts' && (
-                <div className="space-y-2">
-                  {selectedEquipment.alerts && selectedEquipment.alerts.length > 0 ? (
-                    selectedEquipment.alerts.map(alert => (
-                      <div
-                        key={alert.id}
-                        className="p-2 rounded text-xs"
-                        style={{
-                          background: alert.severity === 'critical' ? 'rgba(239, 68, 68, 0.08)' : alert.severity === 'warning' ? 'rgba(245, 158, 11, 0.08)' : 'rgba(46, 134, 171, 0.05)',
-                          border: alert.severity === 'critical' ? '1px solid rgba(239, 68, 68, 0.2)' : alert.severity === 'warning' ? '1px solid rgba(245, 158, 11, 0.15)' : '1px solid rgba(46, 134, 171, 0.1)',
-                        }}
-                      >
-                        <div className="flex justify-between mb-1">
-                          <span className="font-semibold uppercase" style={{
-                            color: alert.severity === 'critical' ? '#EF4444' : alert.severity === 'warning' ? '#F59E0B' : '#2E86AB'
-                          }}>
-                            {alert.severity}
-                          </span>
-                          <span className="text-slate-500">{alert.time}</span>
-                        </div>
-                        <p className="text-slate-300 leading-relaxed">{alert.text}</p>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-center text-slate-500 py-4">✓ No active alerts</div>
-                  )}
-                </div>
-              )}
-
-              {activeTab === 'maintenance' && (
-                <div className="space-y-2">
-                  {selectedEquipment.maintenance ? (
-                    <>
-                      {Object.entries(selectedEquipment.maintenance).map(([k, v]) => (
-                        <div key={k} className="flex justify-between">
-                          <span className="text-slate-400">{k.replace(/_/g, ' ')}</span>
-                          <span className="text-slate-100">{v}</span>
-                        </div>
-                      ))}
-                      <button className="w-full mt-3 px-3 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded text-emerald-400 hover:bg-emerald-500/20 transition-all text-xs font-semibold">
-                        📋 Raise Work Order
-                      </button>
-                    </>
-                  ) : (
-                    <div className="text-center text-slate-500 py-4">No maintenance records</div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <button
-              className="absolute top-3 right-3 text-slate-500 hover:text-slate-300 text-lg"
-              onClick={() => setSelectedEquipment(null)}
-            >
-              ✕
-            </button>
-          </div>
-        )}
+        {/* Phase 3: Equipment detail panels deferred to Phase 4 */}
       </div>
 
       <div className="text-center text-xs text-slate-500 font-mono">
-        Equipment visualization powered by Three.js | Real-time data from SENTINEL BMS
+        Interactive Digital Twin with 3D Occupancy Visualization | Powered by Three.js
       </div>
     </div>
   );
