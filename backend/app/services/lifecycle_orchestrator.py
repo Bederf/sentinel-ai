@@ -313,7 +313,7 @@ class LifecycleOrchestrator:
             try:
                 from app.database.supabase_client import get_supabase_client
                 supabase = get_supabase_client()
-                response = supabase.table("solar_annual_tasks").select("state_snapshot").eq("task_id", task_id).execute()
+                response = supabase.table("lifecycle_simulation_tasks").select("state_snapshot").eq("task_id", task_id).execute()
                 if response.data and response.data[0].get("state_snapshot"):
                     checkpoint = response.data[0]["state_snapshot"]
                     logger.info(f"✅ Found checkpoint for task {task_id}, recovering from day {checkpoint.get('days_simulated', 0)}/365")
@@ -1387,7 +1387,7 @@ class LifecycleOrchestrator:
             state_snapshot = self.serialize_state()
             
             # Update task in database with checkpoint
-            result = await Supabase.instance().client.table("solar_annual_tasks") \
+            result = await Supabase.instance().client.table("lifecycle_simulation_tasks") \
                 .update({
                     "state_snapshot": state_snapshot,
                     "progress_pct": int((self.days_simulated / 365) * 100) if self.seasonal_modeler else 0,

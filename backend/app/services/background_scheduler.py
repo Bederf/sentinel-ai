@@ -1050,9 +1050,9 @@ class BackgroundSchedulerService:
             logger.warning(">>> Supabase client obtained")
 
             # Test basic query first
-            logger.warning(">>> TEST: Trying simple count query on solar_annual_tasks...")
+            logger.warning(">>> TEST: Trying simple count query on lifecycle_simulation_tasks...")
             try:
-                test_response = supabase.table("solar_annual_tasks").select("count", count="exact").execute()
+                test_response = supabase.table("lifecycle_simulation_tasks").select("count", count="exact").execute()
                 logger.warning(f">>> TEST: Count query succeeded, response: {test_response}")
                 if hasattr(test_response, 'count'):
                     logger.warning(f">>> TEST: Total tasks in table: {test_response.count}")
@@ -1062,7 +1062,7 @@ class BackgroundSchedulerService:
             # Test: Get ALL tasks to see what's in the database
             logger.warning(">>> TEST: Querying ALL tasks (no filters) to see what's in database...")
             try:
-                all_tasks_response = supabase.table("solar_annual_tasks").select("task_id,status,simulation_type,scenario").limit(5).execute()
+                all_tasks_response = supabase.table("lifecycle_simulation_tasks").select("task_id,status,simulation_type,scenario").limit(5).execute()
                 logger.warning(f">>> TEST: All tasks query returned {len(all_tasks_response.data) if all_tasks_response.data else 0} rows")
                 if all_tasks_response.data:
                     for task in all_tasks_response.data:
@@ -1167,7 +1167,7 @@ class BackgroundSchedulerService:
 
         try:
             # Check if this is a crash recovery (has state_snapshot)
-            response = supabase.table("solar_annual_tasks") \
+            response = supabase.table("lifecycle_simulation_tasks") \
                 .select("state_snapshot") \
                 .eq("task_id", task_id) \
                 .execute()
@@ -1222,7 +1222,7 @@ class BackgroundSchedulerService:
                 await orchestrator._task
 
             # Mark as completed
-            supabase.table("solar_annual_tasks") \
+            supabase.table("lifecycle_simulation_tasks") \
                 .update({
                     "status": "completed",
                     "progress_pct": 100,
@@ -1238,7 +1238,7 @@ class BackgroundSchedulerService:
 
             # Mark as failed with error message
             try:
-                supabase.table("solar_annual_tasks") \
+                supabase.table("lifecycle_simulation_tasks") \
                     .update({
                         "status": "failed",
                         "error_message": str(e)[:500],  # Truncate long errors

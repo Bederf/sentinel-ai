@@ -225,7 +225,7 @@ async def startup_event(app: FastAPI) -> None:
                 if not state_snapshot:
                     _logger.warning(f"⚠️ Task {task_id} has no state snapshot - cannot recover")
                     # Mark as failed since we can't resume
-                    await client.table("solar_annual_tasks") \
+                    await client.table("lifecycle_simulation_tasks") \
                         .update({
                             "status": "failed",
                             "error_message": "No checkpoint state available for recovery"
@@ -237,7 +237,7 @@ async def startup_event(app: FastAPI) -> None:
                 try:
                     # Mark task as "queued" so queue processor will resume it
                     # Queue processor will deserialize state and continue from checkpoint
-                    await client.table("solar_annual_tasks") \
+                    await client.table("lifecycle_simulation_tasks") \
                         .update({
                             "status": "queued",
                             "error_message": None

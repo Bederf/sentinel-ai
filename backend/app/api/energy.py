@@ -1064,7 +1064,7 @@ async def get_energy_simulated(
         client = Supabase.instance()
         
         # Query for running simulations on this site
-        running_tasks = client.table("solar_annual_tasks") \
+        running_tasks = client.table("lifecycle_simulation_tasks") \
             .select("task_id, scenario") \
             .eq("site_id", site_id) \
             .eq("status", "running") \
