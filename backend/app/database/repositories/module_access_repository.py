@@ -8,6 +8,7 @@ from datetime import datetime
 from app.database.supabase_client import get_supabase_client
 from app.models.auth import SentinelRole
 from app.models.module_registry import ModuleType
+from app.config.demo_configs import has_demo_module_access
 
 import logging
 
@@ -244,6 +245,16 @@ class ModuleAccessRepository:
             return True
         if not user_email:
             return False
+        
+        # Check demo configs (synced with frontend access-control.ts)
+        # This allows demo users to access modules without explicit database grants
+        if has_demo_module_access(user_email, module_type.value):
+            logger.info(
+                f"Demo config grant: user={user_email} module={module_type.value}"
+            )
+            return True
+        
+        # Fall back to explicit database grants
         return module_type.value in self.get_user_modules(user_email=user_email, site_code=site_code)
 
 

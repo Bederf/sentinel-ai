@@ -110,8 +110,8 @@ export const VIEW_TITLES: Record<View, string> = {
  * FREE BASIC PACKAGE PAGES:
  * - Dashboard: view equipment and AI recommendations
  * - System Health: real-time building monitoring
- * 
- * Additional pages (Tech Chat, Digital Twin, Settings) are add-ons or admin-only.
+ * - AI Chat: SENTINEL AI assistant
+ * - Digital Twin: 3D/2D building visualization
  */
 export const BASE_NAV_ITEMS: NavItem[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, description: "Overview and AI recommendation", category: "base" },
@@ -132,9 +132,6 @@ export const ADDON_NAV_ITEMS: NavItem[] = [
   { id: "control", label: "Control", icon: Shield, description: "Building Controls", category: "addon", requiredModule: "control", defaultOrder: 0 },
   { id: "workflow", label: "Asset Workflow", icon: GitBranch, description: "Lifecycle Management", category: "addon", requiredModule: "assets", defaultOrder: 2 },
   { id: "simbiot", label: "SIMBIOT", icon: Plug, description: "BMS Connection Wizard", category: "addon", requiredModule: "simbiot", defaultOrder: 3 },
-  // AI and visualization
-  { id: "ai-chat", label: "AI Chat", icon: MessageSquare, description: "SENTINEL AI Assistant", category: "addon", defaultOrder: 3.5 },
-  { id: "digital-twin", label: "Digital Twin", icon: Box, description: "3D/2D Building Visualization", category: "addon", defaultOrder: 4 },
   // Building system modules
   { id: "technician", label: "Tech Chat", icon: Wrench, description: "Fault Diagnosis", category: "addon", requiredModule: "hvac", defaultOrder: 10 },
   { id: "optimization", label: "Loadshedding", icon: Zap, description: "Load Shedding AI", category: "addon", requiredModule: "energy", defaultOrder: 11 },
