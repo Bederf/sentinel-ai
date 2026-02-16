@@ -29,12 +29,9 @@ USER_DEMO_CONFIGS: dict[str, DemoConfig] = {
         'demoFocus': 'solar-bess',
         'allowedModules': [
             'dashboard',
-            'digital-twin',
             'integrations',
             'solar',
             'control',
-            'technician',
-            'fleet',
             'settings',
         ],
         'allowedSites': ['site-002'],  # Restrict to site-002 only
@@ -52,13 +49,10 @@ COMPANY_DEMO_CONFIGS: dict[str, DemoConfig] = {
         'demoFocus': 'dali-lighting',
         'allowedModules': [
             'dashboard',
-            'digital-twin',
             'integrations',
             'occupancy',
             'lighting',
             'control',
-            'technician',
-            'fleet',
             'settings',
         ],
         'allowedSites': ['site-002'],  # Restrict to site-002 only

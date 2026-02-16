@@ -25,7 +25,6 @@ export const USER_DEMO_CONFIGS: Record<string, CompanyDemoConfig> = {
     demoFocus: 'solar-bess',
     allowedViews: [
       'dashboard',           // Base: always visible
-      'digital-twin',        // Base: always visible
       'integrations',        // Base: System Health
       'solar',               // Add-on: Solar & BESS (their focus module)
       'control',             // Add-on: Building Controls (needed for solar control)
@@ -48,7 +47,6 @@ export const COMPANY_DEMO_CONFIGS: Record<string, CompanyDemoConfig> = {
     demoFocus: 'dali-lighting',
     allowedViews: [
       'dashboard',           // Base: always visible
-      'digital-twin',        // Base: always visible
       'integrations',        // Base: System Health
       'occupancy',           // Add-on: Occupancy monitoring (lighting module)
       'lighting',            // Add-on: Lighting control (lighting module)
