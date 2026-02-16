@@ -198,6 +198,11 @@ def register_middleware(app: FastAPI) -> None:
         """Global auth enforcement -- all /api/ routes require auth unless whitelisted."""
         path = request.url.path
 
+        # Allow CORS preflight requests (OPTIONS) without authentication
+        # This must happen before other checks so CORS headers can be added
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
         # Skip non-API routes and public paths
         if (
             path in _PUBLIC_PATHS
@@ -247,10 +252,12 @@ def register_middleware(app: FastAPI) -> None:
         # Production / non-demo: require real authentication
         auth_ctx = await _authenticate_request(request)
         if auth_ctx is None:
+            headers = {"WWW-Authenticate": "Bearer"}
+            headers.update(_get_cors_headers(request))
             return JSONResponse(
                 status_code=401,
                 content={"detail": "Authentication required"},
-                headers={"WWW-Authenticate": "Bearer"},
+                headers=headers,
             )
 
         if auth_ctx.role.value == "admin":
