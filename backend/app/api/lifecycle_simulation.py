@@ -127,7 +127,7 @@ async def start_simulation(request: StartSimulationRequest):
         task_id = str(uuid.uuid4())
         
         # Create task in database (status='queued')
-        response = await client.table("solar_annual_tasks").insert({
+        response = client.table("solar_annual_tasks").insert({
             "task_id": task_id,
             "site_id": "site-002",  # Default to site-002 (can be parameterized later)
             "scenario": request.scenario,
@@ -179,7 +179,7 @@ async def stop_simulation(task_id: str):
         else:
             # Simulation not running - try to update database status to cancelled
             client = Supabase.instance()
-            await client.table("solar_annual_tasks") \
+            client.table("solar_annual_tasks") \
                 .update({"status": "failed", "error_message": "Cancelled by user"}) \
                 .eq("task_id", task_id) \
                 .execute()
@@ -277,9 +277,9 @@ async def get_simulation_status(task_id: str):
 
     try:
         client = Supabase.instance()
-        
+
         # Query task from database
-        response = await client.table("solar_annual_tasks") \
+        response = client.table("solar_annual_tasks") \
             .select("*") \
             .eq("task_id", task_id) \
             .execute()

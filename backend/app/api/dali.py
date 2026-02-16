@@ -701,7 +701,7 @@ async def get_building_occupancy(site_id: str = Query("site-002", description="S
         total_zones=len(ground_floor_zones),
         total_sensors=sum(z.total_sensors for z in ground_floor_zones),
         occupied_sensors=sum(z.occupied_sensors for z in ground_floor_zones),
-        occupancy_percent=sum(z.occupancy_percent for z in ground_floor_zones) / len(ground_floor_zones),
+        occupancy_percent=round(sum(z.occupancy_percent for z in ground_floor_zones) / len(ground_floor_zones), 1),
         total_luminaires=45,
         faulty_luminaires=0,
         total_power_watts=3200.0,
@@ -714,7 +714,7 @@ async def get_building_occupancy(site_id: str = Query("site-002", description="S
         total_zones=len(level1_zones),
         total_sensors=sum(z.total_sensors for z in level1_zones),
         occupied_sensors=sum(z.occupied_sensors for z in level1_zones),
-        occupancy_percent=sum(z.occupancy_percent for z in level1_zones) / len(level1_zones),
+        occupancy_percent=round(sum(z.occupancy_percent for z in level1_zones) / len(level1_zones), 1),
         total_luminaires=40,
         faulty_luminaires=0,
         total_power_watts=2100.0,
@@ -727,7 +727,7 @@ async def get_building_occupancy(site_id: str = Query("site-002", description="S
         total_zones=len(level2_zones),
         total_sensors=sum(z.total_sensors for z in level2_zones),
         occupied_sensors=sum(z.occupied_sensors for z in level2_zones),
-        occupancy_percent=sum(z.occupancy_percent for z in level2_zones) / len(level2_zones),
+        occupancy_percent=round(sum(z.occupancy_percent for z in level2_zones) / len(level2_zones), 1),
         total_luminaires=50,
         faulty_luminaires=0,
         total_power_watts=2800.0,
@@ -740,9 +740,16 @@ async def get_building_occupancy(site_id: str = Query("site-002", description="S
         site_id=site_id,
         building_name="Sandton Office Complex",
         timestamp=timestamp,
-        total_occupancy_percent=sum(z.occupancy_percent for z in all_zones) / len(all_zones),
+        total_occupancy_percent=round(sum(z.occupancy_percent for z in all_zones) / len(all_zones), 1),
         total_zones=len(all_zones),
         floors=all_floors,
+        total_floors=len(all_floors),
+        total_sensors=sum(f.total_sensors for f in all_floors),
+        occupied_sensors=sum(f.occupied_sensors for f in all_floors),
+        total_luminaires=sum(f.total_luminaires for f in all_floors),
+        faulty_luminaires=sum(f.faulty_luminaires for f in all_floors),
+        total_power_watts=sum(f.total_power_watts for f in all_floors),
+        energy_waste_zones=2,  # Z-L1-01 and Z-L1-03 (empty with lights on)
     )
 
     return building_occupancy.to_dict()
@@ -924,6 +931,11 @@ async def get_dali_stats(site_id: str = Query("site-002", description="Site ID")
         energy_waste_zones=2,  # Z-L1-01 and Z-L1-03 (empty with lights at 100%)
         daylight_harvesting_active=True,
         ml_effectiveness_percent=84.0,  # SENTINEL is learning and improving
+        total_controllers=8,  # 8 DALI-2 controllers across 3 floors
+        online_controllers=8,  # All online
+        online_sensors=26,  # 26 of 28 sensors online
+        faulty_luminaires=0,  # No faulty luminaires currently
+        current_power_watts=8100.0,  # Total lighting power: 3200+2100+2800 W
     )
 
     return stats.to_dict()

@@ -337,15 +337,32 @@ class BuildingOccupancy:
     total_occupancy_percent: float
     total_zones: int
     floors: List[FloorSummary] = field(default_factory=list)
+    total_floors: int = 0
+    total_sensors: int = 0
+    occupied_sensors: int = 0
+    total_luminaires: int = 0
+    faulty_luminaires: int = 0
+    total_power_watts: float = 0.0
+    energy_waste_zones: int = 0
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "site_id": self.site_id,
+            "building_id": self.site_id,
             "building_name": self.building_name,
             "timestamp": self.timestamp,
+            "last_updated": self.timestamp,
             "total_occupancy_percent": self.total_occupancy_percent,
+            "occupancy_percent": round(self.total_occupancy_percent, 1),
             "total_zones": self.total_zones,
+            "total_floors": self.total_floors,
+            "total_sensors": self.total_sensors,
+            "occupied_sensors": self.occupied_sensors,
+            "total_luminaires": self.total_luminaires,
+            "faulty_luminaires": self.faulty_luminaires,
+            "total_power_watts": self.total_power_watts,
+            "energy_waste_zones": self.energy_waste_zones,
             "floors": [f.to_dict() for f in self.floors],
         }
 
@@ -366,20 +383,34 @@ class DALIStats:
     energy_waste_zones: int
     daylight_harvesting_active: bool
     ml_effectiveness_percent: float
+    total_controllers: int = 0
+    online_controllers: int = 0
+    online_sensors: int = 0
+    faulty_luminaires: int = 0
+    current_power_watts: float = 0.0
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "site_id": self.site_id,
             "timestamp": self.timestamp,
+            "last_sync": self.timestamp,
             "avg_occupancy_percent": self.avg_occupancy_percent,
+            "current_occupancy_percent": self.avg_occupancy_percent,
             "avg_brightness_percent": self.avg_brightness_percent,
             "total_zones": self.total_zones,
             "total_sensors": self.total_sensors,
+            "online_sensors": self.online_sensors,
             "total_luminaires": self.total_luminaires,
+            "faulty_luminaires": self.faulty_luminaires,
+            "total_controllers": self.total_controllers,
+            "online_controllers": self.online_controllers,
+            "current_power_watts": self.current_power_watts,
             "daylight_hours_utilized": self.daylight_hours_utilized,
             "kwh_saved_today": self.kwh_saved_today,
+            "energy_today_kwh": self.kwh_saved_today,
             "energy_waste_zones": self.energy_waste_zones,
+            "energy_waste_alerts": self.energy_waste_zones,
             "daylight_harvesting_active": self.daylight_harvesting_active,
             "ml_effectiveness_percent": self.ml_effectiveness_percent,
         }
