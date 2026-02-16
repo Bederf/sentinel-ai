@@ -195,13 +195,28 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose, u
     loadDashboardData();
   }, []);
 
-  // Load dashboard preferences on mount
+  // Load dashboard preferences on mount (but skip for demo users with custom defaults)
   useEffect(() => {
     const loadPreferences = async () => {
       try {
         const response = await api.getDashboardPreferences();
         if (response.preferences) {
-          // Merge saved KPI cards with defaults to include any new cards
+          // For demo users with custom defaults, skip loading preferences
+          // to preserve the demo-specific card selections
+          if (demoDefaults) {
+            console.log('Demo user detected, preserving demo default cards');
+            // Only load preferences for non-demo items (kpi_card_order, energy period, section_order)
+            if (response.preferences.kpi_card_order) {
+              setKpiOrder(response.preferences.kpi_card_order as KPICardId[]);
+            }
+            if (response.preferences.default_energy_period) {
+              setSelectedDays(response.preferences.default_energy_period as TimePeriod);
+            }
+            // Don't load section_order for demo users - use default demo order
+            return;
+          }
+
+          // For non-demo users, merge saved KPI cards with defaults to include any new cards
           const savedKpiCards = response.preferences.visible_kpi_cards || [];
           const mergedKpiCards = Array.from(new Set([...DEFAULT_KPI_CARDS, ...savedKpiCards]));
           setVisibleKpiCards(mergedKpiCards);
@@ -231,7 +246,7 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose, u
     };
 
     loadPreferences();
-  }, []);
+  }, [demoDefaults]);
 
   // Handle card library open state from Sidebar
   useEffect(() => {
