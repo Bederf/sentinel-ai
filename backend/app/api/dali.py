@@ -20,7 +20,7 @@ from typing import List, Optional
 import random
 import math
 from datetime import datetime, timedelta
-from app.database.supabase_client import supabase_client
+from app.database.supabase_client import get_supabase_client
 
 router = APIRouter()
 
@@ -963,9 +963,6 @@ async def get_detailed_occupancy(
     
     Returns per-zone targets that the client-side simulation will use to spawn/despawn people.
     """
-    from datetime import datetime
-    from app.database.supabase_client import supabase_client
-    
     try:
         # Get simulation time (or current time if not provided)
         if time:
@@ -979,7 +976,8 @@ async def get_detailed_occupancy(
         
         # Get zone mappings from database
         try:
-            zone_mappings = supabase_client.table("zone_display_mappings") \
+            supabase = get_supabase_client()
+            zone_mappings = supabase.table("zone_display_mappings") \
                 .select("*") \
                 .eq("site_id", building_id) \
                 .execute()

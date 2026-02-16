@@ -507,6 +507,9 @@ class LifecycleOrchestrator:
         except asyncio.CancelledError:
             logger.info("Simulation cancelled")
         except Exception as e:
+            logger.error(f"Simulation error: {e}", exc_info=True)
+            self.running = False
+
     async def _update_progress_to_db(self, iteration: int, total_iterations: int) -> None:
         """Update database with simulation progress (called every simulated day)."""
         if not self.task_id:
