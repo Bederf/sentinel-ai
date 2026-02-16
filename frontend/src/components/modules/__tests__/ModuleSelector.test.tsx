@@ -199,6 +199,7 @@ describe('ModuleSelector', () => {
       await user.click(hvacSwitch);
 
       expect(mockActivate).toHaveBeenCalledWith('hvac');
+    });
 
     it('should call deactivateModule when toggling module off', async () => {
       const user = userEvent.setup();
