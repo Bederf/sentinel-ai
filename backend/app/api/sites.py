@@ -505,6 +505,11 @@ async def list_sites(
     sites = load_sites()
     alerts = load_alerts()
 
+    # Apply demo site access restrictions for non-admin users
+    if user_email and user_role != SentinelRole.ADMIN:
+        from app.config.demo_configs import has_demo_site_access
+        sites = [s for s in sites if has_demo_site_access(user_email, s.get("code", s.get("id")))]
+
     if region:
         sites = [s for s in sites if s["region"].lower() == region.lower()]
     if site_type:
