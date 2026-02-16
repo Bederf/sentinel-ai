@@ -106,6 +106,7 @@ function App() {
   const [unreadAlertCount, setUnreadAlertCount] = useState(0);
   const [lastViewedAlertTime, setLastViewedAlertTime] = useState<Date | null>(null);
   const [simulationRunning, setSimulationRunning] = useState(false);
+  const [demoTaskId, setDemoTaskId] = useState<string | null>(null);
   const alertsPanelRef = useRef<HTMLDivElement | null>(null);
   const calendarButtonRef = useRef<HTMLDivElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -125,7 +126,12 @@ function App() {
   useEffect(() => {
     const checkSimulationStatus = async () => {
       try {
-        const response = await fetch('/api/lifecycle/status/site-002');
+        // Use demo_task_id if available (Grant's 365-day simulation), otherwise fall back to site-002
+        const statusEndpoint = demoTaskId 
+          ? `/api/lifecycle/status/${demoTaskId}`
+          : '/api/lifecycle/status/site-002';
+        
+        const response = await fetch(statusEndpoint);
         const data = await response.json();
         setSimulationRunning(data.running === true);
       } catch (error) {
@@ -138,7 +144,7 @@ function App() {
     checkSimulationStatus();
     const interval = setInterval(checkSimulationStatus, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [demoTaskId]);
 
   // Use recommendation toasts hook when logged in
   const siteId = currentUser ? 'site-002' : '';
@@ -357,14 +363,21 @@ function App() {
     // Auto-start demo simulation for demo users
     if ((user as any).demo_auto_start === true) {
       console.log('Auto-starting demo scenario:', (user as any).demo_scenario);
-      toast.success(`Demo scenario started: ${(user as any).demo_scenario}`);
       
-      // Start the lifecycle simulator in the background
-      fetch('/api/lifecycle/start', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scenario: (user as any).demo_scenario })
-      }).catch(err => console.error('Failed to start demo scenario:', err));
+      // Extract and store the demo task ID for simulation progress tracking
+      if ((user as any).demo_task_id) {
+        setDemoTaskId((user as any).demo_task_id);
+        console.log('Grant 365-day simulation task ID:', (user as any).demo_task_id);
+        toast.success(`Demo scenario started: ${(user as any).demo_scenario} (365 days → 4 hours, starting from ZERO)`);
+      } else {
+        toast.success(`Demo scenario started: ${(user as any).demo_scenario}`);
+        // Fallback: Start the lifecycle simulator in the background
+        fetch('/api/lifecycle/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ scenario: (user as any).demo_scenario })
+        }).catch(err => console.error('Failed to start demo scenario:', err));
+      }
     }
   }, []);
 

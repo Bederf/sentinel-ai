@@ -9,6 +9,7 @@ FSR Domain: 4.7 - Logical Access Control
 """
 
 import logging
+import uuid
 from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import Optional
@@ -351,32 +352,45 @@ async def login_with_email(request: Request, email: str):
             "session_id": session_id,
         }
 
-        # Auto-start demo for Grant (grant@wardew.co.za)
-        # DISABLED: Comment out to prevent auto-start during testing
-        # if email == "grant@wardew.co.za":
-        #     try:
-        #         # Reset orchestrator for fresh demo on login
-        #         orchestrator = get_lifecycle_orchestrator()
-        #         orchestrator.reset()
-        #     
-        #         # Auto-start Grant's primary scenario: HVAC+DALI+Sentinel AI (365-day annual)
-        #         # This demonstrates full predictive AI control with seasonal variations
-        #         orchestrator.run_scenario(
-        #             scenario_name="grant_hvac_dali_ai_annual",
-        #             duration_minutes=240.0  # 365 days compressed to 4 hours real time
-        #         )
-        #     
-        #         response["demo_auto_start"] = True
-        #         response["demo_type"] = "annual-demonstration"
-        #         response["demo_description"] = "HVAC + DALI + Sentinel AI (365-day full-year with seasonal variations)"
-        #         response["demo_scenario"] = "grant_hvac_dali_ai_annual"
-        #         response["demo_status"] = "running"
-        #         logger.info(f"Auto-started Grant demo scenario: grant_hvac_dali_ai_annual (365 days, ~4 hours real time)")
-        #     except Exception as e:
-        #         logger.error(f"Error auto-starting Grant demo: {e}")
-        #         response["demo_auto_start"] = True
-        #         response["demo_type"] = "three-method-comparison"
-        #         response["demo_error"] = str(e)
+        # Auto-start demo for Grant (grant@wardew.co.za) - 365-day annual simulation
+        # When Grant logs in, his demo scenario auto-starts with data from ZERO
+        # The simulation runs 365 days compressed into 4 hours real time
+        if email == "grant@wardew.co.za":
+            try:
+                from app.database.supabase_client import Supabase
+                
+                # Create simulation task in database (queued status)
+                task_id = str(uuid.uuid4())
+                client = Supabase.instance()
+                
+                response_data = client.table("solar_annual_tasks").insert({
+                    "task_id": task_id,
+                    "site_id": "site-002",
+                    "scenario": "grant_hvac_dali_ai_annual",
+                    "simulation_type": "lifecycle",
+                    "status": "queued",
+                    "progress_pct": 0,
+                    "days_completed": 0,
+                    "duration_minutes": 240.0,  # 365 days in 4 hours
+                    "created_at": datetime.utcnow().isoformat(),
+                }).execute()
+                
+                logger.info(f"Auto-started Grant demo: task_id={task_id}, scenario=grant_hvac_dali_ai_annual (365 days → 4 hours, starting from ZERO)")
+                
+                # Add simulation task info to response
+                response["demo_auto_start"] = True
+                response["demo_type"] = "annual-demonstration"
+                response["demo_description"] = "365-day HVAC + DALI + Sentinel AI simulation with live data accumulation from zero"
+                response["demo_scenario"] = "grant_hvac_dali_ai_annual"
+                response["demo_status"] = "queued"
+                response["demo_task_id"] = task_id
+                response["demo_duration_minutes"] = 240.0
+                response["demo_note"] = "Simulation runs in background. Dashboard will update live as simulation progresses through 365 days."
+                
+            except Exception as e:
+                logger.error(f"Error auto-starting Grant demo: {e}", exc_info=True)
+                response["demo_auto_start"] = False
+                response["demo_error"] = str(e)
     
         # Auto-start demo for Solar/BESS client (bederf@protonmail.com)
         if email == "bederf@protonmail.com":

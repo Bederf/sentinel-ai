@@ -132,6 +132,9 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose, u
   const [energyFilterSiteId, setEnergyFilterSiteId] = useState<string | null>(null);
   const [selectedDays, setSelectedDays] = useState<TimePeriod>(30);
 
+  // Simulated energy data (during Grant's 365-day simulation)
+  const [simulatedEnergy, setSimulatedEnergy] = useState<any>(null);
+  const [isSimulationRunning, setIsSimulationRunning] = useState(false);
 
   // Risk detail modal state
   const [selectedRiskEquipment, setSelectedRiskEquipment] = useState<BuildingEquipmentItem | null>(null);
@@ -283,6 +286,41 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose, u
 
     loadEnergyData();
   }, [energyFilterSiteId, selectedDays]);
+
+  // Poll simulated energy data during Grant's 365-day simulation
+  useEffect(() => {
+    const checkSimulationAndLoadEnergy = async () => {
+      try {
+        // Check if simulation is running
+        const statusResponse = await fetch('/api/lifecycle/status/site-002');
+        const statusData = await statusResponse.json();
+        
+        if (statusData.running) {
+          setIsSimulationRunning(true);
+          
+          // Load simulated energy metrics
+          const energyResponse = await fetch('/api/energy/simulated?site_id=site-002');
+          const energyData = await energyResponse.json();
+          
+          if (energyData.simulated) {
+            setSimulatedEnergy(energyData);
+          }
+        } else {
+          setIsSimulationRunning(false);
+          setSimulatedEnergy(null);
+        }
+      } catch (err) {
+        // Silently fail - simulation might not be running
+        setIsSimulationRunning(false);
+        setSimulatedEnergy(null);
+      }
+    };
+
+    // Poll every 5 seconds
+    checkSimulationAndLoadEnergy();
+    const interval = setInterval(checkSimulationAndLoadEnergy, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Calculate site status counts for KPI - computed values used in render functions
   // @ts-ignore - Site type mismatch from legacy api.ts
@@ -531,11 +569,15 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose, u
         accentColor: "orange" as const,
       },
       'kpi-potential-savings': {
-        title: "Potential Savings",
-        value: formatZAR(totalPotentialSavings),
+        title: isSimulationRunning ? "Live Energy (Simulated)" : "Potential Savings",
+        value: isSimulationRunning && simulatedEnergy 
+          ? formatZAR(simulatedEnergy.total_cost_zar)
+          : formatZAR(totalPotentialSavings),
         icon: <DollarSign className="h-5 w-5" />,
-        subtitle: "If all preventive actions taken",
-        accentColor: "green" as const,
+        subtitle: isSimulationRunning && simulatedEnergy
+          ? `${simulatedEnergy.total_kwh} kWh • ${(simulatedEnergy.occupancy_percent).toFixed(0)}% occupied`
+          : "If all preventive actions taken",
+        accentColor: isSimulationRunning ? "blue" as const : "green" as const,
       },
       'kpi-risk-predictions': {
         title: "Risk Predictions",

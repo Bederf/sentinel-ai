@@ -1032,3 +1032,154 @@ async def get_energy_comparison(
             }
         ]
     }
+
+
+
+@router.get("/energy/simulated")
+async def get_energy_simulated(
+    site_id: str = Query("site-002", description="Site ID"),
+) -> dict:
+    """
+    Get simulated energy consumption during an active simulation.
+    
+    Returns real-time energy metrics based on the current simulated state.
+    If no simulation is running, returns empty/zero values.
+    
+    This endpoint is called by the Dashboard every 5 seconds during Grant's
+    365-day simulation to show live energy accumulation.
+    
+    Args:
+        site_id: Site ID (e.g., "site-002")
+    
+    Returns:
+        EnergyMetrics with current simulated values, or zeros if no simulation
+    """
+    try:
+        from app.services.simulation_orchestrator import get_simulation_by_task_id
+        
+        # Try to find any running simulation for this site
+        # First check for simulation with a task_id pattern
+        from app.database.supabase_client import Supabase
+        
+        client = Supabase.instance()
+        
+        # Query for running simulations on this site
+        running_tasks = client.table("solar_annual_tasks") \
+            .select("task_id, scenario") \
+            .eq("site_id", site_id) \
+            .eq("status", "running") \
+            .limit(1) \
+            .execute()
+        
+        if not running_tasks.data:
+            # No simulation running - return zero metrics
+            return {
+                "total_kwh": 0.0,
+                "total_cost_zar": 0.0,
+                "carbon_kg": 0.0,
+                "hvac_kwh": 0.0,
+                "hvac_percent": 0.0,
+                "lighting_kwh": 0.0,
+                "lighting_percent": 0.0,
+                "power_kwh": 0.0,
+                "power_percent": 0.0,
+                "timestamp": datetime.now().isoformat(),
+                "simulated": False,
+                "message": "No active simulation"
+            }
+        
+        task_id = running_tasks.data[0]["task_id"]
+        orchestrator = get_simulation_by_task_id(task_id)
+        
+        if not orchestrator or not orchestrator.running:
+            # Task marked as running but no orchestrator found
+            return {
+                "total_kwh": 0.0,
+                "total_cost_zar": 0.0,
+                "carbon_kg": 0.0,
+                "hvac_kwh": 0.0,
+                "hvac_percent": 0.0,
+                "lighting_kwh": 0.0,
+                "lighting_percent": 0.0,
+                "power_kwh": 0.0,
+                "power_percent": 0.0,
+                "timestamp": datetime.now().isoformat(),
+                "simulated": False,
+                "message": "Simulation task not running"
+            }
+        
+        # Get current simulated state
+        building_state = orchestrator.building_state or {}
+        
+        # Extract simulated values (or use defaults)
+        occupancy_percent = building_state.get("occupancy_percent", 0)
+        daylight_lux = building_state.get("daylight_factor", 0)
+        chiller_load_percent = building_state.get("chiller_load_percent", 0)
+        
+        # Generate energy based on simulated state
+        # Base values (from building capacity at full occupancy)
+        base_hvac_kwh = 500.0  # Base HVAC per 24 hours
+        base_lighting_kwh = 200.0  # Base lighting per 24 hours
+        base_power_kwh = 100.0  # Base other power per 24 hours
+        
+        # Scale by occupancy (HVAC most affected)
+        occupancy_factor = occupancy_percent / 100.0
+        hvac_kwh = base_hvac_kwh * occupancy_factor * (chiller_load_percent / 100.0)
+        
+        # Lighting scales with occupancy and inverse of daylight
+        daylight_factor = max(0, 1.0 - (daylight_lux / 1000.0))  # More daylight = less artificial
+        lighting_kwh = base_lighting_kwh * occupancy_factor * daylight_factor
+        
+        # Power (standby equipment) less affected by occupancy
+        power_kwh = base_power_kwh * 0.7  # 70% base load
+        
+        # Total and percentages
+        total_kwh = hvac_kwh + lighting_kwh + power_kwh
+        
+        if total_kwh > 0:
+            hvac_percent = (hvac_kwh / total_kwh) * 100
+            lighting_percent = (lighting_kwh / total_kwh) * 100
+            power_percent = (power_kwh / total_kwh) * 100
+        else:
+            hvac_percent = 0
+            lighting_percent = 0
+            power_percent = 0
+        
+        # Carbon and cost
+        carbon_kg = total_kwh * 0.35  # SA grid: 0.35 kg CO₂/kWh
+        total_cost_zar = total_kwh * 5.0  # ~R5/kWh commercial rate
+        
+        return {
+            "total_kwh": round(total_kwh, 2),
+            "total_cost_zar": round(total_cost_zar, 2),
+            "carbon_kg": round(carbon_kg, 2),
+            "hvac_kwh": round(hvac_kwh, 2),
+            "hvac_percent": round(hvac_percent, 1),
+            "lighting_kwh": round(lighting_kwh, 2),
+            "lighting_percent": round(lighting_percent, 1),
+            "power_kwh": round(power_kwh, 2),
+            "power_percent": round(power_percent, 1),
+            "timestamp": datetime.now().isoformat(),
+            "simulated": True,
+            "occupancy_percent": round(occupancy_percent, 1),
+            "daylight_lux": round(daylight_lux, 1),
+            "chiller_load_percent": round(chiller_load_percent, 1),
+        }
+    
+    except Exception as e:
+        logger.error(f"Error getting simulated energy: {e}", exc_info=True)
+        # Return zero metrics on error
+        return {
+            "total_kwh": 0.0,
+            "total_cost_zar": 0.0,
+            "carbon_kg": 0.0,
+            "hvac_kwh": 0.0,
+            "hvac_percent": 0.0,
+            "lighting_kwh": 0.0,
+            "lighting_percent": 0.0,
+            "power_kwh": 0.0,
+            "power_percent": 0.0,
+            "timestamp": datetime.now().isoformat(),
+            "simulated": False,
+            "error": str(e)
+        }
