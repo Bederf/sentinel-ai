@@ -1326,7 +1326,7 @@ class LifecycleOrchestrator:
                     "timestamp": e.timestamp.isoformat(),
                     "event_type": e.event_type.value,
                     "equipment_id": e.equipment_id,
-                    "message": e.message,
+                    "message": e.description,
                 }
                 for e in self.events[-50:]  # Keep last 50 events for display
             ],
