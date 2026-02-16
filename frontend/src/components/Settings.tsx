@@ -69,19 +69,19 @@ export function Settings({ onError }: SettingsProps) {
     }
   })();
   const demoUserEmails = ['grant@wardew.co.za', 'bederf@protonmail.com', 'bederf@gmail.com'];
-  const isDemoUser = currentUserEmail && demoUserEmails.includes(currentUserEmail.toLowerCase());
+  const isDemoUser = !!(currentUserEmail && demoUserEmails.includes(currentUserEmail.toLowerCase()));
   const canManageFeatureAccess = currentUserRole === "admin";
   const [saveSuccess, setSaveSuccess] = useState(false);
-  const [safetyRulesUnlocked, setSafetyRulesUnlocked] = useState(false);
+  const [settingsPageUnlocked, setSettingsPageUnlocked] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [passwordModalFor, setPasswordModalFor] = useState<"safety" | "feature">("safety");
-  const [featureAccessUnlocked, setFeatureAccessUnlocked] = useState(false);
   const [togglingCardId, setTogglingCardId] = useState<string | null>(null);
 
   const handleFeatureToggle = async (card: FeatureToggleCard) => {
-    // Demo users need to unlock Feature Access first
-    if (isDemoUser && !featureAccessUnlocked) {
-      onError?.("Feature Access is locked. Click 'Unlock to Edit' to make changes.");
+    // Demo users need to unlock Settings page first
+    if (isDemoUser && !settingsPageUnlocked) {
+      onError?.(
+        "Settings page is locked. Click 'Unlock to Edit' at the top to make changes."
+      );
       return;
     }
 
@@ -149,21 +149,74 @@ export function Settings({ onError }: SettingsProps) {
       className="h-full overflow-y-auto p-4 md:p-6"
       style={{ background: "var(--color-sentinel-bg-canvas)" }}
     >
-      {/* Header */}
+      {/* Header with Page-Level Unlock */}
       <div className="mb-6">
-        <div className="flex items-center gap-3 mb-2">
-          <SettingsIcon className="h-8 w-8" style={{ color: "var(--color-sentinel-amber)" }} />
-          <h1
-            className="text-2xl font-semibold"
-            style={{ color: "var(--color-sentinel-text-primary)" }}
-          >
-            System Settings
-          </h1>
+        <div className="flex items-center justify-between gap-3 mb-2">
+          <div className="flex items-center gap-3">
+            <SettingsIcon className="h-8 w-8" style={{ color: "var(--color-sentinel-amber)" }} />
+            <h1
+              className="text-2xl font-semibold"
+              style={{ color: "var(--color-sentinel-text-primary)" }}
+            >
+              System Settings
+            </h1>
+          </div>
+
+          {/* Page-Level Lock/Unlock Button (Demo Users Only) */}
+          {isDemoUser && (
+            <button
+              onClick={() => {
+                if (settingsPageUnlocked) {
+                  setSettingsPageUnlocked(false);
+                } else {
+                  setShowPasswordModal(true);
+                }
+              }}
+              className="flex items-center gap-2 px-3 py-2 rounded text-sm font-medium transition-colors hover:brightness-110"
+              style={{
+                background: settingsPageUnlocked
+                  ? "rgba(245, 158, 11, 0.15)"
+                  : "rgba(220, 38, 38, 0.15)",
+                color: settingsPageUnlocked
+                  ? "var(--color-sentinel-amber)"
+                  : "var(--color-sentinel-red)",
+                border: `1px solid ${settingsPageUnlocked ? "rgba(245, 158, 11, 0.3)" : "rgba(220, 38, 38, 0.3)"}`,
+              }}
+            >
+              {settingsPageUnlocked ? (
+                <>
+                  <Lock className="h-4 w-4" />
+                  Lock Settings
+                </>
+              ) : (
+                <>
+                  <Unlock className="h-4 w-4" />
+                  Unlock to Edit
+                </>
+              )}
+            </button>
+          )}
         </div>
         <p style={{ color: "var(--color-sentinel-text-secondary)" }}>
           Configure global system settings and preferences
         </p>
       </div>
+
+      {/* Unlocked Warning Banner (Page Level) */}
+      {isDemoUser && settingsPageUnlocked && (
+        <div
+          className="mb-6 flex items-center gap-2 p-3 rounded-md"
+          style={{
+            background: "rgba(245, 158, 11, 0.15)",
+            border: "1px solid rgba(245, 158, 11, 0.3)",
+          }}
+        >
+          <Unlock className="h-4 w-4" style={{ color: "var(--color-sentinel-amber)" }} />
+          <span className="text-sm" style={{ color: "var(--color-sentinel-amber)" }}>
+            Settings page is unlocked. Click "Lock Settings" when finished making changes.
+          </span>
+        </div>
+      )}
 
       {/* Success Message */}
       {saveSuccess && (
@@ -235,88 +288,31 @@ export function Settings({ onError }: SettingsProps) {
         </div>
 
         {/* Safety Rules */}
-        <div
-          className="glass-panel overflow-hidden"
-          style={{
-            border: safetyRulesUnlocked ? `1px solid var(--color-sentinel-amber)` : undefined,
-          }}
-        >
+        <div className="glass-panel overflow-hidden">
           <div className="p-4 border-b" style={{ borderColor: "var(--color-sentinel-border)" }}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div
-                  className="p-2 rounded"
-                  style={{
-                    background: "rgba(220, 38, 38, 0.15)",
-                    color: "var(--color-sentinel-red)",
-                  }}
-                >
-                  <Shield className="h-5 w-5" />
-                </div>
-                <div>
-                  <h2
-                    className="text-lg font-semibold"
-                    style={{ color: "var(--color-sentinel-text-primary)" }}
-                  >
-                    Safety Rules
-                  </h2>
-                  <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                    Configure safety interlocks and validation rules for device control
-                  </p>
-                </div>
-              </div>
-
-              {/* Lock/Unlock button */}
-              <button
-                onClick={() => {
-                  if (safetyRulesUnlocked) {
-                    setSafetyRulesUnlocked(false);
-                  } else {
-                    setPasswordModalFor("safety");
-                    setShowPasswordModal(true);
-                  }
-                }}
-                className="flex items-center gap-2 px-3 py-2 rounded text-sm font-medium transition-colors hover:brightness-110"
+            <div className="flex items-center gap-3">
+              <div
+                className="p-2 rounded"
                 style={{
-                  background: safetyRulesUnlocked
-                    ? "rgba(245, 158, 11, 0.15)"
-                    : "rgba(220, 38, 38, 0.15)",
-                  color: safetyRulesUnlocked
-                    ? "var(--color-sentinel-amber)"
-                    : "var(--color-sentinel-red)",
-                  border: `1px solid ${safetyRulesUnlocked ? "rgba(245, 158, 11, 0.3)" : "rgba(220, 38, 38, 0.3)"}`,
+                  background: "rgba(220, 38, 38, 0.15)",
+                  color: "var(--color-sentinel-red)",
                 }}
               >
-                {safetyRulesUnlocked ? (
-                  <>
-                    <Unlock className="h-4 w-4" />
-                    Lock Settings
-                  </>
-                ) : (
-                  <>
-                    <Lock className="h-4 w-4" />
-                    Unlock to Edit
-                  </>
-                )}
-              </button>
+                <Shield className="h-5 w-5" />
+              </div>
+              <div>
+                <h2
+                  className="text-lg font-semibold"
+                  style={{ color: "var(--color-sentinel-text-primary)" }}
+                >
+                  Safety Rules
+                </h2>
+                <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                  Configure safety interlocks and validation rules for device control
+                </p>
+              </div>
             </div>
           </div>
-
-          {/* Unlocked warning banner */}
-          {safetyRulesUnlocked && (
-            <div
-              className="px-4 py-2 flex items-center gap-2"
-              style={{
-                background: "rgba(245, 158, 11, 0.15)",
-                borderBottom: "1px solid rgba(245, 158, 11, 0.3)",
-              }}
-            >
-              <Unlock className="h-4 w-4" style={{ color: "var(--color-sentinel-amber)" }} />
-              <span className="text-sm" style={{ color: "var(--color-sentinel-amber)" }}>
-                Safety Rules editing is unlocked. Click "Lock Settings" when finished.
-              </span>
-            </div>
-          )}
 
           <div className="p-4">
             <SafetyRulesEditor
@@ -325,7 +321,7 @@ export function Settings({ onError }: SettingsProps) {
                 setSaveSuccess(true);
                 setTimeout(() => setSaveSuccess(false), 3000);
               }}
-              readOnly={!safetyRulesUnlocked}
+              readOnly={!!(isDemoUser && !settingsPageUnlocked)}
             />
           </div>
         </div>
@@ -375,87 +371,33 @@ export function Settings({ onError }: SettingsProps) {
           className="glass-panel overflow-hidden"
           style={{
             background: "var(--glass-bg)",
-            border: featureAccessUnlocked ? `1px solid var(--color-sentinel-amber)` : "1px solid var(--glass-border)",
+            border: "1px solid var(--glass-border)",
           }}
         >
           <div className="p-4 border-b" style={{ borderColor: "var(--color-sentinel-border)" }}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div
-                  className="p-2 rounded-lg"
-                  style={{
-                    background: "rgba(245, 158, 11, 0.15)",
-                    color: "var(--color-sentinel-amber)",
-                  }}
-                >
-                  <Zap className="h-5 w-5" />
-                </div>
-                <div>
-                  <h2
-                    className="text-lg font-semibold"
-                    style={{ color: "var(--color-sentinel-text-primary)" }}
-                  >
-                    Feature Access
-                  </h2>
-                  <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                    Toggle these pages and capabilities for this site
-                  </p>
-                </div>
+            <div className="flex items-center gap-3">
+              <div
+                className="p-2 rounded-lg"
+                style={{
+                  background: "rgba(245, 158, 11, 0.15)",
+                  color: "var(--color-sentinel-amber)",
+                }}
+              >
+                <Zap className="h-5 w-5" />
               </div>
-
-              {/* Lock/Unlock button for demo users */}
-              {isDemoUser && (
-                <button
-                  onClick={() => {
-                    if (featureAccessUnlocked) {
-                      setFeatureAccessUnlocked(false);
-                    } else {
-                      setPasswordModalFor("feature");
-                      setShowPasswordModal(true);
-                    }
-                  }}
-                  className="flex items-center gap-2 px-3 py-2 rounded text-sm font-medium transition-colors hover:brightness-110"
-                  style={{
-                    background: featureAccessUnlocked
-                      ? "rgba(245, 158, 11, 0.15)"
-                      : "rgba(220, 38, 38, 0.15)",
-                    color: featureAccessUnlocked
-                      ? "var(--color-sentinel-amber)"
-                      : "var(--color-sentinel-red)",
-                    border: `1px solid ${featureAccessUnlocked ? "rgba(245, 158, 11, 0.3)" : "rgba(220, 38, 38, 0.3)"}`,
-                  }}
+              <div>
+                <h2
+                  className="text-lg font-semibold"
+                  style={{ color: "var(--color-sentinel-text-primary)" }}
                 >
-                  {featureAccessUnlocked ? (
-                    <>
-                      <Unlock className="h-4 w-4" />
-                      Lock Access
-                    </>
-                  ) : (
-                    <>
-                      <Lock className="h-4 w-4" />
-                      Unlock to Edit
-                    </>
-                  )}
-                </button>
-              )}
+                  Feature Access
+                </h2>
+                <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                  Toggle these pages and capabilities for this site
+                </p>
+              </div>
             </div>
           </div>
-
-          {/* Unlocked warning banner for demo users */}
-          {isDemoUser && featureAccessUnlocked && (
-            <div
-              className="px-4 py-2 flex items-center gap-2"
-              style={{
-                background: "rgba(245, 158, 11, 0.15)",
-                borderBottom: "1px solid rgba(245, 158, 11, 0.3)",
-              }}
-            >
-              <Unlock className="h-4 w-4" style={{ color: "var(--color-sentinel-amber)" }} />
-              <span className="text-sm" style={{ color: "var(--color-sentinel-amber)" }}>
-                Module access is unlocked. Click "Lock Access" when finished making changes.
-              </span>
-            </div>
-          )}
 
           <div className="p-6">
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -590,17 +532,10 @@ export function Settings({ onError }: SettingsProps) {
         isOpen={showPasswordModal}
         onClose={() => setShowPasswordModal(false)}
         onSuccess={() => {
-          if (passwordModalFor === "safety") {
-            setSafetyRulesUnlocked(true);
-          } else if (passwordModalFor === "feature") {
-            setFeatureAccessUnlocked(true);
-          }
+          setSettingsPageUnlocked(true);
         }}
-        title={passwordModalFor === "safety" ? "Unlock Safety Rules" : "Unlock Module Management"}
-        description={passwordModalFor === "safety"
-          ? "Safety rules control critical device limits. Enter the admin password to modify these settings."
-          : "Module management controls which features are available. Enter the admin password to make changes."
-        }
+        title="Unlock Settings Page"
+        description="This page requires a password to modify settings. Enter the admin password to make changes to safety rules, feature access, and other configurations."
       />
     </div>
   );
