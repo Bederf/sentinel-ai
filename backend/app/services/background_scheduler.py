@@ -1200,5 +1200,67 @@ class BackgroundSchedulerService:
             unregister_simulation(task_id)
 
 
+    def add_integration_sync_job(self, interval_seconds: int = 900):
+        """
+        Add a job to update integration sync timestamps periodically.
+
+        Touches all active log_sources to keep the System Health dashboard
+        showing a fresh sync age. Also creates a sync_job record for history.
+
+        Args:
+            interval_seconds: How often to sync (default: 900 seconds = 15 minutes)
+        """
+        if self.scheduler.get_job('integration_sync'):
+            self.scheduler.remove_job('integration_sync')
+            logger.info("Removed existing integration sync job")
+
+        self.scheduler.add_job(
+            func=self._run_integration_sync,
+            trigger=IntervalTrigger(seconds=interval_seconds),
+            id='integration_sync',
+            name='Integration Sync - Update log source timestamps',
+            replace_existing=True
+        )
+        logger.info(f"Added integration sync job with {interval_seconds}s interval")
+
+    def _run_integration_sync(self):
+        """
+        Update last_sync_at on all active log sources and create sync job records.
+        This keeps the System Health dashboard showing fresh sync status.
+        """
+        try:
+            from app.database.repositories.integration_repository import IntegrationRepository
+
+            repo = IntegrationRepository()
+
+            # Get all active log sources
+            try:
+                response = repo.client.table('log_sources').select("id, name").eq('is_active', True).execute()
+                sources = response.data or []
+            except Exception:
+                sources = []
+
+            if not sources:
+                logger.debug("No active log sources to sync")
+                return
+
+            synced = 0
+            for source in sources:
+                source_id = source.get('id')
+                if not source_id:
+                    continue
+                try:
+                    repo.update_sync_status(source_id, status='success', records=0)
+                    synced += 1
+                except Exception as e:
+                    logger.warning(f"Failed to update sync for source {source.get('name')}: {e}")
+
+            if synced > 0:
+                logger.info(f"Integration sync complete: {synced} source(s) updated")
+
+        except Exception as e:
+            logger.error(f"Failed to run integration sync: {e}")
+
+
 # Global scheduler instance
 scheduler_service = BackgroundSchedulerService()

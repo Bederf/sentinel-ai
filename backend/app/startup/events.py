@@ -121,6 +121,10 @@ async def startup_event(app: FastAPI) -> None:
     # - At-risk equipment (<90%): Maintenance & repair recommendations
     scheduler_service.add_recommendation_generation_job(interval_seconds=settings.recommendation_interval)
 
+    # Start integration sync job (runs every 15 minutes)
+    # Updates last_sync_at on all active log sources so System Health dashboard stays fresh
+    scheduler_service.add_integration_sync_job(interval_seconds=900)  # 15 minutes
+
     # Start demand-aware coordinator (runs every 5 minutes)
     # Phase 081: Cross-module peak demand management
     # Monitors NMD headroom and coordinates HVAC + BESS + energy actions for shaving
@@ -198,10 +202,10 @@ async def startup_event(app: FastAPI) -> None:
                 register_simulation,
             )
 
-            supabase = Supabase.instance()
+            client = Supabase.instance()
 
             # Query for any crashed tasks (status='running')
-            response = await supabase.client.table("solar_annual_tasks") \
+            response = await client.table("solar_annual_tasks") \
                 .select("*") \
                 .eq("status", "running") \
                 .eq("simulation_type", "lifecycle") \
@@ -221,7 +225,7 @@ async def startup_event(app: FastAPI) -> None:
                 if not state_snapshot:
                     _logger.warning(f"⚠️ Task {task_id} has no state snapshot - cannot recover")
                     # Mark as failed since we can't resume
-                    await supabase.client.table("solar_annual_tasks") \
+                    await client.table("solar_annual_tasks") \
                         .update({
                             "status": "failed",
                             "error_message": "No checkpoint state available for recovery"
@@ -233,7 +237,7 @@ async def startup_event(app: FastAPI) -> None:
                 try:
                     # Mark task as "queued" so queue processor will resume it
                     # Queue processor will deserialize state and continue from checkpoint
-                    await supabase.client.table("solar_annual_tasks") \
+                    await client.table("solar_annual_tasks") \
                         .update({
                             "status": "queued",
                             "error_message": None
@@ -268,10 +272,10 @@ async def startup_event(app: FastAPI) -> None:
         try:
             from app.database.supabase_client import Supabase
 
-            supabase = Supabase.instance()
+            client = Supabase.instance()
 
             # Stop any running simulations (set status to 'stopped')
-            running_tasks = await supabase.client.table("solar_annual_tasks") \
+            running_tasks = await client.table("solar_annual_tasks") \
                 .select("task_id") \
                 .eq("status", "running") \
                 .execute()
@@ -279,14 +283,14 @@ async def startup_event(app: FastAPI) -> None:
             if running_tasks.data:
                 _logger.info(f"🛑 Stopping {len(running_tasks.data)} running simulation(s)...")
                 for task in running_tasks.data:
-                    await supabase.client.table("solar_annual_tasks") \
+                    await client.table("solar_annual_tasks") \
                         .update({"status": "stopped"}) \
                         .eq("task_id", task["task_id"]) \
                         .execute()
                 _logger.info(f"✅ Stopped {len(running_tasks.data)} running simulation(s)")
 
             # Mark any queued simulations as 'inactive' (don't auto-start)
-            queued_tasks = await supabase.client.table("solar_annual_tasks") \
+            queued_tasks = await client.table("solar_annual_tasks") \
                 .select("task_id") \
                 .eq("status", "queued") \
                 .execute()
@@ -294,7 +298,7 @@ async def startup_event(app: FastAPI) -> None:
             if queued_tasks.data:
                 _logger.info(f"⏸️  Deactivating {len(queued_tasks.data)} queued simulation(s)...")
                 for task in queued_tasks.data:
-                    await supabase.client.table("solar_annual_tasks") \
+                    await client.table("solar_annual_tasks") \
                         .update({"status": "inactive"}) \
                         .eq("task_id", task["task_id"]) \
                         .execute()

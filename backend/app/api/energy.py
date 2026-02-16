@@ -974,7 +974,7 @@ async def get_energy_comparison_summary(
     )
 
 
-@router.get("/comparison")
+@router.get("/energy/comparison")
 async def get_energy_comparison(
     site_id: str = Query("site-002", description="Site ID to analyze"),
     days: int = Query(30, ge=1, le=365, description="Number of days"),

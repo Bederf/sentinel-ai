@@ -34,18 +34,33 @@ export function extractFloor(code: string): string {
 }
 
 /**
- * Extract zone letter from equipment code
- * Example: S002-CHILLER-B1-A → "A"
- * If numeric (e.g., S002-CHILLER-B1-001), maps to zone A-E
+ * Desk zones use compass directions: N, S, E, W, C
+ * Equipment zones use numeric IDs mapped to 5 groups.
+ * This maps the 5 equipment zone groups to compass directions
+ * matching the desk zone_id convention (Zone-L1-N, Zone-L1-S, etc.)
+ */
+const ZONE_INDEX_TO_COMPASS = ['N', 'E', 'S', 'W', 'C'] as const;
+
+/**
+ * Extract zone direction from equipment code
+ * Maps to compass directions (N/E/S/W/C) to match desk zone_id format.
+ *
+ * Example: S002-VAV-101 → zone index (101-1)%5=0 → "N"
+ * Example: S002-CHILLER-B1-A → "N" (A→N, B→E, C→S, D→W, E→C)
  */
 export function extractZoneLetter(code: string): string {
+  // Letter suffix (A-E) → compass
   const letterMatch = code.match(/-([A-E])$/i);
-  if (letterMatch) return letterMatch[1].toUpperCase();
+  if (letterMatch) {
+    const idx = letterMatch[1].toUpperCase().charCodeAt(0) - 65; // A=0, B=1, ...
+    return ZONE_INDEX_TO_COMPASS[idx] || 'C';
+  }
 
+  // Numeric suffix → compass via modulo 5
   const numMatch = code.match(/-(\d+)$/);
   if (numMatch) {
     const idx = (parseInt(numMatch[1], 10) - 1) % 5;
-    return String.fromCharCode(65 + idx);
+    return ZONE_INDEX_TO_COMPASS[idx] || 'C';
   }
 
   return 'C'; // default: center zone
@@ -168,6 +183,39 @@ export function distributeEquipmentInZone(
   });
 
   return positions;
+}
+
+/**
+ * Generate synthetic zone bounds for floors without desk data (e.g., B1, R).
+ * Creates 5 compass zones (N/E/S/W/C) evenly distributed across the building footprint.
+ * Building footprint: X [-14..14], Z [-9..9]
+ */
+export function generateSyntheticZoneBounds(floorCode: string): Record<string, ZoneBounds> {
+  const bounds: Record<string, ZoneBounds> = {};
+
+  // 5 zones: N (top), S (bottom), E (right), W (left), C (center)
+  const zones: Record<string, { minX: number; maxX: number; minZ: number; maxZ: number }> = {
+    N: { minX: -8, maxX: 8, minZ: -9, maxZ: -3 },
+    S: { minX: -8, maxX: 8, minZ: 3, maxZ: 9 },
+    E: { minX: 4, maxX: 14, minZ: -4, maxZ: 4 },
+    W: { minX: -14, maxX: -4, minZ: -4, maxZ: 4 },
+    C: { minX: -5, maxX: 5, minZ: -4, maxZ: 4 },
+  };
+
+  for (const [dir, rect] of Object.entries(zones)) {
+    bounds[`Zone-${floorCode}-${dir}`] = {
+      minX: rect.minX,
+      maxX: rect.maxX,
+      minZ: rect.minZ,
+      maxZ: rect.maxZ,
+      centerX: (rect.minX + rect.maxX) / 2,
+      centerZ: (rect.minZ + rect.maxZ) / 2,
+      width: rect.maxX - rect.minX,
+      depth: rect.maxZ - rect.minZ,
+    };
+  }
+
+  return bounds;
 }
 
 /**

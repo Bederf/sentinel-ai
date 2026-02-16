@@ -8,7 +8,7 @@ from fastapi import FastAPI
 
 from app.api import buildings, equipment, sensors, devices, devices_batch
 from app.api import dali, dali_discovery, equipment_discovery, equipment_metadata
-from app.api import generators, energy_centre
+from app.api import generators, energy_centre, energy, modules
 from app.api import hvac, fire, security
 from app.api import niagara, niagara_bacnet, niagara_discovery
 from app.api import buildings_3d, digital_twin
@@ -57,6 +57,12 @@ def register_building_routers(app: FastAPI) -> None:
     # Energy centre (generators, MV/LV, ATS, UPS, meters)
     app.include_router(generators.router, prefix="/api", tags=["generators"])
     app.include_router(energy_centre.router, prefix="/api", tags=["energy-centre"])
+    
+    # Energy analytics (energy comparison, predictions, actual vs SENTINEL)
+    app.include_router(energy.router, prefix="/api", tags=["energy"])
+    
+    # Module management (module registry, status, access control)
+    app.include_router(modules.router, prefix="/api", tags=["modules"])
 
     # Niagara integration
     app.include_router(niagara.router, tags=["niagara-obix"])

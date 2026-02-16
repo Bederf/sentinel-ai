@@ -1,7 +1,7 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
-import { X, Snowflake, Wind, Zap, BarChart3, Lightbulb, Flame, Droplet, Video, Lock, Radio, Circle, Wrench, Gauge, Thermometer } from 'lucide-react';
+import { X, Snowflake, Wind, Zap, BarChart3, Lightbulb, Flame, Droplet, Video, Lock, Radio, Circle, Wrench, Gauge, Thermometer, ChevronDown } from 'lucide-react';
 import { BuildingSelector } from '@/components/BuildingSelector';
 import type { ZoneCentroid, Site } from '@/lib/api/sites';
 import { BuildingModel } from './BuildingModel';
@@ -12,6 +12,7 @@ import { StatsBar } from './StatsBar';
 import { AlertBanner } from './AlertBanner';
 import { Compass } from '../3d/Compass';
 import { FloorPlan2D } from './FloorPlan2D';
+import { useTheme } from '@/contexts/ThemeContext';
 import { useEquipmentData } from '@/hooks/useEquipmentData';
 import { useSitesList } from '@/hooks/useSitesList';
 import { useZoneCentroids } from '@/hooks/useZoneCentroids';
@@ -20,6 +21,7 @@ import {
   distributeEquipmentInZone,
   extractFloor,
   extractZoneLetter,
+  generateSyntheticZoneBounds,
   type EquipmentPosition,
 } from '@/utils/equipmentPositioning';
 import {
@@ -69,6 +71,8 @@ const EQUIPMENT_ICONS: Record<string, React.ReactNode> = {
 const DEFAULT_ICON = <Gauge className="w-4 h-4" />;
 
 export function DigitalTwin() {
+  const { theme } = useTheme();
+
   // Site selection state - auto-select first site when loaded
   const [selectedBuildingId, setSelectedBuildingId] = useState<string>('');
 
@@ -93,6 +97,22 @@ export function DigitalTwin() {
   const { equipment, loading, error } = useEquipmentData(buildingId);
   const [selectedEquipment, setSelectedEquipment] = useState<string | null>(null);
   const [equipmentTypeFilter, setEquipmentTypeFilter] = useState<string | null>(null);
+  const [equipmentDropdownOpen, setEquipmentDropdownOpen] = useState(false);
+  const equipmentDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (equipmentDropdownRef.current && !equipmentDropdownRef.current.contains(event.target as Node)) {
+        setEquipmentDropdownOpen(false);
+      }
+    }
+    if (equipmentDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [equipmentDropdownOpen]);
+
   // View mode toggle: 2D floor plan or 3D visualization (default: 3D)
   const [viewMode, setViewMode] = useState<'2D' | '3D'>('3D');
   // Equipment detail panel minimize state (default: minimized)
@@ -171,37 +191,64 @@ export function DigitalTwin() {
     });
   }, [equipment, equipmentTypeFilter]);
 
-  // Pre-calculate equipment positions using new positioning algorithm
-  // This is shared between 2D and 3D views to ensure consistency
+  // Pre-calculate equipment positions using zone-aware adaptive grid.
+  // Merges desk-derived zone bounds with synthetic bounds for floors
+  // without desk data (B1 basement, R roof).
+  // 5 zones per floor: N, E, S, W, C (compass directions)
   const equipmentPositions = useMemo(() => {
     const positions = new Map<string, EquipmentPosition>();
 
-    // If zone bounds available, use adaptive grid distribution
-    if (zoneBounds && Object.keys(zoneBounds).length > 0) {
-      // Group equipment by zone
-      const byZone: Record<string, typeof filteredEquipment> = {};
-      filteredEquipment.forEach((eq) => {
-        const code = (eq as any).code || eq.id || '';
-        const floor = extractFloor(code);
-        const zone = extractZoneLetter(code);
-        const zoneKey = `Zone-${floor === 'G' ? 'L0' : floor}-${zone}`;
+    // Group equipment by zone key (Zone-{floor}-{direction})
+    const byZone: Record<string, typeof filteredEquipment> = {};
+    const floorsNeeded = new Set<string>();
 
-        if (!byZone[zoneKey]) byZone[zoneKey] = [];
-        byZone[zoneKey].push(eq);
-      });
+    filteredEquipment.forEach((eq) => {
+      const code = (eq as any).code || eq.id || '';
+      const floor = extractFloor(code);
+      const normalizedFloor = floor === 'G' ? 'L0' : floor;
+      const zone = extractZoneLetter(code); // Returns N/E/S/W/C
+      const zoneKey = `Zone-${normalizedFloor}-${zone}`;
 
-      // Distribute each zone's equipment
-      Object.entries(byZone).forEach(([zoneKey, zoneEquipment]) => {
-        const bounds = zoneBounds[zoneKey];
-        if (!bounds) return;
+      if (!byZone[zoneKey]) byZone[zoneKey] = [];
+      byZone[zoneKey].push(eq);
+      floorsNeeded.add(normalizedFloor);
+    });
 
-        const floor = zoneKey.split('-')[1] || 'L0';
-        const floorY = getFloorY(floor);
-
-        const distributed = distributeEquipmentInZone(zoneEquipment, bounds, floorY);
-        distributed.forEach((pos, id) => positions.set(id, pos));
-      });
+    // Merge desk-derived bounds with synthetic bounds for missing floors
+    const allBounds: Record<string, import('@/utils/equipmentPositioning').ZoneBounds> = { ...zoneBounds };
+    for (const floor of floorsNeeded) {
+      // Check if this floor has any zone bounds from desk data
+      const hasFloorBounds = Object.keys(allBounds).some(
+        (key) => key.startsWith(`Zone-${floor}-`)
+      );
+      if (!hasFloorBounds) {
+        // Generate synthetic zones for this floor (B1, R, or any without desks)
+        const synthetic = generateSyntheticZoneBounds(floor);
+        Object.assign(allBounds, synthetic);
+      }
     }
+
+    // Distribute equipment within each zone using adaptive grid
+    Object.entries(byZone).forEach(([zoneKey, zoneEquipment]) => {
+      const bounds = allBounds[zoneKey];
+      if (!bounds) return;
+
+      const floor = zoneKey.split('-')[1] || 'L0';
+      const floorY = getFloorY(floor);
+
+      const distributed = distributeEquipmentInZone(zoneEquipment, bounds, floorY);
+      distributed.forEach((pos, id) => positions.set(id, pos));
+    });
+
+    // Fallback for any equipment that didn't get positioned (no zone bounds at all)
+    filteredEquipment.forEach((eq) => {
+      if (!positions.has(eq.id)) {
+        const code = (eq as any).code || eq.id || '';
+        const floor = extractFloor(code) || 'L0';
+        const floorY = getFloorY(floor === 'G' ? 'L0' : floor);
+        positions.set(eq.id, { x: 0, y: floorY, z: 0 });
+      }
+    });
 
     return positions;
   }, [filteredEquipment, zoneBounds]);
@@ -216,7 +263,10 @@ export function DigitalTwin() {
   // Loading state
   if (loading && equipment.length === 0) {
     return (
-      <div className="h-full flex items-center justify-center bg-gradient-to-b from-slate-900 to-slate-800">
+      <div
+        className="h-full flex items-center justify-center"
+        style={{ background: 'var(--color-sentinel-bg-canvas)' }}
+      >
         <div className="text-center">
           <div className="mb-4">
             <div className="inline-block">
@@ -233,7 +283,10 @@ export function DigitalTwin() {
   // Error state
   if (error) {
     return (
-      <div className="h-full flex items-center justify-center bg-gradient-to-b from-slate-900 to-slate-800">
+      <div
+        className="h-full flex items-center justify-center"
+        style={{ background: 'var(--color-sentinel-bg-canvas)' }}
+      >
         <div className="text-center">
           <div className="mb-4 text-6xl">⚠️</div>
           <p className="text-xl font-semibold text-red-400 mb-2">Failed to Load Equipment</p>
@@ -249,77 +302,122 @@ export function DigitalTwin() {
     );
   }
 
+  const rootClass = `h-full flex flex-col ${
+    theme === 'matrix'
+      ? 'matrix-theme bg-gradient-to-br from-[#060E18] via-[#0a1420] to-[#060E18]'
+      : ''
+  }`;
+
   return (
-    <div className="matrix-theme h-full flex flex-col bg-gradient-to-br from-[#060E18] via-[#0a1420] to-[#060E18]">
+    <div className={rootClass}>
       {/* Alert Banner */}
       <AlertBanner equipment={equipment} />
 
       {/* Site Selector and Equipment Filter */}
-      <div className="px-6 py-4 border-b" style={{ borderColor: 'var(--color-matrix-green)', opacity: 0.3 }}>
+      <div
+        className="px-6 py-4 border-b"
+        style={{
+          borderColor:
+            theme === 'matrix'
+              ? 'var(--color-matrix-green)'
+              : 'var(--color-sentinel-border)',
+          opacity: theme === 'matrix' ? 0.3 : 1,
+        }}
+      >
         <div className="flex items-center justify-between gap-4 mb-4">
-          <div className="flex items-center gap-3">
-            <label className="text-sm font-medium" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
-              Building:
-            </label>
-            <BuildingSelector
-              value={selectedBuildingId}
-              onChange={setSelectedBuildingId}
-              sites={sites}
-              disabled={sitesLoading}
-            />
-          </div>
+          <div className="flex items-center gap-4 flex-wrap">
+            <div className="flex items-center gap-3">
+              <label className="text-sm font-medium" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
+                Building:
+              </label>
+              <BuildingSelector
+                value={selectedBuildingId}
+                onChange={setSelectedBuildingId}
+                sites={sites}
+                disabled={sitesLoading}
+              />
+            </div>
 
-          {/* 2D/3D Toggle - Moved to header next to building selector */}
-            <div className="flex items-center gap-2 ml-4 pl-4 border-l" style={{ borderColor: 'var(--color-sentinel-border)' }}>
+            {/* Equipment type filter dropdown with icons */}
+            <div className="relative" ref={equipmentDropdownRef}>
               <button
-                onClick={() => setViewMode('3D')}
-                className={`matrix-btn ${
-                  viewMode === '3D' ? 'matrix-btn-active' : ''
-                }`}
+                onClick={() => setEquipmentDropdownOpen(!equipmentDropdownOpen)}
+                className={`matrix-btn flex items-center gap-2 ${equipmentTypeFilter ? 'matrix-btn-active' : ''}`}
+                style={{ minWidth: '160px', justifyContent: 'space-between' }}
               >
-                3D
+                <span className="flex items-center gap-2">
+                  {equipmentTypeFilter ? (
+                    <>
+                      <span className="flex items-center">{EQUIPMENT_ICONS[equipmentTypeFilter] || DEFAULT_ICON}</span>
+                      <span>{equipmentTypeFilter.toUpperCase()}</span>
+                      <span className="text-xs opacity-75">({equipmentCountByType[equipmentTypeFilter] || 0})</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>ALL EQUIPMENT</span>
+                      <span className="text-xs opacity-75">({equipment.length})</span>
+                    </>
+                  )}
+                </span>
+                <ChevronDown className={`w-3 h-3 transition-transform ${equipmentDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
-              <button
-                onClick={() => setViewMode('2D')}
-                className={`matrix-btn ${
-                  viewMode === '2D' ? 'matrix-btn-active' : ''
-                }`}
-              >
-                2D
-              </button>
+
+              {equipmentDropdownOpen && (
+                <div
+                  className="absolute top-full left-0 mt-1 z-50 rounded-lg border p-2 min-w-[280px] max-h-[320px] overflow-y-auto"
+                  style={{
+                    background: theme === 'matrix' ? 'rgba(6, 14, 24, 0.97)' : 'var(--color-sentinel-bg)',
+                    borderColor: theme === 'matrix' ? 'var(--color-matrix-green)' : 'var(--color-sentinel-border)',
+                    boxShadow: theme === 'matrix'
+                      ? '0 4px 24px rgba(0, 255, 65, 0.15), 0 0 1px rgba(0, 255, 65, 0.3)'
+                      : '0 4px 24px rgba(0,0,0,0.2)',
+                  }}
+                >
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => { setEquipmentTypeFilter(null); setEquipmentDropdownOpen(false); }}
+                      className={`matrix-btn ${!equipmentTypeFilter ? 'matrix-btn-active' : ''}`}
+                    >
+                      ALL ({equipment.length})
+                    </button>
+
+                    {equipmentTypes.map((type) => (
+                      <button
+                        key={type}
+                        onClick={() => {
+                          setEquipmentTypeFilter(equipmentTypeFilter === type ? null : type);
+                          setEquipmentDropdownOpen(false);
+                        }}
+                        className={`matrix-btn ${equipmentTypeFilter === type ? 'matrix-btn-active' : ''}`}
+                      >
+                        <span className="flex items-center">{EQUIPMENT_ICONS[type] || DEFAULT_ICON}</span>
+                        <span>{type.toUpperCase()}</span>
+                        <span className="text-xs opacity-75">({equipmentCountByType[type] || 0})</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Equipment count */}
-          <div className="text-sm font-medium" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
-            Total Equipment: <span style={{ color: 'var(--color-sentinel-text-primary)' }}>{filteredEquipment.length}</span>
-          </div>
-
-        {/* Equipment Type Filter - Professional HUD-style buttons */}
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => setEquipmentTypeFilter(null)}
-            className={`matrix-btn ${
-              !equipmentTypeFilter ? 'matrix-btn-active' : ''
-            }`}
-          >
-            ALL ({equipment.length})
-          </button>
-
-          {equipmentTypes.map((type) => (
+          {/* 2D/3D Toggle */}
+          <div className="flex items-center gap-2 ml-4 pl-4 border-l" style={{ borderColor: 'var(--color-sentinel-border)' }}>
             <button
-              key={type}
-              onClick={() => setEquipmentTypeFilter(equipmentTypeFilter === type ? null : type)}
-              className={`matrix-btn ${
-                equipmentTypeFilter === type ? 'matrix-btn-active' : ''
-              }`}
+              onClick={() => setViewMode('3D')}
+              className={`matrix-btn ${viewMode === '3D' ? 'matrix-btn-active' : ''}`}
             >
-              <span className="flex items-center">{EQUIPMENT_ICONS[type] || DEFAULT_ICON}</span>
-              <span>{type.toUpperCase()}</span>
-              <span className="text-xs opacity-75">({equipmentCountByType[type] || 0})</span>
+              3D
             </button>
-          ))}
+            <button
+              onClick={() => setViewMode('2D')}
+              className={`matrix-btn ${viewMode === '2D' ? 'matrix-btn-active' : ''}`}
+            >
+              2D
+            </button>
+          </div>
         </div>
+
       </div>
 
       {/* Stats Bar */}

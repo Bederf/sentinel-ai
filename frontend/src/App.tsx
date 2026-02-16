@@ -125,7 +125,7 @@ function App() {
   useEffect(() => {
     const checkSimulationStatus = async () => {
       try {
-        const response = await fetch('/api/lifecycle/status');
+        const response = await fetch('/api/lifecycle/status/site-002');
         const data = await response.json();
         setSimulationRunning(data.running === true);
       } catch (error) {
