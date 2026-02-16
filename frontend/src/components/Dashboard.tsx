@@ -523,7 +523,7 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
   }, [stats, normalSites, warningSites, totalPotentialSavings, predictions.length]);
 
   // Debug: trace render path
-  console.log('[Dashboard] render', { loading, error, selectedSiteId: selectedSiteId, visibleSections: visibleSections?.length, sectionOrder: sectionOrder?.length, activeModules: activeModules?.length });
+  console.log(`[Dashboard] render loading=${loading} error=${error} siteId=${selectedSiteId} visSec=${visibleSections?.length} secOrder=${sectionOrder?.length} modules=${activeModules?.length}`);
 
   // Loading state
   if (loading) {

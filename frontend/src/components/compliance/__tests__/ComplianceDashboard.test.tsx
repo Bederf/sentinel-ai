@@ -84,6 +84,76 @@ describe('ComplianceDashboard', () => {
       status: 'success',
       fetchStatus: 'idle',
     } as any)
+
+    // Mock query hooks
+    vi.mocked(complianceApi.useFireEquipment).mockReturnValue({
+      data: [],
+      isLoading: false,
+      error: null,
+      isError: false,
+      isSuccess: true,
+      isIdle: false,
+      isPending: false,
+      isFetching: false,
+      dataUpdatedAt: Date.now(),
+      errorUpdatedAt: 0,
+      failureCount: 0,
+      failureReason: null,
+      status: 'success',
+      fetchStatus: 'idle',
+    } as any)
+
+    vi.mocked(complianceApi.useEmergencyLightStatus).mockReturnValue({
+      data: {
+        site_id: 'S002',
+        critical_issues_count: 0,
+        high_risk_items_count: 0,
+        items_expiring_30days: 0,
+        overdue_inspections: 0,
+        compliance_score_percent: 100,
+        summary: {
+          ohs_status: 'compliant',
+          fire_status: 'compliant',
+          electrical_status: 'compliant',
+          legionella_status: 'compliant',
+          lift_status: 'compliant',
+        },
+      },
+      isLoading: false,
+      error: null,
+      isError: false,
+      isSuccess: true,
+      isIdle: false,
+      isPending: false,
+      isFetching: false,
+      dataUpdatedAt: Date.now(),
+      errorUpdatedAt: 0,
+      failureCount: 0,
+      failureReason: null,
+      status: 'success',
+      fetchStatus: 'idle',
+    } as any)
+
+    // Mock mutation hooks
+    const mockMutation = {
+      mutate: vi.fn(),
+      mutateAsync: vi.fn(),
+      isPending: false,
+      isError: false,
+      error: null,
+      isSuccess: false,
+      status: 'idle' as const,
+      reset: vi.fn(),
+      failureCount: 0,
+      failureReason: null,
+      context: undefined,
+      data: undefined,
+      variables: undefined,
+    }
+
+    vi.mocked(complianceApi.useGenerateOhsChecklist).mockReturnValue(mockMutation as any)
+    vi.mocked(complianceApi.useScheduleFireInspection).mockReturnValue(mockMutation as any)
+    vi.mocked(complianceApi.useRecordEmergencyLightTest).mockReturnValue(mockMutation as any)
   })
 
   const renderComponent = () => {
