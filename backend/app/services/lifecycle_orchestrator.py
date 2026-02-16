@@ -333,8 +333,8 @@ class LifecycleOrchestrator:
         self._scenario_rng.seed(self._occupancy_seed)
         logger.info(f"Seeded occupancy randomness for scenario '{scenario}' (seed={self._occupancy_seed})")
 
-        # Check if this is an annual scenario
-        is_annual = scenario == "grant_hvac_dali_ai_annual"
+        # Check if this is an annual scenario (365-day simulations have "annual" in name)
+        is_annual = "annual" in scenario.lower()
 
         # RECOVERY PATH: If we have a checkpoint, restore ALL state BEFORE starting loop
         if checkpoint and is_annual:
