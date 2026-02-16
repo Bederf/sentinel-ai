@@ -293,13 +293,19 @@ async def startup_event(app: FastAPI) -> None:
                 _logger.info(f"✅ Stopped {len(running_tasks.data)} running simulation(s)")
 
             # Mark any queued simulations as 'inactive' (don't auto-start)
+            # Only deactivate tasks from BEFORE this startup (older than 5 seconds)
+            # This prevents deactivating tasks created during the current startup
+            from datetime import datetime, timedelta
+            cutoff_time = (datetime.utcnow() - timedelta(seconds=5)).isoformat()
+            
             queued_tasks = client.table("lifecycle_simulation_tasks") \
-                .select("task_id") \
+                .select("task_id, created_at") \
                 .eq("status", "queued") \
+                .lt("created_at", cutoff_time) \
                 .execute()
 
             if queued_tasks.data:
-                _logger.info(f"⏸️  Deactivating {len(queued_tasks.data)} queued simulation(s)...")
+                _logger.info(f"⏸️  Deactivating {len(queued_tasks.data)} queued simulation(s) from before startup...")
                 for task in queued_tasks.data:
                     try:
                         client.table("lifecycle_simulation_tasks") \
@@ -309,6 +315,8 @@ async def startup_event(app: FastAPI) -> None:
                     except Exception as update_err:
                         _logger.warning(f"Could not deactivate task {task['task_id']}: {update_err}")
                 _logger.info(f"✅ Deactivated {len(queued_tasks.data)} queued simulation(s)")
+            else:
+                _logger.info("✅ No old queued simulations to deactivate")
 
             if not running_tasks.data and not queued_tasks.data:
                 _logger.info("✅ No active simulations to deactivate")
