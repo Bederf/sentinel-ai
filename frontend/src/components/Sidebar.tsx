@@ -30,7 +30,7 @@ import {
   getPersistedAddonOrder,
   persistAddonOrder,
 } from "../lib/navigation";
-import { getAllowedViews, canAccessView } from "../lib/access-control";
+import { getAllowedViews, canAccessView, isRestrictedDemoUser } from "../lib/access-control";
 
 export type { View } from "../lib/navigation";
 
@@ -83,8 +83,7 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
   // Compute visible internal items, filtered by role
   // Settings is password-protected and visible to admin + demo users
   const visibleInternal = useMemo(() => {
-    const demoUserEmails = ['grant@wardew.co.za', 'bederf@protonmail.com'];
-    const isDemoUser = userEmail && demoUserEmails.includes(userEmail.toLowerCase());
+    const isDemoUser = userEmail && isRestrictedDemoUser(userEmail);
 
     return INTERNAL_NAV_ITEMS.filter(
       (item) => {
@@ -389,6 +388,7 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
           {onCustomizeDashboard && (
             <div className="mt-2 mx-3">
               <button
+                type="button"
                 onClick={() => {
                   onCustomizeDashboard();
                   setIsMobileOpen(false);

@@ -26,8 +26,26 @@ from app.services.health_threshold_service import get_health_thresholds
 
 logger = logging.getLogger(__name__)
 
-# Base-pack modules that must remain enabled once activated.
-NON_DEACTIVATABLE_MODULES = {ModuleType.HVAC, ModuleType.ENERGY}
+# Core infrastructure modules (non-deactivatable base features)
+# These are always active and provide the foundation for all monitoring and automation
+NON_DEACTIVATABLE_MODULES = {
+    ModuleType.KPI,           # Dashboard KPI metrics
+    ModuleType.ML,            # Risk intelligence and predictions
+    ModuleType.HVAC,          # HVAC monitoring (read-only in base, control via CONTROL module)
+    ModuleType.ENERGY,        # Energy monitoring (read-only in base, control via CONTROL module)
+    ModuleType.ASSETS,        # Asset visibility and lifecycle
+    ModuleType.SIMBIOT,       # BMS connection and SIMBIOT wizard
+    ModuleType.INTEGRATIONS,  # System health and integration monitoring
+    ModuleType.NOTIFICATIONS, # Notification management
+}
+
+# Module dependency map: modules that require other modules to be active
+# Format: {dependent_module: required_module}
+# E.g., SOLAR requires CONTROL to be active to function
+MODULE_DEPENDENCIES = {
+    ModuleType.SOLAR: ModuleType.CONTROL,      # BESS arbitrage needs control authority
+    ModuleType.LIGHTING: ModuleType.CONTROL,   # Occupancy automation needs HVAC/DALI control
+}
 
 
 class ModuleRegistryService:
@@ -43,7 +61,9 @@ class ModuleRegistryService:
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self._site_configs: Dict[str, SiteModuleConfig] = {}
         self._recommendations: Dict[str, List[AIRecommendation]] = {}  # By site
+        self._demo_presets: Dict[str, Dict[str, Any]] = {}
         self._load_configs()
+        self._load_presets()
 
     def _load_configs(self) -> None:
         """Load site module configurations from disk."""
@@ -69,6 +89,21 @@ class ModuleRegistryService:
                 json.dump(data, f, indent=2)
         except Exception as e:
             logger.error(f"Error saving module configs: {e}")
+
+    def _load_presets(self) -> None:
+        """Load demo presets from disk."""
+        presets_file = self.data_dir / "demo_presets.json"
+        if presets_file.exists():
+            try:
+                with open(presets_file) as f:
+                    self._demo_presets = json.load(f)
+                logger.info(f"Loaded {len(self._demo_presets)} demo presets")
+            except Exception as e:
+                logger.error(f"Error loading demo presets: {e}")
+
+    def get_available_presets(self) -> Dict[str, Dict[str, Any]]:
+        """Get all available demo presets."""
+        return self._demo_presets
 
     def _parse_site_config(self, data: Dict) -> SiteModuleConfig:
         """Parse site config from JSON."""
@@ -174,6 +209,10 @@ class ModuleRegistryService:
         """
         Activate a module for a site.
 
+        Validates dependency chain:
+        - SOLAR and LIGHTING require CONTROL module to be active
+        - If dependencies not met, raises ValueError
+        
         Creates cross-module links automatically if auto_integration is enabled.
         """
         # Get or create site config
@@ -184,6 +223,19 @@ class ModuleRegistryService:
             )
 
         site_config = self._site_configs[site_id]
+
+        # DEPENDENCY VALIDATION: Check if required modules are active
+        if module_type in MODULE_DEPENDENCIES:
+            required_module = MODULE_DEPENDENCIES[module_type]
+            is_required_active = any(
+                m.module_type == required_module and m.status == ModuleStatus.ACTIVE
+                for m in site_config.active_modules
+            )
+            if not is_required_active:
+                raise ValueError(
+                    f"{module_type.value} module requires {required_module.value} module "
+                    f"to be active first. Enable {required_module.value} to use {module_type.value}."
+                )
 
         # Check if module already active
         existing = next(
@@ -218,14 +270,26 @@ class ModuleRegistryService:
         return instance
 
     def deactivate_module(self, site_id: str, module_type: ModuleType) -> bool:
-        """Deactivate a module for a site."""
+        """
+        Deactivate a module for a site (idempotent operation).
+        
+        CASCADE LOGIC: If a module that others depend on is deactivated,
+        automatically deactivates dependent modules.
+        - Deactivating CONTROL → also deactivates SOLAR and LIGHTING
+        
+        Returns True even if module not found (idempotent behavior for safety).
+        """
         if module_type in NON_DEACTIVATABLE_MODULES:
             raise ValueError(f"{module_type.value} is part of the base pack and cannot be deactivated")
 
         config = self._site_configs.get(site_id)
         if not config:
-            return False
+            # Idempotent: if site has no config, deactivation is already complete
+            logger.debug(f"Site {site_id} has no module config, deactivation is no-op")
+            return True
 
+        # Find and deactivate the module
+        module_found = False
         for module in config.active_modules:
             if module.module_type == module_type:
                 module.status = ModuleStatus.INACTIVE
@@ -235,11 +299,114 @@ class ModuleRegistryService:
                     if link.source_module == module_type or link.target_module == module_type:
                         link.enabled = False
 
-                self._save_configs()
+                module_found = True
                 logger.info(f"Deactivated module {module_type.value} for site {site_id}")
-                return True
+                break
 
-        return False
+        if not module_found:
+            # Idempotent: if module not in list, it's already deactivated
+            logger.debug(f"Module {module_type.value} not in active list for {site_id}, deactivation is no-op")
+            # Note: Changed from 'return False' to 'pass' to continue cascade logic
+            pass
+        else:
+            # CASCADE: Deactivate dependent modules
+            # Find all modules that depend on the deactivated module
+            dependent_modules = [
+                dep_module for dep_module, required_module in MODULE_DEPENDENCIES.items()
+                if required_module == module_type
+            ]
+
+            for dependent in dependent_modules:
+                for module in config.active_modules:
+                    if module.module_type == dependent and module.status == ModuleStatus.ACTIVE:
+                        module.status = ModuleStatus.INACTIVE
+                        
+                        # Disable cross-module links for cascaded deactivation
+                        for link in config.cross_module_links:
+                            if link.source_module == dependent or link.target_module == dependent:
+                                link.enabled = False
+                        
+                        logger.info(
+                            f"Cascaded deactivation: {dependent.value} deactivated because "
+                            f"required module {module_type.value} was deactivated (site: {site_id})"
+                        )
+
+        self._save_configs()
+        return True  # Changed: Always return True (idempotent)
+
+    def apply_preset(self, site_id: str, preset_name: str) -> Dict[str, Any]:
+        """
+        Apply a demo preset to a site.
+        
+        Presets define a specific module configuration for demo scenarios:
+        - 'grant': Base + Controls + Lighting/Occupancy
+        - 'bederf': Base + Controls + Solar/BESS
+        - 'full': Base + All modules
+        
+        Returns activation status for each module and any errors.
+        """
+        if preset_name not in self._demo_presets:
+            raise ValueError(f"Unknown preset: {preset_name}. Available: {list(self._demo_presets.keys())}")
+
+        preset = self._demo_presets[preset_name]
+        config = self._site_configs.get(site_id)
+        
+        if not config:
+            raise ValueError(f"Site {site_id} not configured")
+
+        result = {
+            "preset": preset_name,
+            "site_id": site_id,
+            "activated": [],
+            "deactivated": [],
+            "errors": [],
+            "messaging": preset.get("savings_messaging", "")
+        }
+
+        # Get site name for module activation
+        site_name = config.site_name
+
+        # Deactivate modules first (in reverse order to avoid dependency issues)
+        to_deactivate = preset.get("deactivate", [])
+        for module_name in to_deactivate:
+            try:
+                module_type = ModuleType(module_name)
+                if self.deactivate_module(site_id, module_type):
+                    result["deactivated"].append(module_name)
+                    logger.info(f"Preset '{preset_name}': Deactivated {module_name}")
+            except ValueError as e:
+                # Module might be non-deactivatable (base module), skip silently
+                if "part of the base pack" not in str(e):
+                    result["errors"].append(f"Failed to deactivate {module_name}: {str(e)}")
+            except Exception as e:
+                result["errors"].append(f"Failed to deactivate {module_name}: {str(e)}")
+
+        # Activate modules (respecting dependency order: CONTROL must come before SOLAR/LIGHTING)
+        to_activate = preset.get("activate", [])
+        
+        # Sort to activate CONTROL first if present
+        activation_order = []
+        if "control" in to_activate:
+            activation_order.append("control")
+        
+        for module_name in to_activate:
+            if module_name not in activation_order:
+                activation_order.append(module_name)
+
+        for module_name in activation_order:
+            try:
+                module_type = ModuleType(module_name)
+                self.activate_module(site_id, site_name, module_type)
+                result["activated"].append(module_name)
+                logger.info(f"Preset '{preset_name}': Activated {module_name}")
+            except ValueError as e:
+                result["errors"].append(f"Failed to activate {module_name}: {str(e)}")
+            except Exception as e:
+                result["errors"].append(f"Failed to activate {module_name}: {str(e)}")
+
+        logger.info(f"Applied preset '{preset_name}' to site {site_id}: {len(result['activated'])} activated, {len(result['deactivated'])} deactivated, {len(result['errors'])} errors")
+
+        return result
 
     def _create_integration_links(self, site_id: str, new_module: ModuleType) -> None:
         """Create cross-module integration links when a new module is activated."""

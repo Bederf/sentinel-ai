@@ -71,6 +71,7 @@ class AuthContext:
     api_key_id: Optional[str] = None
     authenticated_at: datetime = field(default_factory=datetime.utcnow)
     metadata: Dict[str, Any] = field(default_factory=dict)
+    entitlements: List[str] = field(default_factory=list)  # Module types user has access to
 
     def has_role(self, required_role: SentinelRole) -> bool:
         """Check if user has the required role or higher."""

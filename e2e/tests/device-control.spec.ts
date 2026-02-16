@@ -97,7 +97,7 @@ test.describe('Device Control E2E Tests', () => {
         await applyButton.first().click();
 
         // Should show either success or safety block message
-        await expect(page.locator('text=Success').or(page.locator('text=Blocked').or(page.locator('text=Warning'))).toBeVisible({ timeout: 5000 });
+        await expect(page.locator('text=Success').or(page.locator('text=Blocked')).or(page.locator('text=Warning'))).toBeVisible({ timeout: 5000 });
       }
     }
   });

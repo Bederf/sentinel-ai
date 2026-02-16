@@ -2428,14 +2428,22 @@ CHAT_TOOLS = [
 
 # Tool-level module requirements for site-aware access control.
 TOOL_MODULE_REQUIREMENTS: dict[str, ModuleType] = {
+    # Control/automation tools (require CONTROL module)
+    "control_device": ModuleType.CONTROL,
+    
+    # Maintenance/work order tools (require MAINTENANCE module)
+    "create_work_order": ModuleType.MAINTENANCE,
+    
     # SIMBIOT / onboarding workflows
     "discover_niagara_points": ModuleType.SIMBIOT,
     "review_point_mapping": ModuleType.SIMBIOT,
     "approve_point_mapping": ModuleType.SIMBIOT,
     "correct_point_classification": ModuleType.SIMBIOT,
+    
     # Security & life safety workflows
     "get_security_status": ModuleType.SECURITY,
     "get_fire_system_status": ModuleType.FIRE,
+    
     # Solar / BESS workflows
     "get_solar_overview": ModuleType.SOLAR,
     "get_bess_status": ModuleType.SOLAR,

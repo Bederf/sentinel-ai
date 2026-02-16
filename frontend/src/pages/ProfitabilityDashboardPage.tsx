@@ -123,7 +123,7 @@ function KPICard({ title, value, subtitle, trend, color = "blue" }: KPICardProps
   const TrendIcon = trend === "up" ? ArrowUp : trend === "down" ? ArrowDown : Minus;
 
   return (
-    <Card className="glass-panel">
+    <Card style={{ background: "rgba(14, 116, 144, 0.05)", border: "1px solid var(--color-sentinel-border)" }}>
       <div className="flex items-center justify-between">
         <div>
           <Text
@@ -742,11 +742,13 @@ export function ProfitabilityDashboardPage() {
 
       {/* Section 2: Loss Leaders Alert Panel */}
       {lossLeaders.length > 0 && (
-        <div className="glass-panel border border-[var(--color-sentinel-border)] rounded-lg p-4"
-          style={{
-            background: "var(--color-sentinel-bg-panel)",
-            borderColor: "var(--color-sentinel-border)",
-          }}
+        <div style={{
+          background: "rgba(14, 116, 144, 0.05)",
+          border: "1px solid var(--color-sentinel-border)",
+          borderRadius: "0.5rem",
+          padding: "1rem",
+          marginTop: "0"
+        }}
         >
           <div className="flex items-center gap-2 mb-3">
             <AlertTriangle className="h-5 w-5 text-[var(--color-sentinel-red)]" />
@@ -798,7 +800,7 @@ export function ProfitabilityDashboardPage() {
       )}
 
       {/* Section 3: Contract Profitability Table */}
-      <div className="glass-panel overflow-hidden">
+      <div style={{ background: "rgba(14, 116, 144, 0.05)", border: "1px solid var(--color-sentinel-border)", overflow: "hidden", borderRadius: "0.5rem" }}>
         <div
           className="px-4 py-4 flex items-center justify-between"
           style={{
@@ -1032,7 +1034,7 @@ export function ProfitabilityDashboardPage() {
       )}
 
       {selectedContractId && (
-        <div className="glass-panel p-6">
+        <div style={{ background: "rgba(14, 116, 144, 0.05)", border: "1px solid var(--color-sentinel-border)", padding: "1.5rem", borderRadius: "0.5rem" }}>
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3
@@ -1081,9 +1083,9 @@ export function ProfitabilityDashboardPage() {
               Loading report...
             </div>
           ) : reportError ? (
-            <div className="border border-[var(--color-sentinel-border)] rounded-lg p-4 bg-[var(--color-sentinel-bg-panel)]">
+            <div style={{ border: "1px solid var(--color-sentinel-border)", borderRadius: "0.5rem", padding: "1rem", background: "rgba(14, 116, 144, 0.05)" }}>
               <div className="flex items-center gap-2 mb-2">
-                <AlertTriangle className="h-5 w-5 text-[var(--color-sentinel-red)]" />
+                <AlertTriangle className="h-5 w-5" style={{ color: "var(--color-sentinel-red)" }} />
                 <h3 style={{ color: "var(--color-sentinel-text-primary)" }} className="font-semibold">
                   Report unavailable
                 </h3>
@@ -1095,9 +1097,9 @@ export function ProfitabilityDashboardPage() {
           ) : selectedReport ? (
             <div className="space-y-4">
               {selectedReport.data_quality_flags.length > 0 && (
-                <div className="border border-amber-500/30 rounded-lg p-4 bg-amber-500/5">
+                <div style={{ border: "1px solid rgba(245, 158, 11, 0.3)", borderRadius: "0.5rem", padding: "1rem", background: "rgba(245, 158, 11, 0.05)" }}>
                   <div className="flex items-center gap-2 mb-2">
-                    <AlertTriangle className="h-5 w-5 text-amber-600" />
+                    <AlertTriangle className="h-5 w-5" style={{ color: "var(--color-sentinel-amber)" }} />
                     <h3 style={{ color: "var(--color-sentinel-text-primary)" }} className="font-semibold">
                       Data quality flags
                     </h3>
@@ -1109,7 +1111,7 @@ export function ProfitabilityDashboardPage() {
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <Card className="glass-panel">
+                <Card style={{ background: "rgba(14, 116, 144, 0.05)", border: "1px solid var(--color-sentinel-border)" }}>
                   <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                     Net Revenue
                   </Text>
@@ -1117,7 +1119,7 @@ export function ProfitabilityDashboardPage() {
                     {formatZAR(selectedReport.profitability.net_revenue_zar)}
                   </Title>
                 </Card>
-                <Card className="glass-panel">
+                <Card style={{ background: "rgba(14, 116, 144, 0.05)", border: "1px solid var(--color-sentinel-border)" }}>
                   <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                     Total Cost
                   </Text>
@@ -1125,7 +1127,7 @@ export function ProfitabilityDashboardPage() {
                     {formatZAR(selectedReport.profitability.total_cost_zar)}
                   </Title>
                 </Card>
-                <Card className="glass-panel">
+                <Card style={{ background: "rgba(14, 116, 144, 0.05)", border: "1px solid var(--color-sentinel-border)" }}>
                   <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                     Gross Margin
                   </Text>
@@ -1133,7 +1135,7 @@ export function ProfitabilityDashboardPage() {
                     {formatZAR(selectedReport.profitability.gross_margin_zar)}
                   </Title>
                 </Card>
-                <Card className="glass-panel">
+                <Card style={{ background: "rgba(14, 116, 144, 0.05)", border: "1px solid var(--color-sentinel-border)" }}>
                   <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                     Asset Count
                   </Text>
@@ -1143,7 +1145,7 @@ export function ProfitabilityDashboardPage() {
                 </Card>
               </div>
 
-              <div className="border border-[var(--color-sentinel-border)] rounded-lg overflow-hidden">
+              <div style={{ border: "1px solid var(--color-sentinel-border)", borderRadius: "0.5rem", overflow: "hidden" }}>
                 <Table>
                   <TableHead>
                     <TableRow>
@@ -1208,7 +1210,7 @@ export function ProfitabilityDashboardPage() {
       )}
 
       {/* Section 4: Trend Chart */}
-      <div className="glass-panel p-6">
+      <div style={{ background: "rgba(14, 116, 144, 0.05)", border: "1px solid var(--color-sentinel-border)", padding: "1.5rem", borderRadius: "0.5rem" }}>
         <div className="flex items-center justify-between mb-4">
           <h3
             className="text-sm font-medium"
@@ -1278,7 +1280,7 @@ export function ProfitabilityDashboardPage() {
       </div>
 
       {/* Section 5: SLA Penalty Trend */}
-      <div className="glass-panel p-6">
+      <div style={{ background: "rgba(14, 116, 144, 0.05)", border: "1px solid var(--color-sentinel-border)", padding: "1.5rem", borderRadius: "0.5rem" }}>
         <div className="flex items-center justify-between mb-4">
           <h3
             className="text-sm font-medium"

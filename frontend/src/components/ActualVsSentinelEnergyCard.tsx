@@ -27,6 +27,8 @@ import {
   AlertCircle,
 } from 'lucide-react'
 import { isExpectedApiError } from '@/lib/api'
+import { useModuleAccess } from '@/hooks/useModuleAccess'
+import type { ModuleType } from '@/lib/moduleRegistry'
 
 interface EnergyMetrics {
   total_kwh: number
@@ -75,7 +77,12 @@ function getSystemIcon(system: 'hvac' | 'lighting' | 'power') {
 }
 
 // Mock fetch for now - replace with actual API calls
-async function fetchEnergyComparison(siteId: string): Promise<ComparisonData> {
+// Savings vary by active modules:
+// - Base (HVAC only): 10-12%
+// - With Solar: +8-10% → 18-22%
+// - With Lighting (DALI): +3-5% → 13-17%
+// - With both: ~22-25%
+async function fetchEnergyComparison(siteId: string, activeModuleTypes: string[] = []): Promise<ComparisonData> {
   try {
     const response = await fetch(`/api/energy/comparison-summary?site_id=${siteId}`)
     if (!response.ok) throw new Error('Failed to fetch energy comparison')
@@ -84,12 +91,33 @@ async function fetchEnergyComparison(siteId: string): Promise<ComparisonData> {
     if (!isExpectedApiError(err)) {
       console.error('Failed to load energy comparison:', err)
     }
-    // Return mock data for demo
+    
+    // Calculate savings based on active modules (demo scenario)
+    let savingsPercent = 11.5; // Base HVAC savings
+    let savingsKwh = 2450 * 0.115; // ~282 kWh
+    let confidencePercent = 78;
+    
+    if (activeModuleTypes.includes('solar')) {
+      savingsPercent += 9.8; // Solar adds 9-10%
+      savingsKwh += 2450 * 0.098;
+      confidencePercent = 88;
+    }
+    
+    if (activeModuleTypes.includes('lighting')) {
+      savingsPercent += 4.2; // DALI adds 4-5%
+      savingsKwh += 2450 * 0.042;
+      confidencePercent = Math.min(confidencePercent + 5, 92);
+    }
+    
+    // Return mock data for demo with dynamic savings
+    const actualTotal = 2450;
+    const sentinelTotal = actualTotal * (1 - (savingsPercent / 100));
+    
     return {
       actual: {
-        total_kwh: 2450,
-        total_cost_zar: 12250,
-        carbon_kg: 892,
+        total_kwh: actualTotal,
+        total_cost_zar: actualTotal * 5, // R5/kWh commercial rate
+        carbon_kg: actualTotal * 0.35, // SA grid carbon intensity
         hvac_kwh: 1200,
         hvac_percent: 49,
         lighting_kwh: 850,
@@ -99,9 +127,9 @@ async function fetchEnergyComparison(siteId: string): Promise<ComparisonData> {
         timestamp: new Date().toISOString(),
       },
       sentinel: {
-        total_kwh: 1980,
-        total_cost_zar: 9900,
-        carbon_kg: 720,
+        total_kwh: sentinelTotal,
+        total_cost_zar: sentinelTotal * 5,
+        carbon_kg: sentinelTotal * 0.35,
         hvac_kwh: 950,
         hvac_percent: 48,
         lighting_kwh: 650,
@@ -110,10 +138,10 @@ async function fetchEnergyComparison(siteId: string): Promise<ComparisonData> {
         power_percent: 19,
         timestamp: new Date().toISOString(),
       },
-      daily_savings_zar: 2350,
-      daily_savings_percent: 19.2,
-      progress_to_target_percent: 80,
-      ai_confidence_percent: 92,
+      daily_savings_zar: (actualTotal - sentinelTotal) * 5,
+      daily_savings_percent: savingsPercent,
+      progress_to_target_percent: Math.min(savingsPercent / 25 * 100, 100),
+      ai_confidence_percent: confidencePercent,
     }
   }
 }
@@ -122,10 +150,19 @@ export function ActualVsSentinelEnergyCard({ siteId }: ActualVsSentinelEnergyCar
   const [comparison, setComparison] = useState<ComparisonData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  
+  // Check which optimization modules are active (drives demo moment)
+  const { isActive: isSolarActive } = useModuleAccess('solar' as ModuleType)
+  const { isActive: isLightingActive } = useModuleAccess('lighting' as ModuleType)
 
   const loadData = useCallback(async () => {
     try {
-      const data = await fetchEnergyComparison(siteId)
+      // Build array of active module types to pass to fetch
+      const activeModules: string[] = []
+      if (isSolarActive) activeModules.push('solar')
+      if (isLightingActive) activeModules.push('lighting')
+      
+      const data = await fetchEnergyComparison(siteId, activeModules)
       setComparison(data)
       setError(null)
     } catch (err) {
@@ -133,7 +170,7 @@ export function ActualVsSentinelEnergyCard({ siteId }: ActualVsSentinelEnergyCar
     } finally {
       setLoading(false)
     }
-  }, [siteId])
+  }, [siteId, isSolarActive, isLightingActive])
 
   useEffect(() => {
     loadData()

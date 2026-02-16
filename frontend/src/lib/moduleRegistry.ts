@@ -12,7 +12,13 @@ const RECOMMENDATIONS_CACHE_PREFIX = "sentinel_module_recommendations_";
 
 // ==================== Types ====================
 
-export type ModuleType = 'control' | 'assets' | 'simbiot' | 'integrations' | 'notifications' | 'hvac' | 'energy' | 'security' | 'lighting' | 'fire' | 'access' | 'solar' | 'water' | 'ml' | 'sustainability' | 'contracts';
+export type ModuleType = 
+  // Core infrastructure (non-deactivatable)
+  | 'kpi' | 'ml' | 'hvac' | 'energy' | 'assets' | 'simbiot' | 'integrations' | 'notifications'
+  // Paid add-ons
+  | 'control' | 'maintenance' | 'digital_twin'
+  // Building system add-ons
+  | 'lighting' | 'fire' | 'security' | 'solar' | 'sustainability' | 'water' | 'contracts';
 export type ModuleStatus = 'active' | 'inactive' | 'error' | 'maintenance';
 export type RecommendationType = 'optimization' | 'maintenance' | 'alert' | 'cross_system' | 'predictive';
 export type RecommendationPriority = 'low' | 'medium' | 'high' | 'critical';
@@ -182,7 +188,15 @@ export const moduleRegistryApi = {
         config,
       }),
     });
-    if (!response.ok) throw new Error('Failed to activate module');
+    if (!response.ok) {
+      try {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || `Failed to activate module (${response.status})`);
+      } catch (e) {
+        if (e instanceof Error) throw e;
+        throw new Error(`Failed to activate module (HTTP ${response.status})`);
+      }
+    }
     return response.json();
   },
 
@@ -194,7 +208,15 @@ export const moduleRegistryApi = {
       `${API_BASE}/api/modules/site/${siteId}/deactivate/${moduleType}`,
       { method: 'POST' }
     );
-    if (!response.ok) throw new Error('Failed to deactivate module');
+    if (!response.ok) {
+      try {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || `Failed to deactivate module (${response.status})`);
+      } catch (e) {
+        if (e instanceof Error) throw e;
+        throw new Error(`Failed to deactivate module (HTTP ${response.status})`);
+      }
+    }
   },
 
   /**
@@ -348,6 +370,7 @@ export const moduleRegistryApi = {
 // ==================== Module Metadata ====================
 
 export const MODULE_ICONS: Record<ModuleType, string> = {
+  kpi: 'grid',
   control: 'shield',
   assets: 'git-branch',
   simbiot: 'plug',
@@ -358,15 +381,17 @@ export const MODULE_ICONS: Record<ModuleType, string> = {
   security: 'shield-check',
   lighting: 'sun',
   fire: 'flame',
-  access: 'key',
   solar: 'sun',
   water: 'droplets',
   ml: 'bar-chart',
   sustainability: 'leaf',
   contracts: 'file-text',
+  digital_twin: 'cube',
+  maintenance: 'wrench',
 };
 
 export const MODULE_COLORS: Record<ModuleType, string> = {
+  kpi: 'slate',
   control: 'slate',
   assets: 'indigo',
   simbiot: 'teal',
@@ -377,12 +402,13 @@ export const MODULE_COLORS: Record<ModuleType, string> = {
   security: 'purple',
   lighting: 'yellow',
   fire: 'red',
-  access: 'green',
   solar: 'yellow',
   water: 'blue',
   ml: 'cyan',
   sustainability: 'emerald',
   contracts: 'orange',
+  digital_twin: 'violet',
+  maintenance: 'orange',
 };
 
 export const PRIORITY_COLORS: Record<RecommendationPriority, string> = {

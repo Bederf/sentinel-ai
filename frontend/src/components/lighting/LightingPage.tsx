@@ -2,6 +2,7 @@
  * LightingPage Component - DALI Lighting Control Page
  *
  * Shows Tridonic DALI zone lighting with:
+ * - Building selector dropdown
  * - Zone grid with brightness, occupancy, daylight metrics
  * - Manual brightness override sliders
  * - Zone status (active, standby, fault)
@@ -12,6 +13,9 @@
 
 import { useState, useEffect } from 'react';
 import { Lightbulb, Sun, Users, Activity } from 'lucide-react';
+import { BuildingSelector } from '../BuildingSelector';
+import { api, isExpectedApiError } from '@/lib/api';
+import type { Site } from '@/lib/api';
 
 interface Zone {
   id: string;
@@ -23,15 +27,44 @@ interface Zone {
   status: 'active' | 'standby' | 'fault';
 }
 
+// Sites with DALI-2 lighting integration installed
+const DALI_ENABLED_SITES = ["site-002"]; // Sandton City
+
 export function LightingPage() {
   const [zones, setZones] = useState<Zone[]>([]);
   const [loading, setLoading] = useState(true);
+  const [sites, setSites] = useState<Site[]>([]);
+  const [selectedSiteId, setSelectedSiteId] = useState<string>("");
+
+  // Fetch sites on mount and set default
+  useEffect(() => {
+    async function loadSites() {
+      try {
+        const sitesData = await api.getSites();
+        setSites(sitesData);
+        // Set first available site as default (prefer Sandton City for demos)
+        const defaultSite = sitesData.find(s => s.name?.includes('Sandton')) || sitesData[0];
+        if (defaultSite) {
+          setSelectedSiteId(defaultSite.id);
+        }
+      } catch (err) {
+        if (!isExpectedApiError(err)) {
+          console.error("Failed to fetch sites:", err);
+        }
+        // Fallback to first site ID for demo if API fails
+        if (sites.length > 0) {
+          setSelectedSiteId(sites[0].id);
+        }
+      }
+    }
+    loadSites();
+  }, [sites]);
 
   useEffect(() => {
     fetchZoneData();
     const interval = setInterval(fetchZoneData, 30000); // Refresh every 30s
     return () => clearInterval(interval);
-  }, []);
+  }, [selectedSiteId]);
 
   const fetchZoneData = async () => {
     try {
@@ -119,6 +152,9 @@ export function LightingPage() {
     }
   };
 
+  // Filter sites to only show DALI-enabled buildings
+  const daliSites = sites.filter(site => DALI_ENABLED_SITES.includes(site.id));
+
   if (loading) {
     return <div className="p-4">Loading DALI zones...</div>;
   }
@@ -127,18 +163,25 @@ export function LightingPage() {
     <div className="h-full overflow-y-auto p-4 md:p-6">
       {/* Page Header */}
       <div className="mb-6">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="p-2 rounded" style={{ background: "rgba(250, 204, 21, 0.15)" }}>
-            <Lightbulb className="h-6 w-6" style={{ color: "#FACC15" }} />
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded" style={{ background: "rgba(250, 204, 21, 0.15)" }}>
+              <Lightbulb className="h-6 w-6" style={{ color: "#FACC15" }} />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                DALI Lighting Control
+              </h1>
+              <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                Wardew Tridonic Integration
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl font-bold" style={{ color: "var(--color-sentinel-text-primary)" }}>
-              DALI Lighting Control
-            </h1>
-            <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-              Wardew Tridonic Integration — Site-002 Sandton Office Complex
-            </p>
-          </div>
+          <BuildingSelector
+            sites={daliSites}
+            value={selectedSiteId}
+            onChange={setSelectedSiteId}
+          />
         </div>
       </div>
 

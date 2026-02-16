@@ -34,7 +34,7 @@ import { hvacApi, type HVACOverview } from "../../lib/hvacApi";
 import ZoneOverviewPanel from "./ZoneOverviewPanel";
 import EquipmentStatusPanel from "./EquipmentStatusPanel";
 import ChillerControlPanel from "./ChillerControlPanel";
-import ThermalOptimizationPanel from "./ThermalOptimizationPanel";
+import { ThermalOptimizationPanelGated } from "./ThermalOptimizationPanelGated";
 import ComfortAssistant from "./ComfortAssistant";
 import HealthConfigEditor from "./HealthConfigEditor";
 
@@ -323,7 +323,7 @@ export function HVACDashboard({
           </div>
           <div className="space-y-4">
             <ChillerControlPanel siteId={siteId} compact />
-            <ThermalOptimizationPanel siteId={siteId} compact />
+            <ThermalOptimizationPanelGated siteId={siteId} compact />
             <ComfortAssistant compact />
           </div>
         </Grid>
@@ -345,7 +345,7 @@ export function HVACDashboard({
 
     // Optimization Tab
     <TabPanel key="optimization">
-      <ThermalOptimizationPanel siteId={siteId} />
+      <ThermalOptimizationPanelGated siteId={siteId} />
     </TabPanel>,
 
     // Health Config Tab

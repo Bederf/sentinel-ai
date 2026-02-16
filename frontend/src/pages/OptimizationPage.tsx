@@ -27,7 +27,7 @@ import {
 import { Table, TableHead, TableRow, TableHeaderCell, TableBody, TableCell, Button, TabGroup, TabList, Tab, TabPanels, TabPanel } from "@tremor/react";
 import api from '@/lib/api';
 import type { OptimizationScenario, OptimizationStatusResponse, Site } from '@/lib/api';
-import { OptimizationPanel } from "../components/OptimizationPanel";
+import { OptimizationPanelGated } from "../components/OptimizationPanelGated";
 import { PageLoading } from "../components/PageLoading";
 import { ProfileSettings } from "../components/optimization/ProfileSettings";
 import { RecommendationsDashboard } from "../components/optimization/RecommendationsDashboard";
@@ -376,7 +376,7 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
 
           {/* Panel Content - Three Column Layout */}
           <div className="p-4">
-            <OptimizationPanel compact={false} />
+            <OptimizationPanelGated compact={false} />
           </div>
         </div>
       </div>

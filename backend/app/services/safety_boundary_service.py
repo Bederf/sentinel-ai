@@ -21,7 +21,13 @@ class SafetyBoundaryService:
 
     def __init__(self):
         """Initialize the safety boundary service."""
-        pass
+        self._initialized = False
+
+    async def initialize(self):
+        """Initialize the safety boundary service."""
+        if not self._initialized:
+            self._initialized = True
+            logger.info("Safety boundary service initialized")
 
     async def check_boundary_approach(
         self,

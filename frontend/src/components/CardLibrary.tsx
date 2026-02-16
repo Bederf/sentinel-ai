@@ -75,10 +75,11 @@ export default function CardLibrary({
     const iconColor = isVisible
       ? 'var(--color-sentinel-blue)'
       : 'var(--color-sentinel-text-secondary)';
+    // FIX: Always make button visible with better contrast
     const buttonBg = isVisible
       ? 'var(--color-sentinel-blue)'
-      : 'var(--color-sentinel-bg-panel)';
-    const buttonColor = isVisible ? 'white' : 'var(--color-sentinel-text-secondary)';
+      : 'rgba(100, 116, 139, 0.3)';  // Slate-500 with transparency for OFF state
+    const buttonColor = isVisible ? 'white' : 'var(--color-sentinel-text-primary)';
 
     return (
       <div
@@ -94,7 +95,7 @@ export default function CardLibrary({
             className="p-2 rounded"
             style={{ background: iconBg, color: iconColor }}
           >
-            {card.icon}
+            {/* Card icon placeholder */}
           </div>
           <div>
             <p
@@ -114,8 +115,13 @@ export default function CardLibrary({
 
         <button
           onClick={() => onToggle(card.id, !isVisible)}
-          className="p-2 rounded-lg transition-colors"
-          style={{ background: buttonBg, color: buttonColor }}
+          className="p-2 rounded-lg transition-all hover:scale-110 active:scale-95"
+          style={{ 
+            background: buttonBg, 
+            color: buttonColor,
+            border: '1px solid rgba(255,255,255,0.1)',
+            cursor: 'pointer'
+          }}
           title={isVisible ? 'Hide card' : 'Show card'}
         >
           {isVisible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}

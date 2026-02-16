@@ -1,14 +1,28 @@
 /**
  * Mandatory Base Modules
- * 
+ *
  * These modules are always active and cannot be deactivated by users.
- * Every user has access to these core features.
+ * Every user has access to these core features as part of the base package.
+ *
+ * Base package includes:
+ * - ML: Risk Intelligence — equipment health and predictions
+ * - HVAC: Building system monitoring (read-only, no control)
+ * - Energy: Energy monitoring and consumption data
+ * - Notifications: Alert notifications
+ * - Integrations: System health / SIMBIOT connection status
+ *
+ * Note: Dashboard, Digital Twin, and System Health pages are always visible
+ * in the sidebar (BASE_NAV_ITEMS) and don't need module gating.
  */
 
 import type { ModuleType } from './moduleRegistry';
 
 export const MANDATORY_MODULES: ModuleType[] = [
-  'ml',            // Risk Intelligence - Equipment health and predictions
+  'ml',              // Risk Intelligence - Equipment health and predictions
+  'hvac',            // HVAC monitoring (read-only in base)
+  'energy',          // Energy monitoring and consumption data
+  'notifications',   // Alert notifications
+  'integrations',    // System health / SIMBIOT connection status
 ];
 
 /**
@@ -23,6 +37,10 @@ export function isMandatoryModule(moduleType: ModuleType): boolean {
  */
 export const MANDATORY_MODULE_NAMES: Partial<Record<ModuleType, string>> = {
   'ml': 'Risk Intelligence',
+  'hvac': 'HVAC Monitoring',
+  'energy': 'Energy Monitoring',
+  'notifications': 'Notifications',
+  'integrations': 'System Health',
 };
 
 /**

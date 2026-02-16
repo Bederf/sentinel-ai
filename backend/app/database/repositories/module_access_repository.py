@@ -15,16 +15,22 @@ logger = logging.getLogger(__name__)
 
 
 # Modules included in the default/base package for all authenticated users.
-# 
-# FREE BASIC PACKAGE:
-# - Dashboard: view equipment and status
-# - HVAC: monitor building systems (no control)
-# - ML: feedback loop to improve recommendations
 #
-# All other modules (Control, Energy, Solar, Lighting, etc.) are PAID ADD-ONS.
+# BASE PACKAGE (every user gets these):
+# - HVAC: monitor building systems (read-only, no automated control)
+# - Energy: energy monitoring and consumption data (read-only)
+# - ML: feedback loop, health scoring, risk predictions
+# - Notifications: alert notifications
+# - Integrations: system health monitoring (SIMBIOT connection status)
+#
+# All other modules (Control, Solar, Lighting, Assets, etc.) are PAID ADD-ONS
+# and require explicit grants via user_module_access table.
 BASE_MODULES: set[str] = {
-    ModuleType.HVAC.value,  # Base: monitoring only, no automated control
-    ModuleType.ML.value,    # Base: feedback loop for recommendation improvement
+    ModuleType.HVAC.value,           # Base: monitoring only, no automated control
+    ModuleType.ENERGY.value,         # Base: energy monitoring, consumption data
+    ModuleType.ML.value,             # Base: feedback loop for recommendation improvement
+    ModuleType.NOTIFICATIONS.value,  # Base: alert notifications
+    ModuleType.INTEGRATIONS.value,   # Base: system health / SIMBIOT connection status
 }
 
 

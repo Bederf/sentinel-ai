@@ -15,6 +15,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Sun, Building2, ChevronDown, RefreshCw } from "lucide-react";
 import { fetchSolarSites } from "../../lib/solarApi";
 import type { SolarSite } from "../../lib/solarApi";
+import { useModuleAccess } from "../../hooks/useModuleAccess";
 import { PageLoading } from "../PageLoading";
 import { SolarOverviewPanel } from "./SolarOverviewPanel";
 import { BESSStatusPanel } from "./BESSStatusPanel";
@@ -40,6 +41,18 @@ export function SolarDashboard() {
   const [solarSites, setSolarSites] = useState<SolarSite[]>([]);
   const [selectedSiteId, setSelectedSiteId] = useState<string>("");
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const { isActive: isSolarActive } = useModuleAccess('solar');
+
+  // Refetch all solar data when module is activated (eliminates 30s stale data lag)
+  useEffect(() => {
+    if (isSolarActive) {
+      queryClient.invalidateQueries({ queryKey: ['solar-overview'] });
+      queryClient.invalidateQueries({ queryKey: ['solar-bess'] });
+      queryClient.invalidateQueries({ queryKey: ['solar-inverters'] });
+      queryClient.invalidateQueries({ queryKey: ['solar-performance'] });
+      queryClient.invalidateQueries({ queryKey: ['solar-financial'] });
+    }
+  }, [isSolarActive, queryClient]);
 
   // Fetch solar sites on mount
   useEffect(() => {
@@ -62,6 +75,17 @@ export function SolarDashboard() {
         if (!selectedSiteId) setSelectedSiteId("site-002");
       });
   }, [selectedSiteId]);
+
+  // Refetch all solar data when module is activated
+  useEffect(() => {
+    if (isSolarActive) {
+      queryClient.invalidateQueries({ queryKey: ['solar-overview'] });
+      queryClient.invalidateQueries({ queryKey: ['solar-bess'] });
+      queryClient.invalidateQueries({ queryKey: ['solar-inverters'] });
+      queryClient.invalidateQueries({ queryKey: ['solar-performance'] });
+      queryClient.invalidateQueries({ queryKey: ['solar-financial'] });
+    }
+  }, [isSolarActive, queryClient]);
 
   /**
    * Refresh all solar queries via React Query

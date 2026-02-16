@@ -149,7 +149,7 @@ export function BudgetReportPage() {
         </div>
       </div>
 
-      <Card className="glass-panel">
+      <Card style={{ background: "rgba(14, 116, 144, 0.05)", border: "1px solid var(--color-sentinel-border)" }}>
         {/* Filters Header */}
         <div className="pb-4 mb-4 border-b" style={{ borderColor: "var(--color-sentinel-border)" }}>
           <div className="flex items-center gap-2 mb-4">
@@ -217,14 +217,14 @@ export function BudgetReportPage() {
       </Card>
 
       {error && (
-        <Card className="glass-panel">
+        <Card style={{ background: "rgba(14, 116, 144, 0.05)", border: "1px solid var(--color-sentinel-border)" }}>
           <Text style={{ color: "var(--color-sentinel-red)" }}>{error}</Text>
         </Card>
       )}
 
       {report && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <Card className="glass-panel">
+          <Card style={{ background: "rgba(14, 116, 144, 0.05)", border: "1px solid var(--color-sentinel-border)" }}>
             <div className="flex items-start justify-between">
               <div>
                 <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
@@ -239,7 +239,7 @@ export function BudgetReportPage() {
               </div>
             </div>
           </Card>
-          <Card className="glass-panel">
+          <Card style={{ background: "rgba(14, 116, 144, 0.05)", border: "1px solid var(--color-sentinel-border)" }}>
             <div className="flex items-start justify-between">
               <div>
                 <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
@@ -254,7 +254,7 @@ export function BudgetReportPage() {
               </div>
             </div>
           </Card>
-          <Card className="glass-panel">
+          <Card style={{ background: "rgba(14, 116, 144, 0.05)", border: "1px solid var(--color-sentinel-border)" }}>
             <div className="flex items-start justify-between">
               <div>
                 <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
@@ -274,7 +274,7 @@ export function BudgetReportPage() {
 
       {report && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card className="glass-panel">
+          <Card style={{ background: "rgba(14, 116, 144, 0.05)", border: "1px solid var(--color-sentinel-border)" }}>
             {/* Section Header */}
             <div className="pb-3 mb-4 border-b" style={{ borderColor: "var(--color-sentinel-border)" }}>
               <div className="flex items-center gap-2">
@@ -310,7 +310,7 @@ export function BudgetReportPage() {
             </Table>
           </Card>
 
-          <Card className="glass-panel">
+          <Card style={{ background: "rgba(14, 116, 144, 0.05)", border: "1px solid var(--color-sentinel-border)" }}>
             {/* Section Header */}
             <div className="pb-3 mb-4 border-b" style={{ borderColor: "var(--color-sentinel-border)" }}>
               <div className="flex items-center gap-2">

@@ -75,10 +75,17 @@ export function DigitalTwin() {
   // Load available sites via React Query hook (auto-caching, deduplication)
   const { data: sites = [], isLoading: sitesLoading } = useSitesList();
 
-  // Auto-select first site when sites load
+  // Auto-select site-002 as default
   useEffect(() => {
     if (!selectedBuildingId && sites.length > 0) {
-      setSelectedBuildingId(sites[0].id);
+      // Try to select site-002 first
+      const site002 = sites.find(s => s.code === 'site-002' || s.id === 'site-002');
+      if (site002) {
+        setSelectedBuildingId(site002.id);
+      } else {
+        // Fallback to first site if site-002 not found
+        setSelectedBuildingId(sites[0].id);
+      }
     }
   }, [sites, selectedBuildingId]);
 
@@ -88,6 +95,8 @@ export function DigitalTwin() {
   const [equipmentTypeFilter, setEquipmentTypeFilter] = useState<string | null>(null);
   // View mode toggle: 2D floor plan or 3D visualization (default: 3D)
   const [viewMode, setViewMode] = useState<'2D' | '3D'>('3D');
+  // Equipment detail panel minimize state (default: minimized)
+  const [isEquipmentPanelMinimized, setIsEquipmentPanelMinimized] = useState(true);
 
   // Dynamically generate floors from equipment data
   const dynamicFloors = useMemo(() => {
@@ -391,17 +400,36 @@ export function DigitalTwin() {
 
         {/* Equipment Detail Panel - Right side overlay */}
         {selectedEquipmentData && (
-          <div className="absolute right-0 top-0 bottom-0 w-96 shadow-2xl overflow-y-auto z-50"
-            style={{ 
-              borderLeft: '2px solid var(--color-sentinel-accent)',
-              borderColor: 'var(--color-sentinel-border)',
-              background: 'var(--color-sentinel-bg-secondary)'
-            }}>
-            <EquipmentDetailPanel
-              equipment={selectedEquipmentData}
-              onClose={() => setSelectedEquipment(null)}
-            />
-          </div>
+          <>
+            {/* Minimize/Expand Button */}
+            <button
+              onClick={() => setIsEquipmentPanelMinimized(!isEquipmentPanelMinimized)}
+              className="absolute right-2 top-2 z-50 p-2 rounded-lg transition-colors hover:bg-opacity-80"
+              style={{
+                background: 'var(--color-sentinel-bg-secondary)',
+                border: '1px solid var(--color-sentinel-border)',
+                color: 'var(--color-sentinel-text-primary)'
+              }}
+              title={isEquipmentPanelMinimized ? 'Expand equipment panel' : 'Minimize equipment panel'}
+            >
+              {isEquipmentPanelMinimized ? '📋' : '→'}
+            </button>
+
+            {/* Equipment Detail Panel */}
+            {!isEquipmentPanelMinimized && (
+              <div className="absolute right-0 top-0 bottom-0 w-96 shadow-2xl overflow-y-auto z-50"
+                style={{ 
+                  borderLeft: '2px solid var(--color-sentinel-accent)',
+                  borderColor: 'var(--color-sentinel-border)',
+                  background: 'var(--color-sentinel-bg-secondary)'
+                }}>
+                <EquipmentDetailPanel
+                  equipment={selectedEquipmentData}
+                  onClose={() => setSelectedEquipment(null)}
+                />
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

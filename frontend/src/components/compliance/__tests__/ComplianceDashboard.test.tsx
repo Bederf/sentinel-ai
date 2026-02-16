@@ -4,13 +4,14 @@
  * Tests for compliance dashboard rendering, tab navigation, and data display.
  */
 
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ComplianceDashboard } from '../ComplianceDashboard'
 import * as complianceApi from '@/lib/api/compliance'
 
-jest.mock('@/lib/api/compliance')
+vi.mock('@/lib/api/compliance')
 
 describe('ComplianceDashboard', () => {
   let queryClient: QueryClient
@@ -24,7 +25,7 @@ describe('ComplianceDashboard', () => {
     })
 
     // Mock API responses
-    jest.mocked(complianceApi.useComplianceStatus).mockReturnValue({
+    vi.mocked(complianceApi.useComplianceStatus).mockReturnValue({
       data: {
         site_id: 'S002',
         critical_issues_count: 0,
@@ -56,7 +57,7 @@ describe('ComplianceDashboard', () => {
       fetchStatus: 'idle',
     } as any)
 
-    jest.mocked(complianceApi.useComplianceAudits).mockReturnValue({
+    vi.mocked(complianceApi.useComplianceAudits).mockReturnValue({
       data: {
         audits: [
           {
@@ -175,7 +176,7 @@ describe('ComplianceDashboard', () => {
   })
 
   it('shows loading state initially', () => {
-    jest.mocked(complianceApi.useComplianceStatus).mockReturnValue({
+    vi.mocked(complianceApi.useComplianceStatus).mockReturnValue({
       data: undefined,
       isLoading: true,
       error: null,
@@ -211,7 +212,7 @@ describe('FireEquipmentPanel', () => {
       },
     })
 
-    jest.mocked(complianceApi.useFireEquipment).mockReturnValue({
+    vi.mocked(complianceApi.useFireEquipment).mockReturnValue({
       data: [
         {
           id: 'equip-001',
@@ -261,7 +262,7 @@ describe('FireEquipmentPanel', () => {
       },
     })
 
-    jest.mocked(complianceApi.useFireEquipment).mockReturnValue({
+    vi.mocked(complianceApi.useFireEquipment).mockReturnValue({
       data: [
         {
           id: 'equip-002',
@@ -309,8 +310,8 @@ describe('FireEquipmentPanel', () => {
       },
     })
 
-    const scheduleMock = jest.fn()
-    jest.mocked(complianceApi.useScheduleFireInspection).mockReturnValue({
+    const scheduleMock = vi.fn()
+    vi.mocked(complianceApi.useScheduleFireInspection).mockReturnValue({
       mutate: scheduleMock,
       isPending: false,
       error: null,
@@ -320,14 +321,14 @@ describe('FireEquipmentPanel', () => {
       status: 'idle',
       failureCount: 0,
       failureReason: null,
-      reset: jest.fn(),
+      reset: vi.fn(),
       context: undefined,
       data: undefined,
       variables: undefined,
-      mutateAsync: jest.fn(),
+      mutateAsync: vi.fn(),
     } as any)
 
-    jest.mocked(complianceApi.useFireEquipment).mockReturnValue({
+    vi.mocked(complianceApi.useFireEquipment).mockReturnValue({
       data: [
         {
           id: 'equip-001',
@@ -379,7 +380,7 @@ describe('EmergencyLightPanel', () => {
       },
     })
 
-    jest.mocked(complianceApi.useEmergencyLightStatus).mockReturnValue({
+    vi.mocked(complianceApi.useEmergencyLightStatus).mockReturnValue({
       data: {
         site_id: 'S002',
         critical_issues_count: 0,

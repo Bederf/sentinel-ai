@@ -36,6 +36,12 @@ import { WaterCostAnalysis } from "./WaterCostAnalysis";
 import { WaterAnomalyChart } from "./WaterAnomalyChart";
 import { WaterAlertPanel } from "./WaterAlertPanel";
 
+interface Building {
+  code: string;
+  name: string;
+  region?: string;
+}
+
 interface WaterPanelProps {
   siteId?: string;
 }
@@ -43,10 +49,34 @@ interface WaterPanelProps {
 export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
   const [selectedSiteId, setSelectedSiteId] = useState<string>(propSiteId || "site-002");
   const [activeTabIndex, setActiveTabIndex] = useState<number>(0);
+  const [buildings, setBuildings] = useState<Building[]>([]);
   const [currentFlow, setCurrentFlow] = useState<CurrentFlowResponse | null>(null);
   const [consumptionData, setConsumptionData] = useState<WaterConsumption[]>([]);
   const [alerts, setAlerts] = useState<WaterAlert[]>([]);
   const [trending, setTrending] = useState<WaterTrending | null>(null);
+
+  // Fetch buildings with water module (on mount)
+  useEffect(() => {
+    const fetchBuildings = async () => {
+      try {
+        const response = await fetch("/api/water/buildings");
+        const data = await response.json();
+        setBuildings(data.buildings || []);
+      } catch (err) {
+        console.error("Failed to fetch water buildings:", err);
+        // Fallback: only show site-002
+        setBuildings([
+          {
+            code: "site-002",
+            name: "Sandton City Office Tower",
+            region: "Johannesburg",
+          },
+        ]);
+      }
+    };
+
+    fetchBuildings();
+  }, []);
 
   // Fetch current flow rate (poll every 30 seconds)
   useEffect(() => {
@@ -260,9 +290,15 @@ export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
                 minWidth: "200px",
               }}
             >
-              <option value="site-002">Sandton City Office Tower</option>
-              <option value="site-003">Rosebank Mini Mall</option>
-              <option value="site-005">Cape Town Harbour</option>
+              {buildings.length > 0 ? (
+                buildings.map((building) => (
+                  <option key={building.code} value={building.code}>
+                    {building.name}
+                  </option>
+                ))
+              ) : (
+                <option value="site-002">Sandton City Office Tower</option>
+              )}
             </select>
           </div>
         </div>

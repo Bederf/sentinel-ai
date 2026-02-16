@@ -82,7 +82,7 @@ test.describe('AI Chat E2E Tests', () => {
     await chatInput.press('Enter');
 
     // Should show loading/typing indicator
-    await expect(page.locator('text=Thinking').or(page.locator('[class*="Loading"]').or(page.locator('[aria-busy="true"]'))).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('text=Thinking').or(page.locator('[class*="Loading"]')).or(page.locator('[aria-busy="true"]'))).toBeVisible({ timeout: 5000 });
 
     // Should eventually show response
     await expect(page.locator('[class*="Message"]').or(page.locator('[class*="Response"]'))).toBeVisible({ timeout: 20000 });

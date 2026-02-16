@@ -27,7 +27,7 @@ import {
 import api, { type Site } from '@/lib/api';
 import { formatDateTime } from "../lib/timeFormat";
 import { OptimizationStatusBadge, type OptimizationStatus } from "./OptimizationStatusBadge";
-import { OptimizationToggle } from "./OptimizationToggle";
+import { OptimizationToggleGated } from "./OptimizationToggleGated";
 
 interface OptimizationSettingsProps {
   /** Filter sites to show (default: all) */
@@ -451,7 +451,7 @@ export function OptimizationSettings({
                       onClick={(e) => e.stopPropagation()}
                       className="w-32"
                     >
-                      <OptimizationToggle
+                      <OptimizationToggleGated
                         siteId={site.id}
                         enabled={site.optimization_enabled || false}
                         onToggle={(enabled) => handleToggleChange(site.id, enabled)}

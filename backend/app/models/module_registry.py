@@ -17,21 +17,27 @@ from enum import Enum
 
 class ModuleType(str, Enum):
     """Available module types."""
-    # Core toggleable modules (base operations)
-    CONTROL = "control"
+    # Core infrastructure (non-deactivatable)
+    KPI = "kpi"
+    ML = "ml"
+    HVAC = "hvac"
+    ENERGY = "energy"
     ASSETS = "assets"
     SIMBIOT = "simbiot"
     INTEGRATIONS = "integrations"
     NOTIFICATIONS = "notifications"
-    # Building system modules (paid add-ons)
-    HVAC = "hvac"
-    ENERGY = "energy"
-    SECURITY = "security"
-    LIGHTING = "lighting"
+    
+    # Paid add-ons
+    CONTROL = "control"  # Gateway add-on — unlocks all automation
+    MAINTENANCE = "maintenance"  # Work order and asset lifecycle management
+    DIGITAL_TWIN = "digital_twin"  # 3D/2D building visualization
+    
+    # Building system add-ons (require CONTROL for automation)
+    LIGHTING = "lighting"  # DALI lighting + occupancy-driven automation
     FIRE = "fire"
-    ACCESS = "access"
+    ACCESS = "access"  # Access control integration
+    SECURITY = "security"  # Includes access control data
     SOLAR = "solar"
-    ML = "ml"
     SUSTAINABILITY = "sustainability"
     WATER = "water"
     CONTRACTS = "contracts"

@@ -35,7 +35,8 @@ from fastapi import HTTPException, Request, status
 
 from app.config.settings import settings
 from app.database.supabase_client import get_supabase_client
-from app.models.auth import AuthContext, AuthLevel, SentinelRole
+from app.database.repositories.user_entitlements_repository import get_user_entitlements_repository
+from app.models.auth import AuthContext, AuthLevel, SentinelRole, ROLE_HIERARCHY
 
 logger = logging.getLogger(__name__)
 
@@ -495,6 +496,43 @@ def _extract_role_from_token(payload: Dict[str, Any]) -> SentinelRole:
 
 
 # =============================================================================
+# User Entitlements Loading
+# =============================================================================
+
+async def _load_user_entitlements(auth_ctx: AuthContext) -> None:
+    """Load and attach user's module entitlements to their auth context.
+
+    Fetches which modules the user is entitled to (has paid for) based on
+    their email address. If no entitlements found, user gets default set.
+
+    Args:
+        auth_ctx: AuthContext object to populate with entitlements
+    """
+    if not auth_ctx.email:
+        logger.debug(f"No email in auth context, skipping entitlements load")
+        return
+
+    try:
+        repo = get_user_entitlements_repository()
+        entitlements_profile = await repo.get_user_entitlements(auth_ctx.email)
+
+        if entitlements_profile:
+            auth_ctx.entitlements = entitlements_profile.entitlements
+            logger.debug(
+                f"Loaded entitlements for {auth_ctx.email}: {auth_ctx.entitlements}"
+            )
+        else:
+            logger.debug(f"No entitlements found for {auth_ctx.email}, using empty set")
+            auth_ctx.entitlements = []
+    except Exception as e:
+        logger.warning(
+            f"Failed to load entitlements for {auth_ctx.email}: {e} - "
+            f"user will see no modules"
+        )
+        auth_ctx.entitlements = []
+
+
+# =============================================================================
 # Authentication Dependencies (for FastAPI Depends())
 # =============================================================================
 
@@ -527,9 +565,13 @@ async def _authenticate_request(request: Request) -> Optional[AuthContext]:
                 scopes=payload.get("scopes", []),
                 metadata={"token_iss": payload.get("iss", "")},
             )
+
+            # Load user entitlements (modules they have access to)
+            await _load_user_entitlements(auth_ctx)
+
             logger.debug(
                 f"Auth success: user={auth_ctx.user_id} role={auth_ctx.role.value} "
-                f"method=bearer_token ip={source_ip}"
+                f"method=bearer_token ip={source_ip} entitlements={auth_ctx.entitlements}"
             )
             return auth_ctx
         else:
@@ -554,9 +596,15 @@ async def _authenticate_request(request: Request) -> Optional[AuthContext]:
                 api_key_id=key_info.get("key_hash", "")[:12],
                 metadata={"description": key_info.get("description", "")},
             )
+
+            # Load user entitlements for API key auth (if applicable)
+            if "email" in key_info:
+                auth_ctx.email = key_info["email"]
+                await _load_user_entitlements(auth_ctx)
+
             logger.debug(
                 f"Auth success: user={auth_ctx.user_id} role={auth_ctx.role.value} "
-                f"method=api_key ip={source_ip}"
+                f"method=api_key ip={source_ip} entitlements={auth_ctx.entitlements}"
             )
             return auth_ctx
         else:
@@ -626,14 +674,14 @@ def require_auth(level: AuthLevel = AuthLevel.AUTHENTICATED):
                 request.state.auth = auth_ctx
                 return auth_ctx
 
-            # Create demo context
+            # Create demo context (OPERATOR role avoids 30/min admin rate limit)
             demo_ctx = AuthContext(
                 user_id="demo-user",
-                role=SentinelRole.ADMIN,  # Demo gets full access
+                role=SentinelRole.OPERATOR,  # Demo gets operator access (avoids admin rate limit)
                 auth_method="demo_mode",
                 source_ip=source_ip,
                 email="demo@sentinel.local",
-                scopes=["admin:all"],
+                scopes=["operator:all"],
                 metadata={"demo_mode": True},
             )
             request.state.auth = demo_ctx
@@ -746,13 +794,16 @@ def require_role(*roles: SentinelRole):
                 request.state.auth = auth_ctx
                 return auth_ctx
 
+            # Create demo context - request the highest required role (avoids 30/min admin limit if possible)
+            # If ADMIN is required, use ADMIN, otherwise use highest required role
+            demo_role = max(roles, key=lambda r: ROLE_HIERARCHY.get(r, 0))
             demo_ctx = AuthContext(
                 user_id="demo-user",
-                role=SentinelRole.ADMIN,
+                role=demo_role,
                 auth_method="demo_mode",
                 source_ip=source_ip,
                 email="demo@sentinel.local",
-                scopes=["admin:all"],
+                scopes=[f"{demo_role.value}:all"],
                 metadata={"demo_mode": True},
             )
             request.state.auth = demo_ctx
@@ -805,3 +856,71 @@ def get_current_auth(request: Request) -> Optional[AuthContext]:
 
 # Convenience dependency for OPERATOR-level auth requirement
 require_operator = require_auth(AuthLevel.OPERATOR)
+
+
+# =============================================================================
+# Module Access Control (Module Gating)
+# =============================================================================
+
+def require_module(*required_modules: 'ModuleType'):
+    """FastAPI dependency that requires specific modules to be active.
+
+    Validates that the requested module(s) are active for the site before allowing access.
+    Used to gate control features (CONTROL module), work orders (MAINTENANCE module), etc.
+
+    Usage:
+        from app.middleware.auth_middleware import require_module
+        from app.models.module_registry import ModuleType
+
+        @router.post(\"/api/hvac/zones/{id}/control\")
+        async def control_hvac(
+            zone_id: str,
+            auth: AuthContext = Depends(require_module(ModuleType.CONTROL)),
+            request: Request
+        ):
+            # CONTROL module is guaranteed to be active here
+            ...
+
+    Args:
+        *required_modules: One or more ModuleType values that must be active
+
+    Returns:
+        FastAPI dependency function
+    
+    Raises:
+        HTTPException 403 if modules not active
+    """
+    # Import here to avoid circular imports
+    from app.models.module_registry import ModuleType
+    from app.services.module_registry_service import module_registry
+
+    async def _dependency(request: Request) -> AuthContext:
+        # Get auth context (module gating still requires authentication)
+        auth_ctx = await _authenticate_request(request)
+        if auth_ctx is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        # Get site_id from request headers or context
+        site_id = request.headers.get("X-Site-Id", "site-002")  # Default to site-002
+
+        # Check if all required modules are active
+        for module in required_modules:
+            if not module_registry.is_module_active(site_id, module):
+                logger.warning(
+                    f"Module access denied: module {module.value} not active for site {site_id}, "
+                    f"user {auth_ctx.user_id}, path {request.url.path}"
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"The {module.value.upper()} module is not active for this site. "
+                           f"Contact your administrator to enable this feature."
+                )
+
+        request.state.auth = auth_ctx
+        return auth_ctx
+
+    return _dependency

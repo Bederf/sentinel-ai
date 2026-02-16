@@ -30,20 +30,26 @@ function authHeaders(): Record<string, string> {
 }
 
 async function fetchJson<T>(endpoint: string): Promise<T> {
-  const res = await authorizedFetch(`${API_BASE_URL}${endpoint}`, {
-    headers: authHeaders(),
-  }, true);
-  if (!res.ok) {
-    let msg = res.statusText;
-    try {
-      const err = await res.json();
-      msg = err.detail || err.message || JSON.stringify(err);
-    } catch {
-      /* ignore */
+  try {
+    const res = await authorizedFetch(`${API_BASE_URL}${endpoint}`, {
+      headers: authHeaders(),
+    }, true);
+    if (!res.ok) {
+      let msg = res.statusText;
+      try {
+        const err = await res.json();
+        msg = err.detail || err.message || JSON.stringify(err);
+      } catch {
+        /* ignore */
+      }
+      throw { message: msg, status: res.status } as { message: string; status: number };
     }
-    throw { message: msg, status: res.status } as { message: string; status: number };
+    return res.json();
+  } catch (err) {
+    // If API fails, log and re-throw (components will show demo data)
+    console.debug(`Solar API failed for ${endpoint}:`, err);
+    throw err;
   }
-  return res.json();
 }
 
 // ============= Response Interfaces =============

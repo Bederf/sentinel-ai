@@ -107,14 +107,12 @@ export const VIEW_TITLES: Record<View, string> = {
  * Base navigation items - always visible, cannot be disabled.
  * FREE BASIC PACKAGE PAGES:
  * - Dashboard: view equipment and AI recommendations
- * - HVAC: monitor building systems (no control)
- * - ML: feedback loop for recommendation improvement
+ * - System Health: real-time building monitoring
  * 
- * Additional pages (AI Chat, Digital Twin, System Health, Settings) are add-ons or admin-only.
+ * Additional pages (Tech Chat, Digital Twin, Settings) are add-ons or admin-only.
  */
 export const BASE_NAV_ITEMS: NavItem[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, description: "Equipment overview & AI recommendations", category: "base" },
-  { id: "digital-twin", label: "Digital Twin", icon: Box, description: "3D/2D Building Visualization", category: "base" },
   { id: "integrations", label: "System Health", icon: Activity, description: "Real-time Health Monitoring", category: "base" },
 ];
 
@@ -131,6 +129,7 @@ export const ADDON_NAV_ITEMS: NavItem[] = [
   { id: "workflow", label: "Asset Workflow", icon: GitBranch, description: "Lifecycle Management", category: "addon", requiredModule: "assets", defaultOrder: 2 },
   { id: "simbiot", label: "SIMBIOT", icon: Plug, description: "BMS Connection Wizard", category: "addon", requiredModule: "simbiot", defaultOrder: 3 },
   // Visualization and analytics
+  { id: "digital-twin", label: "Digital Twin", icon: Box, description: "3D/2D Building Visualization", category: "addon", defaultOrder: 4 },
   // Building system modules
   { id: "technician", label: "Tech Chat", icon: Wrench, description: "Fault Diagnosis", category: "addon", requiredModule: "hvac", defaultOrder: 10 },
   { id: "optimization", label: "Load Shedding Optimization", icon: Zap, description: "Load Shedding AI", category: "addon", requiredModule: "energy", defaultOrder: 11 },

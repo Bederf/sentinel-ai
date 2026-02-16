@@ -3,26 +3,66 @@
  *
  * Manages view/module visibility based on user email domain and company.
  * Used to provide restricted demo experiences for specific clients.
+ *
+ * Two layers of access control:
+ * 1. COMPANY_DEMO_CONFIGS: Domain-based restrictions (e.g., wardew.co.za)
+ * 2. USER_DEMO_CONFIGS: Exact email-based restrictions (e.g., bederf@protonmail.com)
+ *
+ * Priority: USER_DEMO_CONFIGS > COMPANY_DEMO_CONFIGS > unrestricted
  */
 
 import type { View } from './navigation';
 
 /**
+ * Per-user demo configurations.
+ * Takes priority over company/domain-based configs.
+ * Use this for generic email domains (gmail, protonmail, etc.) where
+ * domain-based matching would be too broad.
+ */
+export const USER_DEMO_CONFIGS: Record<string, CompanyDemoConfig> = {
+  'bederf@protonmail.com': {
+    companyName: 'Bederf Solar Demo',
+    demoFocus: 'solar-bess',
+    allowedViews: [
+      'dashboard',           // Base: always visible
+      'digital-twin',        // Base: always visible
+      'integrations',        // Base: System Health
+      'solar',               // Add-on: Solar & BESS (their module)
+      'control',             // Add-on: Building Controls (needed for solar control)
+      'technician',          // Add-on: Tech Chat (base hvac module)
+      'fleet',               // Add-on: Fleet ML (base ml module)
+      'settings',            // Internal: password-protected module management
+    ],
+    defaultView: 'dashboard',
+    viewMode: 'operator',
+    description: 'Solar & BESS Demo for Bederf',
+  },
+};
+
+/**
  * Company demo configurations.
  * Restricts views available to users from specific companies.
+ * Does NOT apply if the user has a USER_DEMO_CONFIG entry.
  */
 export const COMPANY_DEMO_CONFIGS: Record<string, CompanyDemoConfig> = {
   'wardew.co.za': {
     companyName: 'Wardew',
     demoFocus: 'dali-lighting',
-    allowedViews: ['dashboard', 'occupancy'],  // Settings removed - admin only
+    allowedViews: [
+      'dashboard',           // Base: always visible
+      'digital-twin',        // Base: always visible
+      'integrations',        // Base: System Health
+      'occupancy',           // Add-on: Occupancy monitoring (lighting module)
+      'lighting',            // Add-on: Lighting control (lighting module)
+      'control',             // Add-on: Building Controls (needed for lighting control)
+      'technician',          // Add-on: Tech Chat (base hvac module)
+      'fleet',               // Add-on: Fleet ML (base ml module)
+      'settings',            // Internal: password-protected module management
+    ],
     defaultView: 'occupancy',
-    viewMode: 'auditor', // read-only, no control access
-    description: 'DALI Lighting Occupancy Control Demo',
+    viewMode: 'operator',   // Changed from 'auditor' — Grant needs to demo controls
+    description: 'DALI Lighting & Occupancy Control Demo',
   },
-  // NOTE: protonmail.com users (like bederf@protonmail.com) have no custom config
-  // They get FREE BASIC PACKAGE: Dashboard + HVAC monitoring + ML feedback
-  // and will default to 'dashboard' landing page (see getDefaultView function below)
 };
 
 export interface CompanyDemoConfig {
@@ -35,11 +75,19 @@ export interface CompanyDemoConfig {
 }
 
 /**
- * Get company demo config from user email.
- * Returns config if user's email domain has a demo configuration, null otherwise.
+ * Get demo config for a user — checks exact email first, then domain.
+ * Returns config if user has a demo configuration, null otherwise.
  */
 export function getCompanyDemoConfig(email: string): CompanyDemoConfig | null {
-  const domain = email.toLowerCase().split('@')[1];
+  const normalised = email.toLowerCase().trim();
+
+  // 1. Check exact email match first (takes priority)
+  if (USER_DEMO_CONFIGS[normalised]) {
+    return USER_DEMO_CONFIGS[normalised];
+  }
+
+  // 2. Fall back to domain-based match
+  const domain = normalised.split('@')[1];
   if (!domain) return null;
 
   return COMPANY_DEMO_CONFIGS[domain] || null;
@@ -60,16 +108,7 @@ export function getAllowedViews(email: string, allViews: View[]): View[] {
   const config = getCompanyDemoConfig(email);
   if (!config) return allViews;
 
-  // Special case: Demo users can always see Settings for password-protected module management
-  const demoUserEmails = ['grant@wardew.co.za', 'bederf@protonmail.com'];
-  if (demoUserEmails.includes(email.toLowerCase())) {
-    // Add Settings to allowed views for demo users
-    const allowedWithSettings = new Set(config.allowedViews);
-    allowedWithSettings.add('settings');
-    return allViews.filter(view => allowedWithSettings.has(view));
-  }
-
-  // Filter to only allowed views
+  // Filter to only allowed views from the config
   return allViews.filter(view => config.allowedViews.includes(view));
 }
 
@@ -85,13 +124,14 @@ export function getUserViewMode(email: string): 'auditor' | 'operator' | 'admin'
 /**
  * Get the default view to show when user logs in.
  * DEFAULT LANDING PAGE: 'dashboard' (not AI Chat)
- * 
+ *
  * Wardew (wardew.co.za) users override this and default to 'occupancy'.
+ * Bederf protonmail users default to 'dashboard'.
  * All other users default to 'dashboard'.
  */
 export function getDefaultView(email: string): View {
   const config = getCompanyDemoConfig(email);
-  return config?.defaultView || 'dashboard'; // ← Dashboard is the default landing page
+  return config?.defaultView || 'dashboard';
 }
 
 /**

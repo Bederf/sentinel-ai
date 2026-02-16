@@ -14,6 +14,7 @@ import { Card, Title, Text, Badge, Flex, Grid } from "@tremor/react";
 import { Thermometer, Power, PowerOff, Activity, AlertTriangle, Clock, Droplets } from "lucide-react";
 import { hvacApi, type Chiller } from "../../lib/hvacApi";
 import { useHealthThresholds } from "../../hooks/useHealthThresholds";
+import { LockedFeatureOverlay } from "../LockedFeatureOverlay";
 
 interface ChillerControlPanelProps {
   siteId?: string;
@@ -202,71 +203,82 @@ export function ChillerControlPanel({ siteId, compact = false, onChillerChange }
                 </Badge>
               </Flex>
 
-              {/* Status and Control */}
-              <div
-                className="p-4 rounded-lg mb-4"
-                style={{ background: "var(--color-sentinel-bg-secondary)" }}
+              {/* Status and Control - Gated by Controls Module */}
+              <LockedFeatureOverlay
+                module="control"
+                featureName={`${chiller.name} Toggle`}
+                customMessage={`Enable Controls module to let SENTINEL automatically manage chiller operations and reduce cycling losses by 10-15%.`}
               >
-                <Flex justifyContent="between" alignItems="center">
-                  <Flex alignItems="center" className="gap-3">
-                    {chiller.is_running ? (
-                      <Power
-                        className="w-6 h-6"
-                        style={{ color: "var(--color-sentinel-green)" }}
-                      />
-                    ) : (
-                      <PowerOff
-                        className="w-6 h-6"
-                        style={{ color: "var(--color-sentinel-red)" }}
-                      />
-                    )}
-                    <div>
-                      <Text className="font-medium">
-                        {chiller.is_running ? "RUNNING" : "STOPPED"}
-                      </Text>
-                      <Text className="text-xs text-gray-400">
-                        {chiller.manufacturer} {chiller.model}
-                      </Text>
-                    </div>
-                  </Flex>
-
-                  {/* Toggle Button */}
-                  <button
-                    onClick={() => handleToggle(chiller.id, chiller.is_running)}
-                    disabled={isControlling}
-                    className={`relative w-14 h-7 rounded-full transition-all duration-300 ${
-                      isControlling ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
-                    }`}
-                    style={{
-                      background: chiller.is_running
-                        ? "var(--color-sentinel-green)"
-                        : "var(--color-sentinel-red)",
-                    }}
-                  >
-                    {/* Toggle knob */}
-                    <div
-                      className={`absolute top-1 w-5 h-5 rounded-full bg-white transition-all duration-300 ${
-                        chiller.is_running ? "left-8" : "left-1"
-                      }`}
-                      style={{
-                        boxShadow: "0 1px 3px rgba(0, 0, 0, 0.3)",
-                      }}
-                    />
-                    {isControlling && (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <Activity className="w-4 h-4 text-white animate-spin" />
-                      </div>
-                    )}
-                  </button>
-                </Flex>
-              </div>
-
-              {/* CHW Setpoint Control */}
-              {!compact && (
                 <div
                   className="p-4 rounded-lg mb-4"
                   style={{ background: "var(--color-sentinel-bg-secondary)" }}
                 >
+                  <Flex justifyContent="between" alignItems="center">
+                    <Flex alignItems="center" className="gap-3">
+                      {chiller.is_running ? (
+                        <Power
+                          className="w-6 h-6"
+                          style={{ color: "var(--color-sentinel-green)" }}
+                        />
+                      ) : (
+                        <PowerOff
+                          className="w-6 h-6"
+                          style={{ color: "var(--color-sentinel-red)" }}
+                        />
+                      )}
+                      <div>
+                        <Text className="font-medium">
+                          {chiller.is_running ? "RUNNING" : "STOPPED"}
+                        </Text>
+                        <Text className="text-xs text-gray-400">
+                          {chiller.manufacturer} {chiller.model}
+                        </Text>
+                      </div>
+                    </Flex>
+
+                    {/* Toggle Button */}
+                    <button
+                      onClick={() => handleToggle(chiller.id, chiller.is_running)}
+                      disabled={isControlling}
+                      className={`relative w-14 h-7 rounded-full transition-all duration-300 ${
+                        isControlling ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+                      }`}
+                      style={{
+                        background: chiller.is_running
+                          ? "var(--color-sentinel-green)"
+                          : "var(--color-sentinel-red)",
+                      }}
+                    >
+                      {/* Toggle knob */}
+                      <div
+                        className={`absolute top-1 w-5 h-5 rounded-full bg-white transition-all duration-300 ${
+                          chiller.is_running ? "left-8" : "left-1"
+                        }`}
+                        style={{
+                          boxShadow: "0 1px 3px rgba(0, 0, 0, 0.3)",
+                        }}
+                      />
+                      {isControlling && (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <Activity className="w-4 h-4 text-white animate-spin" />
+                        </div>
+                      )}
+                    </button>
+                  </Flex>
+                </div>
+              </LockedFeatureOverlay>
+
+              {/* CHW Setpoint Control - Also Gated by Controls Module */}
+              {!compact && (
+                <LockedFeatureOverlay
+                  module="control"
+                  featureName={`${chiller.name} Setpoint`}
+                  customMessage={`Enable Controls module to optimize CHW supply temperature and achieve 3-5% energy savings on chiller operation.`}
+                >
+                  <div
+                    className="p-4 rounded-lg mb-4"
+                    style={{ background: "var(--color-sentinel-bg-secondary)" }}
+                  >
                   <Flex alignItems="center" className="gap-2 mb-3">
                     <Droplets className="w-4 h-4" style={{ color: "var(--color-sentinel-cyan)" }} />
                     <Text className="font-medium text-sm">CHW Supply Setpoint</Text>
@@ -356,7 +368,8 @@ export function ChillerControlPanel({ siteId, compact = false, onChillerChange }
                       </Text>
                     </div>
                   </Flex>
-                </div>
+                  </div>
+                </LockedFeatureOverlay>
               )}
 
               {/* Equipment Info */}

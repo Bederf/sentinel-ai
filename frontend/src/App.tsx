@@ -384,7 +384,13 @@ function App() {
         currentView={currentView}
         onViewChange={handleViewChange}
         version={health?.version || "13.0"}
-        onCustomizeDashboard={() => setShowCardLibrary(true)}
+        onCustomizeDashboard={() => {
+          setShowCardLibrary(true);
+          // Navigate to dashboard if not already there (CardLibrary only works on dashboard)
+          if (currentView !== "dashboard") {
+            setCurrentView("dashboard");
+          }
+        }}
         userRole={currentUser?.role}
         userEmail={currentUser?.email}
       />

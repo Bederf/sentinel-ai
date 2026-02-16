@@ -169,6 +169,7 @@ export function ModuleSelector({ onModuleActivated, onModuleDeactivated }: Modul
 
 // Map module types to icons
 const MODULE_ICONS: Record<ModuleType, React.ComponentType<any>> = {
+  kpi: Package,
   hvac: Wind,
   energy: Zap,
   security: Lock,
@@ -176,7 +177,6 @@ const MODULE_ICONS: Record<ModuleType, React.ComponentType<any>> = {
   solar: Sun,
   water: Droplets,
   fire: Flame,
-  access: KeyRound,
   ml: Brain,
   sustainability: Leaf,
   contracts: FileText,
@@ -185,6 +185,8 @@ const MODULE_ICONS: Record<ModuleType, React.ComponentType<any>> = {
   simbiot: Plug,
   integrations: Link2,
   notifications: Bell,
+  digital_twin: Package,
+  maintenance: Package,
 };
 
 interface ModuleCardProps {

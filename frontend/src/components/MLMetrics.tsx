@@ -312,7 +312,9 @@ export function MLMetrics() {
         }
         setSites(fetchedSites);
         if (fetchedSites.length > 0 && !selectedSiteId) {
-          setSelectedSiteId(fetchedSites[0].id);
+          // Default to site-002 if available, otherwise use first site
+          const site002 = fetchedSites.find(s => s.id === "site-002" || s.code === "site-002");
+          setSelectedSiteId(site002?.id || fetchedSites[0].id);
         }
       })
       .catch((err: any) => {
@@ -335,13 +337,13 @@ export function MLMetrics() {
   const loadData = async () => {
     try {
       setError(null);
-      // Stagger requests to avoid 429 rate limiting
+      // Stagger requests with 600ms delays to avoid 429 rate limiting (100 req/min limit)
       const healthData = await mlopsApi.getHealth();
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, 600));
       const metricsData = await mlopsApi.getMetrics();
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, 600));
       const driftData = await mlopsApi.getAllDrift();
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, 600));
       const alertsData = await mlopsApi.getAlerts({ limit: 10 });
       
       setHealth(healthData);
