@@ -1111,7 +1111,7 @@ class BackgroundSchedulerService:
 
         try:
             # Check if this is a crash recovery (has state_snapshot)
-            response = await supabase.client.table("solar_annual_tasks") \
+            response = supabase.table("solar_annual_tasks") \
                 .select("state_snapshot") \
                 .eq("task_id", task_id) \
                 .execute()
@@ -1166,7 +1166,7 @@ class BackgroundSchedulerService:
                 await orchestrator._task
 
             # Mark as completed
-            await supabase.client.table("solar_annual_tasks") \
+            supabase.table("solar_annual_tasks") \
                 .update({
                     "status": "completed",
                     "progress_pct": 100,
@@ -1182,7 +1182,7 @@ class BackgroundSchedulerService:
 
             # Mark as failed with error message
             try:
-                await supabase.client.table("solar_annual_tasks") \
+                supabase.table("solar_annual_tasks") \
                     .update({
                         "status": "failed",
                         "error_message": str(e)[:500],  # Truncate long errors
