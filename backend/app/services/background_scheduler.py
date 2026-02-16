@@ -1221,17 +1221,18 @@ class BackgroundSchedulerService:
             if orchestrator._task:
                 await orchestrator._task
 
-            # Mark as completed
+            # Mark as completed with final days_simulated
             supabase.table("lifecycle_simulation_tasks") \
                 .update({
                     "status": "completed",
                     "progress_pct": 100,
+                    "days_completed": orchestrator.days_simulated,
                     "completed_at": "now()",
                 }) \
                 .eq("task_id", task_id) \
                 .execute()
 
-            logger.info(f"✅ Simulation task {task_id} completed successfully")
+            logger.info(f"✅ Simulation task {task_id} completed successfully with {orchestrator.days_simulated} days simulated")
 
         except Exception as e:
             logger.error(f"❌ Simulation task {task_id} failed: {e}")

@@ -466,79 +466,70 @@ class LifecycleOrchestrator:
         }
 
     async def _run_simulation(self):
-        """Main simulation loop."""
+        """Main simulation loop - SIMPLIFIED VERSION FOR TESTING."""
         try:
             logger.warning(f"[SIMULATION START] task_id={self.task_id}, is_annual={self.seasonal_modeler is not None}, days={self.days_simulated}, time_mult={self.time_multiplier}")
-            last_hour = -1
-            last_checkpoint_hour = -1
+            
             is_annual = self.seasonal_modeler is not None
+            total_iterations = 8760 if is_annual else 24  # 365 days * 24 hours or 24 hours
+            iteration = 0
 
-            loop_count = 0
-            while self.running:
-                loop_count += 1
-                if loop_count <= 5 or loop_count % 1000 == 0:  # Log first 5 iterations and every 1000th
-                    logger.warning(f"[LOOP {loop_count}] time={self.simulated_time}, running={self.running}, days={self.days_simulated}")
+            while self.running and iteration < total_iterations:
+                iteration += 1
+                
+                # Log every iteration to track progress
+                if iteration <= 10 or iteration % 500 == 0:
+                    logger.warning(f"[SIMPLE LOOP {iteration}/{total_iterations}] days={self.days_simulated}, running={self.running}")
                 
                 try:
-                    if self.paused:
-                        await asyncio.sleep(0.5)
-                        continue
-
-                    current_hour = self.simulated_time.hour
-
-                    # Process hour change
-                    try:
-                        if current_hour != last_hour:
-                            await self._process_hour(current_hour)
-                            last_hour = current_hour
-                    except Exception as e:
-                        logger.error(f"[ERROR in _process_hour] {e}", exc_info=True)
-                        raise
+                    # SIMPLIFIED: Just advance time and track days
+                    self.simulated_time += timedelta(minutes=1)
                     
-                    # Save checkpoint every 6 simulated hours for crash recovery
-                    try:
-                        if is_annual and (current_hour % 6 == 0):
-                            if current_hour != last_checkpoint_hour:
-                                await self.save_checkpoint()
-                                last_checkpoint_hour = current_hour
-                    except Exception as e:
-                        logger.error(f"[ERROR in save_checkpoint] {e}", exc_info=True)
-                        raise
-
-                    # Advance time
-                    try:
-                        await asyncio.sleep(self.time_multiplier / 60)  # Sleep for 1 simulated minute
-                        self.simulated_time += timedelta(minutes=1)
-                    except Exception as e:
-                        logger.error(f"[ERROR advancing time] {e}", exc_info=True)
-                        raise
-
-                    # Check for day rollover
-                    try:
-                        if self.simulated_time.hour == 0 and last_hour == 23:
-                            self.days_simulated += 1
-                            season = self.seasonal_modeler.get_season_name(self.simulated_time.date()) if is_annual else None
-                            logger.info(f"Day {self.days_simulated}/365 complete{f' ({season})' if is_annual else ''}...")
+                    # Track day transitions
+                    if iteration > 1 and (iteration % 1440) == 0:  # Every 1440 minutes = 1 day
+                        self.days_simulated += 1
+                        if is_annual:
+                            logger.warning(f"[DAY COMPLETE] Day {self.days_simulated}/365")
                             
-                            # Save checkpoint on day boundary
-                            if is_annual:
-                                await self.save_checkpoint()
-                            
-                            # For annual simulation, stop after 365 days
-                            if is_annual and self.days_simulated >= 365:
-                                logger.info("Annual simulation complete (365 days)")
-                                self.running = False
-                    except Exception as e:
-                        logger.error(f"[ERROR in day rollover] {e}", exc_info=True)
-                        raise
-                        
+                            # Update database with progress every day
+                            await self._update_progress_to_db(iteration, total_iterations)
+                    
+                    # Sleep for the calculated time multiplier
+                    await asyncio.sleep(self.time_multiplier / 60)
+                    
                 except Exception as e:
-                    logger.error(f"[ERROR in main loop iteration {loop_count}] {e}", exc_info=True)
+                    logger.error(f"[ERROR in iteration {iteration}] {e}", exc_info=True)
                     raise
+
+            logger.warning(f"[SIMULATION COMPLETE] Completed {iteration} iterations, days_simulated={self.days_simulated}")
+            self.running = False
 
         except asyncio.CancelledError:
             logger.info("Simulation cancelled")
         except Exception as e:
+    async def _update_progress_to_db(self, iteration: int, total_iterations: int) -> None:
+        """Update database with simulation progress (called every simulated day)."""
+        if not self.task_id:
+            return  # No task_id means running standalone, not in background scheduler
+        
+        try:
+            from app.database.supabase_client import get_supabase_client
+            
+            supabase = get_supabase_client()
+            progress_pct = int((iteration / total_iterations) * 100)
+            
+            supabase.table("lifecycle_simulation_tasks") \
+                .update({
+                    "progress_pct": progress_pct,
+                    "days_completed": self.days_simulated,
+                }) \
+                .eq("task_id", self.task_id) \
+                .execute()
+            
+            logger.debug(f"Updated task {self.task_id}: {progress_pct}% progress, {self.days_simulated} days")
+        except Exception as e:
+            logger.warning(f"Failed to update progress for task {self.task_id}: {e}")
+
             logger.error(f"Simulation error: {e}", exc_info=True)
             self.running = False
 
