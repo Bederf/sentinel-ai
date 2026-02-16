@@ -371,10 +371,10 @@ async def login_with_email(request: Request, email: str):
                     "status": "queued",
                     "progress_pct": 0,
                     "days_completed": 0,
-                    "duration_minutes": 240.0,  # 365 days in 4 hours
+                    "duration_minutes": 30.0,  # 365 days in 30 minutes
                 }).execute()
                 
-                logger.info(f"Auto-started Grant demo: task_id={task_id}, scenario=grant_hvac_dali_ai_annual (365 days → 4 hours, starting from ZERO)")
+                logger.info(f"Auto-started Grant demo: task_id={task_id}, scenario=grant_hvac_dali_ai_annual (365 days → 30 minutes, starting from ZERO)")
                 
                 # Add simulation task info to response
                 response["demo_auto_start"] = True
@@ -383,7 +383,7 @@ async def login_with_email(request: Request, email: str):
                 response["demo_scenario"] = "grant_hvac_dali_ai_annual"
                 response["demo_status"] = "queued"
                 response["demo_task_id"] = task_id
-                response["demo_duration_minutes"] = 240.0
+                response["demo_duration_minutes"] = 30.0
                 response["demo_note"] = "Simulation runs in background. Dashboard will update live as simulation progresses through 365 days."
                 
             except Exception as e:
