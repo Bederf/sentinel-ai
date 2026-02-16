@@ -468,11 +468,17 @@ class LifecycleOrchestrator:
     async def _run_simulation(self):
         """Main simulation loop."""
         try:
+            logger.warning(f"[SIMULATION START] task_id={self.task_id}, is_annual={self.seasonal_modeler is not None}, days={self.days_simulated}, time_mult={self.time_multiplier}")
             last_hour = -1
             last_checkpoint_hour = -1
             is_annual = self.seasonal_modeler is not None
 
+            loop_count = 0
             while self.running:
+                loop_count += 1
+                if loop_count <= 5 or loop_count % 1000 == 0:  # Log first 5 iterations and every 1000th
+                    logger.warning(f"[LOOP {loop_count}] time={self.simulated_time}, running={self.running}, days={self.days_simulated}")
+                
                 if self.paused:
                     await asyncio.sleep(0.5)
                     continue
@@ -512,7 +518,7 @@ class LifecycleOrchestrator:
         except asyncio.CancelledError:
             logger.info("Simulation cancelled")
         except Exception as e:
-            logger.error(f"Simulation error: {e}")
+            logger.error(f"Simulation error: {e}", exc_info=True)
             self.running = False
 
     async def _process_hour(self, hour: int):
@@ -1379,6 +1385,7 @@ class LifecycleOrchestrator:
             True if saved successfully, False otherwise
         """
         if not self.task_id:
+            logger.warning(f"Cannot save checkpoint: task_id is None or empty. days_simulated={self.days_simulated}")
             return False  # No task_id means not a queued task
             
         try:

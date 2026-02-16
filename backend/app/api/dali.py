@@ -939,3 +939,218 @@ async def get_dali_stats(site_id: str = Query("site-002", description="Site ID")
     )
 
     return stats.to_dict()
+
+
+# ============================================================================
+# OCCUPANCY ENDPOINTS (Phase 4: Synchronization with Occupancy Simulation)
+# ============================================================================
+
+@router.get("/building/{building_id}/occupancy/detailed")
+async def get_detailed_occupancy(
+    building_id: str,
+    time: Optional[str] = Query(None, description="ISO timestamp for simulation time")
+):
+    """
+    Get per-zone occupancy with display coordinates and persona breakdown.
+    
+    Provides real-time occupancy targets for the frontend occupancy simulation.
+    Integrates with Grant scenario time-based patterns:
+    - Workers: 9-5pm peak occupancy
+    - Security: 24/7 patrols  
+    - Cleaners: After hours (6pm-11pm)
+    - Visitors: 10am-4pm variable
+    
+    Returns per-zone targets that the client-side simulation will use to spawn/despawn people.
+    """
+    from datetime import datetime
+    from app.database.supabase import supabase_client
+    
+    try:
+        # Get simulation time (or current time if not provided)
+        if time:
+            sim_time = datetime.fromisoformat(time)
+        else:
+            sim_time = datetime.now()
+        
+        hour = sim_time.hour
+        day_of_week = sim_time.weekday()
+        is_weekend = day_of_week >= 5
+        
+        # Get zone mappings from database
+        try:
+            zone_mappings = supabase_client.table("zone_display_mappings") \
+                .select("*") \
+                .eq("site_id", building_id) \
+                .execute()
+            zones_data = zone_mappings.data if zone_mappings.data else []
+        except Exception as e:
+            # Fallback: Use empty list if table doesn't exist yet
+            zones_data = []
+        
+        occupancy_data = []
+        total_occupancy = 0
+        
+        for zone in zones_data:
+            zone_type = zone.get("zone_type", "office")
+            max_occ = zone.get("max_occupancy", 10)
+            
+            # Calculate occupancy percentage based on time and zone type
+            occupancy_percent = calculate_zone_occupancy(
+                hour=hour,
+                day_of_week=day_of_week,
+                is_weekend=is_weekend,
+                zone_type=zone_type
+            )
+            
+            current_occupancy = max(0, int(max_occ * occupancy_percent / 100))
+            total_occupancy += current_occupancy
+            
+            # Get persona distribution for this time/zone
+            personas = get_persona_distribution(
+                hour=hour,
+                day_of_week=day_of_week,
+                is_weekend=is_weekend,
+                zone_type=zone_type
+            )
+            
+            occupancy_data.append({
+                "zone_id": zone.get("display_zone_id"),
+                "zone_name": zone.get("display_zone_name"),
+                "floor": zone.get("floor", 0),
+                "coordinates": zone.get("coordinates"),
+                "max_occupancy": max_occ,
+                "current_occupancy": current_occupancy,
+                "occupancy_percent": occupancy_percent,
+                "zone_type": zone_type,
+                "personas": personas,  # {'worker': 0.75, 'security': 0.15, 'cleaner': 0.05, 'visitor': 0.05}
+            })
+        
+        return {
+            "building_id": building_id,
+            "timestamp": sim_time.isoformat(),
+            "day_type": "weekend" if is_weekend else "weekday",
+            "zones": occupancy_data,
+            "total_occupancy": total_occupancy,
+            "occupancy_trend": "peak" if 9 <= hour < 17 else "offpeak",
+        }
+    
+    except Exception as e:
+        # Return empty response on error
+        return {
+            "building_id": building_id,
+            "timestamp": datetime.now().isoformat(),
+            "zones": [],
+            "total_occupancy": 0,
+            "error": str(e),
+        }
+
+
+def calculate_zone_occupancy(
+    hour: int,
+    day_of_week: int,
+    is_weekend: bool,
+    zone_type: str
+) -> float:
+    """
+    Calculate occupancy percentage for a zone at a given time.
+    
+    Based on Grant HVAC/DALI scenario patterns.
+    Returns: 0-100 occupancy percentage
+    """
+    if is_weekend:
+        # Weekend: Only security and minimal occupancy
+        return 5.0 if zone_type != "utility" else 2.0
+    
+    # Weekday patterns by zone type
+    if zone_type == "entry":  # Reception
+        if 7 <= hour < 9:
+            return 60.0 + (hour - 7) * 15  # 60% → 90% arrival rush
+        elif 9 <= hour < 17:
+            return 30.0  # Steady trickle during day
+        elif 17 <= hour < 19:
+            return 50.0 + (hour - 17) * 15  # Departure rush
+        else:
+            return 5.0
+    
+    elif zone_type == "office":  # Workspaces
+        if 7 <= hour < 9:
+            return 30.0 + (hour - 7) * 27.5  # 30% → 85% arrivals
+        elif 9 <= hour < 12:
+            return 85.0 + random.uniform(-5, 5)  # Peak morning
+        elif 12 <= hour < 14:
+            return 65.0 + random.uniform(-10, 10)  # Lunch dip
+        elif 14 <= hour < 17:
+            return 75.0 + random.uniform(-5, 10)  # Afternoon
+        elif 17 <= hour < 19:
+            return max(5.0, 75.0 - (hour - 17) * 25)  # Departures
+        else:
+            return 5.0
+    
+    elif zone_type == "meeting":  # Meeting rooms
+        if 9 <= hour < 17:
+            return 50.0 + random.uniform(-20, 30)  # Highly variable
+        else:
+            return 0.0
+    
+    elif zone_type == "common":  # Common areas, kitchen
+        if 12 <= hour < 14:
+            return 80.0  # Lunch peak
+        elif 9 <= hour < 17:
+            return 30.0  # Throughout day
+        else:
+            return 5.0
+    
+    elif zone_type == "utility":  # Utility rooms
+        return 10.0 if 9 <= hour < 17 else 2.0
+    
+    else:
+        # Default
+        return 20.0 if 9 <= hour < 17 else 5.0
+
+
+def get_persona_distribution(
+    hour: int,
+    day_of_week: int,
+    is_weekend: bool,
+    zone_type: str
+) -> dict:
+    """
+    Get persona type distribution for a zone at a given time.
+    
+    Returns: {'worker': 0.75, 'security': 0.15, 'cleaner': 0.05, 'visitor': 0.05}
+    """
+    personas = {"worker": 0.0, "security": 0.0, "cleaner": 0.0, "visitor": 0.0}
+    
+    if is_weekend:
+        personas["security"] = 0.7
+        personas["cleaner"] = 0.3
+        return personas
+    
+    # Weekday distributions
+    # Workers (9am-5pm peak)
+    if 9 <= hour < 17:
+        personas["worker"] = 0.75
+    elif 7 <= hour < 9 or 17 <= hour < 19:
+        personas["worker"] = 0.6  # Arrival/departure
+    else:
+        personas["worker"] = 0.0
+    
+    # Security (24/7, more at night)
+    personas["security"] = 0.1 if 9 <= hour < 18 else 0.3
+    
+    # Cleaners (6pm-11pm)
+    if 18 <= hour < 23:
+        personas["cleaner"] = 0.4
+        personas["worker"] = max(0.0, personas["worker"] - 0.3)  # Overlap
+    
+    # Visitors (10am-4pm in meetings/common areas)
+    if 10 <= hour < 16 and zone_type in ["meeting", "common", "entry"]:
+        personas["visitor"] = 0.15
+        personas["worker"] = max(0.0, personas["worker"] - 0.1)
+    
+    # Normalize to sum to 1.0
+    total = sum(personas.values())
+    if total > 0:
+        personas = {k: v / total for k, v in personas.items()}
+    
+    return personas
