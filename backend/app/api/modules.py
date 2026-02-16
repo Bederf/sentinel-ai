@@ -175,7 +175,7 @@ async def get_active_modules(site_id: str, request: Request):
 @router.post("/activate", response_model=ModuleResponse)
 async def activate_module(
     request: ActivateModuleRequest,
-    auth: AuthContext = Depends(require_auth(AuthLevel.ADMIN)),
+    auth: AuthContext = Depends(require_auth(AuthLevel.OPERATOR)),  # Allow operators to toggle modules
 ):
     """Activate a module for a site."""
     try:
@@ -205,7 +205,7 @@ async def activate_module(
 async def deactivate_module(
     site_id: str,
     module_type: str,
-    auth: AuthContext = Depends(require_auth(AuthLevel.ADMIN)),
+    auth: AuthContext = Depends(require_auth(AuthLevel.OPERATOR)),  # Allow operators to toggle modules
 ):
     """Deactivate a module for a site."""
     try:
