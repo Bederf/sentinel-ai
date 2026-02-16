@@ -60,6 +60,7 @@ class SimulationStatusResponse(BaseModel):
     active_faults: int
     pending_repairs: int
     recent_events: List[dict]
+    progress_pct: int = 0  # Progress percentage (0-100)
 
 
 class ScenarioInfo(BaseModel):
@@ -297,6 +298,8 @@ async def get_simulation_status(task_id: str):
         if orchestrator and orchestrator.running:
             # Simulation is running - get live status from orchestrator
             status = orchestrator.get_status()
+            # Calculate progress for 365-day simulation: (hours_completed / 8760) * 100
+            progress_pct = int((orchestrator.simulated_time.hour / 24.0) * 100) if orchestrator.simulated_time else 0
             return SimulationStatusResponse(
                 running=True,
                 paused=orchestrator.paused,
@@ -315,7 +318,8 @@ async def get_simulation_status(task_id: str):
                         "message": e.message,
                     }
                     for e in orchestrator.events[-10:]
-                ]
+                ],
+                progress_pct=progress_pct
             )
         else:
             # Simulation not running - get status from database
@@ -325,7 +329,7 @@ async def get_simulation_status(task_id: str):
             if state_snapshot is None or not isinstance(state_snapshot, dict):
                 state_snapshot = {}
             recent_events = state_snapshot.get("recent_events", [])[-10:] if isinstance(state_snapshot, dict) else []
-            
+
             # Extract simulated_hour from ISO format datetime string (YYYY-MM-DDTHH:MM:SS)
             simulated_hour = None
             simulated_time_str = state_snapshot.get("simulated_time") if isinstance(state_snapshot, dict) else None
@@ -335,9 +339,25 @@ async def get_simulation_status(task_id: str):
                     simulated_hour = dt.hour
                 except:
                     simulated_hour = None
-            
+
+            # For completed simulations, also use progress_pct from database
+            # If task is completed and progress > 0, update simulated_time from completion timestamp
+            task_status = task.get("status") if task else "unknown"
+            progress_pct = task.get("progress_pct", 0) if task else 0
+
+            # If simulation is completed but has progress, derive simulated_time from completion date
+            if task_status == "completed" and progress_pct > 0 and not simulated_time_str:
+                completed_at = task.get("completed_at") if task else None
+                if completed_at:
+                    try:
+                        dt = datetime.fromisoformat(str(completed_at).replace('Z', '+00:00'))
+                        simulated_time_str = dt.isoformat()
+                        simulated_hour = dt.hour
+                    except:
+                        pass
+
             return SimulationStatusResponse(
-                running=task.get("status") == "running" if task else False,
+                running=task_status == "running",
                 paused=False,
                 scenario=task.get("scenario") if task else None,
                 simulated_time=simulated_time_str,
@@ -346,7 +366,8 @@ async def get_simulation_status(task_id: str):
                 events_count=len(state_snapshot.get("recent_events", [])) if isinstance(state_snapshot, dict) else 0,
                 active_faults=len(state_snapshot.get("active_faults", {})) if isinstance(state_snapshot, dict) else 0,
                 pending_repairs=len(state_snapshot.get("pending_repairs", {})) if isinstance(state_snapshot, dict) else 0,
-                recent_events=recent_events
+                recent_events=recent_events,
+                progress_pct=progress_pct if task else 0
             )
         
     except HTTPException:
