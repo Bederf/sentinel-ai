@@ -55,7 +55,7 @@ async def get_drift_history(limit: int = Query(20, description="Max results")):
 # --- ML Alerts ---
 
 
-@limiter.limit("120/minute")
+@limiter.limit("600/minute")  # Increased from 120 to 600 (10 req/sec) - alerts polling is frequent
 @router.get("/alerts")
 async def get_ml_alerts(
     request: Request,
@@ -77,7 +77,7 @@ async def get_ml_alerts(
     }
 
 
-@limiter.limit("60/minute")
+@limiter.limit("300/minute")  # Increased from 60 to 300 (5 req/sec) - manual checks
 @router.post("/alerts/check")
 async def run_alert_check(request: Request):
     """Run all alert checks and return new alerts generated."""
