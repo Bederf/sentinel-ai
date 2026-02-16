@@ -71,19 +71,25 @@ echo ""
 if [ ! -z "$TASK_ID" ]; then
     echo "TEST 5: Monitor Simulation Progress"
     echo "---"
-    echo "Polling /api/lifecycle/status/$SITE_ID every 5 seconds..."
+    echo "Polling /api/lifecycle/status/$TASK_ID every 5 seconds..."
     echo "Press Ctrl+C to stop monitoring"
     echo ""
-    
+
     # Poll for up to 5 minutes (300 seconds)
     ELAPSED=0
     MAX_TIME=300
-    
+
     while [ $ELAPSED -lt $MAX_TIME ]; do
-        STATUS_RESPONSE=$(curl -s "$BASE_URL/api/lifecycle/status/$SITE_ID")
-        
-        PROGRESS=$(echo "$STATUS_RESPONSE" | jq -r '.simulation.progress_pct // 0' 2>/dev/null)
-        SIM_STATUS=$(echo "$STATUS_RESPONSE" | jq -r '.simulation.status // "unknown"' 2>/dev/null)
+        STATUS_RESPONSE=$(curl -s "$BASE_URL/api/lifecycle/status/$TASK_ID")
+
+        # Response has running/paused/scenario fields directly (not nested in .simulation)
+        RUNNING=$(echo "$STATUS_RESPONSE" | jq -r '.running // false' 2>/dev/null)
+        SCENARIO=$(echo "$STATUS_RESPONSE" | jq -r '.scenario // "none"' 2>/dev/null)
+        PROGRESS=$(echo "$STATUS_RESPONSE" | jq -r '.progress_pct // 0' 2>/dev/null)
+        SIM_STATUS="running"
+        if [ "$RUNNING" = "false" ]; then
+            SIM_STATUS="not running"
+        fi
         
         printf "\r[%d:%02d] Status: %-10s Progress: %3d%%" $((ELAPSED/60)) $((ELAPSED%60)) "$SIM_STATUS" "$PROGRESS"
         
