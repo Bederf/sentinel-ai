@@ -7,6 +7,7 @@ Handles periodic background tasks such as:
 - Running scheduled maintenance tasks
 """
 
+import asyncio
 import logging
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -1023,9 +1024,6 @@ class BackgroundSchedulerService:
         Prevents multiple concurrent simulations (max 1 at a time).
         """
         try:
-            import asyncio
-            from app.database.supabase_client import Supabase
-
             # Run async logic in event loop
             asyncio.run(self._process_simulation_queue_async())
 
