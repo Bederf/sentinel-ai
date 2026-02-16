@@ -79,3 +79,57 @@ export function getModuleFilteredSections(
     return section.requiredModules.some(module => isModuleActive(module));
   });
 }
+
+/**
+ * Get demo-specific default dashboard cards and sections
+ * Tailors the default view for each demo user
+ */
+export function getDemoDefaultCards(email: string): {
+  kpiCards: string[];
+  sections: string[];
+} {
+  const normalized = email.toLowerCase().trim();
+
+  // Wardew demo (Grant) — DALI lighting focus
+  if (normalized.endsWith('@wardew.co.za')) {
+    return {
+      kpiCards: [
+        'kpi-protected-sites',
+        'kpi-monitored-assets',
+        'kpi-active-risks',
+        'kpi-risk-predictions',
+      ],
+      sections: [
+        'lighting-intelligence',  // His core module
+        'occupancy-dashboard',    // PIR sensors + automation
+        'energy-comparison-actual-vs-sentinel',  // The money shot - energy savings
+        'comfort-assistant',      // Cross-module intelligence
+        'risk-predictions',       // AI predicting failures
+      ],
+    };
+  }
+
+  // Bederf demo (bederf@protonmail.com) — Solar & BESS focus
+  if (normalized === 'bederf@protonmail.com') {
+    return {
+      kpiCards: [
+        'kpi-protected-sites',
+        'kpi-monitored-assets',
+        'kpi-active-risks',
+        'kpi-risk-predictions',
+      ],
+      sections: [
+        'solar-bess',             // His core module - system status
+        'solar-annual',           // Annual performance
+        'energy-comparison-actual-vs-sentinel',  // Energy savings
+        'risk-predictions',       // AI monitoring
+      ],
+    };
+  }
+
+  // Default for all other users
+  return {
+    kpiCards: DEFAULT_KPI_CARDS,
+    sections: DEFAULT_SECTIONS,
+  };
+}

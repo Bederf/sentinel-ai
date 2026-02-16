@@ -692,6 +692,7 @@ function App() {
               onViewChange={handleViewChange}
               openCardLibrary={showCardLibrary}
               onCardLibraryClose={() => setShowCardLibrary(false)}
+              userEmail={currentUser?.email}
             />
           ) : currentView === "digital-twin" ? (
             <div className="h-full overflow-hidden">

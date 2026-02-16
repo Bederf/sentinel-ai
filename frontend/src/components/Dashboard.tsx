@@ -67,7 +67,7 @@ import { SolarAnnualCard } from "./solar/SolarAnnualCard";
 import { LightingIntelligencePanel } from "./LightingIntelligencePanel";
 import { type View } from "./Sidebar";
 import CardLibrary from "./CardLibrary";
-import { DEFAULT_KPI_CARDS, DEFAULT_SECTIONS, getModuleFilteredSections } from "../lib/cardDefinitions";
+import { DEFAULT_KPI_CARDS, DEFAULT_SECTIONS, getModuleFilteredSections, getDemoDefaultCards } from "../lib/cardDefinitions";
 import { useModules } from "@/contexts/ModuleHooks";
 
 // Time period options for energy chart
@@ -99,9 +99,12 @@ interface DashboardProps {
   onViewChange: (view: View) => void;
   openCardLibrary?: boolean;
   onCardLibraryClose?: () => void;
+  userEmail?: string;  // User's email for demo-specific defaults
 }
 
-export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }: DashboardProps) {
+export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose, userEmail }: DashboardProps) {
+  // Get demo-specific defaults if user is a demo user
+  const demoDefaults = userEmail ? getDemoDefaultCards(userEmail) : null;
   // React Query hooks - replaces old manual API calls (stale-while-revalidate approach via React Query)
   const { data: buildingsList = [] } = useBuildingsList();
 
@@ -157,9 +160,9 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose }:
     'kpi-risk-predictions',
   ]);
 
-  // Card visibility state
-  const [visibleKpiCards, setVisibleKpiCards] = useState<string[]>(DEFAULT_KPI_CARDS);
-  const [visibleSections, setVisibleSections] = useState<string[]>(DEFAULT_SECTIONS);
+  // Card visibility state (use demo defaults if available)
+  const [visibleKpiCards, setVisibleKpiCards] = useState<string[]>(demoDefaults?.kpiCards || DEFAULT_KPI_CARDS);
+  const [visibleSections, setVisibleSections] = useState<string[]>(demoDefaults?.sections || DEFAULT_SECTIONS);
   const [isCardLibraryOpen, setIsCardLibraryOpen] = useState(false);
   const [isSavingPreferences, setIsSavingPreferences] = useState(false);
 
