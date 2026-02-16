@@ -506,7 +506,7 @@ async def get_dashboard_equipment(
 
             # Get recent inspections
             try:
-                recent_tasks = inspection_repo.get_tasks_by_equipment(eq_uuid, limit=1) if eq_uuid else []
+                recent_tasks = await inspection_repo.get_tasks_by_equipment(eq_uuid, limit=1) if eq_uuid else []
             except Exception:
                 recent_tasks = []
 

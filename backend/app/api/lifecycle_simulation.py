@@ -430,7 +430,7 @@ async def get_simulation_events(
     Events include building wake, occupancy changes, faults, repairs, etc.
     """
     try:
-        orchestrator = get_lifecycle_orchestrator()
+        orchestrator = get_simulation_by_task_id("default")
         if not orchestrator:
             return {"count": 0, "events": []}
 
@@ -476,7 +476,7 @@ async def get_event_timeline():
 
     Useful for visualizing the day's activity.
     """
-    orchestrator = get_lifecycle_orchestrator()
+    orchestrator = get_simulation_by_task_id("default")
 
     timeline = {}
     for event in orchestrator.events:
@@ -558,7 +558,7 @@ async def inject_fault_manually(
 
     Useful for demonstrating the fault → alert → repair cycle on demand.
     """
-    orchestrator = get_lifecycle_orchestrator()
+    orchestrator = get_simulation_by_task_id("default")
 
     if not orchestrator.running:
         raise HTTPException(status_code=400, detail="Simulation not running")
@@ -580,7 +580,7 @@ async def trigger_repair_manually(equipment_code: str):
 
     Simulates technician completing repair immediately.
     """
-    orchestrator = get_lifecycle_orchestrator()
+    orchestrator = get_simulation_by_task_id("default")
 
     if equipment_code not in orchestrator.pending_repairs:
         raise HTTPException(
@@ -610,7 +610,7 @@ async def run_quick_demo_cycle():
     This compresses 24 hours into 5 minutes with a guaranteed fault
     at simulated 11am and repair at 2pm.
     """
-    orchestrator = get_lifecycle_orchestrator()
+    orchestrator = get_simulation_by_task_id("default")
 
     # Stop any running simulation
     if orchestrator.running:
@@ -642,7 +642,7 @@ async def run_ultra_fast_demo():
 
     24 hours in 2 minutes = 5 seconds per simulated hour.
     """
-    orchestrator = get_lifecycle_orchestrator()
+    orchestrator = get_simulation_by_task_id("default")
 
     if orchestrator.running:
         await orchestrator.stop()
