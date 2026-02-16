@@ -3,20 +3,12 @@ bms.aimthelaw.co.za {
     root * /opt/bms-intelligence/frontend/dist
 
     # API requests go to backend
+    # Note: Backend handles CORS via FastAPI middleware in startup/middleware.py
+    # This allows dynamic CORS checking and support for both production + localhost
     reverse_proxy /api/* localhost:9095 {
-        # CORS headers for API
-        header_up Origin "https://bms.aimthelaw.co.za"
-        header_down Access-Control-Allow-Origin "https://bms.aimthelaw.co.za"
-        header_down Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
-        header_down Access-Control-Allow-Headers "Content-Type, Authorization"
-        header_down Access-Control-Allow-Credentials "true"
+        # Pass through Origin header to backend for CORS handling
+        header_up Origin {http.request.header.Origin}
     }
-
-    # Handle OPTIONS requests for CORS preflight
-    @options {
-        method OPTIONS
-    }
-    respond @options 204
 
     # SPA fallback - route all non-API requests to index.html
     try_files {path} /index.html

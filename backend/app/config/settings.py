@@ -22,7 +22,16 @@ class Settings(BaseSettings):
     debug: bool = False
 
     # CORS settings (restrict to known frontend origins)
-    cors_origins: list[str] = ["http://localhost:9096", "https://localhost:9096", "http://127.0.0.1:9096", "https://127.0.0.1:9096"]
+    # Development: localhost on ports 9096, 3000, 5173, 8080
+    # Production: bms.aimthelaw.co.za via HTTPS
+    cors_origins: list[str] = [
+        "http://localhost:9096", "https://localhost:9096",
+        "http://127.0.0.1:9096", "https://127.0.0.1:9096",
+        "http://localhost:3000", "https://localhost:3000",
+        "http://localhost:5173", "https://localhost:5173",
+        "http://localhost:8080", "https://localhost:8080",
+        "https://bms.aimthelaw.co.za"
+    ]
 
     # Backend URL (for external service health checks)
     backend_url: str = ""
