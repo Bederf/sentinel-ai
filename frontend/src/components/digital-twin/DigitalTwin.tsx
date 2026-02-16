@@ -15,6 +15,7 @@ import { AlertBanner } from './AlertBanner';
 import { Compass } from '../3d/Compass';
 import { FloorPlan2D } from './FloorPlan2D';
 import { OccupancyMarkers3DFiber } from './OccupancyMarkers3DFiber';
+import { useOccupancySync } from '@/hooks/useOccupancySync';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useEquipmentData } from '@/hooks/useEquipmentData';
 import { useSitesList } from '@/hooks/useSitesList';
@@ -199,6 +200,14 @@ export function DigitalTwin() {
     animationFrameId = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(animationFrameId);
   }, [occupancyEnabled]);
+
+  // Phase 4: Sync with backend occupancy targets (1s polling)
+  const { occupancyData, simulationTime, totalOccupancy } = useOccupancySync({
+    buildingId: buildingId || 'site-002',
+    simulationRef,
+    enabled: occupancyEnabled,
+    pollIntervalMs: 1000,
+  });
 
   // Load zone centroids via React Query hook (auto-caching, deduplication)
   const { data: zoneCentroids = {} } = useZoneCentroids(buildingId);
@@ -488,6 +497,26 @@ export function DigitalTwin() {
                 <span className="text-xs opacity-75">({people.length})</span>
               )}
             </button>
+
+            {/* Simulation Time Display (Phase 4) */}
+            {occupancyEnabled && simulationTime && (
+              <div className="flex items-center gap-2 pl-3 ml-2" style={{ borderLeft: '1px solid var(--color-sentinel-border)' }}>
+                <div className="text-xs flex flex-col">
+                  <span style={{ color: 'var(--color-text-secondary)' }}>Simulation</span>
+                  <span className="font-mono font-semibold" style={{ color: 'var(--color-primary)' }}>
+                    {simulationTime.toLocaleTimeString()}
+                  </span>
+                </div>
+                {totalOccupancy > 0 && (
+                  <div className="text-xs flex flex-col ml-2">
+                    <span style={{ color: 'var(--color-text-secondary)' }}>Total</span>
+                    <span className="font-mono font-semibold" style={{ color: 'var(--color-accent)' }}>
+                      {totalOccupancy} people
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

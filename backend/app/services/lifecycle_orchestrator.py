@@ -479,41 +479,62 @@ class LifecycleOrchestrator:
                 if loop_count <= 5 or loop_count % 1000 == 0:  # Log first 5 iterations and every 1000th
                     logger.warning(f"[LOOP {loop_count}] time={self.simulated_time}, running={self.running}, days={self.days_simulated}")
                 
-                if self.paused:
-                    await asyncio.sleep(0.5)
-                    continue
+                try:
+                    if self.paused:
+                        await asyncio.sleep(0.5)
+                        continue
 
-                current_hour = self.simulated_time.hour
+                    current_hour = self.simulated_time.hour
 
-                # Process hour change
-                if current_hour != last_hour:
-                    await self._process_hour(current_hour)
-                    last_hour = current_hour
+                    # Process hour change
+                    try:
+                        if current_hour != last_hour:
+                            await self._process_hour(current_hour)
+                            last_hour = current_hour
+                    except Exception as e:
+                        logger.error(f"[ERROR in _process_hour] {e}", exc_info=True)
+                        raise
                     
                     # Save checkpoint every 6 simulated hours for crash recovery
-                    if is_annual and (current_hour % 6 == 0):
-                        if current_hour != last_checkpoint_hour:
-                            await self.save_checkpoint()
-                            last_checkpoint_hour = current_hour
+                    try:
+                        if is_annual and (current_hour % 6 == 0):
+                            if current_hour != last_checkpoint_hour:
+                                await self.save_checkpoint()
+                                last_checkpoint_hour = current_hour
+                    except Exception as e:
+                        logger.error(f"[ERROR in save_checkpoint] {e}", exc_info=True)
+                        raise
 
-                # Advance time
-                await asyncio.sleep(self.time_multiplier / 60)  # Sleep for 1 simulated minute
-                self.simulated_time += timedelta(minutes=1)
+                    # Advance time
+                    try:
+                        await asyncio.sleep(self.time_multiplier / 60)  # Sleep for 1 simulated minute
+                        self.simulated_time += timedelta(minutes=1)
+                    except Exception as e:
+                        logger.error(f"[ERROR advancing time] {e}", exc_info=True)
+                        raise
 
-                # Check for day rollover
-                if self.simulated_time.hour == 0 and last_hour == 23:
-                    self.days_simulated += 1
-                    season = self.seasonal_modeler.get_season_name(self.simulated_time.date()) if is_annual else None
-                    logger.info(f"Day {self.days_simulated}/365 complete{f' ({season})' if is_annual else ''}...")
-                    
-                    # Save checkpoint on day boundary
-                    if is_annual:
-                        await self.save_checkpoint()
-                    
-                    # For annual simulation, stop after 365 days
-                    if is_annual and self.days_simulated >= 365:
-                        logger.info("Annual simulation complete (365 days)")
-                        self.running = False
+                    # Check for day rollover
+                    try:
+                        if self.simulated_time.hour == 0 and last_hour == 23:
+                            self.days_simulated += 1
+                            season = self.seasonal_modeler.get_season_name(self.simulated_time.date()) if is_annual else None
+                            logger.info(f"Day {self.days_simulated}/365 complete{f' ({season})' if is_annual else ''}...")
+                            
+                            # Save checkpoint on day boundary
+                            if is_annual:
+                                await self.save_checkpoint()
+                            
+                            # For annual simulation, stop after 365 days
+                            if is_annual and self.days_simulated >= 365:
+                                logger.info("Annual simulation complete (365 days)")
+                                self.running = False
+                    except Exception as e:
+                        logger.error(f"[ERROR in day rollover] {e}", exc_info=True)
+                        raise
+                        
+                except Exception as e:
+                    logger.error(f"[ERROR in main loop iteration {loop_count}] {e}", exc_info=True)
+                    raise
 
         except asyncio.CancelledError:
             logger.info("Simulation cancelled")
