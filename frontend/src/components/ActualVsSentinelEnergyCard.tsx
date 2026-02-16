@@ -26,7 +26,7 @@ import {
   Target,
   AlertCircle,
 } from 'lucide-react'
-import { isExpectedApiError } from '@/lib/api'
+import { isExpectedApiError, authorizedFetch } from '@/lib/api'
 import { useModuleAccess } from '@/hooks/useModuleAccess'
 import type { ModuleType } from '@/lib/moduleRegistry'
 
@@ -84,7 +84,7 @@ function getSystemIcon(system: 'hvac' | 'lighting' | 'power') {
 // - With both: ~22-25%
 async function fetchEnergyComparison(siteId: string, activeModuleTypes: string[] = []): Promise<ComparisonData> {
   try {
-    const response = await fetch(`/api/energy/comparison-summary?site_id=${siteId}`)
+    const response = await authorizedFetch(`/api/energy/comparison-summary?site_id=${siteId}`)
     if (!response.ok) throw new Error('Failed to fetch energy comparison')
     return await response.json()
   } catch (err) {

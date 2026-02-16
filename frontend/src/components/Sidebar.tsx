@@ -666,10 +666,11 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
               wordBreak: 'break-word',
             }}
           >
-            <span style={{ color: "var(--color-sentinel-amber)" }}>
-              SENTINEL
-              {!isCollapsed && ` v${version || "13.0"}`}
-            </span>
+            {!isCollapsed && (
+              <span style={{ color: "var(--color-sentinel-amber)" }}>
+                SENTINEL v{version || "13.0"}
+              </span>
+            )}
           </div>
           <div className="hidden md:flex lg:hidden justify-center">
             <div

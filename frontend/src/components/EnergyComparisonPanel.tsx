@@ -11,6 +11,7 @@
 
 import { useState, useEffect } from 'react';
 import { Zap, TrendingDown, Leaf } from 'lucide-react';
+import { authorizedFetch } from '@/lib/api';
 
 interface Scenario {
   name: string;
@@ -38,7 +39,7 @@ export function EnergyComparisonPanel({ siteId }: { siteId: string }) {
 
   const fetchData = async () => {
     try {
-      const response = await fetch(`/api/energy/comparison?site_id=${siteId}&days=30`);
+      const response = await authorizedFetch(`/api/energy/comparison?site_id=${siteId}&days=30`);
       const json = await response.json();
       setData(json);
     } catch (error) {

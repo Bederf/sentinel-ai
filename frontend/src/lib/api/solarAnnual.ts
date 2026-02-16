@@ -3,6 +3,8 @@
  * Handles 365-day simulation requests and result retrieval
  */
 
+import { authorizedFetch } from './client';
+
 export interface MonthSummary {
   month: number
   month_name: string
@@ -94,12 +96,7 @@ export async function fetchAnnualSummary(
     url.searchParams.set('year', year.toString())
   }
 
-  const response = await fetch(url.toString(), {
-    headers: {
-      'Authorization': `Bearer ${localStorage.getItem('token')}`,
-      'Content-Type': 'application/json',
-    },
-  })
+  const response = await authorizedFetch(url.toString(), undefined, true)
 
   if (!response.ok) {
     const error: any = new Error(`Failed to fetch annual summary (${response.status})`)
@@ -119,14 +116,11 @@ export async function startAnnualSimulation(
   scenario: string = 'grant_solar_bess_ai_annual',
   durationMinutes: number = 240.0
 ): Promise<{ task_id: string; site_id: string; scenario: string }> {
-  const response = await fetch(
-    `${import.meta.env.VITE_API_URL}/api/solar/annual/${siteId}/simulate`,
+  const response = await authorizedFetch(
+    `/api/solar/annual/${siteId}/simulate`,
     {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ scenario, duration_minutes: durationMinutes }),
     }
   )
@@ -145,14 +139,8 @@ export async function pollSimulationStatus(
   siteId: string,
   taskId: string
 ): Promise<SimulationStatus> {
-  const response = await fetch(
-    `${import.meta.env.VITE_API_URL}/api/solar/annual/${siteId}/status/${taskId}`,
-    {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        'Content-Type': 'application/json',
-      },
-    }
+  const response = await authorizedFetch(
+    `/api/solar/annual/${siteId}/status/${taskId}`
   )
 
   if (!response.ok) {

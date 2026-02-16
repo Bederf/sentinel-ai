@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Lightbulb, TrendingUp, Brain, Sun, Users, Zap } from 'lucide-react';
+import { authorizedFetch } from '@/lib/api';
 
 interface DaliSimulation {
   summary: {
@@ -46,7 +47,7 @@ export function LightingIntelligencePanel({ siteId }: { siteId: string }) {
 
   const fetchSimulation = async () => {
     try {
-      const response = await fetch(`/api/dali/simulation?site_id=${siteId}`);
+      const response = await authorizedFetch(`/api/dali/simulation?site_id=${siteId}`);
       if (!response.ok) {
         console.error('Failed to fetch DALI simulation:', response.status, response.statusText);
         setLoading(false);

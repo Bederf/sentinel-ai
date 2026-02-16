@@ -116,6 +116,8 @@ export const VIEW_TITLES: Record<View, string> = {
 export const BASE_NAV_ITEMS: NavItem[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, description: "Overview and AI recommendation", category: "base" },
   { id: "integrations", label: "System Health", icon: Activity, description: "Real-time Health Monitoring", category: "base" },
+  { id: "ai-chat", label: "AI Chat", icon: MessageSquare, description: "SENTINEL AI Assistant", category: "base" },
+  { id: "digital-twin", label: "Digital Twin", icon: Box, description: "3D/2D Building Visualization", category: "base" },
 ];
 
 /**

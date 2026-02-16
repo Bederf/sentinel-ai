@@ -8,7 +8,7 @@
 import React, { useEffect, useState } from 'react'
 import { Card, Metric, Text, ProgressBar, Flex, Grid } from '@tremor/react'
 import { ArrowUp, Zap, TrendingUp } from 'lucide-react'
-import { fetchAnnualSummary, startAnnualSimulation } from '@/lib/api/solarAnnual'
+import { fetchAnnualSummary, startAnnualSimulation, pollSimulationStatus } from '@/lib/api/solarAnnual'
 import type { AnnualSummary } from '@/lib/api/solarAnnual'
 
 interface SolarAnnualCardProps {
@@ -98,8 +98,7 @@ export function SolarAnnualCard({ siteId, onSimulationComplete }: SolarAnnualCar
   const pollSimulationProgress = async (taskId: string) => {
     const interval = setInterval(async () => {
       try {
-        const response = await fetch(`/api/solar/annual/${siteId}/status/${taskId}`)
-        const data = await response.json()
+        const data = await pollSimulationStatus(siteId, taskId)
 
         setSimulationProgress(data.progress_pct)
 

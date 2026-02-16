@@ -4,6 +4,7 @@
  */
 
 import { useEffect, useState } from 'react'
+import { authorizedFetch } from '@/lib/api'
 import type { ModuleType } from '@/lib/moduleRegistry'
 
 export interface ModuleAccessState {
@@ -46,7 +47,7 @@ export function useModuleAccess(module: ModuleType | string): ModuleAccessState 
         const siteId = sessionStorage.getItem('sentinel_selected_site') || 'site-002'
 
         // Check if module is active
-        const moduleResponse = await fetch(`/api/modules/status/${siteId}`)
+        const moduleResponse = await authorizedFetch(`/api/modules/status/${siteId}`)
         if (!moduleResponse.ok) {
           throw new Error('Failed to fetch module status')
         }
@@ -62,7 +63,7 @@ export function useModuleAccess(module: ModuleType | string): ModuleAccessState 
         if (!moduleActive) {
           try {
             // Fetch recommendations to get savings data for this module
-            const recResponse = await fetch(`/api/recommendations?module=${module}&site_id=${siteId}`)
+            const recResponse = await authorizedFetch(`/api/recommendations?module=${module}&site_id=${siteId}`)
             if (recResponse.ok) {
               const recommendations = await recResponse.json()
 

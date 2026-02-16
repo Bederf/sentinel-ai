@@ -14,6 +14,7 @@ import {
   Wind, Zap, Lock, Lightbulb, Sun, Droplets, Flame, KeyRound,
   Brain, Leaf, FileText, Gamepad2, Package, Plug, Link2, Bell
 } from 'lucide-react';
+import { ModuleDependencyWarning } from './ModuleDependencyWarning';
 
 const NON_DEACTIVATABLE_MODULES: ModuleType[] = ['hvac', 'energy'];
 
@@ -33,11 +34,51 @@ export function ModuleSelector({ onModuleActivated, onModuleDeactivated }: Modul
   } = useModules();
 
   const [activating, setActivating] = useState<ModuleType | null>(null);
+  const [showWarning, setShowWarning] = useState<ModuleType | null>(null);
+  const [isDeactivating, setIsDeactivating] = useState(false);
+
+  // Determine which modules will be disabled if this module is deactivated
+  const getDependentsToDisable = (moduleType: ModuleType): ModuleType[] => {
+    const DEPENDENT_MODULES: Record<ModuleType, ModuleType[]> = {
+      // Core infrastructure
+      kpi: [],
+      ml: [],
+      hvac: [],
+      energy: [],
+      assets: [],
+      simbiot: [],
+      integrations: [],
+      notifications: [],
+      // Paid add-ons
+      control: ['solar', 'lighting'],
+      maintenance: [],
+      digital_twin: [],
+      // Building system add-ons
+      lighting: [],
+      fire: [],
+      security: [],
+      solar: [],
+      sustainability: [],
+      water: [],
+      contracts: [],
+    };
+    return DEPENDENT_MODULES[moduleType] || [];
+  };
 
   async function handleToggle(moduleType: ModuleType, currentlyActive: boolean) {
     if (currentlyActive && NON_DEACTIVATABLE_MODULES.includes(moduleType)) {
       return;
     }
+
+    // If deactivating, check for cascading dependents
+    if (currentlyActive) {
+      const dependents = getDependentsToDisable(moduleType);
+      if (dependents.length > 0) {
+        setShowWarning(moduleType);
+        return;
+      }
+    }
+
     setActivating(moduleType);
     try {
       if (currentlyActive) {
@@ -51,6 +92,19 @@ export function ModuleSelector({ onModuleActivated, onModuleDeactivated }: Modul
       console.error('Failed to toggle module:', err);
     } finally {
       setActivating(null);
+    }
+  }
+
+  async function handleConfirmDeactivate(moduleType: ModuleType) {
+    setShowWarning(null);
+    setIsDeactivating(true);
+    try {
+      await deactivateModule(moduleType);
+      onModuleDeactivated?.(moduleType);
+    } catch (err) {
+      console.error('Failed to deactivate module:', err);
+    } finally {
+      setIsDeactivating(false);
     }
   }
 
@@ -70,6 +124,16 @@ export function ModuleSelector({ onModuleActivated, onModuleDeactivated }: Modul
 
   return (
     <div>
+      {/* Dependency Warning Modal */}
+      {showWarning && (
+        <ModuleDependencyWarning
+          moduleType={showWarning}
+          onConfirm={() => handleConfirmDeactivate(showWarning)}
+          onCancel={() => setShowWarning(null)}
+          isLoading={isDeactivating}
+        />
+      )}
+
       {/* Integration Status */}
       {integrationSummary && integrationSummary.active_integrations.length > 0 && (
         <div
