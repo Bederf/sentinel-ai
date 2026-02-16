@@ -28,6 +28,7 @@ import {
   Sun,
   FileText,
   TrendingUp,
+  TrendingDown,
   Droplets,
   DollarSign,
   Brain,
@@ -48,6 +49,7 @@ export type View =
   | "integrations"
   | "occupancy"
   | "occupancy-analytics"
+  | "occupancy-energy-correlation"
   | "lighting"
   | "workflow"
   | "security"
@@ -90,6 +92,7 @@ export const VIEW_TITLES: Record<View, string> = {
   integrations: "System Health",
   occupancy: "Occupancy",
   "occupancy-analytics": "Occupancy Analytics",
+  "occupancy-energy-correlation": "Energy Correlation",
   lighting: "Lighting",
   workflow: "Asset Workflow",
   security: "Security",
@@ -139,6 +142,7 @@ export const ADDON_NAV_ITEMS: NavItem[] = [
   { id: "optimization", label: "Loadshedding", icon: Zap, description: "Load Shedding AI", category: "addon", requiredModule: "energy", defaultOrder: 11 },
   { id: "occupancy", label: "Occupancy", icon: Users, description: "Occupancy Monitoring", category: "addon", requiredModule: "lighting", defaultOrder: 12 },
   { id: "occupancy-analytics", label: "Occupancy Analytics", icon: BarChart3, description: "Occupancy Trends & Insights", category: "addon", requiredModule: "lighting", defaultOrder: 12.2 },
+  { id: "occupancy-energy-correlation", label: "Energy Correlation", icon: TrendingDown, description: "Occupancy vs Energy Savings", category: "addon", requiredModule: "lighting", defaultOrder: 12.3 },
   { id: "lighting", label: "Lighting", icon: Lightbulb, description: "Lighting Control", category: "addon", requiredModule: "lighting", defaultOrder: 12.5 },
   { id: "security", label: "Security", icon: ShieldCheck, description: "Access & CCTV", category: "addon", requiredModule: "security", defaultOrder: 13 },
   { id: "solar", label: "Solar & BESS", icon: Sun, description: "PV & Battery Storage", category: "addon", requiredModule: "solar", defaultOrder: 14 },

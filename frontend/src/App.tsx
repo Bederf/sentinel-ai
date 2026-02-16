@@ -25,6 +25,7 @@ import SystemHealthPage from "./components/SystemHealthPage";
 import { AssetWorkflowDashboard } from "./components/AssetWorkflowDashboard";
 import { OccupancyPanel } from "./components/OccupancyPanel";
 import { OccupancyAnalyticsPage } from "./pages/OccupancyAnalyticsPage";
+import { OccupancyEnergyCorrelationPage } from "./pages/OccupancyEnergyCorrelationPage";
 import { LightingPage } from "./components/lighting/LightingPage";
 import { SecurityDashboard } from "./components/SecurityDashboard";
 import { SimbiotPage } from "./components/SimbiotPage";
@@ -753,6 +754,10 @@ function App() {
           ) : currentView === "occupancy-analytics" ? (
             <div className="h-full overflow-y-auto">
               <OccupancyAnalyticsPage />
+            </div>
+          ) : currentView === "occupancy-energy-correlation" ? (
+            <div className="h-full overflow-y-auto">
+              <OccupancyEnergyCorrelationPage />
             </div>
           ) : currentView === "lighting" ? (
             <LightingPage />

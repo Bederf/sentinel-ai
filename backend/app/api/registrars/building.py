@@ -14,7 +14,7 @@ from app.api import niagara, niagara_bacnet, niagara_discovery
 from app.api import buildings_3d, digital_twin
 from app.api import zone_ingestion, desks, documents
 from app.api import device_controls
-from app.api import occupancy_analytics
+from app.api import occupancy_analytics, occupancy_energy_correlation
 
 
 def register_building_routers(app: FastAPI) -> None:
@@ -53,6 +53,9 @@ def register_building_routers(app: FastAPI) -> None:
 
     # Occupancy analytics (trends, zone utilization, peak hours)
     app.include_router(occupancy_analytics.router, prefix="/api", tags=["occupancy-analytics"])
+
+    # Occupancy-energy correlation (wasted energy, "lights left on" cost impact)
+    app.include_router(occupancy_energy_correlation.router, prefix="/api", tags=["occupancy-energy"])
 
     # Building systems - Fire & Security
     app.include_router(fire.router, tags=["fire"])
