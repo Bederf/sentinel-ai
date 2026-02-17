@@ -1067,6 +1067,47 @@ async def get_energy_analysis(site_id: str) -> dict[str, Any]:
         return {"success": False, "error": str(e)}
 
 
+async def get_floor_temperatures(
+    floor: str | None = None,
+    site_id: str | None = None
+) -> dict:
+    """Get zone temperatures filtered by floor. Called when user asks about floor temps.
+
+    Args:
+        floor: Floor level to filter by: 'L0', 'L1', 'L2'. Omit for all floors.
+        site_id: Site ID (default: site-002)
+
+    Returns:
+        Dictionary with zone temperatures, setpoints, and status
+    """
+    try:
+        zones = load_json("hvac_zones.json")
+
+        if floor:
+            zones = [z for z in zones if z.get("floor", "").upper() == floor.upper()]
+
+        return {
+            "success": True,
+            "site_id": site_id or "site-002",
+            "floor_filter": floor,
+            "zone_count": len(zones),
+            "zones": [
+                {
+                    "zone_id": z.get("zone_id"),
+                    "zone_name": z.get("zone_name"),
+                    "floor": z.get("floor"),
+                    "current_temp": z.get("current_temp"),
+                    "setpoint": z.get("setpoint"),
+                    "status": z.get("status"),
+                }
+                for z in zones
+            ],
+        }
+    except Exception as e:
+        logger.error(f"Error getting floor temperatures: {e}")
+        return {"success": False, "error": str(e)}
+
+
 async def lookup_desk(desk_id: str, building: str | None = None) -> dict[str, Any]:
     """
     Look up a desk and return its zone, HVAC, and sensor context.
@@ -2422,6 +2463,30 @@ CHAT_TOOLS = [
             },
             "required": []
         }
+    },
+    {
+        "name": "get_floor_temperatures",
+        "description": (
+            "Get current HVAC zone temperatures, optionally filtered by floor. "
+            "Use when asked 'what is the temperature on floor 1?', 'floor 2 temp', "
+            "or 'show me all zone temperatures'. Returns current_temp, setpoint, status."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "floor": {
+                    "type": "string",
+                    "description": "Floor level to filter by: 'L0', 'L1', or 'L2'. Omit for all floors.",
+                    "enum": ["L0", "L1", "L2"]
+                },
+                "site_id": {
+                    "type": "string",
+                    "description": "Site ID (default: site-002)",
+                    "default": "site-002"
+                }
+            },
+            "required": []
+        }
     }
 ]
 
@@ -2430,20 +2495,20 @@ CHAT_TOOLS = [
 TOOL_MODULE_REQUIREMENTS: dict[str, ModuleType] = {
     # Control/automation tools (require CONTROL module)
     "control_device": ModuleType.CONTROL,
-    
+
     # Maintenance/work order tools (require MAINTENANCE module)
     "create_work_order": ModuleType.MAINTENANCE,
-    
+
     # SIMBIOT / onboarding workflows
     "discover_niagara_points": ModuleType.SIMBIOT,
     "review_point_mapping": ModuleType.SIMBIOT,
     "approve_point_mapping": ModuleType.SIMBIOT,
     "correct_point_classification": ModuleType.SIMBIOT,
-    
+
     # Security & life safety workflows
     "get_security_status": ModuleType.SECURITY,
     "get_fire_system_status": ModuleType.FIRE,
-    
+
     # Solar / BESS workflows
     "get_solar_overview": ModuleType.SOLAR,
     "get_bess_status": ModuleType.SOLAR,
@@ -2546,6 +2611,7 @@ TOOL_HANDLERS = {
     "get_solar_savings": get_solar_savings,
     "get_solar_diagnostics": get_solar_diagnostics,
     "get_solar_forecast": get_solar_forecast,
+    "get_floor_temperatures": get_floor_temperatures,
 }
 
 
