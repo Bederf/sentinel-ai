@@ -50,5 +50,19 @@
     "notifications",
     "fire",
     "access"
+  ],
+  "grant@wardew.co.za": [
+    "control",
+    "lighting",
+    "energy",
+    "hvac",
+    "ml"
+  ],
+  "bederf@protonmail.com": [
+    "control",
+    "solar",
+    "energy",
+    "hvac",
+    "ml"
   ]
 }
