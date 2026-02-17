@@ -14,12 +14,12 @@ Physics-based simulation includes:
 - Tariff bands (off-peak, standard, peak)
 """
 
-from fastapi import APIRouter, Query
-from pydantic import BaseModel
-from typing import List, Optional
-import random
 import math
+import random
 from datetime import datetime, timedelta
+
+from fastapi import APIRouter, Query
+
 from app.database.supabase_client import get_supabase_client
 
 router = APIRouter()
@@ -35,22 +35,23 @@ LATITUDE = -26.12  # Johannesburg
 
 # Tariffs (R/kWh) - South African eskom-style rates
 TARIFF = {
-    "off_peak": 0.82,      # 22:00 - 06:00
-    "standard": 1.25,      # 06:00 - 09:00, 17:00 - 22:00
-    "peak": 1.92,          # 09:00 - 17:00
+    "off_peak": 0.82,  # 22:00 - 06:00
+    "standard": 1.25,  # 06:00 - 09:00, 17:00 - 22:00
+    "peak": 1.92,  # 09:00 - 17:00
 }
 
 # ============================================================================
 # SOLAR GEOMETRY & DAYLIGHT CALCULATION
 # ============================================================================
 
+
 def calculate_daylight_hours(day_of_year: int) -> float:
     """
     Calculate sunrise/sunset for Johannesburg using solar geometry.
-    
+
     Args:
         day_of_year: Day number (1-365)
-    
+
     Returns:
         Hours of daylight
     """
@@ -72,25 +73,25 @@ def calculate_daylight_hours(day_of_year: int) -> float:
 def get_cloud_factor(day_of_year: int, rng) -> float:
     """
     Weather cloud cover factor for Johannesburg's seasonal patterns.
-    
+
     Summer (Nov-Feb): 60% clear (thunderstorms)
     Winter (May-Aug): 85% clear (dry season)
     Autumn/Spring: 70% clear
-    
+
     Args:
         day_of_year: Day number (1-365)
         rng: Random number generator function
-    
+
     Returns:
         Cloud factor (0.15-0.98, higher = clearer)
     """
     month = (day_of_year - 1) // 30 + 1
 
-    if month in [11, 12, 1, 2]:      # Summer
+    if month in [11, 12, 1, 2]:  # Summer
         base_clear = 0.60
-    elif month in [5, 6, 7, 8]:      # Winter
+    elif month in [5, 6, 7, 8]:  # Winter
         base_clear = 0.85
-    else:                             # Autumn/Spring
+    else:  # Autumn/Spring
         base_clear = 0.70
 
     # Add daily variation
@@ -101,15 +102,11 @@ def get_cloud_factor(day_of_year: int, rng) -> float:
 # OCCUPANCY PATTERNS
 # ============================================================================
 
-def get_occupancy(
-    hour: int,
-    day_of_week: int,
-    is_holiday: bool,
-    rng
-) -> float:
+
+def get_occupancy(hour: int, day_of_week: int, is_holiday: bool, rng) -> float:
     """
     Return occupancy percentage for given time.
-    
+
     Weekday schedule (Johannesburg office):
     - 07:00-09:00: Ramp up (30% → 85%)
     - 09:00-12:00: Morning peak (85% → 92%)
@@ -117,16 +114,16 @@ def get_occupancy(
     - 14:00-17:00: Afternoon peak (70% → 88%)
     - 17:00-19:00: Wind down (88% → 20%)
     - 19:00-07:00: Night (5% - security only)
-    
+
     Weekend: 8% (security + maintenance)
     Holidays: 5% (security only)
-    
+
     Args:
         hour: Hour of day (0-23)
         day_of_week: Weekday (0=Monday, 6=Sunday)
         is_holiday: True if public holiday
         rng: Random number generator
-    
+
     Returns:
         Occupancy percentage (0-1)
     """
@@ -156,27 +153,23 @@ def get_occupancy(
 # DAYLIGHT & LIGHTING CONTROL
 # ============================================================================
 
-def get_daylight_lux(
-    hour: float,
-    daylight_hours: float,
-    cloud_factor: float,
-    zone_id: int
-) -> float:
+
+def get_daylight_lux(hour: float, daylight_hours: float, cloud_factor: float, zone_id: int) -> float:
     """
     Calculate natural light (lux) availability for a zone.
-    
+
     Accounts for:
     - Solar elevation angle (higher = brighter)
     - Cloud cover
     - Window orientation (north-facing > south-facing)
     - Interior zones have minimal daylight
-    
+
     Args:
         hour: Hour of day (0-23)
         daylight_hours: Total daylight hours for the day
         cloud_factor: Cloud cover factor (0-1)
         zone_id: Zone identifier (0-7)
-    
+
     Returns:
         Natural light level (lux)
     """
@@ -205,14 +198,14 @@ def get_daylight_lux(
 def get_tariff_band(hour: int) -> str:
     """
     Get tariff band for hour of day (South African Eskom-style).
-    
+
     Off-peak: 22:00 - 06:00 (R0.82/kWh)
     Peak: 09:00 - 17:00 (R1.92/kWh)
     Standard: Other hours (R1.25/kWh)
-    
+
     Args:
         hour: Hour of day (0-23)
-    
+
     Returns:
         Tariff band name
     """
@@ -227,20 +220,21 @@ def get_tariff_band(hour: int) -> str:
 # ML LEARNING CURVE
 # ============================================================================
 
+
 def get_learning_factor(day: int) -> float:
     """
     ML learning curve: effectiveness improves from 60% to 95% over 6 months.
-    
+
     Month 1-2: 60% effective (basic occupancy detection)
     Month 3-4: 75% effective (daylight correlation by zone)
     Month 5-6: 85% effective (behavioral patterns)
     Month 7-12: 95% effective (full optimization)
-    
+
     Uses exponential asymptotic approach: 0.60 + 0.35 * (1 - e^(-t/90))
-    
+
     Args:
         day: Day number (0-364)
-    
+
     Returns:
         Effectiveness factor (0.6-0.95)
     """
@@ -251,13 +245,14 @@ def get_learning_factor(day: int) -> float:
 # SEEDED RANDOM NUMBER GENERATOR
 # ============================================================================
 
+
 def seeded_random(seed: int):
     """
     Create a seeded RNG for reproducible simulations.
-    
+
     Args:
         seed: Seed value
-    
+
     Returns:
         Function that generates random numbers [0, 1)
     """
@@ -275,15 +270,16 @@ def seeded_random(seed: int):
 # MAIN SIMULATION
 # ============================================================================
 
+
 def run_dali_simulation() -> dict:
     """
     Run 365-day DALI lighting simulation with 3 scenarios.
-    
+
     Compares:
     1. Baseline: Fixed schedule (no DALI)
     2. With DALI: Occupancy + daylight harvesting
     3. With SENTINEL AI: Predictive optimization
-    
+
     Returns:
         Dictionary with summary metrics, daily data, and monthly data
     """
@@ -311,7 +307,7 @@ def run_dali_simulation() -> dict:
         day_of_week = current_date.weekday()
 
         # Simple holiday detection (December-January)
-        is_holiday = (day_of_year >= 350 or day_of_year <= 10)
+        is_holiday = day_of_year >= 350 or day_of_year <= 10
 
         # Daylight and weather for the day
         daylight_hours = calculate_daylight_hours(day_of_year)
@@ -337,9 +333,7 @@ def run_dali_simulation() -> dict:
             # Per-zone calculation
             for zone_id in range(BUILDING_ZONES):
                 zone_power_kw = AVG_POWER_PER_ZONE_W / 1000
-                daylight_lux = get_daylight_lux(
-                    hour, daylight_hours, cloud_factor, zone_id
-                )
+                daylight_lux = get_daylight_lux(hour, daylight_hours, cloud_factor, zone_id)
 
                 # ============================================================
                 # SCENARIO 1: BASELINE (Fixed schedule)
@@ -376,11 +370,7 @@ def run_dali_simulation() -> dict:
                     sentinel_brightness *= 0.90
 
                 # Apply learning factor (asymptotic improvement)
-                sentinel_power = (
-                    zone_power_kw
-                    * sentinel_brightness
-                    * (0.95 + 0.05 * (1 - learning_factor))
-                )
+                sentinel_power = zone_power_kw * sentinel_brightness * (0.95 + 0.05 * (1 - learning_factor))
 
                 # Accumulate costs
                 baseline_day_cost += baseline_power * tariff_rate
@@ -406,10 +396,7 @@ def run_dali_simulation() -> dict:
                 monthly_data.append(month_accum)
 
             current_month = month
-            month_names = [
-                "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-                "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
-            ]
+            month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
             month_accum = {
                 "month": month_names[month - 1],
                 "baseline_cost": 0,
@@ -429,15 +416,17 @@ def run_dali_simulation() -> dict:
 
         # Store daily data (every 3rd day for performance)
         if day % 3 == 0:
-            daily_data.append({
-                "day": day + 1,
-                "date": current_date.strftime("%Y-%m-%d"),
-                "baseline_cumulative": round(cumulative_baseline, 2),
-                "dali_cumulative": round(cumulative_dali, 2),
-                "sentinel_cumulative": round(cumulative_sentinel, 2),
-                "savings": round(cumulative_baseline - cumulative_sentinel, 2),
-                "learning_factor": round(learning_factor, 3),
-            })
+            daily_data.append(
+                {
+                    "day": day + 1,
+                    "date": current_date.strftime("%Y-%m-%d"),
+                    "baseline_cumulative": round(cumulative_baseline, 2),
+                    "dali_cumulative": round(cumulative_dali, 2),
+                    "sentinel_cumulative": round(cumulative_sentinel, 2),
+                    "savings": round(cumulative_baseline - cumulative_sentinel, 2),
+                    "learning_factor": round(learning_factor, 3),
+                }
+            )
 
     # Finalize monthly data
     if month_accum:
@@ -477,30 +466,31 @@ def run_dali_simulation() -> dict:
 # API ENDPOINTS
 # ============================================================================
 
+
 @router.get("/simulation")
 async def get_dali_simulation(
     site_id: str = Query("site-002", description="Site ID (currently only site-002 supported)"),
 ):
     """
     Get 365-day DALI lighting simulation with 3-tier comparison.
-    
+
     Compares three scenarios:
     1. **Baseline**: Traditional fixed schedules (no DALI)
     2. **With DALI**: Occupancy detection + daylight harvesting (Tridonic)
     3. **With SENTINEL AI**: Predictive optimization on top of DALI
-    
+
     Simulation includes:
     - Physics-based daylight calculations (Johannesburg latitude: -26.12°)
     - Seasonal weather patterns (summer thunderstorms, winter clear)
     - Realistic occupancy patterns (weekday/weekend/holiday)
     - ML learning curve (60% → 95% over 12 months)
     - Tariff bands (off-peak, standard, peak rates)
-    
+
     Returns:
         - **summary**: Annual costs, savings, metrics
         - **daily_data**: Daily cumulative costs (every 3 days sampled)
         - **monthly_data**: Monthly cost breakdown
-    
+
     Example response:
     ```json
     {
@@ -541,6 +531,7 @@ async def get_dali_simulation(
 # ZONE-LEVEL ENDPOINTS FOR GRANT DEMO
 # ============================================================================
 
+
 @router.get("/building/occupancy")
 async def get_building_occupancy(site_id: str = Query("site-002", description="Site ID")):
     """
@@ -555,9 +546,8 @@ async def get_building_occupancy(site_id: str = Query("site-002", description="S
     demonstrating where SENTINEL saves energy through occupancy-based control.
     """
     from datetime import datetime
-    from app.models.dali import (
-        BuildingOccupancy, FloorSummary, ZoneOccupancy
-    )
+
+    from app.models.dali import BuildingOccupancy, FloorSummary, ZoneOccupancy
 
     now = datetime.now()
     timestamp = now.isoformat()
@@ -768,6 +758,7 @@ async def get_zone_lighting(zone_id: str):
     - Zone-specific optimization
     """
     from datetime import datetime
+
     from app.models.dali import ZoneLighting
 
     now = datetime.now()
@@ -870,7 +861,7 @@ async def get_zone_lighting(zone_id: str):
             "waste_reason": None,
             "power": 240.0,
             "daylight_harvesting": True,
-        }
+        },
     }
 
     data = zone_data.get(zone_id, zone_data["default"])
@@ -912,6 +903,7 @@ async def get_dali_stats(site_id: str = Query("site-002", description="Site ID")
     Tells the demo story: Shows real savings happening right now.
     """
     from datetime import datetime
+
     from app.models.dali import DALIStats
 
     now = datetime.now()
@@ -946,84 +938,122 @@ async def get_dali_stats(site_id: str = Query("site-002", description="Site ID")
 # OCCUPANCY ENDPOINTS (Phase 4: Synchronization with Occupancy Simulation)
 # ============================================================================
 
+
 @router.get("/building/{building_id}/occupancy/detailed")
 async def get_detailed_occupancy(
-    building_id: str,
-    time: Optional[str] = Query(None, description="ISO timestamp for simulation time")
+    building_id: str, time: str | None = Query(None, description="ISO timestamp for simulation time")
 ):
     """
     Get per-zone occupancy with display coordinates and persona breakdown.
-    
+
     Provides real-time occupancy targets for the frontend occupancy simulation.
     Integrates with Grant scenario time-based patterns:
     - Workers: 9-5pm peak occupancy
-    - Security: 24/7 patrols  
+    - Security: 24/7 patrols
     - Cleaners: After hours (6pm-11pm)
     - Visitors: 10am-4pm variable
-    
+
     Returns per-zone targets that the client-side simulation will use to spawn/despawn people.
     """
+    import json
+    import logging
+    import os
+
+    logger = logging.getLogger(__name__)
+
     try:
         # Get simulation time (or current time if not provided)
         if time:
             sim_time = datetime.fromisoformat(time)
         else:
             sim_time = datetime.now()
-        
+
         hour = sim_time.hour
         day_of_week = sim_time.weekday()
         is_weekend = day_of_week >= 5
-        
-        # Get zone mappings from database
-        try:
-            supabase = get_supabase_client()
-            zone_mappings = supabase.table("zone_display_mappings") \
-                .select("*") \
-                .eq("site_id", building_id) \
-                .execute()
-            zones_data = zone_mappings.data if zone_mappings.data else []
-        except Exception as e:
-            # Fallback: Use empty list if table doesn't exist yet
-            zones_data = []
-        
+
+        # Get zone mappings from database or fallback to JSON
+        zones_data = []
+
+        # In DEMO_MODE, always use JSON fallback directly
+        demo_mode = os.getenv("DEMO_MODE", "").lower() == "true"
+
+        if not demo_mode:
+            # Try Supabase first in production
+            try:
+                supabase = get_supabase_client()
+                zone_mappings = supabase.table("zone_display_mappings").select("*").eq("site_id", building_id).execute()
+                zones_data = zone_mappings.data if zone_mappings.data else []
+            except Exception as db_error:
+                logger.debug(f"Supabase zone lookup failed: {db_error}, using JSON fallback")
+
+        # If zones still empty (or DEMO_MODE), try JSON fallback
+        if not zones_data:
+            try:
+                # Map building_id to site_id for file path
+                site_id = building_id.replace("-", "_")
+                if building_id == "gateway-centre":
+                    site_id = "site-002"
+
+                zones_json_path = f"/opt/bms-intelligence/backend/app/data/buildings/{site_id}/zones.json"
+                logger.debug(f"Trying to load zones from: {zones_json_path}")
+
+                if os.path.exists(zones_json_path):
+                    with open(zones_json_path) as f:
+                        zones_file = json.load(f)
+
+                    # Convert file format to zone_mappings format
+                    for zone in zones_file.get("zones", []):
+                        zones_data.append(
+                            {
+                                "display_zone_id": zone.get("zone_id"),
+                                "display_zone_name": f"Zone {zone.get('floor')}-{zone.get('zone_letter', 'A')}",
+                                "floor": int(zone.get("floor", "0").replace("B", "-").replace("L", "")),
+                                "coordinates": {"x": 0, "y": 0, "w": 100, "h": 100},  # Mock coordinates
+                                "max_occupancy": 20,  # Default max occupancy per zone
+                                "zone_type": zone.get("zone_type", "office"),
+                            }
+                        )
+                    logger.debug(f"Loaded {len(zones_data)} zones from JSON")
+                else:
+                    logger.warning(f"Zones JSON not found: {zones_json_path}")
+            except Exception as file_error:
+                logger.error(f"Error loading zones from JSON: {file_error}")
+
         occupancy_data = []
         total_occupancy = 0
-        
+
         for zone in zones_data:
             zone_type = zone.get("zone_type", "office")
             max_occ = zone.get("max_occupancy", 10)
-            
+
             # Calculate occupancy percentage based on time and zone type
             occupancy_percent = calculate_zone_occupancy(
-                hour=hour,
-                day_of_week=day_of_week,
-                is_weekend=is_weekend,
-                zone_type=zone_type
+                hour=hour, day_of_week=day_of_week, is_weekend=is_weekend, zone_type=zone_type
             )
-            
+
             current_occupancy = max(0, int(max_occ * occupancy_percent / 100))
             total_occupancy += current_occupancy
-            
+
             # Get persona distribution for this time/zone
             personas = get_persona_distribution(
-                hour=hour,
-                day_of_week=day_of_week,
-                is_weekend=is_weekend,
-                zone_type=zone_type
+                hour=hour, day_of_week=day_of_week, is_weekend=is_weekend, zone_type=zone_type
             )
-            
-            occupancy_data.append({
-                "zone_id": zone.get("display_zone_id"),
-                "zone_name": zone.get("display_zone_name"),
-                "floor": zone.get("floor", 0),
-                "coordinates": zone.get("coordinates"),
-                "max_occupancy": max_occ,
-                "current_occupancy": current_occupancy,
-                "occupancy_percent": occupancy_percent,
-                "zone_type": zone_type,
-                "personas": personas,  # {'worker': 0.75, 'security': 0.15, 'cleaner': 0.05, 'visitor': 0.05}
-            })
-        
+
+            occupancy_data.append(
+                {
+                    "zone_id": zone.get("display_zone_id"),
+                    "zone_name": zone.get("display_zone_name"),
+                    "floor": zone.get("floor", 0),
+                    "coordinates": zone.get("coordinates"),
+                    "max_occupancy": max_occ,
+                    "current_occupancy": current_occupancy,
+                    "occupancy_percent": occupancy_percent,
+                    "zone_type": zone_type,
+                    "personas": personas,
+                }
+            )
+
         return {
             "building_id": building_id,
             "timestamp": sim_time.isoformat(),
@@ -1032,9 +1062,10 @@ async def get_detailed_occupancy(
             "total_occupancy": total_occupancy,
             "occupancy_trend": "peak" if 9 <= hour < 17 else "offpeak",
         }
-    
+
     except Exception as e:
         # Return empty response on error
+        logger.error(f"Error in get_detailed_occupancy: {e}")
         return {
             "building_id": building_id,
             "timestamp": datetime.now().isoformat(),
@@ -1044,22 +1075,17 @@ async def get_detailed_occupancy(
         }
 
 
-def calculate_zone_occupancy(
-    hour: int,
-    day_of_week: int,
-    is_weekend: bool,
-    zone_type: str
-) -> float:
+def calculate_zone_occupancy(hour: int, day_of_week: int, is_weekend: bool, zone_type: str) -> float:
     """
     Calculate occupancy percentage for a zone at a given time.
-    
+
     Based on Grant HVAC/DALI scenario patterns.
     Returns: 0-100 occupancy percentage
     """
     if is_weekend:
         # Weekend: Only security and minimal occupancy
         return 5.0 if zone_type != "utility" else 2.0
-    
+
     # Weekday patterns by zone type
     if zone_type == "entry":  # Reception
         if 7 <= hour < 9:
@@ -1070,7 +1096,7 @@ def calculate_zone_occupancy(
             return 50.0 + (hour - 17) * 15  # Departure rush
         else:
             return 5.0
-    
+
     elif zone_type == "office":  # Workspaces
         if 7 <= hour < 9:
             return 30.0 + (hour - 7) * 27.5  # 30% → 85% arrivals
@@ -1084,13 +1110,13 @@ def calculate_zone_occupancy(
             return max(5.0, 75.0 - (hour - 17) * 25)  # Departures
         else:
             return 5.0
-    
+
     elif zone_type == "meeting":  # Meeting rooms
         if 9 <= hour < 17:
             return 50.0 + random.uniform(-20, 30)  # Highly variable
         else:
             return 0.0
-    
+
     elif zone_type == "common":  # Common areas, kitchen
         if 12 <= hour < 14:
             return 80.0  # Lunch peak
@@ -1098,33 +1124,28 @@ def calculate_zone_occupancy(
             return 30.0  # Throughout day
         else:
             return 5.0
-    
+
     elif zone_type == "utility":  # Utility rooms
         return 10.0 if 9 <= hour < 17 else 2.0
-    
+
     else:
         # Default
         return 20.0 if 9 <= hour < 17 else 5.0
 
 
-def get_persona_distribution(
-    hour: int,
-    day_of_week: int,
-    is_weekend: bool,
-    zone_type: str
-) -> dict:
+def get_persona_distribution(hour: int, day_of_week: int, is_weekend: bool, zone_type: str) -> dict:
     """
     Get persona type distribution for a zone at a given time.
-    
+
     Returns: {'worker': 0.75, 'security': 0.15, 'cleaner': 0.05, 'visitor': 0.05}
     """
     personas = {"worker": 0.0, "security": 0.0, "cleaner": 0.0, "visitor": 0.0}
-    
+
     if is_weekend:
         personas["security"] = 0.7
         personas["cleaner"] = 0.3
         return personas
-    
+
     # Weekday distributions
     # Workers (9am-5pm peak)
     if 9 <= hour < 17:
@@ -1133,23 +1154,23 @@ def get_persona_distribution(
         personas["worker"] = 0.6  # Arrival/departure
     else:
         personas["worker"] = 0.0
-    
+
     # Security (24/7, more at night)
     personas["security"] = 0.1 if 9 <= hour < 18 else 0.3
-    
+
     # Cleaners (6pm-11pm)
     if 18 <= hour < 23:
         personas["cleaner"] = 0.4
         personas["worker"] = max(0.0, personas["worker"] - 0.3)  # Overlap
-    
+
     # Visitors (10am-4pm in meetings/common areas)
     if 10 <= hour < 16 and zone_type in ["meeting", "common", "entry"]:
         personas["visitor"] = 0.15
         personas["worker"] = max(0.0, personas["worker"] - 0.1)
-    
+
     # Normalize to sum to 1.0
     total = sum(personas.values())
     if total > 0:
         personas = {k: v / total for k, v in personas.items()}
-    
+
     return personas
