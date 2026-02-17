@@ -82,13 +82,14 @@ async def startup_event(app: FastAPI) -> None:
         print("Redis cache unavailable - running without caching")
 
     # Initialize device manager with mock devices + building equipment
-    # TEMPORARILY SKIPPED: Was causing startup hang
-    # from app.api.devices import startup_event as devices_startup
-    # try:
-    #     await asyncio.wait_for(devices_startup(), timeout=15.0)
-    # except asyncio.TimeoutError:
-    #     _logger.warning("⏱️ Device manager initialization timed out - continuing without it")
-    _logger.info("Device manager initialization skipped for quick startup")
+    from app.api.devices import startup_event as devices_startup
+    try:
+        await asyncio.wait_for(devices_startup(), timeout=15.0)
+        _logger.info("✅ Device manager initialized successfully")
+    except asyncio.TimeoutError:
+        _logger.warning("⏱️ Device manager initialization timed out - continuing without it")
+    except Exception as e:
+        _logger.error(f"❌ Device manager initialization failed: {e}")
 
     # Initialize Clawd bot JWT authentication (non-blocking)
     from app.services.clawd_auth_service import initialize_clawd_auth, get_clawd_auth_service

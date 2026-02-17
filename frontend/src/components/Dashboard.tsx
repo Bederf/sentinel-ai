@@ -294,14 +294,14 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose, u
         // Check if simulation is running
         const statusResponse = await fetch('/api/lifecycle/status/site-002');
         const statusData = await statusResponse.json();
-        
+
         if (statusData.running) {
           setIsSimulationRunning(true);
-          
+
           // Load simulated energy metrics
           const energyResponse = await fetch('/api/energy/simulated?site_id=site-002');
           const energyData = await energyResponse.json();
-          
+
           if (energyData.simulated) {
             setSimulatedEnergy(energyData);
           }
@@ -532,7 +532,7 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose, u
   // KPI card definitions - MUST be before early returns (Rules of Hooks)
   const kpiCards = useMemo(() => {
     if (!stats) return {};
-    
+
     return {
       'kpi-protected-sites': {
         title: "Protected Sites",
@@ -570,7 +570,7 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose, u
       },
       'kpi-potential-savings': {
         title: isSimulationRunning ? "Live Energy (Simulated)" : "Potential Savings",
-        value: isSimulationRunning && simulatedEnergy 
+        value: isSimulationRunning && simulatedEnergy
           ? formatZAR(simulatedEnergy.total_cost_zar)
           : formatZAR(totalPotentialSavings),
         icon: <DollarSign className="h-5 w-5" />,

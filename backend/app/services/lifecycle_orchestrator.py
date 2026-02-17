@@ -44,6 +44,7 @@ logger = logging.getLogger(__name__)
 
 class SimulatedHour(int, Enum):
     """Hours of the simulated day."""
+
     MIDNIGHT = 0
     EARLY_MORNING = 6
     MORNING_START = 8
@@ -57,6 +58,7 @@ class SimulatedHour(int, Enum):
 
 class EventType(str, Enum):
     """Types of lifecycle events."""
+
     BUILDING_WAKE = "building_wake"
     OCCUPANCY_INCREASE = "occupancy_increase"
     PEAK_LOAD = "peak_load"
@@ -74,18 +76,20 @@ class EventType(str, Enum):
     SETPOINT_CHANGE = "setpoint_change"
 
 
-
 class OperationMode(str, Enum):
     """Building operation modes for comparison."""
+
     HVAC_ONLY = "hvac_only"
     HVAC_DALI = "hvac_dali"
     HVAC_DALI_SENTINEL = "hvac_dali_sentinel"
     SOLAR_BESS_BASELINE = "solar_bess_baseline"
     SOLAR_BESS_SENTINEL = "solar_bess_sentinel"
 
+
 @dataclass
 class LifecycleEvent:
     """A single event in the building lifecycle."""
+
     timestamp: datetime
     simulated_hour: int
     event_type: EventType
@@ -99,6 +103,7 @@ class LifecycleEvent:
 @dataclass
 class ScenarioConfig:
     """Configuration for a simulation scenario."""
+
     name: str
     description: str
     fault_probability: float = 0.3  # 30% chance of fault during day
@@ -242,19 +247,19 @@ class LifecycleOrchestrator:
         self.device_control_service = get_device_control_service()
         self._task: Optional[asyncio.Task] = None
         self._callbacks: List[Callable[[LifecycleEvent], None]] = []
-        
+
         # Seeded random for reproducible but realistic variation
         # Same scenario always produces same results, but with day-to-day variation
         self._scenario_rng = random.Random()
         self._occupancy_seed: Optional[int] = None
-        
+
         # Seasonal modeler for annual simulations
         self.seasonal_modeler: Optional[SeasonalModeler] = None
         self.days_simulated: int = 0  # Track days for annual simulations
 
     def reset(self):
         """Reset orchestrator state for a fresh demo.
-        
+
         Clears all simulation state so the next start() call begins fresh.
         Called when a user logs in to ensure demo restarts clean each time.
         """
@@ -312,11 +317,19 @@ class LifecycleOrchestrator:
         if task_id and scenario == "grant_hvac_dali_ai_annual":
             try:
                 from app.database.supabase_client import get_supabase_client
+
                 supabase = get_supabase_client()
-                response = supabase.table("lifecycle_simulation_tasks").select("state_snapshot").eq("task_id", task_id).execute()
+                response = (
+                    supabase.table("lifecycle_simulation_tasks")
+                    .select("state_snapshot")
+                    .eq("task_id", task_id)
+                    .execute()
+                )
                 if response.data and response.data[0].get("state_snapshot"):
                     checkpoint = response.data[0]["state_snapshot"]
-                    logger.info(f"✅ Found checkpoint for task {task_id}, recovering from day {checkpoint.get('days_simulated', 0)}/365")
+                    logger.info(
+                        f"✅ Found checkpoint for task {task_id}, recovering from day {checkpoint.get('days_simulated', 0)}/365"
+                    )
             except Exception as e:
                 logger.warning(f"Could not load checkpoint: {e}")
 
@@ -349,7 +362,9 @@ class LifecycleOrchestrator:
             # Restore seasonal modeler for annual sims
             if self.days_simulated > 0:
                 self.seasonal_modeler = SeasonalModeler(seed=self._occupancy_seed)
-                logger.info(f"✅ Restored checkpoint: day {self.days_simulated}/365, time={self.simulated_time.strftime('%Y-%m-%d %H:%M')}")
+                logger.info(
+                    f"✅ Restored checkpoint: day {self.days_simulated}/365, time={self.simulated_time.strftime('%Y-%m-%d %H:%M')}"
+                )
 
             self.real_start_time = datetime.now()
             self.running = True
@@ -362,7 +377,7 @@ class LifecycleOrchestrator:
                 "scenario": self.current_scenario.name,
                 "recovered_from_checkpoint": True,
                 "days_simulated": self.days_simulated,
-                "started_at": self.real_start_time.isoformat()
+                "started_at": self.real_start_time.isoformat(),
             }
 
         # FRESH START PATH: Initialize fresh (no checkpoint)
@@ -384,9 +399,7 @@ class LifecycleOrchestrator:
             # duration_minutes for full 24 hours
             # So 1 simulated hour = duration_minutes / 24 real minutes
             self.time_multiplier = (duration_minutes / 24.0) * 60.0  # seconds per simulated hour
-            self.simulated_time = datetime.now().replace(
-                hour=start_hour, minute=0, second=0, microsecond=0
-            )
+            self.simulated_time = datetime.now().replace(hour=start_hour, minute=0, second=0, microsecond=0)
 
         self.real_start_time = datetime.now()
         self.events = []
@@ -410,7 +423,7 @@ class LifecycleOrchestrator:
             "duration_minutes": duration_minutes,
             "time_multiplier_seconds_per_hour": self.time_multiplier,
             "start_hour": start_hour,
-            "started_at": self.real_start_time.isoformat()
+            "started_at": self.real_start_time.isoformat(),
         }
 
     async def stop(self) -> Dict[str, Any]:
@@ -426,11 +439,7 @@ class LifecycleOrchestrator:
             except asyncio.CancelledError:
                 pass
 
-        return {
-            "success": True,
-            "events_generated": len(self.events),
-            "stopped_at": datetime.now().isoformat()
-        }
+        return {"success": True, "events_generated": len(self.events), "stopped_at": datetime.now().isoformat()}
 
     def pause(self):
         """Pause the simulation."""
@@ -443,7 +452,7 @@ class LifecycleOrchestrator:
     def get_status(self) -> Dict[str, Any]:
         """Get current simulation status including weather and seasonal data."""
         elapsed_real = (datetime.now() - self.real_start_time).total_seconds() if self.real_start_time else 0
-        
+
         # Calculate progress percentage
         total_iterations = 8760 if self.seasonal_modeler is not None else 24
         progress_percent = int((self.days_simulated * 24 / total_iterations) * 100) if total_iterations > 0 else 0
@@ -454,17 +463,17 @@ class LifecycleOrchestrator:
         cloud_cover = 0
         ambient_temp = 22.0
         solar_efficiency = 100.0
-        
+
         if self.seasonal_modeler:
             current_date = self.simulated_time.date()
             current_season = self.seasonal_modeler.get_season_name(current_date)
-            
+
             # Get weather data
             weather = self.seasonal_modeler.get_weather(current_date)
             is_raining = weather.get("is_raining", False)
             cloud_cover = weather.get("cloud_cover", 0)
             ambient_temp = weather.get("temperature", 22.0)
-            
+
             # Calculate solar efficiency based on time and weather
             current_hour = self.simulated_time.hour
             if 6 <= current_hour < 18:  # Daytime
@@ -496,17 +505,19 @@ class LifecycleOrchestrator:
                     "hour": e.simulated_hour,
                     "type": e.event_type.value,
                     "description": e.description,
-                    "equipment": e.equipment_name
+                    "equipment": e.equipment_name,
                 }
                 for e in self.events[-10:]
-            ]
+            ],
         }
 
     async def _run_simulation(self):
         """Main simulation loop - Lightweight version with hourly event processing."""
         try:
-            logger.warning(f"[SIMULATION START] task_id={self.task_id}, is_annual={self.seasonal_modeler is not None}, days={self.days_simulated}, time_mult={self.time_multiplier}")
-            
+            logger.warning(
+                f"[SIMULATION START] task_id={self.task_id}, is_annual={self.seasonal_modeler is not None}, days={self.days_simulated}, time_mult={self.time_multiplier}"
+            )
+
             is_annual = self.seasonal_modeler is not None
             total_iterations = 8760 if is_annual else 24  # 365 days * 24 hours or 24 hours
             iteration = 0
@@ -515,28 +526,30 @@ class LifecycleOrchestrator:
 
             while self.running and iteration < total_iterations:
                 iteration += 1
-                
+
                 # Log progress periodically
                 if iteration <= 10 or iteration % 500 == 0:
-                    logger.warning(f"[SIMULATION {iteration}/{total_iterations}] days={self.days_simulated}, hour={self.simulated_time.hour}")
-                
+                    logger.warning(
+                        f"[SIMULATION {iteration}/{total_iterations}] days={self.days_simulated}, hour={self.simulated_time.hour}"
+                    )
+
                 try:
                     current_hour = self.simulated_time.hour
-                    
+
                     # Process hour change - generate events for this hour
                     if current_hour != last_hour:
                         await self._process_hour(current_hour)
                         last_hour = current_hour
-                    
+
                     # Save checkpoint every 6 simulated hours for crash recovery
                     if is_annual and (current_hour % 6 == 0):
                         if current_hour != last_checkpoint_hour:
                             await self.save_checkpoint()
                             last_checkpoint_hour = current_hour
-                    
+
                     # Advance time by 1 minute
                     self.simulated_time += timedelta(minutes=1)
-                    
+
                     # Track day transitions
                     if iteration > 1 and (iteration % 1440) == 0:  # Every 1440 minutes = 1 day
                         self.days_simulated += 1
@@ -544,11 +557,11 @@ class LifecycleOrchestrator:
                             logger.warning(f"[DAY COMPLETE] Day {self.days_simulated}/365")
                             # Update database with progress every day
                             await self._update_progress_to_db(iteration, total_iterations)
-                    
+
                     # Sleep for the calculated time multiplier
                     sleep_duration = self.time_multiplier / 60
                     await asyncio.sleep(sleep_duration)
-                    
+
                 except asyncio.CancelledError:
                     logger.warning(f"[CANCELLED] iteration={iteration}, task was cancelled")
                     raise
@@ -556,7 +569,9 @@ class LifecycleOrchestrator:
                     logger.error(f"[ERROR in iteration {iteration}] {type(e).__name__}: {e}", exc_info=True)
                     raise
 
-            logger.warning(f"[SIMULATION COMPLETE] Completed {iteration} iterations, days_simulated={self.days_simulated}")
+            logger.warning(
+                f"[SIMULATION COMPLETE] Completed {iteration} iterations, days_simulated={self.days_simulated}"
+            )
             self.running = False
 
         except asyncio.CancelledError:
@@ -569,21 +584,20 @@ class LifecycleOrchestrator:
         """Update database with simulation progress (called every simulated day)."""
         if not self.task_id:
             return  # No task_id means running standalone, not in background scheduler
-        
+
         try:
             from app.database.supabase_client import get_supabase_client
-            
+
             supabase = get_supabase_client()
             progress_pct = int((iteration / total_iterations) * 100)
-            
-            supabase.table("lifecycle_simulation_tasks") \
-                .update({
+
+            supabase.table("lifecycle_simulation_tasks").update(
+                {
                     "progress_pct": progress_pct,
                     "days_completed": self.days_simulated,
-                }) \
-                .eq("task_id", self.task_id) \
-                .execute()
-            
+                }
+            ).eq("task_id", self.task_id).execute()
+
             logger.debug(f"Updated task {self.task_id}: {progress_pct}% progress, {self.days_simulated} days")
         except Exception as e:
             logger.warning(f"Failed to update progress for task {self.task_id}: {e}")
@@ -593,22 +607,28 @@ class LifecycleOrchestrator:
 
     async def _process_hour(self, hour: int):
         """Process events for the given simulated hour - Lightweight version (no faults/repairs)."""
-        logger.info(f"Processing simulated hour: {hour:02d}:00 (Day {self.days_simulated + 1}/365)" if self.seasonal_modeler else f"Processing simulated hour: {hour:02d}:00")
+        logger.info(
+            f"Processing simulated hour: {hour:02d}:00 (Day {self.days_simulated + 1}/365)"
+            if self.seasonal_modeler
+            else f"Processing simulated hour: {hour:02d}:00"
+        )
 
         # Midnight: daily summary for annual simulations
         if hour == 0 and self.seasonal_modeler:
             season = self.seasonal_modeler.get_season_name(self.simulated_time.date())
-            self._emit_event(LifecycleEvent(
-                timestamp=datetime.now(),
-                simulated_hour=0,
-                event_type=EventType.BUILDING_WAKE,
-                description=f"Day {self.days_simulated + 1}: {season.capitalize()} - Building daily cycle begins",
-                details={
-                    "day_of_year": self.days_simulated + 1,
-                    "season": season,
-                    "month": self.simulated_time.strftime("%B")
-                }
-            ))
+            self._emit_event(
+                LifecycleEvent(
+                    timestamp=datetime.now(),
+                    simulated_hour=0,
+                    event_type=EventType.BUILDING_WAKE,
+                    description=f"Day {self.days_simulated + 1}: {season.capitalize()} - Building daily cycle begins",
+                    details={
+                        "day_of_year": self.days_simulated + 1,
+                        "season": season,
+                        "month": self.simulated_time.strftime("%B"),
+                    },
+                )
+            )
 
         # Morning startup
         if hour == 6:
@@ -640,13 +660,15 @@ class LifecycleOrchestrator:
 
     async def _building_wake(self):
         """Simulate building morning startup."""
-        self._emit_event(LifecycleEvent(
-            timestamp=datetime.now(),
-            simulated_hour=6,
-            event_type=EventType.BUILDING_WAKE,
-            description="Building systems starting up for the day",
-            details={"hvac_mode": "pre_cooling", "lighting": "minimal"}
-        ))
+        self._emit_event(
+            LifecycleEvent(
+                timestamp=datetime.now(),
+                simulated_hour=6,
+                event_type=EventType.BUILDING_WAKE,
+                description="Building systems starting up for the day",
+                details={"hvac_mode": "pre_cooling", "lighting": "minimal"},
+            )
+        )
 
         # AI pre-cooling optimization
         await self._ai_optimization("pre_cooling")
@@ -656,25 +678,27 @@ class LifecycleOrchestrator:
         # Day-of-week variation (Monday=100%, Friday=80%, realistic WFH/hybrid patterns)
         day_of_week = self.simulated_time.weekday()  # 0=Monday, 6=Sunday
         day_factor = [1.0, 0.95, 0.90, 0.88, 0.80, 0.3, 0.2][day_of_week]  # Mon-Sun
-        
+
         # Seeded random variation (±10% reproducible)
         occupancy_variance = self._scenario_rng.uniform(0.90, 1.10)
         occupancy_percent = int(60 * day_factor * occupancy_variance)
-        
+
         # Apply seasonal occupancy factor if in annual simulation
         if self.seasonal_modeler:
             seasonal_factor = self._get_seasonal_occupancy_factor(8)
             occupancy_percent = int(occupancy_percent * seasonal_factor)
-        
+
         zones_active = max(2, int(12 * day_factor * occupancy_variance / 100) * 100 // 100)
-        
-        self._emit_event(LifecycleEvent(
-            timestamp=datetime.now(),
-            simulated_hour=8,
-            event_type=EventType.OCCUPANCY_INCREASE,
-            description=f"Occupancy increasing - staff arriving (~{occupancy_percent}%)",
-            details={"occupancy_percent": occupancy_percent, "zones_active": zones_active}
-        ))
+
+        self._emit_event(
+            LifecycleEvent(
+                timestamp=datetime.now(),
+                simulated_hour=8,
+                event_type=EventType.OCCUPANCY_INCREASE,
+                description=f"Occupancy increasing - staff arriving (~{occupancy_percent}%)",
+                details={"occupancy_percent": occupancy_percent, "zones_active": zones_active},
+            )
+        )
 
         # Adjust setpoints for occupancy
         await self._setpoint_change("cooling_setpoint", 22.0, "Occupied mode")
@@ -682,32 +706,36 @@ class LifecycleOrchestrator:
 
     async def _peak_load(self):
         """Simulate peak load period."""
-        self._emit_event(LifecycleEvent(
-            timestamp=datetime.now(),
-            simulated_hour=11,
-            event_type=EventType.PEAK_LOAD,
-            description="Peak cooling load - maximum demand",
-            details={"load_percent": 95, "ambient_temp": 32}
-        ))
+        self._emit_event(
+            LifecycleEvent(
+                timestamp=datetime.now(),
+                simulated_hour=11,
+                event_type=EventType.PEAK_LOAD,
+                description="Peak cooling load - maximum demand",
+                details={"load_percent": 95, "ambient_temp": 32},
+            )
+        )
 
     async def _occupancy_decrease(self):
         """Simulate evening occupancy decrease with realistic variation."""
         # Day-of-week variation (some people leave early Friday, more people Friday night)
         day_of_week = self.simulated_time.weekday()
         day_factor = [0.9, 0.85, 0.85, 0.88, 1.2, 0.1, 0.05][day_of_week]  # Mon-Sun
-        
+
         # Seeded random variation (±15% reproducible)
         occupancy_variance = self._scenario_rng.uniform(0.85, 1.15)
         occupancy_percent = max(5, int(20 * day_factor * occupancy_variance))
         zones_active = max(1, int(occupancy_percent / 5))
-        
-        self._emit_event(LifecycleEvent(
-            timestamp=datetime.now(),
-            simulated_hour=18,
-            event_type=EventType.OCCUPANCY_DECREASE,
-            description=f"Occupancy decreasing - staff leaving (~{occupancy_percent}%)",
-            details={"occupancy_percent": occupancy_percent, "zones_active": zones_active}
-        ))
+
+        self._emit_event(
+            LifecycleEvent(
+                timestamp=datetime.now(),
+                simulated_hour=18,
+                event_type=EventType.OCCUPANCY_DECREASE,
+                description=f"Occupancy decreasing - staff leaving (~{occupancy_percent}%)",
+                details={"occupancy_percent": occupancy_percent, "zones_active": zones_active},
+            )
+        )
 
         # Adjust setpoints for reduced occupancy
         await self._setpoint_change("cooling_setpoint", 25.0, "Unoccupied mode")
@@ -715,42 +743,46 @@ class LifecycleOrchestrator:
 
     async def _night_mode(self):
         """Simulate night mode."""
-        self._emit_event(LifecycleEvent(
-            timestamp=datetime.now(),
-            simulated_hour=22,
-            event_type=EventType.NIGHT_MODE,
-            description="Building entering night mode",
-            details={"hvac_mode": "setback", "lighting": "security_only"}
-        ))
+        self._emit_event(
+            LifecycleEvent(
+                timestamp=datetime.now(),
+                simulated_hour=22,
+                event_type=EventType.NIGHT_MODE,
+                description="Building entering night mode",
+                details={"hvac_mode": "setback", "lighting": "security_only"},
+            )
+        )
 
     async def _ai_optimization(self, context: str):
         """Simulate AI optimization cycle - generates occupancy-aware + daylight-aware recommendations."""
         try:
             # Get current building state
             current_hour = self.simulated_time.hour
-            
+
             # Calculate occupancy based on hour
             occupancy_percent = self._calculate_occupancy(current_hour)
-            
+
             # Calculate daylight factor (0-100%, peaks at noon)
             daylight_factor = self._calculate_daylight(current_hour)
-            
+
             # Determine zones that should be active
             zones_active = max(1, int(occupancy_percent / 8)) if occupancy_percent > 10 else 0
-            
-            logger.info(f"AI Optimization ({context}): hour={current_hour}, occupancy={occupancy_percent}%, daylight={daylight_factor}%, zones={zones_active}")
-            
+
+            logger.info(
+                f"AI Optimization ({context}): hour={current_hour}, occupancy={occupancy_percent}%, daylight={daylight_factor}%, zones={zones_active}"
+            )
+
             equipment_list = self.equipment_repo.get_all()
             if not equipment_list:
                 return
-            
+
             # Filter to site-002 if available
             site_002_equipment = [eq for eq in equipment_list if eq.get("code", "").startswith("S002-")]
             if not site_002_equipment:
                 site_002_equipment = equipment_list[:5]
             else:
                 site_002_equipment = site_002_equipment[:5]
-            
+
             recommendations_created = []
             hvac_recs = []
             dali_recs = []
@@ -758,11 +790,11 @@ class LifecycleOrchestrator:
             for eq in site_002_equipment:
                 eq_code = eq.get("code", eq.get("id"))
                 eq_type = eq.get("type", "unknown").upper()
-                
+
                 # Skip if not controllable
                 if not self.device_control_service.is_controllable(eq_code):
                     continue
-                
+
                 # ========== HVAC OPTIMIZATION ==========
                 if eq_type in ["FCU", "VAV", "AHU", "CHILLER"]:
                     hvac_recommendation = self._generate_hvac_recommendation(
@@ -771,7 +803,7 @@ class LifecycleOrchestrator:
                     if hvac_recommendation:
                         recommendations_created.append(hvac_recommendation)
                         hvac_recs.append(hvac_recommendation["equipment"])
-                        
+
                         # Create control recommendation
                         try:
                             rec = Recommendation(
@@ -797,7 +829,7 @@ class LifecycleOrchestrator:
                             await self.recommendation_repo.create(rec)
                         except Exception as e:
                             logger.warning(f"Failed to create HVAC recommendation for {eq_code}: {e}")
-                
+
                 # ========== DALI OPTIMIZATION ==========
                 if eq_type in ["DALI", "LUM"]:
                     dali_recommendation = self._generate_dali_recommendation(
@@ -806,7 +838,7 @@ class LifecycleOrchestrator:
                     if dali_recommendation:
                         recommendations_created.append(dali_recommendation)
                         dali_recs.append(dali_recommendation["equipment"])
-                        
+
                         # Create control recommendation
                         try:
                             rec = Recommendation(
@@ -843,7 +875,7 @@ class LifecycleOrchestrator:
                         "target_value": 500,  # kW
                         "reason": "Peak tariff arbitrage - discharge BESS to grid",
                         "description": "Discharge 500kW during peak hours to reduce grid purchase",
-                        "savings": 15
+                        "savings": 15,
                     }
                     recommendations_created.append(bess_rec)
                 elif current_hour in [0, 1, 2, 3, 4, 5]:  # Off-peak (R 1.05/kWh)
@@ -853,7 +885,7 @@ class LifecycleOrchestrator:
                         "target_value": 300,  # kW
                         "reason": "Off-peak charging - cheap grid power",
                         "description": "Charge 300kW during off-peak hours",
-                        "savings": 12
+                        "savings": 12,
                     }
                     recommendations_created.append(bess_rec)
 
@@ -866,30 +898,32 @@ class LifecycleOrchestrator:
                         "target_value": 1,
                         "reason": "Simulated load shedding event from grid operator",
                         "description": "Start backup generator due to grid demand response",
-                        "savings": 8
+                        "savings": 8,
                     }
                     recommendations_created.append(gen_rec)
 
             # Emit comprehensive optimization event
-            self._emit_event(LifecycleEvent(
-                timestamp=datetime.now(),
-                simulated_hour=current_hour,
-                event_type=EventType.AI_OPTIMIZATION,
-                description=f"AI optimization ({context}) - Occupancy {occupancy_percent}%, Daylight {daylight_factor}%, {len(recommendations_created)} recommendations pending",
-                details={
-                    "context": context,
-                    "occupancy_percent": occupancy_percent,
-                    "daylight_factor": daylight_factor,
-                    "zones_active": zones_active,
-                    "hvac_recommendations": len(hvac_recs),
-                    "dali_recommendations": len(dali_recs),
-                    "total_recommendations": len(recommendations_created),
-                    "recommendations": recommendations_created
-                }
-            ))
+            self._emit_event(
+                LifecycleEvent(
+                    timestamp=datetime.now(),
+                    simulated_hour=current_hour,
+                    event_type=EventType.AI_OPTIMIZATION,
+                    description=f"AI optimization ({context}) - Occupancy {occupancy_percent}%, Daylight {daylight_factor}%, {len(recommendations_created)} recommendations pending",
+                    details={
+                        "context": context,
+                        "occupancy_percent": occupancy_percent,
+                        "daylight_factor": daylight_factor,
+                        "zones_active": zones_active,
+                        "hvac_recommendations": len(hvac_recs),
+                        "dali_recommendations": len(dali_recs),
+                        "total_recommendations": len(recommendations_created),
+                        "recommendations": recommendations_created,
+                    },
+                )
+            )
         except Exception as e:
             logger.warning(f"AI optimization error: {e}")
-    
+
     def _calculate_occupancy(self, hour: int) -> int:
         """Calculate occupancy percent based on hour of day, with demo mode drift."""
         # Base occupancy from time of day
@@ -911,14 +945,14 @@ class LifecycleOrchestrator:
             base = 30  # Evening: mostly gone
         else:
             base = 5  # Late evening: security/cleaning only
-        
+
         # Demo mode: add occupancy drift (±15%) to keep rules triggering
         if self.current_scenario and self.current_scenario.demo_mode:
             drift = self._scenario_rng.uniform(0.85, 1.15)
             base = int(max(0, min(100, base * drift)))
-        
+
         return base  # Late evening: security/cleaning only
-    
+
     def _calculate_daylight(self, hour: int) -> int:
         """Calculate available natural daylight as percentage (0-100%)."""
         if hour < 6 or hour >= 20:
@@ -935,42 +969,39 @@ class LifecycleOrchestrator:
             return int(70 - (hour - 16) * 20)  # 70-30% (sunset ramp down)
         else:
             return int(max(0, 30 - (hour - 18) * 10))  # 30-0% (sunset finish)
-    
+
     def _get_seasonal_occupancy_factor(self, hour: int) -> float:
         """Get occupancy factor with seasonal adjustments for annual simulations."""
         if not self.seasonal_modeler:
             # No seasonal modeler: return 1.0 (no adjustment)
             return 1.0
-        
+
         # Get seasonal occupancy factor from modeler
         rain_today = self.seasonal_modeler.should_rain_today(self.simulated_time.date())
-        seasonal_factor = self.seasonal_modeler.get_occupancy_factor(
-            self.simulated_time.date(), hour, rain_today
-        )
+        seasonal_factor = self.seasonal_modeler.get_occupancy_factor(self.simulated_time.date(), hour, rain_today)
         return seasonal_factor
-    
+
     def _get_seasonal_fault_probability(self, base_probability: float) -> float:
         """Get fault probability adjusted for seasonal stress."""
         if not self.seasonal_modeler:
             # No seasonal modeler: use base probability
             return base_probability
-        
+
         # Get seasonal multiplier from modeler
         rain_today = self.seasonal_modeler.should_rain_today(self.simulated_time.date())
-        multiplier = self.seasonal_modeler.get_fault_probability_multiplier(
-            self.simulated_time.date(), rain_today
-        )
+        multiplier = self.seasonal_modeler.get_fault_probability_multiplier(self.simulated_time.date(), rain_today)
         # Apply multiplier to base probability (capped at 1.0 for daily chance)
         return min(1.0, base_probability * multiplier)
-    
-    def _generate_hvac_recommendation(self, eq_code: str, eq_type: str, context: str, 
-                                      occupancy_percent: int, hour: int) -> Optional[Dict[str, Any]]:
+
+    def _generate_hvac_recommendation(
+        self, eq_code: str, eq_type: str, context: str, occupancy_percent: int, hour: int
+    ) -> Optional[Dict[str, Any]]:
         """Generate occupancy-aware HVAC recommendation."""
         # Demo mode: lower thresholds for continuous recommendations (2x more sensitive)
         is_demo = self.current_scenario and self.current_scenario.demo_mode
         low_occupancy_threshold = 30 if is_demo else 20
         high_occupancy_threshold = 70 if is_demo else 80
-        
+
         if occupancy_percent < low_occupancy_threshold:
             # Low occupancy: reduce cooling, increase setpoint
             return {
@@ -979,7 +1010,7 @@ class LifecycleOrchestrator:
                 "target_value": 24.0,  # Relax setpoint when unoccupied
                 "reason": f"Low occupancy ({occupancy_percent}%) - reduce active cooling",
                 "description": "Increase setpoint to 24°C for energy efficiency",
-                "savings": 8
+                "savings": 8,
             }
         elif occupancy_percent >= high_occupancy_threshold and hour >= 10 and hour <= 12:
             # Peak occupancy during peak solar hours: pre-cool
@@ -989,7 +1020,7 @@ class LifecycleOrchestrator:
                 "target_value": 20.5,  # Pre-cool during peak demand
                 "reason": f"High occupancy ({occupancy_percent}%) + peak demand - anticipatory pre-cooling",
                 "description": "Reduce setpoint to 20.5°C for peak demand management",
-                "savings": 5
+                "savings": 5,
             }
         elif context == "afternoon":
             # Afternoon: moderate adjustment
@@ -999,16 +1030,23 @@ class LifecycleOrchestrator:
                 "target_value": 21.5,
                 "reason": f"Afternoon optimization at {occupancy_percent}% occupancy",
                 "description": "Adjust setpoint to 21.5°C for afternoon efficiency",
-                "savings": 3
+                "savings": 3,
             }
-        
+
         return None
-    
-    def _generate_dali_recommendation(self, eq_code: str, eq_type: str, context: str,
-                                     occupancy_percent: int, daylight_factor: int, 
-                                     zones_active: int, hour: int) -> Optional[Dict[str, Any]]:
+
+    def _generate_dali_recommendation(
+        self,
+        eq_code: str,
+        eq_type: str,
+        context: str,
+        occupancy_percent: int,
+        daylight_factor: int,
+        zones_active: int,
+        hour: int,
+    ) -> Optional[Dict[str, Any]]:
         """Generate occupancy-aware + daylight-aware DALI recommendation (Tridonic luminaire control)."""
-        
+
         if occupancy_percent < 10:
             # Night/security: minimal lighting
             brightness = 20
@@ -1029,28 +1067,30 @@ class LifecycleOrchestrator:
             # Night: full artificial
             brightness = 80 + (occupancy_percent / 100 * 20)  # 80-100%
             reason = "Night - full artificial lighting required"
-        
+
         # Round to nearest 5%
         brightness = int((brightness + 2.5) / 5) * 5
-        
+
         return {
             "equipment": eq_code,
             "control_point": "brightness_level",
             "target_value": brightness,
             "reason": reason,
             "description": f"Set Tridonic brightness to {brightness}% (daylight {daylight_factor}%, occupancy {occupancy_percent}%)",
-            "savings": max(2, int(100 - brightness) / 10)  # Energy savings from dimming
+            "savings": max(2, int(100 - brightness) / 10),  # Energy savings from dimming
         }
 
     async def _setpoint_change(self, point: str, value: float, reason: str):
         """Simulate a setpoint change."""
-        self._emit_event(LifecycleEvent(
-            timestamp=datetime.now(),
-            simulated_hour=self.simulated_time.hour,
-            event_type=EventType.SETPOINT_CHANGE,
-            description=f"Setpoint change: {point} → {value}",
-            details={"point": point, "value": value, "reason": reason}
-        ))
+        self._emit_event(
+            LifecycleEvent(
+                timestamp=datetime.now(),
+                simulated_hour=self.simulated_time.hour,
+                event_type=EventType.SETPOINT_CHANGE,
+                description=f"Setpoint change: {point} → {value}",
+                details={"point": point, "value": value, "reason": reason},
+            )
+        )
 
     async def _inject_fault(self):
         """Inject a fault into equipment."""
@@ -1065,7 +1105,8 @@ class LifecycleOrchestrator:
             if self.current_scenario and self.current_scenario.fault_equipment_type:
                 target_type = self.current_scenario.fault_equipment_type.lower()
                 filtered = [
-                    eq for eq in equipment_list
+                    eq
+                    for eq in equipment_list
                     if target_type in (eq.get("equipment_type", "") or "").lower()
                     or target_type in (eq.get("code", "") or "").lower()
                 ]
@@ -1097,29 +1138,30 @@ class LifecycleOrchestrator:
                 "fault_category": fault_category,
                 "severity": severity,
                 "fault_hour": self.simulated_time.hour,
-                "detected_at": datetime.now().isoformat()
+                "detected_at": datetime.now().isoformat(),
             }
             self.active_faults[eq_code] = fault_info
 
             # Emit fault event
-            self._emit_event(LifecycleEvent(
-                timestamp=datetime.now(),
-                simulated_hour=self.simulated_time.hour,
-                event_type=EventType.EQUIPMENT_FAULT,
-                equipment_id=eq_code,
-                equipment_name=eq_name,
-                description=f"{fault_type} on {eq_name}",
-                details=fault_info
-            ))
+            self._emit_event(
+                LifecycleEvent(
+                    timestamp=datetime.now(),
+                    simulated_hour=self.simulated_time.hour,
+                    event_type=EventType.EQUIPMENT_FAULT,
+                    equipment_id=eq_code,
+                    equipment_name=eq_name,
+                    description=f"{fault_type} on {eq_name}",
+                    details=fault_info,
+                )
+            )
 
             # Degrade equipment health
             current_health = equipment.get("health_score", 80)
             new_health = max(30, current_health - random.randint(15, 30))
 
-            self.equipment_repo.update(eq_code, {
-                "health_score": new_health,
-                "status": "warning" if new_health >= 50 else "critical"
-            })
+            self.equipment_repo.update(
+                eq_code, {"health_score": new_health, "status": "warning" if new_health >= 50 else "critical"}
+            )
 
             # Create prediction in database
             await self._create_prediction(equipment, fault_info)
@@ -1136,7 +1178,7 @@ class LifecycleOrchestrator:
                 self.pending_repairs[eq_code] = {
                     **fault_info,
                     "scheduled_repair_hour": repair_hour,
-                    "work_order_id": None
+                    "work_order_id": None,
                 }
                 logger.info(f"Repair scheduled for {eq_code} at hour {repair_hour}")
 
@@ -1158,20 +1200,22 @@ class LifecycleOrchestrator:
                 "severity": "high" if fault_info["severity"] >= 75 else "medium",
                 "description": f"ML detected: {fault_info['fault_type']}",
                 "status": "active",
-                "model_version": "lifecycle_sim_v1"
+                "model_version": "lifecycle_sim_v1",
             }
 
             self.prediction_repo.create(prediction_data)
 
-            self._emit_event(LifecycleEvent(
-                timestamp=datetime.now(),
-                simulated_hour=self.simulated_time.hour,
-                event_type=EventType.ALERT_GENERATED,
-                equipment_id=fault_info["equipment_code"],
-                equipment_name=fault_info["equipment_name"],
-                description=f"ML prediction created: {fault_info['severity']}% failure probability",
-                details={"prediction": prediction_data}
-            ))
+            self._emit_event(
+                LifecycleEvent(
+                    timestamp=datetime.now(),
+                    simulated_hour=self.simulated_time.hour,
+                    event_type=EventType.ALERT_GENERATED,
+                    equipment_id=fault_info["equipment_code"],
+                    equipment_name=fault_info["equipment_name"],
+                    description=f"ML prediction created: {fault_info['severity']}% failure probability",
+                    details={"prediction": prediction_data},
+                )
+            )
 
         except Exception as e:
             logger.error(f"Prediction creation error: {e}")
@@ -1180,26 +1224,30 @@ class LifecycleOrchestrator:
         """Generate alert and optionally notify Clawd."""
         try:
             # Create work order
-            work_order = await self.work_order_repo.create_work_order({
-                "equipment_id": equipment.get("id"),
-                "title": f"Repair: {fault_info['fault_type']}",
-                "description": f"Automated work order for {fault_info['equipment_name']}: {fault_info['fault_type']}",
-                "priority": "high" if fault_info["severity"] >= 75 else "medium",
-                "status": "scheduled",
-                "created_by": "LIFECYCLE_SIM"
-            })
+            work_order = await self.work_order_repo.create_work_order(
+                {
+                    "equipment_id": equipment.get("id"),
+                    "title": f"Repair: {fault_info['fault_type']}",
+                    "description": f"Automated work order for {fault_info['equipment_name']}: {fault_info['fault_type']}",
+                    "priority": "high" if fault_info["severity"] >= 75 else "medium",
+                    "status": "scheduled",
+                    "created_by": "LIFECYCLE_SIM",
+                }
+            )
 
             wo_code = work_order.get("code", "WO-SIM") if work_order else "WO-SIM"
 
-            self._emit_event(LifecycleEvent(
-                timestamp=datetime.now(),
-                simulated_hour=self.simulated_time.hour,
-                event_type=EventType.WORK_ORDER_CREATED,
-                equipment_id=fault_info["equipment_code"],
-                equipment_name=fault_info["equipment_name"],
-                description=f"Work order {wo_code} created",
-                details={"work_order_code": wo_code, "priority": "high"}
-            ))
+            self._emit_event(
+                LifecycleEvent(
+                    timestamp=datetime.now(),
+                    simulated_hour=self.simulated_time.hour,
+                    event_type=EventType.WORK_ORDER_CREATED,
+                    equipment_id=fault_info["equipment_code"],
+                    equipment_name=fault_info["equipment_name"],
+                    description=f"Work order {wo_code} created",
+                    details={"work_order_code": wo_code, "priority": "high"},
+                )
+            )
 
             # Update pending repair with work order ID
             if fault_info["equipment_code"] in self.pending_repairs:
@@ -1221,15 +1269,17 @@ class LifecycleOrchestrator:
             # For simulation, we just log it
             logger.info(f"[CLAWD] Notification sent for {work_order_code}: {fault_info['fault_type']}")
 
-            self._emit_event(LifecycleEvent(
-                timestamp=datetime.now(),
-                simulated_hour=self.simulated_time.hour,
-                event_type=EventType.TECHNICIAN_DISPATCHED,
-                equipment_id=fault_info["equipment_code"],
-                equipment_name=fault_info["equipment_name"],
-                description=f"Technician notified via Clawd for {work_order_code}",
-                details={"notification_method": "telegram", "work_order": work_order_code}
-            ))
+            self._emit_event(
+                LifecycleEvent(
+                    timestamp=datetime.now(),
+                    simulated_hour=self.simulated_time.hour,
+                    event_type=EventType.TECHNICIAN_DISPATCHED,
+                    equipment_id=fault_info["equipment_code"],
+                    equipment_name=fault_info["equipment_name"],
+                    description=f"Technician notified via Clawd for {work_order_code}",
+                    details={"notification_method": "telegram", "work_order": work_order_code},
+                )
+            )
 
         except Exception as e:
             logger.warning(f"Clawd notification skipped: {e}")
@@ -1250,15 +1300,17 @@ class LifecycleOrchestrator:
         """Simulate technician completing repair."""
         try:
             # Emit repair started
-            self._emit_event(LifecycleEvent(
-                timestamp=datetime.now(),
-                simulated_hour=self.simulated_time.hour,
-                event_type=EventType.REPAIR_COMPLETED,
-                equipment_id=eq_code,
-                equipment_name=repair_info.get("equipment_name"),
-                description=f"Technician completed repair on {repair_info.get('equipment_name')}",
-                details={"fault_type": repair_info.get("fault_type")}
-            ))
+            self._emit_event(
+                LifecycleEvent(
+                    timestamp=datetime.now(),
+                    simulated_hour=self.simulated_time.hour,
+                    event_type=EventType.REPAIR_COMPLETED,
+                    equipment_id=eq_code,
+                    equipment_name=repair_info.get("equipment_name"),
+                    description=f"Technician completed repair on {repair_info.get('equipment_name')}",
+                    details={"fault_type": repair_info.get("fault_type")},
+                )
+            )
 
             # Submit service feedback
             await self._submit_service_feedback(eq_code, repair_info)
@@ -1278,10 +1330,7 @@ class LifecycleOrchestrator:
             equipment_id = repair_info.get("equipment_id", eq_code)
 
             session = await self.feedback_service.start_feedback_session(
-                work_order_id=work_order_id,
-                equipment_id=equipment_id,
-                equipment_code=eq_code,
-                service_type="breakdown"
+                work_order_id=work_order_id, equipment_id=equipment_id, equipment_code=eq_code, service_type="breakdown"
             )
 
             # Submit some readings showing improvement
@@ -1295,7 +1344,7 @@ class LifecycleOrchestrator:
                     1.2,  # Good value
                     FeedbackItemType.READING,
                     unit="mm/s",
-                    notes="Post-repair vibration within normal range"
+                    notes="Post-repair vibration within normal range",
                 )
             elif fault_category == "temperature":
                 await self.feedback_service.submit_feedback_item(
@@ -1304,7 +1353,7 @@ class LifecycleOrchestrator:
                     22.5,
                     FeedbackItemType.READING,
                     unit="°C",
-                    notes="Temperature stable after repair"
+                    notes="Temperature stable after repair",
                 )
 
             # Submit observation
@@ -1313,54 +1362,57 @@ class LifecycleOrchestrator:
                 "observation",
                 f"Repaired {repair_info.get('fault_type')}. Equipment operating normally.",
                 FeedbackItemType.OBSERVATION,
-                notes="Repair successful"
+                notes="Repair successful",
             )
 
             # Complete session (force=True to skip missing items)
-            result = await self.feedback_service.complete_feedback_session(
-                session.session_id,
-                force=True
+            result = await self.feedback_service.complete_feedback_session(session.session_id, force=True)
+
+            self._emit_event(
+                LifecycleEvent(
+                    timestamp=datetime.now(),
+                    simulated_hour=self.simulated_time.hour,
+                    event_type=EventType.FEEDBACK_SUBMITTED,
+                    equipment_id=eq_code,
+                    equipment_name=repair_info.get("equipment_name"),
+                    description=f"Service feedback submitted: health +{result.get('health_score_change', 0)}",
+                    details={
+                        "session_id": session.session_id,
+                        "health_change": result.get("health_score_change", 0),
+                        "items_collected": result.get("items_collected", 0),
+                    },
+                )
             )
 
-            self._emit_event(LifecycleEvent(
-                timestamp=datetime.now(),
-                simulated_hour=self.simulated_time.hour,
-                event_type=EventType.FEEDBACK_SUBMITTED,
-                equipment_id=eq_code,
-                equipment_name=repair_info.get("equipment_name"),
-                description=f"Service feedback submitted: health +{result.get('health_score_change', 0)}",
-                details={
-                    "session_id": session.session_id,
-                    "health_change": result.get("health_score_change", 0),
-                    "items_collected": result.get("items_collected", 0)
-                }
-            ))
-
             # Emit health restored event
-            self._emit_event(LifecycleEvent(
-                timestamp=datetime.now(),
-                simulated_hour=self.simulated_time.hour,
-                event_type=EventType.HEALTH_RESTORED,
-                equipment_id=eq_code,
-                equipment_name=repair_info.get("equipment_name"),
-                description=f"Equipment health restored for {repair_info.get('equipment_name')}",
-                details={"new_status": "normal"}
-            ))
+            self._emit_event(
+                LifecycleEvent(
+                    timestamp=datetime.now(),
+                    simulated_hour=self.simulated_time.hour,
+                    event_type=EventType.HEALTH_RESTORED,
+                    equipment_id=eq_code,
+                    equipment_name=repair_info.get("equipment_name"),
+                    description=f"Equipment health restored for {repair_info.get('equipment_name')}",
+                    details={"new_status": "normal"},
+                )
+            )
 
             # Resolve predictions
             equipment = self.equipment_repo.get_by_id(eq_code)
             if equipment:
                 self.prediction_repo.resolve_by_equipment(equipment.get("id"))
 
-            self._emit_event(LifecycleEvent(
-                timestamp=datetime.now(),
-                simulated_hour=self.simulated_time.hour,
-                event_type=EventType.ALERT_RESOLVED,
-                equipment_id=eq_code,
-                equipment_name=repair_info.get("equipment_name"),
-                description=f"Alert resolved for {repair_info.get('equipment_name')}",
-                details={}
-            ))
+            self._emit_event(
+                LifecycleEvent(
+                    timestamp=datetime.now(),
+                    simulated_hour=self.simulated_time.hour,
+                    event_type=EventType.ALERT_RESOLVED,
+                    equipment_id=eq_code,
+                    equipment_name=repair_info.get("equipment_name"),
+                    description=f"Alert resolved for {repair_info.get('equipment_name')}",
+                    details={},
+                )
+            )
 
         except Exception as e:
             logger.error(f"Service feedback submission error: {e}")
@@ -1369,7 +1421,7 @@ class LifecycleOrchestrator:
         """
         Serialize orchestrator state to JSON-serializable dict for database storage.
         Enables crash recovery by preserving simulation state.
-        
+
         Returns:
             Dict with: simulated_time, days_simulated, active_faults, pending_repairs, recent_events, time_multiplier, occupancy_seed
         """
@@ -1396,67 +1448,72 @@ class LifecycleOrchestrator:
         """
         Restore orchestrator from serialized state (crash recovery).
         Creates new instance and restores state from checkpoint.
-        
+
         Args:
             state_dict: Dict from serialize_state()
-            
+
         Returns:
             LifecycleOrchestrator instance with restored state
         """
         orchestrator = LifecycleOrchestrator()
-        
+
         # Restore time and simulation progress
         orchestrator.simulated_time = datetime.fromisoformat(state_dict["simulated_time"])
         orchestrator.days_simulated = state_dict["days_simulated"]
         orchestrator.time_multiplier = state_dict["time_multiplier"]
         orchestrator._occupancy_seed = state_dict["occupancy_seed"]
-        
+
         # Restore faults and repairs
         orchestrator.active_faults = state_dict.get("active_faults", {})
         orchestrator.pending_repairs = state_dict.get("pending_repairs", {})
-        
+
         # Restore occupancy randomness (deterministic for same seed)
         if orchestrator._occupancy_seed is not None:
             orchestrator._scenario_rng.seed(orchestrator._occupancy_seed)
-        
+
         logger.info(
             f"Restored orchestrator state: day {orchestrator.days_simulated}, "
             f"{len(orchestrator.active_faults)} active faults, "
             f"{len(orchestrator.pending_repairs)} pending repairs"
         )
-        
+
         return orchestrator
 
     async def save_checkpoint(self) -> bool:
         """
         Save current state to database (called every 6 simulated hours).
         Enables resumption from checkpoint if server crashes.
-        
+
         Returns:
             True if saved successfully, False otherwise
         """
         if not self.task_id:
             logger.warning(f"Cannot save checkpoint: task_id is None or empty. days_simulated={self.days_simulated}")
             return False  # No task_id means not a queued task
-            
+
         try:
             from app.database.supabase_client import Supabase
-            
+
             state_snapshot = self.serialize_state()
-            
+
             # Update task in database with checkpoint
-            result = await Supabase.instance().client.table("lifecycle_simulation_tasks") \
-                .update({
-                    "state_snapshot": state_snapshot,
-                    "progress_pct": int((self.days_simulated / 365) * 100) if self.seasonal_modeler else 0,
-                    "days_completed": self.days_simulated,
-                }) \
-                .eq("task_id", str(self.task_id)) \
+            result = (
+                await Supabase.instance()
+                .client.table("lifecycle_simulation_tasks")
+                .update(
+                    {
+                        "state_snapshot": state_snapshot,
+                        "progress_pct": int((self.days_simulated / 365) * 100) if self.seasonal_modeler else 0,
+                        "days_completed": self.days_simulated,
+                    }
+                )
+                .eq("task_id", str(self.task_id))
                 .execute()
-            
+            )
+
             logger.info(f"Checkpoint saved for task {self.task_id}: day {self.days_simulated}")
             return True
-            
+
         except Exception as e:
             logger.error(f"Failed to save checkpoint: {e}")
             return False

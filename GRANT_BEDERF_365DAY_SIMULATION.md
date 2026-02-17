@@ -62,7 +62,7 @@ if email == "grant@wardew.co.za":
         "days_completed": 0,
         "duration_minutes": 30.0,  # 365 days in 30 minutes
     }).execute()
-    
+
     response["demo_auto_start"] = True
     response["demo_scenario"] = "grant_hvac_dali_ai_annual"
     response["demo_task_id"] = task_id
@@ -141,7 +141,7 @@ SCENARIOS = {
         optimization_enabled=True,
         demo_mode=True,  # Continuous AI recommendations
     ),
-    
+
     "grant_solar_bess_ai_annual": ScenarioConfig(
         name="Grant Demo: Solar + BESS + Sentinel AI (365 days)",
         description="3.9 MWp solar + 5 MWh BESS, City Power TOU",
@@ -281,7 +281,7 @@ Every Day:  Save checkpoint to database
 **Database:** `lifecycle_simulation_tasks` table
 
 ```sql
-SELECT * FROM lifecycle_simulation_tasks 
+SELECT * FROM lifecycle_simulation_tasks
 WHERE scenario = 'grant_hvac_dali_ai_annual' LIMIT 1;
 
 -- Results:
@@ -358,7 +358,7 @@ async def save_checkpoint(self) -> bool:
         "occupancy_seed": self._occupancy_seed,
         "recent_events": [...]
     }
-    
+
     supabase.table("lifecycle_simulation_tasks").update({
         "state_snapshot": state_snapshot,
         "progress_pct": int((days_simulated / 365) * 100),
@@ -379,10 +379,10 @@ if checkpoint and is_annual:
     self.time_multiplier = checkpoint["time_multiplier"]
     self.active_faults = checkpoint["active_faults"]
     self.pending_repairs = checkpoint["pending_repairs"]
-    
+
     # Resume from exact same point
     self._task = asyncio.create_task(self._run_simulation())
-    
+
     return {
         "recovered_from_checkpoint": True,
         "days_simulated": self.days_simulated,

@@ -551,3 +551,38 @@ async def get_site_devices(site_id: str) -> List[dict]:
     except Exception as e:
         logger.error(f"Error getting devices for site {site_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/site/{site_id}/status", response_model=dict)
+async def get_site_device_status(site_id: str) -> dict:
+    """Get aggregated status of all devices at a specific site."""
+    try:
+        devices = await device_manager.list_devices_by_site(site_id)
+
+        # Calculate aggregated status
+        total_devices = len(devices)
+        online_devices = sum(1 for d in devices if getattr(d, 'online', True))
+        offline_devices = total_devices - online_devices
+
+        device_statuses = [
+            {
+                "id": d.id,
+                "name": d.name,
+                "type": d.type,
+                "online": getattr(d, 'online', True),
+                "health": getattr(d, 'health', 'unknown')
+            }
+            for d in devices
+        ]
+
+        return {
+            "site_id": site_id,
+            "total_devices": total_devices,
+            "online_devices": online_devices,
+            "offline_devices": offline_devices,
+            "status": "online" if offline_devices == 0 else "warning" if offline_devices < total_devices else "offline",
+            "devices": device_statuses
+        }
+    except Exception as e:
+        logger.error(f"Error getting site device status for {site_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

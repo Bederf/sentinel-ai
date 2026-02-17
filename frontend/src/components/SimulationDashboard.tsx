@@ -282,7 +282,7 @@ function ControlTab({ selectedSiteId: _selectedSiteId }: { selectedSiteId: strin
       if (details.recommendations && Array.isArray(details.recommendations)) {
         const recs = details.recommendations as any[];
         const totalSavings = recs.reduce((sum: number, r: any) => sum + (r.savings || 0), 0);
-        
+
         const rec: OptimizationRecommendation = {
           id: `${aiOptEvent.timestamp}`,
           site_id: "S002",
@@ -602,7 +602,7 @@ function ControlTab({ selectedSiteId: _selectedSiteId }: { selectedSiteId: strin
                 height: "400px",
               }}
             >
-              <Simulation3DViewer 
+              <Simulation3DViewer
                 events={events}
                 isRunning={isRunning}
                 simulatedHour={status?.simulated_hour ?? 0}

@@ -1,6 +1,6 @@
 /**
  * Simulation 3D Viewer - Real-time 3D occupancy visualization for simulations
- * 
+ *
  * Displays:
  * - 3D building floors with people
  * - Stair climbing animations
@@ -27,16 +27,16 @@ interface Simulation3DViewerProps {
  */
 function extractOccupancyFromEvents(events: LiveEvent[]): Person[] {
   const people: Person[] = [];
-  
+
   // Look for occupancy events
   for (const event of events) {
     if (event.event_type === 'occupancy_increase' || event.event_type === 'occupancy_decrease') {
       const occupancyPercent = (event.details?.occupancy_percent ?? 0) as number;
       const floor = Math.floor(occupancyPercent / 25); // Distribute across floors
-      
+
       // Generate person entries based on occupancy
       const personCount = Math.round((occupancyPercent / 100) * 20); // Max 20 people visible
-      
+
       for (let i = 0; i < personCount; i++) {
         const personas = ['worker', 'security', 'cleaner', 'visitor'] as const;
         const now = new Date();
@@ -61,17 +61,17 @@ function extractOccupancyFromEvents(events: LiveEvent[]): Person[] {
       }
     }
   }
-  
+
   return people;
 }
 
 /**
  * 3D Viewer Component
  */
-export function Simulation3DViewer({ 
-  events, 
+export function Simulation3DViewer({
+  events,
   isRunning,
-  simulatedHour 
+  simulatedHour
 }: Simulation3DViewerProps) {
   const [people, setPeople] = useState<Person[]>([]);
 
@@ -107,14 +107,14 @@ export function Simulation3DViewer({
       >
         {/* Camera */}
         <PerspectiveCamera makeDefault position={[20, 15, 30]} fov={60} />
-        
+
         {/* Lighting */}
         <ambientLight intensity={0.6} />
         <directionalLight position={[10, 20, 10]} intensity={0.8} castShadow />
         <pointLight position={[0, 10, 0]} intensity={0.5} />
-        
+
         {/* Controls */}
-        <OrbitControls 
+        <OrbitControls
           autoRotate={false}
           autoRotateSpeed={4}
           enableDamping
@@ -123,7 +123,7 @@ export function Simulation3DViewer({
           minDistance={5}
           maxDistance={100}
         />
-        
+
         {/* Floor grid */}
         <group>
           {[0, 1, 2, 3].map((floor) => (
@@ -133,14 +133,14 @@ export function Simulation3DViewer({
                 <planeGeometry args={[60, 60]} />
                 <meshStandardMaterial color={floor % 2 === 0 ? '#2a2a3e' : '#333350'} />
               </mesh>
-              
+
               {/* Grid lines */}
               <gridHelper args={[60, 10, '#555555', '#444455']} position={[0, 0.01, 0]} />
-              
+
             </group>
           ))}
         </group>
-        
+
         {/* Occupancy markers */}
         {people.length > 0 && (
           <OccupancyMarkers3DEnhanced
@@ -152,7 +152,7 @@ export function Simulation3DViewer({
             }}
           />
         )}
-        
+
         {/* Occupancy counter */}
         <Html position={[-25, 5, 0]}>
           <div
