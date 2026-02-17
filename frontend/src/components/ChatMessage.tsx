@@ -5,8 +5,10 @@
  * Assistant messages appear on the left with dark panel background.
  * Shows a blinking cursor during streaming.
  * Renders markdown content for assistant messages with improved formatting.
+ * Typewriter effect: Characters appear one-by-one during streaming for readability.
  */
 
+import { useState, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 
 interface ChatMessageProps {
@@ -17,6 +19,28 @@ interface ChatMessageProps {
 
 export function ChatMessage({ role, content, isStreaming }: ChatMessageProps) {
   const isUser = role === "user";
+  const [displayedContent, setDisplayedContent] = useState("");
+  const [charIndex, setCharIndex] = useState(0);
+
+  // Typewriter effect: animate characters one-by-one during streaming
+  useEffect(() => {
+    // If not streaming, show full content immediately
+    if (!isStreaming) {
+      setDisplayedContent(content);
+      setCharIndex(0);
+      return;
+    }
+
+    // If streaming, animate characters with slight delay (30ms per char)
+    if (charIndex < content.length) {
+      const timer = setTimeout(() => {
+        setDisplayedContent(content.slice(0, charIndex + 1));
+        setCharIndex(charIndex + 1);
+      }, 30); // 30ms delay per character
+
+      return () => clearTimeout(timer);
+    }
+  }, [content, charIndex, isStreaming]);
 
   // Preprocess markdown content to improve structure
   const preprocessMarkdown = (text: string): string => {
@@ -43,7 +67,9 @@ export function ChatMessage({ role, content, isStreaming }: ChatMessageProps) {
     return processed;
   };
 
-  const processedContent = isUser ? content : preprocessMarkdown(content);
+  // Use displayed content (typewriter effect) during streaming, full content when done
+  const contentToRender = isStreaming ? displayedContent : content;
+  const processedContent = isUser ? contentToRender : preprocessMarkdown(contentToRender);
 
   return (
     <div
