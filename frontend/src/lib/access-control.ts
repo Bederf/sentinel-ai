@@ -28,6 +28,7 @@ export const USER_DEMO_CONFIGS: Record<string, CompanyDemoConfig> = {
       'ai-chat',             // Base: AI Chat assistant
       'digital-twin',        // Base: 3D/2D visualization
       'integrations',        // Base: System Health
+      'control-audit',       // Base: Audit Logs (part of base package for all users)
       'solar',               // Add-on: Solar & BESS (their focus module)
       'control',             // Add-on: Building Controls (needed for solar control)
       'settings',            // Internal: password-protected module management
@@ -52,6 +53,7 @@ export const COMPANY_DEMO_CONFIGS: Record<string, CompanyDemoConfig> = {
       'ai-chat',             // Base: AI Chat assistant
       'digital-twin',        // Base: 3D/2D visualization
       'integrations',        // Base: System Health
+      'control-audit',       // Base: Audit Logs (part of base package for all users)
       'occupancy',           // Add-on: Occupancy monitoring (lighting module)
       'lighting',            // Add-on: Lighting control (lighting module)
       'control',             // Add-on: Building Controls (needed for lighting control)
