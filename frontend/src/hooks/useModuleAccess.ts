@@ -22,10 +22,10 @@ export interface ModuleAccessState {
 
 /**
  * Check if a module is active for the current site and fetch related savings data.
- * 
+ *
  * @param module - Module type to check (e.g., 'control', 'maintenance', 'solar')
  * @returns Module access state with activation status and relevant savings data
- * 
+ *
  * @example
  * const { isActive, savingsData } = useModuleAccess('control')
  * if (!isActive && savingsData) {
@@ -47,7 +47,7 @@ export function useModuleAccess(module: ModuleType | string): ModuleAccessState 
         const siteId = sessionStorage.getItem('sentinel_selected_site') || 'site-002'
 
         // Check if module is active
-        const moduleResponse = await authorizedFetch(`/api/modules/status/${siteId}`)
+        const moduleResponse = await authorizedFetch(`/api/modules/site/${siteId}/active`)
         if (!moduleResponse.ok) {
           throw new Error('Failed to fetch module status')
         }
@@ -70,7 +70,7 @@ export function useModuleAccess(module: ModuleType | string): ModuleAccessState 
               // Find the most relevant/highest-impact recommendation for this module
               if (recommendations && recommendations.length > 0) {
                 const topRecommendation = recommendations[0] // Sorted by impact
-                
+
                 setState(prev => ({
                   ...prev,
                   savingsData: {
