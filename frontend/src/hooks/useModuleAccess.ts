@@ -63,7 +63,7 @@ export function useModuleAccess(module: ModuleType | string): ModuleAccessState 
         if (!moduleActive) {
           try {
             // Fetch recommendations to get savings data for this module
-            const recResponse = await authorizedFetch(`/api/recommendations?module=${module}&site_id=${siteId}`)
+            const recResponse = await authorizedFetch(`/api/modules/site/${siteId}/recommendations?modules=${module}`)
             if (recResponse.ok) {
               const recommendations = await recResponse.json()
 
