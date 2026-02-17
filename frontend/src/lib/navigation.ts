@@ -34,6 +34,7 @@ import {
   Brain,
   Box,
   Lightbulb,
+  History,
 } from "lucide-react";
 import type { ModuleType } from "./moduleRegistry";
 
@@ -64,7 +65,8 @@ export type View =
   | "contracts"
   | "profitability"
   | "budget-report"
-  | "modules";
+  | "modules"
+  | "audit-logs";
 
 export type NavCategory = "base" | "addon" | "internal";
 
@@ -87,6 +89,7 @@ export const VIEW_TITLES: Record<View, string> = {
   technician: "Technician Chat",
   control: "Control Dashboard",
   "control-audit": "Control Audit Trail",
+  "audit-logs": "Audit Logs",
   optimization: "Loadshedding",
   settings: "Settings",
   integrations: "System Health",
@@ -117,12 +120,14 @@ export const VIEW_TITLES: Record<View, string> = {
  * - System Health: real-time building monitoring
  * - AI Chat: SENTINEL AI assistant
  * - Digital Twin: 3D/2D building visualization
+ * - Audit Logs: system-wide audit trail for compliance and debugging
  */
 export const BASE_NAV_ITEMS: NavItem[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, description: "Overview and AI recommendation", category: "base" },
   { id: "integrations", label: "System Health", icon: Activity, description: "Real-time Health Monitoring", category: "base" },
   { id: "ai-chat", label: "AI Chat", icon: MessageSquare, description: "SENTINEL AI Assistant", category: "base" },
   { id: "digital-twin", label: "Digital Twin", icon: Box, description: "3D/2D Building Visualization", category: "base" },
+  { id: "control-audit", label: "Audit Logs", icon: History, description: "System Audit Trail", category: "base" },
 ];
 
 /**

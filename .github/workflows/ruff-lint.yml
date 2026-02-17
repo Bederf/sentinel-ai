@@ -1,0 +1,47 @@
+name: Ruff Linting
+
+on:
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'backend/**/*.py'
+      - '.pre-commit-config.yaml'
+      - '.github/workflows/ruff-lint.yml'
+  push:
+    branches: [main, develop]
+    paths:
+      - 'backend/**/*.py'
+      - '.pre-commit-config.yaml'
+      - '.github/workflows/ruff-lint.yml'
+
+jobs:
+  ruff-lint:
+    name: Ruff Format & Lint
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: backend/requirements.txt
+      
+      - name: Install ruff
+        run: pip install ruff
+      
+      - name: Check code formatting
+        run: ruff format --check .
+        continue-on-error: false
+      
+      - name: Lint for errors and undefined names (E,F)
+        run: ruff check --select E,F .
+        continue-on-error: false
+      
+      - name: Display ruff version
+        run: ruff --version

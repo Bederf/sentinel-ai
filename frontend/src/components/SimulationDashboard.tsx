@@ -67,6 +67,10 @@ import api from '@/lib/api';
 import type { Site } from '@/lib/api';
 import { PageLoading } from "./PageLoading";
 import { BuildingSelector } from "./BuildingSelector";
+import { SimulationTimeIndicator } from "./SimulationTimeIndicator";
+import { Simulation3DViewer } from "./Simulation3DViewer";
+import { OptimizationRecommendationModal } from "./OptimizationRecommendationModal";
+import type { OptimizationRecommendation, OptimizationAction } from "@/lib/api";
 
 // ---------- Duration presets ----------
 
@@ -218,6 +222,8 @@ function ControlTab({ selectedSiteId: _selectedSiteId }: { selectedSiteId: strin
   const [events, setEvents] = useState<LiveEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showRecommendationModal, setShowRecommendationModal] = useState(false);
+  const [currentRecommendation, setCurrentRecommendation] = useState<OptimizationRecommendation | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Load scenarios once
@@ -267,6 +273,50 @@ function ControlTab({ selectedSiteId: _selectedSiteId }: { selectedSiteId: strin
     if (pollRef.current) clearInterval(pollRef.current);
     pollRef.current = setInterval(pollStatus, 5000);
   }, [pollStatus]);
+
+  // Watch for AI optimization events and show recommendation modal
+  useEffect(() => {
+    const aiOptEvent = events.find((ev) => ev.event_type === "ai_optimization");
+    if (aiOptEvent && aiOptEvent.details) {
+      const details = aiOptEvent.details as any;
+      if (details.recommendations && Array.isArray(details.recommendations)) {
+        const recs = details.recommendations as any[];
+        const totalSavings = recs.reduce((sum: number, r: any) => sum + (r.savings || 0), 0);
+        
+        const rec: OptimizationRecommendation = {
+          id: `${aiOptEvent.timestamp}`,
+          site_id: "S002",
+          timestamp: aiOptEvent.timestamp || new Date().toISOString(),
+          recommendations: recs.map((r: any) => ({
+            equipment_id: r.equipment || "unknown",
+            equipment_name: r.equipment || "unknown",
+            point_name: r.control_point || "setpoint",
+            current_value: 21,
+            recommended_value: typeof r.target_value === "number" ? r.target_value : 22,
+          } as OptimizationAction)),
+          projected_savings: {
+            energy_kwh: totalSavings,
+            cost_zar_per_hour: totalSavings * 5,
+            percentage_improvement: Math.min(35, totalSavings),
+          },
+          confidence: 0.85,
+          reasoning: `AI optimization (${details.context}) - Occupancy ${details.occupancy_percent}%, Daylight ${details.daylight_factor}%`,
+        };
+        setCurrentRecommendation(rec);
+        setShowRecommendationModal(true);
+      }
+    }
+  }, [events]);
+
+  const handleApproveRecommendation = async (_recommendationId: string) => {
+    setShowRecommendationModal(false);
+    setCurrentRecommendation(null);
+  };
+
+  const handleRejectRecommendation = async (_recommendationId: string) => {
+    setShowRecommendationModal(false);
+    setCurrentRecommendation(null);
+  };
 
   const handleStart = async () => {
     setLoading(true);
@@ -534,57 +584,102 @@ function ControlTab({ selectedSiteId: _selectedSiteId }: { selectedSiteId: strin
           />
         </div>
 
-        {/* Recent Events */}
-        {events.length > 0 && (
-          <div>
+        {/* 3D Visualization & Recent Events Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* 3D Viewer - 2 columns */}
+          <div className="lg:col-span-2">
             <h4
               className="text-xs font-semibold mb-2 uppercase tracking-wider"
               style={{ color: "var(--color-sentinel-text-secondary)" }}
             >
-              Recent Events
+              3D Occupancy Visualization
             </h4>
-            <div className="space-y-1 max-h-[300px] overflow-y-auto">
-              {events.map((ev, i) => (
-                <div
-                  key={i}
-                  className="flex items-center gap-3 text-xs px-3 py-2 rounded"
-                  style={{
-                    background: "var(--color-sentinel-bg-primary)",
-                    border: "1px solid var(--color-sentinel-border)",
-                  }}
-                >
-                  <span
-                    className="font-mono w-12 flex-shrink-0"
-                    style={{ color: "var(--color-sentinel-text-secondary)" }}
-                  >
-                    {formatHour(ev.hour)}
-                  </span>
-                  <span
-                    className="px-2 py-0.5 rounded text-xs font-medium flex-shrink-0"
-                    style={{
-                      background: eventTypeColor(ev.event_type) + "20",
-                      color: eventTypeColor(ev.event_type),
-                    }}
-                  >
-                    {EVENT_TYPE_LABELS[ev.event_type] ?? ev.event_type}
-                  </span>
-                  <span style={{ color: "var(--color-sentinel-text-primary)" }}>
-                    {ev.description}
-                  </span>
-                  {ev.equipment_name && (
-                    <span
-                      className="ml-auto flex-shrink-0"
-                      style={{ color: "var(--color-sentinel-text-secondary)" }}
-                    >
-                      {ev.equipment_name}
-                    </span>
-                  )}
-                </div>
-              ))}
+            <div
+              className="rounded-md overflow-hidden"
+              style={{
+                background: "var(--color-sentinel-bg-primary)",
+                border: "1px solid var(--color-sentinel-border)",
+                height: "400px",
+              }}
+            >
+              <Simulation3DViewer 
+                events={events}
+                isRunning={isRunning}
+                simulatedHour={status?.simulated_hour ?? 0}
+              />
             </div>
           </div>
-        )}
+
+          {/* Recent Events - 1 column */}
+          {events.length > 0 && (
+            <div>
+              <h4
+                className="text-xs font-semibold mb-2 uppercase tracking-wider"
+                style={{ color: "var(--color-sentinel-text-secondary)" }}
+              >
+                Recent Events
+              </h4>
+              <div className="space-y-1 max-h-[400px] overflow-y-auto">
+                {events.map((ev, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center gap-3 text-xs px-3 py-2 rounded"
+                    style={{
+                      background: "var(--color-sentinel-bg-primary)",
+                      border: "1px solid var(--color-sentinel-border)",
+                    }}
+                  >
+                    <span
+                      className="font-mono w-12 flex-shrink-0"
+                      style={{ color: "var(--color-sentinel-text-secondary)" }}
+                    >
+                      {formatHour(ev.hour)}
+                    </span>
+                    <span
+                      className="px-2 py-0.5 rounded text-xs font-medium flex-shrink-0"
+                      style={{
+                        background: eventTypeColor(ev.event_type) + "20",
+                        color: eventTypeColor(ev.event_type),
+                      }}
+                    >
+                      {EVENT_TYPE_LABELS[ev.event_type] ?? ev.event_type}
+                    </span>
+                    <span style={{ color: "var(--color-sentinel-text-primary)" }}>
+                      {ev.description}
+                    </span>
+                    {ev.equipment_name && (
+                      <span
+                        className="ml-auto flex-shrink-0"
+                        style={{ color: "var(--color-sentinel-text-secondary)" }}
+                      >
+                        {ev.equipment_name}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* AI Optimization Recommendation Modal */}
+      {currentRecommendation && (
+        <OptimizationRecommendationModal
+          isOpen={showRecommendationModal}
+          onClose={() => {
+            setShowRecommendationModal(false);
+            setCurrentRecommendation(null);
+          }}
+          recommendation={currentRecommendation}
+          onApprove={handleApproveRecommendation}
+          onReject={handleRejectRecommendation}
+          siteName="Simulation"
+        />
+      )}
+
+      {/* Simulation Time Indicator - Sun/Moon Floating Widget */}
+      <SimulationTimeIndicator simulationRunning={isRunning} siteId={_selectedSiteId} />
     </div>
   );
 }

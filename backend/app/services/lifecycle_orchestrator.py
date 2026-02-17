@@ -441,8 +441,39 @@ class LifecycleOrchestrator:
         self.paused = False
 
     def get_status(self) -> Dict[str, Any]:
-        """Get current simulation status."""
+        """Get current simulation status including weather and seasonal data."""
         elapsed_real = (datetime.now() - self.real_start_time).total_seconds() if self.real_start_time else 0
+        
+        # Calculate progress percentage
+        total_iterations = 8760 if self.seasonal_modeler is not None else 24
+        progress_percent = int((self.days_simulated * 24 / total_iterations) * 100) if total_iterations > 0 else 0
+
+        # Get seasonal/weather data if available
+        current_season = ""
+        is_raining = False
+        cloud_cover = 0
+        ambient_temp = 22.0
+        solar_efficiency = 100.0
+        
+        if self.seasonal_modeler:
+            current_date = self.simulated_time.date()
+            current_season = self.seasonal_modeler.get_season_name(current_date)
+            
+            # Get weather data
+            weather = self.seasonal_modeler.get_weather(current_date)
+            is_raining = weather.get("is_raining", False)
+            cloud_cover = weather.get("cloud_cover", 0)
+            ambient_temp = weather.get("temperature", 22.0)
+            
+            # Calculate solar efficiency based on time and weather
+            current_hour = self.simulated_time.hour
+            if 6 <= current_hour < 18:  # Daytime
+                base_efficiency = 100 - (cloud_cover * 0.8)
+                if is_raining:
+                    base_efficiency *= 0.3  # Rain reduces efficiency significantly
+                solar_efficiency = max(10, base_efficiency)
+            else:
+                solar_efficiency = 0
 
         return {
             "running": self.running,
@@ -454,6 +485,12 @@ class LifecycleOrchestrator:
             "events_count": len(self.events),
             "active_faults": len(self.active_faults),
             "pending_repairs": len(self.pending_repairs),
+            "progress_percent": progress_percent,
+            "is_raining": is_raining,
+            "cloud_cover": cloud_cover,
+            "ambient_temp": ambient_temp,
+            "solar_efficiency": solar_efficiency,
+            "current_season": current_season,
             "recent_events": [
                 {
                     "hour": e.simulated_hour,
@@ -466,23 +503,38 @@ class LifecycleOrchestrator:
         }
 
     async def _run_simulation(self):
-        """Main simulation loop - SIMPLIFIED VERSION FOR TESTING."""
+        """Main simulation loop - Lightweight version with hourly event processing."""
         try:
             logger.warning(f"[SIMULATION START] task_id={self.task_id}, is_annual={self.seasonal_modeler is not None}, days={self.days_simulated}, time_mult={self.time_multiplier}")
             
             is_annual = self.seasonal_modeler is not None
             total_iterations = 8760 if is_annual else 24  # 365 days * 24 hours or 24 hours
             iteration = 0
+            last_hour = -1  # Track hour changes for event processing
+            last_checkpoint_hour = -1  # Track checkpoint saves
 
             while self.running and iteration < total_iterations:
                 iteration += 1
                 
-                # Log every iteration to track progress
+                # Log progress periodically
                 if iteration <= 10 or iteration % 500 == 0:
-                    logger.warning(f"[SIMPLE LOOP {iteration}/{total_iterations}] days={self.days_simulated}, running={self.running}")
+                    logger.warning(f"[SIMULATION {iteration}/{total_iterations}] days={self.days_simulated}, hour={self.simulated_time.hour}")
                 
                 try:
-                    # SIMPLIFIED: Just advance time and track days
+                    current_hour = self.simulated_time.hour
+                    
+                    # Process hour change - generate events for this hour
+                    if current_hour != last_hour:
+                        await self._process_hour(current_hour)
+                        last_hour = current_hour
+                    
+                    # Save checkpoint every 6 simulated hours for crash recovery
+                    if is_annual and (current_hour % 6 == 0):
+                        if current_hour != last_checkpoint_hour:
+                            await self.save_checkpoint()
+                            last_checkpoint_hour = current_hour
+                    
+                    # Advance time by 1 minute
                     self.simulated_time += timedelta(minutes=1)
                     
                     # Track day transitions
@@ -490,15 +542,12 @@ class LifecycleOrchestrator:
                         self.days_simulated += 1
                         if is_annual:
                             logger.warning(f"[DAY COMPLETE] Day {self.days_simulated}/365")
-                            
                             # Update database with progress every day
                             await self._update_progress_to_db(iteration, total_iterations)
                     
                     # Sleep for the calculated time multiplier
                     sleep_duration = self.time_multiplier / 60
-                    logger.debug(f"[SLEEP] iteration={iteration}, duration={sleep_duration:.6f}s")
                     await asyncio.sleep(sleep_duration)
-                    logger.debug(f"[AWAKE] iteration={iteration}, resuming")
                     
                 except asyncio.CancelledError:
                     logger.warning(f"[CANCELLED] iteration={iteration}, task was cancelled")
@@ -543,7 +592,7 @@ class LifecycleOrchestrator:
             self.running = False
 
     async def _process_hour(self, hour: int):
-        """Process events for the given simulated hour."""
+        """Process events for the given simulated hour - Lightweight version (no faults/repairs)."""
         logger.info(f"Processing simulated hour: {hour:02d}:00 (Day {self.days_simulated + 1}/365)" if self.seasonal_modeler else f"Processing simulated hour: {hour:02d}:00")
 
         # Midnight: daily summary for annual simulations
@@ -573,21 +622,13 @@ class LifecycleOrchestrator:
         elif hour == 10:
             await self._ai_optimization("mid_morning")
 
-        # Peak load - potential fault time
+        # Peak load period
         elif hour == 11:
             await self._peak_load()
-            if self.current_scenario and self.current_scenario.fault_hour == 11:
-                await self._inject_fault()
 
-        # Afternoon
+        # Afternoon optimization
         elif hour == 14:
             await self._ai_optimization("afternoon")
-            # Check for scheduled repairs
-            await self._check_pending_repairs()
-
-        # Late afternoon
-        elif hour == 16:
-            await self._check_pending_repairs()
 
         # Evening wind-down
         elif hour == 18:
@@ -596,17 +637,6 @@ class LifecycleOrchestrator:
         # Night mode
         elif hour == 22:
             await self._night_mode()
-
-        # Check for random faults based on probability (with seasonal adjustment)
-        if self.current_scenario:
-            base_probability = self.current_scenario.fault_probability / 24
-            seasonal_probability = self._get_seasonal_fault_probability(base_probability)
-            if random.random() < seasonal_probability:
-                if not self.current_scenario.fault_hour:  # Only if not scheduled
-                    await self._inject_fault()
-
-        # Check pending repairs every hour
-        await self._check_pending_repairs()
 
     async def _building_wake(self):
         """Simulate building morning startup."""

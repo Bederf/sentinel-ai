@@ -1219,13 +1219,15 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose, u
             </div>
           </div>
 
-          {/* Top: Solar Overview */}
-          <SolarOverviewPanel siteId={solarSiteId} />
+          {/* Row 1: Solar Overview (left) + Energy Flow (right) for better balance */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <SolarOverviewPanel siteId={solarSiteId} />
+            <div className="min-w-0">
+              <EnergyFlowDiagram siteId={solarSiteId} />
+            </div>
+          </div>
 
-          {/* Middle: Energy Flow Diagram */}
-          <EnergyFlowDiagram siteId={solarSiteId} />
-
-          {/* Bottom: BESS + Inverter Matrix side by side */}
+          {/* Row 2: BESS + Inverter Matrix side by side */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <BESSStatusPanel siteId={solarSiteId} />
             <InverterStatusMatrix siteId={solarSiteId} />

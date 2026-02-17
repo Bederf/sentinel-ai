@@ -6,7 +6,7 @@
  */
 
 import React, { useEffect, useState } from 'react'
-import { Card, Metric, Text, ProgressBar, Flex, Grid } from '@tremor/react'
+import { Metric, Text, ProgressBar, Flex, Grid } from '@tremor/react'
 import { ArrowUp, Zap, TrendingUp } from 'lucide-react'
 import { fetchAnnualSummary, startAnnualSimulation, pollSimulationStatus } from '@/lib/api/solarAnnual'
 import type { AnnualSummary } from '@/lib/api/solarAnnual'
@@ -121,20 +121,26 @@ export function SolarAnnualCard({ siteId, onSimulationComplete }: SolarAnnualCar
 
   if (loading) {
     return (
-      <Card className="bg-gradient-to-br from-amber-50 to-yellow-50 border border-amber-200">
-        <div className="space-y-4">
-          <Flex alignItems="center" justifyContent="start" className="gap-3">
-            <Zap className="w-5 h-5 text-amber-600" />
-            <Text className="font-semibold">Solar + BESS Annual Simulation</Text>
-          </Flex>
-          <div>
-            <Text className="text-sm text-gray-600 mb-2">
-              Generating 365-day results... {simulationProgress}%
-            </Text>
-            <ProgressBar value={simulationProgress} className="h-2" />
-          </div>
+      <div
+        className="rounded-lg border p-4 space-y-4"
+        style={{
+          background: 'var(--color-sentinel-bg-panel)',
+          borderColor: 'var(--color-sentinel-border)',
+        }}
+      >
+        <Flex alignItems="center" justifyContent="start" className="gap-3">
+          <Zap className="w-5 h-5" style={{ color: 'var(--color-sentinel-amber)' }} />
+          <Text className="font-semibold" style={{ color: 'var(--color-sentinel-text-primary)' }}>
+            Solar + BESS Annual Simulation
+          </Text>
+        </Flex>
+        <div>
+          <Text className="text-sm mb-2" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
+            Generating 365-day results... {simulationProgress}%
+          </Text>
+          <ProgressBar value={simulationProgress} className="h-2" />
         </div>
-      </Card>
+      </div>
     )
   }
 
@@ -143,127 +149,146 @@ export function SolarAnnualCard({ siteId, onSimulationComplete }: SolarAnnualCar
   const formatZAR = (value: number) => `R${(value / 1000).toFixed(1)}k`
   const formatKWh = (value: number) => `${(value / 1000).toFixed(0)}k kWh`
 
+  const panelStyle = {
+    background: 'var(--color-sentinel-bg-secondary)',
+    border: '1px solid var(--color-sentinel-border)',
+  }
+  const labelStyle = { color: 'var(--color-sentinel-text-secondary)' }
+  const subLabelStyle = { color: 'var(--color-sentinel-text-disabled)' }
+
   return (
-    <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200">
-      <div className="space-y-6">
-        {/* Header */}
-        <Flex alignItems="center" justifyContent="between">
-          <Flex alignItems="center" justifyContent="start" className="gap-3">
-            <Zap className="w-5 h-5 text-green-600" />
-            <Text className="font-semibold">Annual Simulation Results</Text>
-          </Flex>
-          <Text className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded">
-            365 days
+    <div
+      className="rounded-lg border p-4 space-y-6"
+      style={{
+        background: 'var(--color-sentinel-bg-panel)',
+        borderColor: 'var(--color-sentinel-border)',
+      }}
+    >
+      {/* Header */}
+      <Flex alignItems="center" justifyContent="between">
+        <Flex alignItems="center" justifyContent="start" className="gap-3">
+          <Zap className="w-5 h-5" style={{ color: 'var(--color-sentinel-amber)' }} />
+          <Text className="font-semibold" style={{ color: 'var(--color-sentinel-text-primary)' }}>
+            Annual Simulation Results
           </Text>
         </Flex>
+        <span
+          className="text-xs px-2 py-1 rounded"
+          style={{
+            color: 'var(--color-sentinel-amber)',
+            background: 'rgba(250, 204, 21, 0.15)',
+          }}
+        >
+          365 days
+        </span>
+      </Flex>
 
-        {/* Key Metrics Grid */}
-        <Grid className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Annual Savings */}
-          <div className="bg-white rounded-lg p-4 border border-green-100">
-            <Flex alignItems="end" justifyContent="start" className="gap-2">
-              <div>
-                <Text className="text-xs text-gray-600">Annual Savings</Text>
-                <Metric className="text-green-600">
-                  {formatZAR(summary.annual_savings_zar)}
-                </Metric>
-                <Text className="text-xs text-gray-500">
-                  {summary.annual_savings_pct.toFixed(1)}% vs Standard EMS
-                </Text>
-              </div>
-              <TrendingUp className="w-5 h-5 text-green-500" />
-            </Flex>
-          </div>
+      {/* Key Metrics Grid — 2×2 square (two per row) */}
+      <Grid className="grid grid-cols-2 gap-4">
+        {/* Annual Savings */}
+        <div className="rounded-lg p-4" style={panelStyle}>
+          <Flex alignItems="end" justifyContent="start" className="gap-2">
+            <div>
+              <Text className="text-xs" style={labelStyle}>Annual Savings</Text>
+              <Metric className="text-lg" style={{ color: 'var(--color-sentinel-green)' }}>
+                {formatZAR(summary.annual_savings_zar)}
+              </Metric>
+              <Text className="text-xs" style={subLabelStyle}>
+                {summary.annual_savings_pct.toFixed(1)}% vs Standard EMS
+              </Text>
+            </div>
+            <TrendingUp className="w-5 h-5 flex-shrink-0" style={{ color: 'var(--color-sentinel-green)' }} />
+          </Flex>
+        </div>
 
-          {/* Solar Generation */}
-          <div className="bg-white rounded-lg p-4 border border-amber-100">
-            <Text className="text-xs text-gray-600">Solar Generated</Text>
-            <Metric className="text-amber-600">
-              {formatKWh(summary.total_solar_kwh)}
-            </Metric>
-            <Text className="text-xs text-gray-500">
-              {summary.capacity_factor_pct.toFixed(1)}% capacity factor
-            </Text>
-          </div>
-
-          {/* Self-Consumption */}
-          <div className="bg-white rounded-lg p-4 border border-blue-100">
-            <Text className="text-xs text-gray-600">Self-Consumption</Text>
-            <Metric className="text-blue-600">
-              {summary.self_consumption_pct.toFixed(1)}%
-            </Metric>
-            <Text className="text-xs text-gray-500">
-              {formatKWh(summary.total_self_consumption_kwh)} used on-site
-            </Text>
-          </div>
-
-          {/* Grid Import */}
-          <div className="bg-white rounded-lg p-4 border border-purple-100">
-            <Text className="text-xs text-gray-600">Grid Import</Text>
-            <Metric className="text-purple-600">
-              {formatKWh(summary.total_grid_import_kwh)}
-            </Metric>
-            <Text className="text-xs text-gray-500">
-              -{(((summary.total_solar_kwh + summary.total_grid_import_kwh - summary.total_grid_export_kwh) / summary.total_solar_kwh) * 100 - 100).toFixed(0)}% vs no solar
-            </Text>
-          </div>
-        </Grid>
-
-        {/* ML Learning Curve Preview */}
-        {summary.learning_curve && (
-          <div className="bg-white rounded-lg p-4 border border-blue-100">
-            <Text className="text-xs font-semibold text-gray-700 mb-3">
-              AI Learning Progression
-            </Text>
-            <Grid className="grid grid-cols-3 gap-3">
-              <div>
-                <Text className="text-xs text-gray-500">Month 1-2</Text>
-                <Text className="text-sm font-semibold text-blue-600">
-                  {summary.learning_curve[0]?.savings_pct.toFixed(1)}%
-                </Text>
-                <Text className="text-xs text-gray-400">Learning Phase</Text>
-              </div>
-              <div>
-                <Text className="text-xs text-gray-500">Month 3-6</Text>
-                <Text className="text-sm font-semibold text-blue-600">
-                  {summary.learning_curve[3]?.savings_pct.toFixed(1)}%
-                </Text>
-                <Text className="text-xs text-gray-400">Optimization</Text>
-              </div>
-              <div>
-                <Text className="text-xs text-gray-500">Month 7-12</Text>
-                <Text className="text-sm font-semibold text-blue-600">
-                  {summary.learning_curve[11]?.savings_pct.toFixed(1)}%
-                </Text>
-                <Text className="text-xs text-gray-400">Mature Phase</Text>
-              </div>
-            </Grid>
-          </div>
-        )}
-
-        {/* Monthly Breakdown Summary */}
-        <div className="bg-white rounded-lg p-4 border border-gray-100">
-          <Text className="text-xs font-semibold text-gray-700 mb-3">
-            Seasonal Breakdown
+        {/* Solar Generation */}
+        <div className="rounded-lg p-4" style={panelStyle}>
+          <Text className="text-xs" style={labelStyle}>Solar Generated</Text>
+          <Metric className="text-lg" style={{ color: 'var(--color-sentinel-amber)' }}>
+            {formatKWh(summary.total_solar_kwh)}
+          </Metric>
+          <Text className="text-xs" style={subLabelStyle}>
+            {summary.capacity_factor_pct.toFixed(1)}% capacity factor
           </Text>
-          <Grid className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            {summary.seasonal_data.map((season) => (
-              <div key={season.season}>
-                <Text className="text-xs text-gray-500 capitalize">
-                  {season.season}
-                </Text>
-                <Text className="text-sm font-semibold text-gray-700">
-                  {formatKWh(season.total_solar_kwh)}
-                </Text>
-                <Text className="text-xs text-gray-400">
-                  {season.avg_savings_pct.toFixed(1)}% savings
-                </Text>
-              </div>
-            ))}
+        </div>
+
+        {/* Self-Consumption */}
+        <div className="rounded-lg p-4" style={panelStyle}>
+          <Text className="text-xs" style={labelStyle}>Self-Consumption</Text>
+          <Metric className="text-lg" style={{ color: 'var(--color-sentinel-blue)' }}>
+            {summary.self_consumption_pct.toFixed(1)}%
+          </Metric>
+          <Text className="text-xs" style={subLabelStyle}>
+            {formatKWh(summary.total_self_consumption_kwh)} used on-site
+          </Text>
+        </div>
+
+        {/* Grid Import */}
+        <div className="rounded-lg p-4" style={panelStyle}>
+          <Text className="text-xs" style={labelStyle}>Grid Import</Text>
+          <Metric className="text-lg" style={{ color: 'var(--color-sentinel-text-primary)' }}>
+            {formatKWh(summary.total_grid_import_kwh)}
+          </Metric>
+          <Text className="text-xs" style={subLabelStyle}>
+            -{(((summary.total_solar_kwh + summary.total_grid_import_kwh - summary.total_grid_export_kwh) / summary.total_solar_kwh) * 100 - 100).toFixed(0)}% vs no solar
+          </Text>
+        </div>
+      </Grid>
+
+      {/* ML Learning Curve Preview */}
+      {summary.learning_curve && (
+        <div className="rounded-lg p-4" style={panelStyle}>
+          <Text className="text-xs font-semibold mb-3" style={{ color: 'var(--color-sentinel-text-primary)' }}>
+            AI Learning Progression
+          </Text>
+          <Grid className="grid grid-cols-3 gap-3">
+            <div>
+              <Text className="text-xs" style={labelStyle}>Month 1-2</Text>
+              <Text className="text-sm font-semibold" style={{ color: 'var(--color-sentinel-blue)' }}>
+                {summary.learning_curve[0]?.savings_pct.toFixed(1)}%
+              </Text>
+              <Text className="text-xs" style={subLabelStyle}>Learning Phase</Text>
+            </div>
+            <div>
+              <Text className="text-xs" style={labelStyle}>Month 3-6</Text>
+              <Text className="text-sm font-semibold" style={{ color: 'var(--color-sentinel-blue)' }}>
+                {summary.learning_curve[3]?.savings_pct.toFixed(1)}%
+              </Text>
+              <Text className="text-xs" style={subLabelStyle}>Optimization</Text>
+            </div>
+            <div>
+              <Text className="text-xs" style={labelStyle}>Month 7-12</Text>
+              <Text className="text-sm font-semibold" style={{ color: 'var(--color-sentinel-blue)' }}>
+                {summary.learning_curve[11]?.savings_pct.toFixed(1)}%
+              </Text>
+              <Text className="text-xs" style={subLabelStyle}>Mature Phase</Text>
+            </div>
           </Grid>
         </div>
+      )}
+
+      {/* Seasonal Breakdown */}
+      <div className="rounded-lg p-4" style={panelStyle}>
+        <Text className="text-xs font-semibold mb-3" style={{ color: 'var(--color-sentinel-text-primary)' }}>
+          Seasonal Breakdown
+        </Text>
+        <Grid className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {summary.seasonal_data.map((season) => (
+            <div key={season.season}>
+              <Text className="text-xs capitalize" style={labelStyle}>
+                {season.season}
+              </Text>
+              <Text className="text-sm font-semibold" style={{ color: 'var(--color-sentinel-text-primary)' }}>
+                {formatKWh(season.total_solar_kwh)}
+              </Text>
+              <Text className="text-xs" style={subLabelStyle}>
+                {season.avg_savings_pct.toFixed(1)}% savings
+              </Text>
+            </div>
+          ))}
+        </Grid>
       </div>
-    </Card>
+    </div>
   )
 }
 

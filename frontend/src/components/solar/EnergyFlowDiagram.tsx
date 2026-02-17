@@ -191,9 +191,12 @@ export function EnergyFlowDiagram({ siteId }: EnergyFlowDiagramProps) {
         </div>
       </div>
 
-      {/* Flow Diagram */}
+      {/* Flow Diagram — viewBox 0 0 600 220; nodes aligned to line endpoints */}
       <div className="p-6">
-        <div className="relative" style={{ minHeight: "220px" }}>
+        <div
+          className="relative w-full"
+          style={{ aspectRatio: "600/220", minHeight: "200px" }}
+        >
           {/* SVG for flow paths */}
           <svg
             className="absolute inset-0 w-full h-full"
@@ -232,7 +235,7 @@ export function EnergyFlowDiagram({ siteId }: EnergyFlowDiagramProps) {
             {flows[1].active && (
               <g>
                 <line
-                  x1="90" y1="90" x2="90" y2="160"
+                  x1="90" y1="90" x2="90" y2="187"
                   stroke={flows[1].color}
                   strokeWidth={Math.max(2, Math.min(6, flows[1].power_kw / 200))}
                   strokeDasharray="8 4"
@@ -240,7 +243,7 @@ export function EnergyFlowDiagram({ siteId }: EnergyFlowDiagramProps) {
                 >
                   <animate attributeName="stroke-dashoffset" from="24" to="0" dur="1.5s" repeatCount="indefinite" />
                 </line>
-                <text x="100" y="130" fill={flows[1].color} fontSize="10" fontWeight="bold">
+                <text x="100" y="138" fill={flows[1].color} fontSize="10" fontWeight="bold">
                   {flows[1].power_kw.toFixed(0)} kW
                 </text>
               </g>
@@ -286,7 +289,7 @@ export function EnergyFlowDiagram({ siteId }: EnergyFlowDiagramProps) {
             {flows[4].active && (
               <g>
                 <line
-                  x1="130" y1="180" x2="260" y2="130"
+                  x1="110" y1="187" x2="260" y2="130"
                   stroke={flows[4].color}
                   strokeWidth={Math.max(2, Math.min(6, flows[4].power_kw / 200))}
                   strokeDasharray="8 4"
@@ -294,114 +297,139 @@ export function EnergyFlowDiagram({ siteId }: EnergyFlowDiagramProps) {
                 >
                   <animate attributeName="stroke-dashoffset" from="24" to="0" dur="1.5s" repeatCount="indefinite" />
                 </line>
-                <text x="180" y="170" fill={flows[4].color} fontSize="10" fontWeight="bold">
+                <text x="180" y="168" fill={flows[4].color} fontSize="10" fontWeight="bold">
                   {flows[4].power_kw.toFixed(0)} kW
                 </text>
               </g>
             )}
           </svg>
 
-          {/* Node Icons (positioned absolutely over SVG) */}
-          <div className="relative z-10 flex flex-col" style={{ minHeight: "220px" }}>
-            {/* Top row: Solar ... Grid */}
-            <div className="flex justify-between items-start px-4">
-              {/* Solar Node */}
-              <div className="flex flex-col items-center">
-                <div
-                  className="w-16 h-16 rounded-full flex items-center justify-center"
-                  style={{ background: "rgba(250, 204, 21, 0.2)", border: "2px solid #FACC15" }}
-                >
-                  <Sun className="h-7 w-7" style={{ color: "#FACC15" }} />
-                </div>
-                <span className="text-xs font-medium mt-1" style={{ color: "#FACC15" }}>
-                  Solar
-                </span>
-                <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                  {currentGenerationKw.toFixed(0)} kW
-                </span>
+          {/* Node circles aligned to SVG line endpoints (viewBox 600×220) */}
+          <div className="absolute inset-0 z-10 pointer-events-none">
+            {/* Solar — left top (110, 55) */}
+            <div
+              className="absolute flex flex-col items-center"
+              style={{
+                left: "18.33%",
+                top: "25%",
+                transform: "translate(-50%, -50%)",
+              }}
+            >
+              <div
+                className="w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0"
+                style={{ background: "rgba(250, 204, 21, 0.2)", border: "2px solid #FACC15" }}
+              >
+                <Sun className="h-6 w-6" style={{ color: "#FACC15" }} />
               </div>
-
-              {/* Grid Node */}
-              <div className="flex flex-col items-center">
-                <div
-                  className="w-16 h-16 rounded-full flex items-center justify-center"
-                  style={{
-                    background: gridExportKw > 0 ? "rgba(16, 185, 129, 0.2)" : "rgba(239, 68, 68, 0.2)",
-                    border: `2px solid ${gridExportKw > 0 ? "#10B981" : "#EF4444"}`,
-                  }}
-                >
-                  <Plug className="h-7 w-7" style={{ color: gridExportKw > 0 ? "#10B981" : "#EF4444" }} />
-                </div>
-                <span
-                  className="text-xs font-medium mt-1"
-                  style={{ color: gridExportKw > 0 ? "#10B981" : "#EF4444" }}
-                >
-                  Grid
-                </span>
-                <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                  {gridExportKw > 0
-                    ? `Export ${gridExportKw.toFixed(0)} kW`
-                    : `Import ${gridImportKw.toFixed(0)} kW`}
-                </span>
-              </div>
+              <span className="text-xs font-medium mt-1 whitespace-nowrap" style={{ color: "#FACC15" }}>
+                Solar
+              </span>
+              <span className="text-[10px] whitespace-nowrap" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                {currentGenerationKw.toFixed(0)} kW
+              </span>
             </div>
 
-            {/* Center: Building */}
-            <div className="flex justify-center" style={{ marginTop: "-10px" }}>
-              <div className="flex flex-col items-center">
-                <div
-                  className="w-20 h-20 rounded-full flex items-center justify-center"
-                  style={{
-                    background: "rgba(59, 130, 246, 0.2)",
-                    border: "2px solid var(--color-sentinel-blue)",
-                  }}
-                >
-                  <Building2 className="h-8 w-8" style={{ color: "var(--color-sentinel-blue)" }} />
-                </div>
-                <span className="text-xs font-medium mt-1" style={{ color: "var(--color-sentinel-blue)" }}>
-                  Building
-                </span>
-                <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                  {(solarToBuilding + gridToBuilding + bessToBuilding).toFixed(0)} kW load
-                </span>
-              </div>
-            </div>
-
-            {/* Bottom-left: BESS */}
-            <div className="flex justify-start px-4" style={{ marginTop: "-10px" }}>
-              <div className="flex flex-col items-center">
-                <div
-                  className="w-16 h-16 rounded-full flex items-center justify-center"
-                  style={{
-                    background: bessMode === "charging"
-                      ? "rgba(59, 130, 246, 0.2)"
+            {/* BESS — left bottom (110, 187) */}
+            <div
+              className="absolute flex flex-col items-center"
+              style={{
+                left: "18.33%",
+                top: "85%",
+                transform: "translate(-50%, -50%)",
+              }}
+            >
+              <div
+                className="w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0"
+                style={{
+                  background: bessMode === "charging"
+                    ? "rgba(59, 130, 246, 0.2)"
+                    : bessMode === "discharging"
+                    ? "rgba(139, 92, 246, 0.2)"
+                    : "rgba(107, 114, 128, 0.2)",
+                  border: `2px solid ${
+                    bessMode === "charging"
+                      ? "#3B82F6"
                       : bessMode === "discharging"
-                      ? "rgba(139, 92, 246, 0.2)"
-                      : "rgba(107, 114, 128, 0.2)",
-                    border: `2px solid ${
+                      ? "#8B5CF6"
+                      : "#6B7280"
+                  }`,
+                }}
+              >
+                <Battery
+                  className="h-6 w-6"
+                  style={{
+                    color:
                       bessMode === "charging"
                         ? "#3B82F6"
                         : bessMode === "discharging"
                         ? "#8B5CF6"
-                        : "#6B7280"
-                    }`,
+                        : "#6B7280",
                   }}
-                >
-                  <Battery className="h-7 w-7" style={{
-                    color: bessMode === "charging"
-                      ? "#3B82F6"
-                      : bessMode === "discharging"
-                      ? "#8B5CF6"
-                      : "#6B7280",
-                  }} />
-                </div>
-                <span className="text-xs font-medium mt-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                  BESS
-                </span>
-                <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                  {bessSocPercent.toFixed(0)}% SOC &mdash; {bessMode}
-                </span>
+                />
               </div>
+              <span className="text-xs font-medium mt-1 whitespace-nowrap" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                BESS
+              </span>
+              <span className="text-[10px] whitespace-nowrap" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                {bessSocPercent.toFixed(0)}% SOC &mdash; {bessMode}
+              </span>
+            </div>
+
+            {/* Building — center (300, 120) */}
+            <div
+              className="absolute flex flex-col items-center"
+              style={{
+                left: "50%",
+                top: "54.5%",
+                transform: "translate(-50%, -50%)",
+              }}
+            >
+              <div
+                className="w-16 h-16 rounded-full flex items-center justify-center flex-shrink-0"
+                style={{
+                  background: "rgba(59, 130, 246, 0.2)",
+                  border: "2px solid var(--color-sentinel-blue)",
+                }}
+              >
+                <Building2 className="h-7 w-7" style={{ color: "var(--color-sentinel-blue)" }} />
+              </div>
+              <span className="text-xs font-medium mt-1 whitespace-nowrap" style={{ color: "var(--color-sentinel-blue)" }}>
+                Building
+              </span>
+              <span className="text-[10px] whitespace-nowrap" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                {(solarToBuilding + gridToBuilding + bessToBuilding).toFixed(0)} kW load
+              </span>
+            </div>
+
+            {/* Grid — right (470, 80) */}
+            <div
+              className="absolute flex flex-col items-center"
+              style={{
+                left: "78.33%",
+                top: "36.4%",
+                transform: "translate(-50%, -50%)",
+              }}
+            >
+              <div
+                className="w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0"
+                style={{
+                  background: gridExportKw > 0 ? "rgba(16, 185, 129, 0.2)" : "rgba(239, 68, 68, 0.2)",
+                  border: `2px solid ${gridExportKw > 0 ? "#10B981" : "#EF4444"}`,
+                }}
+              >
+                <Plug className="h-6 w-6" style={{ color: gridExportKw > 0 ? "#10B981" : "#EF4444" }} />
+              </div>
+              <span
+                className="text-xs font-medium mt-1 whitespace-nowrap"
+                style={{ color: gridExportKw > 0 ? "#10B981" : "#EF4444" }}
+              >
+                Grid
+              </span>
+              <span className="text-[10px] whitespace-nowrap" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                {gridExportKw > 0
+                  ? `Export ${gridExportKw.toFixed(0)} kW`
+                  : `Import ${gridImportKw.toFixed(0)} kW`}
+              </span>
             </div>
           </div>
         </div>
