@@ -51,11 +51,13 @@ class ApiKeyCreateRequest(BaseModel):
 
 class RefreshTokenRequest(BaseModel):
     """SECURITY: Refresh token must be in request body, not URL (Phase 75-07)"""
+
     refresh_token: str = Field(..., description="Valid refresh token")
 
 
 class AccessRequestCreateRequest(BaseModel):
     """Public access request submitted from the login screen."""
+
     email: EmailStr
     full_name: Optional[str] = None
     company: Optional[str] = None
@@ -109,6 +111,7 @@ def _record_failed_attempt(identifier: str) -> None:
     """Record a failed login attempt for *identifier*."""
     _login_attempts[identifier].append(datetime.utcnow())
 
+
 # Demo users store - in production this would be in Supabase
 # Email -> User mapping
 _DEMO_USERS = {
@@ -151,14 +154,14 @@ _DEMO_USERS = {
         "user_id": "wardew-grant-001",
         "email": "grant@wardew.co.za",
         "full_name": "Grant - Wardew",
-        "role": SentinelRole.AUDITOR,  # Read-only access for Wardew demo
+        "role": SentinelRole.OPERATOR,  # Operator access for production demo
     },
     # Solar/BESS Demo User
     "bederf@protonmail.com": {
         "user_id": "bederf-solar-001",
         "email": "bederf@protonmail.com",
         "full_name": "Bederf - Solar Demo",
-        "role": SentinelRole.AUDITOR,  # Read-only for demo
+        "role": SentinelRole.OPERATOR,  # Operator access for production demo
     },
 }
 
@@ -208,7 +211,6 @@ async def login_with_email(request: Request, email: str):
         LoginResponse with JWT token, user info, role, and MFA status
     """
     try:
-
         email = email.strip().lower()
 
         # Brute-force check (Phase 58-04 M-5) — keyed by email
@@ -253,6 +255,7 @@ async def login_with_email(request: Request, email: str):
                 from app.database.repositories.login_audit_repository import (
                     get_login_audit_repository,
                 )
+
                 audit_repo = get_login_audit_repository()
                 audit_repo.log_login(
                     user_email=email,
@@ -290,12 +293,16 @@ async def login_with_email(request: Request, email: str):
         refresh_token = _create_jwt_token(user_info, token_type="refresh")
         refresh_payload = validate_jwt_token(refresh_token, required_token_type="refresh") or {}
         refresh_jti = refresh_payload.get("jti", "")
-        session_id = session_service.create_session(
-            user_id=user_info["user_id"],
-            ip=source_ip,
-            user_agent=user_agent,
-            token_jti=refresh_jti,
-        ) if refresh_jti else None
+        session_id = (
+            session_service.create_session(
+                user_id=user_info["user_id"],
+                ip=source_ip,
+                user_agent=user_agent,
+                token_jti=refresh_jti,
+            )
+            if refresh_jti
+            else None
+        )
 
         # Grant default building access for new users
         if is_new_user:
@@ -303,6 +310,7 @@ async def login_with_email(request: Request, email: str):
                 from app.database.repositories.user_site_access_repository import (
                     get_user_site_access_repository,
                 )
+
                 access_repo = get_user_site_access_repository()
                 if access_repo.grant_default_access(email, granted_by="system"):
                     logger.info(f"Granted default building access to new user: {email}")
@@ -312,8 +320,7 @@ async def login_with_email(request: Request, email: str):
 
         # Log the login
         logger.info(
-            f"Login success: email={email} user_id={user_info['user_id']} "
-            f"role={user_info['role'].value} ip={source_ip}"
+            f"Login success: email={email} user_id={user_info['user_id']} role={user_info['role'].value} ip={source_ip}"
         )
 
         # Audit log the login to database
@@ -321,6 +328,7 @@ async def login_with_email(request: Request, email: str):
             from app.database.repositories.login_audit_repository import (
                 get_login_audit_repository,
             )
+
             audit_repo = get_login_audit_repository()
             audit_repo.log_login(
                 user_email=email,
@@ -358,34 +366,46 @@ async def login_with_email(request: Request, email: str):
         if email == "grant@wardew.co.za":
             try:
                 from app.database.supabase_client import Supabase
-                
+
                 # Create simulation task in database (queued status)
                 task_id = str(uuid.uuid4())
                 client = Supabase.instance()
-                
-                response_data = client.table("lifecycle_simulation_tasks").insert({
-                    "task_id": task_id,
-                    "site_id": "site-002",
-                    "scenario": "grant_hvac_dali_ai_annual",
-                    "simulation_type": "lifecycle",
-                    "status": "queued",
-                    "progress_pct": 0,
-                    "days_completed": 0,
-                    "duration_minutes": 30.0,  # 365 days in 30 minutes
-                }).execute()
-                
-                logger.info(f"Auto-started Grant demo: task_id={task_id}, scenario=grant_hvac_dali_ai_annual (365 days → 30 minutes, starting from ZERO)")
-                
+
+                response_data = (
+                    client.table("lifecycle_simulation_tasks")
+                    .insert(
+                        {
+                            "task_id": task_id,
+                            "site_id": "site-002",
+                            "scenario": "grant_hvac_dali_ai_annual",
+                            "simulation_type": "lifecycle",
+                            "status": "queued",
+                            "progress_pct": 0,
+                            "days_completed": 0,
+                            "duration_minutes": 30.0,  # 365 days in 30 minutes
+                        }
+                    )
+                    .execute()
+                )
+
+                logger.info(
+                    f"Auto-started Grant demo: task_id={task_id}, scenario=grant_hvac_dali_ai_annual (365 days → 30 minutes, starting from ZERO)"
+                )
+
                 # Add simulation task info to response
                 response["demo_auto_start"] = True
                 response["demo_type"] = "annual-demonstration"
-                response["demo_description"] = "365-day HVAC + DALI + Sentinel AI simulation with live data accumulation from zero"
+                response["demo_description"] = (
+                    "365-day HVAC + DALI + Sentinel AI simulation with live data accumulation from zero"
+                )
                 response["demo_scenario"] = "grant_hvac_dali_ai_annual"
                 response["demo_status"] = "queued"
                 response["demo_task_id"] = task_id
                 response["demo_duration_minutes"] = 30.0
-                response["demo_note"] = "Simulation runs in background. Dashboard will update live as simulation progresses through 365 days."
-                
+                response["demo_note"] = (
+                    "Simulation runs in background. Dashboard will update live as simulation progresses through 365 days."
+                )
+
             except Exception as e:
                 logger.error(f"Error auto-starting Grant demo: {e}", exc_info=True)
                 response["demo_auto_start"] = False
@@ -397,34 +417,46 @@ async def login_with_email(request: Request, email: str):
         if email == "bederf@protonmail.com":
             try:
                 from app.database.supabase_client import Supabase
-                
+
                 # Create simulation task in database (queued status)
                 task_id = str(uuid.uuid4())
                 client = Supabase.instance()
-                
-                response_data = client.table("lifecycle_simulation_tasks").insert({
-                    "task_id": task_id,
-                    "site_id": "site-002",
-                    "scenario": "grant_solar_bess_ai_annual",
-                    "simulation_type": "lifecycle",
-                    "status": "queued",
-                    "progress_pct": 0,
-                    "days_completed": 0,
-                    "duration_minutes": 30.0,  # 365 days in 30 minutes
-                }).execute()
-                
-                logger.info(f"Auto-started Bederf solar demo: task_id={task_id}, scenario=grant_solar_bess_ai_annual (365 days → 30 minutes, Solar+BESS optimization)")
-                
+
+                response_data = (
+                    client.table("lifecycle_simulation_tasks")
+                    .insert(
+                        {
+                            "task_id": task_id,
+                            "site_id": "site-002",
+                            "scenario": "grant_solar_bess_ai_annual",
+                            "simulation_type": "lifecycle",
+                            "status": "queued",
+                            "progress_pct": 0,
+                            "days_completed": 0,
+                            "duration_minutes": 30.0,  # 365 days in 30 minutes
+                        }
+                    )
+                    .execute()
+                )
+
+                logger.info(
+                    f"Auto-started Bederf solar demo: task_id={task_id}, scenario=grant_solar_bess_ai_annual (365 days → 30 minutes, Solar+BESS optimization)"
+                )
+
                 # Add simulation task info to response
                 response["demo_auto_start"] = True
                 response["demo_type"] = "solar-bess-annual"
-                response["demo_description"] = "Solar+BESS with Sentinel AI (365-day full-year with City Power TOU arbitrage)"
+                response["demo_description"] = (
+                    "Solar+BESS with Sentinel AI (365-day full-year with City Power TOU arbitrage)"
+                )
                 response["demo_scenario"] = "grant_solar_bess_ai_annual"
                 response["demo_status"] = "queued"
                 response["demo_task_id"] = task_id
                 response["demo_duration_minutes"] = 30.0
-                response["demo_note"] = "Solar simulation runs in background. Dashboard will update live as simulation progresses through 365 days."
-                
+                response["demo_note"] = (
+                    "Solar simulation runs in background. Dashboard will update live as simulation progresses through 365 days."
+                )
+
             except Exception as e:
                 logger.error(f"Error auto-starting Bederf demo: {e}", exc_info=True)
                 response["demo_auto_start"] = False
@@ -435,7 +467,6 @@ async def login_with_email(request: Request, email: str):
             response["message"] = "MFA enrollment required for admin users. Please set up MFA."
 
         return response
-
 
     except Exception as e:
         logger.error(f"Login failed for {email}: {e}", exc_info=True)
@@ -452,9 +483,7 @@ async def create_access_request(request: Request, payload: AccessRequestCreateRe
     # Validate requested modules against known module registry types
     valid_module_values = {module.value for module in ModuleType}
     requested_modules = [
-        module.strip().lower()
-        for module in payload.requested_modules
-        if module.strip().lower() in valid_module_values
+        module.strip().lower() for module in payload.requested_modules if module.strip().lower() in valid_module_values
     ]
 
     try:
@@ -560,12 +589,16 @@ async def complete_mfa_login(request: Request, email: str, mfa_code: str):
     refresh_token = _create_jwt_token(user_info, token_type="refresh")
     refresh_payload = validate_jwt_token(refresh_token, required_token_type="refresh") or {}
     refresh_jti = refresh_payload.get("jti", "")
-    session_id = session_service.create_session(
-        user_id=user_info["user_id"],
-        ip=source_ip,
-        user_agent=user_agent,
-        token_jti=refresh_jti,
-    ) if refresh_jti else None
+    session_id = (
+        session_service.create_session(
+            user_id=user_info["user_id"],
+            ip=source_ip,
+            user_agent=user_agent,
+            token_jti=refresh_jti,
+        )
+        if refresh_jti
+        else None
+    )
 
     logger.info(f"MFA login completed for {email}")
 
@@ -574,6 +607,7 @@ async def complete_mfa_login(request: Request, email: str, mfa_code: str):
         from app.database.repositories.login_audit_repository import (
             get_login_audit_repository,
         )
+
         audit_repo = get_login_audit_repository()
         audit_repo.log_login(
             user_email=email,
@@ -749,13 +783,9 @@ async def logout(request: Request, refresh_token: Optional[str] = None):
     if user_id:
         try:
             from app.database.repositories.audit_repository import AuditRepository
+
             audit_repo = AuditRepository()
-            audit_repo.log_security_event(
-                event_type='LOGOUT',
-                user_id=user_id,
-                ip_address=source_ip,
-                result='SUCCESS'
-            )
+            audit_repo.log_security_event(event_type="LOGOUT", user_id=user_id, ip_address=source_ip, result="SUCCESS")
             logger.info(f"User {user_id} logged out successfully")
         except Exception as e:
             logger.warning(f"Failed to audit log logout for {user_id}: {e}")
@@ -790,12 +820,13 @@ async def refresh_access_token(request: Request, body: RefreshTokenRequest):
         # Log failed refresh attempt
         try:
             from app.database.repositories.audit_repository import AuditRepository
+
             audit_repo = AuditRepository()
             audit_repo.log_security_event(
-                event_type='TOKEN_REFRESH',
+                event_type="TOKEN_REFRESH",
                 ip_address=source_ip,
-                result='FAILED',
-                details={'reason': 'invalid_or_expired_token'}
+                result="FAILED",
+                details={"reason": "invalid_or_expired_token"},
             )
         except Exception as e:
             logger.warning(f"Failed to audit log failed token refresh: {e}")
@@ -806,13 +837,14 @@ async def refresh_access_token(request: Request, body: RefreshTokenRequest):
         # Log failed refresh attempt
         try:
             from app.database.repositories.audit_repository import AuditRepository
+
             audit_repo = AuditRepository()
             audit_repo.log_security_event(
-                event_type='TOKEN_REFRESH',
+                event_type="TOKEN_REFRESH",
                 user_id=payload.get("sub"),
                 ip_address=source_ip,
-                result='FAILED',
-                details={'reason': 'not_a_refresh_token'}
+                result="FAILED",
+                details={"reason": "not_a_refresh_token"},
             )
         except Exception as e:
             logger.warning(f"Failed to audit log token validation error: {e}")
@@ -842,23 +874,28 @@ async def refresh_access_token(request: Request, body: RefreshTokenRequest):
     new_refresh_token = _create_jwt_token(user_info, token_type="refresh")
     new_refresh_payload = validate_jwt_token(new_refresh_token, required_token_type="refresh") or {}
     new_refresh_jti = new_refresh_payload.get("jti", "")
-    session_id = session_service.create_session(
-        user_id=user_info["user_id"],
-        ip=source_ip,
-        user_agent=request.headers.get("User-Agent"),
-        token_jti=new_refresh_jti,
-    ) if new_refresh_jti else None
+    session_id = (
+        session_service.create_session(
+            user_id=user_info["user_id"],
+            ip=source_ip,
+            user_agent=request.headers.get("User-Agent"),
+            token_jti=new_refresh_jti,
+        )
+        if new_refresh_jti
+        else None
+    )
 
     # Log successful token refresh (Phase 65-04)
     try:
         from app.database.repositories.audit_repository import AuditRepository
+
         audit_repo = AuditRepository()
         audit_repo.log_security_event(
-            event_type='TOKEN_REFRESH',
-            user_id=user_info['user_id'],
+            event_type="TOKEN_REFRESH",
+            user_id=user_info["user_id"],
             ip_address=source_ip,
-            result='SUCCESS',
-            details={'session_id': session_id}
+            result="SUCCESS",
+            details={"session_id": session_id},
         )
     except Exception as e:
         logger.warning(f"Failed to audit log token refresh for {user_info['user_id']}: {e}")
@@ -897,13 +934,14 @@ async def revoke_session(request: Request, session_id: str):
     # Log session revocation (Phase 65-04)
     try:
         from app.database.repositories.audit_repository import AuditRepository
+
         audit_repo = AuditRepository()
         audit_repo.log_security_event(
-            event_type='SESSION_REVOKED',
+            event_type="SESSION_REVOKED",
             user_id=user["id"],
             ip_address=source_ip,
-            result='SUCCESS',
-            details={'session_id': session_id}
+            result="SUCCESS",
+            details={"session_id": session_id},
         )
         logger.info(f"User {user['id']} revoked session {session_id}")
     except Exception as e:
@@ -925,13 +963,14 @@ async def revoke_all_sessions(request: Request):
     # Log all sessions revocation (Phase 65-04)
     try:
         from app.database.repositories.audit_repository import AuditRepository
+
         audit_repo = AuditRepository()
         audit_repo.log_security_event(
-            event_type='SESSION_REVOKED',
+            event_type="SESSION_REVOKED",
             user_id=user["id"],
             ip_address=source_ip,
-            result='SUCCESS',
-            details={'revoked_count': revoked_count, 'action': 'revoke_all'}
+            result="SUCCESS",
+            details={"revoked_count": revoked_count, "action": "revoke_all"},
         )
         logger.info(f"User {user['id']} revoked all {revoked_count} sessions")
     except Exception as e:
@@ -987,19 +1026,20 @@ async def create_api_key(request: Request, body: ApiKeyCreateRequest):
         # Log API key creation (Phase 65-04)
         try:
             from app.database.repositories.audit_repository import AuditRepository
+
             audit_repo = AuditRepository()
             audit_repo.log_security_event(
-                event_type='API_KEY_CREATED',
+                event_type="API_KEY_CREATED",
                 user_id=user["id"],
                 ip_address=source_ip,
-                result='SUCCESS',
+                result="SUCCESS",
                 details={
-                    'key_id': row.get("id"),
-                    'key_prefix': key_prefix,
-                    'owner': owner,
-                    'role': role_value,
-                    'expires_in_days': body.expires_in_days
-                }
+                    "key_id": row.get("id"),
+                    "key_prefix": key_prefix,
+                    "owner": owner,
+                    "role": role_value,
+                    "expires_in_days": body.expires_in_days,
+                },
             )
             logger.info(f"User {user['id']} created API key {key_prefix} for {owner}")
         except Exception as e:
@@ -1072,17 +1112,14 @@ async def revoke_api_key(request: Request, api_key_id: str):
         # Log API key revocation (Phase 65-04)
         try:
             from app.database.repositories.audit_repository import AuditRepository
+
             audit_repo = AuditRepository()
             audit_repo.log_security_event(
-                event_type='API_KEY_REVOKED',
+                event_type="API_KEY_REVOKED",
                 user_id=user["id"],
                 ip_address=source_ip,
-                result='SUCCESS',
-                details={
-                    'key_id': api_key_id,
-                    'key_prefix': row.get("key_prefix"),
-                    'owner': row.get("owner")
-                }
+                result="SUCCESS",
+                details={"key_id": api_key_id, "key_prefix": row.get("key_prefix"), "owner": row.get("owner")},
             )
             logger.info(f"User {user['id']} revoked API key {api_key_id}")
         except Exception as e:
