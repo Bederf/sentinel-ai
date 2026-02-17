@@ -183,10 +183,12 @@ def create_jwt_token(
         ttl_seconds = legacy_hours * 60 * 60
 
     # Minimize JWT payload for security (Phase 65-04: PII reduction)
-    # Keep: sub (user_id), role, exp, iat, jti
-    # Email moved to database lookup; full_name not needed in JWT
+    # Keep: sub (user_id), role, exp, iat, jti, email (needed for module entitlements)
+    # full_name not needed in JWT
+    # Email is included because module access control needs it for entitlements lookup
     payload = {
         "sub": user_id,
+        "email": email,  # Required for module entitlements checking
         "role": role,
         "token_type": token_type,  # "access" or "refresh"
         "jti": str(uuid.uuid4()),  # Unique token ID for blacklisting
