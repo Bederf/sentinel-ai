@@ -1,6 +1,6 @@
 """Application settings and configuration."""
 
-from pydantic import field_validator, ConfigDict
+from pydantic import ConfigDict, field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -25,12 +25,17 @@ class Settings(BaseSettings):
     # Development: localhost on ports 9096, 3000, 5173, 8080
     # Production: bms.aimthelaw.co.za via HTTPS
     cors_origins: list[str] = [
-        "http://localhost:9096", "https://localhost:9096",
-        "http://127.0.0.1:9096", "https://127.0.0.1:9096",
-        "http://localhost:3000", "https://localhost:3000",
-        "http://localhost:5173", "https://localhost:5173",
-        "http://localhost:8080", "https://localhost:8080",
-        "https://bms.aimthelaw.co.za"
+        "http://localhost:9096",
+        "https://localhost:9096",
+        "http://127.0.0.1:9096",
+        "https://127.0.0.1:9096",
+        "http://localhost:3000",
+        "https://localhost:3000",
+        "http://localhost:5173",
+        "https://localhost:5173",
+        "http://localhost:8080",
+        "https://localhost:8080",
+        "https://bms.aimthelaw.co.za",
     ]
 
     # Backend URL (for external service health checks)
@@ -135,6 +140,15 @@ class Settings(BaseSettings):
     allowed_document_types: list[str] = [".pdf", ".docx", ".txt"]
     supabase_storage_bucket: str = "building-documents"
 
+    # Authentication Rate Limiting (Phase 58-04 M-5: FSR Domain 4.6 Brute-Force Protection)
+    rate_limit_enabled: bool = True  # Master switch for rate limiting
+    rate_limit_max_attempts: int = 5  # Max failed login attempts before lockout
+    rate_limit_lockout_minutes: int = 15  # Lockout duration in minutes
+    rate_limit_per_ip: bool = False  # If True, limit by IP; if False, limit by email (safer)
+    rate_limit_default_rpm: int = 1000  # Default rate limit per minute (global default)
+    rate_limit_login_rpm: int = 5  # Login endpoint: 5 per 15 minutes
+    rate_limit_login_window_minutes: int = 15  # Login rate limit window
+
     @property
     def recommendation_interval(self) -> int:
         """Recommendation generation interval in seconds.
@@ -146,11 +160,7 @@ class Settings(BaseSettings):
             return 120  # 2 minutes for demos
         return 600  # 10 minutes for production
 
-    model_config = ConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        extra="ignore"
-    )
+    model_config = ConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     @field_validator("cors_origins", "demo_allowed_origins", mode="before")
     @classmethod
