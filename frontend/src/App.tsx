@@ -152,6 +152,36 @@ function App() {
   const siteId = currentUser ? 'site-002' : '';
   useRecommendationToasts(siteId);
 
+  // Initialize devices from simulation on login
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const initializeDevices = async () => {
+      try {
+        const token = localStorage.getItem('sentinel_token');
+        if (!token) return;
+
+        const apiUrl = import.meta.env.VITE_API_URL || '';
+        const response = await fetch(`${apiUrl}/api/devices/init`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          console.debug('Devices initialized:', result.result);
+        }
+      } catch (error) {
+        console.debug('Device initialization skipped:', error);
+      }
+    };
+
+    initializeDevices();
+  }, [currentUser]);
+
   useEffect(() => {
     const checkHealth = async () => {
       try {
