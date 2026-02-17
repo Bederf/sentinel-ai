@@ -17,6 +17,7 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone
 
 from app.models.audit_log import AuditLogEntry, AuditActionType, AuditResultType
+from app.services.encryption_service import get_encryption_service
 
 logger = logging.getLogger(__name__)
 
@@ -48,10 +49,12 @@ class AuditLogger:
         self.max_entries = 1000  # Rotate oldest entries out
         self.buffer: List[AuditLogEntry] = []
         self.buffer_size = 10  # Flush after 10 entries
+        self.encryption_service = get_encryption_service()
         self._load_existing_logs()
 
         self._initialized = True
         logger.info(f"Audit logger initialized. Log file: {self.log_file}")
+        logger.info(f"Encryption enabled: {self.encryption_service.enabled}")
 
     def _load_existing_logs(self) -> None:
         """Load existing audit logs from file."""
@@ -64,7 +67,12 @@ class AuditLogger:
                     if len(entries_data) > self.max_entries:
                         entries_data = entries_data[-self.max_entries:]
 
-                    self.buffer = [AuditLogEntry.from_dict(entry) for entry in entries_data]
+                    # Decrypt sensitive fields if encryption is enabled
+                    decrypted_entries = []
+                    for entry in entries_data:
+                        decrypted_entry = self._decrypt_audit_entry(entry)
+                        decrypted_entries.append(AuditLogEntry.from_dict(decrypted_entry))
+                    self.buffer = decrypted_entries
                 logger.info(f"Loaded {len(self.buffer)} existing audit log entries")
             else:
                 # Create empty log file
@@ -74,17 +82,102 @@ class AuditLogger:
             logger.error(f"Failed to load audit logs: {e}")
             self.buffer = []
 
+    def _encrypt_audit_entry(self, entry_dict: Dict[str, Any]) -> Dict[str, Any]:
+        """Encrypt sensitive fields in audit log entry.
+
+        Encrypts: user, device_id, point_name, old_value, new_value, error_message
+        """
+        if not self.encryption_service.enabled:
+            return entry_dict
+
+        encrypted = entry_dict.copy()
+
+        # List of sensitive fields to encrypt
+        sensitive_fields = ["user", "device_id", "point_name", "error_message"]
+
+        for field in sensitive_fields:
+            if field in encrypted and encrypted[field] and isinstance(encrypted[field], str):
+                encrypted[field] = self.encryption_service.encrypt(encrypted[field])
+
+        # Encrypt value fields (might contain sensitive data)
+        if encrypted.get("old_value") is not None:
+            encrypted["old_value"] = self._encrypt_value(encrypted["old_value"])
+        if encrypted.get("new_value") is not None:
+            encrypted["new_value"] = self._encrypt_value(encrypted["new_value"])
+
+        return encrypted
+
+    def _decrypt_audit_entry(self, entry_dict: Dict[str, Any]) -> Dict[str, Any]:
+        """Decrypt sensitive fields in audit log entry."""
+        if not self.encryption_service.enabled:
+            return entry_dict
+
+        decrypted = entry_dict.copy()
+
+        # List of sensitive fields to decrypt
+        sensitive_fields = ["user", "device_id", "point_name", "error_message"]
+
+        for field in sensitive_fields:
+            if field in decrypted and decrypted[field] and isinstance(decrypted[field], str):
+                decrypted[field] = self.encryption_service.decrypt(decrypted[field])
+
+        # Decrypt value fields
+        if decrypted.get("old_value") is not None:
+            decrypted["old_value"] = self._decrypt_value(decrypted["old_value"])
+        if decrypted.get("new_value") is not None:
+            decrypted["new_value"] = self._decrypt_value(decrypted["new_value"])
+
+        return decrypted
+
+    def _encrypt_value(self, value: Any) -> Any:
+        """Encrypt a value (handles strings and other types)."""
+        if isinstance(value, str):
+            return self.encryption_service.encrypt(value)
+        elif isinstance(value, (int, float, bool, type(None))):
+            return value  # Don't encrypt primitive types
+        else:
+            # Serialize complex types as JSON, then encrypt
+            try:
+                serialized = json.dumps(value, default=str)
+                return {"_encrypted_json": self.encryption_service.encrypt(serialized)}
+            except Exception as e:
+                logger.warning(f"Failed to encrypt complex value: {e}")
+                return value
+
+    def _decrypt_value(self, value: Any) -> Any:
+        """Decrypt a value (handles strings and other types)."""
+        if isinstance(value, str):
+            return self.encryption_service.decrypt(value)
+        elif isinstance(value, dict) and "_encrypted_json" in value:
+            # Decrypt and deserialize JSON
+            try:
+                decrypted_json = self.encryption_service.decrypt(value["_encrypted_json"])
+                return json.loads(decrypted_json)
+            except Exception as e:
+                logger.warning(f"Failed to decrypt complex value: {e}")
+                return value
+        else:
+            return value  # Return as-is for primitive types
+
     def _save_logs(self, entries: List[AuditLogEntry]) -> None:
-        """Save audit logs to file."""
+        """Save audit logs to file with encryption."""
         try:
             # Ensure data directory exists
             self.log_file.parent.mkdir(exist_ok=True, parents=True)
 
+            # Encrypt entries before saving
+            encrypted_entries = []
+            for entry in entries:
+                entry_dict = entry.to_dict()
+                encrypted_entry = self._encrypt_audit_entry(entry_dict)
+                encrypted_entries.append(encrypted_entry)
+
             with open(self.log_file, 'w') as f:
                 data = {
                     "updated_at": datetime.now().isoformat(),
-                    "entry_count": len(entries),
-                    "entries": [entry.to_dict() for entry in entries]
+                    "entry_count": len(encrypted_entries),
+                    "encryption_enabled": self.encryption_service.enabled,
+                    "entries": encrypted_entries
                 }
                 json.dump(data, f, indent=2, default=str)
         except Exception as e:
@@ -96,13 +189,16 @@ class AuditLogger:
             if not self.buffer:
                 return
 
-            # Load existing logs
+            # Load existing logs (decrypted)
             existing_entries = []
             if self.log_file.exists():
                 try:
                     with open(self.log_file, 'r') as f:
                         data = json.load(f)
-                        existing_entries = [AuditLogEntry.from_dict(entry) for entry in data.get("entries", [])]
+                        # Decrypt entries when loading for merge
+                        for entry in data.get("entries", []):
+                            decrypted_entry = self._decrypt_audit_entry(entry)
+                            existing_entries.append(AuditLogEntry.from_dict(decrypted_entry))
                 except Exception as e:
                     logger.error(f"Failed to read existing logs for flush: {e}")
                     existing_entries = []
@@ -112,10 +208,10 @@ class AuditLogger:
             if len(all_entries) > self.max_entries:
                 all_entries = all_entries[-self.max_entries:]
 
-            # Save combined logs
+            # Save combined logs (encryption happens in _save_logs)
             self._save_logs(all_entries)
             self.buffer = []  # Clear buffer after successful save
-            logger.debug(f"Flushed {len(all_entries) - len(existing_entries)} audit log entries to disk")
+            logger.debug(f"Flushed {len(self.buffer)} audit log entries to disk")
 
     def log_control_action(
         self,
@@ -370,7 +466,10 @@ class AuditLogger:
             try:
                 with open(self.log_file, 'r') as f:
                     data = json.load(f)
-                    all_entries = [AuditLogEntry.from_dict(entry) for entry in data.get("entries", [])]
+                    # Decrypt entries when loading
+                    for entry in data.get("entries", []):
+                        decrypted_entry = self._decrypt_audit_entry(entry)
+                        all_entries.append(AuditLogEntry.from_dict(decrypted_entry))
             except Exception as e:
                 logger.error(f"Failed to read logs for query: {e}")
                 all_entries = []
@@ -407,7 +506,10 @@ class AuditLogger:
             try:
                 with open(self.log_file, 'r') as f:
                     data = json.load(f)
-                    all_entries = [AuditLogEntry.from_dict(entry) for entry in data.get("entries", [])]
+                    # Decrypt entries when loading
+                    for entry in data.get("entries", []):
+                        decrypted_entry = self._decrypt_audit_entry(entry)
+                        all_entries.append(AuditLogEntry.from_dict(decrypted_entry))
             except Exception as e:
                 logger.error(f"Failed to read logs for stats: {e}")
                 all_entries = []

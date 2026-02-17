@@ -48,6 +48,10 @@ class Settings(BaseSettings):
     demo_mode: bool = False
     demo_allowed_origins: list[str] = []
 
+    # Encryption at rest (Phase 1b FSR Compliance - Cryptography)
+    encryption_enabled: bool = True
+    encryption_key: str = ""  # Base64-encoded Fernet key from cryptography.fernet.Fernet.generate_key()
+
     # JWT secret key (required when not in DEMO_MODE)
     jwt_secret_key: str = ""
 

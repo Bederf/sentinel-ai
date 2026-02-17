@@ -825,7 +825,7 @@ class BackgroundSchedulerService:
         or when model predictions are degrading. Automatically triggers retraining when:
         - 3+ features show statistical drift
         - Prediction accuracy drops >10%
-        
+
         Runs every hour to catch drift early before models become stale.
 
         Args:
@@ -1215,22 +1215,29 @@ class BackgroundSchedulerService:
                 # FRESH START PATH: Initialize new simulation
                 await orchestrator.start(scenario=scenario, duration_minutes=duration_minutes)
 
-            # Wait for completion
+            # For persistent simulations (no checkpoint restart), start task and keep running
+            # The simulation now loops continuously (365 days → reset → repeat)
+            # until manually stopped/cleared by user
             if orchestrator._task:
-                await orchestrator._task
+                # Don't await - let it run in background indefinitely
+                logger.info(f"🔄 Simulation task {task_id} started - Running in persistent loop mode (365 days × ∞)")
+                # Mark as running in database
+                try:
+                    supabase.table("lifecycle_simulation_tasks") \
+                        .update({
+                            "status": "running",
+                            "progress_pct": 0,
+                            "days_completed": 0,
+                        }) \
+                        .eq("task_id", task_id) \
+                        .execute()
+                    logger.info(f"📊 Task {task_id} marked as running in persistent loop mode")
+                except Exception as db_error:
+                    logger.error(f"Failed to update task status to running: {db_error}")
 
-            # Mark as completed with final days_simulated
-            supabase.table("lifecycle_simulation_tasks") \
-                .update({
-                    "status": "completed",
-                    "progress_pct": 100,
-                    "days_completed": orchestrator.days_simulated,
-                    "completed_at": "now()",
-                }) \
-                .eq("task_id", task_id) \
-                .execute()
-
-            logger.info(f"✅ Simulation task {task_id} completed successfully with {orchestrator.days_simulated} days simulated")
+                # Return immediately - don't wait for completion
+                # Simulation runs in background indefinitely
+                return
 
         except Exception as e:
             logger.error(f"❌ Simulation task {task_id} failed: {e}")

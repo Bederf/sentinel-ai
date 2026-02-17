@@ -73,6 +73,9 @@ pyotp>=2.9.0
 slowapi>=0.1.9
 bcrypt>=4.2.0
 
+# Encryption (Phase 1b FSR Compliance - Cryptography)
+cryptography>=42.0.0  # AES-256 encryption for audit logs and PII at rest
+
 # DXF File Parsing (Phase B: Digital Twin Builder)
 # AutoCAD/CAD drawing support for equipment extraction
 ezdxf>=1.3.0                   # Read/write AutoCAD DXF files (all versions R12-2024)

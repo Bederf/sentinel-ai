@@ -524,13 +524,15 @@ class LifecycleOrchestrator:
             last_hour = -1  # Track hour changes for event processing
             last_checkpoint_hour = -1  # Track checkpoint saves
 
-            while self.running and iteration < total_iterations:
+            # Persistent loop: Run 365 days, then restart (loops until manually stopped)
+            cycle_num = 1
+            while self.running:
                 iteration += 1
 
                 # Log progress periodically
                 if iteration <= 10 or iteration % 500 == 0:
                     logger.warning(
-                        f"[SIMULATION {iteration}/{total_iterations}] days={self.days_simulated}, hour={self.simulated_time.hour}"
+                        f"[SIMULATION CYCLE {cycle_num}] {iteration}/{total_iterations} (days={self.days_simulated}, hour={self.simulated_time.hour})"
                     )
 
                 try:
@@ -569,8 +571,22 @@ class LifecycleOrchestrator:
                     logger.error(f"[ERROR in iteration {iteration}] {type(e).__name__}: {e}", exc_info=True)
                     raise
 
+                # Check if completed 365 days (one full cycle)
+                if iteration >= total_iterations:
+                    logger.warning(
+                        f"[CYCLE {cycle_num} COMPLETE] Completed 365 days. Resetting for next cycle..."
+                    )
+                    # Reset for next cycle
+                    iteration = 0
+                    self.days_simulated = 0
+                    self.simulated_time = datetime(2026, 1, 1, 0, 0, 0)  # Reset to Jan 1
+                    cycle_num += 1
+                    last_hour = -1
+                    last_checkpoint_hour = -1
+                    logger.warning(f"[CYCLE {cycle_num} START] Beginning persistent loop cycle {cycle_num}")
+
             logger.warning(
-                f"[SIMULATION COMPLETE] Completed {iteration} iterations, days_simulated={self.days_simulated}"
+                f"[SIMULATION STOPPED] Completed {cycle_num - 1} full cycles, last iteration={iteration}"
             )
             self.running = False
 
