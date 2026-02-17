@@ -172,6 +172,37 @@ async def get_active_modules(site_id: str, request: Request):
     ]
 
 
+@router.get("/status/{site_id}", response_model=List[ModuleResponse])
+async def get_modules_status(site_id: str, request: Request):
+    """Get module status for a site (alias for /site/{site_id}/active)."""
+    modules = module_registry.get_active_modules(site_id)
+    auth_ctx = getattr(request.state, "auth", None)
+    if auth_ctx and getattr(auth_ctx, "email", None):
+        repo = get_module_access_repository()
+        modules = [
+            module
+            for module in modules
+            if repo.has_module_access(
+                user_email=auth_ctx.email,
+                user_role=auth_ctx.role,
+                site_code=site_id,
+                module_type=module.module_type,
+            )
+        ]
+    return [
+        ModuleResponse(
+            instance_id=m.instance_id,
+            site_id=m.site_id,
+            module_type=m.module_type.value,
+            status=m.status.value,
+            activated_at=m.activated_at,
+            health_score=m.health_score,
+            last_telemetry=m.last_telemetry
+        )
+        for m in modules
+    ]
+
+
 @router.post("/activate", response_model=ModuleResponse)
 async def activate_module(
     request: ActivateModuleRequest,
