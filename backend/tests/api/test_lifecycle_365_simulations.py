@@ -135,7 +135,12 @@ def mock_supabase_for_lifecycle():
     # Create mock table with pause/resume support
     mock_table = Mock()
     mock_table.insert.return_value.execute.return_value = mock_insert_response
-    mock_table.select.return_value.eq.return_value.execute.return_value = mock_select_response
+
+    # Make select().eq().execute() return mock_select_response for any task_id
+    def mock_select_fn(*args, **kwargs):
+        return Mock(eq=lambda *args, **kwargs: Mock(execute=lambda: mock_select_response))
+
+    mock_table.select.side_effect = mock_select_fn
     mock_table.update.return_value.eq.return_value.execute.return_value = Mock(
         data=[
             {
@@ -151,22 +156,29 @@ def mock_supabase_for_lifecycle():
 
     # Mock the orchestrator for pause/resume operations
     mock_orchestrator = Mock()
-    mock_orchestrator.running = True
+    mock_orchestrator.running = False  # Endpoint will use database mock for status
     mock_orchestrator.paused = False
     mock_orchestrator.pause = Mock()
     mock_orchestrator.resume = Mock()
     mock_orchestrator.simulated_time = datetime.now()
-    mock_orchestrator.events = []
+    mock_orchestrator.real_start_time = datetime.now()
+    mock_orchestrator.events = daily_events  # Use the mock events
     mock_orchestrator.active_faults = {}
     mock_orchestrator.pending_repairs = {}
+
+    # Mock the scenario
+    mock_scenario = Mock()
+    mock_scenario.name = "grant_hvac_dali_ai_annual"
+    mock_orchestrator.current_scenario = mock_scenario
+
     mock_orchestrator.get_status = Mock(
         return_value={
             "running": True,
             "paused": False,
-            "events_count": 0,
+            "events_count": len(daily_events),
             "active_faults": 0,
             "pending_repairs": 0,
-            "recent_events": [],
+            "recent_events": daily_events,
         }
     )
 
