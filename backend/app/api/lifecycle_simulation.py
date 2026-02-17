@@ -56,6 +56,7 @@ class SimulationStatusResponse(BaseModel):
     pending_repairs: int
     recent_events: List[dict]
     progress_pct: int = 0  # Progress percentage (0-100)
+    days_simulated: int = 0  # Days completed in annual simulation
 
 
 class ScenarioInfo(BaseModel):
@@ -255,20 +256,52 @@ async def get_simulation_status(task_id: str):
     Returns:
         SimulationStatusResponse with status, progress, and recent events
     """
-    # If this looks like a site_id (e.g., "site-002"), return empty status
+    # If this looks like a site_id (e.g., "site-002"), find the most recent running/queued task
     if task_id.startswith("site-"):
-        return SimulationStatusResponse(
-            running=False,
-            paused=False,
-            scenario=None,
-            simulated_time=None,
-            simulated_hour=None,
-            real_elapsed_seconds=0,
-            events_count=0,
-            active_faults=0,
-            pending_repairs=0,
-            recent_events=[],
-        )
+        try:
+            client = Supabase.instance()
+            # Look for the most recent running or queued task for this site
+            site_task = (
+                client.table("lifecycle_simulation_tasks")
+                .select("task_id")
+                .eq("site_id", task_id)
+                .in_("status", ["running", "queued"])
+                .order("created_at", desc=True)
+                .limit(1)
+                .execute()
+            )
+            if site_task.data and site_task.data[0].get("task_id"):
+                # Redirect to the actual task status
+                task_id = site_task.data[0]["task_id"]
+                logger.info(f"Resolved site {task_id} to running task: {task_id}")
+            else:
+                # No running simulation for this site
+                return SimulationStatusResponse(
+                    running=False,
+                    paused=False,
+                    scenario=None,
+                    simulated_time=None,
+                    simulated_hour=None,
+                    real_elapsed_seconds=0,
+                    events_count=0,
+                    active_faults=0,
+                    pending_repairs=0,
+                    recent_events=[],
+                )
+        except Exception as e:
+            logger.warning(f"Could not look up site simulation: {e}")
+            return SimulationStatusResponse(
+                running=False,
+                paused=False,
+                scenario=None,
+                simulated_time=None,
+                simulated_hour=None,
+                real_elapsed_seconds=0,
+                events_count=0,
+                active_faults=0,
+                pending_repairs=0,
+                recent_events=[],
+            )
 
     try:
         client = Supabase.instance()
@@ -289,8 +322,8 @@ async def get_simulation_status(task_id: str):
         if orchestrator and orchestrator.running:
             # Simulation is running - get live status from orchestrator
             status = orchestrator.get_status()
-            # Calculate progress for 365-day simulation: (hours_completed / 8760) * 100
-            progress_pct = int((orchestrator.simulated_time.hour / 24.0) * 100) if orchestrator.simulated_time else 0
+            days = getattr(orchestrator, 'days_simulated', 0)
+            progress_pct = int((days / 365) * 100) if days > 0 else 0
             return SimulationStatusResponse(
                 running=True,
                 paused=orchestrator.paused,
@@ -315,6 +348,7 @@ async def get_simulation_status(task_id: str):
                     for e in orchestrator.events[-10:]
                 ],
                 progress_pct=progress_pct,
+                days_simulated=days,
             )
         else:
             # Simulation not running - get status from database
@@ -415,7 +449,6 @@ async def get_default_simulation_status():
         }
 
 
-@router.get("/status/{site_id}")
 async def get_site_simulation_status(site_id: str):
     """
     Get status of a simulation for a specific site.
@@ -426,14 +459,36 @@ async def get_site_simulation_status(site_id: str):
     Returns:
         Simulation status or empty response if none running
     """
-    # Return default empty status (no simulation running)
-    # This endpoint exists for frontend compatibility
+    try:
+        from app.services.simulation_orchestrator import _active_simulations
+        
+        # Look for any running simulation (simulations run site-wide)
+        for task_id, orchestrator in _active_simulations.items():
+            if orchestrator.running:
+                return {
+                    "running": True,
+                    "paused": orchestrator.paused,
+                    "task_id": task_id,
+                    "scenario": orchestrator.current_scenario.get("name") if orchestrator.current_scenario else None,
+                    "simulated_time": orchestrator.simulated_time.isoformat() if orchestrator.simulated_time else None,
+                    "simulated_hour": orchestrator.simulated_time.hour if orchestrator.simulated_time else 0,
+                    "days_simulated": orchestrator.days_simulated,
+                    "ambient_temp": getattr(orchestrator, 'current_ambient_temp', 22),
+                    "cloud_cover": getattr(orchestrator, 'current_cloud_cover', 0),
+                    "is_raining": getattr(orchestrator, 'is_raining', False),
+                    "site_id": site_id,
+                }
+    except Exception as e:
+        logger.debug(f"Error getting simulation status: {e}")
+    
+    # Return default empty status if no simulation running
     return {
         "running": False,
         "paused": False,
         "scenario": None,
         "simulated_time": None,
         "simulated_hour": None,
+        "days_simulated": 0,
         "site_id": site_id,
     }
 
