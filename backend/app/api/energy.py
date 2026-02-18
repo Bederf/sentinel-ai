@@ -2009,3 +2009,238 @@ async def get_tariff_adjustment_recommendation(
     except Exception as e:
         logger.error(f"[VALIDATION] Tariff adjustment error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/recommendations/ai")
+async def get_ai_recommendations(
+    site_id: str = "site-002",
+    lighting_kwh_current: float = 185.0,
+    water_liters_current: float = 6847.0,
+    hvac_cop_current: float = 3.5,
+    power_anomalies_count: int = 0,
+    cost_variance_pct: float = 0.18,
+) -> Dict[str, Any]:
+    """Generate AI-powered financial recommendations with ROI.
+
+    Analyzes all consumption and validation data to produce ranked
+    recommendations with payback periods, confidence scores, and
+    actionable implementation guidance.
+
+    Body Params:
+        site_id: Building site code
+        lighting_kwh_current: Daily lighting energy (from Phase A.1)
+        water_liters_current: Daily water consumption (from Phase A.2)
+        hvac_cop_current: Chiller COP (from Phase A.3 validation)
+        power_anomalies_count: Equipment anomalies detected
+        cost_variance_pct: Cost model accuracy vs invoices (from Phase A.4)
+
+    Returns:
+        Ranked list of recommendations with:
+        - Annual savings (R/year)
+        - Payback period (months)
+        - ROI percentage
+        - Confidence score (0-1)
+        - Implementation difficulty (1-5)
+        - Actionable messaging
+
+    Example Response:
+        {
+            "building_id": "site-002",
+            "recommendation_count": 4,
+            "total_annual_savings_r": 60250.00,
+            "total_investment_r": 135000.00,
+            "average_payback_months": 27.5,
+            "recommendations": [
+                {
+                    "rank": 1,
+                    "priority": "urgent",
+                    "type": "hvac_maintenance",
+                    "title": "Emergency: Chiller Maintenance Required",
+                    "annual_savings_r": 42025.00,
+                    "investment_cost_r": 15000.00,
+                    "payback_months": 4.3,
+                    "roi_pct": 280.2,
+                    "confidence": 0.92,
+                    "messaging": {
+                        "short": "⚠️ URGENT: Maintenance needed - COP degraded 17%",
+                        "urgency": "critical"
+                    }
+                }
+            ]
+        }
+    """
+    try:
+        from app.services.ai_recommendation_engine import generate_ai_recommendations
+
+        result = await generate_ai_recommendations(
+            building_id=site_id,
+            lighting_kwh_current=lighting_kwh_current,
+            water_liters_current=water_liters_current,
+            hvac_cop_current=hvac_cop_current,
+            power_anomalies_count=power_anomalies_count,
+            cost_variance_pct=cost_variance_pct,
+        )
+
+        return result
+
+    except Exception as e:
+        logger.error(f"[RECOMMENDATIONS] Error generating AI recommendations: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/recommendations/dashboard")
+async def get_recommendations_dashboard(
+    site_id: str = "site-002",
+) -> Dict[str, Any]:
+    """Get dashboard-ready recommendation summary (simplified).
+
+    Returns top 3 recommendations formatted for dashboard cards
+    with messaging ready for end-user display.
+
+    Query Params:
+        site_id: Building site code
+
+    Returns:
+        Dashboard recommendation cards with key metrics:
+        - Top 3 ranked recommendations
+        - Annual savings summary
+        - Quick action buttons
+        - Messaging for UI display
+
+    Example Response:
+        {
+            "top_recommendations": [
+                {
+                    "rank": 1,
+                    "title": "Emergency: Chiller Maintenance",
+                    "savings_r_monthly": 3502.00,
+                    "payback_months": 4.3,
+                    "urgency": "critical",
+                    "button_text": "Schedule Maintenance",
+                    "button_action": "contact_hvac_service"
+                }
+            ],
+            "total_savings_r_annual": 60250.00,
+            "call_to_action": "Implement 4 recommendations to save R60k/year"
+        }
+    """
+    try:
+        from app.services.ai_recommendation_engine import generate_ai_recommendations
+
+        # Get full recommendations
+        full_recs = await generate_ai_recommendations(site_id)
+
+        # Extract top 3
+        top_3 = full_recs.get("recommendations", [])[:3]
+
+        # Format for dashboard
+        dashboard_recs = []
+        for rec in top_3:
+            dashboard_recs.append(
+                {
+                    "rank": rec.get("rank"),
+                    "title": rec.get("title"),
+                    "savings_r_monthly": round(rec.get("annual_savings_r", 0) / 12, 2),
+                    "payback_months": rec.get("payback_months"),
+                    "urgency": rec.get("messaging", {}).get("urgency", "medium"),
+                    "short_message": rec.get("messaging", {}).get("short", ""),
+                    "button_text": self._get_button_text(rec.get("type")),
+                    "button_action": rec.get("type"),
+                }
+            )
+
+        return {
+            "site_id": site_id,
+            "generated": datetime.now().isoformat(),
+            "top_recommendations": dashboard_recs,
+            "total_savings_r_annual": round(full_recs.get("total_annual_savings_r", 0), 2),
+            "total_investment_r": round(full_recs.get("total_investment_r", 0), 2),
+            "call_to_action": (
+                f"Implement {len(top_3)} recommendations to save R{full_recs.get('total_annual_savings_r', 0):,.0f}/year"
+            ),
+        }
+
+    except Exception as e:
+        logger.error(f"[RECOMMENDATIONS] Error getting dashboard: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+    def _get_button_text(self, rec_type: str) -> str:
+        """Get CTA button text for recommendation type."""
+        buttons = {
+            "lighting_optimization": "Get Quote",
+            "water_efficiency": "View Details",
+            "hvac_maintenance": "Schedule Now",
+            "occupancy_optimization": "Learn More",
+        }
+        return buttons.get(rec_type, "Learn More")
+
+
+@router.get("/recommendations/by-type")
+async def get_recommendations_by_type(
+    site_id: str = "site-002",
+    recommendation_type: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Get detailed recommendation by type with full implementation guide.
+
+    Query Params:
+        site_id: Building site code
+        recommendation_type: Filter by type (lighting_optimization, water_efficiency, etc.)
+
+    Returns:
+        Complete recommendation with:
+        - Detailed implementation roadmap
+        - Risk analysis
+        - Benefits breakdown
+        - Next steps
+        - Timeline estimate
+    """
+    try:
+        from app.services.ai_recommendation_engine import generate_ai_recommendations
+
+        full_recs = await generate_ai_recommendations(site_id)
+        recommendations = full_recs.get("recommendations", [])
+
+        if recommendation_type:
+            recommendations = [r for r in recommendations if r.get("type") == recommendation_type]
+
+        if not recommendations:
+            return {
+                "site_id": site_id,
+                "recommendation_type": recommendation_type,
+                "found": False,
+                "message": f"No {recommendation_type} recommendations found",
+            }
+
+        rec = recommendations[0]  # Return first match
+
+        return {
+            "site_id": site_id,
+            "recommendation": {
+                "type": rec.get("type"),
+                "rank": rec.get("rank"),
+                "priority": rec.get("priority"),
+                "title": rec.get("title"),
+                "description": rec.get("description"),
+                "current_state": rec.get("current_state"),
+                "optimized_state": rec.get("optimized_state"),
+                "financials": {
+                    "annual_savings_r": rec.get("annual_savings_r"),
+                    "investment_cost_r": rec.get("investment_cost_r"),
+                    "payback_months": rec.get("payback_months"),
+                    "roi_pct": rec.get("roi_pct"),
+                },
+                "metrics": {
+                    "difficulty": rec.get("difficulty"),
+                    "confidence": rec.get("confidence"),
+                    "timeline_weeks": rec.get("implementation_timeline_weeks"),
+                },
+                "benefits": rec.get("benefits"),
+                "risks": rec.get("risks"),
+                "next_steps": rec.get("next_steps"),
+                "messaging": rec.get("messaging"),
+            },
+        }
+
+    except Exception as e:
+        logger.error(f"[RECOMMENDATIONS] Error getting recommendation detail: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
