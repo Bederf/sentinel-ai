@@ -34,6 +34,8 @@ from app.services.feedback_collection_service import (
 from app.services.device_control_service import get_device_control_service
 from app.services.seasonal_modeler import SeasonalModeler
 from app.services.thermal_simulation_engine import update_simulation_temperatures
+from app.services.power_meter_validation_engine import get_power_meter_validation_engine
+from app.services.cost_validation_engine import get_cost_validation_engine
 from app.models.recommendation import (
     Recommendation,
     RecommendationStatus,
@@ -669,7 +671,7 @@ class LifecycleOrchestrator:
 
         # === THERMAL UPDATE: Calculate and update zone temperatures ===
         # This is called EVERY hour and updates sensor_readings with realistic thermal behavior
-        # 
+        #
         # IMPORTANT: Equipment Health Degradation
         # For NORMAL simulations (Grant/Bederf baseline): consider_equipment_health=False (default)
         #   → Equipment stays healthy, HVAC always responds at full capacity
@@ -687,15 +689,15 @@ class LifecycleOrchestrator:
         try:
             # Generate occupancy data for all zones based on hour
             occupancy_data = self._generate_occupancy_for_hour(hour)
-            
+
             # Get ambient temperature from seasonal modeler
             ambient_temp = self.seasonal_modeler.get_ambient_temperature(
                 self.simulated_time
             ) if self.seasonal_modeler else 20.0
-            
+
             # Determine if building is in night setback mode
             is_night_mode = hour >= 22 or hour < 6
-            
+
             # Update zone temperatures (writes to sensor_readings table)
             # Also calculates HVAC power and daily costs
             # For maintenance simulation, set consider_equipment_health=True
@@ -711,22 +713,50 @@ class LifecycleOrchestrator:
         except Exception as e:
             logger.warning(f"[THERMAL] Failed to update temperatures at hour {hour}: {e}")
 
+        # === POWER METER VALIDATION (A.3) ===
+        try:
+            power_engine = get_power_meter_validation_engine("S002")
+            result = await power_engine.validate_hourly_power(
+                meter_id="S002-MTR-B1-HVAC",
+                reading_kwh=20.0 + (self._calculate_occupancy(hour)/100.0 * 15.0),
+                simulated_hour=hour,
+                simulated_date=self.simulated_time,
+            )
+            if result.get("anomaly_detected"):
+                logger.warning(f"[POWER VALIDATION] Anomaly at {hour}: {result.get('reason')}")
+        except Exception as e:
+            logger.debug(f"[POWER VALIDATION] Skipped: {e}")
+
+        # === COST VALIDATION (A.4) ===
+        if hour == 23:
+            try:
+                cost_engine = get_cost_validation_engine("S002")
+                result = await cost_engine.validate_monthly_cost(
+                    invoice_period_start=self.simulated_time.replace(day=1),
+                    invoice_period_end=self.simulated_time,
+                    real_cost_r=None,
+                )
+                if result.get("variance_pct", 0) > 5:
+                    logger.warning(f"[COST VALIDATION] Variance > 5%: {result.get('variance_pct')}%")
+            except Exception as e:
+                logger.debug(f"[COST VALIDATION] Skipped: {e}")
+
         # AI optimization runs every hour — creates recommendations when it finds improvements
         await self._ai_optimization(f"hour_{hour}")
 
     def _generate_occupancy_for_hour(self, hour: int) -> Dict[str, float]:
         """
         Generate zone occupancy percentages for all zones based on hour of day.
-        
+
         Returns:
             Dictionary mapping zone_id -> occupancy_percent (0-100)
         """
         from app.api.dali import calculate_zone_occupancy
-        
+
         # Get day-of-week info
         day_of_week = self.simulated_time.weekday()  # 0=Monday, 6=Sunday
         is_weekend = day_of_week >= 5
-        
+
         # Zone types and their typical occupancy patterns
         zone_profiles = {
             "Zone-001": "office",      # Level 0 Zone A - Office space
@@ -748,9 +778,9 @@ class LifecycleOrchestrator:
             "Zone-L2-Plant": "utility",# L2 Mechanical Room
             "Zone-R": "utility",       # Rooftop - Solar & Cooling
         }
-        
+
         occupancy_data = {}
-        
+
         for zone_id, zone_type in zone_profiles.items():
             # Calculate occupancy using existing dali logic
             occupancy_pct = calculate_zone_occupancy(
@@ -759,19 +789,19 @@ class LifecycleOrchestrator:
                 is_weekend=is_weekend,
                 zone_type=zone_type
             )
-            
+
             # Apply seasonal variation if in annual simulation
             if self.seasonal_modeler:
                 seasonal_factor = self._get_seasonal_occupancy_factor(hour)
                 occupancy_pct *= seasonal_factor
-            
+
             # Add small random variation for realism (±5%)
             variance = self._scenario_rng.uniform(0.95, 1.05)
             occupancy_pct *= variance
-            
+
             # Clamp to 0-100%
             occupancy_data[zone_id] = max(0.0, min(100.0, occupancy_pct))
-        
+
         return occupancy_data
 
     async def _building_wake(self):
