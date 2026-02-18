@@ -158,7 +158,7 @@ class EnergyPrediction(BaseModel):
 
 def _estimate_occupancy(dt: datetime, site_id: str) -> int:
     """Estimate occupancy % from live simulation first, fallback to time-based.
-    
+
     Primary: Try to get from lifecycle orchestrator's simulation state
     Fallback: Time/day-of-week heuristics
     """
@@ -171,15 +171,15 @@ def _estimate_occupancy(dt: datetime, site_id: str) -> int:
                 return int(occupancy)
     except Exception:
         pass
-    
+
     # Fallback: time-based heuristics
     hour = dt.hour
     day_of_week = dt.weekday()
     is_weekend = day_of_week >= 5
-    
+
     if is_weekend:
         return 5  # Very low on weekends
-    
+
     # Weekday patterns
     if 8 <= hour < 12:
         return 85  # Morning peak
@@ -195,7 +195,7 @@ def _estimate_occupancy(dt: datetime, site_id: str) -> int:
 
 def _estimate_daylight(dt: datetime, site_id: str) -> int:
     """Estimate daylight lux from live simulation first, fallback to seasonal.
-    
+
     Primary: Try to get from lifecycle orchestrator
     Fallback: SeasonalModeler patterns
     """
@@ -208,34 +208,34 @@ def _estimate_daylight(dt: datetime, site_id: str) -> int:
                 return int(daylight)
     except Exception:
         pass
-    
+
     # Fallback: seasonal + hourly pattern
     hour = dt.hour
     month = dt.month
-    
+
     # Night hours: 0 lux
     if hour < 7 or hour >= 18:
         return 0
-    
+
     # Peak hours (10:00-14:00): 800-1000 lux
     if 10 <= hour < 14:
         base = 900
     # Shoulder hours: 400-800 lux
     else:
         base = 600
-    
+
     # Seasonal adjustment (winter = lower, summer = higher)
     if month in [6, 7, 8]:  # Winter
         base = int(base * 0.7)
     elif month in [12, 1, 2]:  # Summer
         base = int(base * 1.1)
-    
+
     return base
 
 
 def _estimate_chiller_load(site_id: str) -> int:
     """Estimate chiller load % from live simulation first.
-    
+
     Primary: Try to get from lifecycle orchestrator
     Fallback: Temperature-based estimation
     """
@@ -248,7 +248,7 @@ def _estimate_chiller_load(site_id: str) -> int:
                 return int(chiller_load)
     except Exception:
         pass
-    
+
     # Fallback: use ambient temperature for estimation
     # Higher temp = higher chiller load
     month = date.today().month
@@ -258,7 +258,7 @@ def _estimate_chiller_load(site_id: str) -> int:
         ambient_temp = 13
     else:
         ambient_temp = 18
-    
+
     # Scale load: 15°C=30%, 35°C=85%
     if ambient_temp < 15:
         return 30
@@ -271,18 +271,18 @@ def _estimate_chiller_load(site_id: str) -> int:
 
 def _get_tariff_band(hour: int, month: int) -> str:
     """Get City Power tariff band based on time and season.
-    
+
     Summer (Oct-Mar): peak 07-10, 18-20
     Winter (Apr-Sep): peak 06-09, 17-22
     Off-peak: 21-05
     Standard: rest
     """
     is_summer = month in [10, 11, 12, 1, 2, 3]
-    
+
     # Off-peak: 21:00 - 05:59 (always)
     if 21 <= hour or hour < 6:
         return "off_peak"
-    
+
     if is_summer:
         # Summer: peak 07-10, 18-20
         if (7 <= hour < 10) or (18 <= hour < 20):
@@ -291,13 +291,13 @@ def _get_tariff_band(hour: int, month: int) -> str:
         # Winter: peak 06-09, 17-22
         if (6 <= hour < 9) or (17 <= hour < 22):
             return "peak"
-    
+
     return "standard"
 
 
 def _get_seasonal_temp(month: int) -> float:
     """Get average ambient temperature for month (South Africa).
-    
+
     Primary: Try to get from SeasonalModeler if available
     Fallback: Hardcoded seasonal averages
     """
@@ -308,7 +308,7 @@ def _get_seasonal_temp(month: int) -> float:
             return modeler.get_temperature_for_month(month)
     except Exception:
         pass
-    
+
     # Fallback: SA seasonal averages (Johannesburg-like)
     seasonal_temps = {
         1: 24, 2: 24, 3: 23,  # Summer
@@ -317,7 +317,7 @@ def _get_seasonal_temp(month: int) -> float:
         9: 18, 10: 21,         # Spring
         11: 22, 12: 24         # Early summer
     }
-    
+
     return float(seasonal_temps.get(month, 20))
 
 
@@ -328,23 +328,23 @@ def _apply_rules_output(
     """Apply rules output savings to actual metrics, creating sentinel metrics."""
     # Get breakdown of savings by system
     by_system = rules_output.by_system
-    
+
     # Subtract savings from each system
     sentinel_hvac = actual_metrics.hvac_kwh - by_system.hvac_kwh
     sentinel_lighting = actual_metrics.lighting_kwh - by_system.lighting_kwh
     sentinel_power = actual_metrics.power_kwh - by_system.power_kwh
-    
+
     sentinel_total_kwh = sentinel_hvac + sentinel_lighting + sentinel_power
-    
+
     # Recalculate percentages
     sentinel_hvac_percent = (sentinel_hvac / sentinel_total_kwh * 100) if sentinel_total_kwh > 0 else 0
     sentinel_lighting_percent = (sentinel_lighting / sentinel_total_kwh * 100) if sentinel_total_kwh > 0 else 0
     sentinel_power_percent = (sentinel_power / sentinel_total_kwh * 100) if sentinel_total_kwh > 0 else 0
-    
+
     # Recalculate carbon and cost
     sentinel_carbon_kg = sentinel_total_kwh * 0.35
     sentinel_cost_zar = sentinel_total_kwh * 5.0
-    
+
     return EnergyMetrics(
         total_kwh=round(sentinel_total_kwh, 2),
         total_cost_zar=round(sentinel_cost_zar, 2),
@@ -901,7 +901,7 @@ async def get_energy_comparison_summary(
                 site_id=site_id,
                 date=now.isoformat()
             )
-            
+
             # Get active modules for conditional DALI rule
             active_modules = []
             try:
@@ -910,7 +910,7 @@ async def get_energy_comparison_summary(
                 active_modules = [m.module_type.value for m in modules] if modules else []
             except Exception:
                 pass
-            
+
             # Evaluate rules
             engine = get_energy_rules_engine(site_id)
             rules_output = engine.evaluate_rules(
@@ -918,17 +918,17 @@ async def get_energy_comparison_summary(
                 active_modules,
                 baseline_kwh=actual_metrics.total_kwh
             )
-            
+
             # Apply rules output to actual metrics to get sentinel metrics
             sentinel_metrics = _apply_rules_output(actual_metrics, rules_output)
-            
+
             # Calculate comparison metrics
             daily_savings_zar = actual_metrics.total_cost_zar - sentinel_metrics.total_cost_zar
             daily_savings_percent = rules_output.delta_percent
-            
+
             # Progress to target (35% total savings target)
             progress_to_target_percent = min(daily_savings_percent / 35.0 * 100, 100.0)
-            
+
             return ComparisonSummary(
                 actual=actual_metrics,
                 sentinel=sentinel_metrics,
@@ -937,11 +937,11 @@ async def get_energy_comparison_summary(
                 progress_to_target_percent=round(progress_to_target_percent, 1),
                 ai_confidence_percent=round(rules_output.confidence * 100, 1),
             )
-        
+
         except Exception as e:
             logger.warning(f"Rules engine failed, falling back to hardcoded: {e}")
             # Fall through to hardcoded method
-    
+
     # Fallback: hardcoded method (original logic)
     prediction_response = await get_energy_prediction(
         site_id=site_id,
@@ -1041,29 +1041,29 @@ async def get_energy_simulated(
 ) -> dict:
     """
     Get simulated energy consumption during an active simulation.
-    
+
     Returns real-time energy metrics based on the current simulated state.
     If no simulation is running, returns empty/zero values.
-    
+
     This endpoint is called by the Dashboard every 5 seconds during Grant's
     365-day simulation to show live energy accumulation.
-    
+
     Args:
         site_id: Site ID (e.g., "site-002")
-    
+
     Returns:
         EnergyMetrics with current simulated values, or zeros if no simulation
     """
     try:
         from app.services.simulation_orchestrator import _active_simulations
-        
+
         # Look for any running simulation
         orchestrator = None
         for task_id, orch in _active_simulations.items():
             if orch.running:
                 orchestrator = orch
                 break
-        
+
         if not orchestrator or not orchestrator.running:
             # No simulation running - return zero metrics
             return {
@@ -1080,16 +1080,16 @@ async def get_energy_simulated(
                 "simulated": False,
                 "message": "No active simulation"
             }
-        
+
         # Get current simulated state from orchestrator
         status = orchestrator.get_status()
-        
+
         # Extract simulated values from status (or use defaults)
         occupancy_percent = status.get("occupancy_percent", 0)
         is_raining = status.get("is_raining", False)
         cloud_cover = status.get("cloud_cover", 0)
         ambient_temp = status.get("ambient_temp", 22)
-        
+
         # Estimate daylight factor from cloud cover and hour
         current_hour = orchestrator.simulated_time.hour if orchestrator.simulated_time else 12
         if 6 <= current_hour < 18:  # Daytime
@@ -1099,7 +1099,7 @@ async def get_energy_simulated(
                 daylight_lux *= 0.3
         else:
             daylight_lux = 0  # Night
-        
+
         # Estimate chiller load from ambient temperature
         if ambient_temp > 28:
             chiller_load_percent = min(100, 30 + (ambient_temp - 28) * 5)
@@ -1107,27 +1107,27 @@ async def get_energy_simulated(
             chiller_load_percent = 20
         else:
             chiller_load_percent = 50 - (22 - ambient_temp) * 2
-        
+
         # Generate energy based on simulated state
         # Base values (from building capacity at full occupancy)
         base_hvac_kwh = 500.0  # Base HVAC per 24 hours
         base_lighting_kwh = 200.0  # Base lighting per 24 hours
         base_power_kwh = 100.0  # Base other power per 24 hours
-        
+
         # Scale by occupancy (HVAC most affected)
         occupancy_factor = occupancy_percent / 100.0
         hvac_kwh = base_hvac_kwh * occupancy_factor * (chiller_load_percent / 100.0)
-        
+
         # Lighting scales with occupancy and inverse of daylight
         daylight_factor = max(0, 1.0 - (daylight_lux / 1000.0))  # More daylight = less artificial
         lighting_kwh = base_lighting_kwh * occupancy_factor * daylight_factor
-        
+
         # Power (standby equipment) less affected by occupancy
         power_kwh = base_power_kwh * 0.7  # 70% base load
-        
+
         # Total and percentages
         total_kwh = hvac_kwh + lighting_kwh + power_kwh
-        
+
         if total_kwh > 0:
             hvac_percent = (hvac_kwh / total_kwh) * 100
             lighting_percent = (lighting_kwh / total_kwh) * 100
@@ -1136,11 +1136,11 @@ async def get_energy_simulated(
             hvac_percent = 0
             lighting_percent = 0
             power_percent = 0
-        
+
         # Carbon and cost
         carbon_kg = total_kwh * 0.35  # SA grid: 0.35 kg CO₂/kWh
         total_cost_zar = total_kwh * 5.0  # ~R5/kWh commercial rate
-        
+
         return {
             "total_kwh": round(total_kwh, 2),
             "total_cost_zar": round(total_cost_zar, 2),
@@ -1157,7 +1157,7 @@ async def get_energy_simulated(
             "daylight_lux": round(daylight_lux, 1),
             "chiller_load_percent": round(chiller_load_percent, 1),
         }
-    
+
     except Exception as e:
         logger.error(f"Error getting simulated energy: {e}", exc_info=True)
         # Return zero metrics on error
@@ -1188,10 +1188,10 @@ async def get_simulated_energy_costs(
 ) -> dict:
     """
     Get daily energy costs from simulated HVAC power consumption.
-    
+
     Uses City Power TOU tariff (Johannesburg commercial rates).
     Pulls from energy_cost_summary table created by thermal simulation.
-    
+
     Returns daily cost breakdown showing:
     - energy_kwh: Total kWh consumed that day
     - energy_cost_r: Energy charges (c/kWh × kWh)
@@ -1199,27 +1199,27 @@ async def get_simulated_energy_costs(
     - service_charge_r: Fixed monthly charge (amortized daily)
     - total_cost_r: Sum of all charges
     - peak_power_kw: Maximum demand that day
-    
+
     This endpoint powers the dashboard cost trend chart.
-    
+
     Args:
         site_id: Site ID (e.g., "site-002")
         days: Number of days to return (1-365)
-    
+
     Returns:
         Daily cost summary list with tariff band breakdown
     """
     try:
         from app.services.energy_cost_service import EnergyCostService
         from app.database.supabase_client import get_supabase_client
-        
+
         supabase = get_supabase_client()
         cost_svc = EnergyCostService(building_id=site_id)
-        
+
         # Query energy_cost_summary table for recent days
         end_date = datetime.now().date()
         start_date = end_date - timedelta(days=days - 1)
-        
+
         response = supabase.table("energy_cost_summary").select("*").gte(
             "date", start_date.isoformat()
         ).lte(
@@ -1227,7 +1227,7 @@ async def get_simulated_energy_costs(
         ).eq(
             "building_id", site_id
         ).order("date", desc=False).execute()
-        
+
         if not response.data:
             logger.info(f"[COST] No cost data for {site_id} in last {days} days")
             return {
@@ -1238,12 +1238,12 @@ async def get_simulated_energy_costs(
                 "period_end": end_date.isoformat(),
                 "message": "No cost data available (simulation not run yet)"
             }
-        
+
         # Format response
         daily_costs = []
         total_kwh = 0.0
         total_cost = 0.0
-        
+
         for record in response.data:
             daily_costs.append({
                 "date": record.get("date"),
@@ -1256,17 +1256,17 @@ async def get_simulated_energy_costs(
                 "average_rate_r_kwh": round(record.get("average_rate_r_kwh", 0), 3),
                 "hourly_data": record.get("hourly_data"),  # Optional detailed breakdown
             })
-            
+
             total_kwh += record.get("total_energy_kwh", 0)
             total_cost += record.get("total_cost_r", 0)
-        
+
         # Calculate averages
         period_days = len(daily_costs) if daily_costs else days
         avg_daily_cost = total_cost / period_days if period_days > 0 else 0
         avg_daily_kwh = total_kwh / period_days if period_days > 0 else 0
-        
+
         logger.info(f"[COST] Retrieved {len(daily_costs)} days of cost data for {site_id}")
-        
+
         return {
             "site_id": site_id,
             "period_days": period_days,
@@ -1278,7 +1278,7 @@ async def get_simulated_energy_costs(
             "average_daily_cost_r": round(avg_daily_cost, 2),
             "daily_costs": daily_costs,
         }
-    
+
     except Exception as e:
         logger.error(f"[COST] Error getting simulated costs: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to retrieve cost data: {str(e)}")
@@ -1292,33 +1292,33 @@ async def get_simulated_monthly_costs(
 ) -> dict:
     """
     Get monthly cost summary from daily energy_cost_summary records.
-    
+
     Aggregates daily costs into monthly view for budget planning.
-    
+
     Args:
         site_id: Site ID
         year: Year (default: current year)
         month: Month 1-12 (default: current month)
-    
+
     Returns:
         Monthly cost totals, averages, and projections
     """
     try:
         from app.services.energy_cost_service import EnergyCostService
-        
+
         cost_svc = EnergyCostService(building_id=site_id)
-        
+
         # Use current date if not specified
         today = datetime.now()
         year = year or today.year
         month = month or today.month
-        
+
         monthly_summary = await cost_svc.get_monthly_summary(
             building_id=site_id,
             year=year,
             month=month,
         )
-        
+
         # Add projections
         days_in_month = 30 if month in [4, 6, 9, 11] else 31 if month != 2 else 28
         if monthly_summary.get("days_recorded", 0) > 0:
@@ -1326,7 +1326,7 @@ async def get_simulated_monthly_costs(
             projected_cost = avg_daily * days_in_month
         else:
             projected_cost = 0
-        
+
         return {
             "site_id": site_id,
             "year": year,
@@ -1336,7 +1336,7 @@ async def get_simulated_monthly_costs(
             "projected_month_cost_r": round(projected_cost, 2),
             "days_in_month": days_in_month,
         }
-    
+
     except Exception as e:
         logger.error(f"[COST] Error getting monthly costs: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -1348,7 +1348,7 @@ async def get_tariff_info(
 ) -> dict:
     """
     Get current tariff information for site.
-    
+
     Returns:
     - Municipality and tariff name
     - Current tariff bands (peak/standard/off-peak)
@@ -1356,28 +1356,28 @@ async def get_tariff_info(
     - Demand charge (R/kVA)
     - Service charge (R/month)
     - Time bands for current season
-    
+
     Args:
         site_id: Site ID
-    
+
     Returns:
         Complete tariff structure for dashboard/API clients
     """
     try:
         from app.services.energy_cost_service import EnergyCostService
-        
+
         cost_svc = EnergyCostService(building_id=site_id)
-        
+
         if not cost_svc.tariff_data:
             raise ValueError("No tariff data available")
-        
+
         # Get tariff info
         today = datetime.now()
         month = today.month
         season = "winter" if month in [6, 7, 8] else "summer"
-        
+
         tariff_data = cost_svc.tariff_data
-        
+
         return {
             "site_id": site_id,
             "municipality": cost_svc.municipality,
@@ -1398,7 +1398,614 @@ async def get_tariff_info(
             "service_charge_r_month": tariff_data.get("service_charge_r_month"),
             "time_bands": tariff_data.get("time_bands", {}),
         }
-    
+
     except Exception as e:
         logger.error(f"[COST] Error getting tariff info: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/water/simulated-consumption")
+async def get_simulated_water_consumption(
+    site_id: str = "site-002",
+    days: int = 7,
+) -> Dict[str, Any]:
+    """Get daily water consumption trends for dashboard visualization.
+
+    Returns simulated water usage with breakdown by tariff tier and cost.
+    Supports multi-day trends for analytics.
+
+    Query Params:
+        site_id: Building site code (default: site-002)
+        days: Number of days to return (1-365, default: 7)
+
+    Returns:
+        Daily water consumption data with:
+        - Total liters consumed
+        - Tiered cost breakdown (Tier 1, 2, 3)
+        - Sewerage charges
+        - Peak consumption hour
+        - Zone-level breakdown
+
+    Example Response:
+        {
+            "site_id": "site-002",
+            "period_days": 7,
+            "total_liters": 45000.0,
+            "total_cost_r": 1250.50,
+            "average_daily_liters": 6428.57,
+            "average_daily_cost_r": 178.64,
+            "daily_consumption": [
+                {
+                    "date": "2026-02-18",
+                    "total_liters": 6500.0,
+                    "tier_1_liters": 3333.33,
+                    "tier_1_cost_r": 26.50,
+                    "tier_2_liters": 3166.67,
+                    "tier_2_cost_r": 39.58,
+                    "tier_3_liters": 0.0,
+                    "tier_3_cost_r": 0.0,
+                    "sewerage_cost_r": 41.00,
+                    "fixed_charge_r": 9.50,
+                    "total_cost_r": 116.58,
+                    "peak_hour_consumption_lpm": 45.2,
+                    "average_rate_r_liter": 0.01794
+                }
+            ]
+        }
+    """
+    try:
+        from app.database.repositories.water_consumption_repository import (
+            get_water_consumption_repository,
+        )
+
+        water_repo = get_water_consumption_repository()
+
+        # Get consumption records for period
+        end_date = date.today()
+        start_date = end_date - timedelta(days=days)
+
+        records = water_repo.get_consumption_by_site(
+            site=site_id,
+            start_date=start_date,
+            end_date=end_date,
+            limit=days * 24 * 60,  # Rough estimate
+        )
+
+        if not records:
+            return {
+                "site_id": site_id,
+                "period_days": days,
+                "total_liters": 0.0,
+                "total_cost_r": 0.0,
+                "average_daily_liters": 0.0,
+                "average_daily_cost_r": 0.0,
+                "daily_consumption": [],
+            }
+
+        # Group by date
+        from collections import defaultdict
+
+        daily_data = defaultdict(
+            lambda: {"records": [], "total_liters": 0.0, "flow_rates": []}
+        )
+        for record in records:
+            record_date = (
+                datetime.fromisoformat(record["timestamp"]).date()
+                if isinstance(record["timestamp"], str)
+                else record["timestamp"].date()
+            )
+            daily_data[record_date]["records"].append(record)
+            daily_data[record_date]["total_liters"] += record.get("volume_liters", 0)
+            if record.get("flow_rate_lpm"):
+                daily_data[record_date]["flow_rates"].append(record["flow_rate_lpm"])
+
+        # Calculate costs using tariff
+        daily_costs = []
+        total_cost = 0.0
+        for day_date in sorted(daily_data.keys()):
+            day_info = daily_data[day_date]
+            total_liters = day_info["total_liters"]
+
+            # Johannesburg tiered tariff
+            tier_1_liters = min(
+                total_liters, 100000 / 30
+            )  # Daily allocation of tier 1
+            tier_1_cost = tier_1_liters * 0.00795  # R7.95 per 1000L
+
+            tier_2_liters = 0.0
+            tier_2_cost = 0.0
+            if total_liters > 100000 / 30:
+                tier_2_liters = min(
+                    total_liters - (100000 / 30), (500000 - 100000) / 30
+                )
+                tier_2_cost = tier_2_liters * 0.01250  # R12.50 per 1000L
+
+            tier_3_liters = 0.0
+            tier_3_cost = 0.0
+            if total_liters > 500000 / 30:
+                tier_3_liters = total_liters - (500000 / 30)
+                tier_3_cost = tier_3_liters * 0.01895  # R18.95 per 1000L
+
+            sewerage_cost = total_liters * 0.00630  # R6.30 per 1000L
+            fixed_charge = 285.00 / 30  # Daily fixed
+
+            day_cost = tier_1_cost + tier_2_cost + tier_3_cost + sewerage_cost + fixed_charge
+            total_cost += day_cost
+
+            daily_costs.append(
+                {
+                    "date": day_date.isoformat(),
+                    "total_liters": round(total_liters, 2),
+                    "tier_1_liters": round(tier_1_liters, 2),
+                    "tier_1_cost_r": round(tier_1_cost, 2),
+                    "tier_2_liters": round(tier_2_liters, 2),
+                    "tier_2_cost_r": round(tier_2_cost, 2),
+                    "tier_3_liters": round(tier_3_liters, 2),
+                    "tier_3_cost_r": round(tier_3_cost, 2),
+                    "sewerage_cost_r": round(sewerage_cost, 2),
+                    "fixed_charge_r": round(fixed_charge, 2),
+                    "total_cost_r": round(day_cost, 2),
+                    "peak_hour_consumption_lpm": round(max(day_info["flow_rates"]), 2)
+                    if day_info["flow_rates"]
+                    else 0.0,
+                    "average_rate_r_liter": round(day_cost / total_liters, 4)
+                    if total_liters > 0
+                    else 0.0,
+                }
+            )
+
+        avg_daily_liters = (
+            sum(d["total_liters"] for d in daily_costs) / len(daily_costs)
+            if daily_costs
+            else 0.0
+        )
+        avg_daily_cost = (
+            total_cost / len(daily_costs) if daily_costs else 0.0
+        )
+
+        return {
+            "site_id": site_id,
+            "period_days": days,
+            "total_liters": round(
+                sum(d["total_liters"] for d in daily_costs), 2
+            ),
+            "total_cost_r": round(total_cost, 2),
+            "average_daily_liters": round(avg_daily_liters, 2),
+            "average_daily_cost_r": round(avg_daily_cost, 2),
+            "daily_consumption": daily_costs,
+        }
+
+    except Exception as e:
+        logger.error(f"[WATER] Error getting consumption: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/water/tariff-info")
+async def get_water_tariff_info(site_id: str = "site-002") -> Dict[str, Any]:
+    """Get water tariff structure for transparency.
+
+    Returns municipal water tariff rates including tiered pricing,
+    sewerage charges, and fixed monthly fees.
+
+    Args:
+        site_id: Building site code
+
+    Returns:
+        Complete tariff structure with:
+        - Tier 1, 2, 3 rates (R/kL)
+        - Sewerage charge rate
+        - Fixed monthly charge
+        - Tier volume thresholds
+    """
+    return {
+        "site_id": site_id,
+        "municipality": "Johannesburg",
+        "currency": "ZAR",
+        "effective_date": "2024-01-01",
+        "tiers": [
+            {
+                "tier": 1,
+                "threshold_liters": 100000,
+                "rate_r_per_kiloliter": 7.95,
+                "rate_r_per_liter": 0.00795,
+                "description": "First 100,000 liters per month",
+            },
+            {
+                "tier": 2,
+                "threshold_liters": 500000,
+                "rate_r_per_kiloliter": 12.50,
+                "rate_r_per_liter": 0.01250,
+                "description": "100,001 to 500,000 liters per month",
+            },
+            {
+                "tier": 3,
+                "threshold_liters": float("inf"),
+                "rate_r_per_kiloliter": 18.95,
+                "rate_r_per_liter": 0.01895,
+                "description": "Above 500,000 liters per month",
+            },
+        ],
+        "sewerage_charge": {
+            "rate_r_per_kiloliter": 6.30,
+            "rate_r_per_liter": 0.00630,
+            "description": "Sewerage treatment charge (% of water consumption)",
+        },
+        "fixed_monthly_charge_r": 285.00,
+        "fixed_daily_allocation": round(285.00 / 30, 2),
+        "annual_projection": {
+            "tier_1": {
+                "annual_liters": 100000 * 12,
+                "annual_cost_r": round((100000 / 1000 * 7.95) * 12, 2),
+            },
+            "tier_2": {
+                "annual_liters": (500000 - 100000) * 12,
+                "annual_cost_r": round(
+                    ((500000 - 100000) / 1000 * 12.50) * 12, 2
+                ),
+            },
+        },
+        "notes": [
+            "Rates effective from January 2024",
+            "Tiering resets monthly",
+            "VAT not included in rates",
+            "Commercial high-use buildings typically exceed Tier 1",
+        ],
+    }
+
+
+@router.post("/validation/power-meter")
+async def validate_power_meter(
+    site_id: str = "site-002",
+    meter_id: str = "S002-MTR-B1-HVAC",
+    simulated_power_kw: float = 28.5,
+    real_power_kw: Optional[float] = None,
+    simulated_hour: int = 12,
+) -> Dict[str, Any]:
+    """Validate hourly power consumption against real meter data.
+
+    Compares simulated HVAC power with actual meter reading to detect
+    anomalies, track equipment efficiency, and identify COP degradation.
+
+    Body Params:
+        site_id: Building site code
+        meter_id: Meter identifier (e.g., S002-MTR-B1-HVAC)
+        simulated_power_kw: Simulated power consumption
+        real_power_kw: Actual meter reading (optional)
+        simulated_hour: Hour of day (0-23)
+
+    Returns:
+        Validation result with:
+        - Status: normal | anomaly | critical
+        - Variance percentage and direction
+        - Z-score for statistical anomaly detection
+        - Actionable recommendation
+
+    Example Response (Anomaly):
+        {
+            "validation_status": "anomaly",
+            "severity": "warning",
+            "simulated_kw": 28.5,
+            "real_kw": 32.1,
+            "variance_pct": 11.2,
+            "variance_direction": "under",
+            "hour": 12,
+            "baseline_mean_kw": 25.4,
+            "baseline_stdev_kw": 8.5,
+            "zscore": 0.87,
+            "recommendation": "Simulation underestimating power consumption..."
+        }
+    """
+    try:
+        from app.services.power_meter_validation_engine import (
+            get_power_meter_validation_engine,
+        )
+
+        engine = get_power_meter_validation_engine(site_id)
+        result = await engine.validate_hourly_power(
+            meter_id=meter_id,
+            simulated_power_kw=simulated_power_kw,
+            real_power_kw=real_power_kw,
+            simulated_hour=simulated_hour,
+            simulated_date=datetime.now(),
+        )
+
+        return result
+
+    except Exception as e:
+        logger.error(f"[VALIDATION] Power meter validation error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/validation/power-meter/baseline")
+async def get_power_baseline(
+    site_id: str = "site-002",
+    meter_id: str = "S002-MTR-B1-HVAC",
+    lookback_days: int = 7,
+) -> Dict[str, Any]:
+    """Get baseline power statistics from real meter data.
+
+    Returns statistical baseline (mean, stdev, percentiles) used for
+    anomaly detection and COP analysis.
+
+    Query Params:
+        site_id: Building site code
+        meter_id: Meter identifier
+        lookback_days: Historical data to analyze (default: 7)
+
+    Returns:
+        Baseline statistics for anomaly detection:
+        - mean_kw: Average power consumption
+        - stdev_kw: Standard deviation
+        - min_kw, max_kw: Range
+        - p95_kw: 95th percentile (peak design)
+        - samples: Number of readings analyzed
+
+    Example Response:
+        {
+            "mean_kw": 25.4,
+            "stdev_kw": 8.5,
+            "min_kw": 6.7,
+            "max_kw": 45.2,
+            "median_kw": 23.1,
+            "p95_kw": 42.1,
+            "samples": 168,
+            "lookback_days": 7
+        }
+    """
+    try:
+        from app.services.power_meter_validation_engine import (
+            get_power_meter_validation_engine,
+        )
+
+        engine = get_power_meter_validation_engine(site_id)
+        baseline = await engine.get_power_baseline(meter_id, lookback_days)
+
+        return baseline
+
+    except Exception as e:
+        logger.error(f"[VALIDATION] Baseline calculation error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/validation/power-meter/cop-adjustment")
+async def get_cop_adjustment_recommendation(
+    site_id: str = "site-002",
+    meter_id: str = "S002-MTR-B1-HVAC",
+    lookback_days: int = 30,
+) -> Dict[str, Any]:
+    """Get COP (Coefficient of Performance) adjustment recommendation.
+
+    Analyzes real power consumption to estimate actual chiller COP and
+    recommend adjustments from design baseline (3.5) if degradation detected.
+
+    Query Params:
+        site_id: Building site code
+        meter_id: Meter identifier
+        lookback_days: Analysis period (default: 30)
+
+    Returns:
+        COP adjustment recommendation:
+        - adjustment_needed: Boolean
+        - current_cop: Design assumption (3.5)
+        - estimated_cop: Calculated from real data
+        - recommended_cop: Adjusted value
+        - status: healthy | degraded | unknown
+        - confidence: 0-1 score
+
+    Example Response (Degraded):
+        {
+            "adjustment_needed": true,
+            "status": "degraded",
+            "current_cop": 3.5,
+            "estimated_cop": 2.9,
+            "recommended_cop": 2.9,
+            "avg_real_power_kw": 15.5,
+            "cooling_load_assumption_kw": 45.0,
+            "confidence": 0.75,
+            "reason": "COP degradation detected - equipment maintenance recommended"
+        }
+    """
+    try:
+        from app.services.power_meter_validation_engine import (
+            get_power_meter_validation_engine,
+        )
+
+        engine = get_power_meter_validation_engine(site_id)
+        adjustment = await engine.calculate_cop_adjustment(meter_id, lookback_days)
+
+        return adjustment
+
+    except Exception as e:
+        logger.error(f"[VALIDATION] COP adjustment error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/validation/cost")
+async def validate_monthly_cost(
+    site_id: str = "site-002",
+    month: int = 2,
+    year: int = 2026,
+    real_invoice_cost_r: float = 18500.00,
+    simulated_total_kwh: Optional[float] = None,
+    simulated_total_water_liters: Optional[float] = None,
+) -> Dict[str, Any]:
+    """Validate monthly simulated costs against real invoice.
+
+    Compares total simulated energy + water costs with actual municipal invoice
+    to validate tariff assumptions and identify billing discrepancies.
+
+    Body Params:
+        site_id: Building site code
+        month: Month (1-12)
+        year: Year
+        real_invoice_cost_r: Actual invoice amount
+        simulated_total_kwh: Optional simulated energy (else queried from DB)
+        simulated_total_water_liters: Optional simulated water (else queried from DB)
+
+    Returns:
+        Monthly validation with:
+        - Status: validated | warning | critical
+        - Real vs simulated cost comparison
+        - Variance percentage
+        - Recommendation for tariff adjustment
+
+    Example Response (Warning):
+        {
+            "validation_status": "warning",
+            "severity": "warning",
+            "month": 2,
+            "year": 2026,
+            "period": "2026-02",
+            "real_invoice_cost_r": 18500.00,
+            "simulated_cost_r": 19450.75,
+            "variance_pct": 5.13,
+            "variance_r": 950.75,
+            "variance_direction": "over",
+            "recommendation": "Simulation overestimating costs..."
+        }
+    """
+    try:
+        from app.services.cost_validation_engine import get_cost_validation_engine
+
+        engine = get_cost_validation_engine(site_id)
+        result = await engine.validate_monthly_cost(
+            month=month,
+            year=year,
+            real_invoice_cost_r=real_invoice_cost_r,
+            simulated_total_kwh=simulated_total_kwh,
+            simulated_total_water_liters=simulated_total_water_liters,
+        )
+
+        return result
+
+    except Exception as e:
+        logger.error(f"[VALIDATION] Cost validation error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/validation/cost/daily")
+async def get_daily_simulated_cost(
+    site_id: str = "site-002",
+    energy_kwh: float = 315.0,
+    water_liters: float = 6847.0,
+    cost_date: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Calculate daily simulated cost breakdown for a specific date.
+
+    Returns energy + water costs using current tariff assumptions for
+    given consumption, useful for invoice reconciliation.
+
+    Query Params:
+        site_id: Building site code
+        energy_kwh: Daily energy consumption
+        water_liters: Daily water consumption
+        cost_date: Date (YYYY-MM-DD, default: today)
+
+    Returns:
+        Daily cost breakdown:
+        - energy_cost_r: Energy charges
+        - water_cost_r: Water charges
+        - total_cost_r: Combined total
+        - season: Current season for rate selection
+
+    Example Response:
+        {
+            "date": "2026-02-18",
+            "energy_kwh": 315.0,
+            "water_liters": 6847.0,
+            "energy_cost_r": 689.54,
+            "water_cost_r": 123.06,
+            "total_cost_r": 812.60,
+            "season": "summer"
+        }
+    """
+    try:
+        from app.services.cost_validation_engine import get_cost_validation_engine
+
+        engine = get_cost_validation_engine(site_id)
+
+        if cost_date:
+            calc_date = datetime.fromisoformat(cost_date)
+        else:
+            calc_date = datetime.now()
+
+        result = await engine.get_daily_simulated_cost(
+            energy_kwh=energy_kwh,
+            water_liters=water_liters,
+            cost_date=calc_date,
+        )
+
+        return result
+
+    except Exception as e:
+        logger.error(f"[VALIDATION] Daily cost calculation error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/validation/cost/tariff-adjustment")
+async def get_tariff_adjustment_recommendation(
+    site_id: str = "site-002",
+    months_analyzed: int = 3,
+) -> Dict[str, Any]:
+    """Get tariff adjustment recommendation based on historical validation.
+
+    Analyzes historical cost variance to recommend tariff multiplier adjustments
+    (typically ±5-10%) for fine-tuning simulated costs to match invoices.
+
+    Query Params:
+        site_id: Building site code
+        months_analyzed: Number of months to analyze (minimum: 3)
+
+    Returns:
+        Tariff adjustment recommendation:
+        - adjustment_needed: Boolean
+        - recommended_tariff_multiplier: 1.0 = no change, 1.05 = +5%
+        - confidence: 0-1 score
+        - bias_direction: over | under
+        - records_analyzed: Number of monthly records used
+
+    Example Response (Adjustment Needed):
+        {
+            "adjustment_needed": true,
+            "avg_variance_pct": 4.8,
+            "variance_stdev_pct": 1.2,
+            "bias_direction": "over",
+            "bias_consistency_pct": 87.5,
+            "recommended_adjustment_pct": 4.8,
+            "current_tariff_multiplier": 1.0,
+            "recommended_tariff_multiplier": 1.048,
+            "confidence": 0.88,
+            "records_analyzed": 3
+        }
+    """
+    try:
+        from app.services.cost_validation_engine import get_cost_validation_engine
+
+        engine = get_cost_validation_engine(site_id)
+
+        # For demo: return mock validation records
+        # In production, would query historical cost_validations table
+        mock_validations = [
+            {
+                "variance_pct": 4.5,
+                "variance_direction": "over",
+            },
+            {
+                "variance_pct": 5.2,
+                "variance_direction": "over",
+            },
+            {
+                "variance_pct": 4.1,
+                "variance_direction": "over",
+            },
+        ]
+
+        result = await engine.get_tariff_adjustment_recommendation(
+            mock_validations[:months_analyzed]
+        )
+
+        return result
+
+    except Exception as e:
+        logger.error(f"[VALIDATION] Tariff adjustment error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
