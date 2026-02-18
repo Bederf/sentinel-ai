@@ -1117,7 +1117,7 @@ async def create_work_order_from_water_alert(
         if not work_order:
             raise HTTPException(status_code=500, detail="Failed to create work order")
 
-        # Send Clawd notification
+        # Send Sentry notification
         await alert_svc.notify_sentry_water_alert(alert, work_order["work_order_id"])
 
         return work_order

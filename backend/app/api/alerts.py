@@ -466,7 +466,7 @@ class CreateAlertResponse(BaseModel):
     """Response for alert creation."""
     id: str
     status: str
-    clawd_notified: bool
+    sentry_notified: bool
     message: str
 
 
@@ -533,7 +533,7 @@ async def recalculate_equipment_health_score(client, equipment_id: str):
 @router.post("/alerts", response_model=CreateAlertResponse)
 async def create_alert(http_request: Request, request: CreateAlertRequest) -> CreateAlertResponse:
     """
-    Create a new alert and optionally notify via Clawd Telegram.
+    Create a new alert and optionally notify via Sentry Telegram.
 
     Used by sensors/thermostats to report issues.
     Also updates equipment health_score based on alert severity.
@@ -637,10 +637,10 @@ async def create_alert(http_request: Request, request: CreateAlertRequest) -> Cr
         logger = logging.getLogger(__name__)
         logger.warning(f"Failed to emit alert event: {e}")
 
-    # Send Clawd notification if requested
-    clawd_notified = False
+    # Send Sentry notification if requested
+    sentry_notified = False
     if request.notify_sentry:
-        clawd_alert = {
+        sentry_alert = {
             "id": alert_id,
             "building_name": building_name,
             "zone_name": request.zone_name or "Unknown",
@@ -652,12 +652,12 @@ async def create_alert(http_request: Request, request: CreateAlertRequest) -> Cr
             "reading": request.reading,
             "setpoint": request.setpoint
         }
-        clawd_notified = alert_notifier.send_alert_sync(clawd_alert)
+        sentry_notified = alert_notifier.send_alert_sync(sentry_alert)
 
     return CreateAlertResponse(
         id=alert_id,
         status="active",
-        clawd_notified=clawd_notified,
+        sentry_notified=sentry_notified,
         message=f"Alert created for {eq['name']}"
     )
 
@@ -732,10 +732,10 @@ async def dispatch_work_order(alert_id: str, request: DispatchWorkOrderRequest):
     """Dispatch a work order from an alert.
 
     Creates a work order, service record with diagnostic context,
-    and notifies the technician via Clawd Telegram.
+    and notifies the technician via Sentry Telegram.
 
     The diagnostic context enables context-aware data collection prompts
-    so Clawd asks targeted questions based on the detected fault.
+    so Sentry asks targeted questions based on the detected fault.
     """
     from app.database.supabase_client import get_supabase_client
     from app.services.sentry_integration.work_order_notifier import work_order_notifier
@@ -779,7 +779,7 @@ async def dispatch_work_order(alert_id: str, request: DispatchWorkOrderRequest):
     if request.diagnostic_context:
         diag_context = request.diagnostic_context.dict()
 
-    # Notify technician via Clawd (creates service record)
+    # Notify technician via Sentry (creates service record)
     wo_data = {
         "work_order_id": work_order_id,
         "equipment_id": alert["equipment_id"],

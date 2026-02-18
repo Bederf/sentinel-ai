@@ -4,7 +4,7 @@
 Simulates a complete building day with:
 - AI optimization adjustments
 - Equipment degradation and faults
-- Alert generation and Clawd notifications
+- Alert generation and Sentry notifications
 - Technician dispatch and repair
 - Service feedback and health restoration
 
@@ -1366,7 +1366,7 @@ class LifecycleOrchestrator:
             logger.error(f"Prediction creation error: {e}")
 
     async def _generate_alert(self, equipment: Dict, fault_info: Dict):
-        """Generate alert and optionally notify Clawd."""
+        """Generate alert and optionally notify Sentry."""
         try:
             # Create work order
             work_order = await self.work_order_repo.create_work_order(
@@ -1398,7 +1398,7 @@ class LifecycleOrchestrator:
             if fault_info["equipment_code"] in self.pending_repairs:
                 self.pending_repairs[fault_info["equipment_code"]]["work_order_id"] = wo_code
 
-            # Notify Clawd if enabled
+            # Notify Sentry if enabled
             if self.current_scenario and self.current_scenario.sentry_notifications:
                 await self._notify_sentry(equipment, fault_info, wo_code)
 
@@ -1412,7 +1412,7 @@ class LifecycleOrchestrator:
 
             # This would send actual Telegram message
             # For simulation, we just log it
-            logger.info(f"[CLAWD] Notification sent for {work_order_code}: {fault_info['fault_type']}")
+            logger.info(f"[SENTRY] Notification sent for {work_order_code}: {fault_info['fault_type']}")
 
             self._emit_event(
                 LifecycleEvent(
@@ -1421,13 +1421,13 @@ class LifecycleOrchestrator:
                     event_type=EventType.TECHNICIAN_DISPATCHED,
                     equipment_id=fault_info["equipment_code"],
                     equipment_name=fault_info["equipment_name"],
-                    description=f"Technician notified via Clawd for {work_order_code}",
+                    description=f"Technician notified via Sentry for {work_order_code}",
                     details={"notification_method": "telegram", "work_order": work_order_code},
                 )
             )
 
         except Exception as e:
-            logger.warning(f"Clawd notification skipped: {e}")
+            logger.warning(f"Sentry notification skipped: {e}")
 
     async def _check_pending_repairs(self):
         """Check if any repairs are due."""

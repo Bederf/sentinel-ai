@@ -2,7 +2,7 @@
 Health Simulation Service - Simulates equipment health degradation in Supabase.
 
 This service periodically degrades equipment health scores in the database,
-triggering Clawd health alerts when equipment drops below thresholds.
+triggering Sentry health alerts when equipment drops below thresholds.
 
 Configuration:
 - SIMULATION_ENABLED: Enable/disable simulation (default: True)
@@ -46,7 +46,7 @@ class HealthSimulationService:
             "business_hours_end": 17,    # 17:00
         }
 
-        # Health thresholds (matches Clawd alerts)
+        # Health thresholds (matches Sentry alerts)
         self.thresholds = {
             "critical": 50,
             "warning": 70,
@@ -156,7 +156,7 @@ class HealthSimulationService:
                 f"{len(threshold_crossings)} threshold crossings"
             )
 
-            # Log threshold crossings (will trigger Clawd alerts)
+            # Log threshold crossings (will trigger Sentry alerts)
             for u in threshold_crossings:
                 logger.warning(
                     f"THRESHOLD CROSSED: {u['name']} dropped from "

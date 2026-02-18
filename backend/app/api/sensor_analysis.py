@@ -5,7 +5,7 @@ REST API for phyphox sensor data processing, baseline management, and trend anal
 
 Endpoints:
 - POST /api/sensor-analysis/process - Process phyphox data
-- POST /api/sensor-analysis/clawd/phyphox - Webhook for Sentry bot
+- POST /api/sensor-analysis/sentry/phyphox - Webhook for Sentry bot
 - GET /api/sensor-analysis/instructions/{type} - Get technician instructions
 - POST /api/sensor-analysis/baseline/{equipment_id} - Capture baseline
 - GET /api/sensor-analysis/baseline/{equipment_id} - Get baseline
@@ -127,8 +127,8 @@ async def process_sensor_data(
     return result
 
 
-@router.post("/clawd/phyphox")
-async def clawd_phyphox_webhook(
+@router.post("/sentry/phyphox")
+async def sentry_phyphox_webhook(
     file: UploadFile = File(...),
     equipment_id: str = Form(...),
     chat_id: str = Form(...),

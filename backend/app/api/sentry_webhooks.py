@@ -1,6 +1,6 @@
 """Sentry bot webhook endpoints for Phase 41 integration.
 
-These endpoints are called by the Clawd Telegram bot when:
+These endpoints are called by the Sentry Telegram bot when:
 1. Technician responds to work order notification
 2. Technician uploads files during data collection
 3. Data collection flow interactions
@@ -47,11 +47,11 @@ class EquipmentResetRequest(BaseModel):
 @router.post("/work-order/response", status_code=status.HTTP_200_OK)
 async def handle_work_order_response(
     data: Dict[str, Any],
-    x_clawd_secret: Optional[str] = Header(None),
+    x_sentry_secret: Optional[str] = Header(None),
 ):
     """Handle technician response to work order notification.
 
-    Called by Clawd when technician replies "done" or sends initial service sheet.
+    Called by Sentry when technician replies "done" or sends initial service sheet.
 
     Request body:
         - service_record_code: str (e.g., "SR-2026-ABC123")
@@ -65,7 +65,7 @@ async def handle_work_order_response(
         - is_complete: Whether data collection is complete
     """
     # Verify Sentry secret (simple auth)
-    if x_clawd_secret and x_clawd_secret != "sentry-bms-phase-41":
+    if x_sentry_secret and x_sentry_secret != "sentry-bms-webhooks":
         raise HTTPException(status_code=403, detail="Unauthorized")
 
     # Required fields
@@ -107,9 +107,9 @@ async def get_data_collection_status(service_record_code: str):
 @router.post("/work-order/notify", status_code=status.HTTP_200_OK)
 async def notify_technician_of_work_order(
     data: Dict[str, Any],
-    x_clawd_secret: Optional[str] = Header(None),
+    x_sentry_secret: Optional[str] = Header(None),
 ):
-    """Send work order notification to technician via Clawd.
+    """Send work order notification to technician via Sentry.
 
     Called by BMS when WO is assigned to trigger Telegram notification.
 
@@ -129,7 +129,7 @@ async def notify_technician_of_work_order(
         - service_record_code: Generated code
     """
     # Verify auth
-    if x_clawd_secret and x_clawd_secret != "sentry-bms-phase-41":
+    if x_sentry_secret and x_sentry_secret != "sentry-bms-webhooks":
         raise HTTPException(status_code=403, detail="Unauthorized")
 
     # Required fields
@@ -158,7 +158,7 @@ async def notify_technician_of_work_order(
 async def mark_service_record_complete(service_record_code: str):
     """Mark service record as complete manually.
 
-    Called when technician confirms completion via Clawd.
+    Called when technician confirms completion via Sentry.
     """
     # Find service record
     result = await work_order_notifier.get_collection_status(service_record_code)
@@ -186,9 +186,9 @@ async def mark_service_record_complete(service_record_code: str):
 @router.post("/equipment/reset", status_code=status.HTTP_200_OK)
 async def reset_equipment_fault(
     request: EquipmentResetRequest,
-    x_clawd_secret: Optional[str] = Header(None),
+    x_sentry_secret: Optional[str] = Header(None),
 ):
-    """Remote fault reset for equipment via Clawd Telegram bot.
+    """Remote fault reset for equipment via Sentry Telegram bot.
 
     Resets device fault status, restores health to >=85, and resolves
     active predictions. Blocks fire and generator equipment for safety.
@@ -202,7 +202,7 @@ async def reset_equipment_fault(
         - predictions_resolved: int
     """
     # Verify auth
-    if x_clawd_secret and x_clawd_secret != "sentry-bms-phase-41":
+    if x_sentry_secret and x_sentry_secret != "sentry-bms-webhooks":
         raise HTTPException(status_code=403, detail="Unauthorized")
 
     equipment_code = request.equipment_code
@@ -235,7 +235,7 @@ async def reset_equipment_fault(
                 equipment_info = resp.json()
                 previous_health = equipment_info.get("health_score") or equipment_info.get("health")
             elif resp.status_code == 401:
-                logger.warning("Clawd JWT auth failed when fetching equipment info")
+                logger.warning("Sentry JWT auth failed when fetching equipment info")
     except Exception as e:
         logger.debug(f"Error fetching equipment info: {e}")
 
@@ -266,7 +266,7 @@ async def reset_equipment_fault(
                     if resp.status_code == 200:
                         new_health = resp.json().get("health_score") or resp.json().get("health")
                     elif resp.status_code == 401:
-                        logger.warning("Clawd JWT auth failed when fetching updated equipment info")
+                        logger.warning("Sentry JWT auth failed when fetching updated equipment info")
             except Exception as e:
                 logger.debug(f"Error fetching updated equipment info: {e}")
 
@@ -323,11 +323,11 @@ class CorrectionResponse(BaseModel):
 @router.post("/ocr/process-service-sheet", status_code=status.HTTP_200_OK)
 async def process_service_sheet_ocr(
     data: ServiceSheetUpload,
-    x_clawd_secret: Optional[str] = Header(None),
+    x_sentry_secret: Optional[str] = Header(None),
 ):
     """Process uploaded service sheet through OCR pipeline.
 
-    Called by Clawd when technician sends service sheet photo.
+    Called by Sentry when technician sends service sheet photo.
     Runs 3-stage OCR pipeline and returns results.
 
     If OCR returns needs_review status, includes first correction prompt
@@ -341,7 +341,7 @@ async def process_service_sheet_ocr(
         - correction_prompt: First correction prompt (if needs_review)
     """
     # Verify auth
-    if x_clawd_secret and x_clawd_secret != "sentry-bms-phase-41":
+    if x_sentry_secret and x_sentry_secret != "sentry-bms-webhooks":
         raise HTTPException(status_code=403, detail="Unauthorized")
 
     # Decode image
@@ -391,17 +391,17 @@ async def process_service_sheet_ocr(
 @router.post("/ocr/correction", status_code=status.HTTP_200_OK)
 async def submit_ocr_correction(
     data: CorrectionResponse,
-    x_clawd_secret: Optional[str] = Header(None),
+    x_sentry_secret: Optional[str] = Header(None),
 ):
     """Submit correction for OCR-extracted value.
 
-    Called by Clawd when technician provides corrected value
+    Called by Sentry when technician provides corrected value
     for a field that failed validation.
 
     Returns next correction prompt or completion status.
     """
     # Verify auth
-    if x_clawd_secret and x_clawd_secret != "sentry-bms-phase-41":
+    if x_sentry_secret and x_sentry_secret != "sentry-bms-webhooks":
         raise HTTPException(status_code=403, detail="Unauthorized")
 
     correction_handler = get_ocr_correction_handler()
@@ -450,7 +450,7 @@ async def get_ocr_correction_status(service_record_id: str):
 @router.get("/work-order/pending")
 async def get_pending_work_orders(
     request: Request,
-    x_clawd_secret: Optional[str] = Header(None),
+    x_sentry_secret: Optional[str] = Header(None),
 ):
     """Get pending work orders that need Telegram notifications.
 
@@ -464,8 +464,8 @@ async def get_pending_work_orders(
         List of pending service records ready for notification
     """
     # Sentry bot authentication via header (optional - endpoint is public)
-    if x_clawd_secret and x_clawd_secret != "sentry-bms-phase-41":
-        logger.warning(f"Invalid Sentry secret provided: {x_clawd_secret[:10]}...")
+    if x_sentry_secret and x_sentry_secret != "sentry-bms-webhooks":
+        logger.warning(f"Invalid Sentry secret provided: {x_sentry_secret[:10]}...")
 
     service_repo = ServiceRecordRepository()
 
@@ -504,9 +504,9 @@ async def get_pending_work_orders(
 
 @router.post("/process-pending-notifications", status_code=status.HTTP_200_OK)
 async def process_pending_sentry_notifications(
-    x_clawd_secret: Optional[str] = Header(None),
+    x_sentry_secret: Optional[str] = Header(None),
 ):
-    """Inspect pending notifications for Clawd delivery.
+    """Inspect pending notifications for Sentry delivery.
 
     Called by background scheduler every 30 seconds.
     This endpoint now acts as a monitor/heartbeat only and does NOT advance
@@ -515,8 +515,8 @@ async def process_pending_sentry_notifications(
     Status transitions must occur from real technician interaction
     (e.g., "done" reply via /work-order/response).
     """
-    if x_clawd_secret and x_clawd_secret != "sentry-bms-phase-41":
-        logger.warning(f"Invalid Sentry secret for process-pending: {x_clawd_secret[:10]}...")
+    if x_sentry_secret and x_sentry_secret != "sentry-bms-webhooks":
+        logger.warning(f"Invalid Sentry secret for process-pending: {x_sentry_secret[:10]}...")
 
     service_repo = ServiceRecordRepository()
     try:
@@ -530,7 +530,7 @@ async def process_pending_sentry_notifications(
             }
 
         pending_codes = [sr.get("code") for sr in pending if sr.get("code")]
-        message = f"Pending notifications waiting for Clawd delivery: {len(pending_codes)}"
+        message = f"Pending notifications waiting for Sentry delivery: {len(pending_codes)}"
         if pending_codes:
             logger.info("📲 %s (%s)", message, ", ".join(pending_codes))
 
@@ -560,7 +560,7 @@ async def process_pending_sentry_notifications(
 async def get_inspection_checklist_for_telegram(equipment_type: str):
     """Get a Telegram-formatted inspection checklist for an equipment type.
 
-    Called by Clawd when sending WO notification so the technician
+    Called by Sentry when sending WO notification so the technician
     knows exactly what to check on-site.
 
     Args:

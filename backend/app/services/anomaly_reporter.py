@@ -2,9 +2,9 @@
 Anomaly Report Generator (Phase 41-03)
 
 Generate human-readable reports from anomaly detection results.
-Formats reports for Telegram/Clawd delivery and service record storage.
+Formats reports for Telegram/Sentry delivery and service record storage.
 
-Reference: backend/app/services/clawd_integration for message patterns
+Reference: backend/app/services/sentry_integration for message patterns
 """
 
 import logging

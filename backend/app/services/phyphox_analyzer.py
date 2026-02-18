@@ -3,7 +3,7 @@ phyphox Screenshot Analyzer (Phase 41-03)
 
 Uses Claude Vision API to extract vibration/audio spectrum data from phyphox app screenshots.
 Technicians capture 10-second recordings in phyphox, screenshot the spectrum graph,
-and send via Clawd/Telegram. This service extracts peak frequencies and amplitudes.
+and send via Sentry/Telegram. This service extracts peak frequencies and amplitudes.
 
 Reference: backend/app/services/vision_service.py for Vision API patterns
 """

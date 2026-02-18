@@ -13,7 +13,7 @@ Each recommendation includes:
   type, equipment_id, priority (routine/soon/urgent),
   estimated_cost, reason, next_due_date
 
-Work orders follow existing Clawd notification + auto-assignment pattern.
+Work orders follow existing Sentry notification + auto-assignment pattern.
 """
 
 import logging

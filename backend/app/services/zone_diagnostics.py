@@ -167,8 +167,8 @@ class ZoneDiagnostics:
             severity=severity
         )
 
-    def format_clawd_message(self, diag: DiagnosticResult) -> str:
-        """Format diagnostic result for Clawd Telegram."""
+    def format_sentry_message(self, diag: DiagnosticResult) -> str:
+        """Format diagnostic result for Sentry Telegram."""
         severity_emoji = {"critical": "🚨", "warning": "⚠️", "info": "ℹ️"}
         emoji = severity_emoji.get(diag.severity, "📢")
 

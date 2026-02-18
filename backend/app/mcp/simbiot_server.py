@@ -2203,7 +2203,7 @@ async def activate_building_tool(
 
 async def get_building_config_tool(building_id: str) -> Dict[str, Any]:
     """Get a building's full configuration."""
-    # LOCKED: Clawd only works with site-002 for now
+    # LOCKED: Sentry only works with site-002 for now
     building_id = "site-002"
 
     loader = get_building_loader()
@@ -3626,7 +3626,7 @@ async def get_solar_overview_tool(site_id: str = "site-002") -> Dict[str, Any]:
 
     MCP Tool: get_solar_overview
     """
-    # LOCKED: Clawd only works with site-002 for now
+    # LOCKED: Sentry only works with site-002 for now
     site_id = "site-002"
 
     try:
@@ -3646,7 +3646,7 @@ async def get_bess_status_tool(site_id: str = "site-002") -> Dict[str, Any]:
 
     MCP Tool: get_bess_status
     """
-    # LOCKED: Clawd only works with site-002 for now
+    # LOCKED: Sentry only works with site-002 for now
     site_id = "site-002"
 
     try:
@@ -3712,7 +3712,7 @@ async def get_solar_diagnostics_tool(site_id: str = "site-002") -> Dict[str, Any
 
     MCP Tool: get_solar_diagnostics
     """
-    # LOCKED: Clawd only works with site-002 for now
+    # LOCKED: Sentry only works with site-002 for now
     site_id = "site-002"
 
     try:

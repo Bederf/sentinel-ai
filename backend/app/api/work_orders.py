@@ -169,9 +169,9 @@ async def get_technician_for_equipment(equipment_code: str):
     Get the assigned technician for a piece of equipment.
 
     Looks up the site assignment based on equipment type → specialty mapping.
-    Used by Clawd bot to determine who to email for a work order.
+    Used by Sentry bot to determine who to email for a work order.
 
-    UNAUTHENTICATED - Accepted risk: Clawd bot integration requires external
+    UNAUTHENTICATED - Accepted risk: Sentry bot integration requires external
     webhook access without auth. Technician data exposure is acceptable for
     operations (names, emails, phones are already in technician_repository).
     Used only for work order routing, not for administrative actions.
@@ -334,8 +334,8 @@ async def get_supabase_work_order(
 async def get_equipment_info_for_technician(equipment_code: str):
     """Get detailed equipment information for technicians.
 
-    This endpoint is designed for Clawd bot integration - when a technician
-    asks for more details about the equipment they're working on, Clawd can
+    This endpoint is designed for Sentry bot integration - when a technician
+    asks for more details about the equipment they're working on, Sentry can
     fetch this information.
 
     Returns comprehensive equipment details including:
@@ -352,7 +352,7 @@ async def get_equipment_info_for_technician(equipment_code: str):
     Returns:
         Equipment details formatted for technician reference
 
-    UNAUTHENTICATED - Accepted risk: Clawd bot integration requires external
+    UNAUTHENTICATED - Accepted risk: Sentry bot integration requires external
     webhook access without auth. Equipment metadata is acceptable for operations
     (manufacturer, model, serial are on the device itself). No sensitive control
     parameters or credentials exposed. Used only for technician information lookups.
@@ -445,7 +445,7 @@ async def get_equipment_summary_for_telegram(equipment_code: str):
     Returns:
         Text summary formatted for Telegram
 
-    UNAUTHENTICATED - Accepted risk: Clawd bot integration requires external
+    UNAUTHENTICATED - Accepted risk: Sentry bot integration requires external
     webhook access without auth. Summary is derived from equipment-info endpoint
     (already unauthenticated). Used only for technician information display.
     See 65-04 for security rationale.
@@ -1124,8 +1124,8 @@ async def start_technician_work_order(work_order_id: str):
 async def get_equipment_info_for_technician(equipment_code: str):
     """Get detailed equipment information for technicians.
 
-    This endpoint is designed for Clawd bot integration - when a technician
-    asks for more details about the equipment they're working on, Clawd can
+    This endpoint is designed for Sentry bot integration - when a technician
+    asks for more details about the equipment they're working on, Sentry can
     fetch this information.
 
     Returns comprehensive equipment details including:
@@ -1142,7 +1142,7 @@ async def get_equipment_info_for_technician(equipment_code: str):
     Returns:
         Equipment details formatted for technician reference
 
-    UNAUTHENTICATED - Accepted risk: Clawd bot integration requires external
+    UNAUTHENTICATED - Accepted risk: Sentry bot integration requires external
     webhook access without auth. Equipment metadata is acceptable for operations
     (manufacturer, model, serial are on the device itself). No sensitive control
     parameters or credentials exposed. Used only for technician information lookups.
@@ -1235,7 +1235,7 @@ async def get_equipment_summary_for_telegram(equipment_code: str):
     Returns:
         Text summary formatted for Telegram
 
-    UNAUTHENTICATED - Accepted risk: Clawd bot integration requires external
+    UNAUTHENTICATED - Accepted risk: Sentry bot integration requires external
     webhook access without auth. Summary is derived from equipment-info endpoint
     (already unauthenticated). Used only for technician information display.
     See 65-04 for security rationale.

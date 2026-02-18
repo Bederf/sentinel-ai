@@ -42,7 +42,7 @@ _PUBLIC_PATHS = {
     "/api/lifecycle/status",  # Simulation status (frontend health check)
 }
 _PUBLIC_PREFIXES = (
-    "/api/clawd",  # Sentry bot endpoints (work order polling, OCR, equipment reset, etc.)
+    "/api/sentry",  # Sentry bot endpoints (work order polling, OCR, equipment reset, etc.)
     "/api/sentry-webhooks",  # Telegram bot callbacks (authenticated via webhook secret)
     "/api/mcp/sse",  # MCP SSE transport for Claude Desktop (authenticated at MCP layer)
     "/api/mcp/openai",  # MCP OpenAI endpoints for ChatGPT/M365 Copilot (authenticated at MCP layer)
@@ -219,7 +219,7 @@ def register_middleware(app: FastAPI) -> None:
                 return await call_next(request)
             # If API key provided but wrong, log it as security event
             if api_key:
-                _logger.warning(f"Invalid Clawd API key attempt on {path} from {_extract_ip_address(request)}")
+                _logger.warning(f"Invalid Sentry API key attempt on {path} from {_extract_ip_address(request)}")
                 return JSONResponse(
                     status_code=401,
                     content={"detail": "Invalid API key"},

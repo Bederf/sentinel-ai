@@ -10,7 +10,7 @@ from app.api import work_orders, inspection, service_feedback, checklists, inspe
 from app.api import workflow, baselines, condition
 from app.api import remote_ops, remote_commands, dispatch
 from app.api import alerts, stats, audit, safety, autonomous, simulation
-from app.api import complaints, clawd_webhooks, lifecycle_simulation, simulation_analytics
+from app.api import complaints, sentry_webhooks, whatsapp_webhooks, lifecycle_simulation, simulation_analytics
 from app.api import integration, concept
 from app.api import modules, health_config, service_records, preferences
 from app.api import solar, water, sustainability, contracts, pricing, municipal_billing
@@ -54,7 +54,8 @@ def register_operations_routers(app: FastAPI) -> None:
     # Integrations
     app.include_router(integration.router)
     app.include_router(concept.router, tags=["concept-cafm"])
-    app.include_router(clawd_webhooks.router, tags=["clawd"])
+    app.include_router(sentry_webhooks.router, tags=["sentry"])
+    app.include_router(whatsapp_webhooks.router, tags=["whatsapp"])
 
     # Module registry and configuration
     app.include_router(modules.router, prefix="/api", tags=["modules"])

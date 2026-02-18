@@ -149,12 +149,12 @@ SENTINEL is an intelligent facilities management platform that transforms reacti
 
 5. **Hybrid AI Architecture**
    - Simple queries → Local Ollama (free, fast)
-   - Complex reasoning/control → Claude API (paid, powerful)
+   - Complex reasoning/control → Advanced reasoning engine (for safety-critical & predictive analysis)
    - 40% cost savings vs cloud-only approach
    - Automatic routing based on query complexity
 
 6. **Alert Workflow Integration**
-   - Equipment warnings trigger Telegram notifications via Clawd bot
+   - Equipment warnings trigger Telegram notifications via Sentry bot
    - Technicians can create work orders with /WO commands
    - Seamless detection → notification → action workflow
 
@@ -185,7 +185,7 @@ SENTINEL is an intelligent facilities management platform that transforms reacti
 
 1. **Local-First AI Processing (Hybrid Architecture)**:
    - Simple queries processed by **local Ollama** - data never leaves your infrastructure
-   - Only complex reasoning escalates to Claude API when necessary
+   - Only complex reasoning escalates to SENTINEL's advanced reasoning engine when necessary
    - You control what goes to the cloud vs stays on-premises
    - Sensitive building data, occupancy patterns, and operational details can be kept entirely local
 
@@ -197,7 +197,7 @@ SENTINEL is an intelligent facilities management platform that transforms reacti
 
 5. **Local Data Storage**: Building data stored locally (JSON files) with Supabase as optional cloud database - system works fully offline.
 
-When users ask "How do you keep client data safe?" - emphasize the **local-first architecture**: most AI processing happens on-premises with Ollama, so sensitive building data doesn't leave your network. Only when complex reasoning is needed does data go to Claude API, and even then it's query-specific, not bulk data exports.
+When users ask "How do you keep client data safe?" - emphasize the **local-first architecture**: most AI processing happens on-premises with Ollama, so sensitive building data doesn't leave your network. Only when complex reasoning is needed (predictive maintenance analysis, optimization recommendations) does data go to SENTINEL's advanced reasoning engine, and even then it's query-specific, not bulk data exports.
 
 **Example Questions You Can Answer:**
 - "What is SENTINEL?" → Explain the platform overview

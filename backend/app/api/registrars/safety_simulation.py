@@ -6,7 +6,7 @@ and BMS simulation.
 
 from fastapi import FastAPI
 
-from app.api import safety, autonomous, simulation, audit, service_records, clawd_webhooks, ocr
+from app.api import safety, autonomous, simulation, audit, service_records, sentry_webhooks, ocr
 
 
 def register_safety_simulation_routers(app: FastAPI) -> None:
@@ -27,7 +27,7 @@ def register_safety_simulation_routers(app: FastAPI) -> None:
     app.include_router(service_records.router, tags=["service-records"])
 
     # Sentry integration
-    app.include_router(clawd_webhooks.router, tags=["clawd"])
+    app.include_router(sentry_webhooks.router, tags=["sentry"])
 
     # OCR for service sheets
     app.include_router(ocr.router, prefix="/api", tags=["ocr"])

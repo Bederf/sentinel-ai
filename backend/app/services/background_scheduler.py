@@ -947,9 +947,9 @@ class BackgroundSchedulerService:
         except Exception as e:
             logger.error(f"Failed to run ML model retraining check: {e}", exc_info=True)
 
-    def add_clawd_notification_job(self, interval_seconds: int = 30):
+    def add_sentry_notification_job(self, interval_seconds: int = 30):
         """
-        Add a job to process pending Clawd notifications periodically.
+        Add a job to process pending Sentry notifications periodically.
 
         Ensures that when equipment health degrades to warning/critical,
         technicians receive Telegram notifications promptly.
@@ -960,25 +960,25 @@ class BackgroundSchedulerService:
         # Remove existing job if it exists
         if self.scheduler.get_job('process_sentry_notifications'):
             self.scheduler.remove_job('process_sentry_notifications')
-            logger.info("Removed existing Clawd notification job")
+            logger.info("Removed existing Sentry notification job")
 
         # Add new job
         self.scheduler.add_job(
             func=self._process_sentry_notifications,
             trigger=IntervalTrigger(seconds=interval_seconds),
             id='process_sentry_notifications',
-            name='Process Clawd Notifications',
+            name='Process Sentry Notifications',
             replace_existing=True
         )
-        logger.info(f"Added Clawd notification job with {interval_seconds}s interval")
+        logger.info(f"Added Sentry notification job with {interval_seconds}s interval")
 
     def _process_sentry_notifications(self):
-        """Wrapper to process pending Clawd notifications (runs in background)."""
+        """Wrapper to process pending Sentry notifications (runs in background)."""
         try:
             import asyncio
             import httpx
 
-            logger.debug("Processing pending Clawd notifications...")
+            logger.debug("Processing pending Sentry notifications...")
 
             # Call the endpoint to process pending notifications
             loop = asyncio.new_event_loop()
@@ -1003,7 +1003,7 @@ class BackgroundSchedulerService:
                 logger.warning(f"Failed to process notifications: {result.get('error')}")
 
         except Exception as e:
-            logger.error(f"Failed to process Clawd notifications: {e}", exc_info=True)
+            logger.error(f"Failed to process Sentry notifications: {e}", exc_info=True)
 
 
     def add_simulation_queue_processor_job(self, interval_seconds: int = 10) -> None:

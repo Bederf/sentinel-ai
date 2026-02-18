@@ -1,0 +1,44 @@
+{
+  "technicians": [
+    {
+      "id": "tech-001",
+      "name": "John Smith",
+      "specialty": "electrical",
+      "whatsapp_number": "+27721234567",
+      "active": true,
+      "site_id": "S002"
+    },
+    {
+      "id": "tech-002",
+      "name": "Mike Johnson",
+      "specialty": "hvac",
+      "whatsapp_number": "+27721234568",
+      "active": true,
+      "site_id": "S002"
+    },
+    {
+      "id": "tech-003",
+      "name": "Sarah Lee",
+      "specialty": "plumbing",
+      "whatsapp_number": "+27721234569",
+      "active": true,
+      "site_id": "S002"
+    },
+    {
+      "id": "tech-004",
+      "name": "David Chen",
+      "specialty": "controls",
+      "whatsapp_number": "+27721234570",
+      "active": true,
+      "site_id": "S002"
+    },
+    {
+      "id": "manager-001",
+      "name": "James Wilson",
+      "specialty": "facilities",
+      "whatsapp_number": "+27721234571",
+      "active": true,
+      "site_id": "S002"
+    }
+  ]
+}

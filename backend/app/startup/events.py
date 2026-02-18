@@ -96,8 +96,8 @@ async def startup_event(app: FastAPI) -> None:
 
     sentry_auth = initialize_sentry_auth(api_url=settings.backend_url or "http://localhost:9095")
 
-    # Skip Clawd login during startup to avoid blocking
-    # Clawd will attempt login on first use via get_token_or_refresh()
+    # Skip Sentry login during startup to avoid blocking
+    # Sentry will attempt login on first use via get_token_or_refresh()
     _logger.info("ℹ Sentry bot JWT authentication deferred to first use")
 
     # Capture the main event loop for cross-thread scheduling (simulation tasks)
@@ -167,12 +167,12 @@ async def startup_event(app: FastAPI) -> None:
     except Exception as e:
         _logger.error(f"Failed to initialize autonomous system: {e}")
 
-    # Start Clawd notification processing (runs every 30 seconds)
+    # Start Sentry notification processing (runs every 30 seconds)
     # When equipment health drops to warning/critical, technicians receive Telegram notifications
     # This background job ensures notifications are sent promptly even if Sentry bot polling is delayed
     # TEMPORARILY DISABLED for testing - uncomment to re-enable
-    # if hasattr(scheduler_service, "add_clawd_notification_job"):
-    #     scheduler_service.add_clawd_notification_job(interval_seconds=30)  # 30 seconds
+    # if hasattr(scheduler_service, "add_sentry_notification_job"):
+    #     scheduler_service.add_sentry_notification_job(interval_seconds=30)  # 30 seconds
 
     # Start ML model retraining job (runs daily)
     # Phase 45-01: Checks model age (>30 days) and R² score (<0.65), auto-retrains stale models
@@ -409,7 +409,7 @@ async def startup_event(app: FastAPI) -> None:
     # except Exception as e:
     #     print(f"Failed to start simulation service: {e}")
 
-    # Start health simulation service (writes to Supabase, triggers Clawd alerts)
+    # Start health simulation service (writes to Supabase, triggers Sentry alerts)
     # Runs every hour between 08:00-17:00
     # DISABLED: Start manually via POST /api/simulation/health-sim/start
     # try:
@@ -443,7 +443,7 @@ async def shutdown_event(app: FastAPI) -> None:
     This function is called when the FastAPI application shuts down.
     It stops background services and closes connections.
     """
-    # Stop Clawd JWT token refresh
+    # Stop Sentry JWT token refresh
     from app.services.sentry_auth_service import get_sentry_auth_service
     sentry_auth = get_sentry_auth_service()
     if sentry_auth:

@@ -26,7 +26,7 @@ class WaterAlertNotificationSettings(BaseModel):
     enabled: bool = True
     notify_critical: bool = True
     notify_warning: bool = True
-    notify_channels: List[str] = ["clawd"]
+    notify_channels: List[str] = ["sentry"]
     technician_group: str = "water_maintenance"
     escalate_after_hours: int = 2
 
@@ -774,7 +774,7 @@ class WaterAlertService:
             notification_id = str(uuid.uuid4())
             sent_at = datetime.now().isoformat()
 
-            # Format Clawd message
+            # Format Sentry message
             severity_emoji = "🚨" if alert.severity == AlertSeverity.CRITICAL else (
                 "⚠️" if alert.severity == AlertSeverity.HIGH else "ℹ️"
             )
@@ -801,28 +801,28 @@ class WaterAlertService:
                 f"Reply with repair details to submit feedback",
             ])
 
-            clawd_message = "\n".join(message_lines)
+            sentry_message = "\n".join(message_lines)
 
             # Log the notification intent
             result = {
                 "notification_id": notification_id,
                 "sent_at": sent_at,
-                "channel": "clawd",
+                "channel": "sentry",
                 "status": "queued_for_sending",
-                "message_preview": clawd_message[:100] + "..." if len(clawd_message) > 100 else clawd_message,
+                "message_preview": sentry_message[:100] + "..." if len(sentry_message) > 100 else sentry_message,
                 "work_order_id": work_order_id,
                 "alert_id": alert.alert_id,
             }
 
             logger.info(
                 f"Water alert notification queued: {notification_id} for work order {work_order_id}. "
-                f"Message: {clawd_message[:200]}"
+                f"Message: {sentry_message[:200]}"
             )
 
             return result
 
         except Exception as e:
-            logger.error(f"Failed to create Clawd notification for alert {alert.alert_id}: {e}")
+            logger.error(f"Failed to create Sentry notification for alert {alert.alert_id}: {e}")
             return {
                 "status": "error",
                 "message": str(e),

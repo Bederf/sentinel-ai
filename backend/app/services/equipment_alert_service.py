@@ -3,7 +3,7 @@ Equipment Alert Service - Orchestrates alert creation and notifications.
 
 Central service for creating equipment alerts with:
 1. Alert creation in Supabase via AlertRepository
-2. Telegram notification via Clawd alert_notifier
+2. Telegram notification via Sentry alert_notifier
 3. Returns created alert data
 
 Phase: Demo Flow - Equipment Warning State with Notifications
@@ -89,7 +89,7 @@ class EquipmentAlertService:
         # Send Telegram notification
         telegram_sent = False
         if notify_telegram:
-            clawd_alert = {
+            sentry_alert = {
                 "id": alert_id,
                 "building_name": building_name,
                 "zone_name": equipment.get("zone_name", "Building"),
@@ -100,7 +100,7 @@ class EquipmentAlertService:
                 "severity": severity,
                 "message": message,
             }
-            telegram_sent = alert_notifier.send_alert_sync(clawd_alert)
+            telegram_sent = alert_notifier.send_alert_sync(sentry_alert)
             if telegram_sent:
                 logger.info(f"Telegram notification sent for alert {alert_id}")
             else:

@@ -973,7 +973,7 @@ async def generate_maintenance_work_orders(site_id: str):
 
     Converts condition-based recommendations with priority 'urgent' or
     'soon' into work orders. Auto-assigns to electrical (solar) team
-    following existing work order patterns (Clawd notification ready).
+    following existing work order patterns (Sentry notification ready).
     """
     svc = get_solar_maintenance_service()
     work_orders = await svc.generate_work_orders(site_id)

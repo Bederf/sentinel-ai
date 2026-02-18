@@ -410,7 +410,7 @@ async def force_equipment_degradation(
 # =============================================================================
 # Health Simulation (Supabase) Endpoints
 # These endpoints control the health simulation that writes to Supabase
-# and triggers Clawd health alerts
+# and triggers Sentry health alerts
 # =============================================================================
 
 from app.services.health_simulation_service import health_simulation_service
@@ -527,7 +527,7 @@ async def trigger_demo_warnings(
     1. Selects N random equipment from the building
     2. Updates health_score to 65 and status to 'warning'
     3. Creates alerts in Supabase for each
-    4. Sends Telegram notifications via Clawd
+    4. Sends Telegram notifications via Sentry
     5. Generates predictions for at-risk equipment
     6. Creates AI maintenance recommendations with suggested actions
 
