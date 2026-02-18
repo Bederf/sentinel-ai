@@ -23,10 +23,15 @@ async def verify_whatsapp_webhook(
     hub_challenge: str = Query(None, alias="hub.challenge")
 ) -> int:
     """
-    WhatsApp webhook verification endpoint (GET).
-    Meta sends: hub.mode, hub.verify_token, hub.challenge
+    WhatsApp webhook verification endpoint (GET) — Phase 102.
 
-    This endpoint is called by Meta during webhook configuration.
+    Meta sends GET request with: hub.mode=subscribe, hub.verify_token, hub.challenge
+    This endpoint is called by Meta during webhook configuration to verify ownership.
+
+    Security (Phase 100):
+    - hub.verify_token is compared against WHATSAPP_WEBHOOK_TOKEN from env
+    - If token matches, echo back hub.challenge to complete handshake
+    - Meta then trusts this webhook for inbound messages & callbacks
     """
     logger.info(f"Webhook verification request: mode={hub_mode}")
 
@@ -38,7 +43,7 @@ async def verify_whatsapp_webhook(
         logger.warning("Invalid webhook verification token")
         raise HTTPException(status_code=403, detail="Invalid token")
 
-    logger.info("WhatsApp webhook verified successfully")
+    logger.info("WhatsApp webhook verified successfully - webhook is trusted by Meta")
     return int(hub_challenge)
 
 
@@ -68,7 +73,6 @@ async def handle_whatsapp_message(request: Request) -> Dict[str, str]:
         message = messages[0]
         from_number = message.get("from")
         message_id = message.get("id")
-        timestamp = message.get("timestamp")
         message_type = message.get("type", "text")
 
         # Extract message content based on type
@@ -83,7 +87,11 @@ async def handle_whatsapp_message(request: Request) -> Dict[str, str]:
             button_reply = interactive.get("button_reply", {})
             content = button_reply.get("title", "")
 
-        logger.info(f"[WhatsApp] Incoming from {from_number}: type={message_type}, content={content[:50] if content else 'N/A'}")
+        content_preview = content[:50] if content else "N/A"
+        logger.info(
+            f"[WhatsApp] Incoming from {from_number}: type={message_type}, "
+            f"content={content_preview}"
+        )
 
         if not content:
             logger.debug("Message received but no extractable content")
