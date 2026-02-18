@@ -36,6 +36,8 @@ export const SECTION_CARDS: CardDefinition[] = [
   { id: 'risk-predictions', name: 'Risk Predictions Panel', description: 'AI risk predictions', requiredModules: [] },
   { id: 'comfort-assistant', name: 'Comfort Assistant', description: 'Comfort optimization', requiredModules: ['hvac'] },
   { id: 'occupancy-dashboard', name: 'Occupancy', description: 'Occupancy monitoring', requiredModules: ['lighting'] },
+  { id: 'power-meter-validation', name: 'Power Meter Validation', description: 'Real-time HVAC anomaly detection', requiredModules: [] },
+  { id: 'cost-validation', name: 'Cost Validation', description: 'Monthly cost reconciliation', requiredModules: [] },
 ];
 
 // Default visible KPI cards on dashboard load
@@ -57,6 +59,8 @@ export const DEFAULT_SECTIONS = [
   'energy-analytics',
   'energy-comparison',
   'energy-comparison-actual-vs-sentinel',
+  'power-meter-validation',
+  'cost-validation',
   'risk-predictions',
   'comfort-assistant',
   'occupancy-dashboard',

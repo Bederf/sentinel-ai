@@ -66,6 +66,7 @@ import { InverterStatusMatrix } from "./solar/InverterStatusMatrix";
 import { EnergyFlowDiagram } from "./solar/EnergyFlowDiagram";
 import { SolarAnnualCard } from "./solar/SolarAnnualCard";
 import { LightingIntelligencePanel } from "./LightingIntelligencePanel";
+import { PowerMeterValidationCard, CostValidationCard } from "./validation";
 import { type View } from "./Sidebar";
 import CardLibrary from "./CardLibrary";
 import { DEFAULT_KPI_CARDS, DEFAULT_SECTIONS, getModuleFilteredSections, getDemoDefaultCards } from "../lib/cardDefinitions";
@@ -87,7 +88,9 @@ type DashboardSectionId =
   | 'energy-comparison'
   | 'energy-comparison-actual-vs-sentinel'
   | 'solar-bess'
-  | 'solar-annual';
+  | 'solar-annual'
+  | 'power-meter-validation'
+  | 'cost-validation';
 
 type KPICardId =
   | 'kpi-protected-sites'
@@ -148,6 +151,8 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose, u
     'solar-bess',
     'solar-annual',
     'energy-analytics',
+    'power-meter-validation',
+    'cost-validation',
     'energy-comparison',
     'energy-comparison-actual-vs-sentinel',
     'risk-predictions',
@@ -1252,6 +1257,82 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose, u
     );
   };
 
+  const renderPowerMeterValidation = () => {
+    return (
+      <DashboardSection id="power-meter-validation">
+        <div className="mt-6 space-y-4">
+          {/* Section Header */}
+          <div className="flex items-center gap-3 mb-2">
+            <div
+              className="p-2 rounded"
+              style={{ background: "rgba(59, 130, 246, 0.15)" }}
+            >
+              <Cpu
+                className="h-5 w-5"
+                style={{ color: "#3B82F6" }}
+              />
+            </div>
+            <div>
+              <h3
+                className="font-medium text-sm"
+                style={{ color: "var(--color-sentinel-text-primary)" }}
+              >
+                Power Meter Validation
+              </h3>
+              <span
+                className="text-xs"
+                style={{ color: "var(--color-sentinel-text-secondary)" }}
+              >
+                Real-time HVAC anomaly detection and COP tracking
+              </span>
+            </div>
+          </div>
+
+          {/* Power Meter Validation Card */}
+          <PowerMeterValidationCard buildingId="site-002" />
+        </div>
+      </DashboardSection>
+    );
+  };
+
+  const renderCostValidation = () => {
+    return (
+      <DashboardSection id="cost-validation">
+        <div className="mt-6 space-y-4">
+          {/* Section Header */}
+          <div className="flex items-center gap-3 mb-2">
+            <div
+              className="p-2 rounded"
+              style={{ background: "rgba(34, 197, 94, 0.15)" }}
+            >
+              <DollarSign
+                className="h-5 w-5"
+                style={{ color: "#22C55E" }}
+              />
+            </div>
+            <div>
+              <h3
+                className="font-medium text-sm"
+                style={{ color: "var(--color-sentinel-text-primary)" }}
+              >
+                Cost Validation
+              </h3>
+              <span
+                className="text-xs"
+                style={{ color: "var(--color-sentinel-text-secondary)" }}
+              >
+                Monthly cost reconciliation and tariff optimization
+              </span>
+            </div>
+          </div>
+
+          {/* Cost Validation Card */}
+          <CostValidationCard buildingId="site-002" />
+        </div>
+      </DashboardSection>
+    );
+  };
+
   // Section renderer map
   const sectionRenderers: Record<DashboardSectionId, () => JSX.Element | null> = {
     'kpi-row': renderKPIRow,
@@ -1265,6 +1346,8 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose, u
     'energy-comparison-actual-vs-sentinel': renderEnergyComparisonActualVsSentinel,
     'solar-bess': renderSolarBess,
     'solar-annual': renderSolarAnnual,
+    'power-meter-validation': renderPowerMeterValidation,
+    'cost-validation': renderCostValidation,
   };
 
   // Filter to only visible sections AND sections with active modules
