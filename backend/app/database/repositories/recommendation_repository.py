@@ -40,9 +40,7 @@ class RecommendationRepository:
 
                 self._client = get_supabase_client()
             except Exception as e:
-                logger.warning(
-                    f"Failed to get Supabase client, using JSON fallback: {e}"
-                )
+                logger.warning(f"Failed to get Supabase client, using JSON fallback: {e}")
                 self._use_json = True
         return self._client
 
@@ -135,16 +133,11 @@ class RecommendationRepository:
             matching = [
                 rec
                 for rec in self._recommendations.values()
-                if rec.get("site_id") == site_id
-                and rec.get("status") == status.value
+                if rec.get("site_id") == site_id and rec.get("status") == status.value
             ]
             # Sort by timestamp DESC (newest first)
-            matching.sort(
-                key=lambda r: r.get("timestamp", ""), reverse=True
-            )
-            return [
-                Recommendation.from_dict(rec) for rec in matching[:limit]
-            ]
+            matching.sort(key=lambda r: r.get("timestamp", ""), reverse=True)
+            return [Recommendation.from_dict(rec) for rec in matching[:limit]]
 
         except Exception as e:
             logger.error(f"Error querying recommendations by status: {e}")
@@ -173,9 +166,7 @@ class RecommendationRepository:
         try:
             if not self._use_json and self.client:
                 # Query Supabase
-                recs = await self._supabase_get_history(
-                    site_id, status_filter, risk_level_filter, limit
-                )
+                recs = await self._supabase_get_history(site_id, status_filter, risk_level_filter, limit)
                 return [Recommendation.from_dict(rec) for rec in recs]
 
             # Fall back to JSON
@@ -190,25 +181,15 @@ class RecommendationRepository:
 
             # Apply status filter if provided
             if status_filter:
-                matching = [
-                    rec for rec in matching
-                    if rec.get("status") == status_filter
-                ]
+                matching = [rec for rec in matching if rec.get("status") == status_filter]
 
             # Apply risk level filter if provided
             if risk_level_filter:
-                matching = [
-                    rec for rec in matching
-                    if rec.get("risk_level") == risk_level_filter
-                ]
+                matching = [rec for rec in matching if rec.get("risk_level") == risk_level_filter]
 
             # Sort by timestamp DESC (newest first)
-            matching.sort(
-                key=lambda r: r.get("timestamp", ""), reverse=True
-            )
-            return [
-                Recommendation.from_dict(rec) for rec in matching[:limit]
-            ]
+            matching.sort(key=lambda r: r.get("timestamp", ""), reverse=True)
+            return [Recommendation.from_dict(rec) for rec in matching[:limit]]
 
         except Exception as e:
             logger.error(f"Error querying recommendation history: {e}")
@@ -246,6 +227,36 @@ class RecommendationRepository:
             logger.error(f"Error updating recommendation {rec_id}: {e}")
             raise
 
+    async def upsert(self, rec: Recommendation) -> Recommendation:
+        """Insert or update recommendation (upsert).
+
+        If recommendation with given ID exists, updates it.
+        Otherwise, creates a new one.
+
+        Args:
+            rec: Recommendation to insert/update
+
+        Returns:
+            The inserted/updated recommendation
+
+        Raises:
+            Exception: If operation fails
+        """
+        try:
+            # Check if exists
+            existing = await self.get(rec.id)
+
+            if existing:
+                # Update existing
+                return await self.update(rec.id, rec)
+            else:
+                # Create new
+                return await self.create(rec)
+
+        except Exception as e:
+            logger.error(f"Error in upsert for recommendation {rec.id}: {e}")
+            raise
+
     def _load_all(self) -> None:
         """Load all recommendations from JSON (fallback)."""
         filepath = DATA_DIR / "recommendations.json"
@@ -270,9 +281,7 @@ class RecommendationRepository:
         except Exception as e:
             logger.error(f"Error saving recommendations.json: {e}")
 
-    async def _supabase_insert(
-        self, rec_dict: Dict[str, Any]
-    ) -> Optional[Dict[str, Any]]:
+    async def _supabase_insert(self, rec_dict: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Insert recommendation to Supabase."""
         if not self.client:
             return None
@@ -292,12 +301,7 @@ class RecommendationRepository:
             return None
 
         try:
-            result = (
-                self.client.table("recommendations")
-                .select("*")
-                .eq("id", rec_id)
-                .execute()
-            )
+            result = self.client.table("recommendations").select("*").eq("id", rec_id).execute()
             if result.data and len(result.data) > 0:
                 return result.data[0]
             return None
@@ -330,20 +334,13 @@ class RecommendationRepository:
             logger.error(f"Supabase query failed: {e}")
             return []
 
-    async def _supabase_update(
-        self, rec_id: str, rec_dict: Dict[str, Any]
-    ) -> Optional[Dict[str, Any]]:
+    async def _supabase_update(self, rec_id: str, rec_dict: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Update recommendation in Supabase."""
         if not self.client:
             return None
 
         try:
-            result = (
-                self.client.table("recommendations")
-                .update(rec_dict)
-                .eq("id", rec_id)
-                .execute()
-            )
+            result = self.client.table("recommendations").update(rec_dict).eq("id", rec_id).execute()
             if result.data and len(result.data) > 0:
                 return result.data[0]
             return None
@@ -393,18 +390,6 @@ class RecommendationRepository:
         except Exception as e:
             logger.error(f"Supabase history query failed: {e}")
             return []
-
-
-# Singleton instance
-_recommendation_repository_instance: Optional[RecommendationRepository] = None
-
-
-def get_recommendation_repository() -> RecommendationRepository:
-    """Get singleton RecommendationRepository instance."""
-    global _recommendation_repository_instance
-    if _recommendation_repository_instance is None:
-        _recommendation_repository_instance = RecommendationRepository()
-    return _recommendation_repository_instance
 
 
 # Singleton instance

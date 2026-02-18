@@ -4,6 +4,11 @@
  * Connects to backend SSE stream and provides real-time event subscription.
  * Automatically invalidates React Query caches on relevant events.
  * Handles connection, reconnection, and graceful disconnection.
+ *
+ * Security: Uses ticket-based auth to avoid exposing JWTs in EventSource URLs.
+ * 1. POST /api/events/ticket with Bearer token in Authorization header
+ * 2. Get back a random UUID ticket (short-lived, single-use)
+ * 3. Open EventSource with ?ticket=UUID (safe to appear in logs/console)
  */
 
 import { useEffect, useRef, useCallback } from 'react'
@@ -69,6 +74,28 @@ interface ServerEventFrame {
 type EventHandler = (event: ServerEvent) => void
 
 /**
+ * Obtain a short-lived SSE ticket from the backend.
+ * The JWT is sent in the Authorization header (not in the URL).
+ * Returns a random UUID ticket or null on failure.
+ */
+async function obtainSseTicket(apiUrl: string, token: string): Promise<string | null> {
+  try {
+    const res = await fetch(`${apiUrl}/api/events/ticket`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    })
+    if (!res.ok) return null
+    const data = await res.json()
+    return data.ticket || null
+  } catch {
+    return null
+  }
+}
+
+/**
  * Hook for subscribing to real-time server events
  *
  * @param onEvent - Optional callback when any event is received
@@ -92,6 +119,7 @@ export function useServerEvents(
   const reconnectAttemptsRef = useRef(0)
   const maxReconnectAttemptsRef = useRef(5)
   const reconnectDelayRef = useRef(1000)
+  const connectingRef = useRef(false)
 
   // Handle individual event
   const handleEvent = useCallback(
@@ -201,87 +229,108 @@ export function useServerEvents(
     [queryClient, onEvent, autoInvalidate]
   )
 
-  // Connect to SSE stream
+  // Connect to SSE stream (async: obtains ticket first)
   const connect = useCallback(() => {
-    if (eventSourceRef.current) {
-      // Already connected
+    if (eventSourceRef.current || connectingRef.current) {
       return
     }
 
+    connectingRef.current = true
+
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:9095'
     const token = localStorage.getItem('sentinel_token')
-    const eventSourceUrl = token
-      ? `${apiUrl}/api/events/stream?access_token=${encodeURIComponent(token)}`
-      : `${apiUrl}/api/events/stream`
 
-    try {
-      const eventSource = new EventSource(eventSourceUrl)
+    // Async ticket acquisition then EventSource connection
+    const doConnect = async () => {
+      try {
+        let eventSourceUrl = `${apiUrl}/api/events/stream`
 
-      // Handle incoming messages
-      eventSource.addEventListener('message', (e: MessageEvent) => {
-        try {
-          const frame = JSON.parse(e.data) as ServerEventFrame
-          const event: ServerEvent = {
-            type: frame.type,
-            data: frame.data
-          } as ServerEvent
-
-          handleEvent(event)
-          reconnectAttemptsRef.current = 0
-          reconnectDelayRef.current = 1000
-        } catch (error) {
-          console.error('Failed to parse SSE message:', error, e.data)
+        if (token) {
+          // Get a short-lived ticket (JWT stays in Authorization header, not in URL)
+          const ticket = await obtainSseTicket(apiUrl, token)
+          if (ticket) {
+            eventSourceUrl = `${apiUrl}/api/events/stream?ticket=${encodeURIComponent(ticket)}`
+          }
+          // If ticket acquisition fails, still try connecting (demo mode may allow it)
         }
-      })
 
-      // Handle connection established
-      eventSource.addEventListener('open', () => {
-        console.log('✓ SSE connected')
-        isConnectedRef.current = true
-        reconnectAttemptsRef.current = 0
-        reconnectDelayRef.current = 1000
-      })
-
-      // Handle errors
-      eventSource.addEventListener('error', (error: Event) => {
-        console.error('SSE connection error:', error)
-        isConnectedRef.current = false
-
-        // Don't retry if explicitly closed
-        if (
-          eventSource.readyState === EventSource.CLOSED &&
-          reconnectAttemptsRef.current >= maxReconnectAttemptsRef.current
-        ) {
-          console.log('Max reconnection attempts reached, giving up')
-          eventSource.close()
+        // Guard against race condition if disconnected while awaiting ticket
+        if (eventSourceRef.current) {
+          connectingRef.current = false
           return
         }
 
-        // Schedule reconnection
-        if (reconnectAttemptsRef.current < maxReconnectAttemptsRef.current) {
-          reconnectAttemptsRef.current += 1
-          const delay = reconnectDelayRef.current
-          reconnectDelayRef.current = Math.min(
-            reconnectDelayRef.current * 2,
-            30000
-          ) // Max 30s
+        const eventSource = new EventSource(eventSourceUrl)
 
-          console.log(
-            `Reconnecting in ${delay}ms (attempt ${reconnectAttemptsRef.current}/${maxReconnectAttemptsRef.current})`
-          )
+        // Handle incoming messages
+        eventSource.addEventListener('message', (e: MessageEvent) => {
+          try {
+            const frame = JSON.parse(e.data) as ServerEventFrame
+            const event: ServerEvent = {
+              type: frame.type,
+              data: frame.data
+            } as ServerEvent
 
-          setTimeout(() => {
-            eventSourceRef.current = null
-            connect()
-          }, delay)
-        }
-      })
+            handleEvent(event)
+            reconnectAttemptsRef.current = 0
+            reconnectDelayRef.current = 1000
+          } catch (error) {
+            console.error('Failed to parse SSE message:', error)
+          }
+        })
 
-      eventSourceRef.current = eventSource
-    } catch (error) {
-      console.error('Failed to create EventSource:', error)
-      toast.error('Failed to connect to real-time events')
+        // Handle connection established
+        eventSource.addEventListener('open', () => {
+          isConnectedRef.current = true
+          reconnectAttemptsRef.current = 0
+          reconnectDelayRef.current = 1000
+        })
+
+        // Handle errors
+        eventSource.addEventListener('error', () => {
+          isConnectedRef.current = false
+
+          // Don't retry if explicitly closed
+          if (
+            eventSource.readyState === EventSource.CLOSED &&
+            reconnectAttemptsRef.current >= maxReconnectAttemptsRef.current
+          ) {
+            eventSource.close()
+            connectingRef.current = false
+            return
+          }
+
+          // Close current connection before reconnecting
+          eventSource.close()
+          eventSourceRef.current = null
+
+          // Schedule reconnection with new ticket
+          if (reconnectAttemptsRef.current < maxReconnectAttemptsRef.current) {
+            reconnectAttemptsRef.current += 1
+            const delay = reconnectDelayRef.current
+            reconnectDelayRef.current = Math.min(
+              reconnectDelayRef.current * 2,
+              30000
+            )
+
+            setTimeout(() => {
+              connectingRef.current = false
+              connect()
+            }, delay)
+          } else {
+            connectingRef.current = false
+          }
+        })
+
+        eventSourceRef.current = eventSource
+        connectingRef.current = false
+      } catch {
+        connectingRef.current = false
+        toast.error('Failed to connect to real-time events')
+      }
     }
+
+    doConnect()
   }, [handleEvent])
 
   // Disconnect from SSE stream
@@ -290,8 +339,8 @@ export function useServerEvents(
       eventSourceRef.current.close()
       eventSourceRef.current = null
       isConnectedRef.current = false
-      console.log('SSE disconnected')
     }
+    connectingRef.current = false
   }, [])
 
   // Setup connection on mount, cleanup on unmount

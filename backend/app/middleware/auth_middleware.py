@@ -35,14 +35,18 @@ from fastapi import HTTPException, Request, status
 
 from app.config.settings import settings
 from app.database.supabase_client import get_supabase_client
-from app.database.repositories.user_entitlements_repository import get_user_entitlements_repository
+from app.database.repositories.user_entitlements_repository import (
+    get_user_entitlements_repository,
+)
 from app.models.auth import AuthContext, AuthLevel, SentinelRole, ROLE_HIERARCHY
+from app.models.module_registry import ModuleType
 
 logger = logging.getLogger(__name__)
 
 # =============================================================================
 # PII Sanitization (Phase 65-04)
 # =============================================================================
+
 
 def sanitize_email(email: str) -> str:
     """Mask email address for logging.
@@ -165,11 +169,7 @@ def create_jwt_token(
     Returns:
         Encoded JWT token string
     """
-    secret = (
-        settings.jwt_secret_key
-        or settings.supabase_key
-        or "sentinel-demo-jwt-secret-change-in-production"
-    )
+    secret = settings.jwt_secret_key or settings.supabase_key or "sentinel-demo-jwt-secret-change-in-production"
 
     # Determine TTL based on token type
     if token_type == "refresh":
@@ -225,11 +225,7 @@ def validate_jwt_token(token: str, required_token_type: Optional[str] = None) ->
         Token payload dict or None if invalid
     """
     try:
-        secret = (
-            settings.jwt_secret_key
-            or settings.supabase_key
-            or "sentinel-demo-jwt-secret-change-in-production"
-        )
+        secret = settings.jwt_secret_key or settings.supabase_key or "sentinel-demo-jwt-secret-change-in-production"
 
         payload = pyjwt.decode(
             token,
@@ -259,6 +255,7 @@ def validate_jwt_token(token: str, required_token_type: Optional[str] = None) ->
 
         try:
             from app.services.token_blacklist_service import token_blacklist
+
             if token_blacklist.is_blacklisted(jti):
                 logger.warning(f"Token {jti} is blacklisted")
                 return None
@@ -301,12 +298,8 @@ def _extract_bearer_token(request: Request) -> Optional[str]:
             return None
         return token
 
-    # EventSource cannot send custom Authorization headers in browsers.
-    # Allow access token as query param for the SSE stream endpoint only.
-    if request.url.path == "/api/events/stream":
-        query_token = request.query_params.get("access_token", "")
-        if query_token and not query_token.startswith("sent_sk_"):
-            return query_token
+    # NOTE: SSE stream uses ticket-based auth (POST /api/events/ticket)
+    # instead of passing JWTs in URLs. No access_token query param needed.
     return None
 
 
@@ -445,9 +438,7 @@ def _validate_api_key(api_key: str) -> Optional[Dict[str, Any]]:
 
             # Non-blocking last_used update
             try:
-                client.table("api_keys").update(
-                    {"last_used_at": now.isoformat()}
-                ).eq("id", record.get("id")).execute()
+                client.table("api_keys").update({"last_used_at": now.isoformat()}).eq("id", record.get("id")).execute()
             except Exception:
                 pass
 
@@ -501,6 +492,7 @@ def _extract_role_from_token(payload: Dict[str, Any]) -> SentinelRole:
 # User Entitlements Loading
 # =============================================================================
 
+
 async def _load_user_entitlements(auth_ctx: AuthContext) -> None:
     """Load and attach user's module entitlements to their auth context.
 
@@ -520,17 +512,12 @@ async def _load_user_entitlements(auth_ctx: AuthContext) -> None:
 
         if entitlements_profile:
             auth_ctx.entitlements = entitlements_profile.entitlements
-            logger.debug(
-                f"Loaded entitlements for {auth_ctx.email}: {auth_ctx.entitlements}"
-            )
+            logger.debug(f"Loaded entitlements for {auth_ctx.email}: {auth_ctx.entitlements}")
         else:
             logger.debug(f"No entitlements found for {auth_ctx.email}, using empty set")
             auth_ctx.entitlements = []
     except Exception as e:
-        logger.warning(
-            f"Failed to load entitlements for {auth_ctx.email}: {e} - "
-            f"user will see no modules"
-        )
+        logger.warning(f"Failed to load entitlements for {auth_ctx.email}: {e} - user will see no modules")
         auth_ctx.entitlements = []
 
 
@@ -578,10 +565,7 @@ async def _authenticate_request(request: Request) -> Optional[AuthContext]:
             return auth_ctx
         else:
             # Token provided but invalid
-            logger.warning(
-                f"Auth failure: invalid bearer token from ip={source_ip} "
-                f"path={request.url.path}"
-            )
+            logger.warning(f"Auth failure: invalid bearer token from ip={source_ip} path={request.url.path}")
             return None
 
     # Try API key
@@ -610,10 +594,7 @@ async def _authenticate_request(request: Request) -> Optional[AuthContext]:
             )
             return auth_ctx
         else:
-            logger.warning(
-                f"Auth failure: invalid API key from ip={source_ip} "
-                f"path={request.url.path}"
-            )
+            logger.warning(f"Auth failure: invalid API key from ip={source_ip} path={request.url.path}")
             return None
 
     # No credentials provided
@@ -645,10 +626,7 @@ def require_auth(level: AuthLevel = AuthLevel.AUTHENTICATED):
         if settings.demo_mode:
             # Block DEMO_MODE bypass in production environment
             if settings.environment == "production":
-                logger.error(
-                    "DEMO_MODE bypass attempted in production environment - "
-                    f"path={request.url.path}"
-                )
+                logger.error(f"DEMO_MODE bypass attempted in production environment - path={request.url.path}")
                 raise HTTPException(
                     status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                     detail="Service misconfigured",
@@ -687,9 +665,7 @@ def require_auth(level: AuthLevel = AuthLevel.AUTHENTICATED):
                 metadata={"demo_mode": True},
             )
             request.state.auth = demo_ctx
-            logger.debug(
-                f"Demo mode auth: path={request.url.path} ip={source_ip}"
-            )
+            logger.debug(f"Demo mode auth: path={request.url.path} ip={source_ip}")
             return demo_ctx
 
         # PUBLIC endpoints don't need auth
@@ -768,10 +744,7 @@ def require_role(*roles: SentinelRole):
         # DEMO_MODE bypass
         if settings.demo_mode:
             if settings.environment == "production":
-                logger.error(
-                    "DEMO_MODE role bypass attempted in production - "
-                    f"path={request.url.path}"
-                )
+                logger.error(f"DEMO_MODE role bypass attempted in production - path={request.url.path}")
                 raise HTTPException(
                     status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                     detail="Service misconfigured",
@@ -783,8 +756,7 @@ def require_role(*roles: SentinelRole):
             _LOCALHOST_IPS = {"127.0.0.1", "::1", "localhost", "testclient", "unknown"}
             if source_ip not in _LOCALHOST_IPS and not _is_demo_origin_allowed(request):
                 logger.warning(
-                    f"DEMO_MODE role access denied from non-local IP: "
-                    f"ip={source_ip} path={request.url.path}"
+                    f"DEMO_MODE role access denied from non-local IP: ip={source_ip} path={request.url.path}"
                 )
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
@@ -856,6 +828,7 @@ def get_current_auth(request: Request) -> Optional[AuthContext]:
     """
     return getattr(request.state, "auth", None)
 
+
 # Convenience dependency for OPERATOR-level auth requirement
 require_operator = require_auth(AuthLevel.OPERATOR)
 
@@ -864,7 +837,8 @@ require_operator = require_auth(AuthLevel.OPERATOR)
 # Module Access Control (Module Gating)
 # =============================================================================
 
-def require_module(*required_modules: 'ModuleType'):
+
+def require_module(*required_modules: "ModuleType"):
     """FastAPI dependency that requires specific modules to be active.
 
     Validates that the requested module(s) are active for the site before allowing access.
@@ -918,7 +892,7 @@ def require_module(*required_modules: 'ModuleType'):
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail=f"The {module.value.upper()} module is not active for this site. "
-                           f"Contact your administrator to enable this feature."
+                    f"Contact your administrator to enable this feature.",
                 )
 
         request.state.auth = auth_ctx

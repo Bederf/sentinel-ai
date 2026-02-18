@@ -39,6 +39,8 @@ _PUBLIC_PATHS = {
     "/health",
     "/api/health",
     "/api/lifecycle/status",  # Simulation status (frontend health check)
+    "/api/events/stream",  # SSE stream (handles own ticket-based auth, no JWT in URL)
+    "/api/events/health",  # SSE health check
 }
 _PUBLIC_PREFIXES = (
     "/api/sentry-webhooks",  # Telegram bot callbacks (authenticated via webhook secret)

@@ -131,6 +131,14 @@ export function getDemoDefaultCards(email: string): {
     };
   }
 
+  // Bederf demo (bederf@gmail.com) — Full platform access, all modules + cards
+  if (normalized === 'bederf@gmail.com') {
+    return {
+      kpiCards: DEFAULT_KPI_CARDS,
+      sections: DEFAULT_SECTIONS,
+    };
+  }
+
   // Default for all other users
   return {
     kpiCards: DEFAULT_KPI_CARDS,

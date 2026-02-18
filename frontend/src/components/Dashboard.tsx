@@ -107,8 +107,8 @@ interface DashboardProps {
 }
 
 export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose, userEmail }: DashboardProps) {
-  // Get demo-specific defaults if user is a demo user
-  const demoDefaults = userEmail ? getDemoDefaultCards(userEmail) : null;
+  // Get demo-specific defaults if user is a demo user (memoized to prevent re-render loops)
+  const demoDefaults = useMemo(() => userEmail ? getDemoDefaultCards(userEmail) : null, [userEmail]);
   // React Query hooks - replaces old manual API calls (stale-while-revalidate approach via React Query)
   const { data: buildingsList = [] } = useBuildingsList();
 
