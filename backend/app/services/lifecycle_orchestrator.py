@@ -115,7 +115,9 @@ class ScenarioConfig:
     optimization_enabled: bool = True
     sentry_notifications: bool = True
     operation_mode: Optional[OperationMode] = None
-    demo_mode: bool = False  # Enable continuous AI recommendations (lower thresholds, BESS arbitrage)  # Building operation mode for demos
+    # Enable continuous AI recommendations (lower thresholds, BESS arbitrage)
+    # and building operation mode for demos
+    demo_mode: bool = False
 
 
 # Predefined scenarios
@@ -195,7 +197,11 @@ SCENARIOS = {
     ),
     "grant_hvac_dali_ai_annual": ScenarioConfig(
         name="Grant Demo: HVAC + DALI + Sentinel AI (365 days)",
-        description="Full-year simulation with South African seasonal variations - temperature cycles, rainfall patterns, occupancy variations, and seasonal fault probabilities",
+        description=(
+            "Full-year simulation with South African seasonal variations - "
+            "temperature cycles, rainfall patterns, occupancy variations, "
+            "and seasonal fault probabilities"
+        ),
         operation_mode=OperationMode.HVAC_DALI_SENTINEL,
         fault_probability=0.05,
         auto_repair=True,
@@ -205,7 +211,11 @@ SCENARIOS = {
     ),
     "grant_solar_bess_ai_annual": ScenarioConfig(
         name="Grant Demo: Solar + BESS + Sentinel AI (365 days)",
-        description="Full-year simulation with 3.9 MWp solar + 5 MWh BESS, City Power TOU arbitrage, demand management, and South African seasonal variations",
+        description=(
+            "Full-year simulation with 3.9 MWp solar + 5 MWh BESS, "
+            "City Power TOU arbitrage, demand management, "
+            "and South African seasonal variations"
+        ),
         operation_mode=OperationMode.SOLAR_BESS_SENTINEL,
         fault_probability=0.03,
         auto_repair=True,
@@ -328,9 +338,8 @@ class LifecycleOrchestrator:
                 )
                 if response.data and response.data[0].get("state_snapshot"):
                     checkpoint = response.data[0]["state_snapshot"]
-                    logger.info(
-                        f"✅ Found checkpoint for task {task_id}, recovering from day {checkpoint.get('days_simulated', 0)}/365"
-                    )
+                    day = checkpoint.get("days_simulated", 0)
+                    logger.info(f"✅ Found checkpoint for task {task_id}, recovering from day {day}/365")
             except Exception as e:
                 logger.warning(f"Could not load checkpoint: {e}")
 
@@ -363,9 +372,8 @@ class LifecycleOrchestrator:
             # Restore seasonal modeler for annual sims
             if self.days_simulated > 0:
                 self.seasonal_modeler = SeasonalModeler(seed=self._occupancy_seed)
-                logger.info(
-                    f"✅ Restored checkpoint: day {self.days_simulated}/365, time={self.simulated_time.strftime('%Y-%m-%d %H:%M')}"
-                )
+                time_str = self.simulated_time.strftime("%Y-%m-%d %H:%M")
+                logger.info(f"✅ Restored checkpoint: day {self.days_simulated}/365, time={time_str}")
 
             self.real_start_time = datetime.now()
             self.running = True
@@ -394,7 +402,10 @@ class LifecycleOrchestrator:
             self.time_multiplier = (duration_minutes * 60.0) / total_hours_annual  # seconds per simulated hour
             # Start on January 1st, 6am (year is arbitrary - Python will handle date math)
             self.simulated_time = datetime(2024, 1, 1, start_hour, 0, 0)
-            logger.info(f"Annual simulation initialized: {duration_minutes} min for full year (365 days), {self.time_multiplier:.3f}s per hour")
+            time_mult = f"{self.time_multiplier:.3f}"
+            logger.info(
+                f"Annual simulation initialized: {duration_minutes} min for full year (365 days), {time_mult}s per hour"
+            )
         else:
             # Daily simulation: just 24 hours
             self.seasonal_modeler = None
@@ -516,8 +527,11 @@ class LifecycleOrchestrator:
     async def _run_simulation(self):
         """Main simulation loop - Advances hour-by-hour for entire 365-day year."""
         try:
+            is_annual = self.seasonal_modeler is not None
+            time_mult_str = f"{self.time_multiplier:.3f}"
             logger.warning(
-                f"[SIMULATION START] task_id={self.task_id}, is_annual={self.seasonal_modeler is not None}, days={self.days_simulated}, time_mult={self.time_multiplier:.3f}s/hour"
+                f"[SIMULATION START] task_id={self.task_id}, is_annual={is_annual}, "
+                f"days={self.days_simulated}, time_mult={time_mult_str}s/hour"
             )
 
             is_annual = self.seasonal_modeler is not None
@@ -533,8 +547,10 @@ class LifecycleOrchestrator:
 
                 # Log progress periodically
                 if iteration <= 10 or iteration % 100 == 0:
+                    day_num = self.days_simulated + 1
                     logger.warning(
-                        f"[SIMULATION CYCLE {cycle_num}] Hour {iteration}/{total_iterations} (day={self.days_simulated+1}, hour={current_hour:02d}:00)"
+                        f"[SIMULATION CYCLE {cycle_num}] Hour {iteration}/{total_iterations} "
+                        f"(day={day_num}, hour={current_hour:02d}:00)"
                     )
 
                 try:
@@ -559,7 +575,8 @@ class LifecycleOrchestrator:
                     if iteration > 0 and (iteration % 24) == 0:  # Every 24 hours = 1 day
                         self.days_simulated += 1
                         if is_annual:
-                            logger.warning(f"[DAY COMPLETE] Day {self.days_simulated}/365, progress={int((self.days_simulated/365)*100)}%")
+                            progress = int((self.days_simulated / 365) * 100)
+                            logger.warning(f"[DAY COMPLETE] Day {self.days_simulated}/365, progress={progress}%")
                             # Update database with progress every day
                             await self._update_progress_to_db(iteration, total_iterations)
 
@@ -575,9 +592,8 @@ class LifecycleOrchestrator:
 
                 # Check if completed 365 days (one full cycle)
                 if iteration >= total_iterations:
-                    logger.warning(
-                        f"[CYCLE {cycle_num} COMPLETE] Completed {self.days_simulated} days. Resetting for next cycle..."
-                    )
+                    days = self.days_simulated
+                    logger.warning(f"[CYCLE {cycle_num} COMPLETE] Completed {days} days. Resetting for next cycle...")
                     # Reset for next cycle
                     iteration = 0
                     self.days_simulated = 0
@@ -586,9 +602,7 @@ class LifecycleOrchestrator:
                     last_checkpoint_hour = -1
                     logger.warning(f"[CYCLE {cycle_num} START] Beginning persistent loop cycle {cycle_num}")
 
-            logger.warning(
-                f"[SIMULATION STOPPED] Completed {cycle_num - 1} full cycles, last iteration={iteration}"
-            )
+            logger.warning(f"[SIMULATION STOPPED] Completed {cycle_num - 1} full cycles, last iteration={iteration}")
             self.running = False
 
         except asyncio.CancelledError:
@@ -689,9 +703,13 @@ class LifecycleOrchestrator:
             occupancy_data = self._generate_occupancy_for_hour(hour)
 
             # Get ambient temperature from seasonal modeler
-            ambient_temp = self.seasonal_modeler.get_ambient_temperature(
-                self.simulated_time
-            ) if self.seasonal_modeler else 20.0
+            if self.seasonal_modeler:
+                is_raining = self.seasonal_modeler.should_rain_today(self.simulated_time.date())
+                ambient_temp = self.seasonal_modeler.get_ambient_temperature(
+                    self.simulated_time.date(), self.simulated_time.hour, is_raining
+                )
+            else:
+                ambient_temp = 20.0
 
             # Determine if building is in night setback mode
             is_night_mode = hour >= 22 or hour < 6
@@ -716,7 +734,7 @@ class LifecycleOrchestrator:
             power_engine = get_power_meter_validation_engine("S002")
             result = await power_engine.validate_hourly_power(
                 meter_id="S002-MTR-B1-HVAC",
-                reading_kwh=20.0 + (self._calculate_occupancy(hour)/100.0 * 15.0),
+                reading_kwh=20.0 + (self._calculate_occupancy(hour) / 100.0 * 15.0),
                 simulated_hour=hour,
                 simulated_date=self.simulated_time,
             )
@@ -757,24 +775,24 @@ class LifecycleOrchestrator:
 
         # Zone types and their typical occupancy patterns
         zone_profiles = {
-            "Zone-001": "office",      # Level 0 Zone A - Office space
-            "Zone-002": "office",      # Level 0 Zone B
-            "Zone-003": "meeting",     # Level 0 Zone C - Meeting rooms
-            "Zone-004": "common",      # Level 0 Zone D - Common areas
-            "Zone-005": "entry",       # Level 0 Zone E - Reception/entry
-            "Zone-101": "office",      # Level 1 Zone A
-            "Zone-102": "office",      # Level 1 Zone B
-            "Zone-103": "meeting",     # Level 1 Zone C
-            "Zone-104": "common",      # Level 1 Zone D
-            "Zone-105": "entry",       # Level 1 Zone E
-            "Zone-201": "office",      # Level 2 Zone A
-            "Zone-202": "office",      # Level 2 Zone B
-            "Zone-203": "meeting",     # Level 2 Zone C
-            "Zone-204": "common",      # Level 2 Zone D
-            "Zone-205": "utility",     # Level 2 Zone E - Utility/server
-            "Zone-B1": "utility",      # Basement - HVAC & Power Plant
-            "Zone-L2-Plant": "utility",# L2 Mechanical Room
-            "Zone-R": "utility",       # Rooftop - Solar & Cooling
+            "Zone-001": "office",  # Level 0 Zone A - Office space
+            "Zone-002": "office",  # Level 0 Zone B
+            "Zone-003": "meeting",  # Level 0 Zone C - Meeting rooms
+            "Zone-004": "common",  # Level 0 Zone D - Common areas
+            "Zone-005": "entry",  # Level 0 Zone E - Reception/entry
+            "Zone-101": "office",  # Level 1 Zone A
+            "Zone-102": "office",  # Level 1 Zone B
+            "Zone-103": "meeting",  # Level 1 Zone C
+            "Zone-104": "common",  # Level 1 Zone D
+            "Zone-105": "entry",  # Level 1 Zone E
+            "Zone-201": "office",  # Level 2 Zone A
+            "Zone-202": "office",  # Level 2 Zone B
+            "Zone-203": "meeting",  # Level 2 Zone C
+            "Zone-204": "common",  # Level 2 Zone D
+            "Zone-205": "utility",  # Level 2 Zone E - Utility/server
+            "Zone-B1": "utility",  # Basement - HVAC & Power Plant
+            "Zone-L2-Plant": "utility",  # L2 Mechanical Room
+            "Zone-R": "utility",  # Rooftop - Solar & Cooling
         }
 
         occupancy_data = {}
@@ -782,10 +800,7 @@ class LifecycleOrchestrator:
         for zone_id, zone_type in zone_profiles.items():
             # Calculate occupancy using existing dali logic
             occupancy_pct = calculate_zone_occupancy(
-                hour=hour,
-                day_of_week=day_of_week,
-                is_weekend=is_weekend,
-                zone_type=zone_type
+                hour=hour, day_of_week=day_of_week, is_weekend=is_weekend, zone_type=zone_type
             )
 
             # Apply seasonal variation if in annual simulation
@@ -912,7 +927,8 @@ class LifecycleOrchestrator:
             zones_active = max(1, int(occupancy_percent / 8)) if occupancy_percent > 10 else 0
 
             logger.info(
-                f"AI Optimization ({context}): hour={current_hour}, occupancy={occupancy_percent}%, daylight={daylight_factor}%, zones={zones_active}"
+                f"AI Optimization ({context}): hour={current_hour}, "
+                f"occupancy={occupancy_percent}%, daylight={daylight_factor}%, zones={zones_active}"
             )
 
             equipment_list = self.equipment_repo.get_all()
@@ -1051,7 +1067,10 @@ class LifecycleOrchestrator:
                     timestamp=datetime.now(),
                     simulated_hour=current_hour,
                     event_type=EventType.AI_OPTIMIZATION,
-                    description=f"AI optimization ({context}) - Occupancy {occupancy_percent}%, Daylight {daylight_factor}%, {len(recommendations_created)} recommendations pending",
+                    description=(
+                        f"AI optimization ({context}) - Occupancy {occupancy_percent}%, "
+                        f"Daylight {daylight_factor}%, {len(recommendations_created)} recommendations pending"
+                    ),
                     details={
                         "context": context,
                         "occupancy_percent": occupancy_percent,
@@ -1219,7 +1238,10 @@ class LifecycleOrchestrator:
             "control_point": "brightness_level",
             "target_value": brightness,
             "reason": reason,
-            "description": f"Set Tridonic brightness to {brightness}% (daylight {daylight_factor}%, occupancy {occupancy_percent}%)",
+            "description": (
+                f"Set Tridonic brightness to {brightness}% "
+                f"(daylight {daylight_factor}%, occupancy {occupancy_percent}%)"
+            ),
             "savings": max(2, int(100 - brightness) / 10),  # Energy savings from dimming
         }
 
@@ -1371,7 +1393,9 @@ class LifecycleOrchestrator:
                 {
                     "equipment_id": equipment.get("id"),
                     "title": f"Repair: {fault_info['fault_type']}",
-                    "description": f"Automated work order for {fault_info['equipment_name']}: {fault_info['fault_type']}",
+                    "description": (
+                        f"Automated work order for {fault_info['equipment_name']}: {fault_info['fault_type']}"
+                    ),
                     "priority": "high" if fault_info["severity"] >= 75 else "medium",
                     "status": "scheduled",
                     "created_by": "LIFECYCLE_SIM",
@@ -1406,7 +1430,6 @@ class LifecycleOrchestrator:
     async def _notify_sentry(self, equipment: Dict, fault_info: Dict, work_order_code: str):
         """Send notification to Sentry bot."""
         try:
-
             # This would send actual Telegram message
             # For simulation, we just log it
             logger.info(f"[SENTRY] Notification sent for {work_order_code}: {fault_info['fault_type']}")
@@ -1565,7 +1588,8 @@ class LifecycleOrchestrator:
         Enables crash recovery by preserving simulation state.
 
         Returns:
-            Dict with: simulated_time, days_simulated, active_faults, pending_repairs, recent_events, time_multiplier, occupancy_seed
+            Dict with: simulated_time, days_simulated, active_faults, pending_repairs,
+            recent_events, time_multiplier, occupancy_seed
         """
         return {
             "simulated_time": self.simulated_time.isoformat(),
@@ -1640,18 +1664,13 @@ class LifecycleOrchestrator:
 
             # Update task in database with checkpoint
             client = Supabase.instance()
-            result = (
-                client.table("lifecycle_simulation_tasks")
-                .update(
-                    {
-                        "state_snapshot": state_snapshot,
-                        "progress_pct": int((self.days_simulated / 365) * 100) if self.seasonal_modeler else 0,
-                        "days_completed": self.days_simulated,
-                    }
-                )
-                .eq("task_id", str(self.task_id))
-                .execute()
-            )
+            client.table("lifecycle_simulation_tasks").update(
+                {
+                    "state_snapshot": state_snapshot,
+                    "progress_pct": int((self.days_simulated / 365) * 100) if self.seasonal_modeler else 0,
+                    "days_completed": self.days_simulated,
+                }
+            ).eq("task_id", str(self.task_id)).execute()
 
             logger.info(f"Checkpoint saved for task {self.task_id}: day {self.days_simulated}")
             return True

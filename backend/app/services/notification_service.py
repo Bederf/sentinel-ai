@@ -84,9 +84,7 @@ class NotificationService:
 
         try:
             # Fetch technician preferences
-            preferences = await self.notification_repo.get_notification_preferences(
-                technician_id
-            )
+            preferences = await self.notification_repo.get_notification_preferences(technician_id)
             if not preferences:
                 logger.warning(f"No notification preferences found for technician {technician_id}")
                 result["success"] = False
@@ -221,9 +219,7 @@ class NotificationService:
                 delivery_log.error_message = notification_result.error_message
                 delivery_log.provider_response = notification_result.provider_response or {}
                 error = notification_result.error_message
-                logger.warning(
-                    f"Notification send failed for {channel_type} to technician {technician_id}: {error}"
-                )
+                logger.warning(f"Notification send failed for {channel_type} to technician {technician_id}: {error}")
 
             # Persist delivery log
             created_log = await self.notification_repo.create_delivery_log(delivery_log)
@@ -233,9 +229,7 @@ class NotificationService:
             delivery_log.status = NotificationStatus.FAILED
             delivery_log.error_code = "exception"
             delivery_log.error_message = str(e)
-            logger.error(
-                f"Error sending notification to {channel_type} for technician {technician_id}: {e}"
-            )
+            logger.error(f"Error sending notification to {channel_type} for technician {technician_id}: {e}")
             created_log = await self.notification_repo.create_delivery_log(delivery_log)
             return (channel_type, created_log, str(e))
 
@@ -276,3 +270,7 @@ class NotificationService:
             }
             for channel in ChannelType
         }
+
+
+# Singleton instance for module-level imports
+notification_service = NotificationService()
