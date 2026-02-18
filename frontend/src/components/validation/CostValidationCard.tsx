@@ -50,8 +50,15 @@ export function CostValidationCard({
     const fetchValidation = async () => {
       try {
         setLoading(true);
+        const token = localStorage.getItem("sentinel_token");
         const response = await fetch(
-          `/api/validation/cost/daily?site_id=${buildingId}`
+          `/api/validation/cost/daily?site_id=${buildingId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token || ""}`,
+              "Content-Type": "application/json",
+            },
+          }
         );
         if (!response.ok) throw new Error("Failed to fetch validation data");
         const data = await response.json();

@@ -54,8 +54,15 @@ export function PowerMeterValidationCard({
     const fetchValidation = async () => {
       try {
         setLoading(true);
+        const token = localStorage.getItem("sentinel_token");
         const response = await fetch(
-          `/api/validation/power-meter/baseline?site_id=${buildingId}`
+          `/api/validation/power-meter/baseline?site_id=${buildingId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token || ""}`,
+              "Content-Type": "application/json",
+            },
+          }
         );
         if (!response.ok) throw new Error("Failed to fetch validation data");
         const data = await response.json();
