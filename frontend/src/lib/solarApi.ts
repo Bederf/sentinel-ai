@@ -276,10 +276,15 @@ export async function fetchSolarSites(): Promise<SolarSite[]> {
 
 /**
  * Fetch site overview with generation, BESS SOC, grid flow.
+ *
+ * Uses request batching to prevent 429 rate limit errors when multiple
+ * components request overview simultaneously. Requests are debounced
+ * and sent sequentially to avoid overwhelming the API.
  */
 export async function fetchSolarOverview(siteId: string): Promise<SolarOverview> {
-  const normalizedId = normalizeSiteId(siteId);
-  return fetchJson<SolarOverview>(`/api/solar/sites/${normalizedId}/overview`);
+  // Import batcher dynamically to avoid circular dependencies
+  const { solarOverviewBatcher } = await import('./api/batchers');
+  return solarOverviewBatcher(siteId);
 }
 
 /**
