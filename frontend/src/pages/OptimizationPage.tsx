@@ -33,6 +33,7 @@ import { PageLoading } from "../components/PageLoading";
 import { ProfileSettings } from "../components/optimization/ProfileSettings";
 import { RecommendationsDashboard } from "../components/optimization/RecommendationsDashboard";
 import { RecommendationHistory } from "../components/optimization/RecommendationHistory";
+import { PowerMeterValidationCard, CostValidationCard } from "../components/validation";
 
 // Sentinel-styled Badge component
 interface SentinelBadgeProps {
@@ -295,6 +296,7 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
         <TabList className="mb-6">
           <Tab>Load Shedding</Tab>
           <Tab>Profile-Based Optimization</Tab>
+          <Tab>Validation Metrics</Tab>
         </TabList>
 
         <TabPanels>
@@ -339,7 +341,7 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
                   className="text-xs"
                   style={{ color: "var(--color-sentinel-text-secondary)" }}
                 >
-                  {isSimulationRunning 
+                  {isSimulationRunning
                     ? `Real-time HVAC from simulation • Hour ${simulatedHour}:00 (Day ${daysSimulated}/365) • ${ambientTemp?.toFixed(1)}°C`
                     : 'Optimize building comfort and energy use during outages'
                   }
@@ -796,6 +798,21 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
               />
               <RecommendationsDashboard siteId={selectedSiteId} />
               <RecommendationHistory siteId={selectedSiteId} />
+            </div>
+          </TabPanel>
+
+          <TabPanel>
+            <div className="space-y-6">
+              <div>
+                <Title className="mb-4">Energy & Cost Validation</Title>
+                <Text className="text-gray-400 mb-4">
+                  Real-time validation of simulated energy consumption and costs against meter readings and invoices.
+                </Text>
+              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <PowerMeterValidationCard buildingId={selectedSiteId} />
+                <CostValidationCard buildingId={selectedSiteId} />
+              </div>
             </div>
           </TabPanel>
         </TabPanels>
