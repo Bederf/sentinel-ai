@@ -119,7 +119,7 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose, u
   useServerEvents();
 
   // Simulation context for live sim data
-  const { running: isSimulationRunning, occupancyPercent, hvacLoadPercent, ambientTemp } = useSimulation();
+  const { running: isSimulationRunning, occupancyPercent, hvacLoadPercent, ambientTemp, totalEnergyKwh, currentHourPowerKw } = useSimulation();
 
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [predictions, setPredictions] = useState<Prediction[]>([]);
@@ -509,6 +509,8 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose, u
     const displayAmbientTemp = isSimulationRunning ? ambientTemp : null;
     const displayOccupancy = isSimulationRunning ? occupancyPercent : null;
     const displayHvacLoad = isSimulationRunning ? hvacLoadPercent : null;
+    const displayTotalEnergy = isSimulationRunning ? totalEnergyKwh : null;
+    const displayCurrentPower = isSimulationRunning ? currentHourPowerKw : null;
 
     return {
       'kpi-protected-sites': {
@@ -548,11 +550,11 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose, u
       'kpi-potential-savings': {
         title: isSimulationRunning ? "Live Energy (Simulated)" : "Potential Savings",
         value: isSimulationRunning
-          ? `${(displayOccupancy || 0).toFixed(0)}% occupied • ${displayAmbientTemp?.toFixed(1)}°C`
+          ? `${(displayTotalEnergy || 0).toFixed(1)} kWh`
           : formatZAR(totalPotentialSavings),
         icon: <DollarSign className="h-5 w-5" />,
         subtitle: isSimulationRunning
-          ? `HVAC load: ${displayHvacLoad?.toFixed(0)}%`
+          ? `Current power: ${(displayCurrentPower || 0).toFixed(2)} kW`
           : "If all preventive actions taken",
         accentColor: isSimulationRunning ? "blue" as const : "green" as const,
       },
@@ -564,7 +566,7 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose, u
         accentColor: "purple" as const,
       },
     };
-  }, [stats, normalSites, warningSites, totalPotentialSavings, predictions.length, isSimulationRunning, ambientTemp, occupancyPercent, hvacLoadPercent]);
+  }, [stats, normalSites, warningSites, totalPotentialSavings, predictions.length, isSimulationRunning, ambientTemp, occupancyPercent, hvacLoadPercent, totalEnergyKwh, currentHourPowerKw]);
 
   // Card Library panel - open when sidebar "Customize Dashboard Cards" is clicked (openCardLibrary) or in-dashboard Customize
   const cardLibraryPanel = (

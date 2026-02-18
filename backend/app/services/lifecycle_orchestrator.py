@@ -231,14 +231,6 @@ class LifecycleOrchestrator:
     Orchestrates a 24-hour building simulation.
 
     Integrates:
-    - Equipment health and readings
-    - AI optimization
-    - Fault injection and alerts
-    - Work order creation
-    - Technician simulation
-    - Service feedback
-    """
-
     def __init__(self, task_id: Optional[str] = None):
         self.task_id = task_id  # For database task tracking
         self.running = False
@@ -258,8 +250,11 @@ class LifecycleOrchestrator:
         self.device_control_service = get_device_control_service()
         self._task: Optional[asyncio.Task] = None
         self._callbacks: List[Callable[[LifecycleEvent], None]] = []
-
-        # Seeded random for reproducible but realistic variation
+        
+        # Energy tracking
+        self.total_energy_kwh: float = 0.0  # Cumulative energy consumption
+        self.current_hour_power_kw: float = 0.0  # Current hour's power in kW
+        self.days_simulated: int = 0  # Track days for progresscible but realistic variation
         # Same scenario always produces same results, but with day-to-day variation
         self._scenario_rng = random.Random()
         self._occupancy_seed: Optional[int] = None
@@ -457,12 +452,6 @@ class LifecycleOrchestrator:
 
     def pause(self):
         """Pause the simulation."""
-        self.paused = True
-
-    def resume(self):
-        """Resume the simulation."""
-        self.paused = False
-
     def get_status(self) -> Dict[str, Any]:
         """Get current simulation status including weather and seasonal data."""
         elapsed_real = (datetime.now() - self.real_start_time).total_seconds() if self.real_start_time else 0
@@ -513,10 +502,18 @@ class LifecycleOrchestrator:
             "ambient_temp": ambient_temp,
             "solar_efficiency": solar_efficiency,
             "current_season": current_season,
+            "total_energy_kwh": round(self.total_energy_kwh, 1),
+            "current_hour_power_kw": round(self.current_hour_power_kw, 2),
             "recent_events": [
                 {
                     "hour": e.simulated_hour,
                     "type": e.event_type.value,
+                    "description": e.description,
+                    "equipment": e.equipment_name,
+                }
+                for e in self.events[-10:]
+            ],
+        }           "type": e.event_type.value,
                     "description": e.description,
                     "equipment": e.equipment_name,
                 }
@@ -729,12 +726,19 @@ class LifecycleOrchestrator:
         except Exception as e:
             logger.warning(f"[THERMAL] Failed to update temperatures at hour {hour}: {e}")
 
+        # === ENERGY CONSUMPTION TRACKING ===
+        # Calculate hourly power and add to cumulative energy
+        occupancy_factor = self._calculate_occupancy(hour) / 100.0
+        current_power_kw = 20.0 + (occupancy_factor * 15.0)  # 20-35 kW range
+        self.current_hour_power_kw = current_power_kw
+        self.total_energy_kwh += current_power_kw  # Add 1 hour of consumption
+
         # === POWER METER VALIDATION (A.3) ===
         try:
             power_engine = get_power_meter_validation_engine("S002")
             result = await power_engine.validate_hourly_power(
                 meter_id="S002-MTR-B1-HVAC",
-                reading_kwh=20.0 + (self._calculate_occupancy(hour) / 100.0 * 15.0),
+                reading_kwh=current_power_kw,
                 simulated_hour=hour,
                 simulated_date=self.simulated_time,
             )

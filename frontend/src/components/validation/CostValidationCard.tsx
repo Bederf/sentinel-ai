@@ -22,7 +22,16 @@ import {
 } from "@tremor/react";
 import { DollarSign, AlertTriangle, TrendingUp } from "lucide-react";
 
-interface CostValidation {
+interface CostValidationRaw {
+  // API field names
+  date?: string;
+  energy_kwh?: number;
+  water_liters?: number;
+  energy_cost_r?: number;
+  water_cost_r?: number;
+  total_cost_r?: number;
+  season?: string;
+  // Extended fields (when available)
   period_start?: string;
   period_end?: string;
   simulated_cost_r?: number;
@@ -32,6 +41,41 @@ interface CostValidation {
   confidence?: number;
   tariff_adjustment_factor?: number;
   [key: string]: any;
+}
+
+interface CostValidation {
+  period_start?: string;
+  period_end?: string;
+  simulated_cost_r?: number;
+  real_cost_r?: number | null;
+  variance_pct?: number;
+  recommendation?: string;
+  confidence?: number;
+  tariff_adjustment_factor?: number;
+  energy_kwh?: number;
+  water_liters?: number;
+  energy_cost_r?: number;
+  water_cost_r?: number;
+  season?: string;
+}
+
+/** Map API response fields to component fields */
+function mapCostResponse(raw: CostValidationRaw): CostValidation {
+  return {
+    period_start: raw.period_start ?? raw.date,
+    period_end: raw.period_end ?? raw.date,
+    simulated_cost_r: raw.simulated_cost_r ?? raw.total_cost_r,
+    real_cost_r: raw.real_cost_r ?? null,
+    variance_pct: raw.variance_pct,
+    recommendation: raw.recommendation,
+    confidence: raw.confidence,
+    tariff_adjustment_factor: raw.tariff_adjustment_factor,
+    energy_kwh: raw.energy_kwh,
+    water_liters: raw.water_liters,
+    energy_cost_r: raw.energy_cost_r,
+    water_cost_r: raw.water_cost_r,
+    season: raw.season,
+  };
 }
 
 interface CostValidationCardProps {
@@ -63,7 +107,7 @@ export function CostValidationCard({
         );
         if (!response.ok) throw new Error("Failed to fetch validation data");
         const data = await response.json();
-        setValidation(data);
+        setValidation(mapCostResponse(data));
       } catch (err) {
         setError(err instanceof Error ? err.message : "Unknown error");
       } finally {
@@ -158,7 +202,9 @@ export function CostValidationCard({
                 : "—"}
             </div>
             <Text className="text-xs text-gray-500 mt-1">
-              Energy + Water + Service
+              {validation.energy_cost_r !== undefined && validation.water_cost_r !== undefined
+                ? `Energy R${validation.energy_cost_r.toLocaleString("en-ZA", { maximumFractionDigits: 0 })} + Water R${validation.water_cost_r.toLocaleString("en-ZA", { maximumFractionDigits: 0 })}`
+                : "Energy + Water + Service"}
             </Text>
           </div>
         </div>

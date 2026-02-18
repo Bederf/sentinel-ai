@@ -64,10 +64,12 @@ function getSystemIcon(system: 'hvac' | 'lighting' | 'power') {
 /**
  * Compute hourly energy for each system based on time-of-day, cloud, occupancy.
  *
- * Building specs (Sandton City S002):
- * - Lighting: 8 DALI zones, ~500 luminaires × 50W = 25 kW capacity
- * - HVAC: Chillers + AHUs + FCUs = ~1200 kW peak
- * - General power: UPS + lifts + misc = ~200 kW base
+ * Building specs (Sandton City S002, ~5,000 m² GFA):
+ * - Lighting: 8 DALI zones, ~2,500 luminaires × 50W = 125 kW capacity
+ * - HVAC: 2 chillers + AHUs + FCUs = ~300 kW peak
+ * - General power: UPS + lifts + plugs + servers = ~70 kW base
+ *
+ * Target energy split (typical commercial): ~55% HVAC, ~25% Lighting, ~20% Other
  *
  * Tridonic DALI reduces lighting via daylight harvesting + occupancy sensing.
  * SENTINEL AI further reduces HVAC (predictive setpoints) + lighting (pre-emptive dimming).
@@ -111,8 +113,8 @@ function computeComparison(
     const daylight = solarFactor * cloudMult // 0-1
 
     // --- HVAC (kW this hour) ---
-    // Base: 1200 kW peak during business, 200 kW off-hours
-    const hvacBase = isBusinessHour ? 1200 : 200
+    // 300 kW peak during business (2 chillers + AHUs + FCUs), 50 kW standby off-hours
+    const hvacBase = isBusinessHour ? 300 : 50
     // Tridonic: HVAC not affected by DALI (same as baseline occupancy-scaled)
     const triHvacHour = hvacBase * (hourOcc / 100) * 0.85
     // SENTINEL: predictive setpoints reduce HVAC 12-18% during business hours
@@ -120,8 +122,8 @@ function computeComparison(
     const senHvacHour = hvacBase * (hourOcc / 100) * 0.85 * sentinelHvacSaving
 
     // --- Lighting (kW this hour) ---
-    // 25 kW total lighting capacity
-    const lightingCapacity = 25
+    // 125 kW total lighting capacity (8 DALI zones × ~15.6 kW each)
+    const lightingCapacity = 125
     // Tridonic: daylight harvesting reduces artificial light
     const triDaylightReduction = daylight * 0.65 // harvests up to 65% from daylight
     const triOccReduction = hourOcc < 15 ? 0.7 : 0 // standby mode saves 70% in empty zones
@@ -134,7 +136,8 @@ function computeComparison(
       * Math.max(0.10, 1 - senDaylightReduction - senOccReduction)
 
     // --- General power (kW this hour) ---
-    const powerBase = isBusinessHour ? 200 : 120
+    // 70 kW business (lifts, UPS, plugs, servers), 40 kW off-hours
+    const powerBase = isBusinessHour ? 70 : 40
     const triPowerHour = powerBase * 0.95
     const senPowerHour = powerBase * 0.92 // UPS optimization, lift scheduling
 

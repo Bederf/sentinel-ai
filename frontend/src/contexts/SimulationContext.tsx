@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react'
+import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react'
 
 /**
  * Real-time simulation state available to all pages.
@@ -23,6 +23,8 @@ export interface SimulationState {
 
   // Energy/Load Data
   hvacLoadPercent: number         // 0-100 (%)
+  totalEnergyKwh: number          // Cumulative kWh consumed
+  currentHourPowerKw: number      // Current hour's power in kW
 
   // Metadata
   scenario: string | null
@@ -54,6 +56,8 @@ const initialState: SimulationState = {
   occupancyPercent: 0,
   currentSeason: 'spring',
   hvacLoadPercent: 0,
+  totalEnergyKwh: 0,
+  currentHourPowerKw: 0,
   scenario: null,
   recentEvents: [],
   lastUpdated: 0,
@@ -107,6 +111,10 @@ export function SimulationProvider({ children, siteId = 'site-002' }: Simulation
           ? Math.max(0, Math.min(100, 30 + (data.ambient_temp - 22) * 3))
           : prev.hvacLoadPercent,
 
+        // Energy consumption data
+        totalEnergyKwh: data.total_energy_kwh ?? prev.totalEnergyKwh,
+        currentHourPowerKw: data.current_hour_power_kw ?? prev.currentHourPowerKw,
+
         lastUpdated: Date.now(),
         isLoading: false,
         error: null,
@@ -120,17 +128,48 @@ export function SimulationProvider({ children, siteId = 'site-002' }: Simulation
     }
   }, [siteId])
 
-  // Poll every 25s for ~1-hour jumps at 3650min compression (25s/hour)
-  // 1 simulated day = 10 real minutes
+  // Poll every 25s for backend sync (1 simulated hour at 10min/day compression)
   useEffect(() => {
-    // Initial fetch
     refresh()
-
-    // Set up polling interval (25s ≈ 1 simulated hour at 10min/day)
     const interval = setInterval(refresh, 25000)
-
     return () => clearInterval(interval)
   }, [refresh])
+
+  // Smooth client-side interpolation: advance displayed time every second
+  // between backend polls so the clock ticks smoothly instead of jumping.
+  // Compression: 1 day = 10 real minutes → 1 hour = 25s → ~2.4 sim-minutes/real-second
+  const SIM_MINUTES_PER_TICK = 2.4
+  const lastPollHourRef = useRef<number>(0)
+
+  useEffect(() => {
+    lastPollHourRef.current = state.simulatedHour
+  }, [state.lastUpdated]) // only reset on actual backend poll
+
+  useEffect(() => {
+    if (!state.running || state.paused) return
+
+    const ticker = setInterval(() => {
+      setState(prev => {
+        if (!prev.running || prev.paused) return prev
+        try {
+          const t = new Date(prev.simulatedTime)
+          t.setMinutes(t.getMinutes() + Math.round(SIM_MINUTES_PER_TICK))
+          const newHour = t.getHours()
+          // If hour wrapped past 23→0, let the backend poll handle the day increment
+          if (newHour < prev.simulatedHour && prev.simulatedHour >= 22) return prev
+          return {
+            ...prev,
+            simulatedTime: t.toISOString(),
+            simulatedHour: newHour,
+          }
+        } catch {
+          return prev
+        }
+      })
+    }, 1000)
+
+    return () => clearInterval(ticker)
+  }, [state.running, state.paused])
 
   return (
     <SimulationContext.Provider value={{ state, refresh }}>

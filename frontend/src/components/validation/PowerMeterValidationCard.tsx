@@ -21,9 +21,34 @@ import {
 } from "@tremor/react";
 import { AlertTriangle, Zap, TrendingDown } from "lucide-react";
 
-interface PowerMeterValidation {
+interface PowerMeterValidationRaw {
+  // API field names
+  mean_kw?: number;
+  stdev_kw?: number;
+  min_kw?: number;
+  max_kw?: number;
+  // Legacy/alternate field names
+  baseline_mean?: number;
+  baseline_stdev?: number;
+  baseline_min?: number;
+  baseline_max?: number;
+  // Common fields
+  median_kw?: number;
+  p95_kw?: number;
+  samples?: number;
+  lookback_days?: number;
   meter_id?: string;
   reading_kwh?: number;
+  validation_status?: string;
+  severity?: string;
+  variance_pct?: number;
+  cop_current?: number;
+  cop_design?: number;
+  anomaly_detected?: boolean;
+  reason?: string;
+}
+
+interface PowerMeterValidation {
   baseline_mean: number;
   baseline_stdev: number;
   baseline_min?: number;
@@ -32,6 +57,8 @@ interface PowerMeterValidation {
   p95_kw?: number;
   samples?: number;
   lookback_days?: number;
+  meter_id?: string;
+  reading_kwh?: number;
   validation_status?: string;
   severity?: string;
   variance_pct?: number;
@@ -39,6 +66,29 @@ interface PowerMeterValidation {
   cop_design?: number;
   anomaly_detected?: boolean;
   reason?: string;
+}
+
+/** Map API response fields to component fields */
+function mapPowerMeterResponse(raw: PowerMeterValidationRaw): PowerMeterValidation {
+  return {
+    baseline_mean: raw.mean_kw ?? raw.baseline_mean ?? 0,
+    baseline_stdev: raw.stdev_kw ?? raw.baseline_stdev ?? 0,
+    baseline_min: raw.min_kw ?? raw.baseline_min,
+    baseline_max: raw.max_kw ?? raw.baseline_max,
+    median_kw: raw.median_kw,
+    p95_kw: raw.p95_kw,
+    samples: raw.samples,
+    lookback_days: raw.lookback_days,
+    meter_id: raw.meter_id,
+    reading_kwh: raw.reading_kwh,
+    validation_status: raw.validation_status,
+    severity: raw.severity,
+    variance_pct: raw.variance_pct,
+    cop_current: raw.cop_current,
+    cop_design: raw.cop_design,
+    anomaly_detected: raw.anomaly_detected,
+    reason: raw.reason,
+  };
 }
 
 interface PowerMeterValidationCardProps {
@@ -70,7 +120,7 @@ export function PowerMeterValidationCard({
         );
         if (!response.ok) throw new Error("Failed to fetch validation data");
         const data = await response.json();
-        setValidation(data);
+        setValidation(mapPowerMeterResponse(data));
       } catch (err) {
         setError(err instanceof Error ? err.message : "Unknown error");
       } finally {

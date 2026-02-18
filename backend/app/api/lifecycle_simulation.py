@@ -63,6 +63,9 @@ class SimulationStatusResponse(BaseModel):
     solar_efficiency: Optional[float] = None
     current_season: Optional[str] = None
     occupancy_percent: Optional[float] = None  # Days completed in annual simulation
+    # Energy consumption fields
+    total_energy_kwh: Optional[float] = None  # Cumulative kWh consumed
+    current_hour_power_kw: Optional[float] = None  # Current hour's power in kW
 
 
 class ScenarioInfo(BaseModel):
@@ -362,6 +365,9 @@ async def get_simulation_status(task_id: str):
                 solar_efficiency=status.get("solar_efficiency"),
                 current_season=status.get("current_season"),
                 occupancy_percent=status.get("occupancy_percent"),
+                # Energy consumption data
+                total_energy_kwh=status.get("total_energy_kwh"),
+                current_hour_power_kw=status.get("current_hour_power_kw"),
             )
         else:
             # Simulation not running - get status from database
@@ -449,6 +455,8 @@ async def get_simulation_status(task_id: str):
                 cloud_cover=cloud_cover,
                 solar_efficiency=solar_efficiency,
                 current_season=current_season,
+                total_energy_kwh=state_snapshot.get("total_energy_kwh") if isinstance(state_snapshot, dict) else None,
+                current_hour_power_kw=state_snapshot.get("current_hour_power_kw") if isinstance(state_snapshot, dict) else None,
             )
 
     except HTTPException:
