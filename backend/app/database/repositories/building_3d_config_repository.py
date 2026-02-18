@@ -9,7 +9,6 @@ import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-from uuid import UUID
 
 from app.database.supabase_client import get_supabase_client
 

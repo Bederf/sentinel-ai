@@ -67,7 +67,7 @@ Direct rendering of OptimizationPanel and related components adds unnecessary co
 The component does handle errors correctly (calls onError callback), but testing this in jsdom requires careful timing. Priority was on core features (execution, history) which represent higher business value.
 
 ## Files Modified
-- `frontend/src/pages/__tests__/OptimizationPage.test.tsx`: 
+- `frontend/src/pages/__tests__/OptimizationPage.test.tsx`:
   - Added component mocks (4 mocks)
   - Simplified rendering tests (removed 7 problematic tests)
   - Fixed async patterns (9 tests updated)

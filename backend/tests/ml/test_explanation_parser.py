@@ -1,6 +1,5 @@
 """Tests for the Explanation Parser."""
 
-import pytest
 from ml.explanations.parser import (
     ExplanationParser,
     ParsedExplanation,

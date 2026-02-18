@@ -161,17 +161,17 @@ def extract_type_from_code(code: str) -> str:
     match = re.search(r'S\d{3}-([A-Z]+)-', code)
     if match:
         return match.group(1)
-    
+
     # Match hospital pattern: site-NNN-UMH-TYPE-...
     match = re.search(r'site-\d+-UMH-([A-Z]+)-', code)
     if match:
         return match.group(1)
-    
+
     # Generic pattern: site-NNN-TYPE-...
     match = re.search(r'site-\d+-([A-Z]+)-', code)
     if match:
         return match.group(1)
-    
+
     return 'unknown'
 
 # Examples
@@ -220,20 +220,20 @@ EQUIPMENT_TYPE_TO_SPECIALTY = {
     # HVAC (read-only comfort optimization)
     'CHILLER': 'hvac', 'AHU': 'hvac', 'FCU': 'hvac', 'VAV': 'hvac',
     'SPLIT': 'hvac', 'CT': 'hvac', 'CRAC': 'hvac', 'PUMP': 'hvac', 'BOILER': 'hvac',
-    
+
     # DALI (lighting control)
     'DALI': 'dali', 'LUM': 'dali',
-    
+
     # Electrical (power systems)
     'GEN': 'electrical', 'TX': 'electrical', 'UPS': 'electrical',
     'ATS': 'electrical', 'MSB': 'electrical', 'MTR': 'electrical',
     'PFC': 'electrical', 'FDR': 'electrical', 'MV': 'electrical', 'DB': 'electrical',
-    
+
     # Specialized
     'FIRE': 'fire',           # Fire safety
     'ACC': 'security',        # Access control
     'CCTV': 'security',       # Surveillance
-    
+
     # Default for medical/other
     'JACE': 'general',        # Building automation
     'LIFT': 'general',        # Elevators

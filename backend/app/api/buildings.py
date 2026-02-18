@@ -20,10 +20,10 @@ import shutil
 from pathlib import Path
 from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException, UploadFile, File
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from app.services.building_loader import get_building_loader, Building
+from app.services.building_loader import get_building_loader
 from app.services.device_abstraction import device_manager
 
 logger = logging.getLogger(__name__)

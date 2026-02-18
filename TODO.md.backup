@@ -13,8 +13,8 @@ Last audit: 2026-01-30
 
 ### **Dashboard Card Library System**
 
-**Status**: ⏳ Planning Complete - Ready for Implementation  
-**Created**: 2026-01-28  
+**Status**: ⏳ Planning Complete - Ready for Implementation
+**Created**: 2026-01-28
 **Project**: `/opt/bms-intelligence`
 
 **Overview**: Implement a customizable dashboard card library system where users can select which cards to display on their dashboard. Cards can be added from a library panel in the sidebar and removed via X buttons on each card. Preferences are stored in Supabase.
@@ -5795,7 +5795,7 @@ A simple, powerful tool that scrapes manufacturer websites, parts suppliers, and
     "severity": "critical",
     "description": "Oil pressure has dropped below minimum threshold. Compressor has shut down to prevent damage."
   },
-  
+
   "probable_causes": [
     {
       "cause": "Low oil level",
@@ -5818,7 +5818,7 @@ A simple, powerful tool that scrapes manufacturer websites, parts suppliers, and
       "check": "Oil should be warm before startup - check heater circuit"
     }
   ],
-  
+
   "recommended_fix": {
     "immediate": [
       "Do not attempt restart until cause identified",
@@ -5835,7 +5835,7 @@ A simple, powerful tool that scrapes manufacturer websites, parts suppliers, and
       "Consider oil analysis to check contamination"
     ]
   },
-  
+
   "parts_suggested": [
     {
       "part_name": "Oil Filter",
@@ -5883,7 +5883,7 @@ A simple, powerful tool that scrapes manufacturer websites, parts suppliers, and
       ]
     }
   ],
-  
+
   "sources": [
     {
       "type": "manufacturer",
@@ -5980,7 +5980,7 @@ class EquipmentLookup:
     """
     Web scraper for equipment fault codes, fixes, and parts.
     """
-    
+
     # Manufacturer fault code URLs
     MANUFACTURER_SOURCES = {
         "carrier": {
@@ -6000,7 +6000,7 @@ class EquipmentLookup:
         },
         # Add more manufacturers...
     }
-    
+
     # SA Parts suppliers
     SA_PARTS_SUPPLIERS = [
         {
@@ -6034,7 +6034,7 @@ class EquipmentLookup:
             "brands": ["bearings", "seals"]
         }
     ]
-    
+
     # Common fault code patterns by manufacturer
     FAULT_CODE_PATTERNS = {
         "carrier": {
@@ -6120,7 +6120,7 @@ class EquipmentLookup:
             }
         }
     }
-    
+
     async def lookup_fault_code(
         self,
         manufacturer: str,
@@ -6138,7 +6138,7 @@ class EquipmentLookup:
             "parts_suggested": [],
             "sources": []
         }
-        
+
         # 1. Check local fault code database first
         local_result = self._lookup_local_db(manufacturer, model, fault_code)
         if local_result:
@@ -6147,7 +6147,7 @@ class EquipmentLookup:
                 "type": "local_db",
                 "source": "SENTINEL Fault Code Database"
             })
-        
+
         # 2. Scrape manufacturer website
         manufacturer_result = await self._scrape_manufacturer(
             manufacturer, model, fault_code
@@ -6156,7 +6156,7 @@ class EquipmentLookup:
             result["probable_causes"] = manufacturer_result.get("causes", [])
             result["recommended_fix"] = manufacturer_result.get("fix", {})
             result["sources"].append(manufacturer_result.get("source"))
-        
+
         # 3. Search forums for real-world fixes
         forum_results = await self._search_forums(
             manufacturer, model, fault_code
@@ -6164,15 +6164,15 @@ class EquipmentLookup:
         if forum_results:
             result["sources"].extend(forum_results.get("sources", []))
             # Merge any additional causes/fixes from forums
-        
+
         # 4. Search parts suppliers
         parts = await self._search_parts(
             manufacturer, model, fault_code, result.get("probable_causes", [])
         )
         result["parts_suggested"] = parts
-        
+
         return result
-    
+
     def _lookup_local_db(
         self,
         manufacturer: str,
@@ -6181,23 +6181,23 @@ class EquipmentLookup:
     ) -> Optional[Dict]:
         """Check local fault code database"""
         manufacturer = manufacturer.lower()
-        
+
         if manufacturer in self.FAULT_CODE_PATTERNS:
             mfr_codes = self.FAULT_CODE_PATTERNS[manufacturer]
-            
+
             # Try specific model first
             if model and model.lower() in mfr_codes:
                 model_codes = mfr_codes[model.lower()]
                 if fault_code.upper() in model_codes:
                     return model_codes[fault_code.upper()]
-            
+
             # Try generic manufacturer codes
             for model_key, codes in mfr_codes.items():
                 if fault_code.upper() in codes:
                     return codes[fault_code.upper()]
-        
+
         return None
-    
+
     async def _scrape_manufacturer(
         self,
         manufacturer: str,
@@ -6206,19 +6206,19 @@ class EquipmentLookup:
     ) -> Optional[Dict]:
         """Scrape manufacturer website for fault code info"""
         manufacturer = manufacturer.lower()
-        
+
         if manufacturer not in self.MANUFACTURER_SOURCES:
             return None
-        
+
         source = self.MANUFACTURER_SOURCES[manufacturer]
-        
+
         # Build search URL
         search_url = f"{source['base_url']}{source['fault_search']}"
         if model:
             search_url += f"?model={model}&code={fault_code}"
         else:
             search_url += f"?code={fault_code}"
-        
+
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.get(search_url, timeout=10) as response:
@@ -6227,13 +6227,13 @@ class EquipmentLookup:
                         return self._parse_manufacturer_page(html, manufacturer)
         except Exception as e:
             print(f"Error scraping {manufacturer}: {e}")
-        
+
         return None
-    
+
     def _parse_manufacturer_page(self, html: str, manufacturer: str) -> Dict:
         """Parse manufacturer fault code page"""
         soup = BeautifulSoup(html, 'html.parser')
-        
+
         result = {
             "causes": [],
             "fix": {},
@@ -6242,10 +6242,10 @@ class EquipmentLookup:
                 "source": f"{manufacturer.title()} Technical Documentation"
             }
         }
-        
+
         # Parsing logic would be manufacturer-specific
         # This is a simplified example
-        
+
         # Look for common patterns
         cause_sections = soup.find_all(['div', 'section'], class_=re.compile(r'cause|reason'))
         for section in cause_sections:
@@ -6253,16 +6253,16 @@ class EquipmentLookup:
                 "cause": section.get_text(strip=True),
                 "likelihood": "unknown"
             })
-        
+
         fix_sections = soup.find_all(['div', 'section'], class_=re.compile(r'fix|solution|remedy'))
         for section in fix_sections:
             result["fix"]["steps"] = [
-                step.get_text(strip=True) 
+                step.get_text(strip=True)
                 for step in section.find_all('li')
             ]
-        
+
         return result
-    
+
     async def _search_forums(
         self,
         manufacturer: str,
@@ -6271,21 +6271,21 @@ class EquipmentLookup:
     ) -> Dict:
         """Search technical forums for real-world solutions"""
         sources = []
-        
+
         # Search HVAC-Talk
         hvac_talk_url = f"https://hvac-talk.com/search?q={manufacturer}+{fault_code}"
-        
+
         # Search Reddit r/HVAC
         reddit_url = f"https://www.reddit.com/r/HVAC/search?q={manufacturer}+{fault_code}"
-        
+
         # Search Eng-Tips
         eng_tips_url = f"https://www.eng-tips.com/search?q={manufacturer}+{fault_code}"
-        
+
         # Would implement actual scraping here
         # For now, return structure
-        
+
         return {"sources": sources}
-    
+
     async def _search_parts(
         self,
         manufacturer: str,
@@ -6295,18 +6295,18 @@ class EquipmentLookup:
     ) -> List[Dict]:
         """Search SA parts suppliers for relevant parts"""
         parts = []
-        
+
         # Determine what parts might be needed based on fault
         # This would use AI/rules to suggest relevant parts
-        
+
         for supplier in self.SA_PARTS_SUPPLIERS:
             if supplier["brands"] == ["all"] or manufacturer.lower() in supplier["brands"]:
                 # Search this supplier
                 results = await self._search_supplier(supplier, manufacturer, model)
                 parts.extend(results)
-        
+
         return parts
-    
+
     async def _search_supplier(
         self,
         supplier: Dict,
@@ -6315,10 +6315,10 @@ class EquipmentLookup:
     ) -> List[Dict]:
         """Search a specific supplier for parts"""
         results = []
-        
+
         query = f"{manufacturer} {model}" if model else manufacturer
         search_url = supplier["url"] + supplier["search_url"].format(query=query)
-        
+
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.get(search_url, timeout=10) as response:
@@ -6327,22 +6327,22 @@ class EquipmentLookup:
                         results = self._parse_supplier_results(html, supplier["name"])
         except Exception as e:
             print(f"Error searching {supplier['name']}: {e}")
-        
+
         return results
-    
+
     def _parse_supplier_results(self, html: str, supplier_name: str) -> List[Dict]:
         """Parse supplier search results"""
         soup = BeautifulSoup(html, 'html.parser')
         results = []
-        
+
         # Generic product parsing - would need customization per supplier
         products = soup.find_all(['div', 'article'], class_=re.compile(r'product'))
-        
+
         for product in products[:5]:  # Limit to top 5
             name = product.find(['h2', 'h3', 'span'], class_=re.compile(r'name|title'))
             price = product.find(['span', 'div'], class_=re.compile(r'price'))
             part_num = product.find(['span'], class_=re.compile(r'sku|part'))
-            
+
             if name:
                 results.append({
                     "part_name": name.get_text(strip=True),
@@ -6350,7 +6350,7 @@ class EquipmentLookup:
                     "supplier": supplier_name,
                     "price": price.get_text(strip=True) if price else "Contact for price"
                 })
-        
+
         return results
 
 
@@ -6695,7 +6695,7 @@ class SafeBACnetClient:
     def read_point(self, device, object_type, instance, property):
         """Safe read - allowed"""
         return self.bacnet.read(f'{device} {object_type} {instance} {property}')
-    
+
     def write_point(self, *args, **kwargs):
         """BLOCKED - Never allow writes"""
         raise PermissionError("BACnet writes are disabled for safety")
@@ -6729,7 +6729,7 @@ class SafeBACnetClient:
 
 ### IT Approval Summary
 
-**Device:** NVIDIA Jetson Orin Nano  
+**Device:** NVIDIA Jetson Orin Nano
 **Purpose:** Local AI diagnostics for BMS
 
 **Network Connections:**
@@ -7012,14 +7012,14 @@ Before ANY BMS write action:
 ```python
 class SafeBMSController:
     """BMS controller with safety limits"""
-    
+
     LIMITS = {
         'zone_setpoint': {'min': 18, 'max': 26},
         'fan_speed': {'min': 30, 'max': 100},
         'setpoint_change_max': 3,  # Max change without approval
         'override_duration_max': 7200,  # 2 hours
     }
-    
+
     BLOCKED_ACTIONS = [
         'chiller_start', 'chiller_stop',
         'ahu_start', 'ahu_stop',
@@ -7027,25 +7027,25 @@ class SafeBMSController:
         'alarm_ack', 'alarm_silence',
         'schedule_modify', 'safety_override'
     ]
-    
+
     def adjust_setpoint(self, zone_id, new_setpoint, reason):
         """Adjust zone setpoint with safety checks"""
-        
+
         # Check limits
         if not 18 <= new_setpoint <= 26:
             raise SafetyError(f"Setpoint {new_setpoint} outside safe range 18-26°C")
-        
+
         # Check change amount
         current = self.get_current_setpoint(zone_id)
         change = abs(new_setpoint - current)
-        
+
         if change > 3:
             return {
                 'status': 'approval_required',
                 'message': f'Change of {change}°C requires FM approval',
                 'action_id': self.queue_for_approval(...)
             }
-        
+
         # Execute with auto-revert (2 hours)
         self.execute_setpoint_change(
             zone_id=zone_id,
@@ -7053,7 +7053,7 @@ class SafeBMSController:
             revert_after=7200,
             reason=reason
         )
-        
+
         return {'status': 'success', 'will_revert_at': now + 2hrs}
 ```
 
@@ -8248,11 +8248,11 @@ SELECT * FROM desk_bms_lookup WHERE desk_id = '25';
 ```
 "I've checked Desk 25 on Level 12.
 
-Your zone is currently 23.5°C (target 22°C). 
+Your zone is currently 23.5°C (target 22°C).
 The cooling system is running at 80% capacity.
 
-I notice Desk 25 is near the west window - at 2:30pm there's 
-significant afternoon sun. The system is working correctly but 
+I notice Desk 25 is near the west window - at 2:30pm there's
+significant afternoon sun. The system is working correctly but
 struggling against solar heat gain.
 
 Quick fixes:
@@ -8331,8 +8331,8 @@ AI: "I've checked Desk 25 on Level 12.
 Your zone is currently 23.5°C (target 22°C). The cooling
 system is running at 80% capacity.
 
-I notice Desk 25 is near the west window - at 2:30pm there's 
-significant afternoon sun. The system is working correctly but 
+I notice Desk 25 is near the west window - at 2:30pm there's
+significant afternoon sun. The system is working correctly but
 struggling against the solar heat gain.
 
 Quick fixes:
@@ -8355,7 +8355,7 @@ DIFF-47 and the damper is stuck at 90% open. Zone temp is
 I've logged a job for a technician to adjust the damper.
 They should be there within 2 hours.
 
-In the meantime, Desk 49 is available and away from the 
+In the meantime, Desk 49 is available and away from the
 direct airflow - would you like to move temporarily?"
 ```
 
@@ -9104,11 +9104,11 @@ _CONTROLLERS: List[ScenecomController] = [
 def generate_points_for_controller(ctrl: ScenecomController) -> List[BACnetPoint]:
     """Generate all BACnet points for a single controller"""
     points = []
-    
+
     # Sensor points
     for i in range(1, ctrl.sensor_count + 1):
         sensor_id = f"PIR-{ctrl.controller_id.replace('DALI-', '')}-{i:03d}"
-        
+
         # Occupancy - REALTIME (most important!)
         points.append(BACnetPoint(
             controller_id=ctrl.controller_id,
@@ -9119,7 +9119,7 @@ def generate_points_for_controller(ctrl: ScenecomController) -> List[BACnetPoint
             tier=PollTier.REALTIME,
             description=f"Occupancy sensor {sensor_id}"
         ))
-        
+
         # Lux Level - FAST
         points.append(BACnetPoint(
             controller_id=ctrl.controller_id,
@@ -9131,7 +9131,7 @@ def generate_points_for_controller(ctrl: ScenecomController) -> List[BACnetPoint
             unit='lux',
             description=f"Daylight level {sensor_id}"
         ))
-        
+
         # Sensor Fault - SLOW
         points.append(BACnetPoint(
             controller_id=ctrl.controller_id,
@@ -9142,11 +9142,11 @@ def generate_points_for_controller(ctrl: ScenecomController) -> List[BACnetPoint
             tier=PollTier.SLOW,
             description=f"Sensor fault {sensor_id}"
         ))
-    
+
     # Luminaire points
     for i in range(1, ctrl.luminaire_count + 1):
         lum_id = f"LUM-{ctrl.controller_id.replace('DALI-', '')}-{i:03d}"
-        
+
         # Dim Level - FAST
         points.append(BACnetPoint(
             controller_id=ctrl.controller_id,
@@ -9158,7 +9158,7 @@ def generate_points_for_controller(ctrl: ScenecomController) -> List[BACnetPoint
             unit='%',
             description=f"Dim level {lum_id}"
         ))
-        
+
         # Power Consumption - SLOW
         points.append(BACnetPoint(
             controller_id=ctrl.controller_id,
@@ -9170,7 +9170,7 @@ def generate_points_for_controller(ctrl: ScenecomController) -> List[BACnetPoint
             unit='W',
             description=f"Power consumption {lum_id}"
         ))
-        
+
         # Operating Hours - PERIODIC
         points.append(BACnetPoint(
             controller_id=ctrl.controller_id,
@@ -9182,7 +9182,7 @@ def generate_points_for_controller(ctrl: ScenecomController) -> List[BACnetPoint
             unit='hours',
             description=f"Operating hours {lum_id}"
         ))
-        
+
         # Lamp Fault - SLOW
         points.append(BACnetPoint(
             controller_id=ctrl.controller_id,
@@ -9193,7 +9193,7 @@ def generate_points_for_controller(ctrl: ScenecomController) -> List[BACnetPoint
             tier=PollTier.SLOW,
             description=f"Lamp fault {lum_id}"
         ))
-    
+
     return points
 
 
@@ -9206,7 +9206,7 @@ class DALIBACnetPoller:
     Efficient BACnet poller for Scenecom controllers
     Uses tiered polling and caching
     """
-    
+
     def __init__(
         self,
         controllers: List[ScenecomController],
@@ -9219,69 +9219,69 @@ class DALIBACnetPoller:
         self.bacnet: Optional[BAC0.lite] = None
         self.redis: Optional[redis.Redis] = None
         self.supabase = None
-        
+
         self.redis_url = redis_url
         self.supabase_url = supabase_url
         self.supabase_key = supabase_key
-        
+
         # Callbacks for real-time updates
         self.on_occupancy_change: Optional[Callable] = None
         self.on_fault_detected: Optional[Callable] = None
-        
+
         # Statistics
         self.poll_count = 0
         self.error_count = 0
         self.last_poll_time: Dict[PollTier, datetime] = {}
-        
+
         # Generate all points
         self._generate_all_points()
-    
+
     def _generate_all_points(self):
         """Generate point list for all controllers"""
         for ctrl in self.controllers.values():
             points = generate_points_for_controller(ctrl)
             for p in points:
                 self.points[p.point_name] = p
-        
+
         logger.info(f"Generated {len(self.points)} BACnet points for {len(self.controllers)} controllers")
-    
+
     async def connect(self):
         """Initialize connections"""
         # BACnet connection
         self.bacnet = BAC0.lite(ip='192.168.10.100/24')  # Jetson IP on BMS network
         logger.info("BACnet connection established")
-        
+
         # Redis for caching
         self.redis = await redis.from_url(self.redis_url)
         logger.info("Redis connection established")
-        
+
         # Supabase for persistence
         if self.supabase_url and self.supabase_key:
             self.supabase = create_client(self.supabase_url, self.supabase_key)
             logger.info("Supabase connection established")
-    
+
     async def disconnect(self):
         """Clean up connections"""
         if self.bacnet:
             self.bacnet.disconnect()
         if self.redis:
             await self.redis.close()
-    
+
     def get_points_by_tier(self, tier: PollTier) -> List[BACnetPoint]:
         """Get all points for a specific polling tier"""
         return [p for p in self.points.values() if p.tier == tier]
-    
+
     async def poll_point(self, point: BACnetPoint) -> Optional[any]:
         """Poll a single BACnet point"""
         try:
             ctrl = self.controllers[point.controller_id]
-            
+
             # Build BACnet address
             address = f"{ctrl.ip_address} {point.object_type} {point.object_instance} {point.property_name}"
-            
+
             # Read from BACnet
             value = self.bacnet.read(address)
-            
+
             # Cache in Redis (with TTL based on tier)
             ttl = point.tier.value * 2  # Cache for 2x poll interval
             await self.redis.setex(
@@ -9289,48 +9289,48 @@ class DALIBACnetPoller:
                 ttl,
                 str(value)
             )
-            
+
             self.poll_count += 1
             return value
-            
+
         except Exception as e:
             self.error_count += 1
             logger.error(f"Error polling {point.point_name}: {e}")
             return None
-    
+
     async def poll_tier(self, tier: PollTier):
         """Poll all points in a tier"""
         points = self.get_points_by_tier(tier)
         logger.debug(f"Polling {len(points)} points for tier {tier.name}")
-        
+
         results = {}
         occupancy_changes = []
         faults_detected = []
-        
+
         # Group by controller for efficient batching
         by_controller: Dict[str, List[BACnetPoint]] = {}
         for p in points:
             by_controller.setdefault(p.controller_id, []).append(p)
-        
+
         for ctrl_id, ctrl_points in by_controller.items():
             ctrl = self.controllers[ctrl_id]
-            
+
             # Use ReadPropertyMultiple for efficiency
             try:
                 # Build request for all points on this controller
                 request = []
                 for p in ctrl_points:
                     request.append((p.object_type, p.object_instance, p.property_name))
-                
+
                 # Execute batch read
                 values = await self._batch_read(ctrl.ip_address, request)
-                
+
                 # Process results
                 for i, p in enumerate(ctrl_points):
                     if i < len(values):
                         value = values[i]
                         results[p.point_name] = value
-                        
+
                         # Check for occupancy changes (REALTIME tier)
                         if 'Occupancy' in p.point_name:
                             old_value = await self.redis.get(f"dali:{p.point_name}")
@@ -9341,7 +9341,7 @@ class DALIBACnetPoller:
                                     'new': value,
                                     'time': datetime.now()
                                 })
-                        
+
                         # Check for faults
                         if 'Fault' in p.point_name and value:
                             faults_detected.append({
@@ -9349,24 +9349,24 @@ class DALIBACnetPoller:
                                 'controller': ctrl_id,
                                 'time': datetime.now()
                             })
-                        
+
                         # Cache
                         ttl = tier.value * 2
                         await self.redis.setex(f"dali:{p.point_name}", ttl, str(value))
-                
+
             except Exception as e:
                 logger.error(f"Batch read error for {ctrl_id}: {e}")
-        
+
         # Trigger callbacks
         if occupancy_changes and self.on_occupancy_change:
             await self.on_occupancy_change(occupancy_changes)
-        
+
         if faults_detected and self.on_fault_detected:
             await self.on_fault_detected(faults_detected)
-        
+
         self.last_poll_time[tier] = datetime.now()
         return results
-    
+
     async def _batch_read(self, ip: str, request: List[tuple]) -> List[any]:
         """Execute ReadPropertyMultiple for efficiency"""
         # BAC0 batch read implementation
@@ -9379,27 +9379,27 @@ class DALIBACnetPoller:
             except:
                 values.append(None)
         return values
-    
+
     async def get_cached_value(self, point_name: str) -> Optional[any]:
         """Get value from Redis cache"""
         value = await self.redis.get(f"dali:{point_name}")
         if value:
             return value.decode()
         return None
-    
+
     async def get_zone_occupancy(self, zone_id: str) -> Dict:
         """Get occupancy summary for a zone"""
-        sensors = [p for p in self.points.values() 
+        sensors = [p for p in self.points.values()
                    if 'Occupancy' in p.point_name and zone_id in p.point_name]
-        
+
         occupied = 0
         total = len(sensors)
-        
+
         for sensor in sensors:
             value = await self.get_cached_value(sensor.point_name)
             if value == 'True' or value == '1':
                 occupied += 1
-        
+
         return {
             'zone_id': zone_id,
             'occupied_sensors': occupied,
@@ -9407,27 +9407,27 @@ class DALIBACnetPoller:
             'occupancy_percent': (occupied / total * 100) if total > 0 else 0,
             'timestamp': datetime.now().isoformat()
         }
-    
+
     async def get_zone_lighting(self, zone_id: str) -> Dict:
         """Get lighting status for a zone"""
-        luminaires = [p for p in self.points.values() 
+        luminaires = [p for p in self.points.values()
                       if 'Level' in p.point_name and zone_id in p.point_name]
-        lux_sensors = [p for p in self.points.values() 
+        lux_sensors = [p for p in self.points.values()
                        if 'Lux' in p.point_name and zone_id in p.point_name]
-        
+
         levels = []
         lux_values = []
-        
+
         for lum in luminaires:
             value = await self.get_cached_value(lum.point_name)
             if value:
                 levels.append(float(value))
-        
+
         for lux in lux_sensors:
             value = await self.get_cached_value(lux.point_name)
             if value:
                 lux_values.append(float(value))
-        
+
         return {
             'zone_id': zone_id,
             'avg_dim_level': sum(levels) / len(levels) if levels else 0,
@@ -9437,20 +9437,20 @@ class DALIBACnetPoller:
             'max_daylight_lux': max(lux_values) if lux_values else 0,
             'timestamp': datetime.now().isoformat()
         }
-    
+
     async def persist_to_supabase(self, tier: PollTier, results: Dict):
         """Store polling results to Supabase for trending"""
         if not self.supabase:
             return
-        
+
         # Only persist SLOW tier data for trending
         if tier != PollTier.SLOW:
             return
-        
+
         # Batch insert for efficiency
         records = []
         timestamp = datetime.now().isoformat()
-        
+
         for point_name, value in results.items():
             if value is not None:
                 records.append({
@@ -9458,37 +9458,37 @@ class DALIBACnetPoller:
                     'point_name': point_name,
                     'value': float(value) if isinstance(value, (int, float)) else str(value)
                 })
-        
+
         # Insert in batches of 1000
         for i in range(0, len(records), 1000):
             batch = records[i:i+1000]
             self.supabase.table('dali_trends').insert(batch).execute()
-    
+
     async def run_forever(self):
         """Main polling loop"""
         logger.info("Starting DALI BACnet polling loop")
-        
+
         last_poll = {
             PollTier.REALTIME: datetime.min,
             PollTier.FAST: datetime.min,
             PollTier.SLOW: datetime.min,
             PollTier.PERIODIC: datetime.min
         }
-        
+
         while True:
             now = datetime.now()
-            
+
             # Check each tier
             for tier in PollTier:
                 elapsed = (now - last_poll[tier]).total_seconds()
-                
+
                 if elapsed >= tier.value:
                     results = await self.poll_tier(tier)
                     last_poll[tier] = now
-                    
+
                     # Persist slower tiers
                     await self.persist_to_supabase(tier, results)
-            
+
             # Small sleep to prevent busy loop
             await asyncio.sleep(0.5)
 
@@ -9505,21 +9505,21 @@ async def main():
         supabase_url="https://xxx.supabase.co",
         supabase_key="xxx"
     )
-    
+
     # Set up callbacks
     async def on_occupancy_change(changes):
         for change in changes:
             logger.info(f"Occupancy change: {change['point']} -> {change['new']}")
-    
+
     async def on_fault_detected(faults):
         for fault in faults:
             logger.warning(f"Fault detected: {fault['point']}")
-    
+
     poller.on_occupancy_change = on_occupancy_change
     poller.on_fault_detected = on_fault_detected
-    
+
     await poller.connect()
-    
+
     try:
         await poller.run_forever()
     finally:
@@ -9576,7 +9576,7 @@ if __name__ == "__main__":
   "name": "sentinel",
   "version": "1.0.0",
   "description": "Building Intelligence - HVAC & Lighting Management for  ",
-  
+
   "triggers": {
     "keywords": [
       "too hot", "too cold", "freezing", "boiling", "stuffy", "aircon",
@@ -9595,7 +9595,7 @@ if __name__ == "__main__":
       "morning briefing"
     ]
   },
-  
+
   "tools": [
     {
       "name": "comfort_check",
@@ -9673,7 +9673,7 @@ if __name__ == "__main__":
       }
     }
   ],
-  
+
   "permissions": [
     "network:bacnet",
     "network:supabase",
@@ -9729,7 +9729,7 @@ export default class SentinelSkill extends Skill {
   // =========================================================================
   // TOOL: Comfort Check
   // =========================================================================
-  
+
   async comfort_check(ctx: SkillContext, params: { location: string }): Promise<ToolResult> {
     const { location } = params;
     ctx.log.info(`Checking comfort at: ${location}`);
@@ -9737,7 +9737,7 @@ export default class SentinelSkill extends Skill {
     try {
       // Step 1: Resolve location to zone
       const zoneInfo = await this.deskLookup.resolve(location);
-      
+
       if (!zoneInfo) {
         return {
           success: false,
@@ -9793,16 +9793,16 @@ export default class SentinelSkill extends Skill {
     try {
       // HVAC Status
       const hvac = await this.hvac.getZoneData(zone_id);
-      
+
       // Lighting Status
       const lighting = await this.dali.getZoneLighting(zone_id);
-      
+
       // Occupancy Status
       const occupancy = await this.dali.getZoneOccupancy(zone_id);
-      
+
       // Active Alarms
       const alarms = await this.hvac.getZoneAlarms(zone_id);
-      
+
       return {
         success: true,
         data: {
@@ -9832,12 +9832,12 @@ export default class SentinelSkill extends Skill {
     try {
       // Get all zones
       const zones = await this.hvac.getAllZones(building);
-      
+
       // Aggregate data
       const summary = {
         building,
         timestamp: new Date().toISOString(),
-        
+
         // HVAC Summary
         hvac: {
           zones_normal: 0,
@@ -9846,7 +9846,7 @@ export default class SentinelSkill extends Skill {
           active_alarms: 0,
           avg_temperature: 0
         },
-        
+
         // Occupancy Summary (from lighting sensors)
         occupancy: {
           total_sensors: 0,
@@ -9855,7 +9855,7 @@ export default class SentinelSkill extends Skill {
           busiest_zones: [],
           empty_zones: []
         },
-        
+
         // Lighting Summary
         lighting: {
           total_luminaires: 0,
@@ -9864,7 +9864,7 @@ export default class SentinelSkill extends Skill {
           avg_daylight_lux: 0,
           total_power_kw: 0
         },
-        
+
         // Issues
         issues: {
           critical: [],
@@ -9880,11 +9880,11 @@ export default class SentinelSkill extends Skill {
       for (const zone of zones) {
         const hvacData = await this.hvac.getZoneData(zone.zone_id);
         const daliData = await this.dali.getZoneData(zone.zone_id);
-        
+
         // HVAC
         tempSum += hvacData.temperature || 0;
         zoneCount++;
-        
+
         if (hvacData.temperature > hvacData.setpoint + 1.5) {
           summary.hvac.zones_above_setpoint++;
         } else if (hvacData.temperature < hvacData.setpoint - 1.5) {
@@ -9892,13 +9892,13 @@ export default class SentinelSkill extends Skill {
         } else {
           summary.hvac.zones_normal++;
         }
-        
+
         summary.hvac.active_alarms += hvacData.alarms?.length || 0;
-        
+
         // Occupancy
         summary.occupancy.total_sensors += daliData.occupancy.total_sensors;
         summary.occupancy.occupied_sensors += daliData.occupancy.occupied_sensors;
-        
+
         if (daliData.occupancy.occupancy_percent > 70) {
           summary.occupancy.busiest_zones.push({
             zone_id: zone.zone_id,
@@ -9907,7 +9907,7 @@ export default class SentinelSkill extends Skill {
         } else if (daliData.occupancy.occupancy_percent === 0) {
           summary.occupancy.empty_zones.push(zone.zone_id);
         }
-        
+
         // Lighting
         summary.lighting.total_luminaires += daliData.lighting.total_luminaires;
         summary.lighting.active_luminaires += daliData.lighting.active_luminaires;
@@ -9919,7 +9919,7 @@ export default class SentinelSkill extends Skill {
       // Calculate averages
       summary.hvac.avg_temperature = tempSum / zoneCount;
       summary.lighting.avg_daylight_lux = luxSum / zoneCount;
-      summary.occupancy.occupancy_percent = 
+      summary.occupancy.occupancy_percent =
         (summary.occupancy.occupied_sensors / summary.occupancy.total_sensors) * 100;
 
       // Sort busiest zones
@@ -9943,7 +9943,7 @@ export default class SentinelSkill extends Skill {
   // =========================================================================
 
   async adjust_comfort(
-    ctx: SkillContext, 
+    ctx: SkillContext,
     params: { location: string; action: string; duration_hours?: number }
   ): Promise<ToolResult> {
     const { location, action, duration_hours = 2 } = params;
@@ -9952,7 +9952,7 @@ export default class SentinelSkill extends Skill {
     try {
       // Resolve location
       const zoneInfo = await this.deskLookup.resolve(location);
-      
+
       if (!zoneInfo) {
         return {
           success: false,
@@ -9962,7 +9962,7 @@ export default class SentinelSkill extends Skill {
 
       // Determine adjustment
       let adjustment: any = {};
-      
+
       switch (action) {
         case 'cooler':
         case 'boost_cooling':
@@ -10007,7 +10007,7 @@ export default class SentinelSkill extends Skill {
           adjustment.change,
           adjustment.duration
         );
-        
+
         return {
           success: true,
           data: result,
@@ -10036,23 +10036,23 @@ export default class SentinelSkill extends Skill {
 
   private formatComfortReport(analysis: any): string {
     const { location, hvac, lighting, diagnosis, suggestions } = analysis;
-    
+
     let report = `**${location.name}** (${location.zone_id})\n\n`;
-    
+
     // HVAC Status
     report += `**Temperature**: ${hvac.temperature}°C (setpoint: ${hvac.setpoint}°C)\n`;
     report += `**Cooling**: ${hvac.fcu_status}\n`;
-    
+
     // Occupancy (from lighting sensors)
     report += `**Occupancy**: ${lighting.occupancy.occupancy_percent.toFixed(0)}% `;
     report += `(${lighting.occupancy.occupied_sensors}/${lighting.occupancy.total_sensors} sensors)\n`;
-    
+
     // Daylight
     report += `**Daylight**: ${lighting.avg_daylight_lux.toFixed(0)} lux\n`;
-    
+
     // Diagnosis
     report += `\n**Diagnosis**: ${diagnosis}\n`;
-    
+
     // Suggestions
     if (suggestions && suggestions.length > 0) {
       report += `\n**Options**:\n`;
@@ -10061,32 +10061,32 @@ export default class SentinelSkill extends Skill {
       });
       report += `\nReply with A, B, or C to take action.`;
     }
-    
+
     return report;
   }
 
   private formatZoneStatus(data: any): string {
     const { zone_id, hvac, lighting, occupancy, alarms } = data;
-    
+
     let report = `**Zone: ${zone_id}**\n\n`;
-    
+
     // HVAC
     report += `**HVAC**\n`;
     report += `• Temperature: ${hvac.temperature}°C (SP: ${hvac.setpoint}°C)\n`;
     report += `• FCU: ${hvac.fcu_running ? 'Running' : 'Off'} at ${hvac.fcu_speed}%\n`;
     report += `• CHW Valve: ${hvac.chw_valve}%\n`;
-    
+
     // Lighting
     report += `\n**Lighting**\n`;
     report += `• Luminaires: ${lighting.active_luminaires}/${lighting.total_luminaires} on\n`;
     report += `• Avg Level: ${lighting.avg_dim_level.toFixed(0)}%\n`;
     report += `• Daylight: ${lighting.avg_daylight_lux.toFixed(0)} lux\n`;
-    
+
     // Occupancy
     report += `\n**Occupancy**\n`;
     report += `• ${occupancy.occupancy_percent.toFixed(0)}% occupied\n`;
     report += `• ${occupancy.occupied_sensors}/${occupancy.total_sensors} sensors active\n`;
-    
+
     // Alarms
     if (alarms && alarms.length > 0) {
       report += `\n**Active Alarms**: ${alarms.length}\n`;
@@ -10094,14 +10094,14 @@ export default class SentinelSkill extends Skill {
         report += `• ${a.message}\n`;
       });
     }
-    
+
     return report;
   }
 
   private formatBuildingOverview(summary: any): string {
     let report = `**${summary.building} Building Status**\n`;
     report += `${new Date(summary.timestamp).toLocaleString()}\n\n`;
-    
+
     // HVAC
     report += `**HVAC**\n`;
     report += `• Avg Temperature: ${summary.hvac.avg_temperature.toFixed(1)}°C\n`;
@@ -10109,7 +10109,7 @@ export default class SentinelSkill extends Skill {
     report += `• Zones Warm: ${summary.hvac.zones_above_setpoint}\n`;
     report += `• Zones Cool: ${summary.hvac.zones_below_setpoint}\n`;
     report += `• Active Alarms: ${summary.hvac.active_alarms}\n`;
-    
+
     // Occupancy
     report += `\n**Occupancy** (from ${summary.occupancy.total_sensors} sensors)\n`;
     report += `• Overall: ${summary.occupancy.occupancy_percent.toFixed(0)}%\n`;
@@ -10118,14 +10118,14 @@ export default class SentinelSkill extends Skill {
       report += `(${summary.occupancy.busiest_zones[0].occupancy.toFixed(0)}%)\n`;
     }
     report += `• Empty Zones: ${summary.occupancy.empty_zones.length}\n`;
-    
+
     // Lighting
     report += `\n**Lighting**\n`;
     report += `• Active: ${summary.lighting.active_luminaires}/${summary.lighting.total_luminaires}\n`;
     report += `• Faulty: ${summary.lighting.faulty_luminaires}\n`;
     report += `• Power: ${summary.lighting.total_power_kw.toFixed(1)} kW\n`;
     report += `• Daylight: ${summary.lighting.avg_daylight_lux.toFixed(0)} lux avg\n`;
-    
+
     // Issues
     if (summary.issues.critical.length > 0) {
       report += `\n**Critical Issues**: ${summary.issues.critical.length}\n`;
@@ -10133,7 +10133,7 @@ export default class SentinelSkill extends Skill {
     if (summary.issues.warnings.length > 0) {
       report += `**Warnings**: ${summary.issues.warnings.length}\n`;
     }
-    
+
     return report;
   }
 }
@@ -10215,7 +10215,7 @@ export class AIAnalyzer {
 
   async analyzeComfort(input: ComfortInput): Promise<ComfortAnalysis> {
     const { location, hvac, dali, context } = input;
-    
+
     // Calculate key metrics
     const tempDelta = hvac.temperature - hvac.setpoint;
     const isAboveSetpoint = tempDelta > 0.5;
@@ -10224,7 +10224,7 @@ export class AIAnalyzer {
     const highDaylight = dali.lighting.max_daylight_lux > 800;
     const fcuWorking = hvac.fcu_running && hvac.chw_valve > 20;
     const hasHvacAlarms = hvac.alarms && hvac.alarms.length > 0;
-    
+
     // Determine diagnosis
     let diagnosis = '';
     let rootCause = '';
@@ -10241,7 +10241,7 @@ export class AIAnalyzer {
                   `The ${hvac.alarms[0]?.type || 'equipment'} may need attention.`;
       rootCause = 'hvac_fault';
       confidence = 0.95;
-      
+
       suggestions.push({
         id: 'dispatch',
         description: 'Dispatch technician to investigate alarm',
@@ -10251,7 +10251,7 @@ export class AIAnalyzer {
         parameters: { alarm: hvac.alarms[0] }
       });
     }
-    
+
     // Case 2: Too Hot - FCU Not Working
     else if (isAboveSetpoint && !fcuWorking) {
       diagnosis = `Zone is ${tempDelta.toFixed(1)}°C above setpoint and the FCU appears ` +
@@ -10259,7 +10259,7 @@ export class AIAnalyzer {
                   `but may not be getting flow.`;
       rootCause = 'fcu_not_cooling';
       confidence = 0.85;
-      
+
       suggestions.push({
         id: 'check_fcu',
         description: 'Check FCU - possible valve or flow issue',
@@ -10268,7 +10268,7 @@ export class AIAnalyzer {
         can_auto_execute: false
       });
     }
-    
+
     // Case 3: Too Hot - Solar Gain (detected via high lux)
     else if (isAboveSetpoint && highDaylight && location.near_window) {
       diagnosis = `Zone is ${tempDelta.toFixed(1)}°C above setpoint. ` +
@@ -10279,7 +10279,7 @@ export class AIAnalyzer {
                   `The FCU is working (${hvac.fcu_speed}%) but struggling against the sun.`;
       rootCause = 'solar_gain';
       confidence = 0.90;
-      
+
       suggestions.push({
         id: 'close_blinds',
         description: 'Close blinds to reduce solar heat gain',
@@ -10287,21 +10287,21 @@ export class AIAnalyzer {
         risk: 'low',
         can_auto_execute: false
       });
-      
+
       suggestions.push({
         id: 'boost_cooling',
         description: `Temporarily boost cooling (${hvac.setpoint}°C → ${hvac.setpoint - 2}°C for 2 hours)`,
         action_type: 'hvac_adjust',
         risk: 'low',
         can_auto_execute: true,
-        parameters: { 
+        parameters: {
           zone_id: location.zone_id,
           new_setpoint: hvac.setpoint - 2,
           duration: 7200
         }
       });
     }
-    
+
     // Case 4: Too Hot - FCU Working Hard (normal operation, may need patience)
     else if (isAboveSetpoint && fcuWorking && hvac.fcu_speed > 70) {
       diagnosis = `Zone is ${tempDelta.toFixed(1)}°C above setpoint. ` +
@@ -10310,7 +10310,7 @@ export class AIAnalyzer {
                   `it may need a few more minutes to reach setpoint.`;
       rootCause = 'still_cooling';
       confidence = 0.75;
-      
+
       suggestions.push({
         id: 'wait',
         description: 'Wait 10-15 minutes for system to catch up',
@@ -10318,21 +10318,21 @@ export class AIAnalyzer {
         risk: 'low',
         can_auto_execute: false
       });
-      
+
       suggestions.push({
         id: 'boost_cooling',
         description: 'Temporarily boost cooling if urgent',
         action_type: 'hvac_adjust',
         risk: 'low',
         can_auto_execute: true,
-        parameters: { 
+        parameters: {
           zone_id: location.zone_id,
           new_setpoint: hvac.setpoint - 2,
           duration: 7200
         }
       });
     }
-    
+
     // Case 5: Too Hot - Low Occupancy (perception issue)
     else if (isAboveSetpoint && occupancyLow) {
       diagnosis = `Zone is ${tempDelta.toFixed(1)}°C above setpoint. ` +
@@ -10342,25 +10342,25 @@ export class AIAnalyzer {
                   `the space feel different. The FCU is operating normally.`;
       rootCause = 'low_occupancy_perception';
       confidence = 0.70;
-      
+
       suggestions.push({
         id: 'minor_adjust',
         description: 'Make a small comfort adjustment',
         action_type: 'hvac_adjust',
         risk: 'low',
         can_auto_execute: true,
-        parameters: { 
+        parameters: {
           zone_id: location.zone_id,
           new_setpoint: hvac.setpoint - 1,
           duration: 7200
         }
       });
     }
-    
+
     // Case 6: Too Cold
     else if (isBelowSetpoint) {
       diagnosis = `Zone is ${Math.abs(tempDelta).toFixed(1)}°C below setpoint. `;
-      
+
       if (hvac.fcu_speed < 30) {
         diagnosis += `The FCU is running low to prevent over-cooling. ` +
                      `You may want to raise the setpoint.`;
@@ -10370,21 +10370,21 @@ export class AIAnalyzer {
         rootCause = 'overcooling';
       }
       confidence = 0.80;
-      
+
       suggestions.push({
         id: 'raise_setpoint',
         description: `Raise setpoint to ${hvac.setpoint + 2}°C`,
         action_type: 'hvac_adjust',
         risk: 'low',
         can_auto_execute: true,
-        parameters: { 
+        parameters: {
           zone_id: location.zone_id,
           new_setpoint: hvac.setpoint + 2,
           duration: 7200
         }
       });
     }
-    
+
     // Case 7: Normal - No Issues
     else {
       diagnosis = `Zone conditions appear normal. ` +
@@ -10394,20 +10394,20 @@ export class AIAnalyzer {
                   `or localized issue (draft, direct sun on desk, etc).`;
       rootCause = 'none_detected';
       confidence = 0.65;
-      
+
       suggestions.push({
         id: 'personal_adjust',
         description: 'Request a small personal comfort adjustment',
         action_type: 'hvac_adjust',
         risk: 'low',
         can_auto_execute: true,
-        parameters: { 
+        parameters: {
           zone_id: location.zone_id,
           new_setpoint: hvac.setpoint - 1,
           duration: 3600  // 1 hour only
         }
       });
-      
+
       suggestions.push({
         id: 'move',
         description: 'I can suggest an alternative desk in a more comfortable zone',
@@ -10435,30 +10435,30 @@ export class AIAnalyzer {
     // Get building-wide data
     const zones = await this.hvac.getAllZones(building);
     const alarms = await this.hvac.getActiveAlarms(building);
-    
+
     let occupancyTotal = 0;
     let occupancyActive = 0;
     let zonesHot = 0;
     let zonesCold = 0;
     let lightingFaults = 0;
-    
+
     for (const zone of zones) {
       const hvac = await this.hvac.getZoneData(zone.zone_id);
       const dali = await this.dali.getZoneData(zone.zone_id);
-      
+
       occupancyTotal += dali.occupancy.total_sensors;
       occupancyActive += dali.occupancy.occupied_sensors;
-      
+
       if (hvac.temperature > hvac.setpoint + 1.5) zonesHot++;
       if (hvac.temperature < hvac.setpoint - 1.5) zonesCold++;
-      
+
       lightingFaults += dali.lighting.faulty_count || 0;
     }
-    
+
     const occupancyPercent = (occupancyActive / occupancyTotal * 100).toFixed(0);
-    
+
     let briefing = `**Good Morning! Here's your ${building} briefing:**\n\n`;
-    
+
     // Alarms
     if (alarms.length > 0) {
       briefing += `**${alarms.length} Active Alarms**\n`;
@@ -10469,27 +10469,27 @@ export class AIAnalyzer {
     } else {
       briefing += `**No Critical Alarms**\n\n`;
     }
-    
+
     // HVAC
     briefing += `**HVAC Status**\n`;
     briefing += `  • Zones too warm: ${zonesHot}\n`;
     briefing += `  • Zones too cold: ${zonesCold}\n`;
     briefing += `  • Zones normal: ${zones.length - zonesHot - zonesCold}\n\n`;
-    
+
     // Occupancy
     briefing += `**Current Occupancy**: ${occupancyPercent}%\n`;
     briefing += `  (${occupancyActive} of ${occupancyTotal} sensors active)\n\n`;
-    
+
     // Lighting
     if (lightingFaults > 0) {
       briefing += `**Lighting**: ${lightingFaults} faulty luminaires detected\n\n`;
     }
-    
+
     // Weather (if available)
     // briefing += `**Weather**: 28°C, Sunny (high solar gain expected)\n\n`;
-    
+
     briefing += `Reply "details" for more information on any item.`;
-    
+
     return briefing;
   }
 }

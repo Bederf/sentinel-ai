@@ -6,9 +6,9 @@ Includes temperature, humidity, and wet-bulb patterns for different regions.
 """
 
 import numpy as np
-from datetime import datetime, date
-from typing import Dict, Tuple, Optional, Any
-from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Dict, Tuple, Optional
+from dataclasses import dataclass
 from enum import Enum
 
 

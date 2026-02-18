@@ -8,14 +8,13 @@ import logging
 from typing import Dict, Any, Optional
 from dataclasses import dataclass
 
-from app.services.ollama_client import get_ollama_client, OllamaClient
-from app.services.vector_db import get_vector_db_service, VectorDBService
+from app.services.ollama_client import get_ollama_client
+from app.services.vector_db import get_vector_db_service
 from ml.explanations.templates import (
     get_equipment_specific_template,
-    format_prediction_for_template,
-    format_contributing_factors
+    format_prediction_for_template
 )
-from ml.explanations.parser import ExplanationParser, ParsedExplanation
+from ml.explanations.parser import ExplanationParser
 
 logger = logging.getLogger(__name__)
 

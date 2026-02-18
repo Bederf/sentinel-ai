@@ -15,12 +15,11 @@ DALI-2 queries supported:
 - Lamp status/failures
 """
 
-import asyncio
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import IntEnum
-from typing import Any, Optional
+from typing import Optional
 
 import httpx
 

@@ -269,7 +269,7 @@ Confidence increases based on deployment duration, indicating ML maturity:
 ```python
 def _calculate_learning_curve_confidence(current_date: date) -> float:
     months_deployed = (current_date - self.deployment_date).days / 30.0
-    
+
     if months_deployed <= 2:
         return 0.78 + (months_deployed * 0.01)  # Phase 1
     elif months_deployed <= 6:

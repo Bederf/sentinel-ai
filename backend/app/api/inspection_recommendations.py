@@ -203,5 +203,5 @@ async def create_repair_work_order_from_inspection(
         "status": "assigned",
         "priority": body.priority,
         "parts_needed": body.parts_needed,
-        "message": f"Repair work order created from inspection findings"
+        "message": "Repair work order created from inspection findings"
     }

@@ -369,19 +369,19 @@ The system doesn't assume all buildings have the same equipment. Instead, it:
 
 **Building A (HVAC + DALI + Generators):**
 ```
-AI Recommendation: "CHILLER setpoint 22°C, AHU damper 60%, DALI zone 1 60%, 
+AI Recommendation: "CHILLER setpoint 22°C, AHU damper 60%, DALI zone 1 60%,
 avoid generator start (solar available). Estimated energy cost R45/hour."
 ```
 
 **Building B (HVAC + Standard Lighting + UPS):**
 ```
-AI Recommendation: "FCU setpoint 24°C, UPS eco mode (off-peak). 
+AI Recommendation: "FCU setpoint 24°C, UPS eco mode (off-peak).
 Standard lighting: no control available."
 ```
 
 **Building C (HVAC + DALI + Security):**
 ```
-AI Recommendation: "HVAC setpoint +1°C (occupancy low), DALI zone 1-3 dim 50% 
+AI Recommendation: "HVAC setpoint +1°C (occupancy low), DALI zone 1-3 dim 50%
 (empty floors), ACC readers enabling zone isolation for fire safety."
 ```
 
@@ -554,8 +554,8 @@ Analysis:
   ✓ ABOVE AVERAGE health (78% vs 68.5%)
   ✓ Well-maintained (8-month service vs 12-month typical)
   ⚠ Fleet trend: bearing wear accelerating (27% of fleet showing signs)
-  
-Recommendation: Continue current maintenance schedule. 
+
+Recommendation: Continue current maintenance schedule.
 Replace if bearing vibration increases OR if fleet bearing failure rate hits 35%.
 Estimated remaining life: 2.1 years (fleet avg: 1.8 years).
 ```
@@ -632,8 +632,8 @@ Total Equipment: 112 units
 
 **AI Optimization Example:**
 ```
-"CHILLER to 20°C (solar generation high), AHU dampers 70%, 
-DALI zones 1-4 at 30% (lux sufficient), UPS eco mode (off-peak), 
+"CHILLER to 20°C (solar generation high), AHU dampers 70%,
+DALI zones 1-4 at 30% (lux sufficient), UPS eco mode (off-peak),
 generator standby (solar+BESS covering load). Estimated energy cost R12/hour."
 ```
 
@@ -649,8 +649,8 @@ Total Equipment: 48 units
 
 **AI Optimization Example:**
 ```
-"FCU setpoint 23°C (balance comfort/energy), UPS eco mode (off-peak). 
-Lighting: no control available (standard fixtures). 
+"FCU setpoint 23°C (balance comfort/energy), UPS eco mode (off-peak).
+Lighting: no control available (standard fixtures).
 Note: No solar or generator available. Recommend solar retrofit for 15% savings."
 ```
 
@@ -667,9 +667,9 @@ Total Equipment: 198 units (largest)
 
 **AI Optimization Example:**
 ```
-"HVAC: CHILLER 21°C (load shedding prep), CRAC for server room isolated, 
-FCU/VAV coordinated by zone occupancy. DALI zones 1-8 at occupancy-based levels, 
-standard lighting unchanged. Generator startup avoided (solar + BESS + demand reduction sufficient). 
+"HVAC: CHILLER 21°C (load shedding prep), CRAC for server room isolated,
+FCU/VAV coordinated by zone occupancy. DALI zones 1-8 at occupancy-based levels,
+standard lighting unchanged. Generator startup avoided (solar + BESS + demand reduction sufficient).
 Security zones A-D locked during load shedding. Estimated energy cost R34/hour."
 ```
 

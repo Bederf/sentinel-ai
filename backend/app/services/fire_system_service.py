@@ -6,7 +6,6 @@ Uses FireSafetyRepository for all data operations (Supabase + JSON fallback).
 Integrates with FireHVACCoordinator for cause-effect execution on alarms.
 """
 
-import asyncio
 import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional

@@ -10,7 +10,6 @@ import logging
 import httpx
 from datetime import datetime, timedelta
 from typing import Optional
-from functools import lru_cache
 
 logger = logging.getLogger(__name__)
 

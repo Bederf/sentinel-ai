@@ -1,6 +1,6 @@
 -- =====================================================
 -- Migration 011: DALI-2 Lighting Schema
--- Tridonic Scenecom evo DA2 integration for  
+-- Tridonic Scenecom evo DA2 integration for
 -- 57 controllers, 1,315 MSensor G3 PIR sensors, 619 luminaires
 -- =====================================================
 

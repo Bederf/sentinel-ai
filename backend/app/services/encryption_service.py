@@ -19,8 +19,6 @@ Environment Variables:
     ENCRYPTION_ENABLED: Whether to encrypt data (default: True)
 """
 
-import base64
-import json
 import logging
 import os
 from typing import Any, Dict, Optional

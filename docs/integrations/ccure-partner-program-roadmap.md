@@ -51,16 +51,16 @@ Email: [Email]
 Phone: [Phone]
 
 Integration Overview:
-SENTINEL is an AI-powered building management system that optimizes energy 
-consumption, predictive maintenance, and occupancy-driven comfort in commercial 
+SENTINEL is an AI-powered building management system that optimizes energy
+consumption, predictive maintenance, and occupancy-driven comfort in commercial
 properties. We seek C•CURE 9000 integration to correlate:
 - Badge access patterns with HVAC/lighting energy consumption
 - Security infrastructure health with building power systems
 - After-hours occupancy anomalies with energy waste detection
 
 Market Opportunity:
-South African commercial real estate increasingly deploys C•CURE for access 
-control. SENTINEL integration enables rapid security + energy system onboarding, 
+South African commercial real estate increasingly deploys C•CURE for access
+control. SENTINEL integration enables rapid security + energy system onboarding,
 reducing client deployment time from weeks to days.
 
 Technical References:
@@ -171,7 +171,7 @@ Customer 2 (Client)
    C•CURE Admin Login:
    - Username: ccure_admin
    - Password: [Set during installation]
-   
+
    victor API Service:
    - URL: https://localhost:6443/api/
    - Operator: sentinel_operator
@@ -190,7 +190,7 @@ Customer 2 (Client)
    # Test victor API endpoint
    curl -k -X GET https://ccure-test.softwarehouse.com/api/system/info \
      -H "Authorization: Bearer <token>"
-   
+
    # Expected response:
    {
      "manufacturer": "Software House",
@@ -210,7 +210,7 @@ Customer 2 (Client)
        "username": "sentinel_operator",
        "password": "your_password"
      }'
-   
+
    # Response:
    {
      "token": "eyJhbGc...",
@@ -227,13 +227,13 @@ Customer 2 (Client)
 1. **Create CCure Adapter**
    ```python
    # backend/app/services/ccure/ccure_adapter.py
-   
+
    class CCureAdapter(DeviceAdapter):
        def __init__(self, api_url, license_guid, username, password):
            self.api_url = api_url
            self.license_guid = license_guid
            self.token = None
-       
+
        async def _authenticate(self):
            """Obtain JWT token from victor API"""
            response = await self.client.post(
@@ -245,7 +245,7 @@ Customer 2 (Client)
                }
            )
            self.token = response.json()["token"]
-       
+
        async def get_badge_events(self, since: datetime):
            """Fetch badge events since timestamp"""
            response = await self.client.get(
@@ -259,13 +259,13 @@ Customer 2 (Client)
 2. **Test Against Test Lab**
    ```bash
    cd backend
-   
+
    # Set environment variables
    export CCURE_API_URL="https://ccure-test.softwarehouse.com/api/"
    export CCURE_LICENSE_GUID="SENTINEL-CCURE-GUID-xxxxx"
    export CCURE_USERNAME="test_partner"
    export CCURE_PASSWORD="test_password"
-   
+
    # Run integration test
    pytest tests/services/ccure/test_integration.py -v
    ```
@@ -371,7 +371,7 @@ Once approved, you receive:
    curl -X GET \
      -H "Authorization: Bearer $TOKEN" \
      https://ccure.customer.com/api/system/info
-   
+
    # Should return: C•CURE system info
    ```
 
@@ -379,10 +379,10 @@ Once approved, you receive:
    ```bash
    # Verify badge events flowing
    GET /api/security/events/recent?limit=10
-   
+
    # Verify controller status
    GET /api/security/ccure/controllers
-   
+
    # Verify occupancy
    GET /api/security/occupancy/real-time
    ```
@@ -413,7 +413,7 @@ Subject: SENTINEL Security Module + C•CURE 9000 Integration Ready
 
 Hi [Customer Name],
 
-Your SENTINEL platform has been successfully integrated with your C•CURE 9000 
+Your SENTINEL platform has been successfully integrated with your C•CURE 9000
 access control system. You now have:
 
 ✅ Real-time badge event monitoring

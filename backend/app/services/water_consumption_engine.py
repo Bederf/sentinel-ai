@@ -15,7 +15,7 @@ Output: Updates power_meters table (S002-MTR-B1-WATER) and energy_consumption_hi
 """
 
 import logging
-from datetime import datetime, date
+from datetime import datetime
 from typing import Dict, Optional, Tuple, Any
 from app.database.supabase_client import get_supabase_client
 from app.database.repositories.water_cost_repository import WaterCostRepository

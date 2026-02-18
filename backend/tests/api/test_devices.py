@@ -14,7 +14,7 @@ class TestDeviceAPI:
     async def test_get_devices(self, async_client: AsyncClient):
         """Test GET /api/devices endpoint."""
         response = await async_client.get("/api/devices")
-        
+
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, list)
@@ -23,7 +23,7 @@ class TestDeviceAPI:
     async def test_get_devices_with_site_filter(self, async_client: AsyncClient):
         """Test GET /api/devices with site_id filter."""
         response = await async_client.get("/api/devices?site_id=test-site-001")
-        
+
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, list)
@@ -32,7 +32,7 @@ class TestDeviceAPI:
     async def test_get_devices_with_type_filter(self, async_client: AsyncClient):
         """Test GET /api/devices with device_type filter."""
         response = await async_client.get("/api/devices?device_type=HVAC_CHILLER")
-        
+
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, list)
@@ -47,7 +47,7 @@ class TestDeviceAPI:
             if devices:
                 device_id = devices[0]["id"]
                 response = await async_client.get(f"/api/devices/{device_id}")
-                
+
                 assert response.status_code == 200
                 data = response.json()
                 assert data["id"] == device_id
@@ -61,7 +61,7 @@ class TestDeviceAPI:
             if devices:
                 device_id = devices[0]["id"]
                 response = await async_client.get(f"/api/devices/{device_id}/points")
-                
+
                 assert response.status_code == 200
                 data = response.json()
                 assert "points" in data
@@ -113,7 +113,7 @@ class TestDeviceAPI:
             if devices:
                 device_id = devices[0]["id"]
                 response = await async_client.get(f"/api/devices/{device_id}/status")
-                
+
                 assert response.status_code == 200
                 data = response.json()
                 assert "device_id" in data or "status" in data

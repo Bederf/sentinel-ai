@@ -192,13 +192,13 @@ class PredictionCalculator:
     ) -> Optional[Dict[str, Any]]:
         """
         Calculate prediction from equipment health score.
-        
+
         Health score is already calculated using:
         - Operational Performance: 35%
         - Maintenance History: 25%
         - Asset Age & Lifecycle: 20%
         - Anomaly Indicators: 20%
-        
+
         We use inverse health score as base probability, then adjust based on work orders/alarms.
         """
         thresholds = get_health_thresholds()

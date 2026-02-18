@@ -7,7 +7,7 @@ CAD coordinates to standard building geometry.
 
 import numpy as np
 from dataclasses import dataclass
-from typing import Tuple, List, Optional
+from typing import Tuple, List
 import logging
 
 logger = logging.getLogger(__name__)

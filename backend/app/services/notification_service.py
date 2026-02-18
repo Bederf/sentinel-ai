@@ -5,17 +5,11 @@ notifications for the escalation system.
 """
 
 import logging
-import asyncio
-import smtplib
-import json
 from datetime import datetime
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 from typing import Dict, Any, List, Optional
 from pathlib import Path
 
 from app.models.autonomous_decision import EscalationEvent, EscalationLevel
-from app.services.claude_service import claude_service
 from app.config.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -277,7 +271,7 @@ Escalation Reason: {reason}
             if notes:
                 body += f"\nAdditional Notes:\n{notes}\n"
 
-            body += f"""
+            body += """
 NEXT STEPS:
 1. Review the work order details in the SENTINEL system
 2. Assess the equipment condition

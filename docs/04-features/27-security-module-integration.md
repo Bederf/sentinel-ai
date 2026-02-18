@@ -144,7 +144,7 @@ function HVACOptimizer() {
     const { total_occupancy } = occupancy
 
     let targetSetpoint = 22 // default
-    
+
     if (total_occupancy === 0) {
       targetSetpoint = 16 // empty → energy save
     } else if (total_occupancy > 50) {
@@ -211,13 +211,13 @@ function VisitorCard({ visitor }) {
 
   return (
     <div>
-      <button 
+      <button
         onClick={() => checkIn({ visitorId: visitor.id })}
         disabled={checkingIn || visitor.status === 'checked_in'}
       >
         Check In
       </button>
-      <button 
+      <button
         onClick={() => checkOut({ visitorId: visitor.id })}
         disabled={checkingOut || visitor.status !== 'checked_in'}
       >
@@ -241,7 +241,7 @@ function AlertCard({ alert }) {
   }
 
   return (
-    <button 
+    <button
       onClick={() => acknowledge({ alertId: alert.id })}
       disabled={isLoading}
     >
@@ -288,7 +288,7 @@ class HVACOptimizer:
     async def adjust_for_occupancy(self, site_id: str):
         # Get current occupancy
         occupancy = await self.security_repo.get_occupancy(site_id)
-        
+
         # Adjust setpoint
         if occupancy['total_occupancy'] == 0:
             setpoint = 16  # Empty → energy save
@@ -296,7 +296,7 @@ class HVACOptimizer:
             setpoint = 20  # Peak occupancy → cool
         else:
             setpoint = 22  # Normal
-        
+
         # Apply HVAC change
         await self.hvac_repo.set_setpoint(site_id, setpoint)
 ```
@@ -382,7 +382,7 @@ import { SecurityPanel } from '@/components/modules/SecurityPanel'
 
 it('renders overview tab with stats', async () => {
   render(<SecurityPanel siteId="site-002" />)
-  
+
   await waitFor(() => {
     expect(screen.getByText(/15 access events/)).toBeInTheDocument()
     expect(screen.getByText(/2 active visitors/)).toBeInTheDocument()

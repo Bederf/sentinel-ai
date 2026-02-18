@@ -5,17 +5,14 @@ history tracking for autonomous boundary management.
 """
 
 import logging
-import asyncio
 from datetime import datetime
-from typing import Dict, Any, List, Optional, Callable
-from enum import Enum
+from typing import Dict, List, Optional, Callable
 
 from app.models.autonomous_decision import (
     BoundaryStatus,
     EscalationLevel,
     EscalationEvent
 )
-from app.models.audit_log import AuditResultType
 from app.services.notification_service import notification_service
 
 logger = logging.getLogger(__name__)
@@ -233,7 +230,6 @@ class EscalationEngine:
         """Get device name from device_id (fallback to device_id if not found)."""
         # Try to get actual device name from device manager
         try:
-            from app.services.device_abstraction import device_manager
             # Note: This would need async context, so we'll use fallback for now
             return device_id  # Placeholder
         except:

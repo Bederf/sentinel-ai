@@ -12,14 +12,12 @@ Alert types:
 
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 
 from app.models.data_quality import (
-    DataQualityLevel,
     DataQualityAlert,
-    EquipmentDataQuality,
 )
 from app.services.data_quality_service import get_data_quality_service, DataQualityService
 

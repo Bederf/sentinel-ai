@@ -1,6 +1,6 @@
 /**
  * Service Health Card
- * 
+ *
  * Shows status of background services like ML, AI, Device Manager, etc.
  */
 

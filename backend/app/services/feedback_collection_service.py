@@ -16,7 +16,6 @@ from typing import Optional, List, Dict, Any, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
 
-from app.database.supabase_client import get_supabase_client
 from app.database.repositories.service_record_repository import ServiceRecordRepository
 from app.database.repositories.equipment_repository import EquipmentRepository
 from app.database.repositories.baseline_repository import BaselineRepository

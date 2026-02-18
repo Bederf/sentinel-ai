@@ -1,6 +1,6 @@
 /**
  * Dynamic Floor Extraction and Management
- * 
+ *
  * Supports multiple building types:
  * - Site-002 (Office): S002-TYPE-ZONE (zone encodes floor: 001-099=L0, 100-199=L1, 200-299=L2)
  * - Site-005 (Hospital): site-005-UMH-TYPE-FLOOR-ID (explicit floor: B1, L1-L9, R)
@@ -16,7 +16,7 @@ export interface Floor {
 
 /**
  * Extract floor code from equipment code pattern
- * 
+ *
  * Handles:
  * - S002-TYPE-ZONE_ID → Extract floor from zone (001-099=L0, 100-199=L1, 200-299=L2)
  * - site-005-UMH-TYPE-FLOOR-ID → Extract FLOOR (B1, L1-L9, R)

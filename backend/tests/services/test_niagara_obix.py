@@ -3,7 +3,6 @@
 import os
 from datetime import datetime
 from unittest.mock import MagicMock, patch
-from xml.etree import ElementTree as ET
 
 import pytest
 
@@ -12,7 +11,6 @@ from app.services.niagara.obix_client import (
     OBIXAuthenticationError,
     OBIXConnectionError,
     OBIXPointNotFoundError,
-    OBIXParseError,
     get_obix_client,
     reset_obix_client,
 )

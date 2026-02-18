@@ -14,7 +14,6 @@ from datetime import datetime, date, timedelta
 from typing import Optional, List, Dict
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from pydantic import BaseModel
 from app.middleware.rate_limiter import limiter
 
 from app.api.dependencies.module_access import require_active_module
@@ -24,9 +23,8 @@ from app.services.water_alert_service import get_water_alert_service, WaterAlert
 from app.services.water_cost_service import get_water_cost_service
 from app.database.repositories.water_consumption_repository import WaterConsumptionRepository
 from app.database.repositories.water_cost_repository import WaterCostRepository
-from app.models.water_meter import WaterAlert, WaterTrend, WaterTariff, WaterCost
+from app.models.water_meter import WaterTariff
 from typing import Dict
-import uuid
 
 logger = logging.getLogger(__name__)
 

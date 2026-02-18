@@ -181,19 +181,19 @@ Expected response: JSON with summary, daily_data (122 entries), monthly_data (12
 
 For Grant (Wardew installer):
 
-> "This simulation shows your Tridonic DALI system's ROI over one year at Sandton Office. 
+> "This simulation shows your Tridonic DALI system's ROI over one year at Sandton Office.
 >
-> Starting with a baseline of traditional lighting schedules costing R182,000 annually, 
+> Starting with a baseline of traditional lighting schedules costing R182,000 annually,
 > Tridonic DALI cuts that to R127,000 through occupancy detection and daylight harvesting.
 >
-> But when you integrate with SENTINEL AI, the cost drops further to R102,000 — a 45% annual 
-> saving of R80,000. 
+> But when you integrate with SENTINEL AI, the cost drops further to R102,000 — a 45% annual
+> saving of R80,000.
 >
-> The AI learns your building's patterns over 12 months, improving from 60% effectiveness 
+> The AI learns your building's patterns over 12 months, improving from 60% effectiveness
 > to 95%, continuously optimizing brightness, occupancy patterns, and weather predictions.
 >
-> This chart shows the cumulative effect: SENTINEL's green line diverges further from the 
-> baseline (gray) as the AI learns, delivering more savings every month. Your clients get 
+> This chart shows the cumulative effect: SENTINEL's green line diverges further from the
+> baseline (gray) as the AI learns, delivering more savings every month. Your clients get
 > proven ROI, not promises."
 
 ## 🎯 Key Features

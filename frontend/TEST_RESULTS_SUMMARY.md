@@ -147,12 +147,12 @@ afterEach(() => {
 
 it('batches requests within 50ms window', async () => {
   const batcher = createBatchAggregator({...});
-  
+
   batcher('id-1');
   batcher('id-2');
-  
+
   vi.advanceTimersByTime(60);
-  
+
   await waitFor(() => {
     expect(apiFetch).toHaveBeenCalledTimes(1);
   });

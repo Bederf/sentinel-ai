@@ -6,13 +6,13 @@ equipment history, and fleet-wide experience.
 
 import logging
 from typing import Dict, Any, Optional, List
-from datetime import datetime, timedelta
+from datetime import datetime
 from dataclasses import dataclass, field
 
-from app.services.ollama_client import get_ollama_client, OllamaClient
+from app.services.ollama_client import get_ollama_client
 from app.services.vector_db import get_vector_db_service
 from ml.explanations.templates import MAINTENANCE_RECOMMENDATION_TEMPLATE
-from ml.explanations.parser import ExplanationParser, ParsedRecommendation
+from ml.explanations.parser import ExplanationParser
 
 logger = logging.getLogger(__name__)
 

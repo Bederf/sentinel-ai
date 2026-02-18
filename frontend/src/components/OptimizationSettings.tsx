@@ -88,7 +88,7 @@ export function OptimizationSettings({
   const [filterMode, setFilterMode] = useState<FilterMode>("all");
   const [expandedSite, setExpandedSite] = useState<string | null>(null);
   // Reserved for future bulk operations
-   
+
   const [, setShowBulkConfirm] = useState<"enable" | "disable" | null>(null);
   const [stats, setStats] = useState({
     totalSites: 0,

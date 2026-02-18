@@ -12,13 +12,12 @@ Covers:
 
 import json
 from datetime import datetime, timedelta
-from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 import pytest
 
 from ml.training.retraining_scheduler import RetrainingScheduler
-from ml.ab_testing.ab_test_manager import ABTestManager, TestStatus
+from ml.ab_testing.ab_test_manager import ABTestManager
 from ml.registry import ModelRegistry
 
 

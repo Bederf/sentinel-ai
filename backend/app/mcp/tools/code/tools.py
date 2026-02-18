@@ -5,7 +5,7 @@ Provides tools for searching and fetching source code from the local codebase.
 Tools are registered with the MCP server and callable via the standard MCP interface.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 import logging
 
 from .search import (

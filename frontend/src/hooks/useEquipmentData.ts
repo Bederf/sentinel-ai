@@ -4,12 +4,12 @@ import type { Equipment } from '@/lib/api/sites';
 
 /**
  * Fetch real building equipment from Supabase via cached API
- * 
+ *
  * Uses sitesApi.getEquipment() which:
  * - Returns equipment array from Supabase
  * - Caches results in Redis for 300s (SEMI_STATIC TTL)
  * - Falls back to JSON files if Supabase unavailable
- * 
+ *
  * Refreshes every 5 seconds to keep equipment status current
  */
 export function useEquipmentData(buildingId: string) {

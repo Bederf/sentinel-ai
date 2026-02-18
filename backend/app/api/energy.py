@@ -1,10 +1,9 @@
 """Energy consumption API endpoints."""
 
-import json
 import logging
 from datetime import datetime, timedelta, date
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict, Any
 import random
 
 from fastapi import APIRouter, Query, HTTPException

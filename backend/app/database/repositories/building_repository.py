@@ -20,7 +20,7 @@ class BuildingRepository:
         """Execute a Supabase query with retry on rate limit."""
         delay = 0.5
         last_error = None
-        
+
         for attempt in range(max_retries + 1):
             try:
                 return query.execute()
@@ -37,7 +37,7 @@ class BuildingRepository:
                         raise e
                 else:
                     raise e
-        
+
         if last_error:
             raise last_error
 
@@ -156,14 +156,14 @@ class BuildingRepository:
         building = self.get_by_id(building_id)
         if not building:
             return []
-        
+
         # Query equipment table by building_id (includes metadata fields)
         response = self.client.table('equipment').select(
             "id, code, name, status, health_score, type, building_id, "
             "manufacturer, model, install_date, commissioning_date, "
             "device_info, operating_data, network_info, location"
         ).eq('building_id', building['id']).execute()
-        
+
         return response.data or []
 
     def create(self, building_data: Dict[str, Any]) -> Dict[str, Any]:

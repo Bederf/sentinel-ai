@@ -1,13 +1,10 @@
 """Tests for profile-aware AI optimizer recommendations."""
 
-import json
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
-from pathlib import Path
+from unittest.mock import MagicMock
 
 from app.models.optimization import OptimizationRecommendation
 from app.services.ai_optimizer import AIOptimizerService, ensure_device_manager_initialized
-from app.services.profile_service import get_profile_service
 
 
 @pytest.fixture

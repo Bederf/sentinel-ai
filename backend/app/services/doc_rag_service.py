@@ -68,7 +68,7 @@ async def search_documentation(
 def get_doc_rag_system_prompt(doc_results: list[dict[str, Any]]) -> str:
     """
     Build a system prompt that includes retrieved documentation context.
-    
+
     This prompt positions the AI as a knowledgeable SENTINEL expert helping
     FM professionals understand the platform — warm, confident, and enthusiastic.
 

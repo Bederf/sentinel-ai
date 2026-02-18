@@ -230,7 +230,7 @@ GET /api/buildings/site-002/desks/zones/Zone-L0-A
 - **DigitalTwin.tsx:** Main orchestrator
   - Loads equipment via `useEquipmentData()`
   - Fetches zone centroids via `sitesApi.getZoneCentroids()`
-  
+
 - **EquipmentMarkers.tsx:** Position calculation
   - Uses `getEquipmentPosition()` to calculate 3D coords
   - Falls back to zone letter offset if centroids unavailable

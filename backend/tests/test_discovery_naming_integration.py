@@ -10,13 +10,9 @@ Tests the complete workflow:
 """
 
 import pytest
-import json
-from pathlib import Path
-from datetime import datetime
 
 from app.services.niagara.mapping_service import (
     PointMappingService,
-    EquipmentMapping,
 )
 from app.services.niagara.point_classifier import ClassifiedPoint, PointType, ConfidenceLevel
 from app.services.equipment_id_converter import EquipmentIDConverter

@@ -145,7 +145,7 @@ export const sitesApi = {
 
   /**
    * Get all accessible sites
-   * 
+   *
    * Returns { total, sites[] } - extract .sites for array of sites
    */
   getSites: () =>
@@ -280,4 +280,3 @@ export const sitesApi = {
       body: JSON.stringify(request),
     }),
 };
-

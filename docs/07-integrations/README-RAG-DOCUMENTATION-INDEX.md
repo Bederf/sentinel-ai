@@ -117,7 +117,7 @@ SIMBIOT discovers BACnet device → Clawd Bot consults this reference
 ```
 Client: "Can you explain why FLC is better than PID for my chiller?"
 Clawd Bot retrieves: FLC Theory & Best Practices
-Response: "FLC adapts to your chiller's non-linear efficiency curve. 
+Response: "FLC adapts to your chiller's non-linear efficiency curve.
 Here's why: [technical explanation with comparison graphs]"
 ```
 
@@ -131,13 +131,13 @@ Here's why: [technical explanation with comparison graphs]"
   - Payback: 0.71 years
   - Energy savings: 15% (R 141,600/year)
   - ROI: 40% Year 1
-  
+
 - **Case Study 2:** Cape Town hospital (compliance-focused multi-zone HVAC)
   - Payback: 0.52 years
   - Energy savings: 31% (R 294,000/year, primarily AHU fan reduction)
   - ROI: 92% Year 1
   - Regulatory compliance achieved
-  
+
 - **Case Study 3:** Durban retail centre (VRF + gateway retrofit)
   - Payback: 0.98 years
   - Energy savings: 26% (R 250,000/year, humidity control crucial)
@@ -154,7 +154,7 @@ Here's why: [technical explanation with comparison graphs]"
 ```
 Facility manager: "What's the ROI if we retrofit FLC for our chiller?"
 Clawd Bot retrieves: PID-to-FLC Migration Cases
-Response: "Similar buildings in Johannesburg saw 15% energy savings 
+Response: "Similar buildings in Johannesburg saw 15% energy savings
 and 0.71-year payback. Your building's profile suggests [comparable figures]..."
 ```
 
@@ -183,9 +183,9 @@ and 0.71-year payback. Your building's profile suggests [comparable figures]..."
 **Usage by Clawd Bot:**
 ```
 After equipment discovery:
-"Based on your chiller type and operating data, I'm applying our 
-LSTM predictive maintenance model (89% detection sensitivity). 
-Expected remaining useful life: 180-240 days. Recommend maintenance 
+"Based on your chiller type and operating data, I'm applying our
+LSTM predictive maintenance model (89% detection sensitivity).
+Expected remaining useful life: 180-240 days. Recommend maintenance
 in 90-120 days based on degradation trend."
 ```
 
@@ -359,4 +359,3 @@ For questions about this documentation or FLC integration:
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0 | Feb 10, 2026 | Initial creation - 6 new documents, RAG ingested |
-

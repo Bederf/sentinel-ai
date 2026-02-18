@@ -22,7 +22,7 @@ with realistic savings (R80-150K/month for Site-002 3.875 MWp).
 import logging
 import random
 from dataclasses import dataclass, field
-from datetime import datetime, timezone, timedelta, date
+from datetime import datetime, timezone, date
 from typing import Dict, List, Optional, Any
 
 logger = logging.getLogger(__name__)

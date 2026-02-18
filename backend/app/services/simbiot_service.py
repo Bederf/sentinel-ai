@@ -4,7 +4,6 @@ Bridges SENTINEL anomaly detection to MRI Evolution (Concept) via FSI Public API
 Auto-creates work orders when AI detects equipment anomalies or occupants raise requests.
 """
 
-import asyncio
 import logging
 from typing import Optional
 

@@ -23,53 +23,53 @@ from app.database.supabase_client import get_supabase_client
 
 def reset_health_scores():
     """Reset all equipment health scores to 90%."""
-    
+
     client = get_supabase_client()
-    
+
     print("🔄 Resetting equipment health scores...")
-    
+
     # Get all equipment first
     all_eq = client.table("equipment").select("id").execute()
     eq_ids = [eq["id"] for eq in (all_eq.data or [])]
-    
+
     if eq_ids:
         # Update all equipment to health_score = 90, status = normal
         result = client.table("equipment").update({
             "health_score": 90,
             "status": "normal"
         }).in_("id", eq_ids).execute()
-        
+
         print(f"✓ Reset {len(eq_ids)} equipment items to health_score=90, status=normal")
     else:
         print(f"✓ No equipment found to reset")
-    
+
     # Resolve all active predictions
     print("\n🔄 Resolving active predictions...")
-    
+
     # Get all active predictions
     predictions = client.table("predictions").select("id").eq("status", "active").execute()
-    
+
     if predictions.data and len(predictions.data) > 0:
         pred_ids = [p["id"] for p in predictions.data]
-        
+
         # Update all to resolved
         resolved = client.table("predictions").update({
             "status": "resolved"
         }).in_("id", pred_ids).execute()
-        
+
         print(f"✓ Resolved {len(pred_ids)} active predictions")
     else:
         print(f"✓ No active predictions to resolve")
-    
+
     # Get all buildings for summary
     print("\n📊 Summary by Site:")
     buildings = client.table("buildings").select("id, code, name").execute()
-    
+
     for building in buildings.data or []:
         eq_count = client.table("equipment").select("id").eq("building_id", building["id"]).execute()
         count = len(eq_count.data) if eq_count.data else 0
         print(f"  • {building['code']} ({building['name']}): {count} equipment")
-    
+
     print("\n✅ Health reset complete!")
     print("\nNext steps:")
     print("  1. Hard refresh your browser (Ctrl+Shift+R)")

@@ -72,12 +72,12 @@ import { authorizedFetch } from '@/lib/api/client';
 ```typescript
 // Problem: Incomplete mock objects cause component errors
 // Solution: Ensure all required fields are present
-json: async () => ({ 
-  fault: { 
-    code: 'E4', 
+json: async () => ({
+  fault: {
+    code: 'E4',
     severity: 'high',  // ← Required for rendering
-    name: 'Test Fault' 
-  } 
+    name: 'Test Fault'
+  }
 })
 ```
 

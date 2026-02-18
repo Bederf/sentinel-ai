@@ -8,14 +8,11 @@ Verifies that:
 """
 
 import pytest
-import asyncio
-from datetime import datetime
-from unittest.mock import Mock, patch, AsyncMock, MagicMock
+from unittest.mock import Mock, AsyncMock
 
 from app.services.thermal_simulation_engine import (
     ThermalSimulationEngine,
     get_thermal_engine,
-    update_simulation_temperatures,
 )
 
 
@@ -171,7 +168,10 @@ class TestThermalCalculations:
         )
 
         # Afternoon should be warmer due to solar
-        assert temp_afternoon > temp_morning, f"Afternoon ({temp_afternoon}°C) should be > morning ({temp_morning}°C) due to solar gain"
+        assert temp_afternoon > temp_morning, (
+            f"Afternoon ({temp_afternoon}°C) should be > morning ({temp_morning}°C) "
+            "due to solar gain"
+        )
 
     def test_temperature_stays_in_bounds(self, thermal_engine):
         """Temperature should stay within reasonable bounds (5-35°C)."""

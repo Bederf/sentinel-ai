@@ -1,6 +1,6 @@
 /**
  * DashboardSection Component
- * 
+ *
  * Wrapper component for dashboard sections that adds drag-and-drop functionality.
  * Provides visual feedback during drag operations.
  */

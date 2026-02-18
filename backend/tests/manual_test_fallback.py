@@ -14,7 +14,7 @@ Usage:
 import asyncio
 import sys
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -23,7 +23,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 async def test_api_error_fallback():
     """Test fallback when Claude API raises APIError."""
     print(f"\n{'='*60}")
-    print(f"Testing: APIError Fallback (simulating 500 error)")
+    print("Testing: APIError Fallback (simulating 500 error)")
     print(f"{'='*60}")
 
     from app.services.hybrid_ai_service import HybridAIService
@@ -55,7 +55,7 @@ async def test_api_error_fallback():
 
                 full_response = "".join(response_chunks)
 
-                print(f"\n✅ SUCCESS - Fallback triggered!")
+                print("\n✅ SUCCESS - Fallback triggered!")
                 print(f"Response:\n{full_response}\n")
 
                 # Verify fallback indicators
@@ -79,7 +79,7 @@ async def test_api_error_fallback():
 async def test_connection_error_fallback():
     """Test fallback when Claude API connection fails."""
     print(f"\n{'='*60}")
-    print(f"Testing: APIConnectionError Fallback")
+    print("Testing: APIConnectionError Fallback")
     print(f"{'='*60}")
 
     from app.services.hybrid_ai_service import HybridAIService
@@ -108,7 +108,7 @@ async def test_connection_error_fallback():
                     response_chunks.append(chunk)
 
                 full_response = "".join(response_chunks)
-                print(f"\n✅ SUCCESS - Connection error handled!")
+                print("\n✅ SUCCESS - Connection error handled!")
                 print(f"Response:\n{full_response}\n")
 
                 return "Claude unavailable" in full_response and "[OLLAMA]" in full_response
@@ -123,7 +123,7 @@ async def test_connection_error_fallback():
 async def test_rate_limit_fallback():
     """Test fallback when rate limit is hit."""
     print(f"\n{'='*60}")
-    print(f"Testing: RateLimitError Fallback")
+    print("Testing: RateLimitError Fallback")
     print(f"{'='*60}")
 
     from app.services.hybrid_ai_service import HybridAIService
@@ -154,7 +154,7 @@ async def test_rate_limit_fallback():
                     response_chunks.append(chunk)
 
                 full_response = "".join(response_chunks)
-                print(f"\n✅ SUCCESS - Rate limit handled!")
+                print("\n✅ SUCCESS - Rate limit handled!")
                 print(f"Response:\n{full_response}\n")
 
                 return "rate limited" in full_response.lower() and "[OLLAMA]" in full_response
@@ -169,7 +169,7 @@ async def test_rate_limit_fallback():
 async def test_normal_operation():
     """Test that normal Claude operation doesn't trigger fallback."""
     print(f"\n{'='*60}")
-    print(f"Testing: Normal Claude Operation (No Fallback)")
+    print("Testing: Normal Claude Operation (No Fallback)")
     print(f"{'='*60}")
 
     from app.services.hybrid_ai_service import HybridAIService
@@ -194,7 +194,7 @@ async def test_normal_operation():
                     response_chunks.append(chunk)
 
                 full_response = "".join(response_chunks)
-                print(f"\n✅ SUCCESS - No fallback triggered!")
+                print("\n✅ SUCCESS - No fallback triggered!")
                 print(f"Response:\n{full_response}\n")
 
                 return "56%" in full_response and "Ollama" not in full_response
@@ -207,7 +207,7 @@ async def test_normal_operation():
 async def test_both_ais_fail():
     """Test graceful handling when both Claude and Ollama fail."""
     print(f"\n{'='*60}")
-    print(f"Testing: Both AI Services Fail")
+    print("Testing: Both AI Services Fail")
     print(f"{'='*60}")
 
     from app.services.hybrid_ai_service import HybridAIService
@@ -233,7 +233,7 @@ async def test_both_ais_fail():
                     response_chunks.append(chunk)
 
                 full_response = "".join(response_chunks)
-                print(f"\n✅ SUCCESS - Graceful error handling!")
+                print("\n✅ SUCCESS - Graceful error handling!")
                 print(f"Response:\n{full_response}\n")
 
                 return "technical difficulties" in full_response.lower() and "try again" in full_response.lower()

@@ -29,7 +29,7 @@ def register_building_routers(app: FastAPI) -> None:
     app.include_router(device_controls.router, prefix="/api", tags=["device-controls"])
     app.include_router(device_init.router, tags=["device-init"])
     app.include_router(equipment_metadata.router, prefix="/api", tags=["equipment-metadata"])
-    
+
     # Building 3D configuration (structure + equipment placement)
     app.include_router(buildings_3d.router, prefix="/api", tags=["buildings-3d"])
 
@@ -65,10 +65,10 @@ def register_building_routers(app: FastAPI) -> None:
     # Energy centre (generators, MV/LV, ATS, UPS, meters)
     app.include_router(generators.router, prefix="/api", tags=["generators"])
     app.include_router(energy_centre.router, prefix="/api", tags=["energy-centre"])
-    
+
     # Energy analytics (energy comparison, predictions, actual vs SENTINEL)
     app.include_router(energy.router, prefix="/api", tags=["energy"])
-    
+
     # Module management (module registry, status, access control)
     app.include_router(modules.router, prefix="/api", tags=["modules"])
 

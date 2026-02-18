@@ -120,19 +120,19 @@ The diagnostics system orchestrates 6 MCP tools in sequence:
 ```
 1. get_devices
    └─> Returns: Full device inventory with statuses
-   
+
 2. discover_tridonic_gateway
    └─> Returns: DALI gateway presence, network connectivity
-   
+
 3. get_buildings
    └─> Returns: Building configurations, floor mappings
-   
+
 4. search_alarms
    └─> Returns: Active alarms, severity levels, timestamps
-   
+
 5. get_health_score
    └─> Returns: Component health scores, degradation signals
-   
+
 6. get_asset_detail
    └─> Returns: Deep inspection of flagged assets, anomalies
 ```
@@ -245,7 +245,7 @@ async def store_health_snapshot_task():
     service = SystemHealthService()
     snapshot = await service.get_current_health()
     await service.store_health_snapshot(snapshot)
-    
+
     # Triggers: component health evaluation, anomaly detection
 ```
 
@@ -256,7 +256,7 @@ async def auto_resolve_errors_task():
     """Auto-resolve errors if component recovered for 24+ hours"""
     service = SystemHealthService()
     await service.auto_resolve_stale_errors()
-    
+
     # Triggers: error log cleanup, trend reversal detection
 ```
 
@@ -266,7 +266,7 @@ async def auto_resolve_errors_task():
 async def cleanup_old_data_task():
     """Remove expired data from all health tables"""
     client = get_supabase_client()
-    
+
     # Runs: cleanup_old_health_snapshots() PL/pgSQL function
     # Removes: snapshots >90 days, resolved errors >180 days, diagnostics >30 days
 ```
@@ -438,12 +438,12 @@ echo "Diagnostic ID: $DIAG_ID"
 for i in {1..20}; do
   STATUS=$(curl -s http://localhost:9095/api/system/diagnostics/$DIAG_ID | jq -r '.status')
   echo "Status: $STATUS"
-  
+
   if [ "$STATUS" = "completed" ] || [ "$STATUS" = "failed" ]; then
     curl -s http://localhost:9095/api/system/diagnostics/$DIAG_ID | jq '.'
     break
   fi
-  
+
   sleep 5
 done
 ```

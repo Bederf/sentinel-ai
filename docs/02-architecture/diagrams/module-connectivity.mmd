@@ -28,19 +28,19 @@ graph TB
     energy -->|loadshed +2°C| hvac
     energy -->|loadshed 50%| lighting
     energy -->|demand response| hvac
-    
+
     solar -->|generation| energy
     solar -->|avoid gen| energy
-    
+
     security -->|occupancy| hvac
     security -->|occupancy| lighting
-    
+
     ml -->|predictive| hvac
     ml -->|anomaly| energy
-    
+
     sustainability -->|carbon| energy
     sustainability -->|green| solar
-    
+
     water -->|monitoring| sustainability
 
     %% AI/ML coordination hub (dashed)

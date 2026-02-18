@@ -495,7 +495,7 @@ class ApprovalService:
             if not hasattr(self.device_manager, 'set_value'):
                 logger.info(f"Demo mode: simulating write to {equipment_id}.{point_name} = {target_value}")
                 return {"success": True, "message": "Demo mode - device write simulated"}
-            
+
             result = await self.device_manager.set_value(
                 equipment_id=equipment_id,
                 point_name=point_name,
@@ -504,7 +504,7 @@ class ApprovalService:
             return result
         except Exception as e:
             logger.error(f"Error writing to device {equipment_id}: {str(e)}")
-            logger.info(f"Demo mode: treating as successful write")
+            logger.info("Demo mode: treating as successful write")
             # In demo mode, return success to allow workflow to continue
             return {"success": True, "message": f"Demo mode - simulated write: {str(e)}"}
 
@@ -741,7 +741,7 @@ class ApprovalService:
                     )
 
                     if auto_rolled_back:
-                        logger.info(f"Tier 3 auto-execute: Auto-rollback completed successfully")
+                        logger.info("Tier 3 auto-execute: Auto-rollback completed successfully")
                         return ApprovalResult(
                             success=False,
                             recommendation_id=recommendation_id,
@@ -750,12 +750,12 @@ class ApprovalService:
                             cov_verified=False
                         )
                     else:
-                        logger.error(f"Tier 3 auto-execute: Auto-rollback failed")
+                        logger.error("Tier 3 auto-execute: Auto-rollback failed")
                         return ApprovalResult(
                             success=False,
                             recommendation_id=recommendation_id,
                             status="failed",
-                            error_message=f"COV verification failed and auto-rollback failed"
+                            error_message="COV verification failed and auto-rollback failed"
                         )
 
             # Schedule outcome measurement for 10-minute learning window
@@ -902,7 +902,7 @@ class ApprovalService:
                 action_type="parasite_auto_rollback",
                 equipment_code=equipment_id,
                 approved_by="system",
-                approval_notes=f"Auto-rollback triggered by COV failure",
+                approval_notes="Auto-rollback triggered by COV failure",
                 change_description=f"Auto-rollback: {control_point} from {cov_result.actual_value} back to {original_value}",
                 execution_status="success",
                 cov_verified=rollback_cov_result.verified

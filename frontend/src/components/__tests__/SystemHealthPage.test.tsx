@@ -458,7 +458,7 @@ describe('SystemHealthPage', () => {
       await waitFor(() => {
         expect(screen.getByText('System Health Dashboard')).toBeInTheDocument();
       }, { timeout: 2000 });
-      
+
       // Simply verify that component renders and dashboard is visible
       expect(screen.getByText('System Health Dashboard')).toBeInTheDocument();
     });

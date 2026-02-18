@@ -381,7 +381,7 @@ psql $DATABASE_URL -c "SELECT zone_id, COUNT(*) FROM desks WHERE building_id = '
 ```bash
 # Manual verification: Calculate centroid for Zone-L0-A
 psql $DATABASE_URL -c "
-  SELECT 
+  SELECT
     AVG(coordinates->>'x')::numeric(10,2) as avg_x,
     AVG(coordinates->>'z')::numeric(10,2) as avg_z
   FROM desks

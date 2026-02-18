@@ -5,7 +5,7 @@ Abstract base class for BMS vendor naming adapters.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 
 
 class VendorAdapter(ABC):

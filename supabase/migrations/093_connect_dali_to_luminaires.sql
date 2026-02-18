@@ -13,7 +13,7 @@ DECLARE
 BEGIN
     -- Look up building UUID for Sandton (site-002)
     SELECT id INTO v_building_id FROM buildings WHERE code = 'site-002';
-    
+
     IF v_building_id IS NULL THEN
         RAISE NOTICE 'Building site-002 not found, skipping DALI-luminaire linking';
         RETURN;
@@ -25,9 +25,9 @@ BEGIN
     -- Level 1: Zones 100-105 (120 luminaires = 20 per zone)
     -- Level 2: Zones 200-205 (120 luminaires = 20 per zone)
     -- =========================================================================
-    
+
     -- LEVEL 0 LUMINAIRES (Zones 001-005)
-    INSERT INTO equipment 
+    INSERT INTO equipment
         (code, building_id, name, type, status, health_score, commissioning_date, device_info)
     SELECT
         'S002-LUM-' || LPAD(zone_num::TEXT, 3, '0') || '-' || LPAD(lum_seq::TEXT, 2, '0') as code,
@@ -47,7 +47,7 @@ BEGIN
     ON CONFLICT (code) DO NOTHING;
 
     -- LEVEL 1 LUMINAIRES (Zones 100-105)
-    INSERT INTO equipment 
+    INSERT INTO equipment
         (code, building_id, name, type, status, health_score, commissioning_date, device_info)
     SELECT
         'S002-LUM-' || LPAD((100 + zone_num - 1)::TEXT, 3, '0') || '-' || LPAD(lum_seq::TEXT, 2, '0') as code,
@@ -67,7 +67,7 @@ BEGIN
     ON CONFLICT (code) DO NOTHING;
 
     -- LEVEL 2 LUMINAIRES (Zones 200-205)
-    INSERT INTO equipment 
+    INSERT INTO equipment
         (code, building_id, name, type, status, health_score, commissioning_date, device_info)
     SELECT
         'S002-LUM-' || LPAD((200 + zone_num - 1)::TEXT, 3, '0') || '-' || LPAD(lum_seq::TEXT, 2, '0') as code,
@@ -104,7 +104,7 @@ END $$;
 -- =====================================================
 
 -- Count luminaires per DALI zone
-SELECT 
+SELECT
     (e.device_info->>'dali_controller') as controller,
     COUNT(*) as luminaire_count,
     MIN(e.code) as first_luminaire,
@@ -129,8 +129,8 @@ WHERE building_id = (SELECT id FROM buildings WHERE code = 'site-002')
 UNION ALL
 
 SELECT
-    'Luminaire (' || ROW_NUMBER() OVER (ORDER BY code) || '/' || 
-    (SELECT COUNT(*) FROM equipment WHERE device_info->>'dali_controller' = 'S002-DALI-102' 
+    'Luminaire (' || ROW_NUMBER() OVER (ORDER BY code) || '/' ||
+    (SELECT COUNT(*) FROM equipment WHERE device_info->>'dali_controller' = 'S002-DALI-102'
      AND building_id = (SELECT id FROM buildings WHERE code = 'site-002')) || ')',
     code,
     type,
@@ -143,9 +143,9 @@ ORDER BY code
 LIMIT 5;
 
 -- Summary statistics
-SELECT 
+SELECT
     'DALI Lighting Infrastructure' as description,
     (SELECT COUNT(*) FROM equipment WHERE building_id = (SELECT id FROM buildings WHERE code = 'site-002') AND type = 'dali_luminaire' OR type = 'DALI') as dali_controllers,
     (SELECT COUNT(*) FROM equipment WHERE building_id = (SELECT id FROM buildings WHERE code = 'site-002') AND type = 'luminaire') as luminaire_fixtures,
-    (SELECT COUNT(*) FROM equipment WHERE building_id = (SELECT id FROM buildings WHERE code = 'site-002') AND type = 'luminaire') / 
+    (SELECT COUNT(*) FROM equipment WHERE building_id = (SELECT id FROM buildings WHERE code = 'site-002') AND type = 'luminaire') /
     NULLIF((SELECT COUNT(*) FROM equipment WHERE building_id = (SELECT id FROM buildings WHERE code = 'site-002') AND (type = 'dali_luminaire' OR type = 'DALI')), 0) as avg_luminaires_per_controller;

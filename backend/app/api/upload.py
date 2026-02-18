@@ -1,8 +1,6 @@
 """Upload API endpoints for CSV data files."""
 
-import os
 import shutil
-from pathlib import Path
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from pydantic import BaseModel
 

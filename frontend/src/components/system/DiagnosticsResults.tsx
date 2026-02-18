@@ -1,6 +1,6 @@
 /**
  * Diagnostics Results Display
- * 
+ *
  * Shows SIMBIOT diagnostic results with polling status.
  */
 

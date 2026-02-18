@@ -267,7 +267,7 @@ curl http://localhost:9095/api/buildings/site-002/equipment | jq '.total_equipme
   - Backend not running
   - Building ID doesn't exist in Supabase
   - Network connectivity issue
-- **Fix:** 
+- **Fix:**
   1. Check backend: `./start-backend.sh`
   2. Verify building exists: `curl http://localhost:9095/api/buildings/site-002`
   3. Check console for network errors
@@ -280,7 +280,7 @@ curl http://localhost:9095/api/buildings/site-002/equipment | jq '.total_equipme
   - Check backend logs for query errors
 
 ### Issue: Equipment markers not visible in 3D
-- **Cause:** 
+- **Cause:**
   - Wrong equipment positioning logic
   - Camera clipping plane too narrow
 - **Fix:**

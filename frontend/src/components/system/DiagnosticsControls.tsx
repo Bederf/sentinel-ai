@@ -1,6 +1,6 @@
 /**
  * Diagnostics Controls
- * 
+ *
  * Interface for triggering SIMBIOT diagnostics workflow.
  */
 

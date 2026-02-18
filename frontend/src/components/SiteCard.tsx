@@ -94,9 +94,9 @@ function getStatusConfig(status: Site["status"]): {
  */
 function getSafePercentageColor(safe: number, total: number): string {
   if (total === 0) return "var(--color-sentinel-text-disabled)";
-  
+
   const percentage = (safe / total) * 100;
-  
+
   if (percentage < 50) {
     return "var(--color-sentinel-red)"; // 0-49%
   } else if (percentage < 80) {
@@ -109,7 +109,7 @@ function getSafePercentageColor(safe: number, total: number): string {
 export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizationStatus = false, onEquipmentControlNavigate }: SiteCardProps) {
   const statusConfig = getStatusConfig(site.status);
   const hasAlerts = site.alert_count > 0;
-  
+
   // Fetch aggregated site summary (replaces per-device API calls)
   const { data: siteSummary, isLoading: loadingSafety } = useSiteSummary(site.id, {
     enabled: showSafetyStatus,
@@ -139,7 +139,7 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
     warning: siteSummary.safety.warning,
     blocked: siteSummary.safety.blocked,
     alarm: siteSummary.safety.alarm,
-    overallStatus: 
+    overallStatus:
       siteSummary.safety.blocked > 0 ? 'blocked' :
       siteSummary.safety.alarm > 0 ? 'alarm' :
       siteSummary.safety.warning > 0 ? 'warning' :

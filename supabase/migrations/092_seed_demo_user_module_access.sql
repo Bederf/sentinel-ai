@@ -2,7 +2,7 @@
 -- Migration 092: Seed User Module Access for Demo Users
 -- Grants specific paid add-on modules to demo users on site-002
 -- =====================================================
--- 
+--
 -- Access model:
 --   bederf@gmail.com    → admin role → sees ALL modules (no grants needed)
 --   grant@wardew.co.za  → operator   → base + control + lighting

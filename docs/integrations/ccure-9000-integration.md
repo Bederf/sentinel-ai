@@ -181,7 +181,7 @@ tamper              - Enclosure tamper detected (CRITICAL)
 
 **Recommendation:**
 ```
-"After-hours access by [Name] at [Time] in [Zone]. 
+"After-hours access by [Name] at [Time] in [Zone].
  Unexpected HVAC/lighting activation detected.
  Energy impact: ~2-5 kWh excess per hour.
  Action: Verify access was authorized, review occupancy schedule."
@@ -262,7 +262,7 @@ SENTINEL Correlations:
 ├─ Network: Switch port 24 DOWN (same time)
 ├─ Power: UPS battery 45% (generator on standby)
 ├─ Infrastructure Health Score: DEGRADED
-└─ Recommendation: "Check network connection at L3 switch, 
+└─ Recommendation: "Check network connection at L3 switch,
                     prepare maintenance window, verify backup power"
 ```
 

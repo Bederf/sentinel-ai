@@ -2,7 +2,7 @@
 
 import json
 from datetime import datetime
-from typing import Any, Optional
+from typing import Optional
 
 from app.database.supabase_client import get_supabase_client
 

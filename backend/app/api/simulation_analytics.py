@@ -20,7 +20,7 @@ analyzer = SimulationAnalyzer()
 @limiter.limit("1000/minute")
 async def list_runs(request: Request):
     """List all simulation runs (most recent first).
-    
+
     Rate limit: 1000 requests/minute
     """
     runs = analyzer.list_runs()
@@ -31,7 +31,7 @@ async def list_runs(request: Request):
 @limiter.limit("1000/minute")
 async def get_run(request: Request, run_id: str):
     """Get metadata for a specific simulation run.
-    
+
     Rate limit: 1000 requests/minute
     """
     run = analyzer.get_run(run_id)
@@ -50,7 +50,7 @@ async def get_run_events(
     limit: int = Query(100, ge=1, le=1000),
 ):
     """Read JSONL events for a simulation run with optional filtering.
-    
+
     Rate limit: 1000 requests/minute (generous for data retrieval)
     """
     run = analyzer.get_run(run_id)
@@ -71,7 +71,7 @@ async def get_run_events(
 @limiter.limit("600/minute")
 async def get_analysis(request: Request, run_id: str):
     """Get or generate analysis report for a simulation run.
-    
+
     Rate limit: 600 requests/minute (slightly lower due to report generation)
     """
     run = analyzer.get_run(run_id)
@@ -88,7 +88,7 @@ async def get_analysis(request: Request, run_id: str):
 @limiter.limit("600/minute")
 async def get_profile_analysis(request: Request, run_id: str, profile: str):
     """Get analysis for a specific optimization profile.
-    
+
     Rate limit: 600 requests/minute
     """
     report = analyzer.get_analysis(run_id)
@@ -117,7 +117,7 @@ class CustomProfileWeights(BaseModel):
 @limiter.limit("100/minute")
 async def reanalyze_run(request: Request, run_id: str, profile: CustomProfileWeights):
     """Trigger re-analysis with custom profile weights.
-    
+
     Rate limit: 100 requests/minute (lower due to CPU-intensive analysis)
     """
     run = analyzer.get_run(run_id)
@@ -140,7 +140,7 @@ async def reanalyze_run(request: Request, run_id: str, profile: CustomProfileWei
 @limiter.limit("1000/minute")
 async def list_profiles(request: Request):
     """List available optimization profiles.
-    
+
     Rate limit: 1000 requests/minute
     """
     profiles = analyzer.get_profiles()

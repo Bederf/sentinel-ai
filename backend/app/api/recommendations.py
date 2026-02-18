@@ -14,7 +14,6 @@ from pydantic import BaseModel
 
 from app.middleware.rate_limiter import limiter
 from app.services.recommendation_service import get_recommendation_service
-from app.models.recommendation import Recommendation, RecommendationStatus
 
 logger = logging.getLogger(__name__)
 

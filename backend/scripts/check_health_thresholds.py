@@ -12,17 +12,17 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 try:
     from app.database.supabase_client import get_supabase_client
     from app.services.health_threshold_service import get_health_thresholds, DEFAULT_THRESHOLDS
-    
+
     print("=" * 70)
     print("HEALTH THRESHOLD SOURCE ANALYSIS")
     print("=" * 70)
-    
+
     # Show defaults in code
     print("\n[1] Hardcoded Python Defaults:")
     print(f"  healthy: {DEFAULT_THRESHOLDS['healthy']}")
     print(f"  warning: {DEFAULT_THRESHOLDS['warning']}")
     print(f"  critical: {DEFAULT_THRESHOLDS['critical']}")
-    
+
     # Show JSON file settings
     print("\n[2] JSON Settings File (backend/app/data/settings.json):")
     try:
@@ -34,7 +34,7 @@ try:
             print(f"  critical: {json_thresholds.get('critical', 'NOT SET')}")
     except FileNotFoundError:
         print("  settings.json not found")
-    
+
     # Check Supabase
     print("\n[3] Supabase system_settings Table:")
     client = get_supabase_client()
@@ -48,23 +48,23 @@ try:
             print("  No entry found in system_settings")
     except Exception as e:
         print(f"  Error querying: {e}")
-    
+
     # Check what's actually being used
     print("\n[4] Currently Active Thresholds:")
     active = get_health_thresholds(force_refresh=True)
     print(f"  healthy: {active['healthy']}")
     print(f"  warning: {active['warning']}")
     print(f"  critical: {active['critical']}")
-    
+
     # Impact analysis
     print("\n[5] Impact Analysis:")
     print(f"  Equipment at 85% health:")
     print(f"    If healthy=90: Status='warning' (BELOW threshold) → Generates predictions")
     print(f"    If healthy=80: Status='healthy' (ABOVE threshold) → No predictions ✓")
     print(f"  Current predictions: 161 (expected to drop to ~20 if threshold fixed)")
-    
+
     print("\n" + "=" * 70)
-    
+
 except Exception as e:
     print(f"Error: {e}")
     import traceback

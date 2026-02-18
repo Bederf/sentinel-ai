@@ -10,8 +10,8 @@ Provides realistic seasonal variations for:
 - HVAC load demand by season
 """
 
-from datetime import datetime, date
-from typing import Dict, Tuple, Optional
+from datetime import date
+from typing import Dict, Optional
 from enum import Enum
 from dataclasses import dataclass
 import random
@@ -31,31 +31,31 @@ class SeasonalConfig:
     month: int                          # 1-12
     month_name: str                     # "January", "February", etc.
     season: Season
-    
+
     # Temperature (Celsius)
     ambient_temp_min: float             # Typical minimum
     ambient_temp_max: float             # Typical maximum
     ambient_temp_avg: float             # Average
-    
+
     # Rainfall
     rainfall_probability: float         # 0.0-1.0: chance of rain on any day
     rainfall_avg_days: int              # Average rainy days in month
     avg_rainfall_mm: float              # Average total rainfall
     cloud_cover_percent: float          # 0.0-1.0: average cloud cover
-    
+
     # Solar generation (relative to optimal)
     solar_efficiency: float             # 0.0-1.0: efficiency vs peak
     daylight_hours: float               # Sunrise to sunset
-    
+
     # Occupancy
     school_holidays: bool               # School breaks
     summer_break: bool                  # Dec 16 - Jan 15
     occupancy_variance: float           # ±% from baseline
-    
+
     # Equipment
     hvac_load_percent: float            # % of peak load
     fault_probability_multiplier: float # × base probability
-    
+
     # Public holidays (South Africa)
     public_holidays: int                # Number of public holidays
 
@@ -204,87 +204,87 @@ SA_SEASONAL_DATA = {
 
 class SeasonalModeler:
     """Applies South African seasonal modeling to simulations."""
-    
+
     def __init__(self, seed: Optional[int] = None):
         """Initialize with optional seed for reproducibility."""
         self.rng = random.Random(seed)
-    
+
     def get_config_for_date(self, simulated_date: date) -> SeasonalConfig:
         """Get seasonal configuration for a specific date."""
         month = simulated_date.month
         return SA_SEASONAL_DATA[month]
-    
+
     def get_ambient_temperature(self, simulated_date: date, hour: int, rain_today: bool = False) -> float:
         """
         Get ambient temperature for a specific date and hour.
-        
+
         Temperature varies by:
         - Time of day (cooler at night, peak in afternoon)
         - Month (seasonal)
         - Rain (cooler when raining)
         """
         config = self.get_config_for_date(simulated_date)
-        
+
         # Daily temperature curve: coldest at 6am, warmest at 3pm
         # Temperature at hour = min + (max - min) * sin((hour - 6) * π / 12)
         import math
         hour_factor = math.sin((hour - 6) * math.pi / 12)
         temp_range = config.ambient_temp_max - config.ambient_temp_min
         temperature = config.ambient_temp_min + (temp_range / 2) + (temp_range / 2) * hour_factor
-        
+
         # Rain reduces temperature by 2-4°C
         if rain_today:
             temperature -= self.rng.uniform(2, 4)
-        
+
         # Add small random variation (±0.5°C)
         temperature += self.rng.uniform(-0.5, 0.5)
-        
+
         return round(temperature, 1)
-    
+
     def should_rain_today(self, simulated_date: date) -> bool:
         """Determine if it rains on a given day."""
         config = self.get_config_for_date(simulated_date)
         return self.rng.random() < config.rainfall_probability
-    
+
     def get_cloud_cover_percent(self, simulated_date: date) -> float:
         """
         Get cloud cover percentage (0-100) for a day.
-        
+
         Used to reduce solar generation efficiency.
         """
         config = self.get_config_for_date(simulated_date)
-        
+
         # Base cloud cover ± variation
         variation = self.rng.uniform(-0.15, 0.15)  # ±15%
         cloud_cover = max(0.0, min(1.0, config.cloud_cover_percent + variation))
-        
+
         return cloud_cover * 100  # Return as percentage
-    
+
     def get_solar_generation_factor(self, simulated_date: date, cloud_cover: float) -> float:
         """
         Get solar generation efficiency factor (0-1).
-        
+
         Accounts for:
         - Seasonal variation (winter shorter days, less intense sun)
         - Cloud cover (rainy days reduce output)
         - Latitude effects already in monthly config
         """
         config = self.get_config_for_date(simulated_date)
-        
+
         # Base efficiency from month
         efficiency = config.solar_efficiency
-        
+
         # Cloud cover reduces efficiency by 30-70%
         # 0% cloud = no reduction
         # 100% cloud = 70% reduction
         cloud_factor = 1.0 - (cloud_cover / 100.0) * 0.70
-        
+
         return efficiency * cloud_factor
-    
+
     def get_occupancy_factor(self, simulated_date: date, hour: int, rain_today: bool = False) -> float:
         """
         Get occupancy factor (0-1) for a specific date and hour.
-        
+
         Accounts for:
         - Time of day (0-8 low, 8-18 peak, 18+ declining)
         - Day of week (weekends lower)
@@ -292,7 +292,7 @@ class SeasonalModeler:
         - Rain (some people WFH on rainy days)
         """
         config = self.get_config_for_date(simulated_date)
-        
+
         # Base occupancy by hour
         if hour < 8 or hour >= 20:
             base_occupancy = 0.0  # Outside working hours
@@ -306,41 +306,41 @@ class SeasonalModeler:
             base_occupancy = 0.85  # Afternoon peak
         else:
             base_occupancy = 0.3  # Evening departure
-        
+
         # Day of week variation
         weekday = simulated_date.weekday()  # 0=Monday, 6=Sunday
         if weekday == 4:  # Friday
             base_occupancy *= 0.80  # Early departures
         elif weekday in (5, 6):  # Weekend
             base_occupancy *= 0.30  # Minimal occupancy
-        
+
         # Holiday/school break impact
         variance = config.occupancy_variance
         base_occupancy *= (1.0 + variance)
-        
+
         # Rain impact: 10% more WFH (reduced occupancy)
         if rain_today and 8 <= hour <= 18:
             base_occupancy *= 0.85  # 15% fewer in building
-        
+
         return max(0.0, min(1.0, base_occupancy))
-    
+
     def get_hvac_load_factor(self, simulated_date: date, occupancy_factor: float, ambient_temp: float) -> float:
         """
         Get HVAC load factor (0-1) based on seasonal demand and occupancy.
-        
+
         Accounts for:
         - Season (winter low, summer high)
         - Occupancy level
         - Temperature deviation from setpoint
         """
         config = self.get_config_for_date(simulated_date)
-        
+
         # Base seasonal load
         base_load = config.hvac_load_percent / 100.0
-        
+
         # Occupancy contribution (more people = more load)
         occupancy_component = occupancy_factor * 0.7  # 70% of load from occupancy
-        
+
         # Temperature deviation (too hot/cold = more work)
         # Assume setpoint 22°C, range 16-28°C for comfort
         temp_deviation = abs(ambient_temp - 22.0)
@@ -348,32 +348,32 @@ class SeasonalModeler:
             temp_factor = 1.0 + (temp_deviation - 6) / 10  # Extra load for extreme temps
         else:
             temp_factor = max(0.3, 1.0 - (6 - temp_deviation) / 10)
-        
+
         # Combined: base (constant) + occupancy + temp effects
         hvac_load = (base_load * 0.3) + (occupancy_component * 0.4) + (temp_factor * 0.3)
-        
+
         return max(0.0, min(1.0, hvac_load))
-    
+
     def get_fault_probability_multiplier(self, simulated_date: date, is_rainy: bool = False) -> float:
         """
         Get equipment fault probability multiplier.
-        
+
         Summer higher (chillers work hard), rain increases moisture faults.
         """
         config = self.get_config_for_date(simulated_date)
         multiplier = config.fault_probability_multiplier
-        
+
         # Rain increases electrical/moisture faults
         if is_rainy:
             multiplier *= 1.3
-        
+
         return multiplier
-    
+
     def get_season_name(self, simulated_date: date) -> str:
         """Get human-readable season name."""
         config = self.get_config_for_date(simulated_date)
         return config.season.value.capitalize()
-    
+
     def get_month_summary(self, month: int) -> Dict[str, any]:
         """Get summary statistics for a month."""
         config = SA_SEASONAL_DATA[month]

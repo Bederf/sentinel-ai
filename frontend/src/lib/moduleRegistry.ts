@@ -12,7 +12,7 @@ const RECOMMENDATIONS_CACHE_PREFIX = "sentinel_module_recommendations_";
 
 // ==================== Types ====================
 
-export type ModuleType = 
+export type ModuleType =
   // Core infrastructure (non-deactivatable)
   | 'kpi' | 'ml' | 'hvac' | 'energy' | 'assets' | 'simbiot' | 'integrations' | 'notifications'
   // Paid add-ons
@@ -127,17 +127,17 @@ export const moduleRegistryApi = {
    */
   async getAvailableModules(): Promise<ModuleDefinition[]> {
     const now = Date.now();
-    
+
     // Return cached data if still valid
     if (modulesCache.data && (now - modulesCache.timestamp) < MODULES_CACHE_TTL) {
       return modulesCache.data;
     }
-    
+
     try {
       const response = await fetchWithAuth(`${API_BASE}/api/modules/available`);
       if (!response.ok) throw new Error('Failed to fetch available modules');
       const data = await response.json();
-      
+
       // Update cache
       modulesCache = { data, timestamp: now };
       return data;

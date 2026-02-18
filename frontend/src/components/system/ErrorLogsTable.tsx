@@ -1,6 +1,6 @@
 /**
  * Error Logs Table
- * 
+ *
  * Displays and filters system error logs.
  */
 

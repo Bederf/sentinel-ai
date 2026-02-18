@@ -5,7 +5,7 @@ monitoring tables so the Integration Monitoring dashboard shows the connected
 data sources, sync history, and point mappings.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any, Dict, Optional
 import logging
 

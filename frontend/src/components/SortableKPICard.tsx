@@ -1,6 +1,6 @@
 /**
  * SortableKPICard Component
- * 
+ *
  * Wrapper around KPICard that adds drag-and-drop functionality
  * for reordering KPI cards in the dashboard.
  */

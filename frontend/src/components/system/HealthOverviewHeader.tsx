@@ -1,6 +1,6 @@
 /**
  * System Health Overview Header
- * 
+ *
  * Displays overall health status badge with score, timestamp, and auto-refresh indicator.
  */
 

@@ -14,8 +14,8 @@ Output: Cost variance reports, tariff adjustment recommendations.
 """
 
 import logging
-from datetime import datetime, date, timedelta
-from typing import Dict, Optional, Tuple, Any, List
+from datetime import datetime
+from typing import Dict, Optional, Any, List
 from statistics import mean, stdev
 from app.database.supabase_client import get_supabase_client
 

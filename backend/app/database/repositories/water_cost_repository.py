@@ -5,13 +5,13 @@ Manages tariff configurations and cost calculations with tiered billing support.
 """
 
 from typing import List, Optional, Dict, Any
-from datetime import datetime, date, timedelta
+from datetime import datetime, timedelta
 import json
 import logging
 from pathlib import Path
 
 from app.database.supabase_client import get_supabase_client
-from app.models.water_meter import WaterTariff, WaterCost, WaterConsumption
+from app.models.water_meter import WaterTariff
 
 logger = logging.getLogger(__name__)
 

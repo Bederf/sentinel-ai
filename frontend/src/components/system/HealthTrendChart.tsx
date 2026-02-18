@@ -1,6 +1,6 @@
 /**
  * Health Trend Chart
- * 
+ *
  * Shows health score trend over time with line chart.
  */
 
@@ -18,14 +18,14 @@ export function HealthTrendChart() {
       try {
         setLoading(true);
         const data = await systemApi.getHealthHistory(selectedRange);
-        
+
         // Format data for chart
         const formatted = (data.snapshots || []).map((s: any, i: number) => ({
           time: new Date(s.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
           score: s.overall_score,
           index: i,
         }));
-        
+
         setChartData(formatted);
       } catch (err) {
         console.error('Failed to fetch trend:', err);

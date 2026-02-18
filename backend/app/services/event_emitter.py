@@ -8,7 +8,7 @@ import asyncio
 import json
 import logging
 from typing import Dict, List, Any
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from enum import Enum
 from datetime import datetime
 

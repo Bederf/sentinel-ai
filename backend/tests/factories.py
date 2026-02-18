@@ -3,11 +3,9 @@ Test data factories for creating mock objects in tests.
 """
 
 from typing import Optional
-from datetime import datetime, timedelta
+from datetime import datetime
 import uuid
 
-from app.models.device import Device, DevicePoint, DeviceStatus, DeviceValue
-from app.models.safety_rules import SafetyRule, RuleSeverity, RuleType
 
 
 class DeviceFactory:

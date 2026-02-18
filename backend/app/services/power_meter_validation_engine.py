@@ -15,7 +15,7 @@ Output: Validation records, anomaly alerts, COP adjustment recommendations.
 
 import logging
 from datetime import datetime, timedelta, date
-from typing import Dict, Optional, Tuple, Any, List
+from typing import Dict, Optional, Any
 from statistics import mean, stdev
 from app.database.supabase_client import get_supabase_client
 

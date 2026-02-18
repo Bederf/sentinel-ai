@@ -15,8 +15,8 @@ Output: Ranked list of actionable recommendations with financial impact.
 """
 
 import logging
-from datetime import datetime, timedelta
-from typing import Dict, Optional, List, Any, Tuple
+from datetime import datetime
+from typing import Dict, Optional, Any
 from statistics import mean
 from enum import Enum
 
@@ -292,7 +292,7 @@ class AIRecommendationEngine:
     ) -> Optional[Dict[str, Any]]:
         """Calculate HVAC maintenance recommendation (COP degradation)."""
         cop_loss_pct = (1.0 - current_cop / BASELINE_HVAC_COP) * 100
-        
+
         if cop_loss_pct < 5.0:
             return None  # Minimal degradation
 

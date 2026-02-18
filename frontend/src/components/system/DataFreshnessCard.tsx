@@ -1,6 +1,6 @@
 /**
  * Data Freshness Card
- * 
+ *
  * Shows how recent the data is and staleness alerts.
  */
 

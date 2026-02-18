@@ -4,7 +4,7 @@ Final sync script: Push corrected zones and desks to Supabase.
 
 Usage:
   python sync_to_supabase_final.py [--dry-run]
-  
+
 Requires Supabase credentials in .env:
   SUPABASE_URL
   SUPABASE_SERVICE_ROLE_KEY
@@ -90,11 +90,11 @@ def prepare_desks(desks: List[Dict], building_id: str) -> List[Dict]:
 def sync_to_supabase(building_code: str, dry_run: bool = False):
     """Main sync function."""
     print(f"🚀 Syncing zones and desks for {building_code}")
-    
+
     # Check for Supabase credentials
     supabase_url = os.getenv("SUPABASE_URL")
     supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-    
+
     if not supabase_url or not supabase_key:
         print("  ⚠️  Supabase credentials not found in .env")
         print("  Required: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY")
@@ -104,15 +104,15 @@ def sync_to_supabase(building_code: str, dry_run: bool = False):
         print("        SUPABASE_URL=http://localhost:54321")
         print("        SUPABASE_SERVICE_ROLE_KEY=<service role key from supabase status>")
         return False
-    
+
     try:
         from app.database.supabase_client import get_supabase_client
     except ImportError as e:
         print(f"  ✗ Failed to import Supabase client: {e}")
         return False
-    
+
     client = get_supabase_client()
-    
+
     # Get building UUID
     print(f"\n📍 Looking up building {building_code}...")
     building_id = get_building_uuid(client, building_code)
@@ -120,31 +120,31 @@ def sync_to_supabase(building_code: str, dry_run: bool = False):
         print(f"  ✗ Building {building_code} not found in Supabase")
         return False
     print(f"  ✓ Found building ID: {building_id}")
-    
+
     # Load JSON data
     print(f"\n📂 Loading data files...")
     zones = load_zones_json(building_code)
     desks = load_desks_json(building_code)
     print(f"  ✓ Loaded {len(zones)} zones")
     print(f"  ✓ Loaded {len(desks)} desks (with corrected floors L0, L1, L2)")
-    
+
     # Prepare data
     print(f"\n📋 Preparing records...")
     zones_prepared = prepare_zones(zones, building_id)
     desks_prepared = prepare_desks(desks, building_id)
     print(f"  ✓ {len(zones_prepared)} zone records ready")
     print(f"  ✓ {len(desks_prepared)} desk records ready")
-    
+
     if dry_run:
         print(f"\n🔍 DRY RUN MODE - Would sync:")
         print(f"   - {len(zones_prepared)} zones")
         print(f"   - {len(desks_prepared)} desks")
         return True
-    
+
     # Sync to Supabase
     try:
         print(f"\n📤 Syncing to Supabase...")
-        
+
         print(f"   Upserting {len(zones_prepared)} zones...")
         response = client.table("zones").upsert(
             zones_prepared,
@@ -152,17 +152,17 @@ def sync_to_supabase(building_code: str, dry_run: bool = False):
         ).execute()
         zones_synced = len(response.data) if response.data else 0
         print(f"   ✓ {zones_synced} zones synced")
-        
+
         # Upsert desks in batches
         batch_size = 500
         total_synced = 0
         num_batches = (len(desks_prepared) + batch_size - 1) // batch_size
-        
+
         for batch_idx in range(num_batches):
             start = batch_idx * batch_size
             end = min(start + batch_size, len(desks_prepared))
             batch = desks_prepared[start:end]
-            
+
             print(f"   Batch {batch_idx + 1}/{num_batches}: {len(batch)} desks...")
             response = client.table("desks").upsert(
                 batch,
@@ -171,7 +171,7 @@ def sync_to_supabase(building_code: str, dry_run: bool = False):
             synced = len(response.data) if response.data else 0
             total_synced += synced
             print(f"   ✓ {synced} desks synced")
-        
+
         print(f"\n✅ Sync complete!")
         print(f"   📊 {zones_synced} zones")
         print(f"   📊 {total_synced} desks")
@@ -180,7 +180,7 @@ def sync_to_supabase(building_code: str, dry_run: bool = False):
         print(f"   2. Equipment will appear in zones on the digital twin")
         print(f"   3. Refresh the browser to see updated 3D visualization")
         return True
-        
+
     except Exception as e:
         print(f"  ✗ Sync failed: {e}")
         import traceback
@@ -198,7 +198,7 @@ def main():
         help="Preview sync without actually writing to Supabase"
     )
     args = parser.parse_args()
-    
+
     success = sync_to_supabase("site-002", dry_run=args.dry_run)
     sys.exit(0 if success else 1)
 

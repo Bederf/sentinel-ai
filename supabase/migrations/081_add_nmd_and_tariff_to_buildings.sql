@@ -28,8 +28,8 @@ COMMENT ON COLUMN buildings.nmd_extracted_from_bill IS 'True if NMD value was ex
 
 -- Populate default NMD for existing buildings (Site-002 = 6000 kVA, Site-005 = 8000 kVA)
 UPDATE buildings
-SET 
-  nmd_limit_kva = CASE 
+SET
+  nmd_limit_kva = CASE
     WHEN code = 'S002' THEN 6000.0
     WHEN code = 'site-005' THEN 8000.0
     ELSE 5000.0

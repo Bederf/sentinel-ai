@@ -114,7 +114,7 @@ async def high_priority_request():
     # Skip rate limiting for critical operations
     if is_critical():
         return await perform_action()
-    
+
     # Otherwise, respect rate limit
     await rate_limiter.acquire()
     return await perform_action()
@@ -124,7 +124,7 @@ def adjust_rate_limit(error_response):
     """Adjust rate limit based on API response headers"""
     remaining = int(error_response.headers.get('X-RateLimit-Remaining', 0))
     reset_time = int(error_response.headers.get('X-RateLimit-Reset', 0))
-    
+
     if remaining < 10:
         rate_limiter.throttle(multiplier=0.5)
     elif remaining > 100:
@@ -142,14 +142,14 @@ deduplicator = RequestDeduplicator(cooldown_seconds=1800)
 # Check before creating work order
 async def create_work_order(equipment_id, anomaly):
     key = f"work_order:{equipment_id}"
-    
+
     if deduplicator.is_duplicate(key):
         logger.info(f"Skipping duplicate WO for {equipment_id}")
         return {"status": "duplicate", "cooldown_remaining": deduplicator.get_cooldown(key)}
-    
+
     # Record this request
     deduplicator.record(key)
-    
+
     # Create work order
     return await workorder_service.create(equipment_id, anomaly)
 
@@ -158,10 +158,10 @@ site_deduplicator = RequestDeduplicator(cooldown_seconds=300)  # 5 min
 
 async def handle_site_alert(site_id, alert_type):
     key = f"{site_id}:{alert_type}"
-    
+
     if site_deduplicator.is_duplicate(key):
         return  # Skip if already alerted in past 5 min
-    
+
     site_deduplicator.record(key)
     await send_alert(site_id, alert_type)
 ```
@@ -208,14 +208,14 @@ async def train_custom_model():
         time_range_days=180,
         normalize=True
     )
-    
+
     # Initialize trainer
     trainer = LSTMTrainer(
         input_shape=(24, 5),  # 24 timesteps, 5 features
         hidden_units=[64, 32],
         dropout=0.2
     )
-    
+
     # Train
     history = await trainer.train(
         data['X_train'],
@@ -224,10 +224,10 @@ async def train_custom_model():
         epochs=100,
         batch_size=32
     )
-    
+
     # Save model
     await trainer.save('./models/chiller_lstm_v2.h5')
-    
+
     # Evaluate
     metrics = await trainer.evaluate(data['X_test'], data['y_test'])
     print(f"Test MSE: {metrics['mse']:.6f}")
@@ -249,13 +249,13 @@ async def train_anomaly_detector():
         equipment_type='chiller',
         days=90
     )
-    
+
     # Initialize autoencoder
     ae = AutoEncoder(
         input_dim=10,  # 10 sensor features
         encoding_dim=3
     )
-    
+
     # Train (unsupervised)
     history = await ae.train(
         X_train,
@@ -263,14 +263,14 @@ async def train_anomaly_detector():
         batch_size=32,
         validation_split=0.2
     )
-    
+
     # Calculate reconstruction error threshold
     train_predictions = ae.predict(X_train)
     train_mse = np.mean(np.power(X_train - train_predictions, 2), axis=1)
     threshold = np.percentile(train_mse, 95)  # 95th percentile
-    
+
     print(f"Anomaly threshold (MSE): {threshold:.6f}")
-    
+
     # Save model and threshold
     await ae.save('./models/chiller_ae.h5')
     with open('./models/chiller_ae_threshold.json', 'w') as f:
@@ -289,11 +289,11 @@ class AnomalyDetectionService:
         # Load pre-trained models
         self.lstm = await LSTMInference.load('./models/chiller_lstm.h5')
         self.ae = await AutoEncoderInference.load('./models/chiller_ae.h5')
-        
+
         # Load thresholds
         with open('./models/chiller_ae_threshold.json') as f:
             self.ae_threshold = json.load(f)['threshold']
-    
+
     async def detect_anomalies(self, sensor_data):
         """
         Dual detection: LSTM for trend anomalies, AE for multivariate anomalies
@@ -304,19 +304,19 @@ class AnomalyDetectionService:
             'confidence': 0.0,
             'details': {}
         }
-        
+
         # LSTM: Predict next value, check if actual deviates significantly
         lstm_pred = await self.lstm.predict(sensor_data[-24:])  # Last 24 hours
         lstm_error = abs(sensor_data[-1] - lstm_pred)
         results['lstm_anomaly'] = lstm_error > 2.0  # Threshold: 2 std devs
         results['details']['lstm_error'] = float(lstm_error)
-        
+
         # Autoencoder: Check reconstruction error
         ae_pred = await self.ae.predict(sensor_data)
         ae_error = np.mean(np.power(sensor_data - ae_pred, 2))
         results['ae_anomaly'] = ae_error > self.ae_threshold
         results['details']['ae_error'] = float(ae_error)
-        
+
         # Confidence = both models agree
         if results['lstm_anomaly'] and results['ae_anomaly']:
             results['confidence'] = 0.95  # High confidence
@@ -324,7 +324,7 @@ class AnomalyDetectionService:
             results['confidence'] = 0.60  # Medium confidence
         else:
             results['confidence'] = 0.0
-        
+
         return results
 ```
 
@@ -343,7 +343,7 @@ from app.services.rag_service import RAGService
 
 async def ingest_knowledge():
     rag = RAGService()
-    
+
     # Ingest maintenance manuals
     documents = [
         {
@@ -359,7 +359,7 @@ async def ingest_knowledge():
             'metadata': {'equipment_type': 'vav', 'priority': 'medium'}
         }
     ]
-    
+
     for doc in documents:
         await rag.ingest_document(
             doc_id=doc['id'],
@@ -367,7 +367,7 @@ async def ingest_knowledge():
             content=doc['content'],
             metadata=doc['metadata']
         )
-    
+
     print(f"Ingested {len(documents)} documents")
 
 # Run ingestion
@@ -389,27 +389,27 @@ class ChatService:
             equipment_type=self._get_equipment_type(equipment_code),
             top_k=3  # Get top 3 relevant documents
         )
-        
+
         # Build context for AI model
         context = "\n".join([
             f"Documentation: {doc['title']}\n{doc['content'][:500]}..."
             for doc in relevant_docs
         ])
-        
+
         # Generate answer using retrieved context
         prompt = f"""
         Answer the following question about {equipment_code} based on the documentation:
-        
+
         Question: {user_question}
-        
+
         Relevant Documentation:
         {context}
-        
+
         Answer:
         """
-        
+
         response = await self.ai_service.query(prompt)
-        
+
         return {
             'answer': response,
             'sources': [doc['title'] for doc in relevant_docs],
@@ -444,11 +444,11 @@ RETURNS DECIMAL(3,2) AS $$
 DECLARE
     v_score DECIMAL(3,2);
 BEGIN
-    SELECT 
+    SELECT
         COALESCE(health_score, 0.5) INTO v_score
     FROM equipment
     WHERE id = p_equipment_id;
-    
+
     RETURN v_score;
 END;
 $$ LANGUAGE plpgsql;
@@ -505,13 +505,13 @@ async def log_slow_queries(request: Request, call_next):
     start = time.time()
     response = await call_next(request)
     duration = time.time() - start
-    
+
     if duration > 0.5:  # Log queries taking >500ms
         logger.warning(
             f"Slow query: {request.method} {request.url.path}",
             extra={'duration_ms': duration * 1000}
         )
-    
+
     return response
 ```
 
@@ -539,7 +539,7 @@ async def get_buildings_with_equipment():
     buildings = await building_repo.get_all()
     building_ids = [b.id for b in buildings]
     equipment_map = await equipment_repo.get_by_buildings(building_ids)
-    
+
     for building in buildings:
         building.equipment = equipment_map.get(building.id, [])
     return buildings
@@ -560,21 +560,21 @@ class CachedEquipmentRepository:
         cached = await redis.get(f"equipment:{code}")
         if cached:
             return Equipment(**cached)
-        
+
         # L2: Check memory cache (5-minute TTL)
         if code in self._memory_cache:
             return self._memory_cache[code]
-        
+
         # L3: Query database
         equipment = await db.query(
             "SELECT * FROM equipment WHERE code = $1",
             code
         )
-        
+
         # Populate caches
         await redis.set(f"equipment:{code}", equipment.dict(), ttl=300)
         self._memory_cache[code] = equipment
-        
+
         return equipment
 ```
 
@@ -592,14 +592,14 @@ async def list_equipment(
 ):
     # Parse field selection
     field_list = fields.split(',')
-    
+
     # Query with selected fields only
     equipment = await equipment_repo.get_paginated(
         skip=skip,
         limit=limit,
         fields=field_list
     )
-    
+
     return {
         'items': equipment,
         'total': await equipment_repo.count(),
@@ -646,20 +646,20 @@ async def predict_maintenance(equipment_code: str, days_ahead: int = 30) -> dict
     equipment = await equipment_repo.get_by_code(equipment_code)
     if not equipment:
         raise ValueError(f"Equipment not found: {equipment_code}")
-    
+
     # Get historical data
     history = await anomaly_repo.get_history(
         equipment_code=equipment_code,
         days=90
     )
-    
+
     # Run ML model
     predictions = await ml_service.predict_maintenance(
         equipment=equipment,
         history=history,
         days_ahead=days_ahead
     )
-    
+
     return {
         "equipment_code": equipment_code,
         "predicted_maintenance": predictions,
@@ -685,7 +685,7 @@ async def test_predict_maintenance():
         equipment_code="S002-CHILLER-B1-001",
         days_ahead=30
     )
-    
+
     assert result['equipment_code'] == "S002-CHILLER-B1-001"
     assert 'predicted_maintenance' in result
     assert 0 <= result['confidence'] <= 1
@@ -707,10 +707,10 @@ from app.services.lifecycle_orchestrator import LifecycleOrchestrator
 @pytest.mark.integration
 async def test_anomaly_to_maintenance_feedback_cycle():
     """Test full cycle: anomaly detection → WO → feedback → health update"""
-    
+
     orchestrator = LifecycleOrchestrator()
     equipment_code = "S002-CHILLER-B1-001"
-    
+
     # 1. Inject anomaly
     anomaly = SentinelAnomaly(
         source=AnomalySource.BMS_ANOMALY,
@@ -718,19 +718,19 @@ async def test_anomaly_to_maintenance_feedback_cycle():
         severity_score=0.82,
         summary="Discharge temp rising"
     )
-    
+
     # 2. Detect anomaly
     result = await orchestrator.process_anomaly(anomaly)
     assert result['status'] == 'work_order_created'
     work_order_id = result['work_order_id']
-    
+
     # 3. Simulate technician accepting and completing WO
     await orchestrator.update_work_order_status(
         work_order_id=work_order_id,
         status='in_progress',
         technician_id='tech_001'
     )
-    
+
     # 4. Provide service feedback
     feedback = ServiceFeedback(
         work_order_id=work_order_id,
@@ -740,13 +740,13 @@ async def test_anomaly_to_maintenance_feedback_cycle():
         corrective_action='Replaced compressor oil',
         health_impact=HealthImpact.POSITIVE
     )
-    
+
     updated_health = await orchestrator.record_feedback(feedback)
-    
+
     # 5. Verify health improved
     equipment = await equipment_repo.get_by_code(equipment_code)
     assert equipment.health_score > 0.7  # Should improve significantly
-    
+
     # 6. Verify maintenance history updated
     maintenance_records = await maintenance_repo.get_by_equipment(equipment_code)
     assert len(maintenance_records) > 0
@@ -778,16 +778,16 @@ export default function() {
     'list equipment status 200': (r) => r.status === 200,
     'list equipment response time < 200ms': (r) => r.timings.duration < 200,
   });
-  
+
   sleep(1);
-  
+
   // Test: Get equipment details
   resp = http.get('http://localhost:9095/api/equipment/S002-CHILLER-B1-001');
   check(resp, {
     'get equipment status 200': (r) => r.status === 200,
     'get equipment response time < 100ms': (r) => r.timings.duration < 100,
   });
-  
+
   sleep(1);
 }
 ```

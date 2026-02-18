@@ -110,7 +110,7 @@ import { authApi, type AuthUser } from '@/lib/api/auth';
 **Size:** ~80 lines
 **Types:** WorkOrder (id, code, title, priority, status, assigned_to, created_at, completed_at), EquipmentAlert (id, title, message, severity, status, created_at, acknowledged_at)
 **Integration:** Used in `MaintenanceHistoryTabs` component for failure prediction details
-**Stale Times:** 
+**Stale Times:**
 - Work orders: 60 seconds (infrequent changes)
 - Alerts: 30 seconds (more frequent updates)
 **Use Case:** Provide maintenance context in PredictionDetail modal to show past issues and service history

@@ -9,9 +9,7 @@ Tests cover:
 - End-to-end discovery-to-activation workflow
 """
 
-import json
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 from app.services.chat_tools import (
     discover_niagara_points,

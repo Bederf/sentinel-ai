@@ -11,9 +11,7 @@ Endpoints:
 """
 
 from fastapi import APIRouter, Query
-from typing import Optional, List, Dict, Any
-from datetime import datetime, timedelta
-import random
+from datetime import datetime
 
 router = APIRouter(prefix="/occupancy/analytics", tags=["occupancy-analytics"])
 
@@ -55,14 +53,14 @@ async def get_hourly_occupancy_trend(
     """
     # Generate hourly data (24 hours)
     hours = list(range(24))
-    
+
     # Use same occupancy heuristics as Phase 4
     from app.api.dali import calculate_zone_occupancy
-    
+
     # Generate data for each zone type
     zone_types = ["office", "meeting", "common", "utility", "entry"]
     zones_data = {}
-    
+
     for zone_type in zone_types:
         occupancy_by_hour = []
         for hour in hours:
@@ -74,18 +72,18 @@ async def get_hourly_occupancy_trend(
                 zone_type=zone_type
             )
             occupancy_by_hour.append(round(occupancy_percent, 1))
-        
+
         zones_data[zone_type] = occupancy_by_hour
-    
+
     # Calculate peak hours (based on office/meeting zones)
     office_occupancy = zones_data["office"]
     peak_threshold = 70  # 70% occupancy
     peak_hours = [h for h, occ in enumerate(office_occupancy) if occ >= peak_threshold]
     offpeak_hours = [h for h, occ in enumerate(office_occupancy) if occ < peak_threshold]
-    
+
     peak_avg = sum(office_occupancy[h] for h in peak_hours) / len(peak_hours) if peak_hours else 0
     offpeak_avg = sum(office_occupancy[h] for h in offpeak_hours) / len(offpeak_hours) if offpeak_hours else 0
-    
+
     return {
         "building_id": building_id,
         "days": days,
@@ -133,13 +131,13 @@ async def get_zone_utilization(
         }
     """
     # Simulate current occupancy (would use database in production)
-    from app.api.dali import calculate_zone_occupancy, get_persona_distribution
-    
+    from app.api.dali import calculate_zone_occupancy
+
     now = datetime.now()
     hour = now.hour
     day_of_week = now.weekday()
     is_weekend = day_of_week >= 5
-    
+
     # Zone configurations (from zone_display_mappings)
     zones_config = [
         {"zone_id": "zone-1", "zone_name": "Reception", "floor": 0, "max_occupancy": 6, "type": "entry"},
@@ -150,9 +148,9 @@ async def get_zone_utilization(
         {"zone_id": "zone-6", "zone_name": "Meeting-2", "floor": 1, "max_occupancy": 8, "type": "meeting"},
         {"zone_id": "zone-7", "zone_name": "Kitchen", "floor": 1, "max_occupancy": 6, "type": "common"},
     ]
-    
+
     zones_data = []
-    
+
     for zone in zones_config:
         occupancy_percent = calculate_zone_occupancy(
             hour=hour,
@@ -160,9 +158,9 @@ async def get_zone_utilization(
             is_weekend=is_weekend,
             zone_type=zone["type"]
         )
-        
+
         current_occupancy = max(0, int(zone["max_occupancy"] * occupancy_percent / 100))
-        
+
         # Determine status
         if current_occupancy == 0:
             status = "empty"
@@ -172,7 +170,7 @@ async def get_zone_utilization(
             status = "crowded"
         else:
             status = "normal"
-        
+
         zones_data.append({
             "zone_id": zone["zone_id"],
             "zone_name": zone["zone_name"],
@@ -182,7 +180,7 @@ async def get_zone_utilization(
             "utilization_percent": round(occupancy_percent, 1),
             "status": status
         })
-    
+
     return {
         "building_id": building_id,
         "timestamp": now.isoformat(),
@@ -222,27 +220,27 @@ async def get_peak_hours(
         building_id=building_id,
         days=1
     )
-    
+
     peak_hours = trend_response["daily_pattern"]["peak_hours"]
     offpeak_hours = trend_response["daily_pattern"]["offpeak_hours"]
     peak_avg = trend_response["daily_pattern"]["peak_avg_occupancy"]
     offpeak_avg = trend_response["daily_pattern"]["offpeak_avg_occupancy"]
-    
+
     # Generate recommendations based on peak pattern
     recommendations = []
-    
+
     if peak_hours:
         peak_hours_str = f"{min(peak_hours)}:00-{max(peak_hours)+1}:00"
         recommendations.append(f"Peak occupancy {peak_hours_str} ({peak_avg}% avg) - optimize HVAC/lighting")
-    
+
     if offpeak_avg < 20:
         recommendations.append("Low occupancy during offpeak (turn off lights, reduce HVAC)")
-    
+
     if peak_avg > 85:
         recommendations.append("High peak occupancy - consider staggered schedules")
-    
+
     recommendations.append("Schedule maintenance during lowest occupancy hours (nights/weekends)")
-    
+
     return {
         "building_id": building_id,
         "timestamp": datetime.now().isoformat(),

@@ -13,9 +13,8 @@ Key design decisions:
 
 import logging
 import os
-import time
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 from xml.etree import ElementTree as ET
 
 import requests

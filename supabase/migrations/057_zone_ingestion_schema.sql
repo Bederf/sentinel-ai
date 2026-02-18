@@ -16,16 +16,16 @@ CREATE TABLE zones (
     zone_type TEXT NOT NULL,                  -- e.g., "open_office", "meeting_room", "plant_room"
     typical_occupancy INTEGER,                -- Average number of occupants
     area_sqm DECIMAL(8,2),                    -- Zone area in square meters
-    
+
     -- Timestamps
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
-    
+
     -- Constraints
     CONSTRAINT unique_building_zone UNIQUE(building_id, zone_id),
     CONSTRAINT valid_zone_type CHECK (zone_type IN (
-        'open_office', 'meeting_room', 'plant_room', 'storage', 
-        'stairwell', 'corridor', 'lobby', 'restroom', 'cafeteria', 
+        'open_office', 'meeting_room', 'plant_room', 'storage',
+        'stairwell', 'corridor', 'lobby', 'restroom', 'cafeteria',
         'server_room', 'comms_room', 'mechanical', 'electrical'
     ))
 );

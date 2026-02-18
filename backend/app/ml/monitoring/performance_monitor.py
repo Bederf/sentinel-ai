@@ -116,7 +116,7 @@ class ConfusionMatrix:
             "building_code": building_code,
             "predictions_count": len(equipment_predictions),
             "alerts_count": len([
-                e for e in all_events 
+                e for e in all_events
                 if e.get("event_type") == "alert_generated"
             ]),
             "metrics": {
@@ -135,7 +135,7 @@ class ConfusionMatrix:
 
     def get_model_health_summary(self) -> Dict[str, Any]:
         """Get health summary of all active models.
-        
+
         Evaluates recent model performance and returns overall health status.
         Returns:
             Dict with model health metrics and summary.
@@ -143,18 +143,18 @@ class ConfusionMatrix:
         try:
             recent_result = self.evaluate_predictions(days_back=7)
             metrics = recent_result.get("metrics", {})
-            
+
             # Determine health status based on metrics
             accuracy = metrics.get("accuracy", 0.0)
             precision = metrics.get("precision", 0.0)
-            
+
             if accuracy >= 0.85 and precision >= 0.80:
                 status = "healthy"
             elif accuracy >= 0.75 and precision >= 0.65:
                 status = "warning"
             else:
                 status = "critical"
-            
+
             return {
                 "status": status,
                 "summary": {

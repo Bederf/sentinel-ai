@@ -1,6 +1,6 @@
 /**
  * System Health & Diagnostics API Client
- * 
+ *
  * Provides access to unified system health monitoring, historical trends,
  * and SIMBIOT-powered diagnostics.
  */
@@ -106,7 +106,7 @@ export const systemApi = {
 
   /**
    * Trigger SIMBIOT diagnostics workflow
-   * 
+   *
    * Returns immediately with diagnostic_id for polling.
    * Client should poll getDiagnosticResults() every 5 seconds until complete.
    */
@@ -119,7 +119,7 @@ export const systemApi = {
 
   /**
    * Poll diagnostic results by ID
-   * 
+   *
    * Returns current status and partial/complete results as they're available.
    * Keep polling until status is 'completed' or 'failed'.
    */

@@ -16,7 +16,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 
 from app.services.audit_logger import AuditLogger
-from app.models.audit_log import AuditActionType, AuditResultType
+from app.models.audit_log import AuditResultType
 
 logger = logging.getLogger(__name__)
 

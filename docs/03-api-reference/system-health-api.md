@@ -338,14 +338,14 @@ DIAGNOSTIC_ID="550e8400-e29b-41d4-a716-446655440000"
 while true; do
   RESULT=$(curl -s http://localhost:9095/api/system/diagnostics/$DIAGNOSTIC_ID)
   STATUS=$(echo $RESULT | jq -r '.status')
-  
+
   echo "Status: $STATUS"
-  
+
   if [ "$STATUS" = "completed" ] || [ "$STATUS" = "failed" ]; then
     echo $RESULT | jq '.'
     break
   fi
-  
+
   sleep 5
 done
 ```
@@ -703,15 +703,15 @@ async function updateHealthDashboard() {
     // Fetch current health
     const response = await axios.get('http://localhost:9095/api/system/health');
     const health = response.data;
-    
+
     // Update UI with health status
     console.log(`Overall Status: ${health.overall_status} (${health.overall_score}%)`);
-    
+
     // Show component scores
     Object.entries(health.components).forEach(([key, component]) => {
       console.log(`  ${component.name}: ${component.status} (${component.score}%)`);
     });
-    
+
     // Display alerts
     if (health.active_alerts.length > 0) {
       console.log('\nActive Alerts:');
@@ -746,10 +746,10 @@ echo "Diagnostic ID: $DIAGNOSTIC_ID"
 COMPLETE=false
 while [ "$COMPLETE" = false ]; do
   sleep 5
-  
+
   RESULT=$(curl -s http://localhost:9095/api/system/diagnostics/$DIAGNOSTIC_ID)
   STATUS=$(echo $RESULT | jq -r '.status')
-  
+
   case $STATUS in
     pending|running)
       MESSAGE=$(echo $RESULT | jq -r '.message // "Running..."')
@@ -757,14 +757,14 @@ while [ "$COMPLETE" = false ]; do
       ;;
     completed)
       echo "✅ Diagnostics completed in $(echo $RESULT | jq '.duration_seconds')s"
-      
+
       # Display findings
       echo "\n📋 Issues Found:"
       echo $RESULT | jq -r '.issues_found[]' | sed 's/^/  - /'
-      
+
       echo "\n💡 Recommendations:"
       echo $RESULT | jq -r '.recommendations[]' | sed 's/^/  - /'
-      
+
       COMPLETE=true
       ;;
     failed)
@@ -785,7 +785,7 @@ API_BASE = "http://localhost:9095/api"
 
 def analyze_errors():
     """Analyze recent critical errors"""
-    
+
     # Fetch critical errors
     response = requests.get(
         f"{API_BASE}/system/error-logs",
@@ -795,10 +795,10 @@ def analyze_errors():
             "limit": 50
         }
     )
-    
+
     errors = response.json()
     print(f"Found {errors['total']} unresolved critical errors\n")
-    
+
     # Group by component
     by_component = {}
     for log in errors['logs']:
@@ -806,7 +806,7 @@ def analyze_errors():
         if component not in by_component:
             by_component[component] = []
         by_component[component].append(log)
-    
+
     # Display summary
     for component, logs in sorted(by_component.items()):
         print(f"🔴 {component}: {len(logs)} critical errors")

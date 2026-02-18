@@ -5,11 +5,9 @@ Generates realistic time-series trend data for BMS points.
 Applies diurnal patterns, weekend variation, and degradation curves.
 """
 
-import csv
-import json
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 import pandas as pd
@@ -17,7 +15,6 @@ import pandas as pd
 from ..models import (
     SimulationConfig,
     POINT_VALUE_RANGES,
-    DEGRADATION_PATTERNS,
 )
 from ..patterns.diurnal import DiurnalPattern, DiurnalConfig
 from ..patterns.degradation import DegradationPattern

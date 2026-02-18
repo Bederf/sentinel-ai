@@ -105,7 +105,7 @@ export function BuildingModel({
           />
         </lineSegments>
       </group>
-      
+
       {/* Ambient green light for Matrix theme */}
       <pointLight position={[15, 8, 15]} color="#00FF41" intensity={0.3} distance={50} />
     </group>

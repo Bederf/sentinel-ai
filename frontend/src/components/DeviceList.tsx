@@ -224,7 +224,7 @@ export function DeviceList({ devices, selectedDevice, onDeviceSelect, onRiskClic
         {filteredDevices.map((device) => {
           const site = siteLookup[device.site_id];
           const siteName = site?.name || device.site_id;
-          
+
           // Extract site number from site_id (e.g., "site-004" -> "004", "site-001" -> "001")
           let siteNumber = "";
           const siteIdMatch = device.site_id.match(/site-(\d+)/i);
@@ -235,9 +235,9 @@ export function DeviceList({ devices, selectedDevice, onDeviceSelect, onRiskClic
             const numMatch = device.site_id.match(/(\d+)/);
             siteNumber = numMatch ? numMatch[1].padStart(3, "0") : device.site_id;
           }
-          
+
           const deviceName = device.name;
-          
+
           return (
             <button
               key={device.id}
@@ -257,7 +257,7 @@ export function DeviceList({ devices, selectedDevice, onDeviceSelect, onRiskClic
                   >
                     {deviceName}
                   </div>
-                  
+
                   {/* Site Information */}
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <div className="flex items-center gap-1">
@@ -286,7 +286,7 @@ export function DeviceList({ devices, selectedDevice, onDeviceSelect, onRiskClic
                       </>
                     )}
                   </div>
-                  
+
                   {/* Device Type and Location */}
                   <div
                     className="text-xs flex items-center gap-2 flex-wrap"
@@ -308,7 +308,7 @@ export function DeviceList({ devices, selectedDevice, onDeviceSelect, onRiskClic
                   {getSafetyIcon(device.safety_status || "unknown", device)}
                 </div>
               </div>
-              
+
               {/* Status Badge Row */}
               <div className="flex items-center gap-4 text-xs mt-2">
                 <span

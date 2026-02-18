@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from app.database.repositories.security_repository import get_security_repository
-from app.models.security import EventDirection, OccupancySource, SecurityOccupancy
+from app.models.security import OccupancySource, SecurityOccupancy
 from app.services.profile_service import get_profile_service
 
 logger = logging.getLogger(__name__)

@@ -9,7 +9,7 @@ Phase 28: SENTINEL Compliance
 
 import pytest
 from datetime import datetime, timedelta
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 from app.services.compliance_service import ComplianceService
 from app.models.compliance import RiskLevel

@@ -4,7 +4,6 @@ Tests that scoring is properly integrated into AI optimizer and API responses.
 """
 
 import pytest
-from unittest.mock import patch, AsyncMock
 from app.models.optimization import OptimizationRecommendation
 
 

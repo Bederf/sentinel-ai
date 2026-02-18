@@ -8,7 +8,7 @@ import logging
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 
-from app.models.water_meter import WaterConsumption, WaterCost, WaterTariff
+from app.models.water_meter import WaterConsumption, WaterCost
 from app.database.repositories.water_cost_repository import WaterCostRepository
 from app.database.repositories.water_consumption_repository import WaterConsumptionRepository
 

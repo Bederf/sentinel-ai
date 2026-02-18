@@ -9,7 +9,6 @@ Example: slot:/Chiller_01/Points/ChwSupplyTemp
 from typing import Any, Dict
 
 from .base import VendorAdapter
-from ..models import SITE_CODE_MAP
 
 
 class NiagaraAdapter(VendorAdapter):

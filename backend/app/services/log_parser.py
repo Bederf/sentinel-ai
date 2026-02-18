@@ -6,7 +6,7 @@ import json
 import re
 import hashlib
 from datetime import datetime
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Optional, Tuple
 from pathlib import Path
 
 from app.models.integration import (

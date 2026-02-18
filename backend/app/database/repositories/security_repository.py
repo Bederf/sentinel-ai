@@ -12,8 +12,8 @@ from pathlib import Path
 
 from app.database.supabase_client import get_supabase_client
 from app.models.security import (
-    AccessEvent, AccessPoint, AccessCard, Visitor, SecurityAlert,
-    AccessStatus, PointStatus, VisitorStatus, AlertStatus
+    AccessEvent, SecurityAlert,
+    AccessStatus, VisitorStatus, AlertStatus
 )
 
 logger = logging.getLogger(__name__)
@@ -68,34 +68,34 @@ class SecurityRepository:
         """List access events for a site."""
         try:
             query = self.client.table("access_events").select("*").eq("building_id", site)
-            
+
             if location:
                 query = query.eq("location", location)
-            
+
             query = query.order("timestamp", desc=True).limit(limit).offset(offset)
             response = query.execute()
             events = response.data
-            
+
             if after_hours:
                 events = [e for e in events if self._is_after_hours(e.get("timestamp"))]
-            
+
             # Backup to JSON
             backup = self._load_json_backup("access_events")
             backup[site] = [e for e in events]
             self._save_json_backup("access_events", backup)
-            
+
             return events
         except Exception as e:
             logger.warning(f"Supabase query failed, using JSON backup: {e}")
             backup = self._load_json_backup("access_events")
             events = backup.get(site, [])
-            
+
             if location:
                 events = [e for e in events if e.get("location") == location]
-            
+
             if after_hours:
                 events = [e for e in events if self._is_after_hours(e.get("timestamp"))]
-            
+
             return events[:limit]
 
     def get_event_by_id(self, event_id: str) -> Optional[Dict[str, Any]]:
@@ -115,11 +115,11 @@ class SecurityRepository:
     def create_event(self, event: AccessEvent) -> Optional[Dict[str, Any]]:
         """Create access event."""
         event_data = event.to_dict()
-        
+
         try:
             response = self.client.table("access_events").insert(event_data).execute()
             record = response.data[0]
-            
+
             # Backup
             backup = self._load_json_backup("access_events")
             building_id = event.location.split("-")[0]
@@ -127,7 +127,7 @@ class SecurityRepository:
                 backup[building_id] = []
             backup[building_id].append(record)
             self._save_json_backup("access_events", backup)
-            
+
             return record
         except Exception as e:
             logger.warning(f"Failed to create event in Supabase: {e}")
@@ -149,12 +149,12 @@ class SecurityRepository:
         try:
             response = self.client.table("access_points").select("*").eq("building_id", site).execute()
             points = response.data
-            
+
             # Backup
             backup = self._load_json_backup("access_points")
             backup[site] = points
             self._save_json_backup("access_points", backup)
-            
+
             return points
         except Exception as e:
             logger.warning(f"Failed to fetch access points for {site}: {e}")
@@ -192,12 +192,12 @@ class SecurityRepository:
                 .execute()
             )
             visitors = response.data
-            
+
             # Backup
             backup = self._load_json_backup("visitors")
             backup[site] = visitors
             self._save_json_backup("visitors", backup)
-            
+
             return visitors
         except Exception as e:
             logger.warning(f"Failed to fetch visitors for {site}: {e}")
@@ -253,38 +253,38 @@ class SecurityRepository:
         """Get security alerts."""
         try:
             query = self.client.table("security_alerts").select("*").eq("building_id", site)
-            
+
             if severity:
                 query = query.eq("severity", severity)
-            
+
             query = query.order("timestamp", desc=True).limit(limit)
             response = query.execute()
             alerts = response.data
-            
+
             # Backup
             backup = self._load_json_backup("security_alerts")
             backup[site] = alerts
             self._save_json_backup("security_alerts", backup)
-            
+
             return alerts
         except Exception as e:
             logger.warning(f"Failed to fetch alerts for {site}: {e}")
             backup = self._load_json_backup("security_alerts")
             alerts = backup.get(site, [])
-            
+
             if severity:
                 alerts = [a for a in alerts if a.get("severity") == severity]
-            
+
             return alerts[:limit]
 
     def create_alert(self, alert: SecurityAlert) -> Optional[Dict[str, Any]]:
         """Create security alert."""
         alert_data = alert.to_dict()
-        
+
         try:
             response = self.client.table("security_alerts").insert(alert_data).execute()
             record = response.data[0]
-            
+
             # Backup
             backup = self._load_json_backup("security_alerts")
             building_id = alert.building_id
@@ -292,7 +292,7 @@ class SecurityRepository:
                 backup[building_id] = []
             backup[building_id].append(record)
             self._save_json_backup("security_alerts", backup)
-            
+
             return record
         except Exception as e:
             logger.warning(f"Failed to create alert in Supabase: {e}")
@@ -333,7 +333,7 @@ class SecurityRepository:
         try:
             # Get recent badge access (last 30 min)
             thirty_min_ago = (datetime.now() - timedelta(minutes=30)).isoformat()
-            
+
             response = (
                 self.client.table("access_events")
                 .select("*")
@@ -342,15 +342,15 @@ class SecurityRepository:
                 .eq("status", AccessStatus.GRANTED)
                 .execute()
             )
-            
+
             recent_events = response.data
-            
+
             # Count unique people (granted access in last 30 min)
             people_in = set()
             for event in recent_events:
                 if event.get("status") == AccessStatus.GRANTED:
                     people_in.add(event.get("person_name"))
-            
+
             # Add checked-in visitors
             visitors_resp = (
                 self.client.table("visitors")
@@ -359,10 +359,10 @@ class SecurityRepository:
                 .eq("status", VisitorStatus.CHECKED_IN)
                 .execute()
             )
-            
+
             for visitor in visitors_resp.data:
                 people_in.add(visitor.get("name"))
-            
+
             return {
                 "total_occupancy": len(people_in),
                 "by_floor": {"L0": len([p for p in people_in if True])},  # Simplified

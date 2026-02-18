@@ -1,6 +1,6 @@
 """Work Orders API endpoints."""
 
-from fastapi import APIRouter, Query, HTTPException, Depends, Request
+from fastapi import APIRouter, Query, HTTPException, Depends
 from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional, List
@@ -359,7 +359,6 @@ async def get_equipment_info_for_technician(equipment_code: str):
     See 65-04 for security rationale.
     """
     from app.database.repositories.equipment_metadata_repository import EquipmentMetadataRepository
-    from app.database.supabase_client import get_supabase_client
 
     repo = EquipmentMetadataRepository()
     metadata = repo.get_equipment_metadata(equipment_code)
@@ -1017,7 +1016,7 @@ async def update_technician_work_order(
             try:
                 from app.services.notification_service import NotificationService
                 notification = NotificationService()
-                
+
                 # Get technician for this equipment
                 equipment_id = work_order.get("equipment_id")
                 if equipment_id:
@@ -1149,7 +1148,6 @@ async def get_equipment_info_for_technician(equipment_code: str):
     See 65-04 for security rationale.
     """
     from app.database.repositories.equipment_metadata_repository import EquipmentMetadataRepository
-    from app.database.supabase_client import get_supabase_client
 
     repo = EquipmentMetadataRepository()
     metadata = repo.get_equipment_metadata(equipment_code)

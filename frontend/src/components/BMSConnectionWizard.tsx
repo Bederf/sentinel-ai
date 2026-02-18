@@ -468,7 +468,7 @@ export function BMSConnectionWizard({
       });
       dispatch({ type: "SET_DISCOVERY_PHASE", phase: 4 }); // Grouping into zones...
       await new Promise(r => setTimeout(r, 300));
-      
+
       dispatch({ type: "SET_DISCOVERY", id: res.discovery_id, summary: res });
       dispatch({ type: "SET_DISCOVERY_PHASE", phase: 0 });
     } catch (err) {
@@ -513,7 +513,7 @@ export function BMSConnectionWizard({
         message: res.message,
         result: { equipment_created: res.equipment_created },
       });
-      
+
       // Launch verification wizard on success
       if (res.success) {
         // Give user a moment to see the success message

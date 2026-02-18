@@ -5,8 +5,6 @@ Tests scheduled jobs, job management, and cron triggers.
 """
 
 import pytest
-import time
-from unittest.mock import Mock, patch
 
 
 @pytest.mark.unit

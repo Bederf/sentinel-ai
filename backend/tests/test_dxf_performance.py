@@ -28,7 +28,7 @@ class TestDXFParserPerformance:
         """
         import tempfile
         import os
-        
+
         doc = ezdxf.new("R2010")
         msp = doc.modelspace()
 
@@ -72,12 +72,12 @@ class TestDXFParserPerformance:
             temp_path = f.name
 
         doc.saveas(temp_path)
-        
+
         with open(temp_path, "rb") as f:
             dxf_bytes = f.read()
 
         os.remove(temp_path)
-        
+
         return dxf_bytes
 
     @pytest.mark.asyncio
@@ -117,7 +117,6 @@ class TestDXFParserPerformance:
     @pytest.mark.asyncio
     async def test_parse_dxf_memory_efficiency(self):
         """Test DXF parsing doesn't leak memory with large files."""
-        import sys
 
         parser = get_dxf_parser_service()
         dxf_bytes = self.generate_large_dxf(equipment_count=200)

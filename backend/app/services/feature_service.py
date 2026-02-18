@@ -26,7 +26,7 @@ from app.models.feature import (
     FeatureBatchResponse,
     FeatureDefinitionsResponse,
 )
-from app.services.influxdb_service import get_influxdb_service, SensorReading
+from app.services.influxdb_service import get_influxdb_service
 
 logger = logging.getLogger(__name__)
 

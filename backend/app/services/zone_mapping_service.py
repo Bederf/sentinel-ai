@@ -87,9 +87,9 @@ class ZoneMappingService:
 
         DALI zones for site-002 (with standardized L0/L1/L2 floor codes):
         - Zone-L2-A, Zone-L2-B, etc.: Level 2 Zones
-        - Zone-L1-A, Zone-L1-B, etc.: Level 1 Zones  
+        - Zone-L1-A, Zone-L1-B, etc.: Level 1 Zones
         - Zone-L0-A, Zone-L0-B, etc.: Ground/Base Level Zones
-        
+
         Note: Older mappings used L10, L11, L12 which are migrated to L0, L1, L2
         """
         default_mappings = [
@@ -113,7 +113,7 @@ class ZoneMappingService:
             ZoneMapping("Zone-L0-C", "Zone-L0-C", "L0", "Ground Level Zone C", "open_office", 3),
             ZoneMapping("Zone-L0-D", "Zone-L0-D", "L0", "Ground Level Zone D", "open_office", 3),
             ZoneMapping("Zone-L0-E", "Zone-L0-E", "L0", "Ground Level Zone E", "open_office", 3),
-            
+
             # Basement
             ZoneMapping("Zone-B1-001", "Zone-B1-001", "B1", "Basement Level 1", "plant_room", 2),
         ]

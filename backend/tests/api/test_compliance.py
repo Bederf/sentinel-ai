@@ -9,14 +9,7 @@ Phase 28: SENTINEL Compliance
 
 import pytest
 from datetime import datetime, timedelta
-from typing import Dict, Any
 
-from app.models.compliance import (
-    ComplianceType,
-    FireEquipmentType,
-    ElectricalCompliance,
-    RiskLevel,
-)
 
 
 # ============================================================================

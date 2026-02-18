@@ -3,7 +3,7 @@ import { sitesApi, type Site } from '@/lib/api/sites';
 
 /**
  * Hook to fetch list of all sites
- * 
+ *
  * Cache: 30s staleTime, 5m gcTime
  * Deduplicates identical queries automatically via React Query
  */

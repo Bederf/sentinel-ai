@@ -10,7 +10,6 @@ Reference: BAC0 documentation (https://bac0.readthedocs.io/en/latest/)
 import asyncio
 import logging
 import os
-import time
 import uuid
 from datetime import datetime, timedelta
 from enum import Enum

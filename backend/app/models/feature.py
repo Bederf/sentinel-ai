@@ -8,7 +8,7 @@ This module defines the data models for:
 """
 
 from datetime import datetime
-from typing import Dict, List, Optional, Any, Literal
+from typing import Dict, List, Optional, Literal
 from pydantic import BaseModel, Field
 
 

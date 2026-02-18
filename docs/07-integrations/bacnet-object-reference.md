@@ -295,37 +295,37 @@ Signature 3: Response to Load Change
 def detect_controller_type(trend_data):
     """
     Analyze 48+ hours of trend data to infer control algorithm.
-    
+
     Returns: "PID", "FLC", or "Unknown"
     """
-    
+
     # Calculate variance of setpoint error over time
     error = setpoint - actual_value
     variance = std_dev(error)
-    
+
     # Count number of setpoint overshoots >1°C
     overshoots_large = count(error > 1.0)
-    
+
     # Measure average correction response time
     response_times = []
     for load_change in detected_step_changes():
         correction_time = time_to_settle_within_0_5C()
         response_times.append(correction_time)
-    
+
     avg_response = mean(response_times)
-    
+
     # Score for FLC likelihood
     flc_score = 0
-    
+
     if variance < 0.3:        # Low variance
         flc_score += 40
-    
+
     if overshoots_large < 2:  # Few large overshoots
         flc_score += 30
-    
+
     if avg_response < 180:    # Fast response (3 min)
         flc_score += 30
-    
+
     # Decision
     if flc_score > 80:
         return "FLC"

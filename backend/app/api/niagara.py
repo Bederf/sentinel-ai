@@ -14,7 +14,6 @@ from fastapi import APIRouter, HTTPException, Query
 
 from app.models.niagara import (
     OBIXAlarm,
-    OBIXAlarmRequest,
     OBIXAlarmResponse,
     OBIXConfig,
     OBIXConfigResponse,

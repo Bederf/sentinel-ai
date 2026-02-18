@@ -1,6 +1,6 @@
 /**
  * Database Status Card
- * 
+ *
  * Shows Supabase, InfluxDB, and Redis connectivity.
  */
 

@@ -85,11 +85,11 @@ RETURNS void AS $$
 BEGIN
     DELETE FROM system_health_snapshots
     WHERE timestamp < NOW() - INTERVAL '90 days';
-    
+
     -- Also cleanup old error logs (keep 180 days)
     DELETE FROM system_error_logs
     WHERE created_at < NOW() - INTERVAL '180 days' AND resolved = TRUE;
-    
+
     -- Cleanup old diagnostics (keep 30 days)
     DELETE FROM system_diagnostics
     WHERE created_at < NOW() - INTERVAL '30 days';

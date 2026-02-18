@@ -22,16 +22,16 @@ COMMENT ON COLUMN work_orders.service_provider_phone IS 'Phone of service provid
 COMMENT ON COLUMN work_orders.service_provider_specialty IS 'Specialty of service provider (hvac, electrical, plumbing, dali, fire, security, general)';
 
 -- Create indexes for escalation workflow
-CREATE INDEX IF NOT EXISTS idx_work_orders_escalation_status 
+CREATE INDEX IF NOT EXISTS idx_work_orders_escalation_status
   ON work_orders(escalated_to_service_provider, status);
 
-CREATE INDEX IF NOT EXISTS idx_work_orders_service_provider_email 
-  ON work_orders(service_provider_email) 
+CREATE INDEX IF NOT EXISTS idx_work_orders_service_provider_email
+  ON work_orders(service_provider_email)
   WHERE escalated_to_service_provider = true;
 
 -- Create view for escalated work orders
 CREATE OR REPLACE VIEW escalated_work_orders AS
-  SELECT 
+  SELECT
     wo.id,
     wo.code,
     e.code as equipment_code,

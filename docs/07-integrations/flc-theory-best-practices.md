@@ -214,7 +214,7 @@ IF (zone_error IS zero) AND (error_rate IS zero)
 ```
 Economizer FLC Logic:
 
-IF (outdoor_temp IS close_to_sat_setpoint) 
+IF (outdoor_temp IS close_to_sat_setpoint)
   AND (outdoor_temp IS warming)
   THEN (oa_damper_percent IS proportional_to_error)
 
@@ -318,11 +318,11 @@ Commissioning Protocol:
    IF overshoot > 0.5°C:
      → Reduce derivative (rate-of-change) weight
      → Narrow "normal" membership function range
-   
+
    IF response time > 5 min:
      → Increase proportional (error) weight
      → Expand "cold/warm" membership ranges
-   
+
    IF hunting/oscillation observed:
      → Add "hold" rule when error near zero
      → Increase overlap between membership functions

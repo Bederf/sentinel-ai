@@ -27,7 +27,7 @@ from app.services.bess_dispatch_engine import get_bess_dispatch_engine
 from app.services.ai_optimizer import get_ai_optimizer
 from app.services.approval_service import get_approval_service
 from app.models.module_registry import (
-    ModuleType, RecommendationType, RecommendationPriority, AIRecommendation
+    ModuleType, RecommendationPriority
 )
 from app.database.repositories.equipment_repository import get_equipment_repository
 from app.database.repositories.alert_repository import get_alert_repository

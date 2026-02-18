@@ -1,7 +1,7 @@
 """Safety API endpoints for safety rule validation and management."""
 
-from fastapi import APIRouter, HTTPException, Depends
-from typing import Dict, Any, List, Optional
+from fastapi import APIRouter, HTTPException
+from typing import Dict, Any, Optional
 from datetime import datetime
 import logging
 

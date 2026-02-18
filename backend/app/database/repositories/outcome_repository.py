@@ -7,7 +7,7 @@ for recommendation verification.
 import json
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 from datetime import datetime, timedelta
 
 from app.config.settings import settings
@@ -199,7 +199,7 @@ class OutcomeRepository:
             # In real implementation, would need to join with recommendations table
             # For now, return 0.0 as placeholder
             logger.debug(
-                f"Average accuracy calculation requires database implementation"
+                "Average accuracy calculation requires database implementation"
             )
             return 0.0
 

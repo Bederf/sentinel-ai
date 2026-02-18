@@ -10,23 +10,16 @@ Phase 28: SENTINEL Compliance
 import logging
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional, Any
-import asyncio
 
 from app.models.compliance import (
-    ComplianceType,
     RiskLevel,
-    AuditStatus,
-    FireEquipmentType,
-    ComplianceChecklistTemplate,
     ComplianceAudit,
     FireEquipmentTracking,
-    EmergencyLightTesting,
     LegionellaRiskAssessment,
     ElectricalCompliance,
-    LiftInspectionTracking,
     ComplianceStatus,
 )
-from app.models.inspection import InspectionSchedule, InspectionTask, InspectionResult
+from app.models.inspection import InspectionSchedule
 from app.database.repositories.compliance_repository import ComplianceRepository
 
 logger = logging.getLogger(__name__)

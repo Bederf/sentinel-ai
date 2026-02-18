@@ -90,14 +90,14 @@ Manages all background jobs using APScheduler's BackgroundScheduler.
 class BackgroundSchedulerService:
     def start(self):
         """Start the background scheduler (call on app startup)"""
-    
+
     def stop(self):
         """Stop the background scheduler (call on app shutdown)"""
-    
+
     def add_ml_retraining_job(self, interval_seconds: int = 86400):
         """
         Add ML model retraining job (runs daily by default).
-        
+
         Args:
             interval_seconds: How often to check for stale models
                              Default: 86400 seconds (24 hours)
@@ -133,7 +133,7 @@ class RetrainingScheduler:
     def check_all_models(self) -> List[Dict]:
         """
         Check freshness and performance of all 14 active models.
-        
+
         Returns list with:
         - model_type: 'lstm' or 'autoencoder'
         - equipment_type: 'chiller', 'ahu', 'fcu', 'vav', 'generator', 'ups', 'pump'
@@ -143,7 +143,7 @@ class RetrainingScheduler:
         - needs_retrain: Boolean flag
         - reason: Explanation of status
         """
-    
+
     def trigger_retraining(
         self,
         model_type: str,
@@ -152,16 +152,16 @@ class RetrainingScheduler:
     ) -> RetrainResult:
         """
         Trigger retraining for a specific model.
-        
+
         Args:
             model_type: 'lstm' or 'autoencoder'
             equipment_type: Equipment type (chiller, ahu, etc.)
             reason: Why retraining was triggered
-        
+
         Returns:
             RetrainResult with success status and new model ID
         """
-    
+
     def auto_retrain_stale(self) -> List[RetrainResult]:
         """
         Check all models and retrain the first stale one found.
@@ -203,34 +203,34 @@ class RetrainingScheduler:
      ├─ UPS (Autoencoder): 9 days old, R²=0.59 → FRESH (but poor) ⚠️
      ├─ Pump (LSTM): 31 days old, R²=0.73 → STALE 🚨
      └─ Pump (Autoencoder): 6 days old, R²=0.68 → FRESH ✅
-  
+
   Stale/Underperforming Models Found: 3
     1. AHU (LSTM) - age 35d
     2. FCU (Autoencoder) - age 40d, R²=0.58
     3. Pump (LSTM) - age 31d
-  
+
   Priority Order:
     (1) Missing models (if any)
     (2) Oldest models
     (3) Worst R² scores
-  
+
   Selected for Retraining: AHU (LSTM) - age 35d
-  
+
   Trigger Retraining:
     └─ Start training AHU LSTM with latest data
        └─ Training takes ~2-3 hours (runs in background thread)
        └─ API continues responding normally
        └─ Predictions/optimization unaffected
        └─ Other services unaffected
-  
+
   Log Result:
     ✅ Retraining triggered for lstm/ahu
     New model ID: lstm_ahu_20260209_060000
     Remaining stale models: fcu (autoencoder), pump (lstm)
-    
+
   Next cycle (24 hours later):
     └─ FCU (Autoencoder) will be retrained
-    
+
   Following cycle:
     └─ Pump (LSTM) will be retrained
 ```
@@ -263,19 +263,19 @@ from app.services.background_scheduler import scheduler_service
 # Example: main.py or startup module
 def startup_event():
     """Called when FastAPI app starts"""
-    
+
     # Start the background scheduler
     scheduler_service.start()
-    
+
     # Enable all background jobs
     scheduler_service.add_demo_data_job(interval_seconds=60)
     scheduler_service.add_optimization_analysis_job(interval_seconds=900)
     scheduler_service.add_prediction_generation_job(interval_seconds=300)
     scheduler_service.add_recommendation_generation_job(interval_seconds=600)
-    
+
     # 🆕 Enable ML retraining (checks daily for stale models)
     scheduler_service.add_ml_retraining_job(interval_seconds=86400)
-    
+
     logger.info("Background scheduler started with all jobs enabled")
 
 def shutdown_event():
@@ -656,7 +656,7 @@ if stale_count > 1:
         h['success'] and datetime.fromisoformat(h['triggered_at']) > datetime.now() - timedelta(days=2)
         for h in history
     )
-    
+
     if not recent_success:
         # Alert: Background retraining not working
         send_alert("⚠️ ML retraining failures - {stale_count} models stale")

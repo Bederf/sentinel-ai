@@ -6,7 +6,7 @@ For integration tests, run: pytest tests/test_zone_ingestion_api.py
 """
 
 import pytest
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Optional
 
 
 # ============= Validation Utilities =============

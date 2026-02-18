@@ -54,4 +54,3 @@ ON user_module_access (LOWER(user_email), site_code);
 
 CREATE INDEX IF NOT EXISTS idx_user_module_access_site_module
 ON user_module_access (site_code, module_type);
-

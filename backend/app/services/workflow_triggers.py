@@ -11,7 +11,6 @@ Automated triggers that connect the workflow systems:
 Phase 53-02: Automated Triggers & Workflow Automation
 """
 
-import asyncio
 import logging
 from datetime import datetime, timedelta
 from typing import Optional, Dict, List, Any, Tuple

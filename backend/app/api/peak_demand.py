@@ -5,7 +5,7 @@ Provides real-time demand monitoring and multi-module peak shaving recommendatio
 Coordinates HVAC, Solar/BESS, and Energy modules for NMD headroom management.
 """
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
 import logging
@@ -15,7 +15,6 @@ from app.services.solar_demand_service import get_solar_demand_service
 from app.services.module_registry_service import module_registry
 from app.services.approval_service import get_approval_service
 from app.models.module_registry import ModuleType
-from app.database.supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
 
@@ -116,7 +115,7 @@ async def get_demand_status(site_id: str):
             )
 
         current_demand_kw = demand_status.get("current_demand_kw", 0)
-        
+
         # PHASE 081: Fetch NMD from database (from municipal bills), fallback to demand_status or default
         nmd_limit_kva = demand_status.get("nmd_limit_kva")
         if not nmd_limit_kva:
@@ -412,7 +411,7 @@ async def get_demand_summary(site_id: str):
             except Exception as exc:
                 logger.warning(f"Failed to fetch NMD from database for summary: {exc}")
                 nmd_limit_kva = 6000  # Fallback
-        
+
         current_demand_kw = demand_status.get("current_demand_kw", 0)
         headroom_percent = ((nmd_limit_kva - current_demand_kw) / nmd_limit_kva * 100) if nmd_limit_kva > 0 else 100
 

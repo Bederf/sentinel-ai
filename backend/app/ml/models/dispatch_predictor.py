@@ -12,8 +12,7 @@ Currently uses rule-based prediction (XGBoost/TensorFlow integration pending).
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, List, Optional, Any
 
 logger = logging.getLogger(__name__)
 
@@ -164,7 +163,7 @@ class DispatchPredictor:
                 power = 2507.0  # Full power charging
                 confidence = 95.0
                 reasoning = f"Load shedding stage {load_shedding_stage}: emergency response"
-                recommendation = f"Charge immediately to 80% SOC to support grid during LS"
+                recommendation = "Charge immediately to 80% SOC to support grid during LS"
             else:
                 action = "idle"
                 confidence = 80.0

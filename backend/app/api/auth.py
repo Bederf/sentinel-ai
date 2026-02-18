@@ -27,7 +27,6 @@ from app.services.session_service import session_service
 from app.services.token_blacklist_service import token_blacklist
 from app.database.repositories.module_access_repository import get_module_access_repository
 from app.models.module_registry import ModuleType
-from app.services.lifecycle_orchestrator import get_lifecycle_orchestrator
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 

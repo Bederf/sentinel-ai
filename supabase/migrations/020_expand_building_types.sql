@@ -7,7 +7,7 @@
 ALTER TABLE buildings DROP CONSTRAINT IF EXISTS buildings_type_check;
 
 -- Add expanded constraint with all building types
-ALTER TABLE buildings ADD CONSTRAINT buildings_type_check 
+ALTER TABLE buildings ADD CONSTRAINT buildings_type_check
   CHECK (type IN ('regional_office', 'branch', 'retail', 'hospital', 'data_centre'));
 
 -- Update any legacy 'data_center' values to 'data_centre' (if they exist)

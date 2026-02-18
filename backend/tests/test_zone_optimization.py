@@ -10,14 +10,14 @@ This module tests the zone-aware optimization features including:
 
 import pytest
 from datetime import datetime
-from unittest.mock import Mock, AsyncMock, patch
+from unittest.mock import patch
 
 from app.models.device import (
-    Device, DeviceType, DeviceLocation, DeviceEquipment, DevicePoint,
-    PointType, ProtocolType, DeviceStatus, ZoneType, ExposureDirection,
+    DeviceType, DeviceLocation, DeviceEquipment, DevicePoint,
+    PointType, ProtocolType, ZoneType, ExposureDirection,
     create_device_from_dict, HVACDevice
 )
-from app.services.ai_optimizer import AIOptimizerService, ai_optimizer_service
+from app.services.ai_optimizer import AIOptimizerService
 
 
 class TestZoneEnums:

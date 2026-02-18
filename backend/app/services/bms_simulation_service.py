@@ -6,7 +6,6 @@ for testing AI responses and fallback scenarios
 import asyncio
 import json
 import random
-import time
 import math
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any

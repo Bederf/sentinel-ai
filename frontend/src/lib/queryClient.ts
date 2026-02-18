@@ -28,7 +28,7 @@ export const queryClient = new QueryClient({
         if (apiError?.status === 429) {
           return failureCount < 3;
         }
-        
+
         // Check Error message string as fallback
         if (
           error instanceof Error &&
@@ -36,7 +36,7 @@ export const queryClient = new QueryClient({
         ) {
           return failureCount < 3;
         }
-        
+
         // Network errors: retry up to 2 times
         if (
           error instanceof Error &&
@@ -44,12 +44,12 @@ export const queryClient = new QueryClient({
         ) {
           return failureCount < 2;
         }
-        
+
         // Check for network-related ApiError messages
         if (apiError?.message?.includes("NetworkError")) {
           return failureCount < 2;
         }
-        
+
         // Other errors: don't retry
         return false;
       },

@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 
 from fastapi import APIRouter, HTTPException
 
-from app.services.technician_chat import get_diagnosis_engine, DiagnosisState
+from app.services.technician_chat import get_diagnosis_engine
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/diagnosis", tags=["diagnosis"])

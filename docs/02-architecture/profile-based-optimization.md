@@ -51,8 +51,8 @@ This system:
 
 **Example Recommendation:**
 ```
-"Run CHILLER 24/7 at 18°C (maximize cooling output). 
-Bearing inspection every 90 days (monitor wear). 
+"Run CHILLER 24/7 at 18°C (maximize cooling output).
+Bearing inspection every 90 days (monitor wear).
 Estimated life remaining: 8 months before major repair needed."
 ```
 
@@ -84,9 +84,9 @@ Estimated life remaining: 8 months before major repair needed."
 
 **Example Recommendation:**
 ```
-"Maintain zone temperature 21.5±0.5°C (tight band). 
-Pre-cool ahead of high occupancy periods. 
-Humidity 45-55% RH. 
+"Maintain zone temperature 21.5±0.5°C (tight band).
+Pre-cool ahead of high occupancy periods.
+Humidity 45-55% RH.
 Estimated energy cost: R85/hour."
 ```
 
@@ -118,9 +118,9 @@ Estimated energy cost: R85/hour."
 
 **Example Recommendation:**
 ```
-"HVAC setpoint 24°C (wider band). 
-Occupancy-based: empty zones +3°C. 
-Use BESS instead of generator (cost reduction). 
+"HVAC setpoint 24°C (wider band).
+Occupancy-based: empty zones +3°C.
+Use BESS instead of generator (cost reduction).
 Estimated energy cost: R28/hour (-60%)."
 ```
 
@@ -250,7 +250,7 @@ Your objective is to minimize operational costs.
 - Maintenance: Defer non-critical items
 
 **YOUR TASK:**
-Prioritize recommendations that minimize energy cost. 
+Prioritize recommendations that minimize energy cost.
 Accept wider comfort bands (19-26°C instead of 21-23°C).
 Avoid expensive generator starts.
 ```
@@ -289,24 +289,24 @@ class RecommendationScorer:
     def score_recommendation(self, rec: Dict, profile: OptimizationProfile) -> float:
         """
         Multi-objective score = Σ(normalized_impact × weight)
-        
+
         Score = 0.0 (worst) to 1.0 (best)
         """
-        
+
         # Extract impacts from recommendation
         comfort_impact = rec.get("comfort_impact", 0)      # -2 to +2
         cost_impact = rec.get("cost_impact", 0)            # -100 to +100 (ZAR)
         health_impact = rec.get("health_impact", 0)        # -2 to +2
         energy_impact = rec.get("energy_impact", 0)        # -50 to +50 (kWh)
         maintenance_impact = rec.get("maintenance_impact", 0)  # -2 to +2
-        
+
         # Normalize to 0-1 range
         comfort_norm = (comfort_impact + 2) / 4             # -2..+2 → 0..1
         cost_norm = min(1.0, max(0.0, cost_impact / 100))   # -100..+100 → 0..1
         health_norm = (health_impact + 2) / 4
         energy_norm = min(1.0, max(0.0, energy_impact / 50))
         maintenance_norm = (maintenance_impact + 2) / 4
-        
+
         # Apply profile weights
         score = (
             comfort_norm * profile.weights.comfort +
@@ -315,7 +315,7 @@ class RecommendationScorer:
             energy_norm * profile.weights.energy +
             maintenance_norm * profile.weights.maintenance
         )
-        
+
         return score
 ```
 
@@ -373,7 +373,7 @@ if control_tier == "monitor":
 ```python
 if control_tier == "human_in_loop":
     rec.requires_approval = True  # ALL require approval
-    
+
     if operator_approves:
         rec.status = APPROVED
         await execute_recommendation(rec)

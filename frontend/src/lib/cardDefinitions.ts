@@ -1,6 +1,6 @@
 /**
  * Card Definitions
- * 
+ *
  * Defines default KPI cards and dashboard sections visibility
  * Sections can be filtered by module access via getModuleFilteredSections()
  */

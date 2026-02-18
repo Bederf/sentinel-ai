@@ -14,16 +14,14 @@ Workflow:
 
 import json
 import logging
-import uuid
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 from app.services.niagara.point_classifier import (
     ClassifiedPoint,
     ConfidenceLevel,
-    PointType,
 )
 
 logger = logging.getLogger(__name__)

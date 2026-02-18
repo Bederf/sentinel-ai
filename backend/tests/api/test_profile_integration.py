@@ -1,13 +1,11 @@
 """Integration tests for profile-based optimization end-to-end."""
 
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import patch
 from httpx import AsyncClient
 
 from app.main import app
-from app.services.profile_service import get_profile_service
 from app.services.security_occupancy_service import (
-    get_security_occupancy_service,
     SecurityOccupancyService,
 )
 

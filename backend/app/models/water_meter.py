@@ -9,8 +9,7 @@ This module defines data models for water meter integration including:
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Dict, Any, Optional, List
-from decimal import Decimal
+from typing import Dict, Any, Optional
 from uuid import uuid4
 
 

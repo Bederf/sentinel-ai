@@ -76,18 +76,18 @@ def is_public_holiday(dt: datetime) -> bool:
 def get_occupancy_factor(dt: datetime, start_hour: int, end_hour: int) -> float:
     """
     Calculate occupancy factor (0-1) based on time of day.
-    
+
     Returns a value representing building occupancy which affects
     HVAC loads, power consumption, etc.
     """
     hour = dt.hour
-    
+
     # Weekends and holidays have minimal occupancy
     if is_weekend(dt) or is_public_holiday(dt):
         if 8 <= hour <= 14:  # Some weekend activity
             return 0.15
         return 0.05
-    
+
     # Weekday patterns
     if hour < start_hour:
         return 0.1  # Night security, essential systems
@@ -108,7 +108,7 @@ def get_occupancy_factor(dt: datetime, start_hour: int, end_hour: int) -> float:
 def get_seasonal_factor(dt: datetime) -> float:
     """
     Calculate seasonal factor for cooling loads.
-    
+
     Summer (Dec-Feb) in South Africa = higher cooling demand
     Winter (Jun-Aug) = lower cooling demand
     """
@@ -131,7 +131,7 @@ def generate_temperature(
 ) -> float:
     """
     Generate realistic temperature reading.
-    
+
     Temperature varies with:
     - Time of day (cooler at night)
     - Occupancy (more people = more heat)
@@ -139,13 +139,13 @@ def generate_temperature(
     """
     # Daily temperature cycle (warmer in afternoon)
     hour_factor = math.sin((dt.hour - 6) * math.pi / 12) * 1.5
-    
+
     # Occupancy heat
     occupancy_heat = occupancy * 1.5
-    
+
     # Random noise
     noise = random.gauss(0, 0.3)
-    
+
     temp = base_temp + hour_factor + occupancy_heat + noise
     return round(temp, 1)
 
@@ -153,18 +153,18 @@ def generate_temperature(
 def generate_humidity(dt: datetime, temp: float) -> float:
     """
     Generate realistic humidity reading.
-    
+
     Higher humidity in morning, inversely related to temperature.
     """
     # Morning humidity peak
     hour_factor = math.sin((dt.hour + 6) * math.pi / 12) * 5
-    
+
     # Temperature inverse relationship
     temp_factor = (22 - temp) * 0.5
-    
+
     # Random noise
     noise = random.gauss(0, 2)
-    
+
     humidity = 50 + hour_factor + temp_factor + noise
     return round(max(30, min(70, humidity)), 1)
 
@@ -177,7 +177,7 @@ def generate_power(
 ) -> float:
     """
     Generate realistic power consumption reading.
-    
+
     Power varies with:
     - Occupancy
     - Equipment cycling
@@ -185,16 +185,16 @@ def generate_power(
     """
     # Base load (always on)
     base = base_power * 0.3
-    
+
     # Occupancy-driven load
     occ_load = base_power * 0.6 * occupancy
-    
+
     # Equipment cycling (small variations)
     cycle = math.sin(dt.hour * math.pi / 3 + random.random()) * base_power * 0.05
-    
+
     # Random noise
     noise = random.gauss(0, base_power * 0.02)
-    
+
     power = base + occ_load + cycle + noise
     return round(max(0, power), 2)
 
@@ -207,14 +207,14 @@ def generate_vibration(
 ) -> float:
     """
     Generate vibration reading with potential anomaly pattern.
-    
+
     For AHU-7 (eqp-003), gradually increase vibration to simulate
     bearing degradation.
     """
     # Normal operation noise
     noise = random.gauss(0, base_vibration * 0.1)
     vibration = base_vibration + noise
-    
+
     # Add anomaly pattern for bearing degradation
     if equipment_id == "eqp-003":
         # Vibration increases by ~40% over 3 weeks (21 days)
@@ -226,7 +226,7 @@ def generate_vibration(
             # Add occasional spikes
             if random.random() < 0.1:  # 10% chance of spike
                 vibration *= 1.15
-    
+
     return round(vibration, 2)
 
 
@@ -238,14 +238,14 @@ def generate_efficiency(
 ) -> float:
     """
     Generate efficiency reading with potential anomaly pattern.
-    
+
     For Chiller at V&A (eqp-055), gradually decrease efficiency
     to simulate refrigerant leak.
     """
     # Normal variation
     noise = random.gauss(0, 1)
     efficiency = base_efficiency + noise
-    
+
     # Add anomaly pattern for refrigerant leak
     if equipment_id == "eqp-055":
         # Efficiency drops by ~2% per week
@@ -254,7 +254,7 @@ def generate_efficiency(
             leak_days = day_index - 5
             efficiency_drop = (leak_days / 7) * 2  # 2% per week
             efficiency -= efficiency_drop
-    
+
     return round(max(50, efficiency), 1)
 
 
@@ -266,17 +266,17 @@ def generate_battery_runtime(
 ) -> float:
     """
     Generate UPS battery runtime with potential anomaly pattern.
-    
+
     For UPS at Umhlanga (eqp-095), gradually decrease runtime
     to simulate battery degradation.
     """
     # Temperature affects battery life (warmer = shorter)
     temp_factor = 1 - (get_seasonal_factor(dt) - 1) * 0.05
-    
+
     # Normal variation
     noise = random.gauss(0, base_runtime * 0.02)
     runtime = base_runtime * temp_factor + noise
-    
+
     # Add anomaly pattern for battery degradation
     if equipment_id == "eqp-095":
         # Runtime decreases ~1 minute per day
@@ -284,7 +284,7 @@ def generate_battery_runtime(
         if day_index > 10:
             degradation_days = day_index - 10
             runtime -= degradation_days * 1  # 1 minute per day
-    
+
     return round(max(5, runtime), 1)
 
 
@@ -297,17 +297,17 @@ def generate_fuel_consumption(
 ) -> float:
     """
     Generate generator fuel consumption with potential anomaly pattern.
-    
+
     For Generator at Rosebank (eqp-017), show fuel consumption spike
     to simulate injector issue.
     """
     # Load-based consumption
     load_factor = 0.3 + occupancy * 0.7
-    
+
     # Normal variation
     noise = random.gauss(0, base_consumption * 0.03)
     consumption = base_consumption * load_factor + noise
-    
+
     # Add anomaly pattern for fuel consumption spike
     if equipment_id == "eqp-017":
         # Consumption spikes by 25% after day 15
@@ -316,7 +316,7 @@ def generate_fuel_consumption(
             # Occasional larger spikes
             if random.random() < 0.15:
                 consumption *= 1.1
-    
+
     return round(consumption, 2)
 
 
@@ -324,7 +324,7 @@ def generate_sensors(equipment: list[dict]) -> list[dict]:
     """Generate sensor definitions for all equipment."""
     sensors = []
     sensor_id = 1
-    
+
     sensor_templates = {
         "ahu": [
             {"type": "temperature", "unit": "°C", "location": "supply_air"},
@@ -397,11 +397,11 @@ def generate_sensors(equipment: list[dict]) -> list[dict]:
             {"type": "power", "unit": "kW", "location": "element"},
         ],
     }
-    
+
     for eq in equipment:
         eq_type = eq["type"]
         templates = sensor_templates.get(eq_type, [])
-        
+
         for template in templates:
             sensors.append({
                 "id": f"sensor-{sensor_id:04d}",
@@ -413,7 +413,7 @@ def generate_sensors(equipment: list[dict]) -> list[dict]:
                 "name": f"{eq['name']} {template['type'].replace('_', ' ').title()}",
             })
             sensor_id += 1
-    
+
     return sensors
 
 
@@ -424,19 +424,19 @@ def generate_readings(
 ) -> list[dict]:
     """Generate 30 days of hourly readings for all sensors."""
     readings = []
-    
+
     # Create equipment lookup
     eq_lookup = {eq["id"]: eq for eq in equipment}
-    
+
     # Generate readings for each sensor
     for sensor in sensors:
         eq = eq_lookup.get(sensor["equipment_id"])
         if not eq:
             continue
-        
+
         site_id = eq["site_id"]
         start_hour, end_hour = get_site_hours(sites, site_id)
-        
+
         # Get base values based on equipment capacity
         capacity_str = eq.get("capacity", "10kW")
         try:
@@ -448,17 +448,17 @@ def generate_readings(
                 base_power = 10
         except:
             base_power = 10
-        
+
         current = START_DATE
         day_index = 0
-        
+
         while current <= END_DATE:
             occupancy = get_occupancy_factor(current, start_hour, end_hour)
             seasonal = get_seasonal_factor(current)
-            
+
             # Generate reading based on sensor type
             value = None
-            
+
             if sensor["type"] == "temperature":
                 if "supply" in sensor["location"] or "room" in sensor["location"]:
                     base_temp = 20.0  # Setpoint
@@ -479,76 +479,76 @@ def generate_readings(
                 else:
                     base_temp = 22.0
                 value = generate_temperature(current, base_temp, occupancy, eq["type"])
-            
+
             elif sensor["type"] == "humidity":
                 temp = generate_temperature(current, 22, occupancy, eq["type"])
                 value = generate_humidity(current, temp)
-            
+
             elif sensor["type"] == "power":
                 value = generate_power(current, base_power, occupancy, eq["type"])
-            
+
             elif sensor["type"] == "vibration":
                 base_vib = 2.0  # mm/s normal
                 value = generate_vibration(current, base_vib, eq["id"], day_index)
-            
+
             elif sensor["type"] == "efficiency":
                 base_eff = 92.0  # % or COP normalized
                 value = generate_efficiency(current, base_eff, eq["id"], day_index)
-            
+
             elif sensor["type"] == "battery_runtime":
                 base_runtime = 30.0  # minutes
                 value = generate_battery_runtime(current, base_runtime, eq["id"], day_index)
-            
+
             elif sensor["type"] == "fuel_consumption":
                 base_consumption = 15.0  # L/hr
                 value = generate_fuel_consumption(
                     current, base_consumption, occupancy, eq["id"], day_index
                 )
-            
+
             elif sensor["type"] == "battery_voltage":
                 value = round(random.gauss(220, 2), 1)
-            
+
             elif sensor["type"] == "fuel_level":
                 # Simulate fuel being used and refilled
                 value = round(50 + random.gauss(0, 10) + 30 * math.sin(day_index * 0.3), 1)
                 value = max(10, min(100, value))
-            
+
             elif sensor["type"] == "pressure":
                 value = round(random.gauss(450, 10), 1)
-            
+
             elif sensor["type"] == "status":
                 value = 1.0 if random.random() > 0.001 else 0.0  # Rarely false
-            
+
             elif sensor["type"] == "runtime":
                 value = round(12000 + day_index * 0.5 + occupancy * 2, 1)
-            
+
             elif sensor["type"] == "smoke_level":
                 value = round(random.gauss(0.01, 0.002), 4)
-            
+
             elif sensor["type"] == "airflow":
                 value = round(random.gauss(120, 5), 1)
-            
+
             elif sensor["type"] == "cpu_usage":
                 value = round(15 + occupancy * 30 + random.gauss(0, 5), 1)
-            
+
             elif sensor["type"] == "points_online":
                 capacity_points = int(eq.get("capacity", "100 points").split()[0])
                 value = round(capacity_points * (0.95 + random.gauss(0, 0.02)))
-            
+
             else:
                 value = round(random.gauss(50, 10), 1)
-            
+
             if value is not None:
                 readings.append({
                     "sensor_id": sensor["id"],
                     "timestamp": current.isoformat(),
                     "value": value,
                 })
-            
+
             current += timedelta(hours=1)
             if current.hour == 0:
                 day_index += 1
-    
+
     return readings
 
 
@@ -557,27 +557,27 @@ def main():
     print("Loading equipment data...")
     equipment = load_equipment()
     sites = load_sites()
-    
+
     print(f"Generating sensors for {len(equipment)} equipment items...")
     sensors = generate_sensors(equipment)
-    
+
     print(f"Generated {len(sensors)} sensors")
-    
+
     # Save sensors
     with open(DATA_DIR / "sensors.json", "w") as f:
         json.dump(sensors, f, indent=2)
     print(f"Saved sensors.json")
-    
+
     print(f"Generating 30 days of hourly readings...")
     readings = generate_readings(sensors, equipment, sites)
-    
+
     print(f"Generated {len(readings):,} readings")
-    
+
     # Save readings
     with open(DATA_DIR / "readings.json", "w") as f:
         json.dump(readings, f)
     print(f"Saved readings.json")
-    
+
     # Print summary
     print("\n=== Generation Summary ===")
     print(f"Sensors: {len(sensors)}")

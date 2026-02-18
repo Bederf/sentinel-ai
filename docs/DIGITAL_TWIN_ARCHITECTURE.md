@@ -85,16 +85,16 @@ function calculateEquipmentPosition(
 ) {
   // 1. Calculate zone centroid from desk positions
   const centroid = calculateZoneCentroid(desksInZone);
-  
+
   // 2. Apply adaptive grid layout
   const gridPosition = gridLayout(equipmentIndex, Math.ceil(Math.sqrt(desksInZone.length)));
-  
+
   // 3. Add type-specific offsets (visual separation)
   const typeOffset = getTypeOffset(equipmentType);
-  
+
   // 4. Add small jitter for visual variety
   const jitter = randomJitter(0.5);
-  
+
   return {
     x: centroid.x + gridPosition.x + typeOffset.x + jitter.x,
     z: centroid.z + gridPosition.z + typeOffset.z + jitter.z

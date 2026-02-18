@@ -240,39 +240,39 @@ export function ThresholdEditor({
             className="absolute top-0 w-px"
             style={{ left: "100%", height: "100%", background: "var(--color-sentinel-green)" }}
           />
-          
+
           {/* Numbers positioned under divider lines */}
           <div className="absolute top-full mt-1 w-full">
             {/* 0 at left edge */}
-            <span 
+            <span
               className="absolute text-xs transform -translate-x-1/2"
               style={{ left: '0%', color: "var(--color-sentinel-text-disabled)" }}
             >
               0
             </span>
             {/* Critical value under red divider */}
-            <span 
+            <span
               className="absolute text-xs transform -translate-x-1/2"
               style={{ left: `${criticalValue}%`, color: "var(--color-sentinel-text-disabled)" }}
             >
               {criticalValue}
             </span>
             {/* Warning value under amber divider */}
-            <span 
+            <span
               className="absolute text-xs transform -translate-x-1/2"
               style={{ left: `${warningValue}%`, color: "var(--color-sentinel-text-disabled)" }}
             >
               {warningValue}
             </span>
             {/* Healthy value under green divider */}
-            <span 
+            <span
               className="absolute text-xs transform -translate-x-1/2"
               style={{ left: `${healthyValue}%`, color: "var(--color-sentinel-text-disabled)" }}
             >
               {healthyValue}
             </span>
             {/* 100 at right edge */}
-            <span 
+            <span
               className="absolute text-xs transform translate-x-1/2"
               style={{ right: '0%', color: "var(--color-sentinel-text-disabled)" }}
             >

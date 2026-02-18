@@ -11,16 +11,13 @@ Phase 44: Asset Baseline Assessment
 """
 
 from typing import Dict, List, Optional, Any, Tuple
-from datetime import datetime, timedelta
-import json
+from datetime import datetime
 import logging
-from decimal import Decimal
 
 from app.models.baseline import (
     EquipmentBaseline,
     ElementBaseline,
     BaselineComparison,
-    EquipmentElement,
     ComparisonResult,
     DeviationStatus
 )

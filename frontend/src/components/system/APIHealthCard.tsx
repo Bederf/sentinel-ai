@@ -1,6 +1,6 @@
 /**
  * API Health Status Card
- * 
+ *
  * Shows status of REST API endpoints and response times.
  */
 

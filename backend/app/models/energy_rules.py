@@ -5,7 +5,7 @@ Defines data structures for the rules-based energy optimization system.
 """
 
 from pydantic import BaseModel
-from typing import Optional, List, Dict
+from typing import List, Dict
 from enum import Enum
 
 
@@ -19,7 +19,7 @@ class LearningCurvePhase(str, Enum):
 
 class BuildingState(BaseModel):
     """Current building operational state for rules evaluation."""
-    
+
     current_hour: int  # 0-23
     occupancy_percent: int  # 0-100%
     daylight_lux: int  # 0-1000+ lux
@@ -33,7 +33,7 @@ class BuildingState(BaseModel):
 
 class RuleResult(BaseModel):
     """Result of a single rule evaluation."""
-    
+
     rule_id: str  # "chiller_staging", "thermal_precooling", etc.
     description: str  # Human-readable rule description
     savings_percent: float  # Savings percentage (0-35%)
@@ -44,7 +44,7 @@ class RuleResult(BaseModel):
 
 class SystemBreakdown(BaseModel):
     """Savings breakdown by system type."""
-    
+
     hvac_kwh: float  # HVAC savings in kWh
     lighting_kwh: float  # Lighting savings in kWh
     power_kwh: float  # Power/electrical savings in kWh
@@ -52,7 +52,7 @@ class SystemBreakdown(BaseModel):
 
 class RulesEngineOutput(BaseModel):
     """Complete output from rules engine evaluation."""
-    
+
     optimised_kwh: float  # Total optimized consumption (baseline minus savings)
     delta_kwh: float  # Savings in kWh
     delta_percent: float  # Savings as percentage (0-35%)

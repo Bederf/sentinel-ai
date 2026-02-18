@@ -7,7 +7,7 @@
 BEGIN;
 
 -- Create backup of alerts in case something goes wrong
-CREATE TABLE IF NOT EXISTS alerts_backup_20260213 AS 
+CREATE TABLE IF NOT EXISTS alerts_backup_20260213 AS
 SELECT * FROM alerts WHERE created_at > NOW() - INTERVAL '7 days';
 
 -- Update alerts to use equipment code in title
@@ -25,7 +25,7 @@ WHERE a.equipment_id = e.id
   AND a.created_at > NOW() - INTERVAL '30 days';  -- Last 30 days only
 
 -- Log the changes
-SELECT 
+SELECT
     COUNT(*) as alerts_updated,
     MIN(a.created_at) as earliest_update,
     MAX(a.created_at) as latest_update
@@ -36,7 +36,7 @@ WHERE a.title LIKE '%S0%-%'  -- New format check
 COMMIT;
 
 -- Verification: Show alerts with actual equipment codes
-SELECT 
+SELECT
     a.id,
     a.severity,
     a.title,

@@ -4,8 +4,8 @@ Integrates with FastAPI for webhook verification and message handling.
 """
 
 from fastapi import APIRouter, Request, HTTPException, Query
-from handlers.whatsapp_handler import get_whatsapp_handler
-from integrations.whatsapp_service import get_whatsapp_service
+from app.handlers.whatsapp_handler import get_whatsapp_handler
+from app.integrations.whatsapp_service import get_whatsapp_service
 import logging
 from typing import Any, Dict
 

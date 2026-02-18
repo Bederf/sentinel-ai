@@ -9,11 +9,9 @@ so API endpoint functions are tested directly with mocked dependencies.
 """
 
 import pytest
-from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from app.services.niagara.bacnet_client import (
-    BACnetException,
     BACnetReadError,
     BACnetTimeoutError,
     BACnetWriteError,

@@ -2,7 +2,6 @@
 
 import json
 import logging
-import random
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional, Any
@@ -17,9 +16,6 @@ from app.services.audit_logger import AuditLogger
 from app.services.eskomsepush_service import eskomsepush_service
 from app.models.audit_log import AuditResultType
 from app.models.optimization import (
-    OptimizationRecommendation,
-    OptimizationSettings,
-    SiteOptimizationStatus,
     OptimizationStatus,
     OptimizationHistoryEntry,
 )
@@ -1321,7 +1317,6 @@ async def get_precooling_status(site_id: str) -> Dict[str, Any]:
 # ============================================================================
 
 from app.services.profile_service import get_profile_service
-from app.models.optimization import SiteProfileConfig
 
 
 class ProfileUpdateRequest(BaseModel):
@@ -1348,7 +1343,7 @@ async def list_profiles() -> Dict[str, Any]:
     try:
         profile_service = get_profile_service()
         profiles = profile_service.list_profiles()
-        
+
         return {
             "success": True,
             "profiles": profiles,
@@ -1371,13 +1366,13 @@ async def get_profile_settings(request: Request, site_id: str) -> Dict[str, Any]
     try:
         profile_service = get_profile_service()
         config = profile_service.load_site_profile_config(site_id)
-        
+
         if not config:
             raise HTTPException(
                 status_code=404,
                 detail=f"Profile config not found for site {site_id}"
             )
-        
+
         return {
             "success": True,
             "site_id": site_id,
@@ -1409,7 +1404,7 @@ async def update_profile_settings(
     """
     try:
         profile_service = get_profile_service()
-        
+
         # Load current config
         config = profile_service.load_site_profile_config(site_id)
         if not config:
@@ -1417,7 +1412,7 @@ async def update_profile_settings(
                 status_code=404,
                 detail=f"Profile config not found for site {site_id}"
             )
-        
+
         # Validate profile exists
         available_profiles = [p["id"] for p in profile_service.list_profiles()]
         if config_request.active_profile not in available_profiles:
@@ -1425,7 +1420,7 @@ async def update_profile_settings(
                 status_code=400,
                 detail=f"Invalid profile: {config_request.active_profile}. Available: {available_profiles}"
             )
-        
+
         # Validate control tier
         valid_tiers = ["monitor", "human_in_loop", "auto_execute"]
         if config_request.control_tier not in valid_tiers:
@@ -1433,11 +1428,11 @@ async def update_profile_settings(
                 status_code=400,
                 detail=f"Invalid control_tier: {config_request.control_tier}. Valid: {valid_tiers}"
             )
-        
+
         # Update config
         config.active_profile = config_request.active_profile
         config.control_tier = config_request.control_tier
-        
+
         # Save
         success = profile_service.save_site_profile_config(site_id, config)
         if not success:
@@ -1445,16 +1440,16 @@ async def update_profile_settings(
                 status_code=500,
                 detail="Failed to save profile configuration"
             )
-        
+
         logger.info(f"Updated profile for site {site_id}: {config_request.active_profile} / {config_request.control_tier}")
-        
+
         return {
             "success": True,
             "site_id": site_id,
             "config": config.to_dict(),
             "message": f"Profile updated to {config_request.active_profile} with {config_request.control_tier} control",
         }
-    
+
     except HTTPException:
         raise
     except Exception as e:
@@ -1479,7 +1474,7 @@ async def add_zone_override(
     """
     try:
         profile_service = get_profile_service()
-        
+
         # Validate profile exists
         available_profiles = [p["id"] for p in profile_service.list_profiles()]
         if request.profile not in available_profiles:
@@ -1487,7 +1482,7 @@ async def add_zone_override(
                 status_code=400,
                 detail=f"Invalid profile: {request.profile}. Available: {available_profiles}"
             )
-        
+
         # Update override
         success = profile_service.update_zone_override(
             site_id=site_id,
@@ -1495,24 +1490,24 @@ async def add_zone_override(
             profile=request.profile,
             reason=request.reason,
         )
-        
+
         if not success:
             raise HTTPException(
                 status_code=500,
                 detail="Failed to save zone override"
             )
-        
+
         config = profile_service.load_site_profile_config(site_id)
-        
+
         logger.info(f"Added zone override for {site_id}/{request.zone_id}: {request.profile}")
-        
+
         return {
             "success": True,
             "site_id": site_id,
             "config": config.to_dict(),
             "message": f"Zone {request.zone_id} override set to {request.profile}",
         }
-    
+
     except HTTPException:
         raise
     except Exception as e:
@@ -1534,25 +1529,25 @@ async def remove_zone_override(site_id: str, zone_id: str) -> Dict[str, Any]:
     """
     try:
         profile_service = get_profile_service()
-        
+
         success = profile_service.remove_zone_override(site_id, zone_id)
         if not success:
             raise HTTPException(
                 status_code=500,
                 detail="Failed to remove zone override"
             )
-        
+
         config = profile_service.load_site_profile_config(site_id)
-        
+
         logger.info(f"Removed zone override for {site_id}/{zone_id}")
-        
+
         return {
             "success": True,
             "site_id": site_id,
             "config": config.to_dict(),
             "message": f"Zone {zone_id} override removed",
         }
-    
+
     except HTTPException:
         raise
     except Exception as e:

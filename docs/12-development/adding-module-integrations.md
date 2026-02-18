@@ -109,13 +109,13 @@ async def on_integration_{source}_{target}(
 ) -> Optional[Dict[str, Any]]:
     """
     Handle {source} → {target} integration.
-    
+
     Args:
         trigger_data: Context data from source module
-        
+
     Returns:
         Result of integration action, or None if no action taken
-        
+
     Raises:
         IntegrationError: If integration cannot be executed
     """
@@ -132,17 +132,17 @@ async def on_integration_energy_hvac(
 ) -> Optional[Dict[str, Any]]:
     """
     Reduce HVAC load when on generator power.
-    
+
     Raises setpoints +2°C to reduce cooling demand during expensive
     generator operation.
     """
     # Extract trigger data from energy module
     ats_position = trigger_data.get("ats_position")  # "grid" or "generator"
     load_shed_level = trigger_data.get("load_shed_level", 0)  # 0-6
-    
+
     if ats_position != "generator":
         return None  # Not on generator, no action
-    
+
     # Calculate setpoint adjustment
     # Load shedding stage 4-6 = aggressive reduction
     if load_shed_level >= 4:
@@ -151,14 +151,14 @@ async def on_integration_energy_hvac(
         setpoint_offset = 1.5  # +1.5°C
     else:
         setpoint_offset = 1.0  # +1°C
-    
+
     # Apply to all zones
     result = await self.apply_load_shedding(
         setpoint_offset_c=setpoint_offset,
         reason="generator_power",
         duration_minutes=30
     )
-    
+
     return {
         "action": "hvac_load_shedding",
         "setpoint_offset_c": setpoint_offset,
@@ -246,7 +246,7 @@ def on_integration_energy_hvac(self, trigger_data):  # Missing async!
 class {TargetModule}Service:
     def __init__(self):
         # ... existing initialization ...
-        
+
         # Register integration handlers
         self.integration_handlers = {
             "energy_lighting_loadshed": self.on_integration_energy_lighting,
@@ -268,7 +268,7 @@ async def trigger_integration(
 ) -> Optional[Dict]:
     """
     Trigger an integration by ID.
-    
+
     1. Looks up target module service
     2. Finds handler in service.integration_handlers
     3. Invokes handler with trigger_data
@@ -276,10 +276,10 @@ async def trigger_integration(
     """
     target_service = self.services[integration.target_module]
     handler = target_service.integration_handlers.get(integration_id)
-    
+
     if handler is None:
         raise IntegrationError(f"Handler not found for {integration_id}")
-    
+
     result = await handler(trigger_data)
     return result
 ```
@@ -308,22 +308,22 @@ async def _monitor_integration_triggers(self):
             # Check trigger conditions
             ats_position = await self.get_ats_position()
             load_shed_level = await self.get_load_shed_level()
-            
+
             trigger_data = {
                 "ats_position": ats_position,
                 "load_shed_level": load_shed_level,
                 "timestamp": datetime.utcnow()
             }
-            
+
             # Trigger all active integrations from this module
             await self.integration_manager.trigger_from_source(
                 source_module="energy",
                 trigger_data=trigger_data
             )
-            
+
         except Exception as e:
             logger.error(f"Integration trigger error: {e}")
-        
+
         # Check every 30 seconds
         await asyncio.sleep(30)
 ```
@@ -340,7 +340,7 @@ async def on_occupancy_change(self, zone_id: str, occupancy: int):
         "occupancy": occupancy,
         "timestamp": datetime.utcnow()
     }
-    
+
     # Trigger HVAC and Lighting integrations
     await self.integration_manager.trigger_from_source(
         source_module="security",
@@ -359,12 +359,12 @@ class IntegrationManager:
     ) -> Dict[str, Any]:
         """
         Trigger all integrations where source_module is active.
-        
+
         Returns dict mapping integration_id → result
         """
         results = {}
         integrations = self.get_active_integrations(source=source_module)
-        
+
         for integration in integrations:
             try:
                 result = await self.trigger_integration(
@@ -375,7 +375,7 @@ class IntegrationManager:
             except Exception as e:
                 logger.error(f"Integration {integration.id} failed: {e}")
                 results[integration.id] = {"error": str(e)}
-        
+
         return results
 ```
 
@@ -407,99 +407,99 @@ from app.models.module_registry import INTEGRATION_DEFINITIONS
 @pytest.mark.integration
 class TestNewIntegration:
     """Test {source} → {target} integration."""
-    
+
     @pytest.fixture
     async def services(self):
         """Initialize services."""
         hvac_service = HVACService()
         energy_service = EnergyService()
-        
+
         # Register with integration manager
         integration_manager.register_service("hvac", hvac_service)
         integration_manager.register_service("energy", energy_service)
-        
+
         return {
             "hvac": hvac_service,
             "energy": energy_service,
             "manager": integration_manager
         }
-    
+
     async def test_integration_triggers_when_condition_met(self, services):
         """Test integration fires when source module detects condition."""
         hvac_service = services["hvac"]
         energy_service = services["energy"]
         manager = services["manager"]
-        
+
         # Setup: Mock zone setpoint getter/setter
         hvac_service.get_zone_setpoint = AsyncMock(return_value=22.0)
         hvac_service.set_zone_setpoint = AsyncMock()
-        
+
         # Trigger: Send data that matches integration condition
         trigger_data = {
             "ats_position": "generator",
             "load_shed_level": 4
         }
-        
+
         # Act: Trigger integration
         results = await manager.trigger_from_source(
             source_module="energy",
             trigger_data=trigger_data
         )
-        
+
         # Assert: Verify HVAC action taken
         assert "hvac_energy_loadshed" in results
         result = results["hvac_energy_loadshed"]
         assert result["success"] is True
         assert result["setpoint_offset_c"] == 2.0
-        
+
         # Verify setpoint was actually changed
         hvac_service.set_zone_setpoint.assert_called()
-    
+
     async def test_integration_idempotent(self, services):
         """Test calling integration multiple times is safe."""
         hvac_service = services["hvac"]
         manager = services["manager"]
-        
+
         hvac_service.set_zone_setpoint = AsyncMock()
-        
+
         trigger_data = {"ats_position": "generator", "load_shed_level": 4}
-        
+
         # Call integration twice
         result1 = await manager.trigger_from_source("energy", trigger_data)
         result2 = await manager.trigger_from_source("energy", trigger_data)
-        
+
         # Both should succeed
         assert result1["hvac_energy_loadshed"]["success"]
         assert result2["hvac_energy_loadshed"]["success"]
-        
+
         # Setpoint should be 24°C both times (idempotent)
         # not 26°C (which would happen if changes accumulated)
         assert hvac_service.set_zone_setpoint.call_count == 2
         calls = hvac_service.set_zone_setpoint.call_args_list
         assert calls[0][1]["setpoint"] == 24.0
         assert calls[1][1]["setpoint"] == 24.0
-    
+
     async def test_integration_handles_errors_gracefully(self, services):
         """Test integration doesn't crash on unexpected data."""
         hvac_service = services["hvac"]
         manager = services["manager"]
-        
+
         # Trigger with missing data
         trigger_data = {"ats_position": None}  # Missing critical field
-        
+
         # Should not raise - should return error in result
         results = await manager.trigger_from_source("energy", trigger_data)
-        
+
         assert "hvac_energy_loadshed" in results
         assert results["hvac_energy_loadshed"]["success"] is False
 
     async def test_integration_definition_complete(self):
         """Verify integration exists in INTEGRATION_DEFINITIONS."""
         integration_id = "hvac_energy_loadshed"
-        
+
         assert integration_id in INTEGRATION_DEFINITIONS
         definition = INTEGRATION_DEFINITIONS[integration_id]
-        
+
         # Verify all required fields
         assert definition["name"]
         assert definition["description"]
@@ -681,7 +681,7 @@ await self.set_setpoint("zone_1", 24.0, reason="load_shedding")  # Still 24°C
 class HVACService:
     async def on_integration_energy_hvac(self, trigger_data):
         pass
-    
+
     # Missing from __init__!
     # self.integration_handlers = {"energy_hvac": self.on_integration_energy_hvac}
 ```
@@ -693,7 +693,7 @@ class HVACService:
         self.integration_handlers = {
             "hvac_energy_loadshed": self.on_integration_energy_hvac,  # Register!
         }
-    
+
     async def on_integration_energy_hvac(self, trigger_data):
         pass
 ```
@@ -716,7 +716,7 @@ async def on_integration_energy_hvac(self, trigger_data):
     if ats_pos is None:
         logger.warning("Integration triggered without ats_position")
         return {"success": False, "reason": "missing_ats_position"}
-    
+
     load_shed = trigger_data.get("load_shed_level", 0)
     # ... rest of implementation
 ```
@@ -745,12 +745,12 @@ async def on_integration_energy_lighting(self, trigger_data):
     ats_position = trigger_data.get("ats_position")
     if ats_position != "generator":
         return None
-    
+
     # Dim all zones to 50%
     zones = await self.get_all_zones()
     for zone in zones:
         await self.set_zone_level(zone.id, level=50)
-    
+
     return {
         "action": "lighting_load_shedding",
         "zones_affected": [z.id for z in zones],
@@ -780,7 +780,7 @@ async def _monitor_integration_triggers(self):
 async def test_energy_lighting_loadshed():
     trigger_data = {"ats_position": "generator"}
     results = await manager.trigger_from_source("energy", trigger_data)
-    
+
     assert results["energy_lighting_loadshed"]["success"]
     assert lighting_service.set_zone_level.called
 ```

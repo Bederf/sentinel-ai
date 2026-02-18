@@ -15,8 +15,8 @@ Emission factors are configured per South African context:
 """
 
 import logging
-from datetime import date, timedelta
-from typing import Dict, List, Optional, Tuple
+from datetime import date
+from typing import Dict, Tuple
 
 from app.database.supabase_client import get_supabase_client
 

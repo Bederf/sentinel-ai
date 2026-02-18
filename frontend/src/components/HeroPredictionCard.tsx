@@ -35,11 +35,11 @@ export function HeroPredictionCard({ prediction, onClick }: HeroPredictionCardPr
   // Savings = how much you save by doing preventive maintenance
   const failureCost = prediction.financial_impact.potential_loss_zar;
   const preventiveCost = prediction.financial_impact.repair_cost_zar;
-  
+
   // Calculate savings: failure cost - preventive cost
   // If preventive cost is higher, there's no savings (edge case in data)
   const savings = failureCost - preventiveCost;
-  
+
   // Ensure we show positive savings only (if preventive > failure, show 0)
   const displaySavings = Math.max(0, savings);
 
@@ -196,7 +196,7 @@ export function HeroPredictionCard({ prediction, onClick }: HeroPredictionCardPr
               <div className="text-center flex flex-col items-center">
                 <div
                   className="text-lg lg:text-xl xl:text-2xl font-bold mb-2 leading-tight"
-                  style={{ 
+                  style={{
                     color: "var(--color-status-error)",
                     fontVariantNumeric: "tabular-nums",
                     letterSpacing: "-0.02em"
@@ -220,7 +220,7 @@ export function HeroPredictionCard({ prediction, onClick }: HeroPredictionCardPr
               <div className="text-center flex flex-col items-center">
                 <div
                   className="text-lg lg:text-xl xl:text-2xl font-bold mb-2 leading-tight"
-                  style={{ 
+                  style={{
                     color: "var(--color-grafana-blue)",
                     fontVariantNumeric: "tabular-nums",
                     letterSpacing: "-0.02em"
@@ -244,7 +244,7 @@ export function HeroPredictionCard({ prediction, onClick }: HeroPredictionCardPr
               <div className="text-center flex flex-col items-center">
                 <div
                   className="text-lg lg:text-xl xl:text-2xl font-bold mb-2 leading-tight"
-                  style={{ 
+                  style={{
                     color: displaySavings > 0 ? "var(--color-status-success)" : "var(--color-grafana-text-secondary)",
                     fontVariantNumeric: "tabular-nums",
                     letterSpacing: "-0.02em"
@@ -260,7 +260,7 @@ export function HeroPredictionCard({ prediction, onClick }: HeroPredictionCardPr
                 </div>
                 <div
                   className="h-1 w-full rounded-full"
-                  style={{ 
+                  style={{
                     background: displaySavings > 0 ? "var(--color-status-success)" : "var(--color-grafana-text-secondary)",
                     opacity: displaySavings > 0 ? 1 : 0.3
                   }}

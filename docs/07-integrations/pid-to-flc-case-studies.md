@@ -223,7 +223,7 @@ Energy Savings Breakdown:
   Reduced damper cycling (less modulation losses):      8,000 kWh/year
   ─────────────────────────────────────────────────────────────────
   Total annual electricity savings:                     105,000 kWh/year
-  
+
   Cost @ R 2.80/kWh (Cape Town municipal rate):        R 294,000/year
 ```
 

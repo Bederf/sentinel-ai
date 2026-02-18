@@ -8,11 +8,9 @@ to JSON settings.
 Phase: Health Score Threshold Consistency Fix
 """
 
-import json
 import logging
 from datetime import datetime, timedelta
 from typing import Dict, Optional
-from functools import lru_cache
 
 from app.database.supabase_client import get_supabase_client
 

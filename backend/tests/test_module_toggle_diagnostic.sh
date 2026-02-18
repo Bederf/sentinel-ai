@@ -84,7 +84,7 @@ if echo "$DEMO_CHECK" | grep -q '"instance_id"'; then
     echo "7. Testing asset module activation..."
     echo "  Request: POST /api/modules/activate with module_type=assets"
     echo "  Response: $(echo "$DEMO_CHECK" | grep -o '"module_type":"[^"]*"' | head -1)"
-    
+
 elif echo "$DEMO_CHECK" | grep -q "unauthorized"; then
     echo "⚠️  DEMO_MODE is DISABLED - endpoints require valid JWT tokens"
     echo "  Production users need valid authentication"

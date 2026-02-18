@@ -8,25 +8,25 @@ CREATE TABLE building_3d_configs (
   site_id TEXT NOT NULL,
   name TEXT NOT NULL,
   code TEXT,
-  
+
   -- Floor definitions: array of {level, height, width, depth, label}
   -- Example: [{level: "G", height: 4.0, width: 50, depth: 40, label: "Ground Floor"}]
   floors JSONB NOT NULL,
-  
+
   -- Equipment positions: array of {equipment_id, floor, x, y}
   -- x, y are in meters relative to floor origin (bottom-left corner)
   equipment_positions JSONB NOT NULL DEFAULT '[]'::jsonb,
-  
+
   -- Zone definitions: auto-generated from equipment positions
   -- Array of {zone_id, floor, equipment_ids, type}
   zones JSONB NOT NULL DEFAULT '[]'::jsonb,
-  
+
   -- Metadata
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   created_by TEXT,
   updated_by TEXT,
-  
+
   CONSTRAINT valid_floors CHECK (jsonb_array_length(floors) > 0),
   CONSTRAINT valid_building_name CHECK (name != '')
 );

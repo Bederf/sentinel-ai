@@ -24,10 +24,9 @@ import logging
 import random
 import statistics
 from dataclasses import dataclass, field
-from datetime import datetime, timezone, timedelta, date
+from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional, Any
 
-from app.models.solar import SolarInverter, BESSContainer
 from app.services.solar_ingestion_service import get_solar_ingestion_service
 
 logger = logging.getLogger(__name__)

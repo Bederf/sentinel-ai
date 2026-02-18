@@ -6,7 +6,7 @@ Engineers can configure how health scores are calculated per equipment type.
 
 import json
 from pathlib import Path
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 

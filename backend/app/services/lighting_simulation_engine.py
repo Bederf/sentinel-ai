@@ -17,10 +17,8 @@ Integration point: Called from thermal_simulation_engine each hour
 """
 
 import logging
-import math
-from datetime import datetime, date
-from typing import Optional, Dict, Any, List
-import json
+from datetime import datetime
+from typing import Optional, Dict, Any
 
 from app.database.supabase_client import get_supabase_client
 

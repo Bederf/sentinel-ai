@@ -14,13 +14,9 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.models.compliance import (
-    ComplianceType,
-    FireEquipmentType,
     ElectricalCompliance,
-    ComplianceAudit,
     ComplianceStatus,
 )
-from app.services.compliance_service import ComplianceService, get_compliance_service
 from app.database.repositories.compliance_repository import ComplianceRepository
 
 logger = logging.getLogger(__name__)

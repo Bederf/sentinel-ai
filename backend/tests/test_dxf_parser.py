@@ -4,7 +4,6 @@ Tests coordinate transformations, geometry utilities, and DXF parsing logic.
 """
 
 import pytest
-from pathlib import Path
 
 from app.services.geometry_utils import (
     BoundingBox,
@@ -14,7 +13,7 @@ from app.services.geometry_utils import (
     cluster_points,
     get_cluster_centroid,
 )
-from app.services.dxf_parser_service import DXFParserService, get_dxf_parser_service
+from app.services.dxf_parser_service import get_dxf_parser_service
 
 
 class TestGeometryUtils:
@@ -275,13 +274,13 @@ class TestDXFParserIntegration:
             temp_path = f.name
 
         doc.saveas(temp_path)
-        
+
         with open(temp_path, "rb") as f:
             dxf_bytes = f.read()
 
         import os
         os.remove(temp_path)
-        
+
         return dxf_bytes
 
     @pytest.mark.asyncio
@@ -324,7 +323,7 @@ class TestDXFParserIntegration:
     async def test_parse_dxf_invalid_file(self):
         """Test DXF parsing with invalid file."""
         parser = get_dxf_parser_service()
-        
+
         with pytest.raises(ValueError):
             await parser.parse_dxf_file(b"invalid dxf content", "site-002", "Test")
 
@@ -342,7 +341,7 @@ class TestDXFParserIntegration:
             temp_path = f.name
 
         doc.saveas(temp_path)
-        
+
         with open(temp_path, "rb") as f:
             dxf_bytes = f.read()
 

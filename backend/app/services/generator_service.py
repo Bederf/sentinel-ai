@@ -18,7 +18,6 @@ logger = logging.getLogger(__name__)
 
 from app.models.generator import (
     Generator, GeneratorGroup, DieselTank,
-    GeneratorEngine, GeneratorElectrical, GeneratorAlarm,
     GeneratorHealth, PredictiveIndicator
 )
 

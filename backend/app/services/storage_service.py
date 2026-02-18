@@ -1,7 +1,6 @@
 """Supabase Storage service for file uploads."""
 
 import logging
-from typing import Optional
 
 from fastapi import UploadFile
 

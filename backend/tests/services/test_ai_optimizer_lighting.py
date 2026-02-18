@@ -1,12 +1,8 @@
 """Tests for AI optimizer with DALI lighting integration."""
 
-import pytest
-from datetime import datetime
-from unittest.mock import MagicMock, AsyncMock, patch
 
 from app.services.ai_optimizer import AIOptimizerService
 from app.services.dali_service import DALIService
-from app.models.dali import ZoneOccupancy, ZoneLighting
 
 
 class TestDALIZoneDataGathering:

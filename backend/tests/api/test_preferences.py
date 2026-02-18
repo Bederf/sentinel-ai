@@ -11,9 +11,6 @@ Tests verify:
 """
 
 import pytest
-import os
-import json
-from pathlib import Path
 from fastapi.testclient import TestClient
 
 from app.main import app

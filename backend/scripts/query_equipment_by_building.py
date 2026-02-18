@@ -45,22 +45,22 @@ except Exception as e:
 try:
     print("\n3. EQUIPMENT PER BUILDING")
     print("-" * 70)
-    
+
     # Get all buildings first
     buildings = client.table("buildings").select("id, code, name").execute()
-    
+
     for building in buildings.data:
         building_id = building['id']
         building_code = building['code']
         building_name = building['name']
-        
+
         # Query equipment by building
         try:
             equip = client.table("equipment").select("*").eq("building_id", building_id).execute()
             count = len(equip.data) if equip.data else 0
             print(f"\n   {building_code} ({building_name})")
             print(f"     Equipment count: {count}")
-            
+
             if equip.data and count > 0:
                 for eq in equip.data[:3]:  # Show first 3
                     print(f"       - {eq.get('code', 'N/A')}: {eq.get('name', 'N/A')} (type: {eq.get('equipment_type', 'N/A')})")
@@ -68,7 +68,7 @@ try:
                     print(f"       ... and {count - 3} more")
         except Exception as e:
             print(f"     ERROR querying equipment: {e}")
-            
+
 except Exception as e:
     print(f"   ERROR: {e}")
 

@@ -14,8 +14,8 @@ COMMENT ON COLUMN equipment.service_provider_phone IS 'Phone number of the assig
 COMMENT ON COLUMN equipment.service_provider_specialty IS 'Specialty of the service provider (hvac, electrical, plumbing, dali, fire, security, general)';
 
 -- Create index for faster lookups by service provider
-CREATE INDEX IF NOT EXISTS idx_equipment_service_provider_email 
+CREATE INDEX IF NOT EXISTS idx_equipment_service_provider_email
   ON equipment(service_provider_email);
 
-CREATE INDEX IF NOT EXISTS idx_equipment_service_provider_specialty 
+CREATE INDEX IF NOT EXISTS idx_equipment_service_provider_specialty
   ON equipment(service_provider_specialty);

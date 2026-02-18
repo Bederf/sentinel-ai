@@ -6,10 +6,9 @@ REST API for pricing calculations, equipment types, and SLA tiers.
 """
 
 from fastapi import APIRouter, HTTPException, Query
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from decimal import Decimal
 
-from typing import List
 from app.models.pricing import (
     QuoteRequest,
     QuoteResponse,
@@ -20,11 +19,9 @@ from app.models.pricing import (
     RenewalPricingResponse,
     PricingBenchmarkResponse,
     RenewalQuote,
-    ContractComparable,
-    RenegotiationOptions,
     RenegotiationAnalysis,
 )
-from app.services.pricing_engine import PricingEngine, get_pricing_engine
+from app.services.pricing_engine import get_pricing_engine
 
 
 router = APIRouter(prefix="/api/pricing", tags=["pricing"])

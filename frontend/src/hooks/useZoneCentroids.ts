@@ -4,10 +4,10 @@ import { sitesApi, type ZoneCentroid } from '@/lib/api/sites';
 /**
  * Hook to fetch zone centroids for a building
  * Used for accurate 3D positioning of equipment in DigitalTwin
- * 
+ *
  * Cache: 5m staleTime, 30m gcTime (rarely changes)
  * Deduplicates identical queries via React Query
- * 
+ *
  * @param buildingId - Building code (e.g., 'site-002')
  * @param options.enabled - Enable/disable query (default: true)
  */

@@ -11,17 +11,14 @@ Provides endpoints for:
 """
 
 from typing import List, Optional, Dict, Any
-from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, Depends, Query, status
-from pydantic import BaseModel
 
 from app.models.baseline import (
     EquipmentBaseline,
     ElementBaseline,
     BaselineComparison,
     EquipmentElement,
-    ComparisonResult,
     ManualBaselineCaptureRequest,
     ElementBaselineCaptureRequest,
     BaselineCaptureResponse,

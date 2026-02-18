@@ -10,7 +10,6 @@ from app.database.repositories.prediction_repository import PredictionRepository
 from app.services.prediction_generator import get_prediction_generator
 from app.services.prediction_taxonomy import (
     normalize_prediction_confidence,
-    normalize_prediction_severity,
     normalize_prediction_urgency,
 )
 

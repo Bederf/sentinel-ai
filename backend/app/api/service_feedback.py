@@ -10,14 +10,12 @@ Phase 59: Service Feedback & Health Score Integration
 
 import logging
 from typing import Optional, List, Any
-from datetime import datetime
 from fastapi import APIRouter, HTTPException, Query, UploadFile, File, Form
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from app.services.feedback_collection_service import (
     get_feedback_collection_service,
     FeedbackItemType,
-    HealthImpact,
 )
 from app.database.repositories.work_order_repository import get_work_order_repository
 from app.database.repositories.equipment_repository import EquipmentRepository

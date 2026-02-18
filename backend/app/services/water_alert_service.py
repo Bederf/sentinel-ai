@@ -798,7 +798,7 @@ class WaterAlertService:
             message_lines.extend([
                 "",
                 f"Command: /water_repair_{work_order_id}",
-                f"Reply with repair details to submit feedback",
+                "Reply with repair details to submit feedback",
             ])
 
             sentry_message = "\n".join(message_lines)

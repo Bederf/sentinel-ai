@@ -4,7 +4,6 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from app.services.query_handler import QueryHandler
-from ml.conversation.intent import Intent
 
 
 @pytest.fixture

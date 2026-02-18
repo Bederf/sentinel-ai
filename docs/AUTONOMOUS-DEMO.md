@@ -140,20 +140,20 @@ Time 0:    Temperature 22.0°C - Normal operation
 Time 5:    Temperature 24.5°C - Still normal (78.6% approach)
 Time 10:   Temperature 25.8°C - Level 1 Warning (82% approach)
            → System log entry created
-           
+
 Time 15:   Temperature 26.4°C - Level 2 Alert (87.5% approach)
            → Email sent: "Temperature Alert: HVAC Unit 1"
            → Operator receives email notification
-           
+
 Time 20:   Temperature 27.1°C - Level 3 Critical (95% approach)
            → Slack: "CRITICAL: Temperature escalation at Site 002"
            → Dashboard red alert appears
            → Urgent bell icon appears
-           
+
 Time 22:   [OPERATOR RESPONSE] Increase cooling capacity
            → Technician acknowledges escalation
            → Takes manual action to increase compressor load
-           
+
 Time 25:   Temperature 26.8°C - De-escalates to Level 2
            → Operator action was effective
            → Alert conditions improving
@@ -195,25 +195,25 @@ Time 1:    Pressure 800 kPa - Compressor struggling
 Time 2:    Pressure 1050 kPa - Level 1 Warning (62.5% approach)
 Time 2.5:  Pressure 1110 kPa - Level 2 Alert (54% approach)
            → Email alert sent
-           
+
 Time 3:    Pressure 1170 kPa - Level 3 Critical (45% approach)
            → Slack urgent notification
            → Dashboard critical alert
-           
+
 Time 3.3:  Pressure 1199 kPa - 99.9% approach to limit
            → Level 4 EMERGENCY TRIGGERED
            → Autonomous emergency stop activated
-           
+
 Time 3.5:  AUTONOMOUS STOP EXECUTED
            → Compressor disabled
            → Relief valve opens (mechanical fail-safe)
            → Pressure controlled by relief valve
            → Equipment safe
-           
+
 Time 5:    Pressure 950 kPa (decreasing)
            → Relief valve working correctly
            → Equipment safe for now
-           
+
 Time 10:   Pressure 600 kPa (stabilized)
            → System in safe state
            → Manual inspection required before restart
@@ -438,4 +438,3 @@ A: "Escalation system gives operators time to respond. If situation exceeds thre
 
 **Q: Is this real or demo?**
 A: "This is a fully functional system. The demo scenarios are realistic simulations, but the architecture is production-ready."
-

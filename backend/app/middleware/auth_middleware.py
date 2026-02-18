@@ -511,7 +511,7 @@ async def _load_user_entitlements(auth_ctx: AuthContext) -> None:
         auth_ctx: AuthContext object to populate with entitlements
     """
     if not auth_ctx.email:
-        logger.debug(f"No email in auth context, skipping entitlements load")
+        logger.debug("No email in auth context, skipping entitlements load")
         return
 
     try:
@@ -888,12 +888,11 @@ def require_module(*required_modules: 'ModuleType'):
 
     Returns:
         FastAPI dependency function
-    
+
     Raises:
         HTTPException 403 if modules not active
     """
     # Import here to avoid circular imports
-    from app.models.module_registry import ModuleType
     from app.services.module_registry_service import module_registry
 
     async def _dependency(request: Request) -> AuthContext:

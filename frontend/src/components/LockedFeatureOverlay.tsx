@@ -1,11 +1,11 @@
 /**
  * LockedFeatureOverlay Component
- * 
+ *
  * Reusable wrapper that gates features by module activation.
- * 
+ *
  * If module is active: renders child component normally
  * If module is inactive: renders greyed-out child + upgrade prompt with savings data
- * 
+ *
  * Usage:
  * <LockedFeatureOverlay module="control" featureName="Temperature Setpoint">
  *   <TemperatureControl {...props} />
@@ -21,16 +21,16 @@ import { formatCurrencyZAR, formatPercentage } from '@/lib/locale'
 interface LockedFeatureOverlayProps {
   /** Module required to access this feature (e.g., 'control', 'maintenance', 'solar') */
   module: string
-  
+
   /** Human-readable feature name for the prompt */
   featureName: string
-  
+
   /** Child component(s) to render (shown normally if module active, greyed if inactive) */
   children: ReactNode
-  
+
   /** Optional custom message to show in upgrade prompt */
   customMessage?: string
-  
+
   /** Optional callback when user clicks "Request Activation" */
   onRequestActivation?: () => void
 }

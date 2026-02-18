@@ -16,8 +16,7 @@ Specification:
 """
 
 import pytest
-from datetime import datetime, timedelta
-from unittest.mock import MagicMock, patch
+from datetime import datetime
 from fastapi import Request
 from starlette.testclient import TestClient
 
@@ -128,7 +127,6 @@ class TestBruteForceProtection:
 
     def test_check_brute_force_resets_after_15_minutes(self):
         """Verify lockout expires after 15 minute window."""
-        from unittest.mock import patch
         from datetime import datetime, timedelta
 
         email = "test-expiry@example.com"

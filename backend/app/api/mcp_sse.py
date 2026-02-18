@@ -22,7 +22,7 @@ import asyncio
 import json
 import logging
 import time
-from typing import Any, Dict, Optional
+from typing import Dict, Optional
 
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
@@ -220,7 +220,7 @@ async def mcp_sse_endpoint():
     SSE endpoint for MCP protocol with robust keep-alive.
 
     Claude connects to this endpoint via SSE to use SIMBIOT tools.
-    
+
     Keep-alive strategy:
     - SSE comment every 5 seconds (inexpensive, keeps proxies/firewalls active)
     - Heartbeat ping every 15 seconds (application-level heartbeat)
@@ -228,7 +228,7 @@ async def mcp_sse_endpoint():
     """
     server = get_sse_server()
     logger.info("New SSE MCP client connected")
-    
+
     return StreamingResponse(
         server.event_stream(),
         media_type="text/event-stream",

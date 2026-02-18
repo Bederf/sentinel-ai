@@ -6,7 +6,7 @@ Follows the same pattern as solar_ingestion_service.py and energy_centre_service
 
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Dict, List, Optional
 from pathlib import Path
 import json
@@ -14,7 +14,6 @@ import json
 from app.models.water_meter import WaterMeter, WaterConsumption
 from app.services.water_meter_adapter import create_water_meter_adapter
 from app.database.repositories.water_consumption_repository import WaterConsumptionRepository
-from app.database.supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
 

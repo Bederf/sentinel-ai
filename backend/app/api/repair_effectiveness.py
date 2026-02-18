@@ -37,7 +37,6 @@ from app.services.followup_scheduler import (
     get_followup_scheduler,
     FollowupTask,
     CostBenefitAnalysis,
-    EscalationRecord,
 )
 
 logger = logging.getLogger(__name__)

@@ -18,7 +18,7 @@ limiter = Limiter(key_func=get_remote_address)
 @limiter.limit("1000/minute")
 async def get_model_status(request: Request):
     """Check all models for staleness and performance issues.
-    
+
     Rate limit: 1000 requests/minute
     """
     from ml.training.retraining_scheduler import get_retraining_scheduler
@@ -43,7 +43,7 @@ async def trigger_retraining(
     reason: str = Query("manual", description="Reason for retraining"),
 ):
     """Trigger model retraining (runs in background).
-    
+
     Rate limit: 100 requests/minute (CPU-intensive)
     """
     from ml.training.retraining_scheduler import get_retraining_scheduler
@@ -65,7 +65,7 @@ async def trigger_retraining(
 @limiter.limit("1000/minute")
 async def get_retrain_history(request: Request):
     """Get history of retraining operations.
-    
+
     Rate limit: 1000 requests/minute
     """
     from ml.training.retraining_scheduler import get_retraining_scheduler
@@ -81,7 +81,7 @@ async def evaluate_performance(
     building_code: str = Query("site-002", description="Building to evaluate"),
 ):
     """Evaluate prediction accuracy against actual outcomes.
-    
+
     Rate limit: 1000 requests/minute
     """
     from ml.monitoring.performance_monitor import get_performance_monitor
@@ -93,7 +93,7 @@ async def evaluate_performance(
 @limiter.limit("1000/minute")
 async def get_model_health(request: Request):
     """Get health summary of all active models.
-    
+
     Rate limit: 1000 requests/minute (was hitting 429 with global 200/min)
     """
     from ml.monitoring.performance_monitor import get_performance_monitor
@@ -108,7 +108,7 @@ async def get_performance_trend(
     limit: int = Query(10, description="Number of recent evaluations"),
 ):
     """Get recent performance evaluation history.
-    
+
     Rate limit: 1000 requests/minute
     """
     from ml.monitoring.performance_monitor import get_performance_monitor
@@ -125,7 +125,7 @@ async def create_ab_test(
     candidate_model_id: str = Query(..., description="Candidate model ID to test"),
 ):
     """Create a new A/B test between current active and candidate model.
-    
+
     Rate limit: 100 requests/minute (CPU-intensive)
     """
     from ml.ab_testing.ab_test_manager import get_ab_test_manager
@@ -142,7 +142,7 @@ async def create_ab_test(
 @limiter.limit("600/minute")
 async def evaluate_ab_test(request: Request, test_id: str):
     """Evaluate A/B test results.
-    
+
     Rate limit: 600 requests/minute
     """
     from ml.ab_testing.ab_test_manager import get_ab_test_manager
@@ -159,7 +159,7 @@ async def evaluate_ab_test(request: Request, test_id: str):
 @limiter.limit("100/minute")
 async def promote_ab_test(request: Request, test_id: str):
     """Promote the candidate model from an A/B test to active.
-    
+
     Rate limit: 100 requests/minute (CPU-intensive)
     """
     from ml.ab_testing.ab_test_manager import get_ab_test_manager
@@ -179,7 +179,7 @@ async def list_ab_tests(
     status: Optional[str] = Query(None, description="Filter by status: running, completed, promoted, cancelled"),
 ):
     """List all A/B tests.
-    
+
     Rate limit: 1000 requests/minute
     """
     from ml.ab_testing.ab_test_manager import get_ab_test_manager

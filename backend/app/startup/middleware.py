@@ -124,6 +124,7 @@ def _get_cors_headers(request: Request | None = None) -> dict:
 
 def register_exception_handlers(app: FastAPI) -> None:
     """Register exception handlers for the application."""
+
     @app.exception_handler(RateLimitExceeded)
     async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
         """Return 429 with Retry-After header when rate limit exceeded."""
@@ -185,9 +186,7 @@ def register_middleware(app: FastAPI) -> None:
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         if not settings.debug:
-            response.headers["Strict-Transport-Security"] = (
-                "max-age=31536000; includeSubDomains"
-            )
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
         return response
 
     # Global authentication enforcement (Phase 58-03 C-1)
@@ -202,11 +201,7 @@ def register_middleware(app: FastAPI) -> None:
             return await call_next(request)
 
         # Skip non-API routes and public paths
-        if (
-            path in _PUBLIC_PATHS
-            or path.startswith(_PUBLIC_PREFIXES)
-            or not path.startswith("/api/")
-        ):
+        if path in _PUBLIC_PATHS or path.startswith(_PUBLIC_PREFIXES) or not path.startswith("/api/"):
             return await call_next(request)
 
         # Allow /api/sites/* with Sentry bot API key

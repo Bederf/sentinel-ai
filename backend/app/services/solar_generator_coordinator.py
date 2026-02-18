@@ -25,7 +25,7 @@ Load shedding coordination:
 import logging
 import random
 from dataclasses import dataclass, field
-from datetime import datetime, date, timezone, timedelta
+from datetime import datetime, timezone, timedelta
 from enum import Enum
 from typing import Dict, List, Optional, Any
 

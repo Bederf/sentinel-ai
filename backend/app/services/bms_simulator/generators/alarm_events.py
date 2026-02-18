@@ -8,17 +8,14 @@ and degradation patterns.
 import json
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 from dataclasses import dataclass, asdict
-import random
 
 import numpy as np
 
 from ..models import (
     SimulationConfig,
-    AlarmSeverity,
     EQUIPMENT_ALARM_PROFILES,
-    POINT_VALUE_RANGES,
 )
 from ..patterns.degradation import DegradationPattern
 from .point_list import PointListExporter

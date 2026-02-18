@@ -18,9 +18,7 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List, Callable
 from dataclasses import dataclass, field
 from enum import Enum
-import json
 
-from app.database.supabase_client import get_supabase_client
 from app.database.repositories.equipment_repository import EquipmentRepository
 from app.database.repositories.prediction_repository import PredictionRepository
 from app.database.repositories.work_order_repository import get_work_order_repository
@@ -1408,7 +1406,6 @@ class LifecycleOrchestrator:
     async def _notify_sentry(self, equipment: Dict, fault_info: Dict, work_order_code: str):
         """Send notification to Sentry bot."""
         try:
-            from app.services.sentry_integration.work_order_notifier import notify_technician_of_work_order
 
             # This would send actual Telegram message
             # For simulation, we just log it

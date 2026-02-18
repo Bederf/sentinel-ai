@@ -11,8 +11,8 @@ Integrates with:
 """
 
 import logging
-from datetime import datetime, date, timedelta
-from typing import Dict, Any, Optional, List
+from datetime import datetime, date
+from typing import Dict, Any, Optional
 from dataclasses import dataclass
 
 from app.database.supabase_client import get_supabase_client

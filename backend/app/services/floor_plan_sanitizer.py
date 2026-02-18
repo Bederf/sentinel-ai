@@ -14,15 +14,11 @@ Approach: Geometric Abstraction (Tier 1 Security)
 - Rebuild lookup table locally for re-identification
 """
 
-import io
-import json
 import logging
-from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Optional, Tuple
 
 import cv2
 import numpy as np
-from PIL import Image
 
 logger = logging.getLogger(__name__)
 

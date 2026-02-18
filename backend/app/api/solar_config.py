@@ -142,7 +142,7 @@ def validate_equipment_code(code: str, expected_type: str) -> None:
     # Sequence/ID: Either 3 digits (e.g., 001) or text identifier (e.g., GRID)
     if not code:
         raise ValueError("Equipment code is required")
-    
+
     pattern = r"^S\d{3}-[A-Z]+-[A-Z0-9]{1,2}-(?:\d{3}|[A-Z]+)$"
     if not re.match(pattern, code):
         raise ValueError(f"Invalid equipment code format: {code}")

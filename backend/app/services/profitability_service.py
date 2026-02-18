@@ -7,7 +7,7 @@ Phase 51: Profitability Dashboards & Analytics
 """
 
 import logging
-from datetime import date, datetime
+from datetime import date
 from typing import Any, Dict, List, Optional
 
 from app.models.contract import (

@@ -90,16 +90,16 @@ if [ ! -z "$TASK_ID" ]; then
         if [ "$RUNNING" = "false" ]; then
             SIM_STATUS="not running"
         fi
-        
+
         printf "\r[%d:%02d] Status: %-10s Progress: %3d%%" $((ELAPSED/60)) $((ELAPSED%60)) "$SIM_STATUS" "$PROGRESS"
-        
+
         # If simulation is complete, break loop
         if [ "$SIM_STATUS" = "complete" ] || [ "$PROGRESS" = "100" ]; then
             echo ""
             echo "✓ Simulation complete!"
             break
         fi
-        
+
         sleep 5
         ELAPSED=$((ELAPSED + 5))
     done

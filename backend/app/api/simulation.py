@@ -3,15 +3,14 @@ Simulation API endpoints for BMS Intelligence
 Provides control and access to simulated equipment data
 """
 
-from fastapi import APIRouter, HTTPException, Depends, Query
-from typing import List, Dict, Any, Optional
+from fastapi import APIRouter, HTTPException, Query
+from typing import Optional
 from datetime import datetime
 import logging
 import random
 
 from app.services.bms_simulation_service import create_simulation_service
 from app.services.health_threshold_service import get_health_status
-from app.models.device import Device, DeviceValue
 
 logger = logging.getLogger(__name__)
 
@@ -506,7 +505,6 @@ async def trigger_equipment_maintenance(equipment_id: str):
 from app.services.equipment_alert_service import get_equipment_alert_service
 from app.services.prediction_generator import get_prediction_generator
 from app.database.repositories.prediction_repository import PredictionRepository
-from app.database.repositories.alert_repository import AlertRepository
 from app.services.maintenance_recommender import get_maintenance_recommender
 from app.services.module_registry_service import ModuleRegistryService
 from app.models.module_registry import (

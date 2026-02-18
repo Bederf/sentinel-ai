@@ -1,6 +1,6 @@
 /**
  * BMS Connectivity Status Card
- * 
+ *
  * Shows connectivity status of Niagara, BACnet, ObiX, and DALI systems.
  */
 

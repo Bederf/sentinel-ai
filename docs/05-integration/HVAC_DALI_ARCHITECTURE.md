@@ -825,4 +825,3 @@ Key files in SENTINEL codebase:
 - `app/services/ai_optimizer.py` - Forecast + recommendations
 - `app/api/hvac.py` - HVAC endpoints
 - `app/api/dali.py` - DALI endpoints
-

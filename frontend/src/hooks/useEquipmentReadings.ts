@@ -73,12 +73,12 @@ function getMockReadings(equipmentId: string): EquipmentReadings {
 
 /**
  * Fetch sensor readings for equipment
- * 
+ *
  * Strategy:
  * 1. Try to fetch from devicesApi (real device data)
  * 2. Fall back to mock data if device not available
  * 3. Refresh every 2 seconds for real-time updates
- * 
+ *
  * TODO: Integrate with InfluxDB timeseries data for historical trends
  */
 export function useEquipmentReadings(equipmentId: string) {

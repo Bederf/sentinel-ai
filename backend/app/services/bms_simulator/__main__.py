@@ -27,11 +27,10 @@ import argparse
 import json
 import logging
 import sys
-from datetime import date, datetime, timedelta
+from datetime import datetime
 
 from .models import SimulationConfig, VendorType
 from .simulator import BMSSimulator
-from .patterns.climate import CLIMATE_PROFILES
 
 
 def setup_logging(verbose: bool = False) -> None:

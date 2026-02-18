@@ -3,7 +3,6 @@
 Ensures that scoring doesn't create unacceptable latency in recommendations.
 """
 
-import pytest
 import time
 import random
 from app.services.recommendation_scorer import RecommendationScorer

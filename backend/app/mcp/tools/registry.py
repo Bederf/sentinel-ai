@@ -31,10 +31,10 @@ def get_all_tools() -> List[Dict[str, Any]]:
         List of tool metadata dicts with name, description, and input schema
     """
     tools = []
-    
+
     # Code search and fetch tools
     tools.extend(get_code_tools())
-    
+
     # TODO: Add other domain tools as they're modularized
     # tools.extend(get_core_tools())
     # tools.extend(get_operations_tools())
@@ -42,7 +42,7 @@ def get_all_tools() -> List[Dict[str, Any]]:
     # tools.extend(get_onboarding_tools())
     # tools.extend(get_ai_tools())
     # tools.extend(get_solar_tools())
-    
+
     return tools
 
 
@@ -54,10 +54,10 @@ def get_all_handlers() -> Dict[str, Callable]:
         Dict of {tool_name: async_handler_function}
     """
     handlers = {}
-    
+
     # Code search and fetch handlers
     handlers.update(get_code_handlers())
-    
+
     # TODO: Add other domain handlers as they're modularized
     # handlers.update(get_core_handlers())
     # handlers.update(get_operations_handlers())
@@ -65,5 +65,5 @@ def get_all_handlers() -> Dict[str, Callable]:
     # handlers.update(get_onboarding_handlers())
     # handlers.update(get_ai_handlers())
     # handlers.update(get_solar_handlers())
-    
+
     return handlers

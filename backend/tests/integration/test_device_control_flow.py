@@ -17,42 +17,42 @@ class TestDeviceControlFlow:
         devices_response = test_client.get("/api/devices")
         assert devices_response.status_code == 200
         devices = devices_response.json()
-        
+
         if not devices:
             pytest.skip("No devices available for testing")
-        
+
         device_id = devices[0]["id"]
-        
+
         # Step 2: Get device details
         device_response = test_client.get(f"/api/devices/{device_id}")
         assert device_response.status_code == 200
         device = device_response.json()
-        
+
         # Step 3: Find a writable point
         if "points" not in device:
             pytest.skip("Device has no points")
-        
+
         writable_point = None
         for point_name, point_data in device["points"].items():
             if point_data.get("writable", False):
                 writable_point = point_name
                 break
-        
+
         if not writable_point:
             pytest.skip("Device has no writable points")
-        
+
         # Step 4: Validate control action
         validate_data = {
             "point": writable_point,
             "value": 22.0,
         }
         validate_response = test_client.post(
-            f"/api/safety/validate",
+            "/api/safety/validate",
             json={"device_id": device_id, **validate_data}
         )
         # Validation may pass or fail depending on safety rules
         assert validate_response.status_code in [200, 400]
-        
+
         # Step 5: Execute control action
         control_data = {
             "point": writable_point,
@@ -64,12 +64,12 @@ class TestDeviceControlFlow:
             json=control_data
         )
         assert control_response.status_code in [200, 201, 400]
-        
+
         # Step 6: Verify audit log entry
         audit_response = test_client.get("/api/audit/logs?page=1&page_size=10")
         assert audit_response.status_code == 200
         audit_data = audit_response.json()
-        
+
         # Should have at least one entry if control succeeded
         if control_response.status_code in [200, 201]:
             assert "entries" in audit_data
@@ -88,30 +88,30 @@ class TestDeviceControlFlow:
         devices_response = test_client.get("/api/devices")
         if devices_response.status_code != 200:
             pytest.skip("No devices available")
-        
+
         devices = devices_response.json()
         if not devices:
             pytest.skip("No devices available")
-        
+
         device_id = devices[0]["id"]
         device_response = test_client.get(f"/api/devices/{device_id}")
         if device_response.status_code != 200:
             pytest.skip("Device not found")
-        
+
         device = device_response.json()
         if "points" not in device:
             pytest.skip("Device has no points")
-        
+
         # Try to set an extreme value that should be blocked
         writable_point = None
         for point_name, point_data in device["points"].items():
             if point_data.get("writable", False):
                 writable_point = point_name
                 break
-        
+
         if not writable_point:
             pytest.skip("Device has no writable points")
-        
+
         # Try extreme value (should be blocked by safety rules)
         control_data = {
             "point": writable_point,
@@ -122,10 +122,10 @@ class TestDeviceControlFlow:
             f"/api/devices/{device_id}/control",
             json=control_data
         )
-        
+
         # Should be blocked (400) or allowed with warning
         assert control_response.status_code in [200, 201, 400, 422]
-        
+
         # If blocked, verify error message
         if control_response.status_code in [400, 422]:
             error_data = control_response.json()

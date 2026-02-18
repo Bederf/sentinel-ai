@@ -74,8 +74,8 @@
 
 ### Option 1: Let Serena Complete the Integration
 ```
-Ask Claude: "Complete the DALI dashboard integration in Dashboard.tsx - 
-update the DashboardSectionId type, add the renderDaliIntelligence 
+Ask Claude: "Complete the DALI dashboard integration in Dashboard.tsx -
+update the DashboardSectionId type, add the renderDaliIntelligence
 function, and register it in sectionRenderers and sectionOrder."
 ```
 
@@ -130,7 +130,7 @@ curl http://localhost:9095/api/dali/simulation?site_id=site-002
    ```bash
    # Terminal 1
    cd backend && DEMO_MODE=true python -m uvicorn app.main:app --reload --port 9095
-   
+
    # Terminal 2
    cd frontend && npm run dev
    ```
@@ -193,7 +193,7 @@ curl http://localhost:9095/api/dali/simulation?site_id=site-002
 ## Rollback Plan
 
 If something breaks:
-1. Remove `dali-intelligence` from `sectionOrder` 
+1. Remove `dali-intelligence` from `sectionOrder`
 2. Comment out `renderDaliIntelligence` function
 3. Remove from `sectionRenderers` map
 4. Remove from `DashboardSectionId` type

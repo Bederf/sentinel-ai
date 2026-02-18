@@ -687,4 +687,3 @@ cat backend/.env | grep -v "=sk-" | head -20
 - **React Query guide:** `frontend/README.md`
 - **Backend README:** `backend/README_MCP_INTEGRATION.md`
 - **Project memory:** `/home/bederf/.claude/projects/-opt-bms-intelligence/memory/MEMORY.md`
-

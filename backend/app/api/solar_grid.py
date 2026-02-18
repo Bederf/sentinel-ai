@@ -14,9 +14,7 @@ from app.api.dependencies.module_access import require_active_module
 from app.models.module_registry import ModuleType
 from app.services.grid_parameters import get_grid_parameters_service
 from app.services.grid_compliance_service import (
-    get_monitoring_engine,
     get_load_shed_scheduler,
-    GridParameters,
 )
 from app.database.supabase_client import get_supabase_client
 

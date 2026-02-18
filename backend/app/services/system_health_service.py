@@ -8,10 +8,9 @@ This service provides:
 """
 
 import asyncio
-import json
 import uuid
 from datetime import datetime, timedelta
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any
 
 import httpx
 
@@ -60,7 +59,7 @@ class SystemHealthService:
 
         # Calculate weighted overall score
         # Weights: BMS 40%, API 30%, Integration 20%, Cache 10% (total = 1.0)
-        
+
         weights = {
             # BMS Connectivity (40% total)
             "niagara_connectivity": 0.15,
@@ -77,7 +76,7 @@ class SystemHealthService:
         }
 
         weighted_score = 0.0
-        
+
         # Calculate weighted score using actual component scores
         # Scores are already 0-100, weights sum to 1.0
         for component, weight in weights.items():

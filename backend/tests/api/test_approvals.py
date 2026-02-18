@@ -10,12 +10,10 @@ Tests cover:
 """
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
-from datetime import datetime
+from unittest.mock import AsyncMock, MagicMock
 
 from app.models.recommendation import Recommendation, RecommendationStatus
-from app.models.approval import ApprovalResponse
-from app.services.approval_service import ApprovalService, ApprovalResult
+from app.services.approval_service import ApprovalService
 
 
 @pytest.fixture

@@ -14,7 +14,7 @@
 
 **Demo:**
 > "Let me show you how SENTINEL helps manage building assets end-to-end.
-> 
+>
 > Let's start by onboarding a new building. I'll use our SIMBIOT MCP Server to import equipment data from a BACnet export."
 
 **Action:** Show building onboarding via SIMBIOT MCP tools
@@ -32,7 +32,7 @@
 
 **Demo:**
 > "125 equipment assets identified across 6 equipment types - chillers, AHUs, generators, cooling towers, pumps, and UPS systems.
-> 
+>
 > Now let's capture initial baselines for our critical equipment. This establishes what 'normal' looks like for each asset."
 
 **Action:** Capture initial baseline for chiller
@@ -79,7 +79,7 @@ POST /api/equipment/chiller-001/baseline
 
 **Demo:**
 > "SENTINEL automatically schedules inspections based on baseline criticality.
-> 
+>
 > Here's our monthly inspection for the main chiller."
 
 **Action:** Show inspection dashboard with due inspections
@@ -124,7 +124,7 @@ POST /api/inspection/results
 
 **Demo:**
 > "SENTINEL automatically compares results to baseline and flags deviations.
-> 
+>
 > Look at this - vibration is up 39% from baseline. The system is flagging this for monitoring."
 
 **Action:** Show baseline comparison
@@ -160,7 +160,7 @@ POST /api/inspection/results
 
 **Demo:**
 > "Three months later, our ML models detected something concerning.
-> 
+>
 > Let me show you the prediction for this chiller."
 
 **Action:** Show ML prediction card
@@ -187,18 +187,18 @@ GET /api/ml/predictions/equipment/chiller-001
 
 **Demo:**
 > "The AI is predicting an 85% probability of compressor bearing failure within the next 7 days.
-> 
+>
 > But the real power is explainable AI - the system tells us WHY it's concerned."
 
 **Action:** Scroll through contributing factors
 
 **Demo:**
 > "Bearing vibration up 111% from baseline - that's the biggest factor at 40% weight.
-> 
+>
 > Motor current is up 16%, bearing temperature is at 85°C versus a 45°C baseline - that's critical.
-> 
+>
 > The asset is 21 years old, exceeding the recommended 20-year lifespan.
-> 
+>
 > All pointing to imminent bearing failure."
 
 **Action:** Show natural language explanation
@@ -279,7 +279,7 @@ GET /api/inspection/results/equipment/chiller-001?latest=true
 
 **Demo:**
 > "Critical deficiency identified: compressor bearing failure is imminent.
-> 
+>
 > SENTINEL automatically created a work order and scheduled a pre-repair baseline."
 
 **Action:** Show auto-generated work order
@@ -301,7 +301,7 @@ GET /api/workflow/triggers/work-orders/chiller-001
 
 **Demo:**
 > "Here's the automated workflow:
-> 
+>
 > 1. Critical deficiency detected → Work order created
 > 2. Pre-repair baseline scheduled (to measure repair effectiveness)
 > 3. Repair completed by technician
@@ -369,7 +369,7 @@ POST /api/workflow/triggers/validate-effectiveness
 
 **Demo:**
 > "The repair is validated as successful with a 55% overall improvement.
-> 
+>
 > This outcome feeds back to our ML models to improve future predictions."
 
 **Key Value Propositions:**
@@ -397,7 +397,7 @@ POST /api/workflow/triggers/validate-effectiveness
 
 **Demo:**
 > "Let me show you our portfolio view.
-> 
+>
 > This scales across all your buildings and equipment."
 
 **Action:** Show workflow dashboard with all equipment
@@ -417,16 +417,16 @@ GET /api/workflow/status/all
 
 **Demo:**
 > "Green equipment: Healthy, routine maintenance only.
-> 
+>
 > Yellow equipment: Anomalies detected, inspections scheduled.
-> 
+>
 > Red equipment: Active repairs, tracking effectiveness."
 
 **Action:** Show equipment grid with state indicators
 
 **Demo:**
 > "For each piece of equipment, you can see:
-> 
+>
 > - Current state in the workflow
 > - Baseline history and trends
 > - ML predictions with explainability
@@ -456,7 +456,7 @@ GET /api/workflow/status/generator-002
 
 **Demo:**
 > "This generator has been healthy for 7 years. Stable baseline, no issues.
-> 
+>
 > Compare to our AHU that just flagged an issue."
 
 **Action:** Drill down into ahu-003 (active issue example)
@@ -482,12 +482,12 @@ GET /api/workflow/status/ahu-003
 
 **Demo:**
 > "Fan motor showing early signs of bearing degradation.
-> 
+>
 > Inspection scheduled for tomorrow - we're catching it BEFORE it fails."
 
 **Demo:**
 > "SENTINEL provides complete visibility from initial onboarding through repair validation - all automated, all data-driven.
-> 
+>
 > And the system gets smarter with every repair, continuously improving its predictions and recommendations."
 
 **Key Value Propositions:**
@@ -513,15 +513,15 @@ GET /api/workflow/status/ahu-003
 
 **Demo:**
 > "That's the complete SENTINEL asset management workflow:
-> 
+>
 > 1. **Onboard** - Import equipment via BACnet, capture baselines
 > 2. **Monitor** - Automated inspections with baseline comparison
 > 3. **Predict** - ML detects anomalies before failure
 > 4. **Repair** - Automated workflow with effectiveness validation
 > 5. **Learn** - System improves with every repair
-> 
+>
 > Complete visibility from onboarding through validation.
-> 
+>
 > Any questions?"
 
 ---

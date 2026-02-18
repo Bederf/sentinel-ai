@@ -19,7 +19,7 @@ Usage:
 """
 
 from typing import Dict, List, Optional
-from datetime import datetime, timedelta
+from datetime import datetime
 import json
 import logging
 from pathlib import Path

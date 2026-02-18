@@ -80,7 +80,7 @@ VIEW_TO_MODULE_MAP: dict[str, str] = {
 
 def get_demo_config_for_email(email: str) -> DemoConfig | None:
     """Get demo config for a user - checks exact email first, then domain.
-    
+
     Returns the config if user has a demo configuration, None otherwise.
     Priority: USER_DEMO_CONFIGS > COMPANY_DEMO_CONFIGS
     """
@@ -100,15 +100,15 @@ def get_demo_config_for_email(email: str) -> DemoConfig | None:
 
 def has_demo_module_access(email: str, module_type: str) -> bool:
     """Check if user has access to a module via demo configuration.
-    
+
     This allows frontend view-based access (e.g., 'solar' view)
     to map to backend module types (e.g., 'solar' module) without
     requiring explicit database grants.
-    
+
     Args:
         email: User email address
         module_type: Backend ModuleType value (e.g., 'solar', 'lighting')
-    
+
     Returns:
         True if user's demo config includes this module, False otherwise
     """
@@ -122,22 +122,22 @@ def has_demo_module_access(email: str, module_type: str) -> bool:
 
 def has_demo_site_access(email: str, site_code: str) -> bool:
     """Check if user has access to a site via demo configuration.
-    
+
     Restricts demo users to specific sites (e.g., site-002 only).
-    
+
     Args:
         email: User email address
         site_code: Site code (e.g., 'site-002')
-    
+
     Returns:
         True if user's demo config includes this site, or if no restriction is set
     """
     config = get_demo_config_for_email(email)
     if not config:
         return True  # No demo config = no site restriction
-    
+
     allowed_sites = config.get('allowedSites', [])
     if not allowed_sites:
         return True  # Empty list = no restriction
-    
+
     return site_code in allowed_sites

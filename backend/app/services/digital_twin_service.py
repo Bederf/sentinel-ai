@@ -15,7 +15,7 @@ Pipeline:
 import base64
 import json
 import logging
-from typing import Dict, Optional
+from typing import Dict
 
 from app.services.floor_plan_sanitizer import get_floor_plan_sanitizer
 

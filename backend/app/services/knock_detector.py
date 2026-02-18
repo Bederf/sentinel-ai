@@ -14,7 +14,6 @@ Reference: SAE papers on engine knock detection
 import logging
 from typing import Dict, Any, List, Optional
 
-import numpy as np
 
 logger = logging.getLogger(__name__)
 

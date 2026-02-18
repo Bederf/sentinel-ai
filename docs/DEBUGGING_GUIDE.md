@@ -93,7 +93,7 @@
 5. Manually trigger prediction: `GET http://localhost:9095/api/predictions/site/S002?include_all=false`
 
 **"Equipment health_score not updating"**
-1. Create test alert: 
+1. Create test alert:
    ```bash
    curl -X POST "http://localhost:9095/api/alerts/supabase" \
      -H "Content-Type: application/json" \

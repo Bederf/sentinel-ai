@@ -7,7 +7,7 @@ endpoints for HVAC shutdown, smoke management, and alarm lifecycle.
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import Optional
 import logging
 
 from app.api.dependencies.module_access import require_active_module

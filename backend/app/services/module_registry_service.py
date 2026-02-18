@@ -13,7 +13,6 @@ import logging
 from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Any, Optional
-from dataclasses import asdict
 import uuid
 
 from app.models.module_registry import (
@@ -212,7 +211,7 @@ class ModuleRegistryService:
         Validates dependency chain:
         - SOLAR and LIGHTING require CONTROL module to be active
         - If dependencies not met, raises ValueError
-        
+
         Creates cross-module links automatically if auto_integration is enabled.
         """
         # Get or create site config
@@ -272,11 +271,11 @@ class ModuleRegistryService:
     def deactivate_module(self, site_id: str, module_type: ModuleType) -> bool:
         """
         Deactivate a module for a site (idempotent operation).
-        
+
         CASCADE LOGIC: If a module that others depend on is deactivated,
         automatically deactivates dependent modules.
         - Deactivating CONTROL → also deactivates SOLAR and LIGHTING
-        
+
         Returns True even if module not found (idempotent behavior for safety).
         """
         if module_type in NON_DEACTIVATABLE_MODULES:
@@ -320,12 +319,12 @@ class ModuleRegistryService:
                 for module in config.active_modules:
                     if module.module_type == dependent and module.status == ModuleStatus.ACTIVE:
                         module.status = ModuleStatus.INACTIVE
-                        
+
                         # Disable cross-module links for cascaded deactivation
                         for link in config.cross_module_links:
                             if link.source_module == dependent or link.target_module == dependent:
                                 link.enabled = False
-                        
+
                         logger.info(
                             f"Cascaded deactivation: {dependent.value} deactivated because "
                             f"required module {module_type.value} was deactivated (site: {site_id})"
@@ -337,12 +336,12 @@ class ModuleRegistryService:
     def apply_preset(self, site_id: str, preset_name: str) -> Dict[str, Any]:
         """
         Apply a demo preset to a site.
-        
+
         Presets define a specific module configuration for demo scenarios:
         - 'grant': Base + Controls + Lighting/Occupancy
         - 'bederf': Base + Controls + Solar/BESS
         - 'full': Base + All modules
-        
+
         Returns activation status for each module and any errors.
         """
         if preset_name not in self._demo_presets:
@@ -350,7 +349,7 @@ class ModuleRegistryService:
 
         preset = self._demo_presets[preset_name]
         config = self._site_configs.get(site_id)
-        
+
         if not config:
             raise ValueError(f"Site {site_id} not configured")
 
@@ -383,12 +382,12 @@ class ModuleRegistryService:
 
         # Activate modules (respecting dependency order: CONTROL must come before SOLAR/LIGHTING)
         to_activate = preset.get("activate", [])
-        
+
         # Sort to activate CONTROL first if present
         activation_order = []
         if "control" in to_activate:
             activation_order.append("control")
-        
+
         for module_name in to_activate:
             if module_name not in activation_order:
                 activation_order.append(module_name)

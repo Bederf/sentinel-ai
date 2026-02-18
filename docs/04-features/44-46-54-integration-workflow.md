@@ -67,7 +67,7 @@ graph TB
     B2 --> C2
     B3 --> C2
     B4 --> C3
-    
+
     C1 --> I1
     C2 --> I4
     C3 --> I5
@@ -173,7 +173,7 @@ Phase 54 applies equipment-type-specific tolerances automatically:
 def detect_deviation(measurement, baseline_value, tolerance):
     """
     Detect deviation and assign severity level.
-    
+
     Returns:
         - OK: within tolerance
         - WARNING: 50-75% of tolerance exceeded
@@ -182,7 +182,7 @@ def detect_deviation(measurement, baseline_value, tolerance):
     """
     deviation = abs(measurement - baseline_value)
     tolerance_percent = (deviation / baseline_value) * 100
-    
+
     if tolerance_percent <= tolerance:
         return "OK"
     elif tolerance_percent <= tolerance * 0.75:

@@ -174,17 +174,17 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
             ${!isActive ? 'hover:bg-white/5' : ''}
           `}
           style={{
-            background: isActive 
-              ? "rgba(245, 158, 11, 0.15)" 
+            background: isActive
+              ? "rgba(245, 158, 11, 0.15)"
               : "transparent",
-            borderLeft: isActive 
-              ? "4px solid var(--color-sentinel-amber)" 
+            borderLeft: isActive
+              ? "4px solid var(--color-sentinel-amber)"
               : "4px solid transparent",
-            color: isActive 
-              ? "var(--color-sentinel-text-primary)" 
+            color: isActive
+              ? "var(--color-sentinel-text-primary)"
               : "var(--color-sentinel-text-secondary)",
             ...(isActive ? {
-              boxShadow: isMobile 
+              boxShadow: isMobile
                 ? "0 0 20px rgba(245, 158, 11, 0.3), inset 0 0 12px rgba(245, 158, 11, 0.1)"
                 : "inset 0 0 8px rgba(245, 158, 11, 0.15)",
             } : {}),
@@ -196,21 +196,21 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
             style={{
               width: isMobile ? '22px' : '20px',
               height: isMobile ? '22px' : '20px',
-              color: isActive 
-                ? "var(--color-sentinel-amber)" 
+              color: isActive
+                ? "var(--color-sentinel-amber)"
                 : "var(--color-sentinel-text-secondary)",
-              filter: isActive 
-                ? "brightness(1.2) drop-shadow(0 0 4px rgba(245, 158, 11, 0.5))" 
+              filter: isActive
+                ? "brightness(1.2) drop-shadow(0 0 4px rgba(245, 158, 11, 0.5))"
                 : "brightness(1.1)",
             }}
           />
           {/* Always show labels on mobile, or when not collapsed on desktop */}
           <div className={`flex flex-col items-start flex-1 ${(isCollapsed && !isMobile) ? "hidden" : "flex"}`}>
-            <span 
+            <span
               className={`font-medium ${isMobile ? 'text-base' : 'text-sm'}`}
-              style={{ 
-                color: isActive 
-                  ? "var(--color-sentinel-text-primary)" 
+              style={{
+                color: isActive
+                  ? "var(--color-sentinel-text-primary)"
                   : "var(--color-sentinel-text-primary)",
                 fontWeight: isActive ? '600' : '500',
               }}
@@ -220,7 +220,7 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
             {item.description && !isMobile && (
               <span
                 className="text-xs"
-                style={{ 
+                style={{
                   color: "var(--color-sentinel-text-secondary)",
                   opacity: 0.8,
                 }}
@@ -467,8 +467,8 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
               onClick={() => setShowMobileMore(!showMobileMore)}
               className="w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-all duration-150"
               style={{
-                background: showMobileMore 
-                  ? "rgba(255, 255, 255, 0.08)" 
+                background: showMobileMore
+                  ? "rgba(255, 255, 255, 0.08)"
                   : "rgba(255, 255, 255, 0.05)",
                 border: "1px solid rgba(255, 255, 255, 0.1)",
                 color: "var(--color-sentinel-text-primary)",

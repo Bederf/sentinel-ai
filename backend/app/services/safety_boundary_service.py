@@ -6,7 +6,7 @@ adjustment capabilities for the autonomous system.
 
 import logging
 from datetime import datetime
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional
 
 from app.models.autonomous_decision import BoundaryStatus, EscalationLevel
 from app.models.device import Device

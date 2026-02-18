@@ -144,7 +144,7 @@ High-value tests retained and improved:
    ```typescript
    // ❌ WRONG
    vi.mock('../lib/api/client')
-   
+
    // ✅ CORRECT
    vi.mock('@/lib/api/client')
    ```
@@ -155,7 +155,7 @@ High-value tests retained and improved:
    ```typescript
    // ❌ WRONG - Unhandled rejection
    batcher('id-1');
-   
+
    // ✅ CORRECT - Await or catch
    const p = batcher('id-1');
    vi.advanceTimersByTime(60);

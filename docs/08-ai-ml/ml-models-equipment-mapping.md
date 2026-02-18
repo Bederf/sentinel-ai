@@ -182,7 +182,7 @@ Components:
      if reconstruction_error >= 0.6: health_anom = 10
 
   Final Score:
-    health_score = (health_age × 0.15) + (health_perf × 0.30) 
+    health_score = (health_age × 0.15) + (health_perf × 0.30)
                  + (health_rul × 0.35) + (health_anom × 0.20)
 ```
 
@@ -356,7 +356,7 @@ When stiction increases >5% over 7 days:
 When response_time > 180 seconds:
   Priority: HIGH
   Recommendation: "Actuator unresponsive; replace within 1 week"
-  
+
 When stiction > 25% AND temperature_deviation > 2°C:
   Priority: CRITICAL
   Recommendation: "Zone control failing; emergency replacement required"
@@ -413,18 +413,18 @@ health_score components:
      vibration_alarm_threshold = 7.1 mm/s (ISO 20816)
      health_bearing = 100 - (vibration_actual / 7.1) × 100
      When vibration > 7.1 mm/s: health = 0 (failed)
-  
+
   2. Seal Condition (25% weight):
      seal_age = months since last replacement (typically 24 mo)
      leakage_rate_trend = increasing? degrading?
      health_seal = 100 - (seal_age / 24) × 100
      Trend analysis: if leakage increasing, reduce by 20%
-  
+
   3. Motor Condition (20% weight):
      current_above_rated = indicates friction increase
      temp_rise = winding temperature rise above baseline
      health_motor = 100 - (temp_rise / max_allowable) × 100
-  
+
   4. Efficiency (15% weight):
      flow_vs_curve = compare current to pump curve
      Degradation indicates impeller erosion
@@ -496,12 +496,12 @@ health_score components:
      Expected stiction: <2% on new valve
      health_stiction = 100 - min(stiction / 10, 1.0) × 100
      When stiction > 10%: health = 20 (failure soon)
-  
+
   2. Response Time (30% weight):
      response_time = time for valve to reach 95% of new position
      Typical: 30-60 seconds
      health_response = similar to VAV actuator calculation
-  
+
   3. Leakage (20% weight):
      shutoff_leakage = flow when valve commanded 0%
      If leakage detected: health = 40 (cartridge needs replacement)
@@ -558,15 +558,15 @@ health_score components:
      Clean tower: fouling = 0%, health = 100
      Fouled tower: fouling = 20-40%, health = 60-80
      Severely fouled: fouling > 50%, health < 50
-  
+
   2. Fan Condition (30% weight):
      vibration + blade erosion patterns
      Similar to pump bearing assessment
-  
+
   3. Age & Maintenance (20% weight):
      Water treatment history
      Last chemical cleaning date
-  
+
   4. Seasonal Efficiency (10% weight):
      Compare to wet-bulb envelope
 
@@ -634,17 +634,17 @@ health_score components:
   1. Maintenance Schedule Adherence (35% weight):
      runtime_hours vs recommended service intervals (500 hr = service)
      health_maintenance = 100 if compliant, degrades if overdue
-  
+
   2. Fuel System (25% weight):
      fuel_contamination_indicator (based on consumption efficiency)
      Recent fuel top-up vs tank age (old fuel = gums)
      health_fuel = 100 - (fuel_degradation_score × 100)
-  
+
   3. Engine Condition (25% weight):
      oil_pressure_trend (declining pressure = bearing wear)
      exhaust_temp_trend (rising temp = valve carbon, combustion issues)
      health_engine = 100 - sqrt(oil_pressure_drop + exhaust_temp_rise)
-  
+
   4. Transfer Switch (15% weight):
      operation_count / expected_lifetime_ops
      health_switch = 100 - (ops / lifetime) × 100
@@ -663,7 +663,7 @@ When runtime_hours > service_interval + 50 hours:
 When fuel_degradation detected:
   Priority: MEDIUM
   Recommendation: "Fuel system maintenance (drain, filter, fuel conditioner)"
-  
+
 When oil_pressure declining trend:
   Priority: HIGH
   Recommendation: "Bearing wear detected; plan major overhaul within 4-8 weeks"
@@ -679,10 +679,10 @@ When Clawd Bot discovers new equipment, it selects appropriate models:
 def select_models_for_equipment(equipment_type, manufacturer, model):
     """
     Determine which LSTM and Autoencoder models to use for discovered equipment.
-    
+
     Returns: (lstm_model_id, autoencoder_model_id, health_score_algo)
     """
-    
+
     model_mapping = {
         'chiller': ('lstm-chiller-v2.1', 'ae-chiller-v1.3', 'health_chiller'),
         'ahu': ('lstm-ahu-v2.0', 'ae-ahu-v1.2', 'health_ahu'),
@@ -693,7 +693,7 @@ def select_models_for_equipment(equipment_type, manufacturer, model):
         'cooling_tower': ('lstm-cwtower-v1.7', 'ae-cwtower-v1.2', 'health_cwtower'),
         'generator': ('lstm-gen-v1.6', 'ae-gen-v1.1', 'health_generator'),
     }
-    
+
     return model_mapping.get(equipment_type, None)
 ```
 

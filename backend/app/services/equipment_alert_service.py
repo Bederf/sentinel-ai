@@ -11,7 +11,6 @@ Phase: Demo Flow - Equipment Warning State with Notifications
 
 import uuid
 import logging
-from datetime import datetime
 from typing import Dict, Any, Optional
 
 from app.database.supabase_client import get_supabase_client

@@ -11,7 +11,7 @@ Handles:
 """
 
 import logging
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, HTTPException, Depends, Query, Path
@@ -54,25 +54,25 @@ async def list_decisions(
     """
     try:
         parasite_repo = ParasiteDecisionRepository()
-        
+
         # Get decisions from repository (with filters if provided)
         all_decisions = await parasite_repo.get_recent_decisions(limit=min(limit, 200))
-        
+
         # Apply filters if provided
         filtered_decisions = all_decisions
-        
+
         if site_id:
             filtered_decisions = [
                 d for d in filtered_decisions
                 if d.get("site_id") == site_id
             ]
-        
+
         if tier:
             filtered_decisions = [
                 d for d in filtered_decisions
                 if d.get("tier") == tier
             ]
-        
+
         # Build response
         return {
             "decisions": filtered_decisions[:limit],
@@ -83,7 +83,7 @@ async def list_decisions(
                 "limit": limit
             }
         }
-    
+
     except Exception as e:
         logger.error(f"Error listing decisions: {str(e)}")
         raise HTTPException(
@@ -112,17 +112,17 @@ async def get_decision(
     """
     try:
         parasite_repo = ParasiteDecisionRepository()
-        
+
         decision = await parasite_repo.get_decision_by_id(decision_id)
-        
+
         if not decision:
             raise HTTPException(
                 status_code=404,
                 detail=f"Decision {decision_id} not found"
             )
-        
+
         return decision
-    
+
     except HTTPException:
         raise
     except Exception as e:
@@ -153,14 +153,14 @@ async def get_stats(
     """
     try:
         parasite_repo = ParasiteDecisionRepository()
-        
+
         # Get all decisions for this site (last 30 days)
         thirty_days_ago = (datetime.utcnow() - timedelta(days=30)).isoformat()
         decisions = await parasite_repo.get_decisions_by_site(
             site_id=site_id,
             since=thirty_days_ago
         )
-        
+
         # Calculate statistics
         total = len(decisions)
         by_tier = {
@@ -168,19 +168,19 @@ async def get_stats(
             "tier2": len([d for d in decisions if d.get("tier") == "tier2"]),
             "tier3": len([d for d in decisions if d.get("tier") == "tier3"])
         }
-        
+
         # Count rollbacks
         rolled_back = len([d for d in decisions if d.get("rolled_back") is True])
         rollback_rate = rolled_back / total if total > 0 else 0.0
-        
+
         # Count COV successes
         cov_verified = len([d for d in decisions if d.get("cov_verified") is True])
         cov_success_rate = cov_verified / total if total > 0 else 0.0
-        
+
         # Count outcome matches (where outcome_matched=true)
         outcome_matched = len([d for d in decisions if d.get("outcome_matched") is True])
         outcome_match_rate = outcome_matched / total if total > 0 else 0.0
-        
+
         return {
             "total_decisions": total,
             "by_tier": by_tier,
@@ -189,7 +189,7 @@ async def get_stats(
             "outcome_match_rate": round(outcome_match_rate, 3),
             "period": "last_30_days"
         }
-    
+
     except Exception as e:
         logger.error(f"Error calculating stats for {site_id}: {str(e)}")
         raise HTTPException(
@@ -218,7 +218,7 @@ async def get_routing_config(
     """
     try:
         routing_engine = get_tier_routing_engine()
-        
+
         return {
             "parasite_enabled": settings.parasite_enabled,
             "tier3_enabled": settings.parasite_tier3_enabled,
@@ -231,7 +231,7 @@ async def get_routing_config(
             "auto_rollback_enabled": settings.parasite_auto_rollback_enabled,
             "outcome_measurement_window_seconds": getattr(settings, "parasite_outcome_measurement_window", 600)
         }
-    
+
     except Exception as e:
         logger.error(f"Error retrieving routing config: {str(e)}")
         raise HTTPException(
@@ -258,16 +258,16 @@ async def get_health(
     """
     try:
         parasite_repo = ParasiteDecisionRepository()
-        
+
         # Determine overall status
         if not settings.parasite_enabled:
             status = "disabled"
         else:
             status = "active"
-        
+
         # Count pending outcome measurements
         pending_measurements = await parasite_repo.count_pending_measurements()
-        
+
         # Count auto-executions in last hour
         one_hour_ago = (datetime.utcnow() - timedelta(hours=1)).isoformat()
         recent_executions = await parasite_repo.get_decisions_since(one_hour_ago)
@@ -275,11 +275,11 @@ async def get_health(
             d for d in recent_executions
             if d.get("decision_type") in ["tier3_auto_execute", "auto_rollback"]
         ])
-        
+
         # Get last decision timestamp
         all_recent = await parasite_repo.get_recent_decisions(limit=1)
         last_decision_at = all_recent[0].get("created_at") if all_recent else None
-        
+
         return {
             "status": status,
             "pending_measurements": pending_measurements,
@@ -288,7 +288,7 @@ async def get_health(
             "tier3_enabled": settings.parasite_tier3_enabled,
             "auto_rollback_enabled": settings.parasite_auto_rollback_enabled
         }
-    
+
     except Exception as e:
         logger.error(f"Error retrieving health status: {str(e)}")
         raise HTTPException(

@@ -8,9 +8,7 @@ triggers data collection after "done" reply.
 """
 
 import requests
-import sys
 import argparse
-import json
 from typing import Dict, Any
 
 BMS_API_URL = "http://localhost:9095"  # SENTINEL BMS Backend

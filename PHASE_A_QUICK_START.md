@@ -420,4 +420,3 @@ Phase A is **fully implemented and testable right now**. The geometric abstracti
 ✅ Returns SIMBIOT-compatible building config
 
 **Ready for production after validation with real floor plans.**
-

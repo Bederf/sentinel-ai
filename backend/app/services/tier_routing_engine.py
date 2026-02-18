@@ -15,7 +15,7 @@ Every decision is logged to parasite_decisions table with full context.
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Dict, Tuple, Optional
 from enum import Enum
 

@@ -14,9 +14,8 @@ Integration point: Called from lifecycle_orchestrator._process_hour() each simul
 """
 
 import logging
-from datetime import datetime, timedelta, date
+from datetime import datetime, date
 from typing import Optional, Dict, Any
-import json
 
 from app.database.supabase_client import get_supabase_client
 from app.services.energy_cost_service import EnergyCostService

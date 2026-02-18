@@ -722,4 +722,3 @@ POST /api/devices/batch
 {"action": "normal_mode"}
 {"action": "set_battery_threshold", "value": 30}  // %
 ```
-

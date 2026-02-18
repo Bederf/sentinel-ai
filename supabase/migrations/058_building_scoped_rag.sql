@@ -67,8 +67,8 @@ BEGIN
     AND d.indexing_status = 'embedded'
     AND (1 - (dc.embedding <=> query_embedding)) >= similarity_threshold
     -- Building filter: return building-specific docs OR system docs (building_id IS NULL)
-    AND (filter_building_id IS NULL 
-         OR dc.building_id = filter_building_id 
+    AND (filter_building_id IS NULL
+         OR dc.building_id = filter_building_id
          OR dc.building_id IS NULL)
   ORDER BY dc.embedding <=> query_embedding
   LIMIT match_count;
@@ -113,8 +113,8 @@ BEGIN
       to_tsvector('english', dc.content) @@ plainto_tsquery('english', query_text)
       AND (filter_equipment_type IS NULL OR dc.equipment_type = filter_equipment_type)
       AND d.is_latest = TRUE
-      AND (filter_building_id IS NULL 
-           OR dc.building_id = filter_building_id 
+      AND (filter_building_id IS NULL
+           OR dc.building_id = filter_building_id
            OR dc.building_id IS NULL)
   ),
   semantic_search AS (
@@ -130,8 +130,8 @@ BEGIN
     WHERE
       (filter_equipment_type IS NULL OR dc.equipment_type = filter_equipment_type)
       AND d.is_latest = TRUE
-      AND (filter_building_id IS NULL 
-           OR dc.building_id = filter_building_id 
+      AND (filter_building_id IS NULL
+           OR dc.building_id = filter_building_id
            OR dc.building_id IS NULL)
   )
   SELECT

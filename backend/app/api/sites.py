@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from app.config.settings import settings
-from app.database.repositories import BuildingRepository, AlertRepository
+from app.database.repositories import BuildingRepository
 from app.middleware.auth_middleware import require_auth
 from app.models.auth import AuthContext, AuthLevel, SentinelRole
 
@@ -406,7 +406,7 @@ def get_sites_from_supabase(
             except Exception as e:
                 logger.warning(f"Failed to get equipment count from Supabase for {building_code}: {e}")
                 eq_count = 0
-            
+
             # Count active risks from predictions (consolidated risk system)
             alert_count = get_prediction_risk_count(building_uuid) if building_uuid else 0
 
@@ -448,7 +448,7 @@ def get_site_from_supabase(site_id: str) -> tuple[Optional[dict], bool]:
         except Exception as e:
             logger.warning(f"Failed to get equipment count from Supabase for {site_id}: {e}")
             eq_count = 0
-        
+
         # Count active risks from predictions (consolidated risk system)
         alert_count = get_prediction_risk_count(building_uuid) if building_uuid else 0
 

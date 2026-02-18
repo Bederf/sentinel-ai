@@ -11,7 +11,7 @@ Implements:
 """
 
 import logging
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any
 from pydantic import BaseModel, Field
 
 from fastapi import APIRouter, HTTPException, Body, Request
@@ -94,7 +94,7 @@ async def batch_safety_status(
         try:
             device = await device_manager.get_device(device_id)
             if not device:
-                errors[device_id] = f"Device not found"
+                errors[device_id] = "Device not found"
                 continue
 
             safety_status = await device_manager.get_device_safety_status(device_id)
@@ -150,7 +150,7 @@ async def batch_latest_readings(
         try:
             device = await device_manager.get_device(device_id)
             if not device:
-                errors[device_id] = f"Device not found"
+                errors[device_id] = "Device not found"
                 continue
 
             # Get device status with current values
@@ -207,7 +207,7 @@ async def batch_condition(
         try:
             device = await device_manager.get_device(device_id)
             if not device:
-                errors[device_id] = f"Device not found"
+                errors[device_id] = "Device not found"
                 continue
 
             # Get device with all status info

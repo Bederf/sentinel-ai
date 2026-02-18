@@ -1,6 +1,5 @@
 """Tests for solar configuration API endpoints."""
 
-import pytest
 
 
 def test_create_solar_site_success(test_client) -> None:

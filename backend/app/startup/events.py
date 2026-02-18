@@ -32,15 +32,14 @@ async def startup_event(app: FastAPI) -> None:
     # Block DEMO_MODE in production
     if settings.environment == "production" and settings.demo_mode:
         raise RuntimeError(
-            "DEMO_MODE cannot be enabled in production environment. "
-            "Set DEMO_MODE=false or ENVIRONMENT=development."
+            "DEMO_MODE cannot be enabled in production environment. Set DEMO_MODE=false or ENVIRONMENT=development."
         )
 
     # Require JWT secret when not in DEMO_MODE (C-2: Secure JWT signing)
     if not settings.demo_mode and not settings.jwt_secret_key and not settings.supabase_key:
         raise RuntimeError(
             "JWT_SECRET_KEY (or SUPABASE_KEY) must be set when DEMO_MODE is disabled. "
-            "Generate a 256-bit secret: python -c \"import secrets; print(secrets.token_hex(32))\" "
+            'Generate a 256-bit secret: python -c "import secrets; print(secrets.token_hex(32))" '
             "and set JWT_SECRET_KEY in your .env file."
         )
 
@@ -49,14 +48,13 @@ async def startup_event(app: FastAPI) -> None:
     if _jwt_key and len(_jwt_key) < 32 and not settings.demo_mode:
         _logger.warning(
             "JWT_SECRET_KEY is shorter than 32 characters — consider using a "
-            "256-bit secret: python -c \"import secrets; print(secrets.token_hex(32))\""
+            '256-bit secret: python -c "import secrets; print(secrets.token_hex(32))"'
         )
 
     # Warn about DEMO_MODE
     if settings.demo_mode:
         _logger.warning(
-            "DEMO_MODE is enabled - authentication is bypassed, "
-            "all requests get ADMIN role. Do NOT use in production."
+            "DEMO_MODE is enabled - authentication is bypassed, all requests get ADMIN role. Do NOT use in production."
         )
 
     # Warn about missing methodology password
@@ -74,8 +72,7 @@ async def startup_event(app: FastAPI) -> None:
             "refusing to start. Set PARASITE_TIER3_ENABLED=false in your .env file."
         )
         raise RuntimeError(
-            "PARASITE Tier 3 autonomous control cannot be enabled in production. "
-            "Set PARASITE_TIER3_ENABLED=false"
+            "PARASITE Tier 3 autonomous control cannot be enabled in production. Set PARASITE_TIER3_ENABLED=false"
         )
 
     if not settings.parasite_enabled:
@@ -97,11 +94,13 @@ async def startup_event(app: FastAPI) -> None:
     if testing_mode:
         _logger.info("TESTING mode: skipping background scheduler initialization")
         from app.api.devices import startup_event as devices_startup
+
         await devices_startup()
         return
 
     # Initialize Redis cache connection
     from app.services.cache_service import cache
+
     if cache.is_connected:
         print("Redis cache connected successfully")
     else:
@@ -109,6 +108,7 @@ async def startup_event(app: FastAPI) -> None:
 
     # Initialize device manager with mock devices + building equipment
     from app.api.devices import startup_event as devices_startup
+
     try:
         await asyncio.wait_for(devices_startup(), timeout=15.0)
         _logger.info("✅ Device manager initialized successfully")
@@ -118,7 +118,7 @@ async def startup_event(app: FastAPI) -> None:
         _logger.error(f"❌ Device manager initialization failed: {e}")
 
     # Initialize Sentry bot JWT authentication (non-blocking)
-    from app.services.sentry_auth_service import initialize_sentry_auth, get_sentry_auth_service
+    from app.services.sentry_auth_service import initialize_sentry_auth
 
     sentry_auth = initialize_sentry_auth(api_url=settings.backend_url or "http://localhost:9095")
 
@@ -169,24 +169,15 @@ async def startup_event(app: FastAPI) -> None:
 
     try:
         # Wrap with timeout to prevent startup hang (10 second limit)
-        await aio.wait_for(
-            autonomous_decision_engine.initialize(load_demo_data=True),
-            timeout=10.0
-        )
+        await aio.wait_for(autonomous_decision_engine.initialize(load_demo_data=True), timeout=10.0)
         _logger.info("Autonomous decision engine initialized successfully")
 
         if not escalation_engine._initialized:
-            await aio.wait_for(
-                escalation_engine.initialize(),
-                timeout=5.0
-            )
+            await aio.wait_for(escalation_engine.initialize(), timeout=5.0)
             _logger.info("Escalation engine initialized successfully")
 
         if not safety_boundary_service._initialized:
-            await aio.wait_for(
-                safety_boundary_service.initialize(),
-                timeout=5.0
-            )
+            await aio.wait_for(safety_boundary_service.initialize(), timeout=5.0)
             _logger.info("Safety boundary service initialized successfully")
     except aio.TimeoutError:
         _logger.warning("⏱️ Autonomous system initialization timed out - continuing without full initialization")
@@ -227,19 +218,17 @@ async def startup_event(app: FastAPI) -> None:
         """
         try:
             from app.database.supabase_client import Supabase
-            from app.services.simulation_orchestrator import (
-                create_orchestrator,
-                register_simulation,
-            )
 
             client = Supabase.instance()
 
             # Query for any crashed tasks (status='running')
-            response = await client.table("lifecycle_simulation_tasks") \
-                .select("*") \
-                .eq("status", "running") \
-                .eq("simulation_type", "lifecycle") \
+            response = (
+                await client.table("lifecycle_simulation_tasks")
+                .select("*")
+                .eq("status", "running")
+                .eq("simulation_type", "lifecycle")
                 .execute()
+            )
 
             if not response.data:
                 _logger.info("✅ No crashed simulations to recover")
@@ -255,34 +244,30 @@ async def startup_event(app: FastAPI) -> None:
                 if not state_snapshot:
                     _logger.warning(f"⚠️ Task {task_id} has no state snapshot - cannot recover")
                     # Mark as failed since we can't resume
-                    await client.table("lifecycle_simulation_tasks") \
-                        .update({
-                            "status": "failed",
-                            "error_message": "No checkpoint state available for recovery"
-                        }) \
-                        .eq("task_id", task_id) \
+                    await (
+                        client.table("lifecycle_simulation_tasks")
+                        .update({"status": "failed", "error_message": "No checkpoint state available for recovery"})
+                        .eq("task_id", task_id)
                         .execute()
+                    )
                     continue
 
                 try:
                     # Mark task as "queued" so queue processor will resume it
                     # Queue processor will deserialize state and continue from checkpoint
-                    await client.table("lifecycle_simulation_tasks") \
-                        .update({
-                            "status": "queued",
-                            "error_message": None
-                        }) \
-                        .eq("task_id", task_id) \
+                    await (
+                        client.table("lifecycle_simulation_tasks")
+                        .update({"status": "queued", "error_message": None})
+                        .eq("task_id", task_id)
                         .execute()
+                    )
 
                     # Extract checkpoint details for logging
                     simulated_time = state_snapshot.get("simulated_time", "unknown")
                     days_simulated = state_snapshot.get("days_simulated", 0)
 
                     _logger.info(
-                        f"✅ Queued recovery for task {task_id}: "
-                        f"day {days_simulated}/365, "
-                        f"time {simulated_time}"
+                        f"✅ Queued recovery for task {task_id}: day {days_simulated}/365, time {simulated_time}"
                     )
 
                 except Exception as e:
@@ -305,19 +290,17 @@ async def startup_event(app: FastAPI) -> None:
             client = Supabase.instance()
 
             # Stop any running simulations (set status to 'stopped')
-            running_tasks = client.table("lifecycle_simulation_tasks") \
-                .select("task_id") \
-                .eq("status", "running") \
-                .execute()
+            running_tasks = (
+                client.table("lifecycle_simulation_tasks").select("task_id").eq("status", "running").execute()
+            )
 
             if running_tasks.data:
                 _logger.info(f"🛑 Stopping {len(running_tasks.data)} running simulation(s)...")
                 for task in running_tasks.data:
                     try:
-                        client.table("lifecycle_simulation_tasks") \
-                            .update({"status": "stopped"}) \
-                            .eq("task_id", task["task_id"]) \
-                            .execute()
+                        client.table("lifecycle_simulation_tasks").update({"status": "stopped"}).eq(
+                            "task_id", task["task_id"]
+                        ).execute()
                     except Exception as update_err:
                         _logger.warning(f"Could not update task {task['task_id']}: {update_err}")
                 _logger.info(f"✅ Stopped {len(running_tasks.data)} running simulation(s)")
@@ -326,22 +309,24 @@ async def startup_event(app: FastAPI) -> None:
             # Only deactivate tasks from BEFORE this startup (older than 5 seconds)
             # This prevents deactivating tasks created during the current startup
             from datetime import datetime, timedelta
+
             cutoff_time = (datetime.utcnow() - timedelta(seconds=5)).isoformat()
 
-            queued_tasks = client.table("lifecycle_simulation_tasks") \
-                .select("task_id, created_at") \
-                .eq("status", "queued") \
-                .lt("created_at", cutoff_time) \
+            queued_tasks = (
+                client.table("lifecycle_simulation_tasks")
+                .select("task_id, created_at")
+                .eq("status", "queued")
+                .lt("created_at", cutoff_time)
                 .execute()
+            )
 
             if queued_tasks.data:
                 _logger.info(f"⏸️  Deactivating {len(queued_tasks.data)} queued simulation(s) from before startup...")
                 for task in queued_tasks.data:
                     try:
-                        client.table("lifecycle_simulation_tasks") \
-                            .update({"status": "inactive"}) \
-                            .eq("task_id", task["task_id"]) \
-                            .execute()
+                        client.table("lifecycle_simulation_tasks").update({"status": "inactive"}).eq(
+                            "task_id", task["task_id"]
+                        ).execute()
                     except Exception as update_err:
                         _logger.warning(f"Could not deactivate task {task['task_id']}: {update_err}")
                 _logger.info(f"✅ Deactivated {len(queued_tasks.data)} queued simulation(s)")
@@ -381,11 +366,12 @@ async def startup_event(app: FastAPI) -> None:
         _logger.info(f"[DEBUG] Total jobs in scheduler: {len(scheduler_service.scheduler.get_jobs())}")
     except Exception as e:
         _logger.error(f"❌ Simulation queue processor initialization failed: {e}", exc_info=True)
-        _logger.warning(f"⚠️ Simulations will not be auto-processed. Manual intervention required.")
+        _logger.warning("⚠️ Simulations will not be auto-processed. Manual intervention required.")
 
     # Start system health snapshot job (runs every 5 minutes)
     # Stores point-in-time health snapshots for trend analysis and historical reporting
     from app.services.system_health_service import SystemHealthService
+
     health_service = SystemHealthService()
 
     async def store_health_snapshot():
@@ -446,11 +432,12 @@ async def startup_event(app: FastAPI) -> None:
 
     # SIMBIOT Concept Evolution connector
     # Auto-initializes when SIMBIOT_API_URL and SIMBIOT_API_KEY env vars are set
-    if hasattr(simbiot_service, 'initialise_from_settings'):
+    if hasattr(simbiot_service, "initialise_from_settings"):
         await simbiot_service.initialise_from_settings()
     elif settings.simbiot_api_url and settings.simbiot_api_key:
         try:
             from simbiot_concept import ConceptConfig
+
             config = ConceptConfig(
                 api_url=settings.simbiot_api_url,
                 api_key=settings.simbiot_api_key,
@@ -471,6 +458,7 @@ async def shutdown_event(app: FastAPI) -> None:
     """
     # Stop Sentry JWT token refresh
     from app.services.sentry_auth_service import get_sentry_auth_service
+
     sentry_auth = get_sentry_auth_service()
     if sentry_auth:
         await sentry_auth.stop_background_refresh()
@@ -486,6 +474,7 @@ def register_events(app: FastAPI) -> None:
     Args:
         app: The FastAPI application instance
     """
+
     @app.on_event("startup")
     async def _startup_event():
         await startup_event(app)

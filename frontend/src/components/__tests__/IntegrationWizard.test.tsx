@@ -25,7 +25,7 @@ vi.mock('@/lib/api/client', () => ({
 vi.mock('../FileUploadStep', () => ({
   FileUploadStep: ({ onNext }: any) => (
     <div data-testid="file-upload-step">
-      <button onClick={() => onNext({ 
+      <button onClick={() => onNext({
         file: new File(['test'], 'test.csv'),
         formatDetection: {
           file_format: 'csv',

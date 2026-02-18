@@ -12,7 +12,7 @@ Endpoints:
 import re
 import logging
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from fastapi import APIRouter, HTTPException, Query
 

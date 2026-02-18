@@ -2,7 +2,6 @@
 
 import pytest
 from unittest.mock import Mock, patch, AsyncMock
-from datetime import datetime
 from app.services.maintenance_recommender import (
     MaintenanceRecommender,
     MaintenanceRecommendation,

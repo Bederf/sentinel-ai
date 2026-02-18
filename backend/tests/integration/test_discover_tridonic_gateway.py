@@ -7,9 +7,7 @@ Usage:
     python -m pytest backend/test_discover_tridonic.py -v
 """
 
-import asyncio
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 
 @pytest.mark.asyncio
@@ -31,23 +29,23 @@ async def test_discover_tridonic_gateway_simulated():
     assert result["gateway_ip"] == "192.168.10.50"
     assert result["gateway"] is not None
     assert result["gateway"]["simulated"] is True
-    
+
     # Check equipment list
     assert result["total_devices"] > 0
     assert len(result["equipment_list"]) > 0
     assert result["devices_by_line"] is not None
-    
+
     # Verify equipment codes follow v2.0 format
     for equipment in result["equipment_list"]:
         assert equipment["equipment_code"].startswith("S002-")
         assert "equipment_type" in equipment
         assert "dali_line" in equipment
         assert "dali_address" in equipment
-    
+
     # Verify summary
     assert result["summary"]["luminaires"] > 0
     assert result["summary"]["controllers"] >= 0
-    
+
     # Verify next steps are provided
     assert len(result["next_steps"]) > 0
 
@@ -84,18 +82,18 @@ async def test_discover_tridonic_gateway_equipment_code_format():
     )
 
     assert result["success"] is True
-    
+
     # Check equipment code formats
     dali_codes = [e for e in result["equipment_list"] if e["equipment_type"] == "DALI"]
     lum_codes = [e for e in result["equipment_list"] if e["equipment_type"] == "LUM"]
-    
+
     # DALI controllers: S{site}-DALI-L{line}-{addr:02d}
     for code_entry in dali_codes:
         code = code_entry["equipment_code"]
         # Format: S005-DALI-L1-01
         import re
         assert re.match(r'^S\d{3}-DALI-L\d+-\d{2}$', code), f"Invalid DALI code: {code}"
-    
+
     # Luminaires: S{site}-LUM-L{line}-{seq:03d}
     for code_entry in lum_codes:
         code = code_entry["equipment_code"]
@@ -141,7 +139,7 @@ async def test_discover_tridonic_gateway_summary_counts():
     )
 
     assert result["success"] is True
-    
+
     # Count equipment by type
     counted = {
         "controllers": len([e for e in result["equipment_list"] if e["equipment_type"] == "DALI"]),
@@ -149,7 +147,7 @@ async def test_discover_tridonic_gateway_summary_counts():
         "sensors": len([e for e in result["equipment_list"] if e["equipment_type"] == "PIR"]),
         "other": 0
     }
-    
+
     # Verify summary matches count
     assert result["summary"]["controllers"] == counted["controllers"]
     assert result["summary"]["luminaires"] == counted["luminaires"]

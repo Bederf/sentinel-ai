@@ -10,7 +10,7 @@ import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from app.services.health_threshold_service import get_health_thresholds
 

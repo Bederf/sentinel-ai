@@ -242,7 +242,7 @@ async function uploadDXF(file: File) {
   );
 
   console.log(`Extracted ${config.equipment.length} equipment`);
-  
+
   return config;
 }
 ```
@@ -262,23 +262,23 @@ class DXFParserService:
         building_name: str
     ) -> Dict:
         """Parse DXF and return BuildingConfig format."""
-        
+
         # 1. Load DXF document
         doc = self._load_dxf(dxf_bytes)
-        
+
         # 2. Calculate bounding box
         bbox = self._calculate_floor_plan_bbox(doc)
-        
+
         # 3. Extract equipment by layer
         equipment = []
         equipment.extend(self._extract_hvac_equipment(doc, bbox, building_code))
         equipment.extend(self._extract_electrical_equipment(doc, bbox, building_code))
         equipment.extend(self._extract_fire_equipment(doc, bbox, building_code))
-        
+
         # 4-6. Infer floors, zones, convert to v2.0 format
         floors = self._infer_floor_definitions(equipment)
         zones = self._create_zones_from_equipment(equipment)
-        
+
         return {
             "equipment": equipment,
             "floors": floors,

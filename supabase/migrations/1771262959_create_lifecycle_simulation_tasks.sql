@@ -9,11 +9,11 @@ CREATE TABLE IF NOT EXISTS lifecycle_simulation_tasks (
   progress_pct INTEGER DEFAULT 0,
   days_completed INTEGER DEFAULT 0,
   duration_minutes FLOAT DEFAULT 240.0,
-  
+
   -- Checkpoint state for crash recovery
   state_snapshot JSONB,
   error_message TEXT,
-  
+
   -- Timestamps
   created_at TIMESTAMP DEFAULT NOW(),
   started_at TIMESTAMP,

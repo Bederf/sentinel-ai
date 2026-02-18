@@ -5,12 +5,10 @@ Supports real Modbus RTU/TCP and simulated mode for demo.
 """
 
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from datetime import datetime
 
 from app.services.device_abstraction import DeviceInterface
-from app.models.device import PointType
-from app.models.water_meter import WaterMeter
 
 logger = logging.getLogger(__name__)
 

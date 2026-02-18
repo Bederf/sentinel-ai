@@ -160,6 +160,6 @@ def test_api_imports():
 
     if circular_failures:
         pytest.fail(
-            f"Circular import errors detected in API modules:\n" +
+            "Circular import errors detected in API modules:\n" +
             "\n".join(f"  - {path}: {error}" for path, error in circular_failures)
         )

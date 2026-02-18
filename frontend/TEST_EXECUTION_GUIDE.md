@@ -211,10 +211,10 @@ npm run test:run -- --grep "should NOT batch" --invert
 ```typescript
 it('should batch requests', async () => {
   const { result } = renderHook(() => useMyHook(), { wrapper });
-  
+
   console.log('After render:', result.current);
   console.log('API calls:', mockApi.mock.calls);
-  
+
   await waitFor(() => {
     console.log('In waitFor:', result.current.data);
     expect(result.current.data).toBeDefined();
@@ -234,9 +234,9 @@ import { screen } from '@testing-library/react';
 
 it('should render', () => {
   render(<MyComponent />);
-  
+
   screen.debug();  // Prints DOM to console
-  
+
   // Output:
   // <div>
   //   <button>Click me</button>
@@ -487,11 +487,11 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: '20'
-      
+
       - run: cd frontend && npm ci
       - run: npm run test:run
       - run: npm run test:coverage
-      
+
       - uses: codecov/codecov-action@v3
         with:
           files: ./coverage/coverage-final.json

@@ -13,7 +13,6 @@ from fastapi import APIRouter, HTTPException, Path, Query
 
 from app.database.repositories.desk_repository import DeskRepository
 from app.database.repositories.zone_repository import ZoneRepository
-from app.services.zone_ingestion_service import ZoneIngestionService
 
 logger = logging.getLogger(__name__)
 
@@ -27,10 +26,10 @@ router = APIRouter(prefix="/api/buildings", tags=["desks"])
 
 def _is_uuid(value: str) -> bool:
     """Check if value is a valid UUID format.
-    
+
     Args:
         value: String to check
-        
+
     Returns:
         True if value matches UUID format (8-4-4-4-12 hex pattern)
     """
@@ -113,7 +112,7 @@ async def get_desks(
     try:
         # Accept both building codes and UUIDs
         actual_building_id = building_id
-        
+
         # If it looks like a building code (not UUID format), convert it to UUID
         if not _is_uuid(building_id):
             try:
@@ -125,7 +124,7 @@ async def get_desks(
             except Exception as e:
                 logger.warning(f"Failed to resolve building code '{building_id}' to UUID: {e}")
                 actual_building_id = building_id
-        
+
         desks = desk_repo.get_by_building_uuid(actual_building_id)
 
         if floor:
@@ -162,7 +161,7 @@ async def get_desks_by_zone(
     try:
         # Accept both building codes and UUIDs
         actual_building_id = building_id
-        
+
         # If it looks like a building code (not UUID format), convert it to UUID
         if not _is_uuid(building_id):
             try:
@@ -173,7 +172,7 @@ async def get_desks_by_zone(
             except Exception as e:
                 logger.warning(f"Failed to resolve building code '{building_id}' to UUID: {e}")
                 actual_building_id = building_id
-        
+
         desks = desk_repo.get_by_zone_id(actual_building_id, zone_id)
 
         logger.info(f"Retrieved {len(desks)} desks for zone {zone_id} in building {building_id} (UUID: {actual_building_id})")
@@ -218,7 +217,7 @@ async def get_zone_centroid(
     try:
         # Accept both building codes and UUIDs
         actual_building_id = building_id
-        
+
         # If it looks like a building code (not UUID format), convert it to UUID
         if not _is_uuid(building_id):
             try:
@@ -231,7 +230,7 @@ async def get_zone_centroid(
             except Exception as e:
                 logger.warning(f"Failed to resolve building code '{building_id}' to UUID: {e}")
                 actual_building_id = building_id
-        
+
         desks = desk_repo.get_by_zone_id(actual_building_id, zone_id)
 
         if not desks:
@@ -293,7 +292,7 @@ async def get_all_zone_centroids(
     try:
         # Accept both building codes (e.g., 'site-002') and UUIDs
         actual_building_id = building_id
-        
+
         # If it looks like a building code (not UUID format), convert it to UUID
         if not _is_uuid(building_id):
             try:
@@ -305,9 +304,9 @@ async def get_all_zone_centroids(
                 logger.warning(f"Failed to resolve building code '{building_id}' to UUID: {e}")
                 # Try querying anyway in case it's already a UUID
                 actual_building_id = building_id
-        
+
         zones = zone_repo.get_by_building(actual_building_id)
-        
+
         if not zones:
             logger.warning(f"No zones found for building {building_id} (UUID: {actual_building_id})")
             # Return empty centroids instead of error
@@ -317,7 +316,7 @@ async def get_all_zone_centroids(
                 "centroid_count": 0,
                 "centroids": {},
             }
-        
+
         zone_ids = [z["zone_id"] for z in zones]
         centroids = desk_repo.get_centroids_for_zones(actual_building_id, zone_ids)
 
@@ -365,7 +364,7 @@ async def get_desk_statistics(
     try:
         # Accept both building codes and UUIDs
         actual_building_id = building_id
-        
+
         # If it looks like a building code (not UUID format), convert it to UUID
         if not _is_uuid(building_id):
             try:
@@ -383,7 +382,7 @@ async def get_desk_statistics(
             except Exception as e:
                 logger.warning(f"Failed to resolve building code '{building_id}' to UUID: {e}")
                 actual_building_id = building_id
-        
+
         desks = desk_repo.get_by_building_uuid(actual_building_id)
         zones = zone_repo.get_by_building(actual_building_id)
 

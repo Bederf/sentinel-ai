@@ -11,12 +11,10 @@ Data sources:
 The killer feature: "Too hot at Desk 25" -> instant BMS diagnosis.
 """
 
-import json
 import logging
 import os
 import re
 from datetime import datetime, timedelta
-from pathlib import Path
 from typing import Dict, List, Optional
 
 from app.models.complaint import (
@@ -26,7 +24,6 @@ from app.models.complaint import (
     ComplaintDiagnosis,
 )
 from app.services.cross_system_analyzer import get_cross_system_analyzer
-from app.services.building_loader import get_building_loader
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +49,7 @@ class ComfortComplaintHandler:
         try:
             from app.database.repositories.desk_repository import DeskRepository
             from app.database.repositories.zone_repository import ZoneRepository
-            
+
             # Load desks from Supabase
             desk_repo = DeskRepository()
             all_desks = desk_repo.get_all()
@@ -65,7 +62,7 @@ class ComfortComplaintHandler:
                 logger.info(f"Loaded {len(self._desks)} desks from Supabase")
             else:
                 logger.warning("No desks found in Supabase")
-            
+
             # Load zones from Supabase
             zone_repo = ZoneRepository()
             all_zones = zone_repo.get_all()
@@ -76,7 +73,7 @@ class ComfortComplaintHandler:
                 logger.info(f"Loaded {len(self._zones)} zones from Supabase")
             else:
                 logger.warning("No zones found in Supabase")
-            
+
         except Exception as e:
             logger.error(f"Error loading data from Supabase: {e}")
             logger.warning("Complaint handler will have no desk/zone data available")

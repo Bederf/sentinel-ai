@@ -18,7 +18,6 @@ from app.models.pricing import (
     QuoteRequest,
     QuoteResponse,
     PricingConfig,
-    MarginTarget,
     WhatIfScenario,
     WhatIfResponse,
     WhatIfScenarioResult,
@@ -27,7 +26,6 @@ from app.models.pricing import (
     PricingBenchmarkResponse,
     RenewalQuote,
     ContractComparable,
-    RenegotiationOptions,
     RenegotiationAnalysis,
     RenegotiationOption
 )

@@ -10,7 +10,7 @@ Implements:
 """
 
 import logging
-from typing import Dict, List, Any
+from typing import Dict, List
 from pydantic import BaseModel, Field
 from datetime import datetime, timezone
 
@@ -120,18 +120,18 @@ async def get_site_summary(request: Request, site_id: str) -> SiteSummary:
     try:
         building_repo = BuildingRepository()
         alert_repo = AlertRepository()
-        
+
         # Get building/site info
         building = building_repo.get_by_id(site_id)
         if not building:
             raise HTTPException(status_code=404, detail=f"Site {site_id} not found")
-        
+
         building_uuid = building.get("id")
-        
+
         # Get all equipment for this site FROM SUPABASE ONLY
         equipment_list = building_repo.get_equipment(site_id)
         logger.info(f"Site {site_id}: Got {len(equipment_list)} equipment from Supabase")
-        
+
         # ⚠️  IMPORTANT: Do NOT fall back to device_manager or JSON data
         # The requirement is: "we must be reading from the supabase only"
         # If equipment is missing, it should be added to Supabase via seeding, not loaded from fallback
@@ -139,21 +139,21 @@ async def get_site_summary(request: Request, site_id: str) -> SiteSummary:
             logger.error(f"Site {site_id}: No equipment found in Supabase! Please seed equipment data.")
             # Return empty summary rather than falling back to inconsistent device_manager data
             equipment_list = []
-        
+
         equipment_count = len(equipment_list) if equipment_list else 0
-        
+
         # Count equipment by type
         equipment_by_type: Dict[str, int] = {}
         safety_counts = {"total": equipment_count, "safe": 0, "warning": 0, "blocked": 0, "alarm": 0}
-        
+
         for equipment in (equipment_list or []):
             eq_type = equipment.get("type", "unknown")
             equipment_by_type[eq_type] = equipment_by_type.get(eq_type, 0) + 1
-            
+
             # Count safety statuses based on status field and health score
             status = equipment.get("status", "normal").lower()
             health_score = equipment.get("health_score", 100)
-            
+
             # Determine equipment status category
             if status == "critical":
                 safety_counts["alarm"] += 1
@@ -177,7 +177,7 @@ async def get_site_summary(request: Request, site_id: str) -> SiteSummary:
                     safety_counts["safe"] += 1
                 else:
                     safety_counts["warning"] += 1
-        
+
         # Get alerts for this site
         alerts = alert_repo.get_active_by_building(building_uuid)
         alert_counts = {"critical": 0, "warning": 0, "info": 0}
@@ -187,7 +187,7 @@ async def get_site_summary(request: Request, site_id: str) -> SiteSummary:
                 alert_counts[severity] += 1
             else:
                 alert_counts["info"] += 1
-        
+
         # Get predictions for this site (if available)
         try:
             prediction_repo = PredictionRepository()
@@ -203,7 +203,7 @@ async def get_site_summary(request: Request, site_id: str) -> SiteSummary:
                     prediction_counts["low_risk"] += 1
         except Exception:
             prediction_counts = {"high_risk": 0, "medium_risk": 0, "low_risk": 0}
-        
+
         # Build response
         return SiteSummary(
             site_id=site_id,

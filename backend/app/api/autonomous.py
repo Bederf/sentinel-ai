@@ -318,7 +318,6 @@ async def test_autonomous_decision():
         raise HTTPException(status_code=500, detail="No controllable points found on device")
 
     # Create a safe test decision
-    from datetime import datetime
 
     try:
         decision = await autonomous_decision_engine.evaluate_and_execute(

@@ -41,12 +41,12 @@ try:
     # Step 1: Query Supabase equipment table
     repo = EquipmentRepository()
     equipment_data = repo.get_by_building_code(site_code)
-    
+
     if equipment_data:  # ← KEY: Empty list [] is falsy in Python
         # Step 2: Process Supabase results
         # ... build equipment_list ...
         return {"equipment": equipment_list, "source": "supabase"}  # ← EARLY RETURN
-        
+
 except Exception as e:
     # Step 3: Fall back to JSON files
     pass
@@ -87,17 +87,17 @@ def get_by_building_code(self, building_code: str) -> List[Dict[str, Any]]:
     building_response = self.client.table('buildings').select('id').eq(
         'code', building_code
     ).execute()
-    
+
     if not building_response.data:
         return []  # ← No building found → returns []
-    
+
     building_uuid = building_response.data[0]['id']
-    
+
     # 2. Query equipment table for this building
     equipment_response = self.client.table('equipment').select("*").eq(
         'building_id', building_uuid
     ).execute()
-    
+
     return equipment_response.data  # ← Returns whatever Supabase returns (could be [])
 ```
 
@@ -128,7 +128,7 @@ Need to verify:
    - Are the `code` values populated correctly?
 
 2. **equipment** table:
-   - Is it empty? 
+   - Is it empty?
    - How many rows per building_id?
    - Are building_id foreign keys correct?
 
@@ -151,8 +151,8 @@ ORDER BY count DESC;
 
 ### Step 3: Check for Specific Equipment
 ```sql
-SELECT id, code, name, building_id 
-FROM equipment 
+SELECT id, code, name, building_id
+FROM equipment
 WHERE building_id = (SELECT id FROM buildings WHERE code = 'site-002')
 LIMIT 5;
 -- Should show equipment like S002-CHILLER-B1-001, S002-FCU-L1-A, etc.
@@ -184,7 +184,7 @@ LIMIT 5;
 - ✅ Both sources work in parallel
 - ✅ Can migrate gradually
 
-**Action**: 
+**Action**:
 1. Fix JSON fallback to work (Option A)
 2. Create seed script for Supabase (Option B)
 3. Run both in parallel during transition
@@ -256,7 +256,7 @@ CREATE TABLE equipment (
 
 ## Files Involved
 
-- **Frontend**: 
+- **Frontend**:
   - `frontend/src/components/digital-twin/DigitalTwin.tsx` (uses equipment API)
   - `frontend/src/hooks/useSitesList.ts` (fetches sites)
   - `frontend/src/hooks/useZoneCentroids.ts` (fetches zone positions)

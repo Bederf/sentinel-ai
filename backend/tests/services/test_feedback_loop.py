@@ -4,8 +4,7 @@ Tests outcome verification, accuracy calculation, and learning from rejections.
 """
 
 import pytest
-import asyncio
-from unittest.mock import patch, AsyncMock, MagicMock
+from unittest.mock import patch, AsyncMock
 from datetime import datetime, timedelta
 
 from app.services.outcome_tracker import OutcomeTracker

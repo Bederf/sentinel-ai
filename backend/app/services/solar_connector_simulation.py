@@ -12,7 +12,7 @@ normal ingestion service pipeline.
 """
 
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
 from app.models.solar import (
@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 class SimulatedSolarConnector(SolarConnector):
     """Connector that pulls data from solar_annual_simulations table.
-    
+
     When a 365-day simulation is running or completed, this connector
     reads the cached results and converts them to live-like inverter/BESS data
     for the current hour.
@@ -63,7 +63,7 @@ class SimulatedSolarConnector(SolarConnector):
     async def read_inverter(self, inverter_id: str) -> Optional[SolarInverter]:
         """Read a single inverter from simulation data."""
         readings = await self.get_normalised_readings()
-        
+
         # Find inverter readings for this inverter_id
         for reading in readings:
             if reading.source_id == inverter_id:
@@ -82,7 +82,7 @@ class SimulatedSolarConnector(SolarConnector):
                     temperature_c=25,
                     efficiency_pct=97.0,
                 )
-        
+
         return None
 
     async def read_all_strings(self, inverter_id: str) -> List[SolarString]:
@@ -108,14 +108,14 @@ class SimulatedSolarConnector(SolarConnector):
         sim_data = await self._get_simulation_data()
         if not sim_data:
             return None
-        
+
         # Extract BESS SOC from simulation
         current_hour_data = self._get_current_hour_data(sim_data)
         if not current_hour_data:
             return None
-        
+
         bess_soc_pct = current_hour_data.get("bess_soc_pct", 65.0)
-        
+
         return BESSContainer(
             container_id=container_id,
             capacity_kwh=5.015,
@@ -142,15 +142,15 @@ class SimulatedSolarConnector(SolarConnector):
         sim_data = await self._get_simulation_data()
         if not sim_data:
             return None
-        
+
         # Extract grid data from simulation
         current_hour_data = self._get_current_hour_data(sim_data)
         if not current_hour_data:
             return None
-        
+
         import_kw = current_hour_data.get("grid_import_kw", 0.0)
         export_kw = current_hour_data.get("grid_export_kw", 0.0)
-        
+
         return GridMeter(
             meter_id=meter_id,
             site_id=self.site_id,
@@ -167,22 +167,22 @@ class SimulatedSolarConnector(SolarConnector):
     async def get_normalised_readings(self) -> List[NormalisedReading]:
         """Poll simulation and return normalised readings for all equipment."""
         readings = []
-        
+
         # Refresh cache if needed
         sim_data = await self._get_simulation_data()
         if not sim_data:
             return readings
-        
+
         current_hour_data = self._get_current_hour_data(sim_data)
         if not current_hour_data:
             return readings
-        
+
         # Extract key metrics from simulation
         solar_gen_kw = current_hour_data.get("solar_gen_kw", 0.0)
         building_load_kw = current_hour_data.get("building_load_kw", 500.0)
         grid_import_kw = current_hour_data.get("grid_import_kw", 0.0)
         grid_export_kw = current_hour_data.get("grid_export_kw", 0.0)
-        
+
         # Create readings for each component
         readings.extend([
             NormalisedReading(
@@ -218,82 +218,82 @@ class SimulatedSolarConnector(SolarConnector):
                 timestamp=datetime.now(timezone.utc).isoformat(),
             ),
         ])
-        
+
         return readings
 
     # --- private helpers ---
 
     async def _get_simulation_data(self) -> Optional[Dict]:
         """Query solar_annual_simulations table for most recent results.
-        
+
         Returns the full results dict with monthly and daily data.
         Caches for 30 seconds to avoid hammering the database.
         """
         now = datetime.now()
-        
+
         # Check cache validity
-        if (self._cache_time and 
+        if (self._cache_time and
             (now - self._cache_time).total_seconds() < self._cache_ttl_seconds):
             return self._cache.get("sim_data")
-        
+
         try:
             supabase = get_supabase_client()
-            
+
             # Query for most recent simulation results for this site
             response = supabase.table("solar_annual_simulations").select(
                 "*"
             ).eq("site_id", self.site_id).order(
                 "created_at", desc=True
             ).limit(1).execute()
-            
+
             if not response.data:
                 logger.debug(f"No simulation data found for {self.site_id}")
                 return None
-            
+
             sim_result = response.data[0]
             results = sim_result.get("results", {})
-            
+
             # Cache the results
             self._cache["sim_data"] = results
             self._cache_time = now
-            
+
             logger.debug(f"Loaded simulation data for {self.site_id} (cached for {self._cache_ttl_seconds}s)")
             return results
-        
+
         except Exception as e:
             logger.error(f"Failed to get simulation data: {e}")
             return None
 
     def _get_current_hour_data(self, sim_data: Dict) -> Optional[Dict]:
         """Extract current hour's data from simulation results.
-        
+
         Uses SeasonalModeler (same as simulation engine) to generate realistic
         solar generation based on current date/time. Scales based on actual
         plant capacity to match weather patterns.
         """
         if not sim_data:
             return None
-        
+
         try:
             now = datetime.now()
             current_date = now.date()
             current_hour = now.hour
-            
+
             # === Use SeasonalModeler for consistent weather patterns ===
             # This matches what the simulation engine uses
             solar_efficiency = self._seasonal_modeler.get_solar_generation_factor(
                 current_date,
                 cloud_cover=0.2  # Assume 20% cloud cover (matching simulation)
             )
-            
+
             # Solar generation curve (Gaussian-like, peaks at 12:00)
             # Matches _generate_hourly_snapshots in solar_annual_aggregator.py
             hour_factor = max(0, 1 - abs(current_hour - 12) / 6)
-            
+
             # Calculate current solar generation based on plant capacity
             # 3.9 MWp nominal capacity * efficiency * hour factor * 0.8 (losses)
             current_solar_kw = self.plant_capacity_kwp * 1000 * solar_efficiency * hour_factor * 0.8
-            
+
             # === Building load (from simulation) ===
             occupancy_factor = self._seasonal_modeler.get_occupancy_factor(
                 current_date,
@@ -304,7 +304,7 @@ class SimulatedSolarConnector(SolarConnector):
             occupancy_load = 300 * occupancy_factor
             hvac_load = 200 * max(0, 1 - abs(current_hour - 14) / 8)  # HVAC peaks at 14:00
             building_load_kw = base_load + occupancy_load + hvac_load
-            
+
             # === BESS dynamics (from simulation) ===
             if current_hour < 7 or current_hour > 20:  # Night: charge from solar surplus
                 bess_charge_kw = max(0, current_solar_kw - building_load_kw)
@@ -315,16 +315,16 @@ class SimulatedSolarConnector(SolarConnector):
             else:
                 bess_charge_kw = 0
                 bess_discharge_kw = 0
-            
+
             # Simple BESS SOC model
             bess_soc_pct = 50 + (bess_charge_kw - bess_discharge_kw) * 0.1
             bess_soc_pct = max(10, min(90, bess_soc_pct))
-            
+
             # === Grid import/export ===
             net_solar = current_solar_kw - building_load_kw - bess_charge_kw + bess_discharge_kw
             grid_export_kw = max(0, net_solar)
             grid_import_kw = max(0, -net_solar)
-            
+
             return {
                 "solar_gen_kw": round(current_solar_kw, 1),
                 "building_load_kw": round(building_load_kw, 1),
@@ -332,7 +332,7 @@ class SimulatedSolarConnector(SolarConnector):
                 "grid_export_kw": round(grid_export_kw, 1),
                 "bess_soc_pct": round(bess_soc_pct, 1),
             }
-        
+
         except Exception as e:
             logger.error(f"Failed to extract current hour data: {e}")
             return None

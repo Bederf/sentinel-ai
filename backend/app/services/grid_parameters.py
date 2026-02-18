@@ -19,8 +19,6 @@ from typing import Dict, List, Optional, Any, Tuple
 
 from app.models.solar import (
     GridMeter,
-    NormalisedReading,
-    ReadingType,
 )
 from app.services.solar_ingestion_service import get_solar_ingestion_service
 from app.services.grid_compliance_service import (
@@ -28,7 +26,6 @@ from app.services.grid_compliance_service import (
     get_monitoring_engine,
     get_load_shed_scheduler,
 )
-from app.database.supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
 

@@ -14,7 +14,6 @@ Scenarios tested:
 """
 
 import pytest
-from fastapi import HTTPException
 from typing import Dict, Any
 
 # Test fixtures and helper functions

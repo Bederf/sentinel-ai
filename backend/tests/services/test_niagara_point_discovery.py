@@ -14,10 +14,8 @@ Tests cover:
 import json
 import pytest
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
 
 from app.services.niagara.point_classifier import (
-    ClassifiedPoint,
     ConfidenceLevel,
     PointClassifier,
     PointType,

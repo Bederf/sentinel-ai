@@ -1,9 +1,9 @@
 """RAG (Retrieval-Augmented Generation) service combining vector search with LLM."""
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any
 import logging
 
-from app.services.vector_db import get_vector_db_service, VectorDBService
-from app.services.ollama_client import get_ollama_client, OllamaClient
+from app.services.vector_db import get_vector_db_service
+from app.services.ollama_client import get_ollama_client
 
 logger = logging.getLogger(__name__)
 

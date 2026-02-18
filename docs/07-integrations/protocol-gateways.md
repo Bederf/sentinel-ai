@@ -387,16 +387,16 @@ When a client has a proprietary protocol:
 
 ```
 Clawd Bot Response:
-"I detected your [Mitsubishi VRF / CAREL chiller / KNX lighting] 
-system on the network. These use a proprietary protocol that SENTINEL 
-doesn't directly support. I recommend a [CoolMaster / IntesisBox] 
+"I detected your [Mitsubishi VRF / CAREL chiller / KNX lighting]
+system on the network. These use a proprietary protocol that SENTINEL
+doesn't directly support. I recommend a [CoolMaster / IntesisBox]
 gateway to bridge the gap.
 
 Expected cost: $[X]-[Y]k
 Deployment time: [N] days
 Ongoing maintenance: Minimal (gateway is passive)
 
-Would you like me to provide a specific quote, or schedule a 
+Would you like me to provide a specific quote, or schedule a
 site survey first?"
 ```
 

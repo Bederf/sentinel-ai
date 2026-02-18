@@ -1638,4 +1638,3 @@ This integration transforms a building from reactive (responding to occupants' d
 - Tridonic Luma Control 2: Technical Datasheet
 - Siemens PXC4.E16-2: Building Controller Specs
 - SENTINEL Codebase: `backend/app/services/` and `backend/app/api/`
-

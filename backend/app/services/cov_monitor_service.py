@@ -92,7 +92,7 @@ class COVMonitorService:
         """
         start_time = datetime.utcnow()
         timeout = timeout_seconds or settings.parasite_cov_timeout_seconds
-        
+
         self._verification_stats["total_attempts"] += 1
 
         try:
@@ -109,7 +109,7 @@ class COVMonitorService:
                 actual_value = read_result.value if hasattr(read_result, 'value') else read_result
                 read_success = True
                 read_error = None
-                
+
                 logger.debug(
                     f"COV read succeeded: equipment={equipment_id}, "
                     f"actual={actual_value}, expected={expected_value}"

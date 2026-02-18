@@ -1,6 +1,6 @@
 /**
  * ChillerToggleControlGated - ChillerToggleControl wrapped with module gating
- * 
+ *
  * Shows locked overlay if Controls module is inactive.
  * Shows normal chiller toggle if Controls module is active.
  */
@@ -28,10 +28,10 @@ interface ChillerToggleControlGatedProps {
 
 /**
  * Chiller toggle control with optional module gating.
- * 
+ *
  * If gated=true and Controls module is inactive, shows upgrade prompt.
  * If gated=false or Controls module is active, shows normal toggle.
- * 
+ *
  * @example
  * <ChillerToggleControlGated
  *   deviceId="chiller-001"

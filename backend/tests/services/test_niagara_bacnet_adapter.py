@@ -5,7 +5,6 @@ device abstraction layer via NiagaraBACnetAdapter.
 """
 
 import pytest
-from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from app.models.device import (
@@ -15,7 +14,6 @@ from app.models.device import (
     DevicePoint,
     DeviceStatus,
     DeviceType,
-    DeviceValue,
     PointType,
     ProtocolType,
 )
@@ -170,7 +168,6 @@ class TestAdapterLifecycle:
 
     @pytest.mark.asyncio
     async def test_disconnect_cancels_subscriptions(self, adapter, mock_client):
-        from app.services.niagara.bacnet_client import COVSubscription
 
         mock_sub = MagicMock()
         mock_sub.device_id = 1234

@@ -157,7 +157,7 @@ class TestAuditLoggerEncryption:
     def test_audit_logger_with_encryption(self):
         """Test that audit logger encrypts sensitive fields."""
         from app.services.audit_logger import AuditLogger
-        from app.models.audit_log import AuditActionType, AuditResultType
+        from app.models.audit_log import AuditResultType
 
         # Create a logger with encryption enabled
         logger = AuditLogger()

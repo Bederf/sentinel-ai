@@ -315,4 +315,3 @@ Key sections:
 - Section 5: Energy comparisons (annual consumption, cost, carbon)
 - Section 6: Real-world use cases (with timelines and cost impact)
 - Section 7: SENTINEL implementation (services, API endpoints, code)
-

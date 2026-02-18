@@ -15,16 +15,13 @@ Phase 28: SENTINEL Compliance
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
 import uuid
-import json
 import logging
 
 from app.models.compliance import (
     ComplianceAudit,
     FireEquipmentTracking,
-    EmergencyLightTesting,
     LegionellaRiskAssessment,
     ElectricalCompliance,
-    LiftInspectionTracking,
     ComplianceStatus,
     RiskLevel,
 )

@@ -1,6 +1,6 @@
 /**
  * TemperatureControlGated - TemperatureControl wrapped with module gating
- * 
+ *
  * Shows locked overlay if Controls module is inactive.
  * Shows normal temperature control if Controls module is active.
  */
@@ -24,10 +24,10 @@ interface TemperatureControlGatedProps {
 
 /**
  * Temperature control with optional module gating.
- * 
+ *
  * If gated=true and Controls module is inactive, shows upgrade prompt.
  * If gated=false or Controls module is active, shows normal control.
- * 
+ *
  * @example
  * <TemperatureControlGated
  *   label="Zone A Setpoint"

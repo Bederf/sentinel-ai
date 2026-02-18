@@ -384,11 +384,11 @@ export const DigitalTwinVisualization: React.FC<DigitalTwinVisualizationProps> =
 
     const animate = () => {
       requestAnimationFrame(animate);
-      
+
       const currentTime = performance.now();
       const deltaTime = (currentTime - lastFrameTime) / 1000;
       lastFrameTime = currentTime;
-      
+
       time += 0.016;
 
       scene.traverse((o: any) => {

@@ -313,4 +313,3 @@ Phase A validation complete. The geometric abstraction pipeline is **proven to w
 - ✅ End-to-end test coverage
 
 **Next:** Proceed with Phase B (DXF Parser) or Tier 2 (On-Premise Vision Model).
-

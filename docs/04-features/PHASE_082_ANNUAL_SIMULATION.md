@@ -358,11 +358,11 @@ Fixed schedule: Charge 22:00-06:00 (off-peak), Discharge 07:00-10:00 + 18:00-20:
 ```
 Monthly Cost = Energy Cost + Demand Cost
 
-Energy Cost = 
+Energy Cost =
   Grid_Import_kwh × Weighted_Tariff_Rate
   (Assuming 30% peak, 30% standard, 40% off-peak)
 
-Demand Cost = 
+Demand Cost =
   Peak_Demand_kW ÷ 0.95 (power factor) × Demand_Charge_ZAR_kVA
 ```
 

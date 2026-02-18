@@ -10,8 +10,6 @@ from typing import Any, Dict, Optional
 
 from app.services.ollama_client import OllamaClient
 from app.services.rag_service import get_rag_service
-from app.services.explanation_service import get_explanation_service
-from app.services.maintenance_recommender import get_maintenance_recommender
 from app.database.repositories.equipment_repository import EquipmentRepository
 from app.database.repositories.alert_repository import AlertRepository
 from ml.conversation.intent import IntentClassifier, Intent, ClassifiedQuery

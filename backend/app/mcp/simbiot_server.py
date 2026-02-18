@@ -21,7 +21,6 @@ from datetime import datetime, timedelta
 from collections import defaultdict
 
 from app.services.device_abstraction import device_manager
-from app.models.device import DeviceStatus
 from app.services.building_loader import get_building_loader
 
 logger = logging.getLogger(__name__)
@@ -1798,12 +1797,12 @@ async def process_municipal_bill_tool(
             try:
                 from app.database.repositories.building_repository import BuildingRepository
                 building_repo = BuildingRepository()
-                
+
                 # Extract NMD and demand charge from bill
                 extracted_nmd_kva = extracted_data.get("demand_kva")
                 billing_start = extracted_data.get("billing_period_start")
                 billing_end = extracted_data.get("billing_period_end")
-                
+
                 if extracted_nmd_kva:
                     # Update building with real NMD from bill
                     building_update = {
@@ -1814,16 +1813,16 @@ async def process_municipal_bill_tool(
                         "bill_document_path": str(pdf_path),
                         "nmd_extracted_from_bill": True,
                     }
-                    
+
                     # Add billing cycle dates if extracted
                     if billing_start:
                         building_update["billing_cycle_start_date"] = billing_start
                     if billing_end:
                         building_update["billing_cycle_end_date"] = billing_end
-                    
+
                     # Update the building
                     await building_repo.update(building_id, building_update)
-                    
+
                     logger.info(
                         f"Updated building {building_id} NMD from bill: {extracted_nmd_kva} kVA "
                         f"(confidence: {extracted_data.get('confidence', 0.0)})"
@@ -2649,9 +2648,7 @@ async def import_point_list_tool(
     4. Create device entries with point mappings
     5. Infer zone structure from device naming patterns
     """
-    import json
     import re
-    from pathlib import Path
 
     if not point_list:
         return {
@@ -2949,8 +2946,6 @@ async def import_controller_list_tool(
     This tool creates controller devices that can be used as parent references
     for other equipment in the system.
     """
-    import json
-    from pathlib import Path
 
     if not controllers:
         return {
@@ -3218,10 +3213,10 @@ async def discover_tridonic_gateway_tool(
         # Generate next steps
         result["next_steps"] = [
             f"Review {len(all_devices)} discovered devices and equipment codes",
-            f"Update building features: set dali=true in building.json",
+            "Update building features: set dali=true in building.json",
             f"Save gateway IP ({gateway_ip}) to building config",
-            f"Call bulk_discover with equipment_list to fetch full metadata",
-            f"Call add_building_zones with dali_zone mappings for cross-system coordination",
+            "Call bulk_discover with equipment_list to fetch full metadata",
+            "Call add_building_zones with dali_zone mappings for cross-system coordination",
             f"Register site with DALI service: register_niagara_site('{building_id}', gateway_ip)",
         ]
 
@@ -4703,7 +4698,7 @@ class SIMBIOTMCPServer:
         """Initialize SIMBIOT MCP server."""
         # Import registry tools (code search, code fetch, code_structure)
         from app.mcp.tools.registry import get_all_tools, get_all_handlers
-        
+
         # Merge MCP_TOOLS with registry tools
         self.tools = MCP_TOOLS + get_all_tools()
         self.tool_handlers = {
@@ -4752,7 +4747,7 @@ class SIMBIOTMCPServer:
             "process_municipal_bill": process_municipal_bill_tool,
             "get_utility_costs": get_utility_costs_tool,
         }
-        
+
         # Merge registry tools (code search, fetch, structure)
         from app.mcp.tools.registry import get_all_handlers
         self.tool_handlers.update(get_all_handlers())

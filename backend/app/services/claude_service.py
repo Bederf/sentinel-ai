@@ -3,7 +3,7 @@
 import json
 import logging
 import sys
-from typing import AsyncGenerator, Any
+from typing import AsyncGenerator
 
 from anthropic import Anthropic, APIError, AuthenticationError, RateLimitError
 
@@ -219,7 +219,7 @@ When referencing data in your responses, ALWAYS use these citation formats:
 **Sites:** Reference as [SITE-ID Site Name]
 - Example: "Based on [site-001 Sandton City] data, the HVAC system shows..."
 
-**Equipment:** Reference as [EQUIPMENT-ID Equipment Name]  
+**Equipment:** Reference as [EQUIPMENT-ID Equipment Name]
 - Example: "The [eqp-003 AHU-7] is showing signs of bearing degradation..."
 
 **Alerts:** Reference as [ALERT-ID]

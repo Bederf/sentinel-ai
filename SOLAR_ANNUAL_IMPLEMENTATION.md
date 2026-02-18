@@ -168,7 +168,7 @@ Cache in Supabase (solar_annual_simulations table)
 
 ### ML Learning Curve
 
-**Phase 1 (Month 1-2): Learning** 
+**Phase 1 (Month 1-2): Learning**
 - 2-5% savings
 - Basic TOU arbitrage, collecting baseline data
 

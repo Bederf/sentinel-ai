@@ -6,14 +6,13 @@ Generates comprehensive baseline assessment reports in multiple formats (JSON, P
 Phase 44: Asset Baseline Assessment
 """
 
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, List
 from datetime import datetime
-import json
 import logging
 
 from app.services.baseline_service import get_baseline_service
 from app.services.building_loader import get_building_loader
-from app.models.baseline import EquipmentBaseline, BaselineComparison
+from app.models.baseline import BaselineComparison
 
 logger = logging.getLogger(__name__)
 

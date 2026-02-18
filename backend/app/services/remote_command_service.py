@@ -21,7 +21,7 @@ from app.models.remote_ops import AuthorizationLevel, COMMAND_AUTHORIZATION
 from app.services.auth_service import get_authorization_service
 from app.services.device_abstraction import device_manager
 from app.services.audit_logger import AuditLogger
-from app.models.audit_log import AuditActionType, AuditResultType
+from app.models.audit_log import AuditResultType
 
 logger = logging.getLogger(__name__)
 

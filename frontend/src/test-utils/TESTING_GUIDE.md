@@ -815,4 +815,3 @@ vi.stubGlobal('fetch', vi.fn());
 - [Testing Library Queries](https://testing-library.com/queries)
 - [TanStack Query Testing](https://tanstack.com/query/latest/docs/react/testing)
 - [Jest DOM Matchers](https://github.com/testing-library/jest-dom)
-

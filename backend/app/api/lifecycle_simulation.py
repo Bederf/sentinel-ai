@@ -10,11 +10,10 @@ from typing import Optional, List
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from app.services.lifecycle_orchestrator import SCENARIOS, EventType
+from app.services.lifecycle_orchestrator import SCENARIOS
 from app.services.simulation_orchestrator import (
     get_simulation_by_task_id,
 )
-from app.services.simulation_logger import SimulationLogger
 from app.database.supabase_client import Supabase
 from datetime import datetime
 import uuid

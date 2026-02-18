@@ -5,7 +5,6 @@ Provides structured data for API endpoints and AI context.
 """
 
 import csv
-import os
 from datetime import datetime
 from pathlib import Path
 from typing import Any

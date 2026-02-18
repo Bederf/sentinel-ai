@@ -13,14 +13,12 @@ Tests cover:
 import json
 import pytest
 from pathlib import Path
-from unittest.mock import patch
 
 from app.services.niagara.point_classifier import (
     ClassifiedPoint,
     ConfidenceLevel,
     PointClassifier,
     PointType,
-    get_point_classifier,
 )
 from app.services.niagara.mapping_service import (
     EquipmentMapping,

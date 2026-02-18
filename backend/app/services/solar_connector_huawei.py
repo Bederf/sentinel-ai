@@ -17,7 +17,6 @@ from app.models.solar import (
     SolarInverter,
     SolarString,
     BESSContainer,
-    BESSRack,
     GridMeter,
     NormalisedReading,
     ConnectorStatus,

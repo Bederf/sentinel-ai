@@ -5,19 +5,12 @@ and smoke management mode in response to fire alarm events. All state
 changes go through FireSafetyRepository (dual-write Supabase + JSON).
 """
 
-import asyncio
 import logging
 import time
-from datetime import datetime
 from typing import Any, Dict, List, Optional, Set
-from uuid import uuid4
 
 from app.database.repositories.fire_safety_repository import get_fire_safety_repository
 from app.models.fire_safety import (
-    AlarmSeverity,
-    CauseEffectEffect,
-    CauseEffectEntry,
-    CauseEffectTargetType,
     DamperStatusEnum,
     FanStatus,
 )

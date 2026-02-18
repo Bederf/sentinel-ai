@@ -105,7 +105,7 @@ describe('AutonomousDecisionPanel', () => {
     })
 
     renderComponent()
-    
+
     expect(screen.getByText(/autonomous/i)).toBeInTheDocument()
   })
 

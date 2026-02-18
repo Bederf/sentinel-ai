@@ -118,5 +118,3 @@ export const zoneIngestionApi = {
   getAllCentroids: (buildingId: string) =>
     fetchApi(`/api/buildings/${buildingId}/zone-ingestion/centroids`),
 };
-
-

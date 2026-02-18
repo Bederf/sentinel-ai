@@ -171,7 +171,7 @@ ACTUAL CONSUMPTION (from simulation or real BMS):
   = Baseline: 245 kWh/day
 
 OPTIMIZED CONSUMPTION (rules engine):
-  building_load (baseline) 
+  building_load (baseline)
   - HVAC optimization rules:
     × Chiller staging bonus (-%5)
     × Setpoint reduction -%3)
@@ -195,7 +195,7 @@ Savings = 32 kWh × R5/kWh = R160
 2. **Create API Endpoint**
    ```
    GET /api/energy/optimised-consumption?site_id=site-002&date=2025-02-15
-   
+
    Returns:
    {
        "actual_kwh": 245,

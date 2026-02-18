@@ -10,7 +10,7 @@ DECLARE
 BEGIN
     -- Look up building UUID for Sandton (site-002)
     SELECT id INTO v_building_id FROM buildings WHERE code = 'site-002';
-    
+
     IF v_building_id IS NULL THEN
         RAISE NOTICE 'Building site-002 not found, skipping zones restoration';
         RETURN;
@@ -22,9 +22,9 @@ BEGIN
     -- =========================================================================
     -- LEVEL 0 ZONES (001-005) - 20 desks each
     -- =========================================================================
-    
+
     INSERT INTO zones (zone_id, zone_name, building_id, floor, zone_letter, zone_type, typical_occupancy)
-    VALUES 
+    VALUES
         ('Zone-001', 'Level 0 Zone A', v_building_id, 'L0', 'A', 'open_office', 20),
         ('Zone-002', 'Level 0 Zone B', v_building_id, 'L0', 'B', 'open_office', 20),
         ('Zone-003', 'Level 0 Zone C', v_building_id, 'L0', 'C', 'open_office', 20),
@@ -35,9 +35,9 @@ BEGIN
     -- =========================================================================
     -- LEVEL 1 ZONES (101-105) - 20 desks each
     -- =========================================================================
-    
+
     INSERT INTO zones (zone_id, zone_name, building_id, floor, zone_letter, zone_type, typical_occupancy)
-    VALUES 
+    VALUES
         ('Zone-101', 'Level 1 Zone A', v_building_id, 'L1', 'A', 'open_office', 20),
         ('Zone-102', 'Level 1 Zone B', v_building_id, 'L1', 'B', 'open_office', 20),
         ('Zone-103', 'Level 1 Zone C', v_building_id, 'L1', 'C', 'open_office', 20),
@@ -48,9 +48,9 @@ BEGIN
     -- =========================================================================
     -- LEVEL 2 ZONES (201-205) - 20 desks each
     -- =========================================================================
-    
+
     INSERT INTO zones (zone_id, zone_name, building_id, floor, zone_letter, zone_type, typical_occupancy)
-    VALUES 
+    VALUES
         ('Zone-201', 'Level 2 Zone A', v_building_id, 'L2', 'A', 'open_office', 20),
         ('Zone-202', 'Level 2 Zone B', v_building_id, 'L2', 'B', 'open_office', 20),
         ('Zone-203', 'Level 2 Zone C', v_building_id, 'L2', 'C', 'open_office', 20),
@@ -74,7 +74,7 @@ END $$;
 SELECT COUNT(*) as zone_count FROM zones WHERE building_id = (SELECT id FROM buildings WHERE code = 'site-002');
 
 -- List all zones
-SELECT zone_id, floor, zone_letter, typical_occupancy 
-FROM zones 
+SELECT zone_id, floor, zone_letter, typical_occupancy
+FROM zones
 WHERE building_id = (SELECT id FROM buildings WHERE code = 'site-002')
 ORDER BY zone_id;

@@ -8,13 +8,11 @@ Provides:
 - Fleet-wide risk summary
 """
 
-import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Dict, List, Optional
 from pathlib import Path
 
-import numpy as np
 
 logger = logging.getLogger(__name__)
 

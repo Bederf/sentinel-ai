@@ -19,7 +19,7 @@ class DeskRepository:
         """Execute a Supabase query with retry on rate limit."""
         delay = 0.5
         last_error = None
-        
+
         for attempt in range(max_retries + 1):
             try:
                 return query.execute()
@@ -36,7 +36,7 @@ class DeskRepository:
                         raise e
                 else:
                     raise e
-        
+
         if last_error:
             raise last_error
 

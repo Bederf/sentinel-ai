@@ -57,14 +57,14 @@ export async function apiFetch<T>(
   // Retry configuration for rate limit errors
   const maxRetries = 3;
   let delay = 500; // Start with 500ms
-  
+
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       const response = await fetch(url, { ...options, headers, body });
 
       if (!response.ok) {
         const data = await parseErrorResponse(response);
-        
+
         // Handle rate limit errors with retry
         if (response.status === 429 && attempt < maxRetries) {
           console.warn(`Rate limit hit (429), retrying in ${delay}ms... (attempt ${attempt + 1}/${maxRetries})`);
@@ -72,7 +72,7 @@ export async function apiFetch<T>(
           delay *= 2; // Exponential backoff
           continue; // Retry
         }
-        
+
         throw new ApiError(response.status, `HTTP ${response.status}`, data);
       }
 
@@ -89,7 +89,7 @@ export async function apiFetch<T>(
         delay *= 2;
         continue;
       }
-      
+
       if (error instanceof ApiError) throw error;
       throw new ApiError(
         0,
@@ -98,6 +98,6 @@ export async function apiFetch<T>(
       );
     }
   }
-  
+
   throw new ApiError(429, 'Rate limit exceeded after retries');
 }

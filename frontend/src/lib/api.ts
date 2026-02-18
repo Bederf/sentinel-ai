@@ -1753,7 +1753,7 @@ export const api = {
         value: sp.value,
       };
     });
-    
+
     return fetchApi(`/api/optimization/approve`, {
       method: "POST",
       body: JSON.stringify({

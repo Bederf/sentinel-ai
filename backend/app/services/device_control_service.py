@@ -29,15 +29,15 @@ class EquipmentType(str, Enum):
     PUMP = "PUMP"
     SPLIT = "SPLIT"  # Split AC
     CT = "CT"  # Cooling Tower
-    
+
     # Lighting
     DALI = "DALI"  # DALI controller
     LUM = "LUM"  # Luminaire/fixture
-    
+
     # Power
     GEN = "GEN"  # Generator
     UPS = "UPS"  # Uninterruptible Power Supply
-    
+
     # Other
     MTR = "MTR"  # Meter
 
@@ -104,7 +104,7 @@ EQUIPMENT_CONTROL_POINTS = {
             writable=True
         ),
     ],
-    
+
     EquipmentType.VAV: [
         ControlPoint(
             name="airflow_setpoint",
@@ -134,7 +134,7 @@ EQUIPMENT_CONTROL_POINTS = {
             writable=True
         ),
     ],
-    
+
     EquipmentType.AHU: [
         ControlPoint(
             name="supply_temp_setpoint",
@@ -169,7 +169,7 @@ EQUIPMENT_CONTROL_POINTS = {
             writable=True
         ),
     ],
-    
+
     EquipmentType.CHILLER: [
         ControlPoint(
             name="chw_setpoint",
@@ -197,7 +197,7 @@ EQUIPMENT_CONTROL_POINTS = {
             writable=True
         ),
     ],
-    
+
     EquipmentType.PUMP: [
         ControlPoint(
             name="flow_setpoint",
@@ -225,7 +225,7 @@ EQUIPMENT_CONTROL_POINTS = {
             writable=True
         ),
     ],
-    
+
     EquipmentType.DALI: [
         ControlPoint(
             name="brightness_level",
@@ -253,7 +253,7 @@ EQUIPMENT_CONTROL_POINTS = {
             writable=True
         ),
     ],
-    
+
     EquipmentType.LUM: [
         ControlPoint(
             name="brightness_level",
@@ -265,7 +265,7 @@ EQUIPMENT_CONTROL_POINTS = {
             writable=True
         ),
     ],
-    
+
     EquipmentType.GEN: [
         ControlPoint(
             name="load_mode",
@@ -293,7 +293,7 @@ EQUIPMENT_CONTROL_POINTS = {
             writable=True
         ),
     ],
-    
+
     EquipmentType.UPS: [
         ControlPoint(
             name="output_mode",
@@ -321,64 +321,64 @@ EQUIPMENT_CONTROL_POINTS = {
 
 class DeviceControlService:
     """Service for device control operations."""
-    
+
     @staticmethod
     def get_equipment_type(equipment_code: str) -> Optional[EquipmentType]:
         """Extract equipment type from equipment code.
-        
+
         Format: {site}-{TYPE}-{location}
         Example: S002-FCU-203 → FCU
         """
         if not equipment_code:
             return None
-        
+
         parts = equipment_code.split('-')
         if len(parts) < 2:
             return None
-        
+
         type_str = parts[1].upper()
-        
+
         try:
             return EquipmentType(type_str)
         except ValueError:
             logger.warning(f"Unknown equipment type in code: {equipment_code}")
             return None
-    
+
     @staticmethod
     def get_control_points(equipment_code: str) -> Dict[str, ControlPoint]:
         """Get all controllable points for equipment."""
         eq_type = DeviceControlService.get_equipment_type(equipment_code)
         if not eq_type:
             return {}
-        
+
         points = EQUIPMENT_CONTROL_POINTS.get(eq_type, [])
         return {p.name: p for p in points}
-    
+
     @staticmethod
     def is_controllable(equipment_code: str) -> bool:
         """Check if equipment type is controllable."""
         eq_type = DeviceControlService.get_equipment_type(equipment_code)
         return eq_type in EQUIPMENT_CONTROL_POINTS
-    
+
     @staticmethod
     def validate_control_value(equipment_code: str, point_name: str, value: Any) -> Dict[str, Any]:
         """Validate a control value against point constraints.
-        
+
         Returns: {"valid": bool, "errors": [str], "warning": Optional[str]}
         """
         points = DeviceControlService.get_control_points(equipment_code)
-        
+
         if point_name not in points:
             return {
                 "valid": False,
                 "errors": [f"Unknown control point: {point_name}"],
                 "warning": None
             }
-        
+
         point = points[point_name]
         errors = []
         warning = None
-        
+
         # Type checking
         if point.data_type == "float":
             try:
@@ -396,20 +396,20 @@ class DeviceControlService:
         elif point.data_type == "enum":
             if value not in point.enum_values:
                 errors.append(f"Invalid value. Allowed: {point.enum_values}")
-        
+
         # Range checking
         if not errors and point.min_value is not None and value < point.min_value:
             errors.append(f"Value {value} below minimum {point.min_value}")
         if not errors and point.max_value is not None and value > point.max_value:
             errors.append(f"Value {value} above maximum {point.max_value}")
-        
+
         # Warnings (not errors, but noteworthy)
         if not errors and point.data_type in ["float", "int"]:
             if point.min_value and value == point.min_value:
                 warning = f"Value at minimum threshold ({point.min_value})"
             elif point.max_value and value == point.max_value:
                 warning = f"Value at maximum threshold ({point.max_value})"
-        
+
         return {
             "valid": len(errors) == 0,
             "errors": errors,

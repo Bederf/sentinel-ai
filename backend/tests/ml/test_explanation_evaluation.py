@@ -1,7 +1,5 @@
 """Tests for Explanation Evaluation framework."""
 
-import pytest
-from unittest.mock import Mock, patch
 from ml.explanations.evaluation import (
     ExplanationEvaluator,
     ExplanationMetrics,

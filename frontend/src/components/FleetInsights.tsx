@@ -383,27 +383,27 @@ export function FleetInsights() {
       // Stagger requests with 600ms delays to prevent rate limiting (100 req/min limit)
       const sumRes = await fleetApi.getSummary();
       setSummary(sumRes);
-      
+
       await new Promise(resolve => setTimeout(resolve, 600));
       const patRes = await fleetApi.getFailurePatterns();
       setPatterns(patRes.patterns);
-      
+
       await new Promise(resolve => setTimeout(resolve, 600));
       const riskRes = await fleetApi.getRiskDistribution();
       setRisk(riskRes);
-      
+
       await new Promise(resolve => setTimeout(resolve, 600));
       const benchRes = await fleetApi.getBenchmarks();
       setBenchmarks(benchRes.benchmarks);
-      
+
       await new Promise(resolve => setTimeout(resolve, 600));
       const gmRes = await fleetApi.getGlobalModels();
       setGlobalModels(gmRes.models);
-      
+
       await new Promise(resolve => setTimeout(resolve, 600));
       const ftRes = await fleetApi.getFineTunedModels();
       setFineTunedModels(ftRes.models);
-      
+
       await new Promise(resolve => setTimeout(resolve, 600));
       const impRes = await fleetApi.getImprovementSummary();
       setImprovement(impRes);

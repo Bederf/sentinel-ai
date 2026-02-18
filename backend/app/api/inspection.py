@@ -15,13 +15,11 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, Depends, Query, Path, status
-from pydantic import BaseModel
 
 from app.models.inspection import (
     InspectionSchedule,
     InspectionScheduleCreate,
     InspectionTask,
-    InspectionTaskCreate,
     InspectionTaskAssignmentRequest,
     InspectionTaskRescheduleRequest,
     InspectionTaskCompleteRequest,
@@ -31,7 +29,6 @@ from app.models.inspection import (
     InspectionDeficiencyCreate,
     InspectionOverviewResponse,
     InspectionTaskStatus,
-    InspectionPriority,
     DeficiencySeverity,
     InspectionSubmission,
     InspectionScheduleSummary
@@ -767,7 +764,6 @@ async def submit_weekly_inspection(
     - Deficiency count calculated from responses
     """
     from app.services.checklist_service import get_checklist_service
-    from datetime import date
     import uuid
 
     scheduler = get_inspection_scheduler()

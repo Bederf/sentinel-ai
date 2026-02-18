@@ -238,12 +238,12 @@ supabase_storage_bucket: str = "building-documents"
 2. **Verify Database Records**
    ```sql
    -- Check document created
-   SELECT id, title, building_id, indexing_status, chunk_count 
+   SELECT id, title, building_id, indexing_status, chunk_count
    FROM documents WHERE building_id IS NOT NULL;
-   
+
    -- Check chunks created with building_id
-   SELECT COUNT(*), building_id 
-   FROM document_chunks WHERE building_id IS NOT NULL 
+   SELECT COUNT(*), building_id
+   FROM document_chunks WHERE building_id IS NOT NULL
    GROUP BY building_id;
    ```
 

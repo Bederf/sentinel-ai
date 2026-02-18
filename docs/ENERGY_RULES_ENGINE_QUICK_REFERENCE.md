@@ -326,7 +326,7 @@ curl "localhost:9095/api/energy/comparison-summary?site_id=site-002" | jq '.dail
                savings_percent=0.0,
                reason="Condition not met"
            )
-       
+
        savings = calculate_savings(state.some_condition)
        return RuleResult(
                rule_id="my_optimization",

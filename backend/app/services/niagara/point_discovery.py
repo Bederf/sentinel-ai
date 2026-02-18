@@ -10,7 +10,6 @@ results to avoid repeated scanning.
 
 import json
 import logging
-import time
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -18,13 +17,11 @@ from typing import Any, Dict, List, Optional
 
 from app.services.niagara.bacnet_client import (
     BACnetException,
-    DiscoveredPoint,
     NiagaraBACnetClient,
     get_bacnet_client,
 )
 from app.services.niagara.point_classifier import (
     ClassifiedPoint,
-    ConfidenceLevel,
     PointClassifier,
     get_point_classifier,
 )

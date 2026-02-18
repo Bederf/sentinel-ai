@@ -11,10 +11,9 @@ with metadata stored in a registry JSON file.
 
 import json
 import logging
-import os
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional
 
 try:
     import pandas as pd
@@ -25,7 +24,6 @@ except ImportError:
 
 from app.models.feature import (
     TrainingDatasetMetadata,
-    TrainingDataRequest,
 )
 from app.services.feature_service import get_feature_service
 

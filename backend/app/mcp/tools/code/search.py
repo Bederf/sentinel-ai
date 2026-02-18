@@ -4,10 +4,9 @@ Code Search Helpers
 Provides functions for searching the codebase by file patterns, content, and symbols.
 """
 
-import os
 import re
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional
 import fnmatch
 
 # Root of the BMS intelligence codebase
@@ -188,10 +187,10 @@ def search_symbols(
     # Patterns for function/class definitions
     # Build patterns using string concatenation to avoid f-string issues with special chars
     escaped_name = re.escape(symbol_name)
-    
+
     py_func_pattern = re.compile(r"^\s*(async\s+)?def\s+" + escaped_name + r"\s*\(")
     py_class_pattern = re.compile(r"^\s*class\s+" + escaped_name + r"[\(:\s]")
-    
+
     ts_func_pattern = re.compile(r"(function|const|export|async)\s+" + escaped_name + r"\s*[\(:|=]")
     ts_class_pattern = re.compile(r"(class|interface|type)\s+" + escaped_name + r"\s*[{:\|<]")
 

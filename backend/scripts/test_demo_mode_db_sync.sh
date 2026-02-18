@@ -103,7 +103,7 @@ OPERATING_DATA=$(echo "$DB_RESULT" | awk -F'|' '{print $2}' | xargs)
 
 if echo "$OPERATING_DATA" | grep -q "temperature_setpoint"; then
     echo -e "${GREEN}✓ operating_data contains temperature_setpoint${NC}"
-    
+
     # Check if value is 20
     if echo "$OPERATING_DATA" | grep -q '"value": 20' || echo "$OPERATING_DATA" | grep -q '"value":20'; then
         echo -e "${GREEN}✓ Value is correctly set to 20${NC}"

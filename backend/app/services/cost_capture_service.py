@@ -11,8 +11,8 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
-from typing import Dict, Any, Optional, List
+from datetime import date, timedelta
+from typing import Dict, Any, Optional
 
 from app.database.repositories.budget_repository import BudgetRepository
 from app.database.repositories.contract_repository import ContractRepository

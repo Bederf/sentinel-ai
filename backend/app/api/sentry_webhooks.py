@@ -16,17 +16,14 @@ Manager control additions:
 import base64
 import logging
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, status, Header, Request
+from fastapi import APIRouter, HTTPException, status, Header, Request
 
-from app.models.auth import AuthContext, AuthLevel
-from app.middleware.auth_middleware import require_auth
 from pydantic import BaseModel, Field
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 
 from app.services.sentry_integration.work_order_notifier import work_order_notifier
 from app.services.ocr_service import get_ocr_service
 from app.services.sentry_integration.ocr_correction_handler import get_ocr_correction_handler
-from app.models.service_record import ServiceStatus
 from app.database.repositories.service_record_repository import ServiceRecordRepository
 from app.services.sentry_auth_service import get_sentry_jwt_headers
 

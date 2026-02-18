@@ -17,17 +17,13 @@ from typing import Dict, List, Optional
 from app.models.solar import (
     SolarPlant,
     SolarInverter,
-    SolarString,
     BESSContainer,
     GridMeter,
     NormalisedReading,
-    ConnectorStatus,
-    QualityFlag,
 )
 from app.services.solar_connector_base import SolarConnector
 from app.services.solar_connector_huawei import SimulatedHuaweiConnector
 from app.services.solar_connector_schneider import SimulatedSchneiderConnector
-from app.services.solar_connector_simulation import SimulatedSolarConnector
 from app.database.supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)

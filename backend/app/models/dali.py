@@ -5,7 +5,6 @@ Models for controllers, sensors (PIR/daylight), luminaires, and zone aggregation
 """
 
 from dataclasses import dataclass, field
-from datetime import datetime
 from enum import Enum
 from typing import List, Dict, Any, Optional
 

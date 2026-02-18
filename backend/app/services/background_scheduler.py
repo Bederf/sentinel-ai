@@ -9,7 +9,7 @@ Handles periodic background tasks such as:
 
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
@@ -90,8 +90,7 @@ class BackgroundSchedulerService:
         try:
             # Import here to avoid circular imports
             import random
-            from app.models.audit_log import AuditActionType, AuditResultType, \
-                AuditActionType as AAT, AuditResultType as ART
+            from app.models.audit_log import AuditResultType as ART
             from app.database.repositories.equipment_repository import EquipmentRepository
 
             logger.debug("Generating periodic demo audit data...")
@@ -1059,7 +1058,6 @@ class BackgroundSchedulerService:
             from app.services.simulation_orchestrator import (
                 create_orchestrator,
                 register_simulation,
-                unregister_simulation,
                 get_simulation_by_task_id,
             )
 
@@ -1137,7 +1135,7 @@ class BackgroundSchedulerService:
                 .update({"status": "running"}) \
                 .eq("task_id", task_id) \
                 .execute()
-            logger.warning(f">>> Task marked as running")
+            logger.warning(">>> Task marked as running")
 
             logger.warning(f">>> ✅ Starting lifecycle simulation task {task_id}")
 
@@ -1145,7 +1143,7 @@ class BackgroundSchedulerService:
             logger.warning(f">>> Creating orchestrator for task {task_id}...")
             orchestrator = create_orchestrator(task_id)
             register_simulation(task_id, orchestrator)
-            logger.warning(f">>> Orchestrator registered")
+            logger.warning(">>> Orchestrator registered")
 
             # Start simulation and wait for completion
             logger.warning(f">>> Starting simulation for task {task_id}...")
@@ -1155,7 +1153,7 @@ class BackgroundSchedulerService:
                 scenario=task["scenario"],
                 duration_minutes=float(task.get("duration_minutes", 3650.0)),
             )
-            logger.warning(f">>> Simulation task completed")
+            logger.warning(">>> Simulation task completed")
 
         except Exception as e:
             logger.error(f"❌ Error in simulation queue processor: {e}", exc_info=True)

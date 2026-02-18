@@ -306,7 +306,7 @@ function getEquipmentPosition(
       return [centroid.x + typeOffset[0], y, centroid.z + typeOffset[1]];
     }
   }
-  
+
   // Fallback to zone letter offsets
   const zoneOffset = (zoneLetter.charCodeAt(0) - 65) * 6;
   return [zoneOffset + 3, y, 10];
@@ -615,7 +615,7 @@ If issues arise:
 - **Backup Data:** `/opt/bms-intelligence/backend/app/data/buildings/site-002/{zones,desks}.json.bak`
 - **Migration Schema:** `supabase/migrations/057_zone_ingestion_schema.sql`
 - **Migration Script:** `backend/scripts/migrate_zone_desk_data.py`
-- **Related Docs:** 
+- **Related Docs:**
   - `docs/02-architecture/naming-conventions.md`
   - `docs/04-features/DIGITAL_TWIN_REAL_DATA_INTEGRATION.md`
   - `CLAUDE.md` (project instructions)

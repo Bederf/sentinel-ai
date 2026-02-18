@@ -25,13 +25,13 @@ CREATE TABLE IF NOT EXISTS public.solar_annual_simulations (
 );
 
 -- Index for fast lookups
-CREATE INDEX IF NOT EXISTS idx_solar_annual_site_year 
+CREATE INDEX IF NOT EXISTS idx_solar_annual_site_year
 ON public.solar_annual_simulations(site_id, year);
 
-CREATE INDEX IF NOT EXISTS idx_solar_annual_scenario 
+CREATE INDEX IF NOT EXISTS idx_solar_annual_scenario
 ON public.solar_annual_simulations(scenario);
 
-CREATE INDEX IF NOT EXISTS idx_solar_annual_created 
+CREATE INDEX IF NOT EXISTS idx_solar_annual_created
 ON public.solar_annual_simulations(created_at DESC);
 
 -- Background task tracking table
@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS public.solar_annual_tasks (
     task_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     site_id TEXT NOT NULL,
     scenario TEXT NOT NULL,
-    status TEXT NOT NULL 
+    status TEXT NOT NULL
         CHECK (status IN ('queued', 'running', 'completed', 'failed')),
     progress_pct INTEGER NOT NULL DEFAULT 0,
     days_completed INTEGER NOT NULL DEFAULT 0,
@@ -49,13 +49,13 @@ CREATE TABLE IF NOT EXISTS public.solar_annual_tasks (
 );
 
 -- Index for task lookup and cleanup
-CREATE INDEX IF NOT EXISTS idx_solar_annual_tasks_site 
+CREATE INDEX IF NOT EXISTS idx_solar_annual_tasks_site
 ON public.solar_annual_tasks(site_id);
 
-CREATE INDEX IF NOT EXISTS idx_solar_annual_tasks_status 
+CREATE INDEX IF NOT EXISTS idx_solar_annual_tasks_status
 ON public.solar_annual_tasks(status);
 
-CREATE INDEX IF NOT EXISTS idx_solar_annual_tasks_started 
+CREATE INDEX IF NOT EXISTS idx_solar_annual_tasks_started
 ON public.solar_annual_tasks(started_at DESC);
 
 -- Function to clean up old tasks (older than 7 days)
@@ -64,7 +64,7 @@ RETURNS void AS $$
 BEGIN
   DELETE FROM public.solar_annual_tasks
   WHERE started_at < NOW() - INTERVAL '7 days';
-  
+
   DELETE FROM public.solar_annual_simulations
   WHERE updated_at < NOW() - INTERVAL '90 days'
     AND scenario != 'grant_solar_bess_ai_annual';  -- Keep current scenario results longer
@@ -76,13 +76,13 @@ ALTER TABLE public.solar_annual_simulations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.solar_annual_tasks ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policy: Authenticated users can read their site's simulations
-CREATE POLICY "solar_annual_read_policy" 
-ON public.solar_annual_simulations 
-FOR SELECT 
+CREATE POLICY "solar_annual_read_policy"
+ON public.solar_annual_simulations
+FOR SELECT
 USING (
   EXISTS (
-    SELECT 1 FROM public.user_site_access 
-    WHERE user_id = auth.uid() 
+    SELECT 1 FROM public.user_site_access
+    WHERE user_id = auth.uid()
     AND site_id = solar_annual_simulations.site_id
   )
 );

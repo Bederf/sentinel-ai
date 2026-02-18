@@ -12,8 +12,8 @@ from datetime import datetime
 from app.services.module_registry_service import module_registry
 from app.database.repositories.module_access_repository import get_module_access_repository
 from app.models.module_registry import (
-    ModuleType, ModuleStatus, RecommendationPriority, RecommendationType,
-    AIRecommendation, MODULE_DEFINITIONS
+    ModuleType, RecommendationPriority, RecommendationType,
+    AIRecommendation
 )
 from app.middleware.auth_middleware import require_auth
 from app.models.auth import AuthContext, AuthLevel

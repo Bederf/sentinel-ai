@@ -105,11 +105,11 @@ function MyComponent() {
 Equipment table structure:
 ```sql
 -- ✅ CORRECT
-ALTER TABLE work_orders ADD CONSTRAINT fk_equipment 
+ALTER TABLE work_orders ADD CONSTRAINT fk_equipment
   FOREIGN KEY (equipment_id) REFERENCES equipment(id);
 
 -- ❌ WRONG
-ALTER TABLE work_orders ADD CONSTRAINT fk_equipment 
+ALTER TABLE work_orders ADD CONSTRAINT fk_equipment
   FOREIGN KEY (equipment_id) REFERENCES equipment(equipment_id);
 ```
 
@@ -257,10 +257,10 @@ async def test_approval_workflow():
     # Arrange
     mock_device_manager = AsyncMock()
     mock_device_manager.set_value.return_value = {"success": True}
-    
+
     # Act
     result = await approval_service.execute_approval(...)
-    
+
     # Assert
     assert result.success is True
 

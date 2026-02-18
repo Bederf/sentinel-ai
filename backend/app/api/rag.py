@@ -1,7 +1,7 @@
 """RAG API endpoints for documentation search and LLM explanations."""
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict
 import logging
 
 from app.services.rag_service import get_rag_service

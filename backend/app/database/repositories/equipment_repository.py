@@ -17,17 +17,17 @@ class EquipmentRepository:
 
     def _execute_with_retry(self, query, max_retries: int = 3):
         """Execute a Supabase query with retry on rate limit.
-        
+
         Args:
             query: Supabase query object
             max_retries: Maximum number of retries
-            
+
         Returns:
             Response data
         """
         delay = 0.5
         last_error = None
-        
+
         for attempt in range(max_retries + 1):
             try:
                 return query.execute()
@@ -44,7 +44,7 @@ class EquipmentRepository:
                         raise e
                 else:
                     raise e
-        
+
         if last_error:
             raise last_error
 

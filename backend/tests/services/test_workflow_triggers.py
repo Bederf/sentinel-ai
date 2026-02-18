@@ -12,7 +12,6 @@ Phase 53-02: Automated Triggers & Workflow Automation
 """
 
 import pytest
-from datetime import datetime, timedelta
 
 from app.services.workflow_triggers import (
     WorkflowTriggerEngine,
@@ -21,7 +20,6 @@ from app.services.workflow_triggers import (
     BaselineComparison,
     InspectionDeficiency,
     TriggerType,
-    TriggerPriority,
 )
 
 

@@ -35,7 +35,7 @@ vi.mock('../../lib/api', () => ({
 describe('Dashboard Integration Flow', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    
+
     // Default mock responses
     (api.getStats as any).mockResolvedValue(createMockDashboardStats());
     (api.getSites as any).mockResolvedValue([

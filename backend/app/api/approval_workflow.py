@@ -6,7 +6,7 @@ import logging
 from typing import List, Optional
 from enum import Enum
 from datetime import datetime
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 import smtplib
 from email.mime.text import MIMEText

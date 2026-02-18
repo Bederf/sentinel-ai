@@ -9,11 +9,10 @@ Discovers device metadata from BACnet/IP devices including:
 Supports both direct BACnet/IP and Niagara gateway queries.
 """
 
-import asyncio
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Optional
+from typing import Optional
 
 from app.database.repositories.equipment_metadata_repository import EquipmentMetadataRepository
 

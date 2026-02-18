@@ -19,8 +19,7 @@ from app.models.inspection import (
     InspectionTask,
     InspectionResult,
     InspectionDeficiency,
-    InspectionMeasurement,
-    InspectionMeasurementCreate
+    InspectionMeasurement
 )
 from app.database.supabase_client import get_supabase_client
 

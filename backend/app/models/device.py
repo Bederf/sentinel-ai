@@ -12,7 +12,6 @@ from typing import Dict, Any, Optional
 import uuid
 
 # Import water meter models
-from app.models.water_meter import WaterMeter, WaterConsumption, WaterAlert
 
 
 class DeviceStatus(Enum):

@@ -12,7 +12,7 @@ Data is read from Supabase (primary) with JSON fallback for config files.
 import json
 import logging
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional
 from datetime import datetime, timedelta
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field

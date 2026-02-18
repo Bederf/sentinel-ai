@@ -345,7 +345,7 @@ export function MLMetrics() {
       const driftData = await mlopsApi.getAllDrift();
       await new Promise((resolve) => setTimeout(resolve, 600));
       const alertsData = await mlopsApi.getAlerts({ limit: 10 });
-      
+
       setHealth(healthData);
       setMetrics(metricsData);
       setDrift(driftData);

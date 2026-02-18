@@ -7,17 +7,13 @@ operations to prevent unsafe operations (e.g., overheating, pressure extremes).
 import logging
 import json
 from pathlib import Path
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional
 from datetime import datetime
-import uuid
 
 from app.models.safety_rules import (
-    SafetyRule, RuleSeverity, RuleType,
-    TemperatureRangeRule, PressureLimitRule, InterlockRule,
-    RuntimeLimitRule, BrightnessLimitRule, CustomRule
+    SafetyRule, RuleSeverity, TemperatureRangeRule
 )
 from app.models.device import Device, DeviceType
-from app.config.settings import settings
 
 logger = logging.getLogger(__name__)
 

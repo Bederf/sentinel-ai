@@ -27,8 +27,6 @@ from app.services.workflow_triggers import (
     AnomalyAlert,
     BaselineComparison,
     InspectionDeficiency,
-    TriggerResult,
-    EffectivenessResult,
 )
 from app.database.supabase_client import get_supabase_client
 from app.database.repositories.equipment_repository import EquipmentRepository

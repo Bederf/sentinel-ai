@@ -60,7 +60,7 @@ When equipment health degrades:
 
 1. **Detection**: Health drops below threshold (e.g., 90%)
 2. **Alert Created**: Stored in database with severity, equipment details
-3. **Telegram Notification**: Sent via Clawd bot to facility managers
+3. **Telegram Notification**: Sent via SENTINEL's Telegram integration to facility managers
 4. **Work Order**: FM can click `/WO_<code>` to create a Concept Evolution-compatible job card
 5. **Resolution**: Technician completes work, uploads service data for ML training
 
@@ -104,7 +104,7 @@ Modules can be enabled/disabled per building. When multiple modules are active, 
 
 ## Integration Points
 
-### Clawd Telegram Bot
+### SENTRY Telegram Bot
 - Receives BMS alerts with equipment details
 - `/WO_<code>` creates work orders
 - `/note_<code>` logs acknowledgments

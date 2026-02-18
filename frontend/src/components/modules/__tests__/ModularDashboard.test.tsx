@@ -372,7 +372,7 @@ describe('ModularDashboard', () => {
 
       // Integration status should be shown for 2+ modules
       expect(screen.getByTestId('integration-status')).toBeInTheDocument();
-      
+
       // Overview tab should be accessible
       expect(screen.getByText('Overview')).toBeInTheDocument();
     });

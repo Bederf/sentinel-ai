@@ -19,10 +19,8 @@ from app.models.device import (
 from app.services.device_abstraction import DeviceAdapter
 from app.services.niagara.bacnet_client import (
     BACnetException,
-    BACnetObjectType,
     BACnetReadError,
     BACnetTimeoutError,
-    BACnetWriteError,
     DiscoveredPoint,
     get_bacnet_client,
 )

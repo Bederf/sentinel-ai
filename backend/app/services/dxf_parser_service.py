@@ -13,12 +13,11 @@ professional CAD drawings using standardized layer conventions.
 - FP-LIFE: Fire protection and life safety equipment
 """
 
-import io
 import re
 import logging
 import tempfile
 import os
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 from collections import defaultdict
 
@@ -30,8 +29,6 @@ from app.services.geometry_utils import (
     calculate_bounding_box,
     normalize_coordinates,
     infer_floor_from_z_coordinate,
-    euclidean_distance,
-    get_cluster_centroid,
 )
 
 logger = logging.getLogger(__name__)

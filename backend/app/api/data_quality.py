@@ -19,7 +19,6 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from app.models.data_quality import (
-    DataQualityLevel,
     DataGap,
     EquipmentDataQuality,
     DataQualityAlert,

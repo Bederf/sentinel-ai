@@ -5,7 +5,7 @@
 -- =====================================================================
 
 -- Step 1: Add HVAC equipment reference columns to zones table
-ALTER TABLE zones 
+ALTER TABLE zones
 ADD COLUMN IF NOT EXISTS fcu_id TEXT,      -- Fan Coil Unit equipment code
 ADD COLUMN IF NOT EXISTS vav_id TEXT,      -- Variable Air Volume equipment code
 ADD COLUMN IF NOT EXISTS ahu_id TEXT,      -- Air Handling Unit equipment code
@@ -19,24 +19,24 @@ ADD COLUMN IF NOT EXISTS humidity_sensor TEXT; -- Humidity sensor ID
 
 -- For each zone, find equipment that matches the zone pattern
 UPDATE zones z
-SET 
+SET
     fcu_id = (
-        SELECT code FROM equipment 
-        WHERE type = 'FCU' 
+        SELECT code FROM equipment
+        WHERE type = 'FCU'
           AND building_id = z.building_id
           AND code LIKE '%' || RIGHT(z.zone_id, 3)
         LIMIT 1
     ),
     vav_id = (
-        SELECT code FROM equipment 
-        WHERE type = 'VAV' 
+        SELECT code FROM equipment
+        WHERE type = 'VAV'
           AND building_id = z.building_id
           AND code LIKE '%' || RIGHT(z.zone_id, 3)
         LIMIT 1
     ),
     ahu_id = (
-        SELECT code FROM equipment 
-        WHERE type = 'AHU' 
+        SELECT code FROM equipment
+        WHERE type = 'AHU'
           AND building_id = z.building_id
           AND code LIKE '%' || RIGHT(z.zone_id, 3)
         LIMIT 1
@@ -55,7 +55,7 @@ BEGIN
     SELECT COUNT(*) INTO zones_with_fcu FROM zones WHERE fcu_id IS NOT NULL;
     SELECT COUNT(*) INTO zones_with_vav FROM zones WHERE vav_id IS NOT NULL;
     SELECT COUNT(*) INTO zones_with_ahu FROM zones WHERE ahu_id IS NOT NULL;
-    
+
     RAISE NOTICE 'Zone HVAC Equipment Mapping Results:';
     RAISE NOTICE '  Total desk zones: %', total_zones;
     RAISE NOTICE '  Zones with FCU mapped: %', zones_with_fcu;
@@ -79,7 +79,7 @@ COMMENT ON COLUMN zones.ahu_id IS 'Air Handling Unit ID serving this zone (usual
 -- SELECT zone_id, floor FROM zones WHERE zone_id LIKE 'Zone-%' AND fcu_id IS NULL;
 --
 -- Check equipment codes match naming convention:
--- SELECT DISTINCT code FROM equipment WHERE type IN ('FCU', 'VAV', 'AHU') 
+-- SELECT DISTINCT code FROM equipment WHERE type IN ('FCU', 'VAV', 'AHU')
 -- ORDER BY code;
 --
 -- =====================================================================
@@ -92,7 +92,7 @@ COMMENT ON COLUMN zones.ahu_id IS 'Air Handling Unit ID serving this zone (usual
 --    SELECT code, type FROM equipment WHERE code LIKE '%-101' ORDER BY code;
 --
 -- 2. Manually link equipment if needed:
---    UPDATE zones SET fcu_id = 'S002-FCU-101' 
+--    UPDATE zones SET fcu_id = 'S002-FCU-101'
 --    WHERE zone_id = 'Zone-101';
 --
 -- 3. Check equipment naming convention:

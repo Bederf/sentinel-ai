@@ -15,9 +15,8 @@ Phase 54: Equipment Baseline Assessment - Wave 1 (Parallel with 54-01, 54-03)
 """
 
 import logging
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 from datetime import datetime
-from enum import Enum
 from pydantic import BaseModel, Field
 
 # Import baseline models
@@ -25,10 +24,7 @@ from app.models.baseline import (
     EquipmentBaseline,
     BaselineType,
     BaselineSource,
-    BaselineStatus,
-    ElementBaseline,
-    MeasurementType,
-    ElementType
+    BaselineStatus
 )
 
 # Import existing services

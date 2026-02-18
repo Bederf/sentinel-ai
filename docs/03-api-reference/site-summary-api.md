@@ -23,7 +23,7 @@ Retrieve comprehensive summary for a single site.
   "site_id": "site-002",
   "site_name": "Sandton City Office Tower",
   "last_updated": "2026-02-10T11:45:30Z",
-  
+
   "equipment": {
     "total_count": 156,
     "by_type": {
@@ -299,21 +299,21 @@ export function Dashboard({ siteId }) {
     <div>
       {/* KPI Row */}
       <div className="grid grid-cols-4 gap-4">
-        <KPICard 
-          label="Equipment" 
-          value={summary.equipment.total_count} 
+        <KPICard
+          label="Equipment"
+          value={summary.equipment.total_count}
         />
-        <KPICard 
-          label="Safety Status" 
-          value={summary.safety.overall_status} 
+        <KPICard
+          label="Safety Status"
+          value={summary.safety.overall_status}
         />
-        <KPICard 
-          label="Active Alerts" 
-          value={summary.alerts.total_active} 
+        <KPICard
+          label="Active Alerts"
+          value={summary.alerts.total_active}
         />
-        <KPICard 
-          label="Power Usage" 
-          value={`${summary.energy.current_kw} kW`} 
+        <KPICard
+          label="Power Usage"
+          value={`${summary.energy.current_kw} kW`}
         />
       </div>
 

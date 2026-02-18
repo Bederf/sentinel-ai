@@ -11,13 +11,11 @@ import logging
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException, Query, Body
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from app.models.baseline import (
-    EquipmentBaselineCreate,
     EquipmentBaseline,
-    BaselineComparison,
     ComparisonResult,
     DeviationStatus,
     BaselineType,

@@ -8,7 +8,7 @@ Also includes comprehensive prediction endpoint that combines all ML models.
 """
 
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 from fastapi import APIRouter, HTTPException, Query
 

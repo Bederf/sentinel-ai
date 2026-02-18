@@ -2,7 +2,7 @@
 
 # Phase 087: Manual Testing of Module Gating
 # Run this against a live backend to validate the middleware works
-# 
+#
 # Usage:
 #   chmod +x manual_gating_test.sh
 #   ./manual_gating_test.sh

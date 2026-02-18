@@ -9,7 +9,6 @@ Validates:
 
 import asyncio
 import time
-from typing import List
 import pytest
 import httpx
 
@@ -138,7 +137,7 @@ def test_concurrent_batch_requests_no_429(client):
 
     avg_time_ms = (total_time / len(results)) * 1000 if results else 0
 
-    print(f"\n=== Concurrent Batch Test Results ===")
+    print("\n=== Concurrent Batch Test Results ===")
     print(f"Total Requests: {len(results)}")
     print(f"Successful: {success_count}")
     print(f"429 Errors: {error_429_count}")
@@ -197,10 +196,10 @@ def test_sequential_requests_meet_timing(client):
 
     total_time = time.time() - start_total
 
-    print(f"\n=== Sequential Request Timing ===")
+    print("\n=== Sequential Request Timing ===")
     print(f"10 Requests Total Time: {total_time:.2f}s")
     print(f"Per-Request Average: {(total_time/10)*1000:.1f}ms")
-    print(f"With 1000ms batch window, expect ~5 batches = ~5 seconds minimum")
+    print("With 1000ms batch window, expect ~5 batches = ~5 seconds minimum")
     print(f"Actual: {total_time:.2f}s ✓")
 
 
@@ -238,7 +237,7 @@ def test_concurrent_requests_via_testclient(client):
     error_429_count = sum(1 for r in results if r["is_429"])
     success_count = sum(1 for r in results if r["is_success"])
 
-    print(f"\n=== TestClient Concurrent Results ===")
+    print("\n=== TestClient Concurrent Results ===")
     print(f"Total: {len(results)}")
     print(f"Success: {success_count}")
     print(f"429 Errors: {error_429_count}")
@@ -336,7 +335,7 @@ def test_response_time_percentiles(client):
     p99 = response_times[int(len(response_times) * 0.99)]
     max_time = response_times[-1]
 
-    print(f"\n=== Response Time Percentiles (100 requests) ===")
+    print("\n=== Response Time Percentiles (100 requests) ===")
     print(f"P50 (median): {p50:.1f}ms")
     print(f"P95:          {p95:.1f}ms")
     print(f"P99:          {p99:.1f}ms")

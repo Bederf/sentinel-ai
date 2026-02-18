@@ -20,7 +20,6 @@ from app.models.niagara import (
     BACnetDeviceInfo,
     BACnetDiscoverRequest,
     BACnetDiscoverResponse,
-    BACnetPointDiscoveryRequest,
     BACnetPointDiscoveryResponse,
     BACnetPointInfo,
     BACnetPointReadResponse,
@@ -29,7 +28,6 @@ from app.models.niagara import (
     BACnetTestConnectionRequest,
 )
 from app.services.niagara.bacnet_client import (
-    BACnetDeviceNotFoundError,
     BACnetException,
     BACnetReadError,
     BACnetTimeoutError,

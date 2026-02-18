@@ -18,13 +18,12 @@ Approval Workflow Integration:
 """
 
 import logging
-from typing import Optional, List, Dict, Any
+from typing import Optional, Dict, Any
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, Query, Depends
 
 from app.services.device_control_service import (
     get_device_control_service,
-    DeviceControlService,
 )
 from app.database.repositories.equipment_repository import EquipmentRepository
 from app.database.repositories.recommendation_repository import (
@@ -51,11 +50,11 @@ async def list_controllable_equipment(
 ) -> Dict[str, Any]:
     """
     List all controllable equipment in the system.
-    
+
     Query Parameters:
     - building_id: Filter by building (e.g., "site-002")
     - zone_id: Filter by zone (e.g., "Zone-203")
-    
+
     Returns:
     {
         "total": 45,
@@ -68,25 +67,25 @@ async def list_controllable_equipment(
     }
     """
     all_equipment = equipment_repo.get_all()
-    
+
     # Filter by building
     if building_id:
         all_equipment = [
             eq for eq in all_equipment
             if eq.get("building_id") == building_id
         ]
-    
+
     # Filter by zone (via name/location)
     if zone_id:
         all_equipment = [
             eq for eq in all_equipment
             if zone_id in eq.get("location", "") or zone_id in eq.get("name", "")
         ]
-    
+
     # Separate controllable from non-controllable
     controllable = []
     by_type = {}
-    
+
     for eq in all_equipment:
         code = eq.get("code")
         if device_control_service.is_controllable(code):
@@ -99,13 +98,13 @@ async def list_controllable_equipment(
                 "status": eq.get("status"),
             }
             controllable.append(eq_data)
-            
+
             # Group by type
             eq_type = eq_data["type"]
             if eq_type not in by_type:
                 by_type[eq_type] = []
             by_type[eq_type].append(eq_data)
-    
+
     return {
         "total": len(all_equipment),
         "controllable": len(controllable),
@@ -118,7 +117,7 @@ async def list_controllable_equipment(
 async def get_device_controls(equipment_code: str) -> Dict[str, Any]:
     """
     Get device details and available control points.
-    
+
     Returns:
     {
         "code": "S002-FCU-203",
@@ -139,13 +138,13 @@ async def get_device_controls(equipment_code: str) -> Dict[str, Any]:
     """
     try:
         eq_type = device_control_service.get_equipment_type(equipment_code)
-        
+
         if not eq_type:
             raise HTTPException(
                 status_code=400,
                 detail=f"Invalid equipment code: {equipment_code}"
             )
-        
+
         # Get equipment details - filter from all equipment by code
         all_equipment = equipment_repo.get_all()
         equipment = next(
@@ -157,10 +156,10 @@ async def get_device_controls(equipment_code: str) -> Dict[str, Any]:
                 status_code=404,
                 detail=f"Equipment not found: {equipment_code}"
             )
-        
+
         # Get control points
         control_points = device_control_service.get_control_points(equipment_code)
-        
+
         points_dict = {}
         for name, point in control_points.items():
             points_dict[name] = {
@@ -172,7 +171,7 @@ async def get_device_controls(equipment_code: str) -> Dict[str, Any]:
                 "writable": point.writable,
                 "enum_values": point.enum_values,
             }
-        
+
         return {
             "code": equipment_code,
             "name": equipment.get("name"),
@@ -201,12 +200,12 @@ async def validate_control_value(
 ) -> Dict[str, Any]:
     """
     Validate a control value before submission.
-    
+
     Query Parameters:
     - equipment_code: Equipment identifier
     - control_point: Point name (e.g., "cooling_setpoint")
     - value: Value to set
-    
+
     Returns:
     {
         "valid": true,
@@ -217,7 +216,7 @@ async def validate_control_value(
     result = device_control_service.validate_control_value(
         equipment_code, control_point, value
     )
-    
+
     return {
         "valid": result["valid"],
         "errors": result["errors"],
@@ -229,7 +228,7 @@ async def validate_control_value(
 async def get_device_status(equipment_code: str) -> Dict[str, Any]:
     """
     Get current control state and readings.
-    
+
     Returns device's current point values and health status.
     """
     equipment = equipment_repo.get_by_code(equipment_code)
@@ -238,7 +237,7 @@ async def get_device_status(equipment_code: str) -> Dict[str, Any]:
             status_code=404,
             detail=f"Equipment not found: {equipment_code}"
         )
-    
+
     return {
         "code": equipment_code,
         "name": equipment.get("name"),
@@ -259,9 +258,9 @@ async def recommend_control(
 ) -> Dict[str, Any]:
     """
     Generate a control recommendation (typically from complaint system).
-    
+
     This creates a pending recommendation that must be approved by an operator.
-    
+
     Body:
     {
         "reason": "Zone too hot - AHU cooling insufficient",
@@ -269,7 +268,7 @@ async def recommend_control(
         "suggested_value": 18.0,
         "estimated_impact": "Zone will cool down by 2-3°C in 10 minutes"
     }
-    
+
     Returns:
     {
         "recommendation_id": "rec-123",
@@ -282,13 +281,13 @@ async def recommend_control(
     validation = device_control_service.validate_control_value(
         equipment_code, suggested_point, suggested_value
     )
-    
+
     if not validation["valid"]:
         raise HTTPException(
             status_code=400,
             detail=f"Invalid control value: {validation['errors']}"
         )
-    
+
     # Get equipment details for site_id
     all_equipment = equipment_repo.get_all()
     equipment = next(
@@ -300,12 +299,12 @@ async def recommend_control(
             status_code=404,
             detail=f"Equipment not found: {equipment_code}"
         )
-    
+
     # Determine site_id from equipment (format: S002-XXX, site-005-XXX, etc.)
     # Extract site prefix from equipment code
     parts = equipment_code.split('-')
     site_id = f"{parts[0]}-{parts[1]}" if len(parts) >= 2 and parts[0] == "site" else parts[0]
-    
+
     # Create recommendation
     recommendation = Recommendation(
         site_id=site_id,
@@ -324,11 +323,11 @@ async def recommend_control(
         status=RecommendationStatus.PENDING,
         requires_approval=True,  # All device control requires approval
     )
-    
+
     try:
         # Save to repository
         created_rec = await rec_repo.create(recommendation)
-        
+
         return {
             "recommendation_id": created_rec.id,
             "equipment_code": equipment_code,
@@ -358,13 +357,13 @@ async def execute_control(
 ) -> Dict[str, Any]:
     """
     Execute a control action (must be pre-approved via approval workflow).
-    
+
     Integration with ApprovalService:
     1. Validates control against safety rules
     2. Executes write via device_manager
     3. Verifies COV (Change of Value) feedback
     4. Creates audit log entry
-    
+
     Returns:
     {
         "success": true,
@@ -377,13 +376,13 @@ async def execute_control(
     validation = device_control_service.validate_control_value(
         equipment_code, control_point, target_value
     )
-    
+
     if not validation["valid"]:
         raise HTTPException(
             status_code=400,
             detail=f"Invalid control value: {validation['errors']}"
         )
-    
+
     # Get equipment details
     all_equipment = equipment_repo.get_all()
     equipment = next(
@@ -395,11 +394,11 @@ async def execute_control(
             status_code=404,
             detail=f"Equipment not found: {equipment_code}"
         )
-    
+
     # Extract site_id
     parts = equipment_code.split('-')
     site_id = f"{parts[0]}-{parts[1]}" if len(parts) >= 2 and parts[0] == "site" else parts[0]
-    
+
     try:
         # Create execution recommendation record
         recommendation = Recommendation(
@@ -427,10 +426,10 @@ async def execute_control(
                 "cov_verified": True,
             }
         )
-        
+
         # Save execution record
         await rec_repo.create(recommendation)
-        
+
         return {
             "success": True,
             "equipment_code": equipment_code,
@@ -457,7 +456,7 @@ async def get_control_history(
 ) -> Dict[str, Any]:
     """
     Get history of control actions on this equipment.
-    
+
     Returns all approved/executed controls with audit trail.
     """
     # Get equipment to determine site_id
@@ -471,22 +470,22 @@ async def get_control_history(
             status_code=404,
             detail=f"Equipment not found: {equipment_code}"
         )
-    
+
     # Extract site_id from equipment code
     parts = equipment_code.split('-')
     site_id = f"{parts[0]}-{parts[1]}" if len(parts) >= 2 and parts[0] == "site" else parts[0]
-    
+
     try:
         # Query historical recommendations for this site
         # Filter to only those matching this equipment
         all_history = await rec_repo.get_history(site_id, limit=limit * 2)
-        
+
         # Filter to this specific equipment
         equipment_history = [
             rec for rec in all_history
             if rec.target_equipment == equipment_code
         ][:limit]
-        
+
         # Format for response
         history_items = []
         for rec in equipment_history:
@@ -500,7 +499,7 @@ async def get_control_history(
                 "executed_at": rec.executed_at.isoformat() if rec.executed_at else None,
                 "timestamp": rec.timestamp.isoformat() if rec.timestamp else None,
             })
-        
+
         return {
             "equipment_code": equipment_code,
             "total_controls": len(history_items),

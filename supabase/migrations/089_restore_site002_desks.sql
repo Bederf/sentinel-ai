@@ -11,7 +11,7 @@ DECLARE
 BEGIN
     -- Look up building UUID for Sandton (site-002)
     SELECT id INTO v_building_id FROM buildings WHERE code = 'site-002';
-    
+
     IF v_building_id IS NULL THEN
         RAISE NOTICE 'Building site-002 not found, skipping desks restoration';
         RETURN;
@@ -26,10 +26,10 @@ BEGIN
     -- BULK INSERT: Generate desks for all 15 zones (100 desks per level)
     -- Zones: 001-005 (L0), 101-105 (L1), 201-205 (L2)
     -- =========================================================================
-    
+
     -- LEVEL 0: Zones 001-005 (20 desks each)
     INSERT INTO desks (desk_id, building_id, floor, zone_id, context, x_coord, z_coord, near_window, near_diffuser, near_printer, orientation)
-    SELECT 
+    SELECT
         '00' || LPAD((ROW_NUMBER() OVER (ORDER BY zone_num, desk_seq))::TEXT, 3, '0') as desk_id,
         v_building_id,
         'L0',
@@ -55,7 +55,7 @@ BEGIN
 
     -- LEVEL 1: Zones 101-105 (20 desks each)
     INSERT INTO desks (desk_id, building_id, floor, zone_id, context, x_coord, z_coord, near_window, near_diffuser, near_printer, orientation)
-    SELECT 
+    SELECT
         '10' || LPAD((ROW_NUMBER() OVER (ORDER BY zone_num, desk_seq))::TEXT, 3, '0') as desk_id,
         v_building_id,
         'L1',
@@ -81,7 +81,7 @@ BEGIN
 
     -- LEVEL 2: Zones 201-205 (20 desks each)
     INSERT INTO desks (desk_id, building_id, floor, zone_id, context, x_coord, z_coord, near_window, near_diffuser, near_printer, orientation)
-    SELECT 
+    SELECT
         '20' || LPAD((ROW_NUMBER() OVER (ORDER BY zone_num, desk_seq))::TEXT, 3, '0') as desk_id,
         v_building_id,
         'L2',
@@ -121,15 +121,15 @@ END $$;
 SELECT COUNT(*) as desk_count FROM desks WHERE building_id = (SELECT id FROM buildings WHERE code = 'site-002');
 
 -- Count desks per level
-SELECT floor, COUNT(*) as desk_count 
-FROM desks 
+SELECT floor, COUNT(*) as desk_count
+FROM desks
 WHERE building_id = (SELECT id FROM buildings WHERE code = 'site-002')
 GROUP BY floor
 ORDER BY floor;
 
 -- Count desks per zone (sample: Level 0)
-SELECT zone_id, COUNT(*) as desk_count 
-FROM desks 
+SELECT zone_id, COUNT(*) as desk_count
+FROM desks
 WHERE building_id = (SELECT id FROM buildings WHERE code = 'site-002')
   AND floor = 'L0'
 GROUP BY zone_id

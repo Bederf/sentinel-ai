@@ -19,7 +19,6 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from app.services.consent_service import (
-    ConsentRecord,
     get_consent_service,
     hash_identifier,
     CONSENT_TEMPLATES,

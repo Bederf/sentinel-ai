@@ -9,13 +9,12 @@ The simulated variants generate realistic demo data following Johannesburg solar
 
 import logging
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 from app.models.solar import (
     SolarInverter,
     SolarString,
     BESSContainer,
-    BESSRack,
     GridMeter,
     NormalisedReading,
     ConnectorStatus,

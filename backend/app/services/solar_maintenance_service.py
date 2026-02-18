@@ -18,7 +18,7 @@ Work orders follow existing Sentry notification + auto-assignment pattern.
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone, timedelta, date
+from datetime import datetime, timezone, timedelta
 from enum import Enum
 from typing import Dict, List, Optional, Any
 

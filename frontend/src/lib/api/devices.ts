@@ -101,4 +101,3 @@ export const devicesApi = {
   checkSafety: (deviceId: string) =>
     fetchApi<DeviceSafetyStatus>(`/api/devices/${deviceId}/safety-status`),
 };
-

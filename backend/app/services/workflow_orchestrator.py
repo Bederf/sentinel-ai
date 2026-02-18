@@ -7,11 +7,10 @@ Inspection, ML Predictions, and AI Recommendations.
 Phase 53: SENTINEL Asset Management Workflow Integration
 """
 
-import asyncio
 import logging
 from datetime import datetime, timedelta
 from typing import Optional, Dict, List, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 # Import existing services
 try:

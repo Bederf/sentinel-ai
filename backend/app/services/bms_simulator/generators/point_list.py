@@ -7,7 +7,6 @@ in vendor-specific CSV formats for BMS onboarding.
 
 import csv
 import json
-import os
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Type

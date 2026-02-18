@@ -86,7 +86,7 @@ def transform_desks(desks: List[Dict], building_id: str) -> List[Dict]:
     """
     transformed = []
     desk_by_zone = {}
-    
+
     # Group desks by (corrected) zone to calculate context positioning
     for desk in desks:
         floor = FLOOR_MAP.get(desk["floor"], desk["floor"])
@@ -95,25 +95,25 @@ def transform_desks(desks: List[Dict], building_id: str) -> List[Dict]:
         for old_floor, new_floor in FLOOR_MAP.items():
             if old_floor != new_floor:
                 zone_id = zone_id.replace(f"Zone-{old_floor}-", f"Zone-{new_floor}-")
-        
+
         if zone_id not in desk_by_zone:
             desk_by_zone[zone_id] = []
         desk_by_zone[zone_id].append((desk, floor, zone_id))
-    
+
     # Generate coordinates
     for zone_id, desks_in_zone in desk_by_zone.items():
         # Get zone base center (default to origin if not found)
         zone_letter = zone_id.split("-")[-1]  # e.g., "A", "B", "001"
         base_x, base_z = ZONE_CENTERS.get(zone_id.replace("Zone-", ""), (0.0, 0.0))
-        
+
         for idx, (desk, floor, corrected_zone) in enumerate(desks_in_zone):
             context = desk.get("context", "open_plan")
             offset_x, offset_z = CONTEXT_OFFSETS.get(context, (0.0, 0.0))
-            
+
             # Calculate unique position for desk within zone
             x_coord = base_x + offset_x + (idx % 5) * 0.5
             z_coord = base_z + offset_z + (idx // 5) * 0.5
-            
+
             transformed.append({
                 "id": str(uuid.uuid4()),
                 "building_id": building_id,
@@ -126,7 +126,7 @@ def transform_desks(desks: List[Dict], building_id: str) -> List[Dict]:
                 "z_coord": round(z_coord, 2),
                 "y_coord": 0.0,
             })
-    
+
     return transformed
 
 
@@ -152,9 +152,9 @@ def transform_zones(zones: List[Dict], building_id: str) -> List[Dict]:
 def sync_to_supabase(building_code: str):
     """Main sync function."""
     client = get_supabase_client()
-    
+
     print(f"🔄 Syncing zones and desks for {building_code}...")
-    
+
     # Get building UUID
     try:
         building_id = get_building_uuid(client, building_code)
@@ -162,25 +162,25 @@ def sync_to_supabase(building_code: str):
     except ValueError as e:
         print(f"✗ Error: {e}")
         return False
-    
+
     # Load JSON data
     print(f"📂 Loading zones from zones.json...")
     zones = load_zones_json(building_code)
     print(f"  → Found {len(zones)} zones")
-    
+
     print(f"📂 Loading desks from desks.json.bak...")
     desks_raw = load_desks_json(building_code)
     print(f"  → Found {len(desks_raw)} desks")
-    
+
     # Transform data
     print(f"🔄 Transforming zones...")
     zones_transformed = transform_zones(zones, building_id)
     print(f"  → Prepared {len(zones_transformed)} zone records")
-    
+
     print(f"🔄 Transforming desks (correcting floors, generating coordinates)...")
     desks_transformed = transform_desks(desks_raw, building_id)
     print(f"  → Prepared {len(desks_transformed)} desk records")
-    
+
     # Upsert to Supabase
     try:
         print(f"📤 Upserting zones to Supabase...")
@@ -189,7 +189,7 @@ def sync_to_supabase(building_code: str):
             on_conflict="building_id,zone_id"
         ).execute()
         print(f"  ✓ {len(response.data)} zones synced")
-        
+
         print(f"📤 Upserting desks to Supabase...")
         # Upsert in batches to avoid payload limits
         batch_size = 500
@@ -202,15 +202,15 @@ def sync_to_supabase(building_code: str):
             ).execute()
             total_synced += len(response.data)
             print(f"  ✓ Batch {i // batch_size + 1}: {len(response.data)} desks synced")
-        
+
         print(f"  ✓ Total: {total_synced} desks synced")
-        
+
         print(f"\n✅ Sync complete!")
         print(f"   - {len(zones_transformed)} zones")
         print(f"   - {total_synced} desks (with corrected floors L0, L1, L2)")
         print(f"   - All desks have x_coord and z_coord for centroid calculation")
         return True
-        
+
     except Exception as e:
         print(f"✗ Sync failed: {e}")
         return False

@@ -69,12 +69,12 @@ async def get_annual_summary(
             results_row = sorted(response.data, key=lambda x: x.get("created_at", ""), reverse=True)[0]
         else:
             results_row = response.data[0]
-        
+
         results_row = response.data[0]
         results_json = results_row.get("results", {})
-        
+
         return AnnualSummary(**results_json)
-    
+
     except HTTPException:
         raise
     except Exception as e:
@@ -121,9 +121,9 @@ async def start_annual_simulation(
             scenario=scenario,
             duration_minutes=duration_minutes,
         )
-        
+
         logger.info(f"Queued annual simulation: task_id={task_id}, duration={duration_minutes}min")
-        
+
         return {
             "task_id": task_id,
             "site_id": site_id,
@@ -131,7 +131,7 @@ async def start_annual_simulation(
             "status": "queued",
             "queued_at": datetime.now().isoformat(),
         }
-    
+
     except Exception as e:
         logger.error(f"Failed to start annual simulation: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -145,7 +145,7 @@ async def get_simulation_status(
 ) -> Dict[str, Any]:
     """
     Poll simulation progress.
-    
+
     Returns:
     - status: queued | running | completed | failed
     - progress_pct: 0-100
@@ -155,9 +155,9 @@ async def get_simulation_status(
     try:
         if task_id not in _simulation_tasks:
             raise HTTPException(status_code=404, detail="Task not found")
-        
+
         task = _simulation_tasks[task_id]
-        
+
         # Calculate estimated time remaining
         if task["status"] == "running":
             elapsed = (datetime.now() - datetime.fromisoformat(task["started_at"])).total_seconds()
@@ -169,7 +169,7 @@ async def get_simulation_status(
                 remaining = -1
         else:
             remaining = -1
-        
+
         return {
             "task_id": task_id,
             "status": task["status"],
@@ -179,7 +179,7 @@ async def get_simulation_status(
             "started_at": task["started_at"],
             "error": task.get("error"),
         }
-    
+
     except HTTPException:
         raise
     except Exception as e:
@@ -244,7 +244,7 @@ async def _run_annual_simulation(
         logger.info(f"📈 Progress: {task['progress_pct']}%, Days: {task['days_completed']}/365")
 
         logger.info("⚙️ Aggregating results...")
-        
+
         # Aggregate via SolarAnnualAggregator
         logger.info("🔄 Creating aggregator...")
         aggregator = get_solar_annual_aggregator()
@@ -265,7 +265,7 @@ async def _run_annual_simulation(
         task["days_completed"] = 365
 
         logger.info(f"🎉 Annual simulation complete: {annual_summary.annual_savings_pct:.1f}% savings, R{annual_summary.annual_savings_zar:,.0f}")
-    
+
     except Exception as e:
         logger.error(f"Simulation failed: {e}", exc_info=True)
         task = _simulation_tasks.get(task_id, {})
@@ -386,34 +386,34 @@ async def _generate_hourly_snapshots_paced(orchestrator, duration_minutes: float
 def _generate_hourly_snapshots(orchestrator) -> list:
     """
     Generate 8760 hourly snapshots from simulation data.
-    
+
     In production, these would be actual telemetry from equipment.
     For now, we generate synthetic data based on seasonal patterns.
     """
     from app.services.seasonal_modeler import SeasonalModeler
     from datetime import datetime as dt, timedelta
-    
+
     snapshots = []
     modeler = SeasonalModeler(seed=42)
-    
+
     start_date = dt(2024, 1, 1, 6, 0, 0)
-    
+
     for hour in range(8760):
         current_time = start_date + timedelta(hours=hour)
         # Calculate day_of_year (1-365, even in leap years)
         day_of_year = (current_time.timetuple().tm_yday - 1) % 365 + 1
         current_hour = current_time.hour
-        
+
         # Solar generation (0 at night, peaks at noon)
         solar_efficiency = modeler.get_solar_generation_factor(
             current_time.date(),
             cloud_cover=0.2  # Assume 20% cloud cover
         )
-        
+
         # Solar peaks at noon (12:00)
         hour_factor = max(0, 1 - abs(current_hour - 12) / 6)  # Gaussian-like curve
         solar_gen_kw = 3900 * solar_efficiency * hour_factor * 0.8  # 3.9 MWp capacity
-        
+
         # Building load (higher during day, occupancy-dependent)
         occupancy_factor = modeler.get_occupancy_factor(
             current_time.date(),
@@ -424,7 +424,7 @@ def _generate_hourly_snapshots(orchestrator) -> list:
         occupancy_load = 300 * occupancy_factor
         hvac_load = 200 * max(0, 1 - abs(current_hour - 14) / 8)  # HVAC peaks at 14:00
         building_load_kw = base_load + occupancy_load + hvac_load
-        
+
         # BESS dynamics (charge at night, discharge during peak)
         if current_hour < 7 or current_hour > 20:  # Night: charge from solar surplus
             bess_charge_kw = max(0, solar_gen_kw - building_load_kw)
@@ -435,16 +435,16 @@ def _generate_hourly_snapshots(orchestrator) -> list:
         else:
             bess_charge_kw = 0
             bess_discharge_kw = 0
-        
+
         # BESS SOC (simple model)
         bess_soc_pct = 50 + (bess_charge_kw - bess_discharge_kw) * 0.1  # Simplified
         bess_soc_pct = max(10, min(90, bess_soc_pct))  # Keep between 10-90%
-        
+
         # Grid import/export
         net_solar = solar_gen_kw - building_load_kw - bess_charge_kw + bess_discharge_kw
         grid_export_kw = max(0, net_solar)
         grid_import_kw = max(0, -net_solar)
-        
+
         # Tariff band (peak/standard/off_peak)
         if current_hour in [7, 8, 9, 18, 19]:  # Peak hours
             tariff_band = "peak"
@@ -455,7 +455,7 @@ def _generate_hourly_snapshots(orchestrator) -> list:
         else:  # Off-peak
             tariff_band = "off_peak"
             rate = 1.05
-        
+
         snapshot = HourlySnapshot(
             hour=hour,
             date=current_time,
@@ -471,13 +471,13 @@ def _generate_hourly_snapshots(orchestrator) -> list:
             tariff_band=tariff_band,
             tariff_rate_c_kwh=rate,
         )
-        
+
         snapshots.append(snapshot)
-        
+
         # Log progress every 24 hours
         if (hour + 1) % 24 == 0:
             logger.debug(f"Generated hourly snapshots: {hour + 1}/8760")
-    
+
     logger.info(f"Generated {len(snapshots)} hourly snapshots")
     return snapshots
 
@@ -573,7 +573,7 @@ async def _cache_results(site_id: str, annual_summary: AnnualSummary, hourly_dat
             "capacity_factor_pct": annual_summary.capacity_factor_pct,
             "self_consumption_pct": annual_summary.self_consumption_pct,
         }
-        
+
         # Upsert annual simulation into Supabase (replace if exists)
         response = supabase.table("solar_annual_simulations").upsert({
             "site_id": site_id,
@@ -584,9 +584,9 @@ async def _cache_results(site_id: str, annual_summary: AnnualSummary, hourly_dat
             "simulation_completed_at": annual_summary.simulation_completed_at,
             "simulation_duration_seconds": annual_summary.simulation_duration_seconds,
         }).execute()
-        
+
         logger.info(f"Cached annual summary for {site_id}: {response.data}")
-    
+
     except Exception as e:
         logger.error(f"Failed to cache results: {e}")
         raise

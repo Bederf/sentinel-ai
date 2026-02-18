@@ -12,7 +12,6 @@ Usage:
 """
 from typing import Dict, List, Optional
 import asyncio
-import aiohttp
 import json
 import re
 from pathlib import Path

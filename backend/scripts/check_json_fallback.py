@@ -15,7 +15,7 @@ def count_json_equipment(site_code: str) -> dict:
     """Count equipment available in JSON files for a site."""
     site_path = BUILDINGS_PATH / site_code
     equipment_dir = site_path / 'equipment'
-    
+
     counts = {
         'equipment_files': 0,
         'hvac_zones': 0,
@@ -23,11 +23,11 @@ def count_json_equipment(site_code: str) -> dict:
         'energy_centre': 0,
         'dali_controllers': 0,
     }
-    
+
     # Count individual equipment files
     if equipment_dir.exists():
         counts['equipment_files'] = len(list(equipment_dir.glob('*.json')))
-    
+
     # Count HVAC zones
     zones_file = site_path / 'zones.json'
     if zones_file.exists():
@@ -37,7 +37,7 @@ def count_json_equipment(site_code: str) -> dict:
                 counts['hvac_zones'] = len(zones) if isinstance(zones, list) else 0
         except:
             pass
-    
+
     # Count generators
     gen_file = site_path / 'generators.json'
     if gen_file.exists():
@@ -51,7 +51,7 @@ def count_json_equipment(site_code: str) -> dict:
                 )
         except:
             pass
-    
+
     # Count energy centre
     ec_file = site_path / 'energy_centre.json'
     if ec_file.exists():
@@ -71,7 +71,7 @@ def count_json_equipment(site_code: str) -> dict:
                 )
         except:
             pass
-    
+
     return counts
 
 print("=" * 80)
@@ -84,17 +84,17 @@ if BUILDINGS_PATH.exists():
         d.name for d in BUILDINGS_PATH.iterdir()
         if d.is_dir() and not d.name.startswith('_')
     ])
-    
+
     print(f"\nFound {len(sites)} sites:")
     print()
-    
+
     total_equipment = 0
-    
+
     for site_code in sites:
         counts = count_json_equipment(site_code)
         total = sum(v for k, v in counts.items() if k != 'equipment_files')
         total += counts['equipment_files']
-        
+
         print(f"  {site_code}:")
         print(f"    Equipment files:  {counts['equipment_files']:3d}")
         print(f"    HVAC zones:       {counts['hvac_zones']:3d}")
@@ -103,13 +103,13 @@ if BUILDINGS_PATH.exists():
         print(f"    ───────────────────────")
         print(f"    TOTAL:            {total:3d}")
         print()
-        
+
         total_equipment += total
-    
+
     print("=" * 80)
     print(f"TOTAL EQUIPMENT ACROSS ALL SITES: {total_equipment}")
     print("=" * 80)
-    
+
     # Specific detail for site-002
     print("\nDETAIL: site-002 Equipment Files")
     print("-" * 80)
@@ -122,7 +122,7 @@ if BUILDINGS_PATH.exists():
             print(f"  - {f.name}")
         if len(files) > 10:
             print(f"  ... and {len(files) - 10} more")
-    
+
     print("\n" + "=" * 80)
     print("NEXT STEPS:")
     print("=" * 80)

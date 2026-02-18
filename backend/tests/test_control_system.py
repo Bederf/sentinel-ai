@@ -11,7 +11,6 @@ Verifies that all components work together correctly.
 """
 
 import pytest
-import asyncio
 import time
 from app.models.audit_log import AuditResultType
 from app.services.device_abstraction import device_manager

@@ -11,7 +11,6 @@ Each module operates standalone but integrates when multiple are activated.
 
 from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional
-from datetime import datetime
 from enum import Enum
 
 
@@ -26,12 +25,12 @@ class ModuleType(str, Enum):
     SIMBIOT = "simbiot"
     INTEGRATIONS = "integrations"
     NOTIFICATIONS = "notifications"
-    
+
     # Paid add-ons
     CONTROL = "control"  # Gateway add-on — unlocks all automation
     MAINTENANCE = "maintenance"  # Work order and asset lifecycle management
     DIGITAL_TWIN = "digital_twin"  # 3D/2D building visualization
-    
+
     # Building system add-ons (require CONTROL for automation)
     LIGHTING = "lighting"  # DALI lighting + occupancy-driven automation
     FIRE = "fire"

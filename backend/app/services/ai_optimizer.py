@@ -16,22 +16,16 @@ equipment combinations.
 
 import logging
 import json
-import random
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 
-from anthropic import Anthropic
 
 from app.models.optimization import (
     OptimizationRecommendation,
-    OptimizationSettings,
-    OptimizationStatus,
     SiteOptimizationStatus,
-    OptimizationHistoryEntry,
 )
 from app.models.device import Device, DeviceType, DevicePoint, ZoneType, ExposureDirection
-from app.models.dali import ZoneOccupancy, ZoneLighting
 from app.services.claude_service import claude_service
 from app.services.device_abstraction import device_manager
 from app.services.safety_interlocks import safety_engine
@@ -717,7 +711,6 @@ Provide ONLY the JSON response, no additional text."""
             logger.info(f"Using Claude AI for optimization of site {site_id}")
 
             # Call Claude (synchronous call for analysis)
-            import asyncio
 
             response_text = ""
             async for chunk in self._claude_service.stream_response(

@@ -7,12 +7,10 @@ Gracefully falls back to JSON-only when Supabase is unavailable.
 from typing import List, Optional, Dict, Any
 from datetime import datetime, date, timedelta
 import json
-import os
 import logging
 from pathlib import Path
 
 from app.database.supabase_client import get_supabase_client
-from app.models.water_meter import WaterConsumption, WaterAlert, WaterMeter
 
 logger = logging.getLogger(__name__)
 

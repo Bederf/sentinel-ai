@@ -11,7 +11,7 @@ This bridges the gap between:
 
 import logging
 from datetime import datetime
-from typing import Dict, List, Optional, Any
+from typing import Dict, Optional, Any
 
 from app.database.supabase_client import get_supabase_client
 from app.services.solar_connector_simulation import SimulatedSolarConnector

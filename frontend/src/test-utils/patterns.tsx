@@ -63,13 +63,13 @@ export function testDataFetching(
     it('should cache data after first fetch', async () => {
       const wrapper = createTestWrapper();
       const { result: result1 } = renderHook(() => useHook('test-id'), { wrapper });
-      
+
       await waitFor(() => {
         expect(result1.current.data).toBeDefined();
       });
 
       const { result: result2 } = renderHook(() => useHook('test-id'), { wrapper });
-      
+
       // Second hook should have cached data immediately
       expect(result2.current.data).toEqual(mockData);
     });
@@ -416,7 +416,7 @@ export function testBatchAggregation(
 
     it('should deduplicate requests for same ID', async () => {
       const wrapper = createTestWrapper();
-      
+
       // Two hooks requesting same device
       const { result: result1 } = renderHook(
         () => useHooks[0](),
@@ -439,7 +439,7 @@ export function testBatchAggregation(
     it('should handle batch size limit', async () => {
       // If batch aggregator has maxBatchSize, test that large batches split
       const wrapper = createTestWrapper();
-      
+
       // Create many hooks (would trigger second batch if limit < count)
       const manyResults = Array(10).fill(0).map(() =>
         renderHook(() => useHooks[0](), { wrapper })

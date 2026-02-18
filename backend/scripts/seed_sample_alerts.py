@@ -23,9 +23,9 @@ from app.services.prediction_generator import get_prediction_generator
 
 async def create_sample_alerts():
     """Create sample alerts to demonstrate risk prediction."""
-    
+
     client = get_supabase_client()
-    
+
     # Sample equipment that will be marked as at-risk
     at_risk_equipment = [
         {
@@ -59,22 +59,22 @@ async def create_sample_alerts():
             "message": "5 ballasts no longer responding - possible RF interference or power supply issue",
         },
     ]
-    
+
     print(f"Creating {len(at_risk_equipment)} sample alerts...")
-    
+
     created_alerts = []
     for equipment_data in at_risk_equipment:
         # Get equipment by code
         eq_response = client.table("equipment").select("id, building_id, name").eq(
             "code", equipment_data["code"]
         ).execute()
-        
+
         if not eq_response.data:
             print(f"  ✗ Equipment {equipment_data['code']} not found - skipping")
             continue
-        
+
         equipment = eq_response.data[0]
-        
+
         # Create alert
         alert_id = str(uuid.uuid4())
         alert_data = {
@@ -87,41 +87,41 @@ async def create_sample_alerts():
             "title": equipment_data["title"],
             "message": equipment_data["message"],
         }
-        
+
         # Insert alert
         alert_result = client.table("alerts").insert(alert_data).execute()
-        
+
         if alert_result.data:
             created_alerts.append(alert_data)
             print(f"  ✓ Alert created for {equipment_data['code']} ({equipment_data['severity']})")
-            
+
             # Update equipment health score based on severity
             health_score = 30 if equipment_data["severity"] == "critical" else 60
             update_result = client.table("equipment").update({
                 "health_score": health_score,
                 "status": equipment_data["severity"]
             }).eq("id", equipment["id"]).execute()
-            
+
             if update_result.data:
                 print(f"    → Updated health_score to {health_score}")
         else:
             print(f"  ✗ Failed to create alert for {equipment_data['code']}")
-    
+
     print(f"\n✓ Created {len(created_alerts)} alerts")
-    
+
     # Manually trigger prediction generation
     print("\nGenerating predictions for at-risk equipment...")
     generator = get_prediction_generator()
     result = await generator.generate_predictions_for_all_sites()
-    
+
     print(f"  Generated: {result.get('generated', 0)} predictions")
     print(f"  Skipped (duplicate): {result.get('skipped_duplicate', 0)}")
     print(f"  Skipped (low probability): {result.get('skipped_low_probability', 0)}")
     print(f"  Resolved: {result.get('resolved', 0)}")
-    
+
     if result.get('errors'):
         print(f"  Errors: {result.get('errors')}")
-    
+
     print("\n✓ Sample alerts and predictions ready!")
     print("\nNext steps:")
     print("  1. Hard refresh your browser (Ctrl+Shift+R)")
@@ -132,7 +132,7 @@ async def create_sample_alerts():
 
 if __name__ == "__main__":
     import asyncio
-    
+
     try:
         asyncio.run(create_sample_alerts())
     except Exception as e:

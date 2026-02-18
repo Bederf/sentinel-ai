@@ -5,7 +5,6 @@ Tests SIMBIOT MCP server tools and protocol abstraction.
 """
 
 import pytest
-import json
 
 
 @pytest.mark.integration

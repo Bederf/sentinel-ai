@@ -56,7 +56,7 @@ import json
 import asyncio
 from pathlib import Path
 from typing import AsyncGenerator, Generator
-from unittest.mock import Mock, AsyncMock, patch
+from unittest.mock import Mock, patch
 
 from fastapi.testclient import TestClient
 from httpx import AsyncClient, ASGITransport
@@ -101,8 +101,6 @@ if os.getenv("TESTING", "").lower() == "true":
 from app.services.device_abstraction import DeviceManager
 from app.services.safety_interlocks import SafetyEngine
 from app.services.audit_logger import AuditLogger
-from app.models.device import Device, DevicePoint
-from app.models.safety_rules import SafetyRule
 
 # Test data directory
 TEST_DATA_DIR = Path(__file__).parent.parent / "app" / "data"
@@ -316,16 +314,16 @@ def mock_claude_api():
     with patch("app.services.claude_service.anthropic.Anthropic") as mock:
         mock_instance = Mock()
         mock.return_value = mock_instance
-        
+
         # Mock streaming response
         async def mock_stream(*args, **kwargs):
             class MockMessage:
                 delta = Mock()
                 delta.text = "Test AI response"
                 type = "content_block_delta"
-            
+
             yield MockMessage()
-        
+
         mock_instance.messages.stream.return_value = mock_stream()
         yield mock_instance
 

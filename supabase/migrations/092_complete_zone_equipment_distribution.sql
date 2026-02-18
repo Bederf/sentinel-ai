@@ -13,7 +13,7 @@ DECLARE
 BEGIN
     -- Look up building UUID for Sandton (site-002)
     SELECT id INTO v_building_id FROM buildings WHERE code = 'site-002';
-    
+
     IF v_building_id IS NULL THEN
         RAISE NOTICE 'Building site-002 not found, skipping zone equipment completion';
         RETURN;
@@ -22,7 +22,7 @@ BEGIN
     -- =========================================================================
     -- ADD MISSING FCU EQUIPMENT
     -- =========================================================================
-    
+
     INSERT INTO equipment (code, building_id, name, type, status, health_score, commissioning_date)
     VALUES
         ('S002-FCU-105', v_building_id, 'Level 1 Zone E FCU', 'FCU', 'normal', 86, '2012-04-10'),
@@ -32,7 +32,7 @@ BEGIN
     -- =========================================================================
     -- ADD MISSING VAV EQUIPMENT
     -- =========================================================================
-    
+
     INSERT INTO equipment (code, building_id, name, type, status, health_score, commissioning_date)
     VALUES
         ('S002-VAV-105', v_building_id, 'Level 1 Zone E VAV', 'VAV', 'normal', 93, '2015-07-15'),
@@ -59,14 +59,14 @@ END $$;
 
 -- Verify all zones have complete equipment
 WITH zone_nums AS (
-  SELECT z.zone_id, 
+  SELECT z.zone_id,
          SUBSTRING(z.zone_id FROM 'Zone-(.+)') as zone_code,
          z.floor
   FROM zones z
   WHERE z.building_id = (SELECT id FROM buildings WHERE code = 'site-002')
     AND z.zone_type = 'open_office'
 )
-SELECT 
+SELECT
   z.zone_id,
   z.floor,
   z.zone_code,
@@ -85,7 +85,7 @@ GROUP BY z.zone_id, z.floor, z.zone_code
 ORDER BY z.zone_code;
 
 -- Summary statistics
-SELECT 
+SELECT
   'Zone Equipment Summary for Site-002' as description,
   COUNT(DISTINCT SUBSTRING(code FROM 'S002-([A-Z]+)-')) as equipment_types,
   COUNT(*) as total_zone_equipment

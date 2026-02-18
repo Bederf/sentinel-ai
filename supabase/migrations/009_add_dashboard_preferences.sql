@@ -5,19 +5,19 @@
 CREATE TABLE IF NOT EXISTS dashboard_preferences (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     user_id TEXT NOT NULL UNIQUE,  -- Can be anonymous session ID or auth user ID
-    
+
     -- Card visibility (which cards are shown)
     visible_kpi_cards JSONB NOT NULL DEFAULT '["kpi-protected-sites", "kpi-monitored-assets", "kpi-active-risks", "kpi-potential-savings", "kpi-risk-predictions"]',
     visible_sections JSONB NOT NULL DEFAULT '["kpi-row", "site-protection", "energy-analytics", "risk-predictions"]',
-    
+
     -- Card ordering
     kpi_card_order JSONB NOT NULL DEFAULT '["kpi-protected-sites", "kpi-monitored-assets", "kpi-active-risks", "kpi-potential-savings", "kpi-risk-predictions"]',
     section_order JSONB NOT NULL DEFAULT '["kpi-row", "site-protection", "energy-analytics", "risk-predictions"]',
-    
+
     -- Additional preferences
     default_energy_period INTEGER DEFAULT 30,
     default_energy_site_id TEXT DEFAULT NULL,
-    
+
     -- Timestamps
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()

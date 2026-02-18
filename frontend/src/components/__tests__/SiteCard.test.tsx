@@ -150,9 +150,9 @@ describe('SiteCard', () => {
     it('should call onClick when card is clicked', async () => {
       const handleClick = vi.fn();
       const user = userEvent.setup();
-      
+
       render(<SiteCard site={mockSite} onClick={handleClick} showSafetyStatus={false} />);
-      
+
       const card = screen.getByText('Test Site').closest('div[class*="cursor-pointer"]');
       if (card) {
         await user.click(card);
@@ -163,7 +163,7 @@ describe('SiteCard', () => {
     it('should not call onClick when onClick prop is not provided', async () => {
       const user = userEvent.setup();
       render(<SiteCard site={mockSite} showSafetyStatus={false} />);
-      
+
       const card = screen.getByText('Test Site').closest('div');
       if (card) {
         await user.click(card);
@@ -212,7 +212,7 @@ describe('SiteCard', () => {
 
     it('should not fetch safety status when showSafetyStatus is false', () => {
       render(<SiteCard site={mockSite} showSafetyStatus={false} />);
-      
+
       expect(api.getSiteDevices).not.toHaveBeenCalled();
     });
   });

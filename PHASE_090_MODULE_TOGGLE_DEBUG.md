@@ -36,7 +36,7 @@ Changed authentication level on module toggle endpoints from ADMIN to OPERATOR:
 
 If production backend hasn't been restarted after deploying commit a48fb87, it's still running old code.
 
-**Check**: 
+**Check**:
 ```bash
 # On production server
 ps aux | grep "uvicorn.*modules"
@@ -67,7 +67,7 @@ If user tries to activate these without CONTROL active, activation fails with:
 403 Forbidden: "solar module requires control module to be active first"
 ```
 
-**Check**: 
+**Check**:
 ```bash
 # In Settings, try activating "Building Controls" (CONTROL module) first
 # Then try "Solar & BESS" (SOLAR module)
@@ -90,7 +90,7 @@ def deactivate_module(self, site_id: str, module_type: ModuleType) -> bool:
     """Deactivate a module for a site (idempotent)."""
     if module_type in NON_DEACTIVATABLE_MODULES:
         raise ValueError(...)
-    
+
     config = self._site_configs.get(site_id)
     if not config:
         return True  # Changed: return True if not found (idempotent)
@@ -122,7 +122,7 @@ reverse_proxy /api/* localhost:9095 {
 
 Frontend might be caching active modules list incorrectly.
 
-**Check**: 
+**Check**:
 - Refresh page, try toggle again
 - Check localStorage: `localStorage.getItem("sentinel_module_recommendations_*")`
 

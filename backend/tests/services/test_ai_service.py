@@ -5,7 +5,6 @@ Tests hybrid AI routing, tool use, and streaming responses.
 """
 
 import pytest
-from unittest.mock import Mock, patch, AsyncMock
 
 
 @pytest.mark.unit
@@ -41,9 +40,7 @@ class TestClaudeIntegration:
     async def test_claude_tool_execution(self):
         """Test Claude can use tools for device control."""
         from app.services.chat_tools import (
-            list_devices,
-            get_device_details,
-            control_device
+            list_devices
         )
 
         # Tools should be callable

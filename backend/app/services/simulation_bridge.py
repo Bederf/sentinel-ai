@@ -3,10 +3,8 @@ Simulation Bridge - Integrates BMS simulation with existing equipment API
 Converts simulation data to match existing equipment format
 """
 
-import json
-import asyncio
 from datetime import datetime, timedelta
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from pathlib import Path
 
 from app.services.bms_simulation_service import create_simulation_service

@@ -11,15 +11,12 @@ Tests cover:
 
 import asyncio
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock
 
 from app.services.niagara.bacnet_client import (
     NiagaraBACnetClient,
     BACnetException,
     BACnetTimeoutError,
-    BACnetReadError,
-    BACnetWriteError,
-    BACnetDeviceNotFoundError,
     BACnetObjectType,
     COVSubscription,
     DiscoveredDevice,

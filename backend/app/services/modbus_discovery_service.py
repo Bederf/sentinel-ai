@@ -8,12 +8,11 @@ Discovers device metadata from Modbus TCP/RTU devices including:
 Supports generators, power meters, UPS systems, and ATS units.
 """
 
-import asyncio
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import IntEnum
-from typing import Any, Optional
+from typing import Optional
 
 from app.database.repositories.equipment_metadata_repository import EquipmentMetadataRepository
 

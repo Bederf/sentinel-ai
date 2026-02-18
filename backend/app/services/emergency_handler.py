@@ -5,7 +5,6 @@ restoration, and emergency notification distribution.
 """
 
 import logging
-import asyncio
 from datetime import datetime
 from typing import Dict, Any, List
 

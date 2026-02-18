@@ -7,7 +7,6 @@ import uuid
 from typing import List, Optional, Literal
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, UploadFile, File, Query
-from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 
 from app.models.integration import (
@@ -16,7 +15,7 @@ from app.models.integration import (
     PointAssetMapping, PointAssetMappingCreate,
     FormatDetectionResult, ParseResult, BulkMatchResult,
     ColumnMapping as CMModel,
-    BuildingStatus, ChecklistItem, ValidationChecklist,
+    BuildingStatus, ValidationChecklist,
 )
 
 

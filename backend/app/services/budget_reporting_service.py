@@ -6,7 +6,7 @@ Phase 49-10: Cost reporting and export.
 
 from __future__ import annotations
 
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, Optional
 
 from app.database.repositories.budget_repository import BudgetRepository
 from app.services.budget_variance_service import get_budget_variance_service

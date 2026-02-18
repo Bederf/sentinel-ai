@@ -1,5 +1,6 @@
 """Tests for the Explanation Service."""
 
+import asyncio
 import pytest
 from unittest.mock import Mock, patch, AsyncMock
 from app.services.explanation_service import (
@@ -227,6 +228,3 @@ The generator load is approaching maximum capacity.
         assert all(isinstance(r, ExplanationResult) for r in results)
         assert results[0].equipment_type == "chiller"
         assert results[1].equipment_type == "ahu"
-
-# Need to import asyncio for concurrent test
-import asyncio

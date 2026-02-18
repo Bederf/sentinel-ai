@@ -44,11 +44,11 @@ def load_equipment_files(site_id: str) -> List[Dict[str, Any]]:
     """Load all equipment JSON files for a site."""
     equipment_dir = Path(f"app/data/buildings/{site_id}/equipment")
     equipment_list = []
-    
+
     for file_path in sorted(equipment_dir.glob("*.json")):
         with open(file_path) as f:
             equipment_list.append(json.load(f))
-    
+
     return equipment_list
 
 
@@ -80,18 +80,18 @@ def prepare_equipment_for_supabase(
     building_uuid: str
 ) -> Dict[str, Any]:
     """Transform equipment JSON to Supabase schema."""
-    
+
     # Extract equipment type from equipment_id
     # e.g., "site-005-UMH-GEN-B1-002.run" -> "GEN" or "S012-GEN-G-001" -> "GEN"
     equipment_id = equipment_data.get("id", "")
-    
+
     # Try to extract type (usually the third segment)
     parts = equipment_id.split("-")
     if len(parts) >= 3:
         equipment_type = parts[2]  # "GEN", "AHU", "FCU", etc.
     else:
         equipment_type = equipment_data.get("equipment_type", "unknown")
-    
+
     return {
         "id": str(uuid.uuid4()),
         "code": equipment_data.get("id", ""),
@@ -118,12 +118,12 @@ def seed_site(site_id: str, client) -> bool:
         logger.info(f"\n{'='*60}")
         logger.info(f"Seeding {site_id}...")
         logger.info(f"{'='*60}")
-        
+
         # Load building data
         logger.info(f"Loading building data for {site_id}...")
         building_data = load_building_json(site_id)
         building_supabase = prepare_building_for_supabase(building_data)
-        
+
         # Check if building already exists
         existing = client.table('buildings').select('id').eq('code', site_id).execute()
         if existing.data:
@@ -138,20 +138,20 @@ def seed_site(site_id: str, client) -> bool:
                 return False
             building_uuid = response.data[0]['id']
             logger.info(f"✅ Building inserted: {site_id} (UUID: {building_uuid})")
-        
+
         # Load and insert equipment
         logger.info(f"Loading equipment files for {site_id}...")
         equipment_list = load_equipment_files(site_id)
         logger.info(f"Found {len(equipment_list)} equipment items")
-        
+
         for i, equipment_data in enumerate(equipment_list, 1):
             equipment_supabase = prepare_equipment_for_supabase(equipment_data, building_uuid)
-            
+
             # Check if equipment already exists
             existing = client.table('equipment').select('id').eq(
                 'code', equipment_supabase['code']
             ).execute()
-            
+
             if existing.data:
                 logger.debug(f"  Equipment {equipment_supabase['code']} already exists. Skipping...")
             else:
@@ -163,10 +163,10 @@ def seed_site(site_id: str, client) -> bool:
                         logger.error(f"  [{i}/{len(equipment_list)}] ❌ Failed to insert {equipment_supabase['code']}")
                 except Exception as e:
                     logger.error(f"  [{i}/{len(equipment_list)}] ❌ Error inserting {equipment_supabase['code']}: {e}")
-        
+
         logger.info(f"✅ Completed seeding {site_id}")
         return True
-        
+
     except Exception as e:
         logger.error(f"❌ Error seeding {site_id}: {e}")
         import traceback
@@ -177,24 +177,24 @@ def seed_site(site_id: str, client) -> bool:
 def main():
     """Main entry point."""
     logger.info("Starting seed script for site-005 and site-012...")
-    
+
     # Connect to Supabase
     client = get_supabase_client()
-    
+
     success = True
-    
+
     # Seed both sites
     for site_id in ["site-005", "site-012"]:
         if not seed_site(site_id, client):
             success = False
-    
+
     logger.info(f"\n{'='*60}")
     if success:
         logger.info("✅ ALL SITES SEEDED SUCCESSFULLY!")
     else:
         logger.error("❌ Some sites failed to seed. Check logs above.")
     logger.info(f"{'='*60}\n")
-    
+
     return 0 if success else 1
 
 

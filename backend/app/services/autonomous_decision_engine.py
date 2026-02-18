@@ -7,11 +7,9 @@ approved rules automatically within strict safety boundaries.
 import logging
 import uuid
 import json
-import asyncio
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any, List, Optional, Callable
-from enum import Enum
 
 from app.models.autonomous_decision import (
     AutonomousDecision,
@@ -23,7 +21,6 @@ from app.models.autonomous_decision import (
 from app.models.audit_log import AuditResultType
 from app.services.safety_interlocks import safety_engine
 from app.services.device_abstraction import device_manager
-from app.services.claude_service import claude_service
 
 logger = logging.getLogger(__name__)
 

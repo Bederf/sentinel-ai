@@ -14,12 +14,9 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from app.services.niagara.point_discovery import (
-    DiscoveryResult,
-    PointDiscoveryService,
     get_point_discovery_service,
 )
 from app.services.niagara.mapping_service import (
-    PointMappingService,
     get_mapping_service,
 )
 from app.services.niagara.point_classifier import get_point_classifier

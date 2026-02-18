@@ -107,7 +107,7 @@ export const workflowApi = {
    * Returns equipment list + workflow state for each
    */
   getDashboardEquipment: (siteId?: string) => {
-    const url = siteId 
+    const url = siteId
       ? `/api/workflow/dashboard/equipment?site_id=${encodeURIComponent(siteId)}`
       : `/api/workflow/dashboard/equipment`;
     return fetchApi<{
@@ -121,4 +121,3 @@ export const workflowApi = {
     }>(url);
   },
 };
-

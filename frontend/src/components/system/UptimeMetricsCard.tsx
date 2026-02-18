@@ -1,6 +1,6 @@
 /**
  * Uptime Metrics Card
- * 
+ *
  * Shows uptime percentages for different time ranges (24h, 7d, 30d).
  */
 

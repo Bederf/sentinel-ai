@@ -1,9 +1,8 @@
 """Equipment Metadata API - Endpoints for equipment notes and metadata management."""
 
-from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query, Body
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from app.database.repositories.equipment_metadata_repository import EquipmentMetadataRepository

@@ -218,7 +218,7 @@ export class OccupancySimulation {
   private selectPersonaByTargets(personas?: Record<PersonaType, number>): PersonaType {
     // If personas is empty or undefined, default to 'worker'
     const validPersonas = personas && Object.keys(personas).length > 0 ? personas : { worker: 1, security: 0, cleaner: 0, visitor: 0 };
-    
+
     const rand = Math.random();
     let cumulative = 0;
 

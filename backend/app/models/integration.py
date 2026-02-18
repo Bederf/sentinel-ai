@@ -1,6 +1,6 @@
 """Pydantic models for integration/log ingestion."""
 
-from datetime import datetime, date
+from datetime import datetime
 from typing import List, Optional, Dict, Any
 from enum import Enum
 from pydantic import BaseModel, Field
