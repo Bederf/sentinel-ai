@@ -15,7 +15,7 @@ from app.api import integration, concept
 from app.api import modules, health_config, service_records, preferences
 from app.api import solar, water, sustainability, contracts, pricing, municipal_billing
 from app.api import parts_orders, approval_workflow, delivery_tracking, approvals, parasite_decisions
-from app.api import security, compliance
+from app.api import security, compliance, notifications
 
 
 def register_operations_routers(app: FastAPI) -> None:
@@ -62,6 +62,9 @@ def register_operations_routers(app: FastAPI) -> None:
     app.include_router(health_config.router, tags=["health-config"])
     app.include_router(service_records.router, tags=["service-records"])
     app.include_router(preferences.router, prefix="/api", tags=["preferences"])
+
+    # Multi-channel notifications (Phase 102)
+    app.include_router(notifications.router, prefix="/api", tags=["notifications"])
 
     # Parts ordering and approval workflow (Phase 20)
     app.include_router(approval_workflow.router, tags=["approval-workflow"])
