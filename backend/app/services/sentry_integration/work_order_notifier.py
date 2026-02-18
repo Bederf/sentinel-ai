@@ -1,0 +1,1080 @@
+"""Work order notification service for Sentry Telegram bot.
+
+Handles sending work order notifications to technicians via Sentry,
+managing the conversation flow for data collection, and storing
+responses in service records.
+"""
+
+import asyncio
+import logging
+import json
+import os
+from typing import Dict, Any, Optional
+from datetime import datetime
+import httpx
+
+from app.database.repositories.service_record_repository import ServiceRecordRepository
+from app.database.repositories.work_order_repository import get_work_order_repository
+from app.services.ml_template_service import MLTemplateService
+from app.models.service_record import ServiceStatus
+from app.services.health_simulation_service import health_simulation_service
+
+logger = logging.getLogger(__name__)
+
+
+class WorkOrderNotifier:
+    """Service for notifying technicians about work orders via Sentry."""
+
+    def __init__(self):
+        self.sentry_api_url = "http://localhost:18789"  # Sentry bot API
+        self.bms_api_url = "http://localhost:9095"    # SENTINEL API
+        self.repository = ServiceRecordRepository()
+        self.template_service = MLTemplateService()
+
+    @staticmethod
+    def _normalize_text(value: Any) -> str:
+        """Normalize text fields and convert escaped newlines for email readability."""
+        if value is None:
+            return ""
+        text = str(value).strip()
+        return text.replace("\\n", "\n")
+
+    async def _load_work_order_context(self, work_order_id: str) -> Dict[str, Any]:
+        """Load work order context from repository using ID or code."""
+        if not work_order_id:
+            return {}
+
+        try:
+            work_order_repo = get_work_order_repository()
+            # Most flows send UUID id here.
+            work_order = await work_order_repo.get_work_order(work_order_id)
+            if work_order:
+                return work_order
+
+            # Fallback: some flows may pass code e.g. WO-2026-0042.
+            work_order = await work_order_repo.get_work_order_by_code(work_order_id)
+            return work_order or {}
+        except Exception as e:
+            logger.warning(f"Failed to load work order context for {work_order_id}: {e}")
+            return {}
+
+    def _build_email_subject(self, work_order_data: Dict[str, Any], work_order: Dict[str, Any]) -> str:
+        """Build a descriptive subject line with WO reference and priority."""
+        equipment_name = work_order_data.get("equipment_name") or work_order.get("title") or "Equipment"
+        criticality = str(work_order_data.get("criticality") or work_order.get("priority") or "MEDIUM").upper()
+        wo_ref = (
+            work_order.get("code")
+            or work_order_data.get("work_order_code")
+            or work_order_data.get("work_order_id")
+            or "N/A"
+        )
+        return f"[{criticality}] Work Order {wo_ref} - {equipment_name}"
+
+    def _build_email_body(
+        self,
+        work_order_data: Dict[str, Any],
+        service_record: Dict[str, Any],
+        work_order: Dict[str, Any],
+    ) -> str:
+        """Build full-detail email body for technician execution."""
+        equipment_obj = work_order.get("equipment") or {}
+        building_obj = work_order.get("buildings") or {}
+        diagnostic_context = (
+            work_order_data.get("diagnostic_context")
+            or service_record.get("diagnostic_context")
+            or {}
+        )
+
+        wo_ref = (
+            work_order.get("code")
+            or work_order_data.get("work_order_code")
+            or work_order_data.get("work_order_id")
+            or "N/A"
+        )
+        equipment_name = (
+            work_order_data.get("equipment_name")
+            or equipment_obj.get("name")
+            or "Unknown Equipment"
+        )
+        equipment_code = (
+            equipment_obj.get("code")
+            or work_order_data.get("equipment_code")
+            or work_order_data.get("equipment_id")
+            or "N/A"
+        )
+        equipment_type = equipment_obj.get("type") or work_order_data.get("equipment_type") or "N/A"
+        building_name = building_obj.get("name") or work_order_data.get("building_name") or "N/A"
+        building_code = building_obj.get("code") or work_order_data.get("building_code") or "N/A"
+        priority = str(work_order_data.get("criticality") or work_order.get("priority") or "MEDIUM").upper()
+        service_type = str(work_order_data.get("service_type") or "callout").lower()
+        technician_name = work_order_data.get("technician_name", "Technician")
+        service_record_code = service_record.get("code", "")
+
+        title = self._normalize_text(work_order.get("title") or work_order_data.get("title"))
+        description = self._normalize_text(
+            work_order.get("description")
+            or work_order_data.get("problem_description")
+            or work_order_data.get("description")
+            or "No description provided."
+        )
+
+        diagnostics_text = ""
+        if isinstance(diagnostic_context, dict) and diagnostic_context:
+            diagnostics_text = json.dumps(diagnostic_context, indent=2, ensure_ascii=True)
+        elif diagnostic_context:
+            diagnostics_text = self._normalize_text(diagnostic_context)
+
+        instructions = self._normalize_text(
+            work_order_data.get("instructions")
+            or work_order_data.get("inspection_instructions")
+        )
+
+        lines = [
+            f"Hi {technician_name},",
+            "",
+            "A new work order has been assigned.",
+            "",
+            "WORK ORDER REFERENCES",
+            f"- Work Order: {wo_ref}",
+            f"- Service Record: {service_record_code}",
+            f"- Priority: {priority}",
+            f"- Service Type: {service_type}",
+            "",
+            "EQUIPMENT & SITE",
+            f"- Site: {building_name} ({building_code})",
+            f"- Equipment: {equipment_name}",
+            f"- Equipment Code: {equipment_code}",
+            f"- Equipment Type: {equipment_type}",
+        ]
+
+        if title:
+            lines.extend(["", "ISSUE TITLE", title])
+
+        lines.extend(["", "ISSUE DESCRIPTION", description])
+
+        if diagnostics_text:
+            lines.extend([
+                "",
+                "DIAGNOSTIC CONTEXT",
+                diagnostics_text,
+            ])
+
+        if instructions:
+            lines.extend([
+                "",
+                "FIELD INSTRUCTIONS",
+                instructions,
+            ])
+        else:
+            lines.extend([
+                "",
+                "FIELD INSTRUCTIONS",
+                "1. Verify site safety controls before touching equipment.",
+                "2. Inspect the faulted subsystem and capture photos/readings.",
+                "3. Run diagnostics and record measured values.",
+                "4. Identify likely root cause and required corrective action.",
+                "5. Reply DONE on Telegram to submit structured findings.",
+            ])
+
+        lines.extend([
+            "",
+            "NEXT STEPS",
+            "1. Perform inspection and diagnostics per instructions.",
+            "2. Capture required photos/audio/readings for the service record.",
+            "3. Reply DONE on Telegram to start structured item-by-item feedback capture.",
+            "",
+            "---",
+            "SENTINEL BMS Intelligence / Sentry",
+        ])
+
+        return "\n".join(lines)
+
+    async def _send_email_via_local_gmail_helper(self, to_email: str, subject: str, body: str) -> bool:
+        """Fallback delivery via local gmail helper, still triggered from API flow."""
+        if not to_email or "@" not in to_email:
+            return False
+
+        helper_path = "$SENTRY_HOME/tools/gmail_helper.py"
+        if not os.path.exists(helper_path):
+            logger.warning("Gmail helper not found at %s", helper_path)
+            return False
+
+        try:
+            process = await asyncio.create_subprocess_exec(
+                "/usr/bin/python3",
+                helper_path,
+                "send",
+                subject,
+                body,
+                to_email,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, stderr = await process.communicate()
+            out = (stdout or b"").decode("utf-8", errors="ignore")
+            err = (stderr or b"").decode("utf-8", errors="ignore")
+
+            if process.returncode == 0 and "Email sent successfully" in out:
+                logger.info("Email sent via local gmail helper fallback to %s", to_email)
+                return True
+
+            logger.warning(
+                "gmail_helper fallback failed rc=%s stdout=%s stderr=%s",
+                process.returncode,
+                out.strip(),
+                err.strip(),
+            )
+            return False
+        except Exception as e:
+            logger.warning("Exception in gmail_helper fallback: %s", e)
+            return False
+
+    async def notify_technician_with_code(self, work_order_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Notify technician via BOTH email and Telegram.
+
+        Creates a service record for the work order and sends notifications via:
+        1. Telegram via Sentry bot (instant messaging)
+        2. Email via Sentry Gmail API (documentation + record)
+
+        Returns:
+            Dict with success status and service_record_code
+        """
+        try:
+            # Create service record first
+            service_record = await self.create_service_record(work_order_data)
+
+            if not service_record:
+                return {"success": False, "error": "Failed to create service record"}
+
+            logger.info(f"Service record created: {service_record['code']} for equipment {work_order_data['equipment_name']}")
+
+            # Send Telegram notification (Sentry will poll /api/sentry/work-order/pending)
+            telegram_sent = await self._send_telegram_notification(work_order_data, service_record)
+
+            # Send Email notification via Sentry Gmail API
+            email_sent = await self._send_email_notification(work_order_data, service_record)
+
+            logger.info(f"Notifications sent - Telegram: {telegram_sent}, Email: {email_sent}")
+
+            return {
+                "success": True,
+                "service_record_code": service_record["code"],
+                "telegram_sent": telegram_sent,
+                "email_sent": email_sent
+            }
+
+        except Exception as e:
+            logger.error(f"Error creating service record: {e}")
+            return {"success": False, "error": str(e)}
+
+    async def _send_telegram_notification(self, work_order_data: Dict[str, Any], service_record: Dict[str, Any]) -> bool:
+        """Send Telegram notification via Sentry bot.
+
+        Sentry polls /api/sentry/work-order/pending and sends Telegram messages.
+        This is a placeholder - actual sending is done by Sentry polling.
+        """
+        try:
+            logger.info(f"Telegram notification queued for {work_order_data['technician_name']}")
+            # Sentry bot will poll and send the actual Telegram message
+            return True
+        except Exception as e:
+            logger.warning(f"Failed to queue Telegram notification: {e}")
+            return False
+
+    async def _send_email_notification(self, work_order_data: Dict[str, Any], service_record: Dict[str, Any]) -> bool:
+        """Send email notification via Sentry Gmail API.
+
+        Calls Sentry bot's email endpoint to send work order details via Gmail.
+        """
+        try:
+            work_order = await self._load_work_order_context(work_order_data.get("work_order_id", ""))
+
+            technician_id = work_order_data.get("technician_id", "")
+            technician_email = work_order_data.get("technician_email")
+
+            # In this environment technician_id is commonly an email address.
+            recipient = technician_email or technician_id
+            if "@" not in str(recipient):
+                logger.warning("No valid recipient email for work order %s", work_order_data.get("work_order_id"))
+                return False
+
+            email_subject = self._build_email_subject(work_order_data, work_order)
+            email_body = self._build_email_body(work_order_data, service_record, work_order)
+
+            # Call Sentry bot email endpoint
+            async with httpx.AsyncClient(timeout=10) as client:
+                response = await client.post(
+                    f"{self.sentry_api_url}/send-email",  # Sentry email endpoint
+                    json={
+                        "to": recipient,
+                        "subject": email_subject,
+                        "body": email_body,
+                        "service_record_code": service_record.get("code", ""),
+                        "work_order_id": work_order_data.get("work_order_id", ""),
+                    },
+                    headers={"X-Sentry-Secret": "sentry-bms-phase-41"}
+                )
+
+                if response.status_code == 200:
+                    logger.info("Email notification sent via Sentry for %s", service_record.get("code", ""))
+                    return True
+                else:
+                    logger.warning("Failed to send email via Sentry: %s", response.text)
+                    return await self._send_email_via_local_gmail_helper(
+                        to_email=recipient,
+                        subject=email_subject,
+                        body=email_body,
+                    )
+
+        except Exception as e:
+            logger.warning("Failed to send email notification via Sentry: %s", e)
+            return await self._send_email_via_local_gmail_helper(
+                to_email=recipient if "recipient" in locals() else "",
+                subject=email_subject if "email_subject" in locals() else "Work Order Notification",
+                body=email_body if "email_body" in locals() else "Work order notification.",
+            )
+
+    async def notify_technician(self, work_order_data: Dict[str, Any]) -> bool:
+        """Notify technician about new work order via Sentry.
+
+        Sends notification only - data collection does NOT start yet.
+        Technician must reply "done" AFTER completing service work.
+
+        Args:
+            work_order_data: Work order information including:
+                - work_order_id: UUID
+                - equipment_id: Equipment UUID
+                - building_id: Building UUID
+                - equipment_name: Display name
+                - criticality: HIGH/MEDIUM/LOW
+                - service_type: minor/major/breakdown/callout
+                - technician_id: Telegram ID/email
+                - technician_name: Display name
+                - description: Problem description
+
+        Workflow:
+            1. Create service record in database
+            2. Send notification via Sentry (Telegram)
+            3. Technician completes service work
+            4. Technician replies "done" → triggers data collection
+            5. See handle_technician_reply() for collection flow
+
+        Returns:
+            True if notification sent successfully
+        """
+        result = await self.notify_technician_with_code(work_order_data)
+        return result.get("success", False)
+
+    async def create_service_record(self, work_order_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Create a service record from work order data.
+
+        Args:
+            work_order_data: Work order information including diagnostic_context
+
+        Returns:
+            Created service record, or None if failed
+        """
+        import uuid
+
+        # Idempotency guard: if a service record already exists for this work order,
+        # reuse it instead of creating duplicates (DB trigger + notifier can both run).
+        existing = await self.repository.list(
+            filters={"work_order_id": work_order_data["work_order_id"]}
+        )
+        if existing:
+            logger.info(
+                "Reusing existing service record %s for work order %s",
+                existing[0].get("code"),
+                work_order_data["work_order_id"],
+            )
+            return existing[0]
+
+        # Generate service record code
+        code = f"SR-{datetime.now().year}-{str(uuid.uuid4())[:6].upper()}"
+
+        # Extract diagnostic context from work order (passed from alert)
+        diagnostic_context = work_order_data.get("diagnostic_context")
+
+        record_data = {
+            "code": code,
+            "work_order_id": work_order_data["work_order_id"],
+            "equipment_id": work_order_data["equipment_id"],
+            "building_id": work_order_data["building_id"],
+            "service_type": work_order_data["service_type"],
+            "technician_id": work_order_data["technician_id"],
+            "technician_name": work_order_data["technician_name"],
+            "status": ServiceStatus.NOTIFIED.value,
+            "items_collected": [],
+            "diagnostic_context": diagnostic_context,  # Store alert context for data collection
+        }
+
+        return await self.repository.create(record_data)
+
+    async def handle_technician_reply(self, service_record_code: str, reply_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle technician's reply to work order notification.
+
+        Args:
+            service_record_code: Service record code (e.g., SR-2026-ABC123)
+            reply_data: Reply information including:
+                - message_type: text/photo/audio/file
+                - content: Message content or file info
+                - telegram_user_id: User ID for context
+
+        Returns:
+            Response with next action
+        """
+        try:
+            # Find service record
+            filters = {"code": service_record_code}
+            records = await self.repository.list(filters)
+
+            if not records:
+                return {
+                    "error": "Service record not found",
+                    "service_record_code": service_record_code
+                }
+
+            service_record = records[0]
+
+            # Get equipment type
+            equipment = await self.repository.get_equipment_by_id(service_record["equipment_id"])
+            if not equipment:
+                return {
+                    "error": "Equipment not found",
+                    "equipment_id": service_record["equipment_id"]
+                }
+
+            equipment_type = equipment.get("type", "unknown")
+
+            # Process the reply based on type
+            if reply_data["message_type"] == "text":
+                result = await self._handle_text_reply(service_record, equipment_type, reply_data)
+            elif reply_data["message_type"] in ["photo", "file"]:
+                result = await self._handle_file_reply(service_record, equipment_type, reply_data)
+            elif reply_data["message_type"] == "audio":
+                result = await self._handle_audio_reply(service_record, equipment_type, reply_data)
+            else:
+                result = {"error": "Unsupported message type"}
+
+            # Check if data collection is complete
+            if result.get("success"):
+                completion_status = self._check_completion(service_record, equipment_type)
+                result.update(completion_status)
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Error handling technician reply: {e}")
+            return {"error": str(e)}
+
+    async def _handle_text_reply(self, service_record: Dict[str, Any], equipment_type: str, reply_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle text reply from technician."""
+        content = reply_data.get("content", "")
+        diagnostic_context = service_record.get("diagnostic_context")
+        service_type = service_record.get("service_type", "minor")
+
+        # Check if it's the initial "done" response to start data collection
+        if content.lower() in ["done", "ok", "completed", "finished"]:
+            # "Done" response - move to data collection
+            await self.repository.update(
+                service_record["id"],
+                {"status": ServiceStatus.DATA_COLLECTION.value}
+            )
+
+            # Get context-aware flow for breakdowns with diagnostic context
+            if service_type == "breakdown" and diagnostic_context:
+                flow = self.template_service.get_breakdown_flow(equipment_type, diagnostic_context)
+                current_step = flow[0] if flow else "fault_description"
+
+                # Get context-aware prompt
+                prompt_data = self.template_service.get_context_aware_prompt(
+                    equipment_type,
+                    service_type,
+                    diagnostic_context,
+                    service_record.get("items_collected", []),
+                    current_step
+                )
+
+                # Store current step
+                await self.repository.update(
+                    service_record["id"],
+                    {"current_prompt": current_step}
+                )
+
+                return {
+                    "success": True,
+                    "type": "ready_for_collection",
+                    "next_prompt": prompt_data["prompt"],
+                    "prompt_type": prompt_data["type"],
+                    "options": prompt_data.get("options"),
+                    "current_step": current_step,
+                    "collected_items": service_record.get("items_collected", [])
+                }
+
+            # Standard flow for minor/major services
+            next_item = self.template_service.get_next_prompt(
+                equipment_type,
+                service_type,
+                service_record.get("items_collected", [])
+            )
+
+            return {
+                "success": True,
+                "type": "ready_for_collection",
+                "next_prompt": next_item,
+                "collected_items": service_record.get("items_collected", [])
+            }
+
+        # Handle responses during data collection (not "done")
+        current_step = service_record.get("current_prompt")
+
+        # For breakdown with context, try to extract all info from response
+        if service_type == "breakdown" and diagnostic_context:
+            # First, try to extract structured info from free-form response
+            extraction = self.template_service.extract_info_from_response(
+                equipment_type, diagnostic_context, content
+            )
+
+            # If technician provided comprehensive info, process it all
+            if extraction["completed_steps"]:
+                return await self._handle_comprehensive_response(
+                    service_record, equipment_type, diagnostic_context, extraction, content
+                )
+
+            # Otherwise, process as single step response
+            if current_step:
+                return await self._handle_breakdown_step_response(
+                    service_record, equipment_type, diagnostic_context, current_step, content
+                )
+
+        # Otherwise store as observation
+        observation = await self.repository.add_observation(
+            service_record["id"],
+            {
+                "observation_type": "text",
+                "content": content
+            }
+        )
+        return {
+            "success": True,
+            "type": "observation",
+            "observation_id": observation["id"]
+        }
+
+    async def _handle_comprehensive_response(
+        self,
+        service_record: Dict[str, Any],
+        equipment_type: str,
+        diagnostic_context: Dict[str, Any],
+        extraction: Dict[str, Any],
+        original_content: str
+    ) -> Dict[str, Any]:
+        """Handle a comprehensive response that contains multiple pieces of info.
+
+        When technician says something like:
+        "Yes actuator failed, replaced Belimo LMV-D3, zone now 21.5C"
+
+        Extract all info and skip to what's still needed (usually just the photo).
+
+        Args:
+            service_record: Service record
+            equipment_type: Equipment type
+            diagnostic_context: Diagnostic context
+            extraction: Extracted info from template service
+            original_content: Original technician message
+
+        Returns:
+            Response with acknowledgment and next needed item
+        """
+        extracted = extraction["extracted"]
+        completed_steps = extraction["completed_steps"]
+        remaining_steps = extraction["remaining_steps"]
+
+        # Store extracted data
+        if "fault_confirmation" in extracted:
+            await self.repository.add_observation(
+                service_record["id"],
+                {"observation_type": "fault_confirmation", "content": extracted["fault_confirmation"]}
+            )
+
+        if "root_cause" in extracted:
+            await self.repository.update(
+                service_record["id"],
+                {"confirmed_fault": extracted["root_cause"]}
+            )
+
+        if "repair_action" in extracted:
+            await self.repository.update(
+                service_record["id"],
+                {"actual_repair": extracted["repair_action"]}
+            )
+
+        if "verification_reading" in extracted:
+            await self.repository.add_observation(
+                service_record["id"],
+                {"observation_type": "verification_reading", "content": str(extracted["verification_reading"])}
+            )
+
+        # Update collected items
+        current_collected = service_record.get("items_collected", [])
+        for step in completed_steps:
+            if step not in current_collected:
+                current_collected.append(step)
+                await self.repository.update_items_collected(service_record["id"], step)
+
+        # Build acknowledgment message
+        ack_parts = []
+        if "fault_confirmation" in extracted:
+            ack_parts.append("fault confirmed")
+        if "root_cause" in extracted:
+            ack_parts.append(f"root cause: {extracted['root_cause']}")
+        if "parts_mentioned" in extracted:
+            ack_parts.append(f"part: {extracted['parts_mentioned']}")
+        if "verification_reading" in extracted:
+            ack_parts.append(f"temp: {extracted['verification_reading']}°C")
+
+        acknowledgment = f"Got it! ({', '.join(ack_parts)})"
+
+        # If only photo needed
+        if extraction["all_text_complete"] and extraction["needs_photo"]:
+            return {
+                "success": True,
+                "type": "comprehensive_response",
+                "acknowledgment": acknowledgment,
+                "next_prompt": "Just need a photo of the replacement part label",
+                "prompt_type": "photo",
+                "completed_steps": completed_steps,
+                "remaining_steps": remaining_steps,
+                "extracted_data": extracted
+            }
+
+        # If there are still text steps needed
+        if remaining_steps:
+            next_step = remaining_steps[0]
+            prompt_data = self.template_service.get_context_aware_prompt(
+                equipment_type, "breakdown", diagnostic_context, current_collected, next_step
+            )
+
+            await self.repository.update(
+                service_record["id"],
+                {"current_prompt": next_step}
+            )
+
+            return {
+                "success": True,
+                "type": "comprehensive_response",
+                "acknowledgment": acknowledgment,
+                "next_prompt": prompt_data["prompt"],
+                "prompt_type": prompt_data["type"],
+                "options": prompt_data.get("options"),
+                "current_step": next_step,
+                "completed_steps": completed_steps,
+                "remaining_steps": remaining_steps
+            }
+
+        # All complete
+        return {
+            "success": True,
+            "type": "collection_complete",
+            "acknowledgment": acknowledgment,
+            "is_complete": True,
+            "extracted_data": extracted
+        }
+
+    async def _handle_breakdown_step_response(
+        self,
+        service_record: Dict[str, Any],
+        equipment_type: str,
+        diagnostic_context: Dict[str, Any],
+        current_step: str,
+        content: str
+    ) -> Dict[str, Any]:
+        """Handle response to a breakdown data collection step.
+
+        Args:
+            service_record: Service record
+            equipment_type: Equipment type
+            diagnostic_context: Original diagnostic context
+            current_step: Current step in flow
+            content: Technician's response
+
+        Returns:
+            Response with next prompt
+        """
+        # Store the response based on step
+        if current_step == "fault_confirmation":
+            # Store confirmation
+            await self.repository.add_observation(
+                service_record["id"],
+                {"observation_type": "fault_confirmation", "content": content}
+            )
+        elif current_step == "root_cause":
+            # Store confirmed root cause
+            await self.repository.update(
+                service_record["id"],
+                {"confirmed_fault": content}
+            )
+        elif current_step == "repair_action":
+            # Store actual repair
+            await self.repository.update(
+                service_record["id"],
+                {"actual_repair": content}
+            )
+
+        # Mark step as collected
+        collected = service_record.get("items_collected", [])
+        if current_step not in collected:
+            collected.append(current_step)
+            await self.repository.update_items_collected(service_record["id"], current_step)
+
+        # Get next step in flow
+        flow = self.template_service.get_breakdown_flow(equipment_type, diagnostic_context)
+        current_index = flow.index(current_step) if current_step in flow else -1
+        next_index = current_index + 1
+
+        if next_index < len(flow):
+            next_step = flow[next_index]
+
+            # Get next context-aware prompt
+            prompt_data = self.template_service.get_context_aware_prompt(
+                equipment_type,
+                "breakdown",
+                diagnostic_context,
+                collected,
+                next_step
+            )
+
+            # Update current step
+            await self.repository.update(
+                service_record["id"],
+                {"current_prompt": next_step}
+            )
+
+            return {
+                "success": True,
+                "type": "next_step",
+                "next_prompt": prompt_data["prompt"],
+                "prompt_type": prompt_data["type"],
+                "options": prompt_data.get("options"),
+                "current_step": next_step,
+                "collected_items": collected
+            }
+
+        # All steps complete
+        return {
+            "success": True,
+            "type": "collection_complete",
+            "collected_items": collected,
+            "is_complete": True
+        }
+
+    async def _handle_file_reply(self, service_record: Dict[str, Any], equipment_type: str, reply_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle file/photo reply from technician."""
+        file_info = reply_data.get("content", {})
+
+        # Determine attachment type
+        attachment_type = self._classify_attachment(file_info, service_record)
+
+        # Add attachment to service record
+        attachment = await self.repository.add_attachment({
+            "service_record_id": service_record["id"],
+            "attachment_type": attachment_type,
+            "file_path": file_info.get("file_path", ""),
+            "file_name": file_info.get("file_name", ""),
+            "file_size_bytes": file_info.get("file_size", 0),
+            "mime_type": file_info.get("mime_type", "application/octet-stream"),
+            "analysis_status": "pending"
+        })
+
+        # Update collected items
+        new_collected = service_record.get("items_collected", []) + [attachment_type]
+        await self.repository.update_items_collected(service_record["id"], attachment_type)
+
+        # For breakdown service with diagnostic context, use context-aware flow
+        service_type = service_record.get("service_type", "minor")
+        diagnostic_context = service_record.get("diagnostic_context")
+
+        if service_type == "breakdown" and diagnostic_context:
+            # Get next step in breakdown flow
+            flow = self.template_service.get_breakdown_flow(equipment_type, diagnostic_context)
+            current_step = service_record.get("current_prompt", "")
+
+            # Find next step after current
+            try:
+                current_index = flow.index(current_step) if current_step in flow else -1
+                next_index = current_index + 1
+
+                if next_index < len(flow):
+                    next_step = flow[next_index]
+
+                    # Update current step
+                    await self.repository.update(
+                        service_record["id"],
+                        {"current_prompt": next_step}
+                    )
+
+                    # Get context-aware prompt for next step
+                    prompt_data = self.template_service.get_context_aware_prompt(
+                        equipment_type,
+                        service_type,
+                        diagnostic_context,
+                        new_collected,
+                        next_step
+                    )
+
+                    return {
+                        "success": True,
+                        "type": "attachment_added",
+                        "attachment_type": attachment_type,
+                        "attachment_id": attachment["id"],
+                        "next_prompt": prompt_data["prompt"],
+                        "prompt_type": prompt_data["type"],
+                        "options": prompt_data.get("options"),
+                        "current_step": next_step
+                    }
+                else:
+                    # All steps complete
+                    return {
+                        "success": True,
+                        "type": "collection_complete",
+                        "attachment_type": attachment_type,
+                        "attachment_id": attachment["id"],
+                        "is_complete": True
+                    }
+            except ValueError:
+                pass  # Fall through to standard handling
+
+        # Standard flow - get next prompt
+        next_prompt = self.template_service.get_next_prompt(
+            equipment_type,
+            service_type,
+            new_collected
+        )
+
+        return {
+            "success": True,
+            "type": "attachment_added",
+            "attachment_type": attachment_type,
+            "attachment_id": attachment["id"],
+            "next_prompt": next_prompt
+        }
+
+    async def _handle_audio_reply(self, service_record: Dict[str, Any], equipment_type: str, reply_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle audio reply from technician."""
+        return await self._handle_file_reply(service_record, equipment_type, reply_data)
+
+    def _classify_attachment(self, file_info: Dict[str, Any], service_record: Dict[str, Any]) -> str:
+        """Classify attachment type based on file characteristics and current step.
+
+        For photos, uses the current collection step to determine if it's a
+        before photo, after photo, or parts photo.
+        """
+        file_name = file_info.get("file_name", "").lower()
+        mime_type = file_info.get("mime_type", "")
+        current_step = service_record.get("current_prompt", "")
+        collected_items = service_record.get("items_collected", [])
+
+        # Check by MIME type
+        if mime_type.startswith("image/"):
+            # First check filename hints for specific types
+            if "oil" in file_name:
+                return "oil_sample"
+            elif "diesel" in file_name or "fuel" in file_name:
+                return "diesel_sample"
+            elif "service" in file_name or "sheet" in file_name:
+                return "service_sheet"
+            elif "thermal" in file_name or "flir" in file_name:
+                return "thermal_image"
+
+            # Use current step to determine photo type
+            if current_step == "photo_before":
+                return "photo_before"
+            elif current_step == "photo_after":
+                return "photo_after"
+            elif current_step == "parts_replaced":
+                return "parts_replaced"
+
+            # Fallback: determine based on what's already collected
+            if "photo_before" not in collected_items:
+                return "photo_before"
+            elif "photo_after" not in collected_items:
+                return "photo_after"
+            elif "parts_replaced" not in collected_items:
+                return "parts_replaced"
+            else:
+                return "issue_photo"
+
+        elif mime_type.startswith("audio/"):
+            return "audio_recording"
+
+        elif mime_type.startswith("video/"):
+            return "load_test_video"
+
+        # Default based on what we expect
+        return "service_sheet"
+
+    def _check_completion(self, service_record: Dict[str, Any], equipment_type: str) -> Dict[str, Any]:
+        """Check if all required items have been collected.
+
+        Args:
+            service_record: Service record with collected items
+            equipment_type: Equipment type
+
+        Returns:
+            Status of completion
+        """
+        validation = self.template_service.validate_collected_items(
+            equipment_type,
+            service_record["service_type"],
+            service_record.get("items_collected", [])
+        )
+
+        if validation["is_complete"]:
+            # Mark as complete and trigger equipment health restoration
+            asyncio.create_task(
+                self._complete_service_record_and_restore_equipment(service_record)
+            )
+
+        return {
+            "is_complete": validation["is_complete"],
+            "missing_items": validation["missing_items"],
+            "progress": validation["progress"],
+            "completion_percentage": validation["completion_percentage"]
+        }
+
+    async def _complete_service_record_and_restore_equipment(self, service_record: Dict[str, Any]):
+        """Complete service record and restore equipment to healthy state.
+
+        This method:
+        1. Marks the service record as complete
+        2. Restores equipment health_score (85-95%)
+        3. Resolves any active alerts for the equipment
+        4. Resolves any active predictions for the equipment
+
+        Args:
+            service_record: The completed service record
+        """
+        try:
+            # 1. Mark service record as complete
+            await self.repository.update(
+                service_record["id"],
+                {"status": ServiceStatus.COMPLETE.value}
+            )
+            logger.info(f"Service record {service_record.get('code')} marked as complete")
+
+            # 2. Restore equipment health via health_simulation_service
+            equipment_id = service_record.get("equipment_id")
+            if equipment_id:
+                result = await health_simulation_service.trigger_maintenance(equipment_id)
+                if "error" not in result:
+                    logger.info(
+                        f"Equipment {result.get('equipment_name')} health restored: "
+                        f"{result.get('old_health')}% -> {result.get('new_health')}%"
+                    )
+                else:
+                    logger.warning(f"Failed to restore equipment health: {result.get('error')}")
+
+            # 3. Resolve active alerts for this equipment
+            await self._resolve_equipment_alerts(equipment_id)
+
+            # 4. Resolve active predictions for this equipment
+            await self._resolve_equipment_predictions(equipment_id)
+
+            # 5. Update equipment status to 'normal' in Supabase
+            await self._update_equipment_status(equipment_id, "normal")
+
+        except Exception as e:
+            logger.error(f"Error completing service record: {e}")
+
+    async def _resolve_equipment_alerts(self, equipment_id: str):
+        """Resolve all active alerts for equipment."""
+        try:
+            from app.database.repositories.alert_repository import AlertRepository
+            alert_repo = AlertRepository()
+            result = await alert_repo.resolve_by_equipment(equipment_id)
+            if result:
+                logger.info(f"Resolved alerts for equipment {equipment_id}")
+        except Exception as e:
+            logger.warning(f"Could not resolve alerts: {e}")
+
+    async def _resolve_equipment_predictions(self, equipment_id: str):
+        """Resolve all active predictions for equipment."""
+        try:
+            from app.database.repositories.prediction_repository import PredictionRepository
+            pred_repo = PredictionRepository()
+            result = await pred_repo.resolve_by_equipment(equipment_id)
+            if result:
+                logger.info(f"Resolved predictions for equipment {equipment_id}")
+        except Exception as e:
+            logger.warning(f"Could not resolve predictions: {e}")
+
+    async def _update_equipment_status(self, equipment_id: str, status: str):
+        """Update equipment status in Supabase."""
+        try:
+            from app.database.supabase_client import get_supabase_client
+            client = get_supabase_client()
+            client.table("equipment").update({
+                "status": status,
+                "updated_at": datetime.now().isoformat()
+            }).eq("id", equipment_id).execute()
+            logger.info(f"Equipment {equipment_id} status updated to '{status}'")
+        except Exception as e:
+            logger.warning(f"Could not update equipment status: {e}")
+
+    async def get_collection_status(self, service_record_code: str) -> Dict[str, Any]:
+        """Get data collection status for a service record.
+
+        Args:
+            service_record_code: Service record code
+
+        Returns:
+            Collection status with progress and next steps
+        """
+        # Find service record
+        filters = {"code": service_record_code}
+        records = await self.repository.list(filters)
+
+        if not records:
+            return {
+                "error": "Service record not found",
+                "service_record_code": service_record_code
+            }
+
+        service_record = records[0]
+
+        # Get equipment type
+        equipment = await self.repository.get_equipment_by_id(service_record["equipment_id"])
+        if not equipment:
+            return {
+                "error": "Equipment not found",
+                "equipment_id": service_record["equipment_id"]
+            }
+
+        equipment_type = equipment.get("type", "unknown")
+
+        # Get status
+        validation = self.template_service.validate_collected_items(
+            equipment_type,
+            service_record["service_type"],
+            service_record.get("items_collected", [])
+        )
+
+        next_prompt = self.template_service.get_next_prompt(
+            equipment_type,
+            service_record["service_type"],
+            service_record.get("items_collected", [])
+        )
+
+        return {
+            "service_record_code": service_record_code,
+            "status": service_record["status"],
+            "collected_items": service_record.get("items_collected", []),
+            "missing_items": validation["missing_items"],
+            "progress": validation["progress"],
+            "completion_percentage": validation["completion_percentage"],
+            "next_prompt": next_prompt
+        }
+
+
+# Global instance
+work_order_notifier = WorkOrderNotifier()
