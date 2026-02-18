@@ -158,7 +158,7 @@ async def main():
     embedding_service = get_embedding_service()
     vector_db = get_vector_db_service(client)
 
-    print(f"\nEmbedding model: all-MiniLM-L6-v2")
+    print("\nEmbedding model: all-MiniLM-L6-v2")
     print(f"Vector dimensions: {embedding_service.get_embedding_dimension()}")
 
     # Find all .md files
@@ -238,7 +238,7 @@ async def main():
         doc_count = client.table('documents').select('id', count='exact').execute().count or 0
         chunk_count = client.table('document_chunks').select('id', count='exact').execute().count or 0
 
-        print(f"\nDatabase totals:")
+        print("\nDatabase totals:")
         print(f"  Documents: {doc_count}")
         print(f"  Chunks: {chunk_count}")
     except Exception as e:

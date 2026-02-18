@@ -41,7 +41,7 @@ def reset_health_scores():
 
         print(f"✓ Reset {len(eq_ids)} equipment items to health_score=90, status=normal")
     else:
-        print(f"✓ No equipment found to reset")
+        print("✓ No equipment found to reset")
 
     # Resolve all active predictions
     print("\n🔄 Resolving active predictions...")
@@ -59,7 +59,7 @@ def reset_health_scores():
 
         print(f"✓ Resolved {len(pred_ids)} active predictions")
     else:
-        print(f"✓ No active predictions to resolve")
+        print("✓ No active predictions to resolve")
 
     # Get all buildings for summary
     print("\n📊 Summary by Site:")

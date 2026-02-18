@@ -7,7 +7,7 @@ dictionaries that can be used in the UI or stored in the database.
 import re
 import logging
 from typing import Dict, List, Optional, Any
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field
 from enum import Enum
 
 logger = logging.getLogger(__name__)

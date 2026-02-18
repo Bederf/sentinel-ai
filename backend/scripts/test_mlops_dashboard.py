@@ -67,7 +67,7 @@ async def test_endpoint(
 
     except httpx.ConnectError:
         print(f"  {Colors.RED}Error: Cannot connect to {BASE_URL}{Colors.END}")
-        print(f"  Please ensure backend is running: ./start-backend.sh")
+        print("  Please ensure backend is running: ./start-backend.sh")
         return False
     except Exception as e:
         print(f"  {Colors.RED}Error: {e}{Colors.END}")
@@ -76,7 +76,7 @@ async def test_endpoint(
 async def run_all_tests() -> Dict[str, Any]:
     """Run all ML Metrics Dashboard tests."""
     print(f"\n{Colors.CYAN}{'='*60}")
-    print(f"ML Metrics Dashboard API Test Suite")
+    print("ML Metrics Dashboard API Test Suite")
     print(f"{'='*60}{Colors.END}\n")
 
     tests = [
@@ -127,7 +127,7 @@ async def run_all_tests() -> Dict[str, Any]:
 
     # Print summary
     print(f"\n{Colors.CYAN}{'='*60}")
-    print(f"Test Summary")
+    print("Test Summary")
     print(f"{'='*60}{Colors.END}")
     print(f"{Colors.GREEN}Passed: {results['passed']}{Colors.END}")
     print(f"{Colors.RED}Failed: {results['failed']}{Colors.END}")

@@ -5,8 +5,7 @@ Creates sliding window sequences from sensor data for forecasting.
 """
 
 import logging
-from datetime import datetime, timedelta
-from typing import List, Tuple, Optional, Dict, Any
+from typing import List, Tuple, Dict, Any
 import numpy as np
 
 try:

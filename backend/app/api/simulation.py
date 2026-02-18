@@ -510,7 +510,6 @@ from app.services.module_registry_service import ModuleRegistryService
 from app.models.module_registry import (
     AIRecommendation, ModuleType, RecommendationType, RecommendationPriority
 )
-import random
 import uuid
 
 

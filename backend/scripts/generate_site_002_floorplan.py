@@ -10,9 +10,8 @@ Creates floor plan images that match the demo building structure:
 Output: PNG images for each floor in backend/app/data/demo_floor_plans/
 """
 
-import io
 from pathlib import Path
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 
 # Site-002 Demo Building Configuration
 SITE_CONFIG = {

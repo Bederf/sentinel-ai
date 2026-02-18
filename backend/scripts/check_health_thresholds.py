@@ -58,10 +58,10 @@ try:
 
     # Impact analysis
     print("\n[5] Impact Analysis:")
-    print(f"  Equipment at 85% health:")
-    print(f"    If healthy=90: Status='warning' (BELOW threshold) → Generates predictions")
-    print(f"    If healthy=80: Status='healthy' (ABOVE threshold) → No predictions ✓")
-    print(f"  Current predictions: 161 (expected to drop to ~20 if threshold fixed)")
+    print("  Equipment at 85% health:")
+    print("    If healthy=90: Status='warning' (BELOW threshold) → Generates predictions")
+    print("    If healthy=80: Status='healthy' (ABOVE threshold) → No predictions ✓")
+    print("  Current predictions: 161 (expected to drop to ~20 if threshold fixed)")
 
     print("\n" + "=" * 70)
 

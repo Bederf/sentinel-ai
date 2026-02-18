@@ -30,7 +30,7 @@ def main():
     )
 
     if result["status"] == "success":
-        print(f"\n✅ Training successful!")
+        print("\n✅ Training successful!")
         print(f"   Accuracy: {result['accuracy']:.3f}")
         print(f"   Classes: {result['n_classes']}")
         print(f"   Samples: {result['n_samples']}")

@@ -100,7 +100,7 @@ if BUILDINGS_PATH.exists():
         print(f"    HVAC zones:       {counts['hvac_zones']:3d}")
         print(f"    Generators:       {counts['generators']:3d}")
         print(f"    Energy centre:    {counts['energy_centre']:3d}")
-        print(f"    ───────────────────────")
+        print("    ───────────────────────")
         print(f"    TOTAL:            {total:3d}")
         print()
 

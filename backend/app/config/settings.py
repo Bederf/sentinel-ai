@@ -1,6 +1,6 @@
 """Application settings and configuration."""
 
-from pydantic import ConfigDict, field_validator
+from pydantic import ConfigDict, field_validator, Field
 from pydantic_settings import BaseSettings
 
 
@@ -74,7 +74,8 @@ class Settings(BaseSettings):
     sentry_webhook_secret: str = ""
 
     # Sentry bot API key (for authenticated access to /api/sites/* endpoints)
-    sentry_bot_api_key: str = ""
+    # Maps from CLAWD_BOT_API_KEY (legacy) or SENTRY_BOT_API_KEY (current) env var
+    sentry_bot_api_key: str = Field(default="", validation_alias="CLAWD_BOT_API_KEY")
 
     # SIMBIOT Concept Evolution (FSI Public API) credentials
     simbiot_api_key: str = ""

@@ -11,7 +11,6 @@ Tests all MCP endpoints:
 """
 
 import requests
-import json
 import sys
 
 BASE_URL = "http://localhost:9095/api/mcp/simbiot"
@@ -49,7 +48,7 @@ def test_get_tool_schema():
     schema = response.json()
     assert schema["name"] == "get_buildings"
     assert "input_schema" in schema
-    print(f"  OK: Schema retrieved for 'get_buildings'")
+    print("  OK: Schema retrieved for 'get_buildings'")
 
 
 def test_get_tool_schema_not_found():

@@ -15,10 +15,8 @@ Run: python backend/scripts/seed_equipment_to_supabase.py
 import sys
 import json
 from pathlib import Path
-from datetime import datetime
 import uuid
 from dotenv import load_dotenv
-import os
 
 # Load environment variables from .env
 load_dotenv(Path(__file__).parent.parent / '.env')
@@ -254,7 +252,7 @@ def seed_zones_for_site(client, site_code: str, building_uuid: str) -> int:
                 zone_name = zone.get('zone_name', zone_id)
 
                 if not zone_id:
-                    print(f"    ⓘ Skipping zone with no zone_id")
+                    print("    ⓘ Skipping zone with no zone_id")
                     continue
 
                 # Map status to valid value

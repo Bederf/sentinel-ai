@@ -11,7 +11,7 @@ Anomaly detection via reconstruction error:
 """
 
 import logging
-from typing import Tuple, Dict, Any, Optional
+from typing import Tuple, Dict, Any
 import numpy as np
 
 logger = logging.getLogger(__name__)

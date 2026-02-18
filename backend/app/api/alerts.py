@@ -82,7 +82,7 @@ def load_alerts() -> list[dict]:
                 "is_database": True
             }
             alerts.append(alert)
-    except Exception as e:
+    except Exception:
         # If Supabase not available, continue without database alerts
         pass
 
@@ -117,7 +117,7 @@ def load_alerts() -> list[dict]:
                 "is_simulation": True
             }
             alerts.append(alert)
-    except Exception as e:
+    except Exception:
         # If simulation not available, continue with static alerts only
         pass
 
@@ -705,7 +705,7 @@ async def acknowledge_alert(request: Request, alert_id: str, acknowledged_by: st
         return {"status": "acknowledged", "alert_id": alert_id}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         # If Supabase fails, the alert might be from static JSON (not acknowledgeable)
         raise HTTPException(status_code=404, detail=f"Alert {alert_id} not found or cannot be acknowledged")
 

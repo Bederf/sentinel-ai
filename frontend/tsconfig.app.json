@@ -7,8 +7,6 @@
     "module": "ESNext",
     "types": ["vite/client", "jest", "node"],
     "skipLibCheck": true,
-
-    /* Bundler mode */
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,

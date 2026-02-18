@@ -136,7 +136,7 @@ class SentinelHealthMonitor:
             if response.status_code == 200:
                 data = response.json()
                 self.jwt_token = data.get("access_token")
-                logger.info(f"✓ Login successful - JWT token obtained")
+                logger.info("✓ Login successful - JWT token obtained")
                 return True
             elif response.status_code == 401:
                 logger.error("Login failed - invalid username/password")

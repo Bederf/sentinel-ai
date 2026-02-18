@@ -48,9 +48,9 @@ async def test_routing():
 
         # Visual indicator
         if routing['provider'] == 'ollama':
-            print(f"✅ FREE (Local Ollama)")
+            print("✅ FREE (Local Ollama)")
         else:
-            print(f"💸 PAID (Cloud Claude)")
+            print("💸 PAID (Cloud Claude)")
 
     print("\n" + "=" * 80)
     print("ROUTING SUMMARY")
@@ -70,7 +70,7 @@ async def test_routing():
     all_claude_cost = len(test_queries) * 0.0105
     savings = all_claude_cost - total_cost
 
-    print(f"\nCost Analysis:")
+    print("\nCost Analysis:")
     print(f"  All Claude: ${all_claude_cost:.4f}")
     print(f"  Hybrid:     ${total_cost:.4f}")
     print(f"  Savings:    ${savings:.4f} ({savings/all_claude_cost*100:.0f}%)")

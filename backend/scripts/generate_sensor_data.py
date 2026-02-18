@@ -566,9 +566,9 @@ def main():
     # Save sensors
     with open(DATA_DIR / "sensors.json", "w") as f:
         json.dump(sensors, f, indent=2)
-    print(f"Saved sensors.json")
+    print("Saved sensors.json")
 
-    print(f"Generating 30 days of hourly readings...")
+    print("Generating 30 days of hourly readings...")
     readings = generate_readings(sensors, equipment, sites)
 
     print(f"Generated {len(readings):,} readings")
@@ -576,7 +576,7 @@ def main():
     # Save readings
     with open(DATA_DIR / "readings.json", "w") as f:
         json.dump(readings, f)
-    print(f"Saved readings.json")
+    print("Saved readings.json")
 
     # Print summary
     print("\n=== Generation Summary ===")

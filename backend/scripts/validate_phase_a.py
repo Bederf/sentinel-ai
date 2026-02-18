@@ -5,8 +5,6 @@ Tests the complete sanitization → extraction → re-identification pipeline
 using generated floor plans for site-002.
 """
 
-import base64
-import json
 import sys
 from pathlib import Path
 
@@ -70,7 +68,7 @@ def test_floor_plan(floor_code, floor_path):
 
     reidentified = sanitizer.reidentify_equipment_config(reidentified_config, lookup)
 
-    print(f"  ✓ Re-identification complete")
+    print("  ✓ Re-identification complete")
     for eq in reidentified.get("equipment", []):
         zone_name = eq.get("zone_name", "Unknown")
         print(f"    - {eq['name']:20} → Zone: {zone_name}")

@@ -21,8 +21,6 @@ Requirements:
 import json
 import sys
 from pathlib import Path
-from datetime import datetime
-from decimal import Decimal
 import uuid
 
 # Add backend to path
@@ -702,7 +700,7 @@ def verify_asset_summary(supabase: Client, building_id: str):
         if response.data:
             summary = response.data[0]
             print(f"\n  Asset Summary for {summary['building_name']}:")
-            print(f"  ────────────────────────────────────")
+            print("  ────────────────────────────────────")
             print(f"  Equipment:       {summary.get('equipment_count', 0):>5}")
             print(f"  HVAC Zones:      {summary.get('hvac_zone_count', 0):>5}")
             print(f"  Generators:      {summary.get('generator_count', 0):>5}")
@@ -718,9 +716,9 @@ def verify_asset_summary(supabase: Client, building_id: str):
             print(f"  UPS Systems:     {summary.get('ups_count', 0):>5}")
             print(f"  Feeders:         {summary.get('feeder_count', 0):>5}")
             print(f"  DALI Controllers:{summary.get('dali_controller_count', 0):>5}")
-            print(f"  ────────────────────────────────────")
+            print("  ────────────────────────────────────")
             print(f"  TOTAL ASSETS:    {summary.get('total_assets', 0):>5}")
-            print(f"\n  (Supplementary - not in total):")
+            print("\n  (Supplementary - not in total):")
             print(f"  Desks:           {summary.get('desk_count', 0):>5}")
             print(f"  Luminaires:      {summary.get('luminaire_count', 0):>5}")
             print(f"  DALI Sensors:    {summary.get('dali_sensor_count', 0):>5}")

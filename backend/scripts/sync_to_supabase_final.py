@@ -14,7 +14,7 @@ import json
 import sys
 import uuid
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Optional
 import argparse
 import os
 from dotenv import load_dotenv
@@ -122,28 +122,28 @@ def sync_to_supabase(building_code: str, dry_run: bool = False):
     print(f"  ✓ Found building ID: {building_id}")
 
     # Load JSON data
-    print(f"\n📂 Loading data files...")
+    print("\n📂 Loading data files...")
     zones = load_zones_json(building_code)
     desks = load_desks_json(building_code)
     print(f"  ✓ Loaded {len(zones)} zones")
     print(f"  ✓ Loaded {len(desks)} desks (with corrected floors L0, L1, L2)")
 
     # Prepare data
-    print(f"\n📋 Preparing records...")
+    print("\n📋 Preparing records...")
     zones_prepared = prepare_zones(zones, building_id)
     desks_prepared = prepare_desks(desks, building_id)
     print(f"  ✓ {len(zones_prepared)} zone records ready")
     print(f"  ✓ {len(desks_prepared)} desk records ready")
 
     if dry_run:
-        print(f"\n🔍 DRY RUN MODE - Would sync:")
+        print("\n🔍 DRY RUN MODE - Would sync:")
         print(f"   - {len(zones_prepared)} zones")
         print(f"   - {len(desks_prepared)} desks")
         return True
 
     # Sync to Supabase
     try:
-        print(f"\n📤 Syncing to Supabase...")
+        print("\n📤 Syncing to Supabase...")
 
         print(f"   Upserting {len(zones_prepared)} zones...")
         response = client.table("zones").upsert(
@@ -172,13 +172,13 @@ def sync_to_supabase(building_code: str, dry_run: bool = False):
             total_synced += synced
             print(f"   ✓ {synced} desks synced")
 
-        print(f"\n✅ Sync complete!")
+        print("\n✅ Sync complete!")
         print(f"   📊 {zones_synced} zones")
         print(f"   📊 {total_synced} desks")
-        print(f"\n🎯 Next steps:")
-        print(f"   1. Zone centroids will auto-calculate from desk coordinates")
-        print(f"   2. Equipment will appear in zones on the digital twin")
-        print(f"   3. Refresh the browser to see updated 3D visualization")
+        print("\n🎯 Next steps:")
+        print("   1. Zone centroids will auto-calculate from desk coordinates")
+        print("   2. Equipment will appear in zones on the digital twin")
+        print("   3. Refresh the browser to see updated 3D visualization")
         return True
 
     except Exception as e:

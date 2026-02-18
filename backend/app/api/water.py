@@ -24,7 +24,6 @@ from app.services.water_cost_service import get_water_cost_service
 from app.database.repositories.water_consumption_repository import WaterConsumptionRepository
 from app.database.repositories.water_cost_repository import WaterCostRepository
 from app.models.water_meter import WaterTariff
-from typing import Dict
 
 logger = logging.getLogger(__name__)
 

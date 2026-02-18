@@ -4,7 +4,6 @@
 import sys
 from pathlib import Path
 from dotenv import load_dotenv
-from collections import defaultdict
 
 load_dotenv(Path(__file__).parent.parent / '.env')
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -60,14 +59,14 @@ try:
     print("\n" + "=" * 70)
     print("SUMMARY OF CHANGES")
     print("=" * 70)
-    print(f"\nBefore Fix (healthy=90 threshold):")
-    print(f"  Predictions: 161 (all 85% equipment flagged as at-risk)")
-    print(f"  Issue: All showing 60% probability (formula minimum)")
+    print("\nBefore Fix (healthy=90 threshold):")
+    print("  Predictions: 161 (all 85% equipment flagged as at-risk)")
+    print("  Issue: All showing 60% probability (formula minimum)")
 
-    print(f"\nAfter Fix (healthy=80 threshold):")
+    print("\nAfter Fix (healthy=80 threshold):")
     print(f"  Predictions: ~{at_risk_count} (only actual at-risk equipment)")
-    print(f"  Solution: Equipment at 85% health no longer flagged")
-    print(f"  Result: More accurate risk assessment ✓")
+    print("  Solution: Equipment at 85% health no longer flagged")
+    print("  Result: More accurate risk assessment ✓")
 
     print("\n" + "=" * 70)
 

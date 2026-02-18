@@ -50,7 +50,7 @@ try:
                 'building_id', site002['id']
             ).limit(5).execute()
             if sample.data:
-                print(f"\nSample equipment from site-002:")
+                print("\nSample equipment from site-002:")
                 for item in sample.data:
                     print(f"  {item['code']}: {item['name']} ({item['type']})")
 

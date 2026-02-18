@@ -12,15 +12,12 @@ Uses simulated data to avoid network dependencies.
 """
 
 import sys
-import json
 import asyncio
-from typing import List, Dict, Any
 
 # Add backend to path
 sys.path.insert(0, '/opt/bms-intelligence/backend')
 
 from app.database.repositories.building_repository import BuildingRepository
-from app.database.repositories.equipment_repository import EquipmentRepository
 from app.services.dali_discovery_service import SimulatedDALIDiscovery
 from app.services.bacnet_discovery_service import SimulatedBACnetDiscovery
 from app.services.modbus_discovery_service import SimulatedModbusDiscovery
@@ -159,11 +156,11 @@ async def discover_equipment_for_site(site_code: str):
     print(f"   Success Rate: {success_count*100//len(equipment_list)}%")
 
     if success_count > 0:
-        print(f"\n✨ Equipment metadata has been populated!")
-        print(f"   - Device info (manufacturer, model, serial)")
-        print(f"   - Network info (IP, DALI address, BACnet device ID)")
-        print(f"   - Operating data (lamp hours, power cycles, fault count)")
-        print(f"\n🔄 Equipment Age and Alarms should now display in the dashboard!")
+        print("\n✨ Equipment metadata has been populated!")
+        print("   - Device info (manufacturer, model, serial)")
+        print("   - Network info (IP, DALI address, BACnet device ID)")
+        print("   - Operating data (lamp hours, power cycles, fault count)")
+        print("\n🔄 Equipment Age and Alarms should now display in the dashboard!")
 
 
 if __name__ == "__main__":

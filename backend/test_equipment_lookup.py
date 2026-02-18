@@ -122,9 +122,9 @@ async def test_lookup():
     print(f"✓ Total fault codes in database: {total_codes}")
 
     if total_codes >= 300:
-        print(f"✓ Database meets minimum requirement (300+ codes)")
+        print("✓ Database meets minimum requirement (300+ codes)")
     else:
-        print(f"✗ WARNING: Database has fewer than 300 codes")
+        print("✗ WARNING: Database has fewer than 300 codes")
 
     print("\n" + "=" * 60)
     print("✅ ALL EQUIPMENT LOOKUP TESTS PASSED!")
@@ -147,20 +147,20 @@ async def test_sample_diagnosis():
 
         print(f"\n🔴 FAULT: {fault['code']} - {fault['name']}")
         print(f"Severity: {fault['severity'].upper()}")
-        print(f"\nDescription:")
+        print("\nDescription:")
         print(f"  {fault['description']}")
 
-        print(f"\nProbable Causes:")
+        print("\nProbable Causes:")
         for i, cause in enumerate(fault['probable_causes'], 1):
             print(f"  {i}. {cause['cause']} (Likelihood: {cause['likelihood']})")
             print(f"     Check: {cause['check']}")
 
-        print(f"\nRecommended Actions:")
+        print("\nRecommended Actions:")
         for action in fault['recommended_fix']['immediate']:
             print(f"  • {action}")
 
         if fault['recommended_fix'].get('scenarios'):
-            print(f"\nScenario-Based Fixes:")
+            print("\nScenario-Based Fixes:")
             for scenario, fix in fault['recommended_fix']['scenarios'].items():
                 print(f"  {scenario}: {fix}")
 

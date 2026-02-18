@@ -113,7 +113,7 @@ async def format_sensor_with_zone_and_desks(sensor_data: Dict[str, Any]) -> Dict
 
         if result.data:
             equipment_record = result.data[0]  # Take first match
-    except Exception as e:
+    except Exception:
         # Equipment lookup failed, continue with DALI service data
         pass
 
@@ -138,7 +138,7 @@ async def format_sensor_with_zone_and_desks(sensor_data: Dict[str, Any]) -> Dict
                 formatted['desks_in_zone'] = desks
                 formatted['desk_count'] = len(desks)
                 formatted['desk_numbers'] = [d.get('number') for d in desks if d.get('number')]
-            except Exception as e:
+            except Exception:
                 # Desk lookup failed, continue
                 formatted['desks_in_zone'] = []
                 formatted['desk_count'] = 0

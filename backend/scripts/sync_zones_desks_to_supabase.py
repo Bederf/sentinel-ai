@@ -164,33 +164,33 @@ def sync_to_supabase(building_code: str):
         return False
 
     # Load JSON data
-    print(f"📂 Loading zones from zones.json...")
+    print("📂 Loading zones from zones.json...")
     zones = load_zones_json(building_code)
     print(f"  → Found {len(zones)} zones")
 
-    print(f"📂 Loading desks from desks.json.bak...")
+    print("📂 Loading desks from desks.json.bak...")
     desks_raw = load_desks_json(building_code)
     print(f"  → Found {len(desks_raw)} desks")
 
     # Transform data
-    print(f"🔄 Transforming zones...")
+    print("🔄 Transforming zones...")
     zones_transformed = transform_zones(zones, building_id)
     print(f"  → Prepared {len(zones_transformed)} zone records")
 
-    print(f"🔄 Transforming desks (correcting floors, generating coordinates)...")
+    print("🔄 Transforming desks (correcting floors, generating coordinates)...")
     desks_transformed = transform_desks(desks_raw, building_id)
     print(f"  → Prepared {len(desks_transformed)} desk records")
 
     # Upsert to Supabase
     try:
-        print(f"📤 Upserting zones to Supabase...")
+        print("📤 Upserting zones to Supabase...")
         response = client.table("zones").upsert(
             zones_transformed,
             on_conflict="building_id,zone_id"
         ).execute()
         print(f"  ✓ {len(response.data)} zones synced")
 
-        print(f"📤 Upserting desks to Supabase...")
+        print("📤 Upserting desks to Supabase...")
         # Upsert in batches to avoid payload limits
         batch_size = 500
         total_synced = 0
@@ -205,10 +205,10 @@ def sync_to_supabase(building_code: str):
 
         print(f"  ✓ Total: {total_synced} desks synced")
 
-        print(f"\n✅ Sync complete!")
+        print("\n✅ Sync complete!")
         print(f"   - {len(zones_transformed)} zones")
         print(f"   - {total_synced} desks (with corrected floors L0, L1, L2)")
-        print(f"   - All desks have x_coord and z_coord for centroid calculation")
+        print("   - All desks have x_coord and z_coord for centroid calculation")
         return True
 
     except Exception as e:

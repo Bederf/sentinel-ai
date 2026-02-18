@@ -16,7 +16,6 @@ Prerequisites:
     - Backend environment variables configured (.env)
 """
 
-import asyncio
 import json
 import sys
 from pathlib import Path
@@ -76,7 +75,7 @@ class BmsIngestionDemo:
         result = response.json()
         self.discovery_id = result.get("discovery_id")
 
-        print(f"\n✓ Discovery successful!")
+        print("\n✓ Discovery successful!")
         print(f"  Discovery ID: {self.discovery_id}")
         print(f"  Points discovered: {result.get('points_count')}")
         print(f"  Equipment identified: {result.get('equipment_count')}")
@@ -85,9 +84,9 @@ class BmsIngestionDemo:
         # Print summary
         summary = result.get("summary", {})
         if summary:
-            print(f"\nClassification Summary:")
+            print("\nClassification Summary:")
             unique_equipment = summary.get("unique_equipment", {})
-            print(f"  Equipment types discovered:")
+            print("  Equipment types discovered:")
             equipment_types = {}
             for eq_id, eq_type in unique_equipment.items():
                 if eq_type not in equipment_types:
@@ -99,7 +98,7 @@ class BmsIngestionDemo:
                 print(f"    - {eq_type}: {count}")
 
             confidence = summary.get("confidence_breakdown", {})
-            print(f"\n  Confidence breakdown:")
+            print("\n  Confidence breakdown:")
             print(f"    - High: {confidence.get('high', 0)}")
             print(f"    - Medium: {confidence.get('medium', 0)}")
             print(f"    - Low: {confidence.get('low', 0)}")
@@ -131,7 +130,7 @@ class BmsIngestionDemo:
 
         result = response.json()
 
-        print(f"\n✓ Mappings retrieved!")
+        print("\n✓ Mappings retrieved!")
         print(f"  Total equipment: {result.get('equipment_count')}")
         print(f"  Total points: {result.get('total_points')}")
         print(f"  Status: {result.get('status')}")
@@ -152,7 +151,7 @@ class BmsIngestionDemo:
 
         # Print validation results
         validation = result.get("validation", {})
-        print(f"\nValidation Results:")
+        print("\nValidation Results:")
         print(f"  Valid: {validation.get('valid', True)}")
         orphan_count = len(validation.get("orphan_points", []))
         if orphan_count > 0:
@@ -192,7 +191,7 @@ class BmsIngestionDemo:
 
         result = response.json()
 
-        print(f"\n✓ Approval successful!")
+        print("\n✓ Approval successful!")
         print(f"  Equipment created: {result.get('equipment_created')}")
         print(f"  Message: {result.get('message')}")
 
@@ -216,13 +215,13 @@ class BmsIngestionDemo:
 
             if response.status_code == 200:
                 building = response.json()
-                print(f"\n✓ Building found!")
+                print("\n✓ Building found!")
                 print(f"  Name: {building.get('name')}")
                 print(f"  Address: {building.get('address')}")
                 print(f"  Equipment count: {building.get('equipment_count')}")
                 return True
             elif response.status_code == 404:
-                print(f"\n⚠ Building not in API yet, checking filesystem...")
+                print("\n⚠ Building not in API yet, checking filesystem...")
         except Exception as e:
             print(f"\n⚠ API check failed: {e}, checking filesystem...")
 
@@ -258,7 +257,7 @@ class BmsIngestionDemo:
                     print(f"    Warning: Could not read {eq_file.name}: {e}")
 
             if type_counts:
-                print(f"  Equipment by type:")
+                print("  Equipment by type:")
                 for eq_type in sorted(type_counts.keys()):
                     print(f"    - {eq_type}: {type_counts[eq_type]}")
 
@@ -287,7 +286,7 @@ class BmsIngestionDemo:
         print("\n" + "=" * 75)
         print("BMS INGESTION DEMO - site-013 (Rosebank Corporate Park - Block B)")
         print("=" * 75)
-        print(f"\nConfiguration:")
+        print("\nConfiguration:")
         print(f"  Site ID: {SITE_ID}")
         print(f"  Device IP: {DEVICE_IP}")
         print(f"  Demo mode: {DEMO_MODE}")
@@ -324,15 +323,15 @@ class BmsIngestionDemo:
 
         all_passed = all("✓" in r for r in results.values())
         if all_passed:
-            print(f"\n✓ All steps completed successfully!")
-            print(f"\nNext steps:")
-            print(f"  1. Access the frontend: http://localhost:9096")
-            print(f"  2. Select 'Rosebank Corporate Park - Block B' from the site dropdown")
+            print("\n✓ All steps completed successfully!")
+            print("\nNext steps:")
+            print("  1. Access the frontend: http://localhost:9096")
+            print("  2. Select 'Rosebank Corporate Park - Block B' from the site dropdown")
             print(f"  3. Verify {self.discovery_id and 'equipment' or 'building'} display")
-            print(f"  4. Check Integration Monitoring dashboard for BMS data")
+            print("  4. Check Integration Monitoring dashboard for BMS data")
             return True
         else:
-            print(f"\n❌ Workflow completed with errors. See details above.")
+            print("\n❌ Workflow completed with errors. See details above.")
             return False
 
 

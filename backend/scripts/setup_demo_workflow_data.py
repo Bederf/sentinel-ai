@@ -19,24 +19,17 @@ import json
 import sys
 from pathlib import Path
 from datetime import datetime, timedelta
-from typing import Dict, Any, List
+from typing import Dict, List
 
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from app.models.baseline import (
-    EquipmentBaseline,
-    BaselineType,
     BaselineStatus,
     BaselineSource
 )
 from app.models.inspection import (
-    InspectionSchedule,
-    InspectionTask,
-    InspectionResult,
-    InspectionDeficiency,
     InspectionScheduleFrequency,
-    InspectionTaskStatus,
     InspectionOverallStatus,
     DeficiencySeverity,
     DeficiencyCategory
@@ -560,9 +553,9 @@ async def setup_chiller_001_lifecycle(store: DemoDataStore):
 
     print(f"    ✓ {len(CHILLER_001_BASELINES)} baselines")
     print(f"    ✓ {len(CHILLER_001_INSPECTIONS)} inspections")
-    print(f"    ✓ 1 schedule")
-    print(f"    ✓ 1 ML prediction")
-    print(f"    ✓ 1 work order (completed)")
+    print("    ✓ 1 schedule")
+    print("    ✓ 1 ML prediction")
+    print("    ✓ 1 work order (completed)")
 
 
 async def setup_generator_002_healthy(store: DemoDataStore):
@@ -605,8 +598,8 @@ async def setup_generator_002_healthy(store: DemoDataStore):
     store.add_prediction(equipment_id, prediction)
 
     print(f"    ✓ {len(GENERATOR_002_BASELINES)} baselines")
-    print(f"    ✓ 1 schedule")
-    print(f"    ✓ 1 ML prediction (healthy)")
+    print("    ✓ 1 schedule")
+    print("    ✓ 1 ML prediction (healthy)")
 
 
 async def setup_ahu_003_issue(store: DemoDataStore):
@@ -672,9 +665,9 @@ async def setup_ahu_003_issue(store: DemoDataStore):
     })
 
     print(f"    ✓ {len(AHU_003_BASELINES)} baselines")
-    print(f"    ✓ 1 schedule")
-    print(f"    ✓ 1 ML prediction (active)")
-    print(f"    ✓ 1 pending inspection task")
+    print("    ✓ 1 schedule")
+    print("    ✓ 1 ML prediction (active)")
+    print("    ✓ 1 pending inspection task")
 
 
 async def setup_demo_workflow_data():

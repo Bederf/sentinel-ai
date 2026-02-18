@@ -150,7 +150,7 @@ async def get_equipment_types() -> Dict[str, Any]:
             "equipment_types": list(templates.keys()),
             "count": len(templates)
         }
-    except Exception as e:
+    except Exception:
         # Fallback to default templates
         from app.services.pricing_engine import PricingEngine
         engine = PricingEngine()

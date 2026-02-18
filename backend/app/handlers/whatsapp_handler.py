@@ -4,7 +4,7 @@ Maps BMS events to WhatsApp messages for technicians and facility managers.
 """
 
 from typing import Dict, Any, Optional, List
-from integrations.whatsapp_service import get_whatsapp_service
+from app.integrations.whatsapp_service import get_whatsapp_service
 import json
 import logging
 from datetime import datetime

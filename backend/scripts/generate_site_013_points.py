@@ -10,7 +10,6 @@ Creates 195 BACnet points representing a 4-floor office building with:
 """
 
 import json
-import sys
 from pathlib import Path
 
 
@@ -327,7 +326,7 @@ def main():
         obj_type = p["object_type"]
         type_counts[obj_type] = type_counts.get(obj_type, 0) + 1
 
-    print(f"\nPoint types:")
+    print("\nPoint types:")
     for obj_type, count in sorted(type_counts.items()):
         print(f"  {obj_type}: {count}")
 
@@ -337,7 +336,7 @@ def main():
         cls = p.get("bacnet_class", "unknown")
         class_counts[cls] = class_counts.get(cls, 0) + 1
 
-    print(f"\nBACnet point classes:")
+    print("\nBACnet point classes:")
     for cls, count in sorted(class_counts.items()):
         print(f"  {cls}: {count}")
 
@@ -358,7 +357,7 @@ def main():
     print(f"\n✓ Saved to {output_file}")
 
     # Print sample
-    print(f"\nSample points (first 10):")
+    print("\nSample points (first 10):")
     for p in points[:10]:
         writable = "R/W" if p["writable"] else "RO"
         print(f"  {p['name']:40} {p['object_type']:15} ({writable})")

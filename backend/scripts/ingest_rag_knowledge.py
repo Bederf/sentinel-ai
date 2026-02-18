@@ -342,7 +342,7 @@ async def main():
     embedding_service = get_embedding_service()
     vector_db = get_vector_db_service(client)
 
-    print(f"\nEmbedding model: all-MiniLM-L6-v2")
+    print("\nEmbedding model: all-MiniLM-L6-v2")
     print(f"Vector dimensions: {embedding_service.get_embedding_dimension()}")
 
     # 1. Update existing knowledge entries with embeddings
@@ -418,7 +418,7 @@ async def main():
         chunk_count = client.table('document_chunks').select('id', count='exact').execute().count or 0
         knowledge_count = client.table('equipment_knowledge').select('id', count='exact').execute().count or 0
 
-        print(f"\nCurrent counts:")
+        print("\nCurrent counts:")
         print(f"  Documents: {doc_count}")
         print(f"  Chunks: {chunk_count}")
         print(f"  Knowledge entries: {knowledge_count}")

@@ -25,7 +25,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from app.database.repositories.module_access_repository import get_module_access_repository
-from app.models.module_registry import ModuleType
 
 
 def main():
@@ -79,7 +78,7 @@ def main():
             user_role=None,  # Will include base modules
             site_code=args.site_code,
         )
-        print(f"\n✓ Successfully granted modules!")
+        print("\n✓ Successfully granted modules!")
         print(f"\nUser {args.email} now has access to at site {args.site_code}:")
         base_mods = ['control', 'assets', 'simbiot', 'integrations', 'notifications', 'hvac', 'energy']
         print(f"  - Base modules (automatic): {', '.join(sorted(base_mods))}")

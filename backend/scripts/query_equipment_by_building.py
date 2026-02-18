@@ -22,7 +22,7 @@ try:
     if result.count is not None:
         print(f"   Total equipment records: {result.count}")
     else:
-        print(f"   Count: Unable to retrieve")
+        print("   Count: Unable to retrieve")
 except Exception as e:
     print(f"   ERROR: {e}")
 

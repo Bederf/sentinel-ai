@@ -4,7 +4,6 @@
 import sys
 from pathlib import Path
 from dotenv import load_dotenv
-import json
 
 load_dotenv(Path(__file__).parent.parent / '.env')
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -61,9 +60,9 @@ try:
             print("  ✗ Failed to create entry")
 
     print("\n[4] Expected Impact:")
-    print(f"  Predictions before: 161 (all at 60% probability)")
-    print(f"  Predictions after: ~20 (equipment with health < 60%)")
-    print(f"  Reason: Equipment at 85% health now considered 'healthy'")
+    print("  Predictions before: 161 (all at 60% probability)")
+    print("  Predictions after: ~20 (equipment with health < 60%)")
+    print("  Reason: Equipment at 85% health now considered 'healthy'")
 
     print("\n[5] To activate the fix:")
     print("  - Clear Python cache: health_threshold_service.clear_cache()")

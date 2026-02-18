@@ -9,12 +9,11 @@ Usage:
     python -m ml.lstm.train --all --epochs 50
 """
 
-import os
 import logging
 import argparse
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 
 import numpy as np
 

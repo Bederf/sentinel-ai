@@ -17,7 +17,6 @@ import re
 import hashlib
 import time
 from pathlib import Path
-from typing import Optional
 
 # Add backend to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -199,7 +198,7 @@ async def main():
     embedding_service = get_embedding_service()
     vector_db = get_vector_db_service(client)
 
-    print(f"Embedding model: all-MiniLM-L6-v2")
+    print("Embedding model: all-MiniLM-L6-v2")
     print(f"Vector dimensions: {embedding_service.get_embedding_dimension()}")
     print(f"Docs directory: {DOCS_DIR}")
     print(f"Force re-ingest: {force}")
@@ -239,7 +238,7 @@ async def main():
     skipped = 0
     errors = 0
 
-    print(f"\nProcessing documents...")
+    print("\nProcessing documents...")
 
     for i, filepath in enumerate(md_files):
         # Display path relative to project root (works for any file location)
@@ -337,7 +336,7 @@ async def main():
 
     # Summary
     print(f"\n{'=' * 55}")
-    print(f"Ingestion Complete!")
+    print("Ingestion Complete!")
     print(f"  Added:   {added}")
     print(f"  Skipped: {skipped}")
     print(f"  Errors:  {errors}")
@@ -348,7 +347,7 @@ async def main():
         chunk_count = client.table('document_chunks').select('id', count='exact').execute().count or 0
         knowledge_count = client.table('equipment_knowledge').select('id', count='exact').execute().count or 0
 
-        print(f"\nTotal RAG content:")
+        print("\nTotal RAG content:")
         print(f"  Documents:       {doc_count}")
         print(f"  Document chunks: {chunk_count}")
         print(f"  Knowledge base:  {knowledge_count}")

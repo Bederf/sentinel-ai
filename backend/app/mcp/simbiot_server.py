@@ -4749,7 +4749,6 @@ class SIMBIOTMCPServer:
         }
 
         # Merge registry tools (code search, fetch, structure)
-        from app.mcp.tools.registry import get_all_handlers
         self.tool_handlers.update(get_all_handlers())
         logger.info("SIMBIOTMCPServer initialized with %d tools", len(self.tools))
 

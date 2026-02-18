@@ -7,7 +7,7 @@ Tracks trained models, their metrics, and which version is active for inference.
 import json
 import logging
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import List, Optional
 from pathlib import Path
 
 logger = logging.getLogger(__name__)

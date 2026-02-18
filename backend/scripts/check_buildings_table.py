@@ -21,7 +21,7 @@ try:
     # Get all buildings with their equipment_count
     result = client.table('buildings').select('code, name, equipment_count').execute()
 
-    print(f"\nBuildings in Supabase:\n")
+    print("\nBuildings in Supabase:\n")
     for building in result.data:
         print(f"  {building['code']}: equipment_count = {building.get('equipment_count', 'N/A')}")
 

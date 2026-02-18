@@ -16,8 +16,6 @@ import sys
 import argparse
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple
-import re
-from decimal import Decimal
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -251,7 +249,7 @@ def validate_zones_and_desks(zones: List[Dict], desks: List[Dict]) -> Tuple[bool
             errors.append(f"❌ Desk {desk['desk_id']}: Z coordinate {z} out of bounds (0-20)")
 
     if not errors:
-        print(f"✓ Desk coordinates within bounds (X: 0-30m, Z: 0-20m)")
+        print("✓ Desk coordinates within bounds (X: 0-30m, Z: 0-20m)")
 
     # Check floor codes
     valid_floors = {"B1", "G", "L0", "L1", "L2", "R"}
@@ -375,10 +373,10 @@ def main():
     # Dry run
     if args.dry_run:
         print("\n[DRY RUN] Migration complete (no database changes)")
-        print(f"\nWould migrate:")
+        print("\nWould migrate:")
         print(f"  {len(zones)} zones from zones.json.bak")
         print(f"  {len(desks)} desks from desks.json.bak")
-        print(f"\nTo confirm and execute, run without --dry-run flag")
+        print("\nTo confirm and execute, run without --dry-run flag")
         sys.exit(0)
 
     # Connect to Supabase
@@ -409,7 +407,7 @@ def main():
     verify_insertion(supabase_client, building_uuid)
 
     print(f"\n{'='*60}")
-    print(f"✓ Migration complete!")
+    print("✓ Migration complete!")
     print(f"  {len(zones)} zones → Supabase")
     print(f"  {len(desks)} desks → Supabase")
     print(f"{'='*60}\n")

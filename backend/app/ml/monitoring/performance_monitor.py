@@ -29,7 +29,8 @@ class ConfusionMatrix:
     true_negatives: int = 0      # NO fault predicted and NOT repaired
 
 
-"""Calculates ML model performance metrics from simulation events."""
+class PerformanceMonitor:
+    """Calculates ML model performance metrics from simulation events."""
 
     def __init__(self, log_dir: Path = LOG_DIR):
         self.log_dir = log_dir

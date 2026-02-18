@@ -15,7 +15,6 @@ Requires backend server running on localhost:9095
 
 import asyncio
 import sys
-from typing import Optional
 
 try:
     import httpx
@@ -278,11 +277,11 @@ async def main():
         print(f"\n✅ All {total} test suites PASSED!")
         print("\nAPI Endpoints Ready:")
         print(f"  GET  {BASE_URL}/api/equipment-lookup/fault-code")
-        print(f"       ?manufacturer=Carrier&fault_code=E4&model=30XA")
+        print("       ?manufacturer=Carrier&fault_code=E4&model=30XA")
         print(f"  GET  {BASE_URL}/api/equipment-lookup/parts")
-        print(f"       ?part_number=30HX-405-332")
+        print("       ?part_number=30HX-405-332")
         print(f"  POST {BASE_URL}/api/equipment-lookup/search")
-        print(f"       ?query=carrier+fault+E4")
+        print("       ?query=carrier+fault+E4")
         print(f"\nAPI Docs: {BASE_URL}/docs")
     else:
         print(f"\n❌ {total - passed} of {total} test suites FAILED")

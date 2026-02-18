@@ -83,7 +83,7 @@ try:
     print("SUMMARY")
     print("=" * 70)
     print(f"Equipment Count: {equipment_result.count}")
-    print(f"Expected Count: 19")
+    print("Expected Count: 19")
     print(f"Difference: {equipment_result.count - 19}")
 
     if equipment_result.count > 19:

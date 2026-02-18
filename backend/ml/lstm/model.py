@@ -6,7 +6,7 @@ Predicts sensor values at 24h, 48h, and 72h horizons.
 """
 
 import logging
-from typing import Tuple, List, Optional, Dict, Any
+from typing import Tuple, Dict, Any
 import numpy as np
 
 logger = logging.getLogger(__name__)

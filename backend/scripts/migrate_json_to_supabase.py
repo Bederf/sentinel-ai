@@ -12,7 +12,6 @@ Usage:
 import json
 import sys
 from pathlib import Path
-from datetime import datetime
 import uuid
 
 # Add backend to path
@@ -196,7 +195,7 @@ def migrate_sensors(supabase: Client, equipment_map: dict) -> dict:
         try:
             supabase.table("sensors").upsert(record).execute()
             count += 1
-        except Exception as e:
+        except Exception:
             skipped += 1
 
     print(f"  Migrated {count} sensors (skipped {skipped})")

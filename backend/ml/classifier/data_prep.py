@@ -294,7 +294,6 @@ class ClassifierDataPrep:
             List of feature dictionaries with labels
         """
         import random
-        import numpy as np
 
         samples = []
 

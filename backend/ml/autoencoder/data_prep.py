@@ -7,7 +7,7 @@ failure periods from training data. High reconstruction error = anomaly.
 
 import logging
 from datetime import datetime, timedelta
-from typing import List, Tuple, Optional, Dict, Any
+from typing import List, Tuple, Dict, Any
 import numpy as np
 
 try:

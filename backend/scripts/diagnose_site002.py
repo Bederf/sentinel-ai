@@ -4,7 +4,6 @@ Diagnostic script: Check Supabase data for site-002
 Shows: buildings, equipment, zones, desks, technicians
 """
 
-import os
 import sys
 from pathlib import Path
 from datetime import datetime
@@ -26,7 +25,7 @@ def check_building(client):
 
         if result.data:
             building = result.data[0]
-            print(f"✅ Building found:")
+            print("✅ Building found:")
             print(f"   ID: {building.get('id')}")
             print(f"   Code: {building.get('code')}")
             print(f"   Name: {building.get('name')}")
@@ -58,7 +57,7 @@ def check_equipment(client, building_id):
         print(f"Equipment records found: {count}")
 
         if count > 0:
-            print(f"\n✅ Sample equipment (first 10):")
+            print("\n✅ Sample equipment (first 10):")
             for i, eq in enumerate(result.data[:10], 1):
                 print(f"   {i}. {eq.get('code')} - {eq.get('name')} ({eq.get('type')}) [Status: {eq.get('status')}]")
 
@@ -71,7 +70,7 @@ def check_equipment(client, building_id):
                 eq_type = eq.get('type', 'unknown')
                 types[eq_type] = types.get(eq_type, 0) + 1
 
-            print(f"\nEquipment by type:")
+            print("\nEquipment by type:")
             for eq_type, count in sorted(types.items()):
                 print(f"   - {eq_type}: {count}")
         else:
@@ -99,7 +98,7 @@ def check_zones(client, building_id):
         print(f"Zone records found: {count}")
 
         if count > 0:
-            print(f"\n✅ Zones:")
+            print("\n✅ Zones:")
             for zone in result.data:
                 print(f"   - {zone.get('zone_id')} ({zone.get('floor')}) {zone.get('zone_type')} - {zone.get('area_sqm')} sqm")
         else:
@@ -127,7 +126,7 @@ def check_desks(client, building_id):
         print(f"Desk records found: {count}")
 
         if count > 0:
-            print(f"\n✅ Sample desks (first 5):")
+            print("\n✅ Sample desks (first 5):")
             for i, desk in enumerate(result.data[:5], 1):
                 print(f"   {i}. {desk.get('desk_id')} (Floor: {desk.get('floor')}, Zone: {desk.get('zone_id')})")
 
@@ -159,7 +158,7 @@ def check_technicians(client, building_id):
         print(f"Technician assignments found: {count}")
 
         if count > 0:
-            print(f"\n✅ Technician assignments:")
+            print("\n✅ Technician assignments:")
             for assignment in result.data:
                 primary = "PRIMARY" if assignment.get('is_primary') else "secondary"
                 print(f"   - Technician {assignment.get('technician_id')}: {assignment.get('specialty')} ({primary})")
@@ -186,7 +185,7 @@ def check_technician_details(client):
         print(f"Total technicians in system: {count}")
 
         if count > 0:
-            print(f"\n✅ All technicians:")
+            print("\n✅ All technicians:")
             for tech in result.data:
                 print(f"   - {tech.get('code')}: {tech.get('name')} ({tech.get('email')}) - Active: {tech.get('active')}")
 

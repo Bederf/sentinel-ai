@@ -12,7 +12,6 @@ Usage:
     python -m ml.autoencoder.train --all --epochs 50
 """
 
-import os
 import logging
 import argparse
 from datetime import datetime

@@ -7,7 +7,7 @@ failure type classifiers.
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List
+from typing import List
 
 from ml.classifier.data_prep import ClassifierDataPrep
 from ml.classifier.model import FailureClassifier
@@ -113,7 +113,7 @@ class ClassifierTrainer:
                     "trained_at": datetime.now().isoformat()
                 }
             )
-            logger.info(f"Model registered in registry")
+            logger.info("Model registered in registry")
         except Exception as e:
             logger.warning(f"Failed to register model: {e}")
 
@@ -218,7 +218,7 @@ def main():
         )
 
         if result["status"] == "success":
-            print(f"\nTraining successful!")
+            print("\nTraining successful!")
             print(f"Accuracy: {result['accuracy']:.3f}")
             print(f"Classes: {result['n_classes']}")
             print(f"Samples: {result['n_samples']}")
