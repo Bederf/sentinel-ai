@@ -243,7 +243,7 @@ All controlled features use same pattern:
 const { isActive, savingsData } = useModuleAccess('module-name')
 
 // 2. Wrap component with gating overlay
-<LockedFeatureOverlay 
+<LockedFeatureOverlay
   module="module-name"
   featureName="Feature Name"
 >
