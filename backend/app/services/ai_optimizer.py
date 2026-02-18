@@ -1540,6 +1540,7 @@ Provide ONLY the JSON response, no additional text."""
 
         # Rule 4: FCU optimization for ALL FCUs (ZONE-AWARE)
         # Optimize fan speed and setpoints based on conditions and zone type
+        # FCU recommendations are marked as advisory (low confidence) - no human approval needed
         if temp_diff > 2.0:
             for fcu in fcus:
                 zone_type = self._get_zone_type(fcu)
@@ -1574,6 +1575,8 @@ Provide ONLY the JSON response, no additional text."""
                             round(new_setpoint, 1),
                             f"Increase FCU setpoint {adjusted_change:.1f}°C{zone_info}{exposure_info} to reduce cooling load during high outdoor temps ({outdoor_temp}°C)",
                         )
+                        # Mark as advisory - add low confidence to route to Tier 1
+                        recommendations[-1]["confidence"] = 0.45  # Below tier2_min (~0.6)
 
                 # Optimize fan speed if available and conditions warrant
                 # Don't reduce fan speed in executive zones (comfort priority)
@@ -1591,6 +1594,8 @@ Provide ONLY the JSON response, no additional text."""
                             new_speed,
                             "Reduce fan speed 10% for energy savings - moderate temperature differential allows lower airflow",
                         )
+                        # Mark as advisory - add low confidence to route to Tier 1
+                        recommendations[-1]["confidence"] = 0.45  # Below tier2_min (~0.6)
 
         # ============================================================
         # DALI Lighting Optimization Rules
