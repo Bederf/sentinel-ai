@@ -338,6 +338,82 @@ The Security Dashboard includes:
 
 ---
 
+## Phase 58.6: Video Intelligence Integration (Camera/LPR → SENTINEL)
+
+**Status:** 🔮 Future | **Priority:** Post-58.5 | **Timeline:** Phase B roadmap
+
+**Objective:** Integrate vehicle counting and license plate recognition into facility security monitoring and work order pipeline.
+
+**Integration Points:**
+- **LPR Camera Systems** → Vehicle counts, unauthorized vehicles, parking violations
+- **Alert Pipeline**: Generate work orders for security team (e.g., "Unauthorized vehicle in loading bay")
+- **Equipment Abstraction**: Security cameras become equipment type `CAMERA` with `LPR` specialty
+- **Work Order Routing**: Security alerts auto-routed based on location (parking, entrance, loading dock)
+- **Schema Compatibility**: Existing `alerts` + `work_orders` tables handle camera events without modification
+- **Notification System**: Phase 102 multi-channel notifications deliver camera alerts to security technicians
+
+**Examples:**
+- ✅ "High-speed vehicle detected in parking area" → Security work order (safety concern)
+- ✅ "Unknown license plate detected 3x in 1 hour" → Security alert (suspicious pattern)
+- ✅ "Loading bay capacity exceeded" → Operational alert
+
+**Why This Works:**
+- Uses same alert and work order pipeline as badge events
+- Camera equipment maps to existing equipment abstraction layer
+- Security roles inherit view permissions via RLS policies
+- Audit trail captures all camera-based alerts and resolutions
+
+---
+
+## Phase 58.7: Facial Recognition Integration (Unwanted Persons → SENTINEL)
+
+**Status:** 🔮 Future | **Priority:** Post-58.6 | **Timeline:** Phase B+ roadmap
+
+**Objective:** Detect and alert on flagged individuals, feeding into security and access control workflows.
+
+**Integration Points:**
+- **Facial Recognition System** → Person identification + confidence scores
+- **Watchlist Matching**: Detect known threats, missing persons, flagged employees
+- **Alert Generation**: Instant work order to security team with location, confidence, recommended action
+- **Cascade Actions**: Can trigger access control lock-down, escalate to law enforcement
+- **Schema Compatibility**: Existing `alerts` + `work_orders` tables handle facial recognition events without modification
+- **Notification System**: Phase 102 multi-channel notifications deliver urgent alerts to security team
+
+**Examples:**
+- ✅ "Flagged individual detected in Zone-A (91% confidence)" → High-priority security work order
+- ✅ "Missing person recognized in Building 2" → Alert to authorities
+- ✅ "Employee flagged for investigation entering after-hours" → Access log alert + escalation
+
+**Governance Requirements:**
+- Privacy compliance (POPIA, GDPR)
+- Watchlist management and audit trail
+- Confidence threshold configuration per watchlist category
+- Opt-out mechanisms for employees
+- Data retention policies (24-72 hours typical)
+
+**Why This Works:**
+- Same alert and work order pipeline as C•CURE badge events
+- Facial recognition equipment maps to existing equipment abstraction
+- Security roles inherit view permissions via RLS policies
+- No schema changes required — uses existing alert severity/type system
+
+---
+
+## Architectural Advantage: Unified Security Pipeline
+
+All security integrations (C•CURE badge events, Camera/LPR, Facial recognition) leverage the **same** SENTINEL infrastructure without schema modification:
+
+1. **Alert Pipeline**: All security events use `alerts` table (severity, equipment_id, message, status)
+2. **Work Order System**: Security work orders route identically to maintenance/operations
+3. **Notification Infrastructure**: Phase 102 multi-channel notifications (Telegram, WhatsApp, SMS) deliver alerts
+4. **Equipment Abstraction**: Controllers, cameras, facial recognition systems map to existing equipment types
+5. **Authorization**: Existing role-based access control (ADMIN, OPERATOR, TECHNICIAN + SECURITY) gates visibility
+6. **Audit Trail**: Existing audit logs capture all security events, changes, and resolutions
+
+**Key Insight:** The notification system being built (Phase 102.1 multi-channel technician notifications) was designed to be integration-agnostic. Security systems hook into the same pipelines as HVAC, electrical, and occupancy systems—no special-casing required for new security data sources.
+
+---
+
 ## Key Files
 
 | File | Purpose |
