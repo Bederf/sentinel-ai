@@ -370,7 +370,7 @@ async def login_with_email(request: Request, email: str):
                 task_id = str(uuid.uuid4())
                 client = Supabase.instance()
 
-                response_data = (
+                (
                     client.table("lifecycle_simulation_tasks")
                     .insert(
                         {
@@ -381,14 +381,14 @@ async def login_with_email(request: Request, email: str):
                             "status": "queued",
                             "progress_pct": 0,
                             "days_completed": 0,
-                            "duration_minutes": 30.0,  # 365 days in 30 minutes
+                            "duration_minutes": 480.0,  # 365 days in 480 min (8h)
                         }
                     )
                     .execute()
                 )
 
                 logger.info(
-                    f"Auto-started Grant demo: task_id={task_id}, scenario=grant_hvac_dali_ai_annual (365 days → 30 minutes, starting from ZERO)"
+                    f"Auto-started Grant demo: task_id={task_id}, scenario=grant_hvac_dali_ai_annual (365d → 480min/8h)"
                 )
 
                 # Add simulation task info to response
@@ -400,9 +400,10 @@ async def login_with_email(request: Request, email: str):
                 response["demo_scenario"] = "grant_hvac_dali_ai_annual"
                 response["demo_status"] = "queued"
                 response["demo_task_id"] = task_id
-                response["demo_duration_minutes"] = 30.0
+                response["demo_duration_minutes"] = 480.0
                 response["demo_note"] = (
-                    "Simulation runs in background. Dashboard will update live as simulation progresses through 365 days."
+                    "Simulation runs in background (8 hours). "
+                    "Dashboard will update live as simulation progresses through 365 days."
                 )
 
             except Exception as e:
@@ -421,7 +422,7 @@ async def login_with_email(request: Request, email: str):
                 task_id = str(uuid.uuid4())
                 client = Supabase.instance()
 
-                response_data = (
+                (
                     client.table("lifecycle_simulation_tasks")
                     .insert(
                         {
@@ -432,14 +433,15 @@ async def login_with_email(request: Request, email: str):
                             "status": "queued",
                             "progress_pct": 0,
                             "days_completed": 0,
-                            "duration_minutes": 30.0,  # 365 days in 30 minutes
+                            "duration_minutes": 480.0,  # 365 days in 480 minutes (8h)
                         }
                     )
                     .execute()
                 )
 
                 logger.info(
-                    f"Auto-started Bederf solar demo: task_id={task_id}, scenario=grant_solar_bess_ai_annual (365 days → 30 minutes, Solar+BESS optimization)"
+                    f"Auto-started Bederf solar demo: task_id={task_id}, "
+                    f"scenario=grant_solar_bess_ai_annual (365d → 480min/8h)"
                 )
 
                 # Add simulation task info to response
@@ -451,9 +453,10 @@ async def login_with_email(request: Request, email: str):
                 response["demo_scenario"] = "grant_solar_bess_ai_annual"
                 response["demo_status"] = "queued"
                 response["demo_task_id"] = task_id
-                response["demo_duration_minutes"] = 30.0
+                response["demo_duration_minutes"] = 480.0
                 response["demo_note"] = (
-                    "Solar simulation runs in background. Dashboard will update live as simulation progresses through 365 days."
+                    "Solar simulation runs in background (8 hours). "
+                    "Dashboard will update live as simulation progresses through 365 days."
                 )
 
             except Exception as e:

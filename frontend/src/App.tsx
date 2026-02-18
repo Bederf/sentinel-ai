@@ -408,7 +408,6 @@ function App() {
   }, []);
 
   const handleEmailEntrySuccess = useCallback((user: AuthUser) => {
-    console.log('Login success:', user);
     setCurrentUser(user);
 
     // Auto-start demo simulation — only if none is already running
@@ -420,19 +419,17 @@ function App() {
         .then(res => res.json())
         .then(status => {
           if (status.running) {
-            console.log('Simulation already running:', status.scenario, `Day ${status.days_simulated}/365`);
             toast.success(`Simulation in progress: Day ${status.days_simulated || 0}/365`);
           } else {
-            console.log('No simulation running, starting:', scenario);
             fetch('/api/lifecycle/start', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ scenario, duration_minutes: isAnnual ? 240 : 24 })
+              body: JSON.stringify({ scenario, duration_minutes: isAnnual ? 480 : 24 })
             })
               .then(res => res.json())
               .then(data => {
                 if (data.task_id) setDemoTaskId(data.task_id);
-                toast.success(`Simulation started: ${scenario} (365 days → 4 hours)`);
+                toast.success(`Simulation started: ${scenario} (365 days → 8 hours)`);
               })
               .catch(err => console.error('Failed to start simulation:', err));
           }
@@ -448,7 +445,6 @@ function App() {
 
   // Show email entry if not authenticated
   if (!currentUser) {
-    console.log('Showing email entry (user =', currentUser, ')');
     return <EmailEntry onSuccess={handleEmailEntrySuccess} />;
   }
 
