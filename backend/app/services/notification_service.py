@@ -23,6 +23,7 @@ from ..models.notification import (
     TechnicianNotificationChannel,
     NotificationDeliveryLog,
 )
+from ..database.repositories.notification_repository import NotificationRepository
 
 logger = logging.getLogger(__name__)
 
@@ -30,15 +31,10 @@ logger = logging.getLogger(__name__)
 class NotificationService:
     """Orchestrates multi-channel technician notification delivery."""
 
-    def __init__(self, technician_repository, notification_repository):
-        """Initialize with data access layers.
-
-        Args:
-            technician_repository: Access to technician and channel data
-            notification_repository: Access to notification delivery logs
-        """
-        self.technician_repo = technician_repository
-        self.notification_repo = notification_repository
+    def __init__(self):
+        """Initialize the notification service."""
+        # Initialize repository for database access
+        self.notification_repo = NotificationRepository()
 
         # Initialize providers
         self.providers = {
@@ -88,7 +84,7 @@ class NotificationService:
 
         try:
             # Fetch technician preferences
-            preferences = await self.technician_repo.get_notification_preferences(
+            preferences = await self.notification_repo.get_notification_preferences(
                 technician_id
             )
             if not preferences:
@@ -108,7 +104,7 @@ class NotificationService:
                 return result
 
             # Fetch enabled channels
-            enabled_channels = await self.technician_repo.get_notification_channels(
+            enabled_channels = await self.notification_repo.get_notification_channels(
                 technician_id,
                 channel_types=preferences.enabled_channels,
             )
@@ -230,8 +226,8 @@ class NotificationService:
                 )
 
             # Persist delivery log
-            await self.notification_repo.create_delivery_log(delivery_log)
-            return (channel_type, delivery_log, error)
+            created_log = await self.notification_repo.create_delivery_log(delivery_log)
+            return (channel_type, created_log, error)
 
         except Exception as e:
             delivery_log.status = NotificationStatus.FAILED
@@ -240,8 +236,8 @@ class NotificationService:
             logger.error(
                 f"Error sending notification to {channel_type} for technician {technician_id}: {e}"
             )
-            await self.notification_repo.create_delivery_log(delivery_log)
-            return (channel_type, delivery_log, str(e))
+            created_log = await self.notification_repo.create_delivery_log(delivery_log)
+            return (channel_type, created_log, str(e))
 
     async def test_provider_connection(self, channel_type: ChannelType) -> bool:
         """Test if a provider is configured and reachable.
