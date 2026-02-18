@@ -22,18 +22,22 @@ import {
 import { AlertTriangle, Zap, TrendingDown } from "lucide-react";
 
 interface PowerMeterValidation {
-  meter_id: string;
-  reading_kwh: number;
+  meter_id?: string;
+  reading_kwh?: number;
   baseline_mean: number;
   baseline_stdev: number;
-  baseline_min: number;
-  baseline_max: number;
-  validation_status: string;
-  severity: string;
-  variance_pct: number;
-  cop_current: number;
-  cop_design: number;
-  anomaly_detected: boolean;
+  baseline_min?: number;
+  baseline_max?: number;
+  median_kw?: number;
+  p95_kw?: number;
+  samples?: number;
+  lookback_days?: number;
+  validation_status?: string;
+  severity?: string;
+  variance_pct?: number;
+  cop_current?: number;
+  cop_design?: number;
+  anomaly_detected?: boolean;
   reason?: string;
 }
 
@@ -98,10 +102,16 @@ export function PowerMeterValidationCard({
 
   if (!validation) return null;
 
-  const copPercent = (validation.cop_current / validation.cop_design) * 100;
-  const isAnomalous = validation.anomaly_detected;
+  const copPercent =
+    validation.cop_current && validation.cop_design
+      ? (validation.cop_current / validation.cop_design) * 100
+      : 0;
+  const isAnomalous = validation.anomaly_detected || false;
   const isWarning = validation.severity === "warning";
   const isCritical = validation.severity === "critical";
+  const hasCurrentReading = validation.reading_kwh !== undefined;
+  const hasCOPData =
+    validation.cop_current !== undefined && validation.cop_design !== undefined;
 
   return (
     <Card className={className}>
@@ -121,80 +131,83 @@ export function PowerMeterValidationCard({
       </div>
 
       <Grid className="grid grid-cols-2 gap-4 mb-4">
-        {/* Current Reading */}
-        <div>
-          <div className="bg-slate-700/50 rounded-lg p-3">
-            <Text className="text-xs text-gray-400">Current Reading</Text>
-            <div className="text-2xl font-bold text-white mt-1">
-              {validation.reading_kwh.toFixed(1)} kW
-            </div>
-            <Text className="text-xs text-gray-500 mt-1">
-              Variance: {validation.variance_pct > 0 ? "+" : ""}
-              {validation.variance_pct.toFixed(1)}%
-            </Text>
-          </div>
-        </div>
-
         {/* Baseline Stats */}
         <div>
           <div className="bg-slate-700/50 rounded-lg p-3">
-            <Text className="text-xs text-gray-400">Baseline (Mean ± SD)</Text>
-            <div className="text-lg font-semibold text-white mt-1">
-              {validation.baseline_mean.toFixed(1)} ± {validation.baseline_stdev.toFixed(1)} kW
+            <Text className="text-xs text-gray-400">Mean Power</Text>
+            <div className="text-2xl font-bold text-white mt-1">
+              {validation.baseline_mean.toFixed(1)} kW
             </div>
             <Text className="text-xs text-gray-500 mt-1">
-              Range: {validation.baseline_min.toFixed(1)} - {validation.baseline_max.toFixed(1)} kW
+              Std Dev: ±{validation.baseline_stdev.toFixed(1)} kW
             </Text>
           </div>
         </div>
 
-        {/* COP Performance */}
+        {/* Statistics */}
         <div>
           <div className="bg-slate-700/50 rounded-lg p-3">
-            <div className="flex items-center justify-between mb-2">
-              <Text className="text-xs text-gray-400">COP Performance</Text>
-              <TrendingDown className={`w-4 h-4 ${
-                copPercent < 80 ? "text-red-400" : copPercent < 90 ? "text-yellow-400" : "text-green-400"
-              }`} />
+            <Text className="text-xs text-gray-400">Statistics</Text>
+            <div className="text-sm font-semibold text-white mt-1">
+              {validation.baseline_min !== undefined && validation.baseline_max !== undefined ? (
+                <>Min: {validation.baseline_min.toFixed(1)} kW</>
+              ) : (
+                <>Samples: {validation.samples ?? 0}</>
+              )}
             </div>
-            <div className="text-lg font-semibold text-white">
-              {validation.cop_current.toFixed(2)} / {validation.cop_design.toFixed(2)}
-            </div>
-            <ProgressBar
-              value={Math.min(100, copPercent)}
-              color={copPercent < 80 ? "red" : copPercent < 90 ? "yellow" : "green"}
-              className="mt-2"
-            />
-            <Text className="text-xs text-gray-500 mt-1">
-              {copPercent.toFixed(0)}% of Design COP
-            </Text>
-          </div>
-        </div>
-
-        {/* Status */}
-        <div>
-          <div className="bg-slate-700/50 rounded-lg p-3">
-            <Text className="text-xs text-gray-400">Validation Status</Text>
-            <div className="mt-2">
-              <Badge
-                color={
-                  validation.validation_status === "ok"
-                    ? "green"
-                    : validation.validation_status === "warning"
-                    ? "yellow"
-                    : "rose"
-                }
-              >
-                {validation.validation_status.toUpperCase()}
-              </Badge>
-            </div>
-            {validation.reason && (
-              <Text className="text-xs text-gray-400 mt-2 italic">
-                {validation.reason}
+            {validation.p95_kw !== undefined && (
+              <Text className="text-xs text-gray-500 mt-1">
+                P95: {validation.p95_kw.toFixed(1)} kW
               </Text>
             )}
           </div>
         </div>
+
+        {/* Range Info */}
+        {validation.baseline_min !== undefined && validation.baseline_max !== undefined && (
+          <div>
+            <div className="bg-slate-700/50 rounded-lg p-3">
+              <Text className="text-xs text-gray-400">Operating Range</Text>
+              <div className="text-lg font-semibold text-white mt-1">
+                {validation.baseline_min.toFixed(1)} - {validation.baseline_max.toFixed(1)} kW
+              </div>
+              <Text className="text-xs text-gray-500 mt-1">
+                Lookback: {validation.lookback_days ?? 7} days
+              </Text>
+            </div>
+          </div>
+        )}
+
+        {/* COP Performance - only show if data exists */}
+        {hasCOPData && (
+          <div>
+            <div className="bg-slate-700/50 rounded-lg p-3">
+              <div className="flex items-center justify-between mb-2">
+                <Text className="text-xs text-gray-400">COP Performance</Text>
+                <TrendingDown
+                  className={`w-4 h-4 ${
+                    copPercent < 80
+                      ? "text-red-400"
+                      : copPercent < 90
+                      ? "text-yellow-400"
+                      : "text-green-400"
+                  }`}
+                />
+              </div>
+              <div className="text-lg font-semibold text-white">
+                {validation.cop_current?.toFixed(2)} / {validation.cop_design?.toFixed(2)}
+              </div>
+              <ProgressBar
+                value={Math.min(100, copPercent)}
+                color={copPercent < 80 ? "red" : copPercent < 90 ? "yellow" : "green"}
+                className="mt-2"
+              />
+              <Text className="text-xs text-gray-500 mt-1">
+                {copPercent.toFixed(0)}% of Design
+              </Text>
+            </div>
+          </div>
+        )}
       </Grid>
 
       {isAnomalous && (
@@ -205,12 +218,20 @@ export function PowerMeterValidationCard({
               Anomaly Detected
             </Text>
             <Text className="text-xs text-rose-400/70 mt-1">
-              Power consumption variance exceeds {validation.variance_pct > 25 ? "critical" : "warning"} threshold.
-              {validation.cop_current < 2.9 && " COP degradation detected."}
+              {validation.reason ||
+                "Anomaly detected in power meter data. Review baseline statistics above."}
             </Text>
           </div>
         </div>
       )}
+
+      {/* Info Message for Baseline Data */}
+      <div className="bg-blue-900/20 border border-blue-700/30 rounded-lg p-3 mt-4">
+        <Text className="text-xs text-blue-300">
+          📊 Baseline Analysis: {validation.samples ?? 0} readings over{" "}
+          {validation.lookback_days ?? 7} days
+        </Text>
+      </div>
     </Card>
   );
 }

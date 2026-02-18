@@ -23,14 +23,15 @@ import {
 import { DollarSign, AlertTriangle, TrendingUp } from "lucide-react";
 
 interface CostValidation {
-  period_start: string;
-  period_end: string;
-  simulated_cost_r: number;
-  real_cost_r: number | null;
-  variance_pct: number;
-  recommendation: string;
-  confidence: number;
-  tariff_adjustment_factor: number;
+  period_start?: string;
+  period_end?: string;
+  simulated_cost_r?: number;
+  real_cost_r?: number | null;
+  variance_pct?: number;
+  recommendation?: string;
+  confidence?: number;
+  tariff_adjustment_factor?: number;
+  [key: string]: any;
 }
 
 interface CostValidationCardProps {
@@ -94,13 +95,20 @@ export function CostValidationCard({
 
   if (!validation) return null;
 
-  const varianceAbove5Pct = Math.abs(validation.variance_pct) > 5;
-  const varianceAbove15Pct = Math.abs(validation.variance_pct) > 15;
-  const adjustmentNeeded = Math.abs(validation.tariff_adjustment_factor - 1.0) > 0.02;
+  const varianceAbove5Pct =
+    validation.variance_pct !== undefined && Math.abs(validation.variance_pct) > 5;
+  const varianceAbove15Pct =
+    validation.variance_pct !== undefined && Math.abs(validation.variance_pct) > 15;
+  const adjustmentNeeded =
+    validation.tariff_adjustment_factor !== undefined &&
+    Math.abs(validation.tariff_adjustment_factor - 1.0) > 0.02;
 
-  const savingsR = validation.real_cost_r
-    ? Math.abs(validation.real_cost_r - validation.simulated_cost_r)
-    : null;
+  const savingsR =
+    validation.real_cost_r !== undefined &&
+    validation.real_cost_r !== null &&
+    validation.simulated_cost_r !== undefined
+      ? Math.abs(validation.real_cost_r - validation.simulated_cost_r)
+      : null;
 
   return (
     <Card className={className}>
@@ -111,11 +119,11 @@ export function CostValidationCard({
         </div>
         {varianceAbove15Pct ? (
           <Badge color="rose" className="text-xs">
-            🔴 Critical (&gt;{(validation.variance_pct).toFixed(1)}%)
+            🔴 Critical ({Math.abs(validation.variance_pct ?? 0).toFixed(1)}%)
           </Badge>
         ) : varianceAbove5Pct ? (
           <Badge color="yellow" className="text-xs">
-            🟡 Warning (&gt;{(validation.variance_pct).toFixed(1)}%)
+            🟡 Warning ({Math.abs(validation.variance_pct ?? 0).toFixed(1)}%)
           </Badge>
         ) : (
           <Badge color="green" className="text-xs">
@@ -128,11 +136,13 @@ export function CostValidationCard({
         {/* Simulated Cost */}
         <div>
           <div className="bg-slate-700/50 rounded-lg p-3">
-            <Text className="text-xs text-gray-400">Simulated Cost (Monthly)</Text>
+            <Text className="text-xs text-gray-400">Simulated Cost</Text>
             <div className="text-2xl font-bold text-white mt-1">
-              R{validation.simulated_cost_r.toLocaleString("en-ZA", {
-                maximumFractionDigits: 0,
-              })}
+              {validation.simulated_cost_r !== undefined
+                ? `R${validation.simulated_cost_r.toLocaleString("en-ZA", {
+                    maximumFractionDigits: 0,
+                  })}`
+                : "—"}
             </div>
             <Text className="text-xs text-gray-500 mt-1">
               Energy + Water + Service
@@ -144,7 +154,7 @@ export function CostValidationCard({
         <div>
           <div className="bg-slate-700/50 rounded-lg p-3">
             <Text className="text-xs text-gray-400">Real Invoice</Text>
-            {validation.real_cost_r ? (
+            {validation.real_cost_r !== undefined && validation.real_cost_r !== null ? (
               <>
                 <div className="text-2xl font-bold text-white mt-1">
                   R{validation.real_cost_r.toLocaleString("en-ZA", {
@@ -153,7 +163,7 @@ export function CostValidationCard({
                 </div>
                 {savingsR && (
                   <Text className="text-xs text-gray-500 mt-1">
-                    Variance: R{(savingsR).toLocaleString("en-ZA", {
+                    Variance: R{savingsR.toLocaleString("en-ZA", {
                       maximumFractionDigits: 0,
                     })}
                   </Text>
@@ -172,36 +182,45 @@ export function CostValidationCard({
           <div className="bg-slate-700/50 rounded-lg p-3">
             <div className="flex items-center justify-between mb-2">
               <Text className="text-xs text-gray-400">Variance %</Text>
-              <TrendingUp className={`w-4 h-4 ${
-                Math.abs(validation.variance_pct) < 5
-                  ? "text-green-400"
-                  : Math.abs(validation.variance_pct) < 15
-                  ? "text-yellow-400"
-                  : "text-red-400"
-              }`} />
+              <TrendingUp
+                className={`w-4 h-4 ${
+                  validation.variance_pct !== undefined
+                    ? Math.abs(validation.variance_pct) < 5
+                      ? "text-green-400"
+                      : Math.abs(validation.variance_pct) < 15
+                      ? "text-yellow-400"
+                      : "text-red-400"
+                    : "text-gray-400"
+                }`}
+              />
             </div>
             <div className="text-lg font-semibold text-white">
-              {validation.variance_pct > 0 ? "+" : ""}
-              {validation.variance_pct.toFixed(1)}%
+              {validation.variance_pct !== undefined
+                ? `${validation.variance_pct > 0 ? "+" : ""}${validation.variance_pct.toFixed(1)}%`
+                : "—"}
             </div>
-            <ProgressBar
-              value={Math.min(100, Math.abs(validation.variance_pct))}
-              color={
-                Math.abs(validation.variance_pct) < 5
-                  ? "green"
-                  : Math.abs(validation.variance_pct) < 15
-                  ? "yellow"
-                  : "red"
-              }
-              className="mt-2"
-            />
-            <Text className="text-xs text-gray-500 mt-1">
-              {Math.abs(validation.variance_pct) < 5
-                ? "Within tolerance"
-                : Math.abs(validation.variance_pct) < 15
-                ? "Adjustment recommended"
-                : "Out of range"}
-            </Text>
+            {validation.variance_pct !== undefined && (
+              <>
+                <ProgressBar
+                  value={Math.min(100, Math.abs(validation.variance_pct))}
+                  color={
+                    Math.abs(validation.variance_pct) < 5
+                      ? "green"
+                      : Math.abs(validation.variance_pct) < 15
+                      ? "yellow"
+                      : "red"
+                  }
+                  className="mt-2"
+                />
+                <Text className="text-xs text-gray-500 mt-1">
+                  {Math.abs(validation.variance_pct) < 5
+                    ? "Within tolerance"
+                    : Math.abs(validation.variance_pct) < 15
+                    ? "Adjustment recommended"
+                    : "Out of range"}
+                </Text>
+              </>
+            )}
           </div>
         </div>
 
@@ -210,19 +229,27 @@ export function CostValidationCard({
           <div className="bg-slate-700/50 rounded-lg p-3">
             <Text className="text-xs text-gray-400">Tariff Adjustment</Text>
             <div className="text-lg font-semibold text-white mt-1">
-              {validation.tariff_adjustment_factor > 1
-                ? "+"
-                : ""}
-              {((validation.tariff_adjustment_factor - 1) * 100).toFixed(1)}%
+              {validation.tariff_adjustment_factor !== undefined ? (
+                <>
+                  {validation.tariff_adjustment_factor > 1 ? "+" : ""}
+                  {((validation.tariff_adjustment_factor - 1) * 100).toFixed(1)}%
+                </>
+              ) : (
+                "—"
+              )}
             </div>
-            <ProgressBar
-              value={validation.confidence * 100}
-              color="blue"
-              className="mt-2"
-            />
-            <Text className="text-xs text-gray-500 mt-1">
-              Confidence: {(validation.confidence * 100).toFixed(0)}%
-            </Text>
+            {validation.confidence !== undefined && (
+              <>
+                <ProgressBar
+                  value={validation.confidence * 100}
+                  color="blue"
+                  className="mt-2"
+                />
+                <Text className="text-xs text-gray-500 mt-1">
+                  Confidence: {(validation.confidence * 100).toFixed(0)}%
+                </Text>
+              </>
+            )}
           </div>
         </div>
       </Grid>
