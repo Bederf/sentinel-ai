@@ -125,9 +125,10 @@ class RecommendationRepository:
         """
         try:
             if not self._use_json and self.client:
-                # Query Supabase
+                # Query Supabase, fall through to JSON if empty/failed
                 recs = await self._supabase_get_by_status(site_id, status, limit)
-                return [Recommendation.from_dict(rec) for rec in recs]
+                if recs:
+                    return [Recommendation.from_dict(rec) for rec in recs]
 
             # Fall back to JSON
             self._load_all()

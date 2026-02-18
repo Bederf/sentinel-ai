@@ -4,7 +4,7 @@ import { Toaster, toast } from "sonner";
 import { formatTime } from "./lib/timeFormat";
 import api, { AUTH_EXPIRED_EVENT, isExpectedApiError, type Alert, type AuthUser } from "./lib/api";
 import { SimulationTimeIndicator } from "./components/SimulationTimeIndicator";
-import { useRecommendationToasts } from "./components/RecommendationToast";
+import { useRecommendationToasts, RecommendationCard } from "./components/RecommendationToast";
 
 // Security: Prevent console logging in production (Phase 75-07)
 import { initializeSecurityProtections } from "./lib/api/security-utils";
@@ -43,6 +43,7 @@ import { SolarConfigWizard } from "./components/wizards/SolarConfigWizard";
 import { ModuleProvider } from "./contexts/ModuleContext";
 import { useModules } from "./contexts/ModuleHooks";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { SimulationProvider } from "./contexts/SimulationContext";
 import { type View, VIEW_TITLES, ALL_NAV_ITEMS } from "./lib/navigation";
 import { canAccessView, getDefaultView } from "./lib/access-control";
 
@@ -148,9 +149,19 @@ function App() {
     return () => clearInterval(interval);
   }, [demoTaskId]);
 
+  // AI Recommendation card state
+  const [selectedRec, setSelectedRec] = useState<any>(null);
+  const handleShowRecCard = useCallback((rec: any) => setSelectedRec(rec), []);
+  const handleApproveRec = useCallback(async (id: string) => {
+    try {
+      await fetch(`/api/recommendations/${id}/approve`, { method: 'POST' });
+    } catch (e) { /* silent */ }
+    setSelectedRec(null);
+  }, []);
+
   // Use recommendation toasts hook when logged in
   const siteId = currentUser ? 'site-002' : '';
-  useRecommendationToasts(siteId);
+  useRecommendationToasts(siteId, handleShowRecCard);
 
   // Initialize devices from simulation on login
   useEffect(() => {
@@ -392,24 +403,33 @@ function App() {
     console.log('Login success:', user);
     setCurrentUser(user);
 
-    // Auto-start demo simulation for demo users
+    // Auto-start demo simulation — only if none is already running
     if ((user as any).demo_auto_start === true) {
-      console.log('Auto-starting demo scenario:', (user as any).demo_scenario);
-      
-      // Extract and store the demo task ID for simulation progress tracking
-      if ((user as any).demo_task_id) {
-        setDemoTaskId((user as any).demo_task_id);
-        console.log('Grant 365-day simulation task ID:', (user as any).demo_task_id);
-        toast.success(`Demo scenario started: ${(user as any).demo_scenario} (365 days → 4 hours, starting from ZERO)`);
-      } else {
-        toast.success(`Demo scenario started: ${(user as any).demo_scenario}`);
-        // Fallback: Start the lifecycle simulator in the background
-        fetch('/api/lifecycle/start', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ scenario: (user as any).demo_scenario })
-        }).catch(err => console.error('Failed to start demo scenario:', err));
-      }
+      const scenario = (user as any).demo_scenario;
+      const isAnnual = (scenario || '').includes('annual');
+
+      fetch('/api/lifecycle/status/site-002')
+        .then(res => res.json())
+        .then(status => {
+          if (status.running) {
+            console.log('Simulation already running:', status.scenario, `Day ${status.days_simulated}/365`);
+            toast.success(`Simulation in progress: Day ${status.days_simulated || 0}/365`);
+          } else {
+            console.log('No simulation running, starting:', scenario);
+            fetch('/api/lifecycle/start', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ scenario, duration_minutes: isAnnual ? 240 : 24 })
+            })
+              .then(res => res.json())
+              .then(data => {
+                if (data.task_id) setDemoTaskId(data.task_id);
+                toast.success(`Simulation started: ${scenario} (365 days → 4 hours)`);
+              })
+              .catch(err => console.error('Failed to start simulation:', err));
+          }
+        })
+        .catch(err => console.error('Failed to check simulation status:', err));
     }
   }, []);
 
@@ -425,6 +445,7 @@ function App() {
   }
 
   return (
+    <SimulationProvider siteId="site-002">
     <ThemeProvider>
     <ModuleProvider initialSiteId="site-002" initialSiteName="Sandton City Office Tower">
     <div
@@ -839,6 +860,15 @@ function App() {
         </main>
       </div>
 
+      {/* AI Recommendation detail card */}
+      {selectedRec && (
+        <RecommendationCard
+          recommendation={selectedRec}
+          onClose={() => setSelectedRec(null)}
+          onApprove={handleApproveRec}
+        />
+      )}
+
       {/* Toast notifications */}
       <Toaster
         position="top-right"
@@ -854,6 +884,7 @@ function App() {
     </div>
     </ModuleProvider>
     </ThemeProvider>
+    </SimulationProvider>
   );
 }
 

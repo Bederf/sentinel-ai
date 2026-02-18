@@ -13,6 +13,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Sun, Building2, ChevronDown, RefreshCw } from "lucide-react";
+import { useSimulation } from "../../contexts/SimulationContext";
 import { fetchSolarSites } from "../../lib/solarApi";
 import type { SolarSite } from "../../lib/solarApi";
 import { useModuleAccess } from "../../hooks/useModuleAccess";
@@ -42,6 +43,9 @@ export function SolarDashboard() {
   const [selectedSiteId, setSelectedSiteId] = useState<string>("");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { isActive: isSolarActive } = useModuleAccess('solar');
+
+  // Get simulation context for live solar efficiency data
+  const { running: isSimulationRunning, solarEfficiency, cloudCover, simulatedHour, daysSimulated } = useSimulation();
 
   // Refetch all solar data when module is activated (eliminates 30s stale data lag)
   useEffect(() => {
@@ -120,17 +124,32 @@ export function SolarDashboard() {
             <Sun className="h-5 w-5" style={{ color: "var(--color-sentinel-amber)" }} />
           </div>
           <div>
-            <h2
-              className="text-lg font-semibold"
-              style={{ color: "var(--color-sentinel-text-primary)" }}
-            >
-              Solar & BESS
-            </h2>
+            <div className="flex items-center gap-2">
+              <h2
+                className="text-lg font-semibold"
+                style={{ color: "var(--color-sentinel-text-primary)" }}
+              >
+                Solar & BESS
+              </h2>
+              {isSimulationRunning && (
+                <div className="px-2 py-0.5 rounded text-xs font-medium"
+                  style={{
+                    background: 'rgba(250, 204, 21, 0.15)',
+                    color: '#FACC15',
+                  }}
+                >
+                  ☀️ Live • {solarEfficiency?.toFixed(0)}% efficiency
+                </div>
+              )}
+            </div>
             <p
               className="text-xs"
               style={{ color: "var(--color-sentinel-text-secondary)" }}
             >
-              Generation, storage, dispatch, and financial performance
+              {isSimulationRunning 
+                ? `Real-time generation from simulation • Hour ${simulatedHour}:00 (Day ${daysSimulated}/365) • ${cloudCover?.toFixed(0)}% cloud cover`
+                : 'Generation, storage, dispatch, and financial performance'
+              }
             </p>
           </div>
         </div>

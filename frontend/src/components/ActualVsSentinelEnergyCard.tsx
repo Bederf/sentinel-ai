@@ -1,24 +1,21 @@
 /**
- * Actual vs SENTINEL Energy Comparison Card
+ * DALI Tridonic vs SENTINEL AI Energy Comparison Card
  *
- * Side-by-side energy monitoring comparison:
- * - Left column: Actual (monitored) energy consumption
- * - Right column: SENTINEL AI (optimized) prediction
+ * Side-by-side energy comparison driven reactively by simulation context:
+ * - Left column: DALI Tridonic (smart lighting automation)
+ * - Right column: SENTINEL AI (full AI optimization)
  *
- * Displays:
- * - Total energy (kWh) and cost (R/day)
- * - Carbon footprint (kg CO₂)
- * - System breakdown (HVAC, Lighting, Power) with percentages
- * - Daily savings and progress to target
- * - AI confidence score
+ * Computes hourly energy accumulation based on:
+ * - Simulated hour (0-23): drives solar curve, occupancy patterns
+ * - Cloud cover: affects daylight harvesting efficiency
+ * - Occupancy percent: drives HVAC and lighting demand
  *
- * Follows BESSStatusPanel pattern with 30s auto-refresh.
+ * Values update live as the simulation clock advances.
  */
 
-import { useState, useEffect, useCallback } from 'react'
+import { useMemo } from 'react'
 import {
   TrendingDown,
-  Zap,
   Wind,
   Lightbulb,
   Plug,
@@ -26,9 +23,7 @@ import {
   Target,
   AlertCircle,
 } from 'lucide-react'
-import { isExpectedApiError, authorizedFetch } from '@/lib/api'
-import { useModuleAccess } from '@/hooks/useModuleAccess'
-import type { ModuleType } from '@/lib/moduleRegistry'
+import { useSimulation } from '@/contexts/SimulationContext'
 
 interface EnergyMetrics {
   total_kwh: number
@@ -40,7 +35,6 @@ interface EnergyMetrics {
   lighting_percent: number
   power_kwh: number
   power_percent: number
-  timestamp: string
 }
 
 interface ComparisonData {
@@ -56,15 +50,6 @@ interface ActualVsSentinelEnergyCardProps {
   siteId: string
 }
 
-// Color utilities
-function getCostColor(isOptimized: boolean): string {
-  return isOptimized ? 'var(--color-sentinel-green)' : 'var(--color-sentinel-text-secondary)'
-}
-
-function getCostBgColor(isOptimized: boolean): string {
-  return isOptimized ? 'rgba(16, 185, 129, 0.15)' : 'rgba(107, 114, 128, 0.15)'
-}
-
 function getSystemIcon(system: 'hvac' | 'lighting' | 'power') {
   switch (system) {
     case 'hvac':
@@ -76,133 +61,163 @@ function getSystemIcon(system: 'hvac' | 'lighting' | 'power') {
   }
 }
 
-// Mock fetch for now - replace with actual API calls
-// Savings vary by active modules:
-// - Base (HVAC only): 10-12%
-// - With Solar: +8-10% → 18-22%
-// - With Lighting (DALI): +3-5% → 13-17%
-// - With both: ~22-25%
-async function fetchEnergyComparison(siteId: string, activeModuleTypes: string[] = []): Promise<ComparisonData> {
-  try {
-    const response = await authorizedFetch(`/api/energy/comparison-summary?site_id=${siteId}`)
-    if (!response.ok) throw new Error('Failed to fetch energy comparison')
-    return await response.json()
-  } catch (err) {
-    if (!isExpectedApiError(err)) {
-      console.error('Failed to load energy comparison:', err)
+/**
+ * Compute hourly energy for each system based on time-of-day, cloud, occupancy.
+ *
+ * Building specs (Sandton City S002):
+ * - Lighting: 8 DALI zones, ~500 luminaires × 50W = 25 kW capacity
+ * - HVAC: Chillers + AHUs + FCUs = ~1200 kW peak
+ * - General power: UPS + lifts + misc = ~200 kW base
+ *
+ * Tridonic DALI reduces lighting via daylight harvesting + occupancy sensing.
+ * SENTINEL AI further reduces HVAC (predictive setpoints) + lighting (pre-emptive dimming).
+ */
+function computeComparison(
+  simulatedHour: number,
+  cloudCover: number,
+  occupancyPercent: number,
+  daysSimulated: number,
+): ComparisonData {
+  const rate = 5      // R5/kWh
+  const carbonRate = 0.35  // 0.35 kg CO₂/kWh SA grid
+
+  // Accumulate energy hour-by-hour up to current simulated hour
+  let triHvacAccum = 0
+  let triLightAccum = 0
+  let triPowerAccum = 0
+  let senHvacAccum = 0
+  let senLightAccum = 0
+  let senPowerAccum = 0
+
+  for (let h = 0; h <= simulatedHour; h++) {
+    const isBusinessHour = h >= 7 && h <= 18
+    const isCoreBusiness = h >= 8 && h <= 17
+
+    // Occupancy curve: peaks 9-12, drops 13-14 (lunch), back 14-17
+    let hourOcc = 5 // base nighttime
+    if (isCoreBusiness) {
+      hourOcc = occupancyPercent * (h >= 12 && h <= 13 ? 0.6 : 1.0) // lunch dip
+    } else if (isBusinessHour) {
+      hourOcc = occupancyPercent * 0.4 // early/late partial occupancy
     }
-    
-    // Calculate savings based on active modules (demo scenario)
-    let savingsPercent = 11.5; // Base HVAC savings
-    let savingsKwh = 2450 * 0.115; // ~282 kWh
-    let confidencePercent = 78;
-    
-    if (activeModuleTypes.includes('solar')) {
-      savingsPercent += 9.8; // Solar adds 9-10%
-      savingsKwh += 2450 * 0.098;
-      confidencePercent = 88;
+    hourOcc = Math.max(5, Math.min(100, hourOcc))
+
+    // Solar daylight factor: cos curve 6-18, 0 at night
+    let solarFactor = 0
+    if (h >= 6 && h <= 18) {
+      solarFactor = Math.max(0, Math.cos((h - 12) * Math.PI / 12))
     }
-    
-    if (activeModuleTypes.includes('lighting')) {
-      savingsPercent += 4.2; // DALI adds 4-5%
-      savingsKwh += 2450 * 0.042;
-      confidencePercent = Math.min(confidencePercent + 5, 92);
-    }
-    
-    // Return mock data for demo with dynamic savings
-    const actualTotal = 2450;
-    const sentinelTotal = actualTotal * (1 - (savingsPercent / 100));
-    
-    return {
-      actual: {
-        total_kwh: actualTotal,
-        total_cost_zar: actualTotal * 5, // R5/kWh commercial rate
-        carbon_kg: actualTotal * 0.35, // SA grid carbon intensity
-        hvac_kwh: 1200,
-        hvac_percent: 49,
-        lighting_kwh: 850,
-        lighting_percent: 35,
-        power_kwh: 400,
-        power_percent: 16,
-        timestamp: new Date().toISOString(),
-      },
-      sentinel: {
-        total_kwh: sentinelTotal,
-        total_cost_zar: sentinelTotal * 5,
-        carbon_kg: sentinelTotal * 0.35,
-        hvac_kwh: 950,
-        hvac_percent: 48,
-        lighting_kwh: 650,
-        lighting_percent: 33,
-        power_kwh: 380,
-        power_percent: 19,
-        timestamp: new Date().toISOString(),
-      },
-      daily_savings_zar: (actualTotal - sentinelTotal) * 5,
-      daily_savings_percent: savingsPercent,
-      progress_to_target_percent: Math.min(savingsPercent / 25 * 100, 100),
-      ai_confidence_percent: confidencePercent,
-    }
+    const cloudMult = 1 - (cloudCover / 100) * 0.6
+    const daylight = solarFactor * cloudMult // 0-1
+
+    // --- HVAC (kW this hour) ---
+    // Base: 1200 kW peak during business, 200 kW off-hours
+    const hvacBase = isBusinessHour ? 1200 : 200
+    // Tridonic: HVAC not affected by DALI (same as baseline occupancy-scaled)
+    const triHvacHour = hvacBase * (hourOcc / 100) * 0.85
+    // SENTINEL: predictive setpoints reduce HVAC 12-18% during business hours
+    const sentinelHvacSaving = isBusinessHour ? 0.85 : 0.95 // 15% saving business, 5% off
+    const senHvacHour = hvacBase * (hourOcc / 100) * 0.85 * sentinelHvacSaving
+
+    // --- Lighting (kW this hour) ---
+    // 25 kW total lighting capacity
+    const lightingCapacity = 25
+    // Tridonic: daylight harvesting reduces artificial light
+    const triDaylightReduction = daylight * 0.65 // harvests up to 65% from daylight
+    const triOccReduction = hourOcc < 15 ? 0.7 : 0 // standby mode saves 70% in empty zones
+    const triLightHour = lightingCapacity * (hourOcc / 100)
+      * Math.max(0.15, 1 - triDaylightReduction - triOccReduction)
+    // SENTINEL: predictive pre-dimming + tighter occupancy thresholds
+    const senDaylightReduction = daylight * 0.75 // AI predicts cloud gaps, harvests more
+    const senOccReduction = hourOcc < 25 ? 0.8 : (hourOcc < 50 ? 0.3 : 0) // more aggressive
+    const senLightHour = lightingCapacity * (hourOcc / 100)
+      * Math.max(0.10, 1 - senDaylightReduction - senOccReduction)
+
+    // --- General power (kW this hour) ---
+    const powerBase = isBusinessHour ? 200 : 120
+    const triPowerHour = powerBase * 0.95
+    const senPowerHour = powerBase * 0.92 // UPS optimization, lift scheduling
+
+    triHvacAccum += triHvacHour
+    triLightAccum += triLightHour
+    triPowerAccum += triPowerHour
+    senHvacAccum += senHvacHour
+    senLightAccum += senLightHour
+    senPowerAccum += senPowerHour
+  }
+
+  // Project to monthly (×30 working days) so numbers are meaningful
+  const monthlyMultiplier = 30
+
+  const triHvac = Math.round(triHvacAccum * monthlyMultiplier)
+  const triLight = Math.round(triLightAccum * monthlyMultiplier)
+  const triPower = Math.round(triPowerAccum * monthlyMultiplier)
+  const triTotal = triHvac + triLight + triPower
+
+  const senHvac = Math.round(senHvacAccum * monthlyMultiplier)
+  const senLight = Math.round(senLightAccum * monthlyMultiplier)
+  const senPower = Math.round(senPowerAccum * monthlyMultiplier)
+  const senTotal = senHvac + senLight + senPower
+
+  const triCost = triTotal * rate
+  const senCost = senTotal * rate
+  const savingsZar = triCost - senCost
+  const savingsPct = triCost > 0 ? (savingsZar / triCost) * 100 : 0
+
+  // AI confidence grows with simulation days (learning curve)
+  const aiConfidence = Math.min(95, 60 + (daysSimulated / 365) * 35)
+
+  return {
+    actual: {
+      total_kwh: triTotal,
+      total_cost_zar: triCost,
+      carbon_kg: Math.round(triTotal * carbonRate),
+      hvac_kwh: triHvac,
+      hvac_percent: triTotal > 0 ? Math.round((triHvac / triTotal) * 100) : 0,
+      lighting_kwh: triLight,
+      lighting_percent: triTotal > 0 ? Math.round((triLight / triTotal) * 100) : 0,
+      power_kwh: triPower,
+      power_percent: triTotal > 0 ? Math.round((triPower / triTotal) * 100) : 0,
+    },
+    sentinel: {
+      total_kwh: senTotal,
+      total_cost_zar: senCost,
+      carbon_kg: Math.round(senTotal * carbonRate),
+      hvac_kwh: senHvac,
+      hvac_percent: senTotal > 0 ? Math.round((senHvac / senTotal) * 100) : 0,
+      lighting_kwh: senLight,
+      lighting_percent: senTotal > 0 ? Math.round((senLight / senTotal) * 100) : 0,
+      power_kwh: senPower,
+      power_percent: senTotal > 0 ? Math.round((senPower / senTotal) * 100) : 0,
+    },
+    daily_savings_zar: Math.round(savingsZar),
+    daily_savings_percent: Math.round(savingsPct * 10) / 10,
+    progress_to_target_percent: Math.min(Math.round(savingsPct / 15 * 100), 100),
+    ai_confidence_percent: Math.round(aiConfidence),
   }
 }
 
 export function ActualVsSentinelEnergyCard({ siteId }: ActualVsSentinelEnergyCardProps) {
-  const [comparison, setComparison] = useState<ComparisonData | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  
-  // Check which optimization modules are active (drives demo moment)
-  const { isActive: isSolarActive } = useModuleAccess('solar' as ModuleType)
-  const { isActive: isLightingActive } = useModuleAccess('lighting' as ModuleType)
+  const {
+    running,
+    simulatedHour,
+    cloudCover,
+    occupancyPercent,
+    daysSimulated,
+  } = useSimulation()
 
-  const loadData = useCallback(async () => {
-    try {
-      // Build array of active module types to pass to fetch
-      const activeModules: string[] = []
-      if (isSolarActive) activeModules.push('solar')
-      if (isLightingActive) activeModules.push('lighting')
-      
-      const data = await fetchEnergyComparison(siteId, activeModules)
-      setComparison(data)
-      setError(null)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load')
-    } finally {
-      setLoading(false)
-    }
-  }, [siteId, isSolarActive, isLightingActive])
-
-  useEffect(() => {
-    loadData()
-    const interval = setInterval(loadData, 30000) // 30s refresh
-    return () => clearInterval(interval)
-  }, [loadData])
-
-  if (loading) {
-    return (
-      <div
-        className="rounded-md p-6"
-        style={{
-          background: 'var(--color-sentinel-bg-panel)',
-          border: '1px solid var(--color-sentinel-border)',
-        }}
-      >
-        <div className="animate-pulse space-y-4">
-          <div className="h-4 w-48 rounded" style={{ background: 'var(--color-sentinel-bg-secondary)' }} />
-          <div className="grid grid-cols-2 gap-4">
-            {[0, 1].map((i) => (
-              <div key={i} className="space-y-3">
-                <div className="h-16 rounded" style={{ background: 'var(--color-sentinel-bg-secondary)' }} />
-                <div className="h-32 rounded" style={{ background: 'var(--color-sentinel-bg-secondary)' }} />
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+  // Reactively compute comparison whenever simulation state changes
+  const comparison = useMemo<ComparisonData | null>(() => {
+    if (!running) return null
+    return computeComparison(
+      simulatedHour || 0,
+      cloudCover || 0,
+      occupancyPercent || 0,
+      daysSimulated || 1,
     )
-  }
+  }, [running, simulatedHour, cloudCover, occupancyPercent, daysSimulated])
 
-  if (error || !comparison) {
+  if (!comparison) {
     return (
       <div
         className="rounded-md p-6 text-center"
@@ -213,7 +228,7 @@ export function ActualVsSentinelEnergyCard({ siteId }: ActualVsSentinelEnergyCar
       >
         <AlertCircle className="h-8 w-8 mx-auto mb-2" style={{ color: 'var(--color-sentinel-text-disabled)' }} />
         <span className="text-sm" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
-          {error || 'No energy comparison data available'}
+          Start a simulation to see live energy comparison
         </span>
       </div>
     )
@@ -244,10 +259,10 @@ export function ActualVsSentinelEnergyCard({ siteId }: ActualVsSentinelEnergyCar
           </div>
           <div>
             <h3 className="font-medium text-sm" style={{ color: 'var(--color-sentinel-text-primary)' }}>
-              Energy Comparison: Actual vs SENTINEL AI
+              Energy: DALI Tridonic vs SENTINEL AI
             </h3>
             <span className="text-xs" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
-              Real-time monitoring vs AI-optimized prediction
+              Monthly projected energy comparison
             </span>
           </div>
         </div>
@@ -272,10 +287,10 @@ export function ActualVsSentinelEnergyCard({ siteId }: ActualVsSentinelEnergyCar
             >
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-semibold uppercase" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
-                  Actual (Today)
+                  DALI Tridonic
                 </span>
                 <span className="text-xs" style={{ color: 'var(--color-sentinel-text-disabled)' }}>
-                  Monitored
+                  Smart Lighting
                 </span>
               </div>
 
@@ -551,7 +566,7 @@ export function ActualVsSentinelEnergyCard({ siteId }: ActualVsSentinelEnergyCar
             <div className="flex items-center gap-2">
               <TrendingDown className="h-4 w-4" style={{ color: 'var(--color-sentinel-green)' }} />
               <span className="text-sm" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
-                Daily Savings
+                Monthly Savings
               </span>
             </div>
             <div className="text-right">

@@ -37,7 +37,7 @@ class StartSimulationRequest(BaseModel):
         description="Scenario name: normal_day, fault_day, chiller_failure, multi_fault, maintenance_day",
     )
     duration_minutes: float = Field(
-        default=24.0, ge=1.0, le=1440.0, description="Real-time duration for 24-hour simulation (24 = 1 min/hour)"
+        default=3650.0, ge=1.0, le=11000.0, description="Total real-time minutes for 365 days (3650 = 10 min/day, 25s/hour)"
     )
     start_hour: int = Field(default=6, ge=0, le=23, description="Simulated hour to start (0-23)")
 
@@ -56,7 +56,14 @@ class SimulationStatusResponse(BaseModel):
     pending_repairs: int
     recent_events: List[dict]
     progress_pct: int = 0  # Progress percentage (0-100)
-    days_simulated: int = 0  # Days completed in annual simulation
+    days_simulated: int = 0
+    # Weather and environment fields
+    ambient_temp: Optional[float] = None
+    is_raining: Optional[bool] = None
+    cloud_cover: Optional[float] = None
+    solar_efficiency: Optional[float] = None
+    current_season: Optional[str] = None
+    occupancy_percent: Optional[float] = None  # Days completed in annual simulation
 
 
 class ScenarioInfo(BaseModel):
@@ -349,6 +356,13 @@ async def get_simulation_status(task_id: str):
                 ],
                 progress_pct=progress_pct,
                 days_simulated=days,
+                # Weather data from orchestrator's get_status()
+                ambient_temp=status.get("ambient_temp"),
+                is_raining=status.get("is_raining"),
+                cloud_cover=status.get("cloud_cover"),
+                solar_efficiency=status.get("solar_efficiency"),
+                current_season=status.get("current_season"),
+                occupancy_percent=status.get("occupancy_percent"),
             )
         else:
             # Simulation not running - get status from database
@@ -385,6 +399,37 @@ async def get_simulation_status(task_id: str):
                     except:
                         pass
 
+            # Get days from database or derive from state snapshot
+            days_completed = task.get("days_completed", 0) if task else 0
+            if not days_completed and isinstance(state_snapshot, dict):
+                days_completed = state_snapshot.get("days_simulated", 0)
+
+            # Compute weather data from simulated_time using SeasonalModeler
+            ambient_temp = None
+            is_raining = None
+            cloud_cover = None
+            solar_efficiency = None
+            current_season = None
+            if simulated_time_str:
+                try:
+                    from app.services.seasonal_modeler import SeasonalModeler
+                    sim_dt = datetime.fromisoformat(simulated_time_str.replace("Z", "+00:00"))
+                    sim_hour = sim_dt.hour
+                    modeler = SeasonalModeler()
+                    current_season = modeler.get_season_name(sim_dt.date())
+                    is_raining = modeler.should_rain_today(sim_dt.date())
+                    cloud_cover = modeler.get_cloud_cover_percent(sim_dt.date())
+                    ambient_temp = modeler.get_ambient_temperature(sim_dt.date(), sim_hour, is_raining)
+                    if 6 <= sim_hour < 18:
+                        base_eff = 100 - (cloud_cover * 0.8)
+                        if is_raining:
+                            base_eff *= 0.3
+                        solar_efficiency = max(10, base_eff)
+                    else:
+                        solar_efficiency = 0
+                except Exception:
+                    pass
+
             return SimulationStatusResponse(
                 running=task_status == "running",
                 paused=False,
@@ -399,6 +444,12 @@ async def get_simulation_status(task_id: str):
                 else 0,
                 recent_events=recent_events,
                 progress_pct=progress_pct if task else 0,
+                days_simulated=days_completed,
+                ambient_temp=ambient_temp,
+                is_raining=is_raining,
+                cloud_cover=cloud_cover,
+                solar_efficiency=solar_efficiency,
+                current_season=current_season,
             )
 
     except HTTPException:
@@ -465,32 +516,48 @@ async def get_site_simulation_status(site_id: str):
         # Look for any running simulation (simulations run site-wide)
         for task_id, orchestrator in _active_simulations.items():
             if orchestrator.running:
-                return {
-                    "running": True,
-                    "paused": orchestrator.paused,
-                    "task_id": task_id,
-                    "scenario": orchestrator.current_scenario.get("name") if orchestrator.current_scenario else None,
-                    "simulated_time": orchestrator.simulated_time.isoformat() if orchestrator.simulated_time else None,
-                    "simulated_hour": orchestrator.simulated_time.hour if orchestrator.simulated_time else 0,
-                    "days_simulated": orchestrator.days_simulated,
-                    "ambient_temp": getattr(orchestrator, 'current_ambient_temp', 22),
-                    "cloud_cover": getattr(orchestrator, 'current_cloud_cover', 0),
-                    "is_raining": getattr(orchestrator, 'is_raining', False),
-                    "site_id": site_id,
-                }
+                # Get full status from orchestrator
+                status = orchestrator.get_status()
+                
+                return SimulationStatusResponse(
+                    running=True,
+                    paused=orchestrator.paused,
+                    scenario=orchestrator.current_scenario.name if orchestrator.current_scenario else None,
+                    simulated_time=orchestrator.simulated_time.isoformat() if orchestrator.simulated_time else None,
+                    simulated_hour=orchestrator.simulated_time.hour if orchestrator.simulated_time else None,
+                    real_elapsed_seconds=status.get("real_elapsed_seconds", 0),
+                    events_count=status.get("events_count", 0),
+                    active_faults=status.get("active_faults", 0),
+                    pending_repairs=status.get("pending_repairs", 0),
+                    recent_events=status.get("recent_events", []),
+                    progress_pct=status.get("progress_percent", 0),
+                    days_simulated=orchestrator.days_simulated,
+                    # Weather fields
+                    ambient_temp=status.get("ambient_temp"),
+                    is_raining=status.get("is_raining"),
+                    cloud_cover=status.get("cloud_cover"),
+                    solar_efficiency=status.get("solar_efficiency"),
+                    current_season=status.get("current_season"),
+                    occupancy_percent=status.get("occupancy_percent"),
+                )
     except Exception as e:
         logger.debug(f"Error getting simulation status: {e}")
     
     # Return default empty status if no simulation running
-    return {
-        "running": False,
-        "paused": False,
-        "scenario": None,
-        "simulated_time": None,
-        "simulated_hour": None,
-        "days_simulated": 0,
-        "site_id": site_id,
-    }
+    return SimulationStatusResponse(
+        running=False,
+        paused=False,
+        scenario=None,
+        simulated_time=None,
+        simulated_hour=None,
+        real_elapsed_seconds=0,
+        events_count=0,
+        active_faults=0,
+        pending_repairs=0,
+        recent_events=[],
+        progress_pct=0,
+        days_simulated=0,
+    )
 
 
 # ============================================================================

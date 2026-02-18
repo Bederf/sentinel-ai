@@ -100,6 +100,9 @@ async def startup_event(app: FastAPI) -> None:
     # Clawd will attempt login on first use via get_token_or_refresh()
     _logger.info("ℹ Clawd bot JWT authentication deferred to first use")
 
+    # Capture the main event loop for cross-thread scheduling (simulation tasks)
+    scheduler_service.set_main_loop(asyncio.get_event_loop())
+
     # Start background scheduler for demo data generation
     scheduler_service.start()
 

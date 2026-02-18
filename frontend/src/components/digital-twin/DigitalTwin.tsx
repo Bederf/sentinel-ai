@@ -156,15 +156,15 @@ export function DigitalTwin() {
       // This layout allows testing elevator transitions between floors
       const defaultZones = [
         // Floor 0 (Ground)
-        { id: 'zone-1', name: 'Reception', x: -2, y: -2, w: 4, h: 4, floor: 0, maxOccupancy: 6, type: 'entry' as const },
-        { id: 'zone-2', name: 'Workspace-A', x: 3, y: 3, w: 4, h: 4, floor: 0, maxOccupancy: 20, type: 'office' as const },
-        { id: 'zone-4', name: 'Common', x: -2, y: -7, w: 4, h: 4, floor: 0, maxOccupancy: 8, type: 'common' as const },
-        { id: 'zone-5', name: 'Utility', x: -7, y: 3, w: 4, h: 4, floor: 0, maxOccupancy: 2, type: 'utility' as const },
+        { id: 'zone-1', name: 'Reception', x: -20, y: -20, w: 35, h: 35, floor: 0, maxOccupancy: 6, type: 'entry' as const },
+        { id: 'zone-2', name: 'Workspace-A', x: 20, y: 20, w: 35, h: 35, floor: 0, maxOccupancy: 20, type: 'office' as const },
+        { id: 'zone-4', name: 'Common', x: -20, y: -65, w: 35, h: 35, floor: 0, maxOccupancy: 8, type: 'common' as const },
+        { id: 'zone-5', name: 'Utility', x: -65, y: 20, w: 35, h: 35, floor: 0, maxOccupancy: 2, type: 'utility' as const },
 
         // Floor 1 (Level 1) - For multi-floor testing
-        { id: 'zone-3', name: 'Meeting-1', x: -7, y: -7, w: 4, h: 4, floor: 1, maxOccupancy: 10, type: 'meeting' as const },
-        { id: 'zone-6', name: 'Meeting-2', x: -2, y: -7, w: 4, h: 4, floor: 1, maxOccupancy: 8, type: 'meeting' as const },
-        { id: 'zone-7', name: 'Kitchen', x: 3, y: -7, w: 4, h: 4, floor: 1, maxOccupancy: 6, type: 'common' as const },
+        { id: 'zone-3', name: 'Meeting-1', x: -65, y: -65, w: 35, h: 35, floor: 1, maxOccupancy: 10, type: 'meeting' as const },
+        { id: 'zone-6', name: 'Meeting-2', x: -20, y: -65, w: 35, h: 35, floor: 1, maxOccupancy: 8, type: 'meeting' as const },
+        { id: 'zone-7', name: 'Kitchen', x: 20, y: -65, w: 35, h: 35, floor: 1, maxOccupancy: 6, type: 'common' as const },
       ];
       simulationRef.current = new OccupancySimulation(defaultZones);
 
@@ -201,12 +201,11 @@ export function DigitalTwin() {
     return () => cancelAnimationFrame(animationFrameId);
   }, [occupancyEnabled]);
 
-  // Phase 4: Sync with backend occupancy targets (1s polling)
-  const { occupancyData, simulationTime, totalOccupancy } = useOccupancySync({
+  // Phase 4: Sync with SimulationContext occupancy targets
+  const { simulationTime, totalOccupancy } = useOccupancySync({
     buildingId: buildingId || 'site-002',
     simulationRef,
     enabled: occupancyEnabled,
-    pollIntervalMs: 1000,
   });
 
   // Load zone centroids via React Query hook (auto-caching, deduplication)

@@ -7,6 +7,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useSimulation } from '@/contexts/SimulationContext';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Card } from '@/components/Card';
 import { TrendingUp, AlertCircle } from 'lucide-react';
@@ -64,6 +65,9 @@ export function OccupancyAnalyticsPage() {
   const [buildingId] = useState('site-002');
   const [days, setDays] = useState<1 | 7 | 30>(1);
 
+  // Get simulation context
+  const { running: isSimulationRunning, simulatedHour, daysSimulated } = useSimulation();
+
   // Fetch occupancy trend
   const { data: trendData, isLoading: trendLoading } = useQuery<OccupancyTrendData>({
     queryKey: ['occupancy-trend', buildingId, days],
@@ -111,9 +115,10 @@ export function OccupancyAnalyticsPage() {
     });
   }, [trendData]);
 
-  // Calculate average occupancy
-  const averageOccupancy = useMemo(() => {
-    if (!trendData) return 0;
+  // Calculate average occupancy and get current hour occupancy
+  const { averageOccupancy, currentHourOccupancy } = useMemo(() => {
+    if (!trendData) return { averageOccupancy: 0, currentHourOccupancy: 0 };
+    
     const allValues = [
       ...trendData.zones.office,
       ...trendData.zones.meeting,
@@ -121,8 +126,26 @@ export function OccupancyAnalyticsPage() {
       ...trendData.zones.utility,
       ...trendData.zones.entry,
     ];
-    return Math.round(allValues.reduce((a, b) => a + b, 0) / allValues.length);
-  }, [trendData]);
+    const avg = Math.round(allValues.reduce((a, b) => a + b, 0) / allValues.length);
+    
+    // Get current hour occupancy from simulation if running
+    let currentOccupancy = avg;
+    if (isSimulationRunning && simulatedHour !== undefined) {
+      const hourIndex = trendData.hours.indexOf(simulatedHour);
+      if (hourIndex !== -1) {
+        const hourValues = [
+          trendData.zones.office[hourIndex] ?? 0,
+          trendData.zones.meeting[hourIndex] ?? 0,
+          trendData.zones.common[hourIndex] ?? 0,
+          trendData.zones.utility[hourIndex] ?? 0,
+          trendData.zones.entry[hourIndex] ?? 0,
+        ];
+        currentOccupancy = Math.round(hourValues.reduce((a, b) => a + b, 0) / hourValues.length);
+      }
+    }
+    
+    return { averageOccupancy: avg, currentHourOccupancy: currentOccupancy };
+  }, [trendData, isSimulationRunning, simulatedHour]);
 
   const isLoading = trendLoading || utilizationLoading || peakHoursLoading;
 
@@ -132,9 +155,24 @@ export function OccupancyAnalyticsPage() {
         {/* Header */}
         <div className="flex justify-between items-start">
           <div>
-            <h1 className="text-4xl font-bold">Occupancy Analytics</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-4xl font-bold">Occupancy Analytics</h1>
+              {isSimulationRunning && (
+                <div className="px-3 py-1 rounded-full text-sm font-medium"
+                  style={{
+                    background: 'rgba(59, 130, 246, 0.15)',
+                    color: 'var(--color-sentinel-blue)',
+                  }}
+                >
+                  🔴 Live • Hour {simulatedHour}:00 (Day {daysSimulated}/365)
+                </div>
+              )}
+            </div>
             <p className="text-muted-foreground mt-2">
-              Building-wide occupancy trends, zone utilization, and peak hour analysis
+              {isSimulationRunning 
+                ? 'Real-time occupancy from 365-day simulation'
+                : 'Building-wide occupancy trends, zone utilization, and peak hour analysis'
+              }
             </p>
           </div>
 
@@ -182,9 +220,15 @@ export function OccupancyAnalyticsPage() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
             <div className="p-4">
-              <p className="text-sm font-medium opacity-75">Avg Occupancy</p>
-              <div className="text-3xl font-bold mt-2">{averageOccupancy}%</div>
-              <p className="text-xs opacity-50 mt-2">Across all zones</p>
+              <p className="text-sm font-medium opacity-75">
+                {isSimulationRunning ? 'Live Occupancy' : 'Avg Occupancy'}
+              </p>
+              <div className="text-3xl font-bold mt-2">
+                {isSimulationRunning ? currentHourOccupancy : averageOccupancy}%
+              </div>
+              <p className="text-xs opacity-50 mt-2">
+                {isSimulationRunning ? `Hour ${simulatedHour}:00` : 'Across all zones'}
+              </p>
             </div>
           </Card>
 

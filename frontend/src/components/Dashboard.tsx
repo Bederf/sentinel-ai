@@ -14,6 +14,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useServerEvents } from "@/hooks/useServerEvents";
+import { useSimulation } from "@/contexts/SimulationContext";
 import {
   Building2,
   AlertTriangle,
@@ -114,6 +115,9 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose, u
   // Real-time event updates from backend SSE
   useServerEvents();
 
+  // Simulation context for live sim data
+  const { running: isSimulationRunning, occupancyPercent, hvacLoadPercent, ambientTemp } = useSimulation();
+
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -131,10 +135,6 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose, u
   const [energyLoading, setEnergyLoading] = useState(false);
   const [energyFilterSiteId, setEnergyFilterSiteId] = useState<string | null>(null);
   const [selectedDays, setSelectedDays] = useState<TimePeriod>(30);
-
-  // Simulated energy data (during Grant's 365-day simulation)
-  const [simulatedEnergy, setSimulatedEnergy] = useState<any>(null);
-  const [isSimulationRunning, setIsSimulationRunning] = useState(false);
 
   // Risk detail modal state
   const [selectedRiskEquipment, setSelectedRiskEquipment] = useState<BuildingEquipmentItem | null>(null);
@@ -287,40 +287,7 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose, u
     loadEnergyData();
   }, [energyFilterSiteId, selectedDays]);
 
-  // Poll simulated energy data during Grant's 365-day simulation
-  useEffect(() => {
-    const checkSimulationAndLoadEnergy = async () => {
-      try {
-        // Check if simulation is running
-        const statusResponse = await fetch('/api/lifecycle/status/site-002');
-        const statusData = await statusResponse.json();
 
-        if (statusData.running) {
-          setIsSimulationRunning(true);
-
-          // Load simulated energy metrics
-          const energyResponse = await fetch('/api/energy/simulated?site_id=site-002');
-          const energyData = await energyResponse.json();
-
-          if (energyData.simulated) {
-            setSimulatedEnergy(energyData);
-          }
-        } else {
-          setIsSimulationRunning(false);
-          setSimulatedEnergy(null);
-        }
-      } catch (err) {
-        // Silently fail - simulation might not be running
-        setIsSimulationRunning(false);
-        setSimulatedEnergy(null);
-      }
-    };
-
-    // Poll every 5 seconds
-    checkSimulationAndLoadEnergy();
-    const interval = setInterval(checkSimulationAndLoadEnergy, 5000);
-    return () => clearInterval(interval);
-  }, []);
 
   // Calculate site status counts for KPI - computed values used in render functions
   // @ts-ignore - Site type mismatch from legacy api.ts
@@ -533,6 +500,11 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose, u
   const kpiCards = useMemo(() => {
     if (!stats) return {};
 
+    // When simulation running, show live metrics
+    const displayAmbientTemp = isSimulationRunning ? ambientTemp : null;
+    const displayOccupancy = isSimulationRunning ? occupancyPercent : null;
+    const displayHvacLoad = isSimulationRunning ? hvacLoadPercent : null;
+
     return {
       'kpi-protected-sites': {
         title: "Protected Sites",
@@ -570,12 +542,12 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose, u
       },
       'kpi-potential-savings': {
         title: isSimulationRunning ? "Live Energy (Simulated)" : "Potential Savings",
-        value: isSimulationRunning && simulatedEnergy
-          ? formatZAR(simulatedEnergy.total_cost_zar)
+        value: isSimulationRunning
+          ? `${(displayOccupancy || 0).toFixed(0)}% occupied • ${displayAmbientTemp?.toFixed(1)}°C`
           : formatZAR(totalPotentialSavings),
         icon: <DollarSign className="h-5 w-5" />,
-        subtitle: isSimulationRunning && simulatedEnergy
-          ? `${simulatedEnergy.total_kwh} kWh • ${(simulatedEnergy.occupancy_percent).toFixed(0)}% occupied`
+        subtitle: isSimulationRunning
+          ? `HVAC load: ${displayHvacLoad?.toFixed(0)}%`
           : "If all preventive actions taken",
         accentColor: isSimulationRunning ? "blue" as const : "green" as const,
       },
@@ -587,7 +559,7 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose, u
         accentColor: "purple" as const,
       },
     };
-  }, [stats, normalSites, warningSites, totalPotentialSavings, predictions.length]);
+  }, [stats, normalSites, warningSites, totalPotentialSavings, predictions.length, isSimulationRunning, ambientTemp, occupancyPercent, hvacLoadPercent]);
 
   // Card Library panel - open when sidebar "Customize Dashboard Cards" is clicked (openCardLibrary) or in-dashboard Customize
   const cardLibraryPanel = (

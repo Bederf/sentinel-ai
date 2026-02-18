@@ -19,6 +19,7 @@ import { OccupancyHeatmap } from "./OccupancyHeatmap";
 import { BuildingSelector } from "./BuildingSelector";
 import { api, daliApi, isExpectedApiError } from '@/lib/api';
 import { PageLoading } from "./PageLoading";
+import { useSimulation } from '@/contexts/SimulationContext';
 import type { BuildingOccupancy, DALIStats, ZoneLighting, ZoneOccupancy, DALISensor, DALILuminaire, Site } from '@/lib/api';
 
 // Get occupancy color based on percentage
@@ -38,6 +39,9 @@ interface OccupancyPanelProps {
 const DALI_ENABLED_SITES = ["site-002"]; // Sandton City
 
 export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPanelProps) {
+  // Get live simulation state when available
+  const { running, occupancyPercent: simOccupancyPercent } = useSimulation();
+
   const [buildingOccupancy, setBuildingOccupancy] = useState<BuildingOccupancy | null>(null);
   const [daliStats, setDaliStats] = useState<DALIStats | null>(null);
   const [zoneLighting, setZoneLighting] = useState<Record<string, ZoneLighting>>({});
@@ -59,6 +63,9 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
 
   // Filter sites to only show DALI-enabled buildings
   const daliSites = sites.filter(site => DALI_ENABLED_SITES.includes(site.id));
+
+  // Compute display occupancy: use simulated value if running, otherwise use API data
+  const displayOccupancy = running ? simOccupancyPercent : buildingOccupancy?.occupancy_percent ?? 0;
 
   const fetchData = useCallback(async (showRefreshing = false) => {
     try {
@@ -251,12 +258,12 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
             <div className="text-center">
               <span
                 className="text-2xl font-bold block"
-                style={{ color: getOccupancyColor(buildingOccupancy.occupancy_percent) }}
+                style={{ color: getOccupancyColor(displayOccupancy) }}
               >
-                {buildingOccupancy.occupancy_percent}%
+                {displayOccupancy.toFixed(0)}%
               </span>
               <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                Occupancy
+                {running ? "Live Occupancy" : "Occupancy"}
               </span>
             </div>
 
@@ -290,34 +297,39 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
 
           {/* Floor Summary Bars */}
           <div className="space-y-2">
-            {buildingOccupancy.floors.map((floor) => (
-              <div key={floor.floor} className="flex items-center gap-2">
-                <span
-                  className="text-xs w-8 text-right"
-                  style={{ color: "var(--color-sentinel-text-secondary)" }}
-                >
-                  {floor.floor}
-                </span>
-                <div
-                  className="flex-1 h-4 rounded overflow-hidden"
-                  style={{ background: "var(--color-sentinel-bg-secondary)" }}
-                >
+            {buildingOccupancy.floors.map((floor) => {
+              // When simulation is running, show simulated occupancy for all floors
+              const floorOccupancy = running ? displayOccupancy : floor.occupancy_percent;
+              return (
+                <div key={floor.floor} className="flex items-center gap-2">
+                  <span
+                    className="text-xs w-8 text-right"
+                    style={{ color: "var(--color-sentinel-text-secondary)" }}
+                  >
+                    {floor.floor}
+                  </span>
                   <div
-                    className="h-full rounded transition-all duration-300"
-                    style={{
-                      width: `${floor.occupancy_percent}%`,
-                      background: getOccupancyColor(floor.occupancy_percent),
-                    }}
-                  />
+                    className="flex-1 h-4 rounded overflow-hidden"
+                    style={{ background: "var(--color-sentinel-bg-secondary)" }}
+                  >
+                    <div
+                      className="h-full rounded transition-all duration-300"
+                      style={{
+                        width: `${floorOccupancy}%`,
+                        background: getOccupancyColor(floorOccupancy),
+                      }}
+                    />
+                  </div>
+                  <span
+                    className="text-xs w-8"
+                    style={{ color: getOccupancyColor(floorOccupancy) }}
+                  >
+                    {floorOccupancy.toFixed(0)}%
+                  </span>
                 </div>
-                <span
-                  className="text-xs w-8"
-                  style={{ color: getOccupancyColor(floor.occupancy_percent) }}
-                >
-                  {floor.occupancy_percent}%
-                </span>
-              </div>
-            ))}
+              );
+            })}
+
           </div>
 
           {/* View Details Button */}
@@ -402,17 +414,19 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
                 <Users className="h-5 w-5" style={{ color: "var(--color-sentinel-blue)" }} />
               </div>
               <span className="text-sm font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>
-                Occupancy
+                {running ? "Live Occupancy" : "Occupancy"}
               </span>
             </div>
             <span
               className="text-3xl font-bold block"
-              style={{ color: getOccupancyColor(buildingOccupancy.occupancy_percent) }}
+              style={{ color: getOccupancyColor(displayOccupancy) }}
             >
-              {buildingOccupancy.occupancy_percent}%
+              {displayOccupancy.toFixed(0)}%
             </span>
             <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-              {buildingOccupancy.occupied_sensors} of {buildingOccupancy.total_sensors} sensors
+              {running 
+                ? "From simulation" 
+                : `${buildingOccupancy.occupied_sensors} of ${buildingOccupancy.total_sensors} sensors`}
             </span>
           </div>
 
@@ -608,14 +622,14 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
                       <div className="flex items-center gap-2 mb-1">
                         <Users className="h-4 w-4" style={{ color: "var(--color-sentinel-blue)" }} />
                         <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                          Occupancy
+                          {running ? "Live Occupancy" : "Occupancy"}
                         </span>
                       </div>
                       <span
                         className="text-xl font-bold"
-                        style={{ color: getOccupancyColor(selectedZone.occupancy_percent) }}
+                        style={{ color: getOccupancyColor(displayOccupancy) }}
                       >
-                        {selectedZone.occupancy_percent}%
+                        {displayOccupancy.toFixed(0)}%
                       </span>
                     </div>
                     <div

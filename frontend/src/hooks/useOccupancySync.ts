@@ -1,110 +1,84 @@
 /**
  * OCCUPANCY SYNC HOOK
  *
- * Polls backend occupancy endpoint and syncs frontend simulation
- * with backend Grant scenario time and occupancy targets.
+ * Syncs frontend occupancy simulation with live SimulationContext data.
+ * Uses simulated occupancy percentage to drive zone-level occupancy targets.
  *
  * Flow:
- * 1. Poll /dali/building/{building_id}/occupancy/detailed every 1 second
- * 2. Extract simulation time from response
+ * 1. Get simulation time and occupancy% from SimulationContext (polling every 3s)
+ * 2. Calculate zone occupancy from total occupancy percent
  * 3. Update OccupancySimulation targets for each zone
  * 4. Automatically spawn/despawn people based on targets
- * 5. Keep simulation in sync with backend scenario
+ * 5. Keep 3D animation in sync with backend simulation
  */
 
-import { useQuery } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import type { OccupancySimulation } from '@/lib/occupancySimulation';
 import type React from 'react';
-
-interface OccupancyZoneData {
-  zone_id: string;
-  zone_name: string;
-  floor: number;
-  coordinates: { x: number; y: number; w: number; h: number };
-  max_occupancy: number;
-  current_occupancy: number;
-  occupancy_percent: number;
-  zone_type: string;
-  personas: Record<string, number>;
-}
-
-interface DetailedOccupancyResponse {
-  building_id: string;
-  timestamp: string;
-  day_type: 'weekday' | 'weekend';
-  zones: OccupancyZoneData[];
-  total_occupancy: number;
-  occupancy_trend: 'peak' | 'offpeak';
-}
+import { useSimulation } from '@/contexts/SimulationContext';
 
 interface UseOccupancySyncOptions {
   buildingId: string;
   simulationRef: React.RefObject<OccupancySimulation | null>;
   enabled: boolean;
-  pollIntervalMs?: number;
 }
 
 /**
- * Hook for syncing frontend occupancy simulation with backend
+ * Hook for syncing frontend occupancy simulation with SimulationContext
  *
- * Polls occupancy endpoint and updates simulation targets.
- * Ensures frontend animation stays in sync with backend scenario time.
+ * Uses live occupancy percentage from simulation to update zone targets.
+ * Ensures 3D animation stays in sync with backend lifecycle simulation.
  */
 export function useOccupancySync({
   buildingId,
   simulationRef,
   enabled,
-  pollIntervalMs = 1000,
 }: UseOccupancySyncOptions) {
-  // Fetch occupancy targets from backend
-  const { data: occupancyData, isLoading } = useQuery<DetailedOccupancyResponse>({
-    queryKey: ['building-occupancy-detailed', buildingId],
-    queryFn: async () => {
-      const response = await fetch(
-        `/api/dali/building/${buildingId}/occupancy/detailed`
-      );
-      if (!response.ok) {
-        throw new Error(`Failed to fetch occupancy: ${response.statusText}`);
-      }
-      return response.json() as Promise<DetailedOccupancyResponse>;
-    },
-    refetchInterval: pollIntervalMs, // Poll every 1 second
-    enabled: enabled && !!buildingId,
-    staleTime: 0, // Always consider data stale (we want fresh updates)
-  });
+  // Get live occupancy data from SimulationContext
+  const { running, occupancyPercent, simulatedTime, daysSimulated } = useSimulation();
 
-  // Update simulation with targets from backend
+  // Update simulation with live targets from SimulationContext
   useEffect(() => {
-    if (!occupancyData || !simulationRef.current) return;
+    if (!simulationRef.current || !enabled || !running) return;
 
     const simulation = simulationRef.current;
+    const totalOccupancy = occupancyPercent || 0;
 
-    // Update simulation time to match backend (Grant scenario time)
-    const simTime = new Date(occupancyData.timestamp);
-    // Note: In a full implementation, we'd store this in the simulation
-    // For now, frontend runs at its own pace but uses backend targets
+    // Default zone configuration (5 zones distributed across building)
+    const zones = [
+      { zoneId: 'zone-1', name: 'Open Office L1', floor: 0, max: 80 },
+      { zoneId: 'zone-2', name: 'Conference L1', floor: 0, max: 30 },
+      { zoneId: 'zone-3', name: 'Lobby L0', floor: -1, max: 50 },
+      { zoneId: 'zone-4', name: 'Open Office L2', floor: 1, max: 100 },
+      { zoneId: 'zone-5', name: 'Meeting Rooms L2', floor: 1, max: 40 },
+    ];
 
-    // Reconcile occupancy for each zone
-    for (const zoneData of occupancyData.zones) {
-      // Update zone targets in simulation
-      // The simulation will automatically spawn/despawn people to match targets
+    const totalMaxOccupancy = zones.reduce((sum, z) => sum + z.max, 0);
+
+    // Distribute total occupancy across zones proportionally
+    for (const zone of zones) {
+      const zoneOccupancy = Math.round((zone.max / totalMaxOccupancy) * totalOccupancy);
+      
       simulation.updateZoneTarget({
-        zoneId: zoneData.zone_id,
-        targetOccupancy: zoneData.current_occupancy,
-        maxOccupancy: zoneData.max_occupancy,
-        personas: zoneData.personas, // Persona ratios from backend
+        zoneId: zone.zoneId,
+        targetOccupancy: zoneOccupancy,
+        maxOccupancy: zone.max,
+        personas: {
+          worker: 0.7,
+          security: 0.1,
+          cleaner: 0.1,
+          visitor: 0.1,
+        },
       });
     }
-  }, [occupancyData, simulationRef]);
+  }, [occupancyPercent, running, enabled, simulationRef]);
 
   return {
-    occupancyData,
-    isLoading,
-    simulationTime: occupancyData ? new Date(occupancyData.timestamp) : null,
-    totalOccupancy: occupancyData?.total_occupancy || 0,
-    dayType: occupancyData?.day_type || 'weekday',
-    occupancyTrend: occupancyData?.occupancy_trend || 'offpeak',
+    isLoading: false,
+    simulationTime: simulatedTime ? new Date(simulatedTime) : null,
+    totalOccupancy: occupancyPercent || 0,
+    dayType: daysSimulated > 180 ? 'weekend' : 'weekday', // Simple heuristic
+    occupancyTrend: (occupancyPercent || 0) > 70 ? 'peak' : 'offpeak',
   };
 }
 

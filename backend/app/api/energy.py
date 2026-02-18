@@ -1055,23 +1055,16 @@ async def get_energy_simulated(
         EnergyMetrics with current simulated values, or zeros if no simulation
     """
     try:
-        from app.services.simulation_orchestrator import get_simulation_by_task_id
+        from app.services.simulation_orchestrator import _active_simulations
         
-        # Try to find any running simulation for this site
-        # First check for simulation with a task_id pattern
-        from app.database.supabase_client import Supabase
+        # Look for any running simulation
+        orchestrator = None
+        for task_id, orch in _active_simulations.items():
+            if orch.running:
+                orchestrator = orch
+                break
         
-        client = Supabase.instance()
-        
-        # Query for running simulations on this site
-        running_tasks = client.table("lifecycle_simulation_tasks") \
-            .select("task_id, scenario") \
-            .eq("site_id", site_id) \
-            .eq("status", "running") \
-            .limit(1) \
-            .execute()
-        
-        if not running_tasks.data:
+        if not orchestrator or not orchestrator.running:
             # No simulation running - return zero metrics
             return {
                 "total_kwh": 0.0,
@@ -1088,33 +1081,32 @@ async def get_energy_simulated(
                 "message": "No active simulation"
             }
         
-        task_id = running_tasks.data[0]["task_id"]
-        orchestrator = get_simulation_by_task_id(task_id)
+        # Get current simulated state from orchestrator
+        status = orchestrator.get_status()
         
-        if not orchestrator or not orchestrator.running:
-            # Task marked as running but no orchestrator found
-            return {
-                "total_kwh": 0.0,
-                "total_cost_zar": 0.0,
-                "carbon_kg": 0.0,
-                "hvac_kwh": 0.0,
-                "hvac_percent": 0.0,
-                "lighting_kwh": 0.0,
-                "lighting_percent": 0.0,
-                "power_kwh": 0.0,
-                "power_percent": 0.0,
-                "timestamp": datetime.now().isoformat(),
-                "simulated": False,
-                "message": "Simulation task not running"
-            }
+        # Extract simulated values from status (or use defaults)
+        occupancy_percent = status.get("occupancy_percent", 0)
+        is_raining = status.get("is_raining", False)
+        cloud_cover = status.get("cloud_cover", 0)
+        ambient_temp = status.get("ambient_temp", 22)
         
-        # Get current simulated state
-        building_state = orchestrator.building_state or {}
+        # Estimate daylight factor from cloud cover and hour
+        current_hour = orchestrator.simulated_time.hour if orchestrator.simulated_time else 12
+        if 6 <= current_hour < 18:  # Daytime
+            base_daylight = 800  # lux at peak
+            daylight_lux = base_daylight * (1.0 - (cloud_cover / 100.0 * 0.8))
+            if is_raining:
+                daylight_lux *= 0.3
+        else:
+            daylight_lux = 0  # Night
         
-        # Extract simulated values (or use defaults)
-        occupancy_percent = building_state.get("occupancy_percent", 0)
-        daylight_lux = building_state.get("daylight_factor", 0)
-        chiller_load_percent = building_state.get("chiller_load_percent", 0)
+        # Estimate chiller load from ambient temperature
+        if ambient_temp > 28:
+            chiller_load_percent = min(100, 30 + (ambient_temp - 28) * 5)
+        elif ambient_temp < 15:
+            chiller_load_percent = 20
+        else:
+            chiller_load_percent = 50 - (22 - ambient_temp) * 2
         
         # Generate energy based on simulated state
         # Base values (from building capacity at full occupancy)
@@ -1183,3 +1175,230 @@ async def get_energy_simulated(
             "simulated": False,
             "error": str(e)
         }
+
+
+# ============================================================================
+# Phase 5.6: Tariff Integration - Simulated Energy Cost Endpoints
+# ============================================================================
+
+@router.get("/energy/simulated-costs")
+async def get_simulated_energy_costs(
+    site_id: str = Query("site-002", description="Site ID"),
+    days: int = Query(7, ge=1, le=365, description="Number of days"),
+) -> dict:
+    """
+    Get daily energy costs from simulated HVAC power consumption.
+    
+    Uses City Power TOU tariff (Johannesburg commercial rates).
+    Pulls from energy_cost_summary table created by thermal simulation.
+    
+    Returns daily cost breakdown showing:
+    - energy_kwh: Total kWh consumed that day
+    - energy_cost_r: Energy charges (c/kWh × kWh)
+    - network_cost_r: Distribution/network charges
+    - service_charge_r: Fixed monthly charge (amortized daily)
+    - total_cost_r: Sum of all charges
+    - peak_power_kw: Maximum demand that day
+    
+    This endpoint powers the dashboard cost trend chart.
+    
+    Args:
+        site_id: Site ID (e.g., "site-002")
+        days: Number of days to return (1-365)
+    
+    Returns:
+        Daily cost summary list with tariff band breakdown
+    """
+    try:
+        from app.services.energy_cost_service import EnergyCostService
+        from app.database.supabase_client import get_supabase_client
+        
+        supabase = get_supabase_client()
+        cost_svc = EnergyCostService(building_id=site_id)
+        
+        # Query energy_cost_summary table for recent days
+        end_date = datetime.now().date()
+        start_date = end_date - timedelta(days=days - 1)
+        
+        response = supabase.table("energy_cost_summary").select("*").gte(
+            "date", start_date.isoformat()
+        ).lte(
+            "date", end_date.isoformat()
+        ).eq(
+            "building_id", site_id
+        ).order("date", desc=False).execute()
+        
+        if not response.data:
+            logger.info(f"[COST] No cost data for {site_id} in last {days} days")
+            return {
+                "site_id": site_id,
+                "period_days": days,
+                "daily_costs": [],
+                "period_start": start_date.isoformat(),
+                "period_end": end_date.isoformat(),
+                "message": "No cost data available (simulation not run yet)"
+            }
+        
+        # Format response
+        daily_costs = []
+        total_kwh = 0.0
+        total_cost = 0.0
+        
+        for record in response.data:
+            daily_costs.append({
+                "date": record.get("date"),
+                "energy_kwh": round(record.get("total_energy_kwh", 0), 2),
+                "energy_cost_r": round(record.get("energy_cost_r", 0), 2),
+                "network_cost_r": round(record.get("network_cost_r", 0), 2),
+                "service_charge_r": round(record.get("service_charge_r", 0), 2),
+                "total_cost_r": round(record.get("total_cost_r", 0), 2),
+                "peak_power_kw": round(record.get("peak_power_kw", 0), 2),
+                "average_rate_r_kwh": round(record.get("average_rate_r_kwh", 0), 3),
+                "hourly_data": record.get("hourly_data"),  # Optional detailed breakdown
+            })
+            
+            total_kwh += record.get("total_energy_kwh", 0)
+            total_cost += record.get("total_cost_r", 0)
+        
+        # Calculate averages
+        period_days = len(daily_costs) if daily_costs else days
+        avg_daily_cost = total_cost / period_days if period_days > 0 else 0
+        avg_daily_kwh = total_kwh / period_days if period_days > 0 else 0
+        
+        logger.info(f"[COST] Retrieved {len(daily_costs)} days of cost data for {site_id}")
+        
+        return {
+            "site_id": site_id,
+            "period_days": period_days,
+            "period_start": start_date.isoformat(),
+            "period_end": end_date.isoformat(),
+            "total_kwh": round(total_kwh, 2),
+            "total_cost_r": round(total_cost, 2),
+            "average_daily_kwh": round(avg_daily_kwh, 2),
+            "average_daily_cost_r": round(avg_daily_cost, 2),
+            "daily_costs": daily_costs,
+        }
+    
+    except Exception as e:
+        logger.error(f"[COST] Error getting simulated costs: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve cost data: {str(e)}")
+
+
+@router.get("/energy/simulated-costs/monthly")
+async def get_simulated_monthly_costs(
+    site_id: str = Query("site-002", description="Site ID"),
+    year: int = Query(None, description="Year (default: current year)"),
+    month: int = Query(None, description="Month (1-12, default: current month)"),
+) -> dict:
+    """
+    Get monthly cost summary from daily energy_cost_summary records.
+    
+    Aggregates daily costs into monthly view for budget planning.
+    
+    Args:
+        site_id: Site ID
+        year: Year (default: current year)
+        month: Month 1-12 (default: current month)
+    
+    Returns:
+        Monthly cost totals, averages, and projections
+    """
+    try:
+        from app.services.energy_cost_service import EnergyCostService
+        
+        cost_svc = EnergyCostService(building_id=site_id)
+        
+        # Use current date if not specified
+        today = datetime.now()
+        year = year or today.year
+        month = month or today.month
+        
+        monthly_summary = await cost_svc.get_monthly_summary(
+            building_id=site_id,
+            year=year,
+            month=month,
+        )
+        
+        # Add projections
+        days_in_month = 30 if month in [4, 6, 9, 11] else 31 if month != 2 else 28
+        if monthly_summary.get("days_recorded", 0) > 0:
+            avg_daily = monthly_summary["total_cost_r"] / monthly_summary["days_recorded"]
+            projected_cost = avg_daily * days_in_month
+        else:
+            projected_cost = 0
+        
+        return {
+            "site_id": site_id,
+            "year": year,
+            "month": month,
+            "month_name": datetime(year, month, 1).strftime("%B"),
+            **monthly_summary,
+            "projected_month_cost_r": round(projected_cost, 2),
+            "days_in_month": days_in_month,
+        }
+    
+    except Exception as e:
+        logger.error(f"[COST] Error getting monthly costs: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/energy/tariff-info")
+async def get_tariff_info(
+    site_id: str = Query("site-002", description="Site ID"),
+) -> dict:
+    """
+    Get current tariff information for site.
+    
+    Returns:
+    - Municipality and tariff name
+    - Current tariff bands (peak/standard/off-peak)
+    - Energy and network rates (c/kWh) by band
+    - Demand charge (R/kVA)
+    - Service charge (R/month)
+    - Time bands for current season
+    
+    Args:
+        site_id: Site ID
+    
+    Returns:
+        Complete tariff structure for dashboard/API clients
+    """
+    try:
+        from app.services.energy_cost_service import EnergyCostService
+        
+        cost_svc = EnergyCostService(building_id=site_id)
+        
+        if not cost_svc.tariff_data:
+            raise ValueError("No tariff data available")
+        
+        # Get tariff info
+        today = datetime.now()
+        month = today.month
+        season = "winter" if month in [6, 7, 8] else "summer"
+        
+        tariff_data = cost_svc.tariff_data
+        
+        return {
+            "site_id": site_id,
+            "municipality": cost_svc.municipality,
+            "tariff_name": tariff_data.get("tariff_name", "City Power Commercial"),
+            "current_season": season,
+            "effective_date": tariff_data.get("effective_date"),
+            "currency": tariff_data.get("currency", "ZAR"),
+            "vat_inclusive": tariff_data.get("vat_inclusive", False),
+            "energy_charges": {
+                "summer": tariff_data.get("energy_charge_c_kwh", {}).get("summer", {}),
+                "winter": tariff_data.get("energy_charge_c_kwh", {}).get("winter", {}),
+            },
+            "network_charges": {
+                "summer": tariff_data.get("network_charge_c_kwh", {}).get("summer", {}),
+                "winter": tariff_data.get("network_charge_c_kwh", {}).get("winter", {}),
+            },
+            "demand_charges": tariff_data.get("demand_charge_r_kva", {}),
+            "service_charge_r_month": tariff_data.get("service_charge_r_month"),
+            "time_bands": tariff_data.get("time_bands", {}),
+        }
+    
+    except Exception as e:
+        logger.error(f"[COST] Error getting tariff info: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

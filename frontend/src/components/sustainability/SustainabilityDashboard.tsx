@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Leaf } from 'lucide-react';
+import { useSimulation } from '../../contexts/SimulationContext';
 import {
   Card,
   Title,
@@ -52,6 +53,9 @@ export function SustainabilityDashboard({
   siteId: _externalSiteId,
   enabledModules: _enabledModules = ['sustainability'],
 }: SustainabilityDashboardProps) {
+  // Get simulation context for live carbon metrics
+  const { running: isSimulationRunning, daysSimulated, simulatedHour, occupancyPercent } = useSimulation();
+
   const [sites, setSites] = useState<Site[]>([]);
   const [selectedSiteId, setSelectedSiteId] = useState<string>('');
   const [summary, setSummary] = useState<SustainabilitySummary | null>(null);
@@ -173,17 +177,32 @@ export function SustainabilityDashboard({
             <Leaf className="h-5 w-5" style={{ color: 'var(--color-sentinel-emerald)' }} />
           </div>
           <div>
-            <h2
-              className="text-lg font-semibold"
-              style={{ color: 'var(--color-sentinel-text-primary)' }}
-            >
-              Sustainability & ESG
-            </h2>
+            <div className="flex items-center gap-2">
+              <h2
+                className="text-lg font-semibold"
+                style={{ color: 'var(--color-sentinel-text-primary)' }}
+              >
+                Sustainability & ESG
+              </h2>
+              {isSimulationRunning && (
+                <div className="px-2 py-0.5 rounded text-xs font-medium"
+                  style={{
+                    background: 'rgba(16, 185, 129, 0.15)',
+                    color: 'var(--color-sentinel-emerald)',
+                  }}
+                >
+                  📊 Live • Day {daysSimulated}/365
+                </div>
+              )}
+            </div>
             <p
               className="text-xs"
               style={{ color: 'var(--color-sentinel-text-secondary)' }}
             >
-              Carbon emissions, efficiency metrics, and Green Star SA tracker
+              {isSimulationRunning
+                ? `Real-time carbon metrics from simulation • Hour ${simulatedHour}:00 • ${occupancyPercent?.toFixed(0)}% occupied`
+                : 'Carbon emissions, efficiency metrics, and Green Star SA tracker'
+              }
             </p>
           </div>
         </div>
@@ -207,12 +226,16 @@ export function SustainabilityDashboard({
       {/* KPI Row */}
       <Grid className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
-          <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>Total CO2 YTD</Text>
+          <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>
+            {isSimulationRunning ? 'CO2 in Simulation' : 'Total CO2 YTD'}
+          </Text>
           <Metric>{summary?.ytd.total_co2_tonnes.toFixed(1) ?? '—'} t</Metric>
           <Flex className="mt-2">
-            <Badge color={trendColor} size="xs">{trendLabel}</Badge>
+            <Badge color={isSimulationRunning ? 'blue' : trendColor} size="xs">
+              {isSimulationRunning ? `Day ${daysSimulated}/365` : trendLabel}
+            </Badge>
             <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-              Target: -{summary?.target_reduction_pct ?? 10}% YoY
+              {isSimulationRunning ? 'From 365-day sim' : `Target: -${summary?.target_reduction_pct ?? 10}% YoY`}
             </Text>
           </Flex>
         </Card>

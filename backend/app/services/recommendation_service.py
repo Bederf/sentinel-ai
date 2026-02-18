@@ -106,15 +106,32 @@ class RecommendationService:
         """Get pending recommendations for a site (Tier 2 approval queue).
 
         Args:
-            site_id: Building identifier
+            site_id: Building identifier (accepts 'site-002' or 'S002' format)
             limit: Maximum number to return
 
         Returns:
             List of pending recommendations
         """
-        # Note: In full implementation, this would query a repository.
-        # For now, return empty list (repository pattern in Task 4.3)
-        return []
+        from app.database.repositories import get_recommendation_repository
+
+        try:
+            repo = get_recommendation_repository()
+            # Normalize site_id: "site-002" → "S002"
+            normalized = site_id
+            if site_id.startswith("site-"):
+                num = site_id.split("-")[1]
+                normalized = f"S{num}"
+
+            recs = await repo.get_by_status(
+                site_id=normalized,
+                status=RecommendationStatus.PENDING,
+                limit=limit,
+            )
+            logger.info(f"Found {len(recs)} pending recommendations for {normalized}")
+            return recs
+        except Exception as e:
+            logger.error(f"Error fetching pending recommendations for {site_id}: {e}")
+            return []
 
     async def get_history(
         self,

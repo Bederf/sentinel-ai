@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Lightbulb, TrendingUp, Brain, Sun, Users, Zap } from 'lucide-react';
 import { authorizedFetch } from '@/lib/api';
+import { useSimulation } from '@/contexts/SimulationContext';
 
 interface DaliSimulation {
   summary: {
@@ -40,14 +41,25 @@ interface DaliSimulation {
 export function LightingIntelligencePanel({ siteId }: { siteId: string }) {
   const [data, setData] = useState<DaliSimulation | null>(null);
   const [loading, setLoading] = useState(true);
+  const { daysSimulated, running } = useSimulation();
+
+  // Only show data up to where the simulation has reached
+  const maxDay = running ? Math.max(1, daysSimulated) : 0;
 
   useEffect(() => {
-    fetchSimulation();
-  }, [siteId]);
+    if (maxDay > 0) {
+      fetchSimulation();
+    }
+  }, [siteId, maxDay]);
+
+  // Don't render if simulation hasn't started
+  if (!running || maxDay === 0) {
+    return null;
+  }
 
   const fetchSimulation = async () => {
     try {
-      const response = await authorizedFetch(`/api/dali/simulation?site_id=${siteId}`);
+      const response = await authorizedFetch(`/api/dali/simulation?site_id=${siteId}&max_day=${maxDay}`);
       if (!response.ok) {
         console.error('Failed to fetch DALI simulation:', response.status, response.statusText);
         setLoading(false);
@@ -147,11 +159,11 @@ export function LightingIntelligencePanel({ siteId }: { siteId: string }) {
     );
   };
 
-  // Calculate energy reduction percentage (with safety check)
+  // Calculate energy reduction percentage: SENTINEL vs Tridonic (the installed system)
   const energyReductionPct =
-    summary.baseline_annual_cost > 0
-      ? ((summary.baseline_annual_cost - summary.sentinel_annual_cost) /
-          summary.baseline_annual_cost) *
+    summary.dali_annual_cost > 0
+      ? ((summary.dali_annual_cost - summary.sentinel_annual_cost) /
+          summary.dali_annual_cost) *
         100
       : 0;
 
@@ -188,7 +200,7 @@ export function LightingIntelligencePanel({ siteId }: { siteId: string }) {
               className="text-xs"
               style={{ color: 'var(--color-sentinel-text-secondary)' }}
             >
-              365-Day Comparative Simulation · Site-002 Sandton Office Complex
+              Day {maxDay} of 365 · Comparative Simulation · Site-002 Sandton Office Complex
             </span>
           </div>
         </div>
@@ -210,7 +222,7 @@ export function LightingIntelligencePanel({ siteId }: { siteId: string }) {
             icon={<TrendingUp className="h-5 w-5" />}
             label="Annual Savings"
             value={fmtRK(summary.total_savings_zar)}
-            subtitle="Sentinel vs Baseline"
+            subtitle="Sentinel vs Tridonic"
             color="#22C55E"
           />
           <MetricCard
@@ -218,7 +230,7 @@ export function LightingIntelligencePanel({ siteId }: { siteId: string }) {
             label="Energy Reduced"
             value={`${energyReductionPct.toFixed(0)}%`}
             subtitle={`${fmtRK(
-              summary.baseline_annual_cost - summary.sentinel_annual_cost
+              summary.dali_annual_cost - summary.sentinel_annual_cost
             )} grid energy saved`}
             color="#FACC15"
           />
@@ -237,7 +249,7 @@ export function LightingIntelligencePanel({ siteId }: { siteId: string }) {
             className="text-sm font-medium mb-2"
             style={{ color: 'var(--color-sentinel-text-secondary)' }}
           >
-            Cumulative Cost Over 365 Days
+            Cumulative Cost — Day {maxDay} of 365
           </h4>
           <ResponsiveContainer width="100%" height={240}>
             <AreaChart data={daily_data}>

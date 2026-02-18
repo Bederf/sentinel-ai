@@ -24,6 +24,7 @@ import {
   Building2,
   ChevronDown,
 } from "lucide-react";
+import { useSimulation } from "@/contexts/SimulationContext";
 import { Table, TableHead, TableRow, TableHeaderCell, TableBody, TableCell, Button, TabGroup, TabList, Tab, TabPanels, TabPanel } from "@tremor/react";
 import api from '@/lib/api';
 import type { OptimizationScenario, OptimizationStatusResponse, Site } from '@/lib/api';
@@ -114,6 +115,9 @@ interface OptimizationPageProps {
 }
 
 export function OptimizationPage({ onError }: OptimizationPageProps) {
+  // Get simulation context for live HVAC metrics
+  const { running: isSimulationRunning, hvacLoadPercent, ambientTemp, simulatedHour, daysSimulated } = useSimulation();
+
   // State
   const [sites, setSites] = useState<Site[]>([]);
   const [selectedSiteId, setSelectedSiteId] = useState<string>("site-002");
@@ -313,17 +317,32 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
                 <Zap className="h-5 w-5" style={{ color: "var(--color-sentinel-blue)" }} />
               </div>
               <div>
-                <h3
-                  className="font-medium text-sm"
-                  style={{ color: "var(--color-sentinel-text-primary)" }}
-                >
-                  Load Shedding Optimization
-                </h3>
+                <div className="flex items-center gap-2">
+                  <h3
+                    className="font-medium text-sm"
+                    style={{ color: "var(--color-sentinel-text-primary)" }}
+                  >
+                    Load Shedding Optimization
+                  </h3>
+                  {isSimulationRunning && (
+                    <div className="px-2 py-0.5 rounded text-xs font-medium"
+                      style={{
+                        background: 'rgba(59, 130, 246, 0.15)',
+                        color: 'var(--color-sentinel-blue)',
+                      }}
+                    >
+                      🔧 Live • {hvacLoadPercent?.toFixed(0)}% load
+                    </div>
+                  )}
+                </div>
                 <span
                   className="text-xs"
                   style={{ color: "var(--color-sentinel-text-secondary)" }}
                 >
-                  Optimize building comfort and energy use during outages
+                  {isSimulationRunning 
+                    ? `Real-time HVAC from simulation • Hour ${simulatedHour}:00 (Day ${daysSimulated}/365) • ${ambientTemp?.toFixed(1)}°C`
+                    : 'Optimize building comfort and energy use during outages'
+                  }
                 </span>
               </div>
             </div>
@@ -392,26 +411,30 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
                 className="text-xs mb-1"
                 style={{ color: "var(--color-sentinel-text-secondary)" }}
               >
-                Energy Savings
+                {isSimulationRunning ? "Live HVAC Load" : "Energy Savings"}
               </div>
               <div
                 className="text-2xl font-semibold"
                 style={{ color: "var(--color-sentinel-text-primary)" }}
               >
-                {kpis.energySavings}%
+                {isSimulationRunning ? `${hvacLoadPercent?.toFixed(0)}%` : `${kpis.energySavings}%`}
               </div>
               <div
                 className="text-sm"
-                style={{ color: "var(--color-sentinel-green)" }}
+                style={{ color: isSimulationRunning ? "var(--color-sentinel-blue)" : "var(--color-sentinel-green)" }}
               >
-                avg. across sites
+                {isSimulationRunning ? "Current load" : "avg. across sites"}
               </div>
             </div>
             <div
               className="h-10 w-10 rounded flex items-center justify-center"
-              style={{ background: "rgba(16, 185, 129, 0.15)" }}
+              style={{ background: isSimulationRunning ? "rgba(59, 130, 246, 0.15)" : "rgba(16, 185, 129, 0.15)" }}
             >
-              <TrendingDown className="h-5 w-5" style={{ color: "var(--color-sentinel-green)" }} />
+              {isSimulationRunning ? (
+                <Zap className="h-5 w-5" style={{ color: "var(--color-sentinel-blue)" }} />
+              ) : (
+                <TrendingDown className="h-5 w-5" style={{ color: "var(--color-sentinel-green)" }} />
+              )}
             </div>
           </div>
         </div>
@@ -425,26 +448,30 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
                 className="text-xs mb-1"
                 style={{ color: "var(--color-sentinel-text-secondary)" }}
               >
-                Comfort Extension
+                {isSimulationRunning ? "Ambient Temperature" : "Comfort Extension"}
               </div>
               <div
                 className="text-2xl font-semibold"
                 style={{ color: "var(--color-sentinel-text-primary)" }}
               >
-                {kpis.comfortExtension} min
+                {isSimulationRunning ? `${ambientTemp?.toFixed(1)}°C` : `${kpis.comfortExtension} min`}
               </div>
               <div
                 className="text-sm"
-                style={{ color: "var(--color-sentinel-green)" }}
+                style={{ color: isSimulationRunning ? "var(--color-sentinel-amber)" : "var(--color-sentinel-green)" }}
               >
-                avg. extension
+                {isSimulationRunning ? "Current temp" : "avg. extension"}
               </div>
             </div>
             <div
               className="h-10 w-10 rounded flex items-center justify-center"
-              style={{ background: "rgba(59, 130, 246, 0.15)" }}
+              style={{ background: isSimulationRunning ? "rgba(245, 158, 11, 0.15)" : "rgba(59, 130, 246, 0.15)" }}
             >
-              <Thermometer className="h-5 w-5" style={{ color: "var(--color-sentinel-blue)" }} />
+              {isSimulationRunning ? (
+                <Thermometer className="h-5 w-5" style={{ color: "var(--color-sentinel-amber)" }} />
+              ) : (
+                <Thermometer className="h-5 w-5" style={{ color: "var(--color-sentinel-blue)" }} />
+              )}
             </div>
           </div>
         </div>

@@ -67,6 +67,52 @@ The lifecycle simulation compresses 24 simulated hours into 2-24 real minutes, a
 └─────────────────┘  └─────────────────┘  └─────────────────┘
 ```
 
+## Thermal Simulation Engine Integration (Phase 5.5)
+
+**NEW:** Zone temperatures now react realistically to occupancy, time of day, and HVAC response!
+
+Each simulated hour, the **Thermal Simulation Engine** creates realistic sensor data:
+
+### Daily Temperature Profile
+
+**Example: Office Zone (Zone-001)** with realistic occupancy:
+```
+06:00  Night          0% occupancy     18.2°C
+08:00  Arrival       60% occupancy     21.5°C  (+3.3°C warmup)
+11:00  Peak          85% occupancy     23.8°C  (+2.3°C occupancy heat)
+14:00  Peak + Solar  85% occupancy     24.2°C  (+0.4°C solar gain)
+18:00  Evening       30% occupancy     22.1°C  (-2.1°C cooldown)
+22:00  Setback        0% occupancy     19.5°C  (-2.6°C night mode)
+```
+
+### What This Enables
+
+✅ **AI Recommendations** - "Zone at 24.2°C with 85% occupancy → reduce setpoint to 20°C"
+✅ **ML Training** - 157,680 realistic sensor readings/year for occupancy patterns
+✅ **Energy Accuracy** - Calculate actual wasted energy = (temp above setpoint) × hours × occupancy
+✅ **Fault Detection** - Anomalies visible when zones can't reach setpoint
+
+### Equipment Health Degradation (Future Maintenance Sims)
+
+**Infrastructure ready** but DISABLED for baseline (Grant/Bederf):
+
+To enable for maintenance/fault scenarios:
+```python
+# In lifecycle_orchestrator.py, line ~705:
+consider_equipment_health=True  # Enable health degradation
+```
+
+Then degrade equipment:
+```sql
+UPDATE equipment SET health_score = 50 WHERE code = 'S002-CHILLER-B1-001';
+```
+
+Result: Chiller at 50% → Peak zone rises from 24.2°C to 25.8°C (can't cool)
+
+**Learn more:** [`docs/04-features/thermal-simulation.md`](./thermal-simulation.md)
+
+---
+
 ## API Endpoints
 
 ### Control Endpoints

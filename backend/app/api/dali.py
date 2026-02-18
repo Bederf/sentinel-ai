@@ -271,7 +271,7 @@ def seeded_random(seed: int):
 # ============================================================================
 
 
-def run_dali_simulation() -> dict:
+def run_dali_simulation(max_day: int = 365) -> dict:
     """
     Run 365-day DALI lighting simulation with 3 scenarios.
 
@@ -286,6 +286,9 @@ def run_dali_simulation() -> dict:
     rng = seeded_random(20260214)
     start_date = datetime(2025, 3, 1)
 
+    # Clamp max_day to valid range
+    max_day = max(1, min(365, max_day))
+
     # Results storage
     daily_data = []
     monthly_data = []
@@ -298,10 +301,10 @@ def run_dali_simulation() -> dict:
     month_accum = None
 
     # ========================================================================
-    # SIMULATION LOOP: 365 days
+    # SIMULATION LOOP: up to max_day days
     # ========================================================================
 
-    for day in range(365):
+    for day in range(max_day):
         current_date = start_date + timedelta(days=day)
         day_of_year = current_date.timetuple().tm_yday
         day_of_week = current_date.weekday()
@@ -346,7 +349,9 @@ def run_dali_simulation() -> dict:
                 # ============================================================
                 # SCENARIO 2: WITH DALI (Occupancy + Daylight)
                 # ============================================================
-                if occupancy < 0.05:
+                if not (7 <= hour < 18):
+                    dali_brightness = 0.0  # Lights off outside business hours
+                elif occupancy <= 0.10:
                     dali_brightness = 0.30  # Vacancy dimming
                 elif daylight_lux > 500:
                     dali_brightness = 0.50  # Daylight harvesting
@@ -436,9 +441,10 @@ def run_dali_simulation() -> dict:
     # CALCULATE SUMMARY METRICS
     # ========================================================================
 
-    total_savings = cumulative_baseline - cumulative_sentinel
     dali_savings = cumulative_baseline - cumulative_dali
     sentinel_additional = cumulative_dali - cumulative_sentinel
+    # Total savings = what SENTINEL adds over Tridonic (the installed system)
+    total_savings = sentinel_additional
 
     # Estimates for breakdowns
     occupancy_hours_saved = 3200
@@ -452,10 +458,11 @@ def run_dali_simulation() -> dict:
             "total_savings_zar": round(total_savings, 2),
             "dali_savings_zar": round(dali_savings, 2),
             "sentinel_additional_zar": round(sentinel_additional, 2),
-            "savings_pct": round((total_savings / cumulative_baseline) * 100, 1),
+            "savings_pct": round((total_savings / cumulative_dali) * 100, 1),
             "occupancy_hours_saved": occupancy_hours_saved,
             "daylight_hours_utilized": daylight_hours_utilized,
-            "ml_effectiveness_pct": int(get_learning_factor(364) * 100),
+            "ml_effectiveness_pct": int(get_learning_factor(max_day - 1) * 100),
+            "days_simulated": max_day,
         },
         "daily_data": daily_data,
         "monthly_data": monthly_data,
@@ -470,6 +477,7 @@ def run_dali_simulation() -> dict:
 @router.get("/simulation")
 async def get_dali_simulation(
     site_id: str = Query("site-002", description="Site ID (currently only site-002 supported)"),
+    max_day: int = Query(365, ge=1, le=365, description="Simulate up to this many days (1-365)"),
 ):
     """
     Get 365-day DALI lighting simulation with 3-tier comparison.
@@ -524,7 +532,7 @@ async def get_dali_simulation(
     }
     ```
     """
-    return run_dali_simulation()
+    return run_dali_simulation(max_day=max_day)
 
 
 # ============================================================================

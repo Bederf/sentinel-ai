@@ -43,7 +43,13 @@ class BackgroundSchedulerService:
 
         self._initialized = True
         self.scheduler = BackgroundScheduler()
+        self._main_loop = None  # Will be set during startup
         logger.info("Background scheduler initialized")
+
+    def set_main_loop(self, loop: asyncio.AbstractEventLoop):
+        """Store reference to the main (uvicorn) event loop for cross-thread scheduling."""
+        self._main_loop = loop
+        logger.info(f"Main event loop captured: {loop}")
 
     def start(self):
         """Start the background scheduler."""
@@ -1022,13 +1028,25 @@ class BackgroundSchedulerService:
         """
         Poll database for queued simulations and start one.
         Prevents multiple concurrent simulations (max 1 at a time).
+
+        Uses the main event loop so that background asyncio tasks
+        (like the simulation loop) survive after this function returns.
         """
         logger.warning(">>> _process_simulation_queue() called by APScheduler")
         try:
-            # Run async logic in event loop
-            logger.warning(">>> Starting asyncio.run() for queue processor async")
-            asyncio.run(self._process_simulation_queue_async())
-            logger.warning(">>> asyncio.run() completed for queue processor")
+            # Use the main event loop (uvicorn's loop) so background asyncio tasks survive
+            if self._main_loop and self._main_loop.is_running():
+                future = asyncio.run_coroutine_threadsafe(
+                    self._process_simulation_queue_async(), self._main_loop
+                )
+                # Wait for the queue check to complete (not the simulation itself)
+                future.result(timeout=300)
+                logger.warning(">>> Queue processor completed on main event loop")
+            else:
+                # Fallback: no main loop available
+                logger.warning(">>> No main loop available, using asyncio.run() fallback")
+                asyncio.run(self._process_simulation_queue_async())
+                logger.warning(">>> asyncio.run() fallback completed")
 
         except Exception as e:
             logger.error(f"❌ Error processing simulation queue: {e}", exc_info=True)
@@ -1135,7 +1153,7 @@ class BackgroundSchedulerService:
                 task_id,
                 orchestrator,
                 scenario=task["scenario"],
-                duration_minutes=float(task.get("duration_minutes", 240.0)),
+                duration_minutes=float(task.get("duration_minutes", 3650.0)),
             )
             logger.warning(f">>> Simulation task completed")
 

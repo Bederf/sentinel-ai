@@ -14,6 +14,7 @@ import { Sun, Battery, Building2, Plug } from "lucide-react";
 import type { SolarOverview } from "../../lib/solarApi";
 import { fetchSolarOverview } from "../../lib/solarApi";
 import { isExpectedApiError } from "../../lib/api";
+import { useSimulation } from "../../contexts/SimulationContext";
 
 interface EnergyFlowDiagramProps {
   siteId: string;
@@ -31,6 +32,7 @@ interface FlowPath {
 export function EnergyFlowDiagram({ siteId }: EnergyFlowDiagramProps) {
   const [overview, setOverview] = useState<SolarOverview | null>(null);
   const [loading, setLoading] = useState(true);
+  const { running, solarEfficiency, simulatedHour } = useSimulation();
 
   const loadData = useCallback(async () => {
     try {
@@ -40,24 +42,23 @@ export function EnergyFlowDiagram({ siteId }: EnergyFlowDiagramProps) {
       if (!isExpectedApiError(err)) {
         console.error("Failed to load solar overview for flow diagram:", err);
       }
-      // Fallback to demo data
-      const demoData: SolarOverview = {
+      // Fallback: set Sandton specs so simulation can drive values
+      setOverview({
         site_id: siteId,
         site_name: "Solar Campus",
         installed_capacity_kwp: 3900,
-        current_generation_kw: 2450,
-        daily_yield_kwh: 18500,
+        current_generation_kw: 0,
+        daily_yield_kwh: 0,
         expected_daily_yield_kwh: 20000,
         performance_ratio: 0.92,
         bess_soc_percent: 65,
         bess_mode: "charging",
-        grid_import_kw: 150,
+        grid_import_kw: 0,
         grid_export_kw: 0,
         self_consumption_percent: 78,
-        estimated_savings_today_zar: 12350,
+        estimated_savings_today_zar: 0,
         plants: []
-      };
-      setOverview(demoData);
+      });
     } finally {
       setLoading(false);
     }
@@ -103,11 +104,39 @@ export function EnergyFlowDiagram({ siteId }: EnergyFlowDiagramProps) {
     typeof value === "number" && Number.isFinite(value) ? value : 0
   );
 
-  const currentGenerationKw = safeNumber(overview.current_generation_kw);
-  const gridExportKw = safeNumber(overview.grid_export_kw);
-  const gridImportKw = safeNumber(overview.grid_import_kw);
-  const bessSocPercent = safeNumber(overview.bess_soc_percent);
-  const bessMode = overview.bess_mode || "idle";
+  const installedCapacity = overview.installed_capacity_kwp || 3900;
+  let currentGenerationKw = safeNumber(overview.current_generation_kw);
+  let gridExportKw = safeNumber(overview.grid_export_kw);
+  let gridImportKw = safeNumber(overview.grid_import_kw);
+  let bessSocPercent = safeNumber(overview.bess_soc_percent);
+  let bessMode = overview.bess_mode || "idle";
+
+  // When simulation is running, compute flows from simulation context
+  if (running && solarEfficiency !== undefined) {
+    currentGenerationKw = Math.round((solarEfficiency / 100) * installedCapacity);
+    const buildingLoad = (simulatedHour >= 7 && simulatedHour <= 18) ? 1200 : 400;
+
+    if (currentGenerationKw > buildingLoad) {
+      // Excess solar: charge BESS first, then export remainder
+      const excess = currentGenerationKw - buildingLoad;
+      const bessCharge = Math.min(excess * 0.6, 500); // Up to 500 kW charge rate
+      gridExportKw = Math.round(excess - bessCharge);
+      gridImportKw = 0;
+      bessMode = "charging";
+      bessSocPercent = Math.min(95, 40 + simulatedHour * 3); // Rough charge curve
+    } else {
+      gridImportKw = Math.round(buildingLoad - currentGenerationKw);
+      gridExportKw = 0;
+      // BESS discharges during peak hours (17-21) if charged
+      if (simulatedHour >= 17 && simulatedHour <= 21 && bessSocPercent > 20) {
+        bessMode = "discharging";
+        bessSocPercent = Math.max(20, 80 - (simulatedHour - 17) * 15);
+      } else {
+        bessMode = currentGenerationKw > 0 ? "charging" : "idle";
+        bessSocPercent = simulatedHour < 6 ? 35 : Math.min(90, 40 + simulatedHour * 3);
+      }
+    }
+  }
 
   // Compute flows
   const solarToBuilding = Math.max(0, currentGenerationKw - gridExportKw);

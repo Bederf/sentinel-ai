@@ -33,6 +33,7 @@ from app.services.feedback_collection_service import (
 )
 from app.services.device_control_service import get_device_control_service
 from app.services.seasonal_modeler import SeasonalModeler
+from app.services.thermal_simulation_engine import update_simulation_temperatures
 from app.models.recommendation import (
     Recommendation,
     RecommendationStatus,
@@ -386,19 +387,21 @@ class LifecycleOrchestrator:
             self.seasonal_modeler = SeasonalModeler(seed=self._occupancy_seed)
             self.days_simulated = 0
             # Calculate time multiplier for 365-day simulation
-            # Default: 240 minutes = 4 hours real time for full year (1 day per ~20 real seconds)
+            # duration_minutes = real time in minutes (e.g., 120 min = 2 hours)
+            # total_hours = 365 * 24 = 8760 simulated hours
+            # Each simulated hour takes: (duration_minutes * 60) / 8760 seconds
             total_hours_annual = 365 * 24
-            self.time_multiplier = (duration_minutes / total_hours_annual) * 60.0  # seconds per simulated hour
+            self.time_multiplier = (duration_minutes * 60.0) / total_hours_annual  # seconds per simulated hour
             # Start on January 1st, 6am (year is arbitrary - Python will handle date math)
             self.simulated_time = datetime(2024, 1, 1, start_hour, 0, 0)
-            logger.info(f"Annual simulation initialized: {duration_minutes} min for full year (365 days)")
+            logger.info(f"Annual simulation initialized: {duration_minutes} min for full year (365 days), {self.time_multiplier:.3f}s per hour")
         else:
             # Daily simulation: just 24 hours
             self.seasonal_modeler = None
             # Calculate time multiplier for 24-hour simulation
             # duration_minutes for full 24 hours
-            # So 1 simulated hour = duration_minutes / 24 real minutes
-            self.time_multiplier = (duration_minutes / 24.0) * 60.0  # seconds per simulated hour
+            # Each simulated hour takes: (duration_minutes * 60) / 24 seconds
+            self.time_multiplier = (duration_minutes * 60.0) / 24.0  # seconds per simulated hour
             self.simulated_time = datetime.now().replace(hour=start_hour, minute=0, second=0, microsecond=0)
 
         self.real_start_time = datetime.now()
@@ -467,15 +470,14 @@ class LifecycleOrchestrator:
         if self.seasonal_modeler:
             current_date = self.simulated_time.date()
             current_season = self.seasonal_modeler.get_season_name(current_date)
+            current_hour = self.simulated_time.hour
 
-            # Get weather data
-            weather = self.seasonal_modeler.get_weather(current_date)
-            is_raining = weather.get("is_raining", False)
-            cloud_cover = weather.get("cloud_cover", 0)
-            ambient_temp = weather.get("temperature", 22.0)
+            # Get weather data using individual SeasonalModeler methods
+            is_raining = self.seasonal_modeler.should_rain_today(current_date)
+            cloud_cover = self.seasonal_modeler.get_cloud_cover_percent(current_date)
+            ambient_temp = self.seasonal_modeler.get_ambient_temperature(current_date, current_hour, is_raining)
 
             # Calculate solar efficiency based on time and weather
-            current_hour = self.simulated_time.hour
             if 6 <= current_hour < 18:  # Daytime
                 base_efficiency = 100 - (cloud_cover * 0.8)
                 if is_raining:
@@ -512,36 +514,37 @@ class LifecycleOrchestrator:
         }
 
     async def _run_simulation(self):
-        """Main simulation loop - Lightweight version with hourly event processing."""
+        """Main simulation loop - Advances hour-by-hour for entire 365-day year."""
         try:
             logger.warning(
-                f"[SIMULATION START] task_id={self.task_id}, is_annual={self.seasonal_modeler is not None}, days={self.days_simulated}, time_mult={self.time_multiplier}"
+                f"[SIMULATION START] task_id={self.task_id}, is_annual={self.seasonal_modeler is not None}, days={self.days_simulated}, time_mult={self.time_multiplier:.3f}s/hour"
             )
 
             is_annual = self.seasonal_modeler is not None
-            total_iterations = 8760 if is_annual else 24  # 365 days * 24 hours or 24 hours
+            total_iterations = (365 * 24) if is_annual else 24  # Hours: 8760 for annual, 24 for daily
             iteration = 0
-            last_hour = -1  # Track hour changes for event processing
             last_checkpoint_hour = -1  # Track checkpoint saves
 
             # Persistent loop: Run 365 days, then restart (loops until manually stopped)
             cycle_num = 1
             while self.running:
                 iteration += 1
+                current_hour = self.simulated_time.hour
 
                 # Log progress periodically
-                if iteration <= 10 or iteration % 500 == 0:
+                if iteration <= 10 or iteration % 100 == 0:
                     logger.warning(
-                        f"[SIMULATION CYCLE {cycle_num}] {iteration}/{total_iterations} (days={self.days_simulated}, hour={self.simulated_time.hour})"
+                        f"[SIMULATION CYCLE {cycle_num}] Hour {iteration}/{total_iterations} (day={self.days_simulated+1}, hour={current_hour:02d}:00)"
                     )
 
                 try:
-                    current_hour = self.simulated_time.hour
+                    # Pause support: hold on same hour
+                    if self.paused:
+                        await asyncio.sleep(0.1)
+                        continue
 
-                    # Process hour change - generate events for this hour
-                    if current_hour != last_hour:
-                        await self._process_hour(current_hour)
-                        last_hour = current_hour
+                    # Process events for this hour
+                    await self._process_hour(current_hour)
 
                     # Save checkpoint every 6 simulated hours for crash recovery
                     if is_annual and (current_hour % 6 == 0):
@@ -549,20 +552,19 @@ class LifecycleOrchestrator:
                             await self.save_checkpoint()
                             last_checkpoint_hour = current_hour
 
-                    # Advance time by 1 minute
-                    self.simulated_time += timedelta(minutes=1)
+                    # Advance time by 1 hour
+                    self.simulated_time += timedelta(hours=1)
 
-                    # Track day transitions
-                    if iteration > 1 and (iteration % 1440) == 0:  # Every 1440 minutes = 1 day
+                    # Track day transitions (every 24 hours)
+                    if iteration > 0 and (iteration % 24) == 0:  # Every 24 hours = 1 day
                         self.days_simulated += 1
                         if is_annual:
-                            logger.warning(f"[DAY COMPLETE] Day {self.days_simulated}/365")
+                            logger.warning(f"[DAY COMPLETE] Day {self.days_simulated}/365, progress={int((self.days_simulated/365)*100)}%")
                             # Update database with progress every day
                             await self._update_progress_to_db(iteration, total_iterations)
 
-                    # Sleep for the calculated time multiplier
-                    sleep_duration = self.time_multiplier / 60
-                    await asyncio.sleep(sleep_duration)
+                    # Sleep for the calculated time per simulated hour
+                    await asyncio.sleep(self.time_multiplier)
 
                 except asyncio.CancelledError:
                     logger.warning(f"[CANCELLED] iteration={iteration}, task was cancelled")
@@ -574,14 +576,13 @@ class LifecycleOrchestrator:
                 # Check if completed 365 days (one full cycle)
                 if iteration >= total_iterations:
                     logger.warning(
-                        f"[CYCLE {cycle_num} COMPLETE] Completed 365 days. Resetting for next cycle..."
+                        f"[CYCLE {cycle_num} COMPLETE] Completed {self.days_simulated} days. Resetting for next cycle..."
                     )
                     # Reset for next cycle
                     iteration = 0
                     self.days_simulated = 0
-                    self.simulated_time = datetime(2026, 1, 1, 0, 0, 0)  # Reset to Jan 1
+                    self.simulated_time = datetime(2024, 1, 1, 0, 0, 0)  # Reset to Jan 1
                     cycle_num += 1
-                    last_hour = -1
                     last_checkpoint_hour = -1
                     logger.warning(f"[CYCLE {cycle_num} START] Beginning persistent loop cycle {cycle_num}")
 
@@ -654,17 +655,9 @@ class LifecycleOrchestrator:
         elif hour == 8:
             await self._occupancy_increase()
 
-        # Mid-morning optimization
-        elif hour == 10:
-            await self._ai_optimization("mid_morning")
-
         # Peak load period
         elif hour == 11:
             await self._peak_load()
-
-        # Afternoon optimization
-        elif hour == 14:
-            await self._ai_optimization("afternoon")
 
         # Evening wind-down
         elif hour == 18:
@@ -673,6 +666,113 @@ class LifecycleOrchestrator:
         # Night mode
         elif hour == 22:
             await self._night_mode()
+
+        # === THERMAL UPDATE: Calculate and update zone temperatures ===
+        # This is called EVERY hour and updates sensor_readings with realistic thermal behavior
+        # 
+        # IMPORTANT: Equipment Health Degradation
+        # For NORMAL simulations (Grant/Bederf baseline): consider_equipment_health=False (default)
+        #   → Equipment stays healthy, HVAC always responds at full capacity
+        #
+        # For MAINTENANCE/FAULT simulations: consider_equipment_health=True
+        #   → HVAC response degrades with equipment health
+        #   → If chiller health = 50%, HVAC response reduced to 50%
+        #   → Zones won't reach setpoint during equipment failure
+        #   → Enables realistic modeling of cooling loss during faults
+        #
+        # To enable for a maintenance simulation:
+        #   1. Add parameter to update_simulation_temperatures() call below
+        #   2. Set consider_equipment_health=True
+        #   3. Run simulation with degraded equipment health in database
+        try:
+            # Generate occupancy data for all zones based on hour
+            occupancy_data = self._generate_occupancy_for_hour(hour)
+            
+            # Get ambient temperature from seasonal modeler
+            ambient_temp = self.seasonal_modeler.get_ambient_temperature(
+                self.simulated_time
+            ) if self.seasonal_modeler else 20.0
+            
+            # Determine if building is in night setback mode
+            is_night_mode = hour >= 22 or hour < 6
+            
+            # Update zone temperatures (writes to sensor_readings table)
+            # Also calculates HVAC power and daily costs
+            # For maintenance simulation, set consider_equipment_health=True
+            await update_simulation_temperatures(
+                building_id=self.building_id,
+                simulated_hour=hour,
+                occupancy_data=occupancy_data,
+                ambient_temp=ambient_temp,
+                is_night_mode=is_night_mode,
+                consider_equipment_health=False,  # Set to True for maintenance/fault simulations
+                simulated_date=self.simulated_time,  # For tariff band calculation
+            )
+        except Exception as e:
+            logger.warning(f"[THERMAL] Failed to update temperatures at hour {hour}: {e}")
+
+        # AI optimization runs every hour — creates recommendations when it finds improvements
+        await self._ai_optimization(f"hour_{hour}")
+
+    def _generate_occupancy_for_hour(self, hour: int) -> Dict[str, float]:
+        """
+        Generate zone occupancy percentages for all zones based on hour of day.
+        
+        Returns:
+            Dictionary mapping zone_id -> occupancy_percent (0-100)
+        """
+        from app.api.dali import calculate_zone_occupancy
+        
+        # Get day-of-week info
+        day_of_week = self.simulated_time.weekday()  # 0=Monday, 6=Sunday
+        is_weekend = day_of_week >= 5
+        
+        # Zone types and their typical occupancy patterns
+        zone_profiles = {
+            "Zone-001": "office",      # Level 0 Zone A - Office space
+            "Zone-002": "office",      # Level 0 Zone B
+            "Zone-003": "meeting",     # Level 0 Zone C - Meeting rooms
+            "Zone-004": "common",      # Level 0 Zone D - Common areas
+            "Zone-005": "entry",       # Level 0 Zone E - Reception/entry
+            "Zone-101": "office",      # Level 1 Zone A
+            "Zone-102": "office",      # Level 1 Zone B
+            "Zone-103": "meeting",     # Level 1 Zone C
+            "Zone-104": "common",      # Level 1 Zone D
+            "Zone-105": "entry",       # Level 1 Zone E
+            "Zone-201": "office",      # Level 2 Zone A
+            "Zone-202": "office",      # Level 2 Zone B
+            "Zone-203": "meeting",     # Level 2 Zone C
+            "Zone-204": "common",      # Level 2 Zone D
+            "Zone-205": "utility",     # Level 2 Zone E - Utility/server
+            "Zone-B1": "utility",      # Basement - HVAC & Power Plant
+            "Zone-L2-Plant": "utility",# L2 Mechanical Room
+            "Zone-R": "utility",       # Rooftop - Solar & Cooling
+        }
+        
+        occupancy_data = {}
+        
+        for zone_id, zone_type in zone_profiles.items():
+            # Calculate occupancy using existing dali logic
+            occupancy_pct = calculate_zone_occupancy(
+                hour=hour,
+                day_of_week=day_of_week,
+                is_weekend=is_weekend,
+                zone_type=zone_type
+            )
+            
+            # Apply seasonal variation if in annual simulation
+            if self.seasonal_modeler:
+                seasonal_factor = self._get_seasonal_occupancy_factor(hour)
+                occupancy_pct *= seasonal_factor
+            
+            # Add small random variation for realism (±5%)
+            variance = self._scenario_rng.uniform(0.95, 1.05)
+            occupancy_pct *= variance
+            
+            # Clamp to 0-100%
+            occupancy_data[zone_id] = max(0.0, min(100.0, occupancy_pct))
+        
+        return occupancy_data
 
     async def _building_wake(self):
         """Simulate building morning startup."""
@@ -686,8 +786,7 @@ class LifecycleOrchestrator:
             )
         )
 
-        # AI pre-cooling optimization
-        await self._ai_optimization("pre_cooling")
+        # AI optimization handled by hourly check in _process_hour
 
     async def _occupancy_increase(self):
         """Simulate morning occupancy increase with realistic day-to-day variation."""
@@ -1513,9 +1612,9 @@ class LifecycleOrchestrator:
             state_snapshot = self.serialize_state()
 
             # Update task in database with checkpoint
+            client = Supabase.instance()
             result = (
-                await Supabase.instance()
-                .client.table("lifecycle_simulation_tasks")
+                client.table("lifecycle_simulation_tasks")
                 .update(
                     {
                         "state_snapshot": state_snapshot,
