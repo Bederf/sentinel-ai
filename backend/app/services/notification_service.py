@@ -1,444 +1,282 @@
-"""Notification Service for sending escalation alerts via multiple channels.
+"""
+NotificationService — orchestrates multi-channel notification delivery.
 
-Handles email notifications, Slack alerts, dashboard notifications, and emergency
-notifications for the escalation system.
+Phase 102: Routes notifications to technicians via their enabled channels (Telegram, WhatsApp, SMS).
+Respects technician preferences: quiet hours, alert level thresholds, emergency override.
 """
 
 import logging
+from typing import Optional
+from uuid import UUID
 from datetime import datetime
-from typing import Dict, Any, List, Optional
-from pathlib import Path
 
-from app.models.autonomous_decision import EscalationEvent, EscalationLevel
-from app.config.settings import settings
+from .notification_providers import (
+    TelegramProvider,
+    WhatsAppProvider,
+    BulkSMSProvider,
+)
+from .notification_providers.base_provider import NotificationResult
+from ..models.notification import (
+    ChannelType,
+    AlertLevel,
+    NotificationStatus,
+    TechnicianNotificationChannel,
+    NotificationDeliveryLog,
+)
 
 logger = logging.getLogger(__name__)
 
-# Configuration file
-CONFIG_DIR = Path(__file__).parent.parent / "config"
-NOTIFICATION_CONFIG_FILE = CONFIG_DIR / "notifications.py"
-
 
 class NotificationService:
-    """Multi-channel notification service for escalation alerts."""
+    """Orchestrates multi-channel technician notification delivery."""
 
-    def __init__(self):
-        """Initialize the notification service."""
-        self.smtp_config: Dict[str, Any] = {}
-        self.slack_webhooks: Dict[str, str] = {}
-        self.email_recipients: List[str] = []
-        self.notification_history: List[Dict[str, Any]] = []
-        self._initialized = False
-
-    async def initialize(self, load_mock_data: bool = True) -> None:
-        """Initialize notification service with configuration."""
-        if self._initialized:
-            return
-
-        logger.info("Initializing NotificationService")
-
-        # Load configuration (from environment or config file)
-        await self._load_configuration()
-
-        self._initialized = True
-        logger.info("NotificationService initialized")
-
-    async def _load_configuration(self) -> None:
-        """Load notification configuration from environment variables."""
-        # Load SMTP configuration from environment
-        if settings.notification_smtp_host:
-            self.smtp_config = {
-                "host": settings.notification_smtp_host,
-                "port": settings.notification_smtp_port,
-                "username": settings.notification_smtp_username,
-                "password": settings.notification_smtp_password,
-                "use_tls": settings.notification_smtp_use_tls,
-            }
-            logger.info(f"Loaded SMTP configuration for {settings.notification_smtp_host}")
-        else:
-            logger.debug("No SMTP configuration found in environment")
-
-        # Load Slack webhooks from environment
-        if settings.notification_slack_webhook_critical:
-            self.slack_webhooks["critical"] = settings.notification_slack_webhook_critical
-            logger.info("Loaded critical Slack webhook configuration")
-
-        if settings.notification_slack_webhook_emergency:
-            self.slack_webhooks["emergency"] = settings.notification_slack_webhook_emergency
-            logger.info("Loaded emergency Slack webhook configuration")
-
-        # Load email recipients from environment
-        if settings.notification_email_recipients:
-            self.email_recipients = settings.notification_email_recipients
-            logger.info(f"Loaded {len(self.email_recipients)} email recipients")
-
-        # Demo mode fallback for development
-        if not self.smtp_config and not self.slack_webhooks and not self.email_recipients:
-            if settings.demo_mode:
-                logger.info("No notification configuration found - notifications disabled in demo mode")
-                logger.info("To enable notifications in demo mode, set NOTIFICATION_* environment variables")
-            else:
-                # Production mode - require configuration
-                logger.error("No notification configuration found in production mode")
-                logger.error("Please set NOTIFICATION_* environment variables to enable alerts")
-
-        logger.info("Loaded notification configuration")
-
-    async def send_email_alert(self, event: EscalationEvent) -> bool:
-        """
-        Send email alert for escalation event.
+    def __init__(self, technician_repository, notification_repository):
+        """Initialize with data access layers.
 
         Args:
-            event: Escalation event to alert about
-
-        Returns:
-            True if email sent successfully
+            technician_repository: Access to technician and channel data
+            notification_repository: Access to notification delivery logs
         """
-        if not self.email_recipients:
-            logger.warning("No email recipients configured")
-            return False
+        self.technician_repo = technician_repository
+        self.notification_repo = notification_repository
 
-        try:
-            # In production, this would send actual emails
-            # For demo purposes, log the email content
-            email_content = self._generate_email_content(event)
+        # Initialize providers
+        self.providers = {
+            ChannelType.TELEGRAM: TelegramProvider(),
+            ChannelType.WHATSAPP: WhatsAppProvider(),
+            ChannelType.SMS: BulkSMSProvider(),
+        }
 
-            logger.info(f"EMAIL ALERT ({event.escalation_level.name}):\n{email_content}")
-
-            # Add to notification history
-            self.notification_history.append({
-                "timestamp": datetime.now().isoformat(),
-                "channel": "email",
-                "escalation_id": event.id,
-                "level": event.escalation_level.name,
-                "recipients": self.email_recipients.copy(),
-                "content": email_content,
-            })
-
-            return True
-
-        except Exception as e:
-            logger.error(f"Error sending email alert: {e}")
-            return False
-
-    async def send_slack_alert(self, event: EscalationEvent) -> bool:
-        """
-        Send Slack notification for escalation event.
-
-        Args:
-            event: Escalation event to alert about
-
-        Returns:
-            True if Slack message sent successfully
-        """
-        try:
-            webhook_url = self.slack_webhooks.get("critical")
-            if not webhook_url:
-                logger.warning("No Slack webhook configured for critical alerts")
-                return False
-
-            # In production, this would send actual Slack message
-            slack_message = self._generate_slack_message(event)
-
-            logger.info(f"SLACK ALERT ({event.escalation_level.name}):\n{slack_message}")
-
-            # Add to notification history
-            self.notification_history.append({
-                "timestamp": datetime.now().isoformat(),
-                "channel": "slack",
-                "escalation_id": event.id,
-                "level": event.escalation_level.name,
-                "content": slack_message,
-            })
-
-            return True
-
-        except Exception as e:
-            logger.error(f"Error sending Slack alert: {e}")
-            return False
-
-    async def send_dashboard_alert(self, event: EscalationEvent, urgent: bool = False) -> bool:
-        """
-        Send dashboard notification for escalation event.
-
-        Args:
-            event: Escalation event to alert about
-            urgent: Whether this is an urgent alert
-
-        Returns:
-            True if dashboard notification sent successfully
-        """
-        try:
-            dashboard_message = self._generate_dashboard_message(event, urgent)
-
-            logger.info(f"DASHBOARD ALERT ({'URGENT' if urgent else 'NORMAL'}): \n{dashboard_message}")
-
-            # Add to notification history
-            self.notification_history.append({
-                "timestamp": datetime.now().isoformat(),
-                "channel": "dashboard",
-                "escalation_id": event.id,
-                "level": event.escalation_level.name,
-                "urgent": urgent,
-                "content": dashboard_message,
-            })
-
-            return True
-
-        except Exception as e:
-            logger.error(f"Error sending dashboard alert: {e}")
-            return False
-
-    async def send_emergency_notification(self, event: EscalationEvent) -> bool:
-        """
-        Send emergency notification via all channels.
-
-        Args:
-            event: Escalation event for emergency
-
-        Returns:
-            True if at least one notification sent successfully
-        """
-        try:
-            results = []
-
-            # Send to all channels
-            results.append(await self.send_email_alert(event))
-            results.append(await self.send_slack_alert(event))
-            results.append(await self.send_dashboard_alert(event, urgent=True))
-
-            success_count = sum(results)
-            logger.error(f"EMERGENCY NOTIFICATION sent via {success_count}/{len(results)} channels")
-
-            return success_count > 0
-
-        except Exception as e:
-            logger.error(f"Error sending emergency notification: {e}")
-            return False
-
-
-    async def send_escalation_email(
+    async def notify_technician(
         self,
-        to_email: str,
-        technician_name: str,
-        work_order_id: str,
-        equipment_code: str,
-        equipment_name: str,
-        health_score: Optional[float] = None,
-        reason: str = "Work order escalated to service provider",
-        notes: Optional[str] = None,
-        priority: str = "normal",
-    ) -> bool:
-        """
-        Send work order escalation email to service provider.
+        technician_id: UUID,
+        title: str,
+        body: str,
+        alert_level: AlertLevel = AlertLevel.WARNING,
+        work_order_id: Optional[UUID] = None,
+        notification_type: str = "work_order_assigned",
+    ) -> dict:
+        """Send notification to technician via enabled channels.
+
+        Respects technician preferences: quiet hours, alert thresholds, emergency override.
+        Sends simultaneously to ALL enabled channels (not cascade/fallback).
 
         Args:
-            to_email: Service provider email address
-            technician_name: Service provider name
-            work_order_id: Work order ID/code
-            equipment_code: Equipment code
-            equipment_name: Equipment name
-            health_score: Equipment health score (optional)
-            reason: Escalation reason
-            notes: Additional notes
-            priority: Work order priority
+            technician_id: UUID of technician to notify
+            title: Notification title
+            body: Notification body/message
+            alert_level: Severity level (info, warning, critical)
+            work_order_id: Associated work order ID (optional)
+            notification_type: Type of notification (work_order_assigned, alert, update, test)
 
         Returns:
-            True if email sent successfully
+            {
+                "success": bool,
+                "channels_sent": [ChannelType],
+                "channels_failed": [ChannelType],
+                "deliveries": [NotificationDeliveryLog],
+                "errors": {ChannelType: error_message},
+            }
         """
+        result = {
+            "success": True,
+            "channels_sent": [],
+            "channels_failed": [],
+            "deliveries": [],
+            "errors": {},
+        }
+
         try:
-            if not to_email:
-                logger.warning("No email address provided for escalation notification")
-                return False
+            # Fetch technician preferences
+            preferences = await self.technician_repo.get_notification_preferences(
+                technician_id
+            )
+            if not preferences:
+                logger.warning(f"No notification preferences found for technician {technician_id}")
+                result["success"] = False
+                result["errors"]["system"] = "No preferences configured"
+                return result
 
-            # Generate email content
-            subject = f"[SENTINEL] Work Order Escalation - {equipment_code} ({work_order_id})"
+            # Check if notification should be sent (respects quiet hours, alert levels)
+            if not preferences.should_notify_now(alert_level):
+                logger.info(
+                    f"Notification suppressed for technician {technician_id} "
+                    f"(quiet hours active, alert_level={alert_level})"
+                )
+                result["success"] = False
+                result["errors"]["system"] = "Notification suppressed by quiet hours"
+                return result
 
-            body = f"""Dear {technician_name},
+            # Fetch enabled channels
+            enabled_channels = await self.technician_repo.get_notification_channels(
+                technician_id,
+                channel_types=preferences.enabled_channels,
+            )
+            if not enabled_channels:
+                logger.warning(f"No notification channels configured for technician {technician_id}")
+                result["success"] = False
+                result["errors"]["system"] = "No channels configured"
+                return result
 
-Your service provider has been assigned to the following escalated work order:
+            # Send to all enabled channels simultaneously (not cascade)
+            delivery_tasks = []
+            for channel in enabled_channels:
+                task = self._send_to_channel(
+                    channel=channel,
+                    technician_id=technician_id,
+                    title=title,
+                    body=body,
+                    work_order_id=work_order_id,
+                    notification_type=notification_type,
+                )
+                delivery_tasks.append(task)
 
-WORK ORDER DETAILS:
-{'='*50}
-Work Order ID: {work_order_id}
-Equipment: {equipment_name} ({equipment_code})
-Priority: {priority.upper()}
-Escalation Reason: {reason}
-"""
-            if health_score is not None:
-                body += f"Equipment Health Score: {health_score}%\n"
+            # Execute all sends concurrently
+            deliveries = []
+            for channel_delivery in delivery_tasks:
+                channel_type, delivery_log, error = await channel_delivery
+                deliveries.append((channel_type, delivery_log, error))
 
-            if notes:
-                body += f"\nAdditional Notes:\n{notes}\n"
+            # Collect results
+            for channel_type, delivery_log, error in deliveries:
+                if error:
+                    result["channels_failed"].append(channel_type)
+                    result["errors"][channel_type] = error
+                else:
+                    result["channels_sent"].append(channel_type)
+                    result["deliveries"].append(delivery_log)
 
-            body += """
-NEXT STEPS:
-1. Review the work order details in the SENTINEL system
-2. Assess the equipment condition
-3. Update the work order with your findings
-4. Complete the service work or request additional information
-
-Please log in to the SENTINEL BMS to view the full work order details.
-
-Questions? Contact your operations team.
-
----
-This is an automated notification from the SENTINEL Building Management System.
-Work Order Escalation Notification
-"""
-
-            email_content = f"""Subject: {subject}
-
-{body}"""
-
-            # Log the email (in production, this would send via SMTP)
-            logger.info(f"ESCALATION EMAIL to {to_email}:\n{email_content}")
-
-            # Add to notification history
-            self.notification_history.append({
-                "timestamp": datetime.now().isoformat(),
-                "channel": "email",
-                "type": "escalation",
-                "work_order_id": work_order_id,
-                "equipment_code": equipment_code,
-                "recipient": to_email,
-                "reason": reason,
-                "content": email_content,
-            })
-
-            return True
+            # Overall success: at least one channel succeeded
+            result["success"] = bool(result["channels_sent"])
+            return result
 
         except Exception as e:
-            logger.error(f"Error sending escalation email: {e}")
-            return False
+            logger.error(f"NotificationService error for technician {technician_id}: {e}")
+            result["success"] = False
+            result["errors"]["system"] = str(e)
+            return result
 
-    def _generate_email_content(self, event: EscalationEvent) -> str:
-        """Generate email content for escalation event."""
-        subject = f"[SENTINEL] {event.escalation_level.name} Alert - {event.device_name}"
+    async def _send_to_channel(
+        self,
+        channel: TechnicianNotificationChannel,
+        technician_id: UUID,
+        title: str,
+        body: str,
+        work_order_id: Optional[UUID],
+        notification_type: str,
+    ) -> tuple:
+        """Send notification to single channel and log delivery.
 
-        body = f"""
-SENTINEL Building Management System - Escalation Alert
-{'='*50}
-
-Severity: {event.escalation_level.name}
-Device: {event.device_name} ({event.device_id})
-Point: {event.point_name}
-Current Value: {event.current_value}
-
-Boundaries:
-  Minimum: {event.boundary_min or 'N/A'}
-  Maximum: {event.boundary_max or 'N/A'}
-  Approach: {event.approach_percentage:.1f}%
-
-Warnings:
-"""
-
-        for warning in event.warnings:
-            body += f"  - {warning}\n"
-
-        body += f"""
-Event ID: {event.id}
-Timestamp: {event.timestamp.strftime('%Y-%m-%d %H:%M:%S')}
-
-Please review and take appropriate action.
-
----
-This is an automated alert from the SENTINEL Autonomous Building Management System.
-"""
-
-        return f"Subject: {subject}\n\n{body}"
-
-    def _generate_slack_message(self, event: EscalationEvent) -> str:
-        """Generate Slack message for escalation event."""
-        emoji_map = {
-            EscalationLevel.WARNING: ":warning:",
-            EscalationLevel.ALERT: ":exclamation:",
-            EscalationLevel.CRITICAL: ":rotating_light:",
-            EscalationLevel.EMERGENCY: ":fire:",
-        }
-
-        emoji = emoji_map.get(event.escalation_level, ":question:")
-
-        message = f"""{emoji} *SENTINEL ALERT: {event.escalation_level.name}*
-
-*Device:* {event.device_name}
-*Point:* {event.point_name}
-*Value:* {event.current_value} ({event.approach_percentage:.1f}% of limit)
-
-"""
-
-        if event.warnings:
-            message += "*Warnings:*\n"
-            for warning in event.warnings:
-                message += f"• {warning}\n"
-
-        message += f"""\n*Event ID:* `{event.id}`\n*Time:* <!date^{int(event.timestamp.timestamp())}^{{date_num}} {{time_secs}}|{event.timestamp.strftime('%Y-%m-%d %H:%M:%S')}>
-
-:chart_with_upwards_trend: <View Dashboard|http://localhost:5173/dashboard>
-:rescue_worker_helmet: <Acknowledge Alert|http://localhost:5173/escalations/{event.id}/acknowledge>
-"""
-
-        return message
-
-    def _generate_dashboard_message(self, event: EscalationEvent, urgent: bool = False) -> Dict[str, Any]:
-        """Generate dashboard notification message."""
-        return {
-            "id": event.id,
-            "timestamp": event.timestamp.isoformat(),
-            "level": event.escalation_level.name,
-            "urgent": urgent,
-            "device": {
-                "id": event.device_id,
-                "name": event.device_name,
-            },
-            "point": event.point_name,
-            "value": event.current_value,
-            "boundary": {
-                "min": event.boundary_min,
-                "max": event.boundary_max,
-            },
-            "approach_percentage": event.approach_percentage,
-            "warnings": event.warnings,
-            "acknowledged": event.acknowledged,
-        }
-
-    async def update_configuration(self, config: Dict[str, Any]) -> bool:
+        Returns:
+            (channel_type, delivery_log, error_message)
         """
-        Update notification service configuration.
+        channel_type = channel.channel_type
+        recipient_identifier = channel.get_contact_identifier()
+
+        # Get provider for this channel
+        provider = self.providers.get(channel_type)
+        if not provider:
+            error_msg = f"Provider not found for channel {channel_type}"
+            logger.error(error_msg)
+            return (channel_type, None, error_msg)
+
+        # Check if provider is enabled
+        if not provider.is_enabled():
+            error_msg = f"Provider {provider.provider_name} not configured"
+            logger.warning(error_msg)
+            return (channel_type, None, error_msg)
+
+        # Create delivery log entry (initial state: PENDING)
+        delivery_log = NotificationDeliveryLog(
+            id=UUID(int=0),  # Will be set by repository
+            work_order_id=work_order_id,
+            technician_id=technician_id,
+            notification_type=notification_type,
+            title=title,
+            body=body,
+            channel_type=channel_type,
+            recipient_identifier=recipient_identifier,
+            status=NotificationStatus.PENDING,
+            provider=provider.provider_name,
+        )
+
+        try:
+            # Send via provider
+            notification_result: NotificationResult = await provider.send(
+                recipient=recipient_identifier,
+                title=title,
+                body=body,
+            )
+
+            # Update delivery log with result
+            if notification_result.success:
+                delivery_log.status = NotificationStatus.SENT
+                delivery_log.external_message_id = notification_result.message_id
+                delivery_log.sent_at = datetime.utcnow()
+                delivery_log.provider_response = notification_result.provider_response or {}
+                logger.info(
+                    f"Notification sent to {channel_type} for technician {technician_id} "
+                    f"(provider: {provider.provider_name})"
+                )
+                error = None
+            else:
+                delivery_log.status = NotificationStatus.FAILED
+                delivery_log.error_code = notification_result.error_code
+                delivery_log.error_message = notification_result.error_message
+                delivery_log.provider_response = notification_result.provider_response or {}
+                error = notification_result.error_message
+                logger.warning(
+                    f"Notification send failed for {channel_type} to technician {technician_id}: {error}"
+                )
+
+            # Persist delivery log
+            await self.notification_repo.create_delivery_log(delivery_log)
+            return (channel_type, delivery_log, error)
+
+        except Exception as e:
+            delivery_log.status = NotificationStatus.FAILED
+            delivery_log.error_code = "exception"
+            delivery_log.error_message = str(e)
+            logger.error(
+                f"Error sending notification to {channel_type} for technician {technician_id}: {e}"
+            )
+            await self.notification_repo.create_delivery_log(delivery_log)
+            return (channel_type, delivery_log, str(e))
+
+    async def test_provider_connection(self, channel_type: ChannelType) -> bool:
+        """Test if a provider is configured and reachable.
 
         Args:
-            config: Configuration dictionary with email, slack settings
+            channel_type: Channel to test (TELEGRAM, WHATSAPP, SMS)
 
         Returns:
-            True if configuration updated successfully
+            True if provider is ready, False otherwise
         """
-        try:
-            if "smtp" in config:
-                self.smtp_config.update(config["smtp"])
-            if "slack_webhooks" in config:
-                self.slack_webhooks.update(config["slack_webhooks"])
-            if "email_recipients" in config:
-                self.email_recipients = config["email_recipients"]
-
-            logger.info("Notification configuration updated")
-            return True
-
-        except Exception as e:
-            logger.error(f"Error updating notification configuration: {e}")
+        provider = self.providers.get(channel_type)
+        if not provider:
+            logger.error(f"No provider found for channel {channel_type}")
             return False
 
-    async def get_notification_history(self, limit: int = 100) -> List[Dict[str, Any]]:
-        """Get notification history."""
-        return self.notification_history[-limit:]
+        try:
+            return await provider.test_connection()
+        except Exception as e:
+            logger.error(f"Provider test failed for {channel_type}: {e}")
+            return False
 
-    def get_active_channels(self) -> Dict[str, bool]:
-        """Get status of active notification channels."""
+    def get_provider_status(self) -> dict:
+        """Get configuration and readiness status of all providers.
+
+        Returns:
+            {
+                "telegram": {"enabled": bool, "name": str},
+                "whatsapp": {"enabled": bool, "name": str},
+                "sms": {"enabled": bool, "name": str},
+            }
+        """
         return {
-            "email": len(self.email_recipients) > 0,
-            "slack": len(self.slack_webhooks) > 0,
-            "dashboard": True,  # Always available
+            channel.value: {
+                "enabled": self.providers[channel].is_enabled(),
+                "name": self.providers[channel].provider_name,
+            }
+            for channel in ChannelType
         }
-
-
-# Global instance
-notification_service = NotificationService()
