@@ -114,7 +114,7 @@ export function SimulationTimeIndicator({
       <span className="tabular-nums font-bold text-sm">{timeDisplay}</span>
       <span className="opacity-80">D{daysSimulated}/365</span>
       <span className="opacity-80">{seasonEmoji} {currentSeason}</span>
-      <span className="opacity-80">{ambientTemp?.toFixed(0)}\u00B0C</span>
+      <span className="opacity-80">{ambientTemp?.toFixed(0)}°C</span>
     </div>
   );
 }

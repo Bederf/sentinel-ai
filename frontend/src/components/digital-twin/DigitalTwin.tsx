@@ -24,7 +24,7 @@ import { useZoneBounds } from '@/hooks/useZoneBounds';
 import {
   distributeEquipmentInZone,
   extractFloor,
-  extractZoneLetter,
+  extractZoneNumber,
   generateSyntheticZoneBounds,
   type EquipmentPosition,
 } from '@/utils/equipmentPositioning';
@@ -266,7 +266,7 @@ export function DigitalTwin() {
   const equipmentPositions = useMemo(() => {
     const positions = new Map<string, EquipmentPosition>();
 
-    // Group equipment by zone key (Zone-{floor}-{direction})
+    // Group equipment by zone key (Zone-{floor}-{zoneNum})
     const byZone: Record<string, typeof filteredEquipment> = {};
     const floorsNeeded = new Set<string>();
 
@@ -274,8 +274,8 @@ export function DigitalTwin() {
       const code = (eq as any).code || eq.id || '';
       const floor = extractFloor(code);
       const normalizedFloor = floor === 'G' ? 'L0' : floor;
-      const zone = extractZoneLetter(code); // Returns N/E/S/W/C
-      const zoneKey = `Zone-${normalizedFloor}-${zone}`;
+      const zoneNum = extractZoneNumber(code); // Returns 0-99
+      const zoneKey = `Zone-${normalizedFloor}-${zoneNum}`;
 
       if (!byZone[zoneKey]) byZone[zoneKey] = [];
       byZone[zoneKey].push(eq);

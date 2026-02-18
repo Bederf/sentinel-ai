@@ -154,7 +154,15 @@ function App() {
   const handleShowRecCard = useCallback((rec: any) => setSelectedRec(rec), []);
   const handleApproveRec = useCallback(async (id: string) => {
     try {
-      await fetch(`/api/recommendations/${id}/approve`, { method: 'POST' });
+      const token = localStorage.getItem('sentinel_token');
+      await fetch(`/api/approvals/recommendations/${id}/approve`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token || ''}`,
+        },
+        body: JSON.stringify({ approved_by: 'dashboard' }),
+      });
     } catch (e) { /* silent */ }
     setSelectedRec(null);
   }, []);
@@ -871,7 +879,7 @@ function App() {
 
       {/* Toast notifications */}
       <Toaster
-        position="top-right"
+        position="bottom-left"
         toastOptions={{
           style: {
             background: "var(--color-sentinel-bg-panel)",

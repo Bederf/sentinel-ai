@@ -59,15 +59,17 @@ export const optimizationApi = {
       { method: 'POST', body: JSON.stringify(filters) }
     ),
 
-  approve: (recId: string, reason: string) =>
-    fetchApi(`/api/recommendations/${recId}/approve`, {
+  // Use approvalsApi for actual approval workflow (Tier 2)
+  // These are deprecated - use approvalsApi.approveRecommendation instead
+  approve: (recId: string, approvedBy: string) =>
+    fetchApi(`/api/approvals/recommendations/${recId}/approve`, {
       method: 'POST',
-      body: JSON.stringify({ reason }),
+      body: JSON.stringify({ approved_by: approvedBy }),
     }),
 
-  reject: (recId: string, reason: string) =>
-    fetchApi(`/api/recommendations/${recId}/reject`, {
+  reject: (recId: string, rejectedBy: string, reason: string) =>
+    fetchApi(`/api/approvals/recommendations/${recId}/reject`, {
       method: 'POST',
-      body: JSON.stringify({ reason }),
+      body: JSON.stringify({ rejected_by: rejectedBy, reason }),
     }),
 }

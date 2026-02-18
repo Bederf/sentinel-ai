@@ -843,7 +843,7 @@ export function Dashboard({ onViewChange, openCardLibrary, onCardLibraryClose, u
             <EnergyChart
               data={energyData}
               loading={energyLoading}
-              selectedSiteId={selectedSiteId}
+              selectedSiteId={energyFilterSiteId}
               days={selectedDays}
             />
           </div>

@@ -9,7 +9,7 @@
  * Add-on items can be reordered with up/down arrows (persisted in localStorage).
  */
 
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import {
   Menu,
   X,
@@ -51,6 +51,7 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
   const [isMobile, setIsMobile] = useState(false);
 
   const { isModuleActive, activeModules } = useModules();
+  const aboutBtnRef = useRef<HTMLDivElement>(null);
 
   // Detect mobile screen size
   useEffect(() => {
@@ -492,6 +493,7 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
 
           {/* About Section */}
           <div
+            ref={aboutBtnRef}
             className="mt-4 pt-4 mx-3 relative"
             style={{ borderTop: "1px solid var(--color-grafana-border)" }}
           >
@@ -511,11 +513,11 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
                 }}
               />
               <span className={`font-medium text-sm ${isCollapsed ? "hidden" : "block"} flex-1 text-left`}>About</span>
-              {isAboutOpen ? (
-                <ChevronDown className={`h-4 w-4 ${isCollapsed ? "hidden" : "block"}`} />
+              {!isCollapsed && (isAboutOpen ? (
+                <ChevronDown className="h-4 w-4" />
               ) : (
-                <ChevronRight className={`h-4 w-4 ${isCollapsed ? "hidden" : "block"}`} />
-              )}
+                <ChevronRight className="h-4 w-4" />
+              ))}
             </button>
 
             {/* Expandable about section */}
@@ -523,9 +525,13 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
               <div
                 className={`mt-2 md:block ${
                   isCollapsed
-                    ? "absolute left-full top-0 z-50 ml-3 w-72"
+                    ? "fixed z-50 w-72 max-h-96 overflow-y-auto"
                     : "relative"
                 }`}
+                style={isCollapsed && aboutBtnRef.current ? {
+                  left: aboutBtnRef.current.getBoundingClientRect().right + 12,
+                  bottom: Math.max(8, window.innerHeight - aboutBtnRef.current.getBoundingClientRect().bottom),
+                } : undefined}
               >
                 <div
                   className="rounded p-3 text-xs space-y-3"

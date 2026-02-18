@@ -120,14 +120,14 @@ export function SimulationProvider({ children, siteId = 'site-002' }: Simulation
     }
   }, [siteId])
 
-  // Poll every 50s for ~2-hour jumps at 3650min compression (25s/hour)
+  // Poll every 25s for ~1-hour jumps at 3650min compression (25s/hour)
   // 1 simulated day = 10 real minutes
   useEffect(() => {
     // Initial fetch
     refresh()
 
-    // Set up polling interval (50s ≈ 2 simulated hours at 10min/day)
-    const interval = setInterval(refresh, 50000)
+    // Set up polling interval (25s ≈ 1 simulated hour at 10min/day)
+    const interval = setInterval(refresh, 25000)
 
     return () => clearInterval(interval)
   }, [refresh])

@@ -108,6 +108,46 @@ export function ModuleProvider({
     }
   }, [siteId, loadSiteData]);
 
+  // Retry loading modules if initial load failed (e.g. backend was offline)
+  useEffect(() => {
+    if (!siteId || activeModules.length > 0 || !error) return;
+
+    let retryCount = 0;
+    let cancelled = false;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    const retry = () => {
+      if (cancelled || retryCount >= 5) return;
+      const delay = Math.min(3000 * Math.pow(2, retryCount), 30000);
+      timeoutId = setTimeout(async () => {
+        if (cancelled) return;
+        retryCount++;
+        try {
+          const [modules, summary] = await Promise.all([
+            moduleRegistryApi.getActiveModules(siteId),
+            moduleRegistryApi.getIntegrationSummary(siteId),
+          ]);
+          if (!cancelled && modules.length > 0) {
+            setActiveModules(modules);
+            setIntegrationSummary(summary);
+            setError(null);
+          } else if (!cancelled) {
+            retry();
+          }
+        } catch {
+          if (!cancelled) retry();
+        }
+      }, delay);
+    };
+
+    retry();
+
+    return () => {
+      cancelled = true;
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [siteId, activeModules.length, error]);
+
   // Poll recommendations
   useEffect(() => {
     if (!siteId) return;

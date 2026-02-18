@@ -1,11 +1,14 @@
 /**
  * Equipment positioning algorithms for Digital Twin visualization
  *
- * Provides adaptive grid-based distribution of equipment within zones
- * to avoid clustering at zone centroids.
+ * Provides zone-grid-based distribution of equipment within building zones.
+ * S002 equipment codes encode floor in the zone number:
+ *   001-099 = L0 (Ground), 100-199 = L1, 200-299 = L2
+ * Plant equipment has explicit floor markers: S002-CHILLER-B1-001
  */
 
 import type { Equipment } from '@/lib/api/sites';
+import { extractFloorFromCode } from '@/utils/floorExtraction';
 
 export interface ZoneBounds {
   minX: number;
@@ -25,46 +28,71 @@ export interface EquipmentPosition {
 }
 
 /**
- * Extract floor code from equipment ID
- * Example: S002-CHILLER-B1-001 → "B1"
+ * Extract floor code from equipment code.
+ * Delegates to floorExtraction.ts which handles:
+ *   S002-VAV-204    → zone 204 → L2
+ *   S002-CHILLER-B1-001 → B1
+ *   S002-INV-R-002  → R
  */
 export function extractFloor(code: string): string {
-  const match = code.match(/-(B\d|G|L\d+|R)-/i);
-  return match ? match[1].toUpperCase() : 'L0';
+  return extractFloorFromCode(code) || 'L0';
 }
 
 /**
- * Desk zones use compass directions: N, S, E, W, C
- * Equipment zones use numeric IDs mapped to 5 groups.
- * This maps the 5 equipment zone groups to compass directions
- * matching the desk zone_id convention (Zone-L1-N, Zone-L1-S, etc.)
- */
-const ZONE_INDEX_TO_COMPASS = ['N', 'E', 'S', 'W', 'C'] as const;
-
-/**
- * Extract zone direction from equipment code
- * Maps to compass directions (N/E/S/W/C) to match desk zone_id format.
+ * Extract the zone number from an S002 equipment code.
+ * Returns the floor-relative zone index (0-based within that floor).
  *
- * Example: S002-VAV-101 → zone index (101-1)%5=0 → "N"
- * Example: S002-CHILLER-B1-A → "N" (A→N, B→E, C→S, D→W, E→C)
+ * Examples:
+ *   S002-VAV-204       → zone 204, floor-relative = 4
+ *   S002-LUM-101-08    → zone 101, floor-relative = 1
+ *   S002-FCU-015       → zone 15,  floor-relative = 15
+ *   S002-CHILLER-B1-001 → seq 1,   floor-relative = 1
+ *   S002-DALI-001      → 1,        floor-relative = 1
  */
-export function extractZoneLetter(code: string): string {
-  // Letter suffix (A-E) → compass
-  const letterMatch = code.match(/-([A-E])$/i);
-  if (letterMatch) {
-    const idx = letterMatch[1].toUpperCase().charCodeAt(0) - 65; // A=0, B=1, ...
-    return ZONE_INDEX_TO_COMPASS[idx] || 'C';
+export function extractZoneNumber(code: string): number {
+  if (!code) return 0;
+
+  // S002-TYPE-ZONE or S002-TYPE-ZONE-FIXTURE
+  // The zone number is always the 3rd segment for S002
+  const parts = code.split('-');
+  if (parts.length >= 3 && parts[0] === 'S002') {
+    // Check if 3rd part is a number (zone-based equipment)
+    const thirdPart = parseInt(parts[2], 10);
+    if (!isNaN(thirdPart)) {
+      // Floor-relative zone: strip the floor hundreds digit
+      return thirdPart % 100;
+    }
+
+    // Plant equipment: S002-TYPE-FLOOR-SEQ (e.g., S002-CHILLER-B1-001)
+    // Use the sequence number as zone
+    if (parts.length >= 4) {
+      const fourthPart = parseInt(parts[3], 10);
+      if (!isNaN(fourthPart)) return fourthPart;
+    }
   }
 
-  // Numeric suffix → compass via modulo 5
+  // Fallback: last numeric segment
   const numMatch = code.match(/-(\d+)$/);
-  if (numMatch) {
-    const idx = (parseInt(numMatch[1], 10) - 1) % 5;
-    return ZONE_INDEX_TO_COMPASS[idx] || 'C';
-  }
+  if (numMatch) return parseInt(numMatch[1], 10) % 100;
 
-  return 'C'; // default: center zone
+  return 0;
 }
+
+/**
+ * Build a zone key for grouping equipment.
+ * Returns "Zone-{floor}-{zoneNum}" for zone-grid placement.
+ */
+export function buildZoneKey(code: string): string {
+  const floor = extractFloor(code);
+  const zoneNum = extractZoneNumber(code);
+  return `Zone-${floor}-${zoneNum}`;
+}
+
+// Keep backward compat export
+export const extractZoneLetter = (code: string): string => {
+  const zoneNum = extractZoneNumber(code);
+  return String(zoneNum);
+};
 
 /**
  * Clamp value to [min, max] range
@@ -74,21 +102,19 @@ export function clamp(val: number, min: number, max: number): number {
 }
 
 /**
- * Add random jitter to a value
- * @param value Base value
- * @param maxJitterPercent Jitter as percentage of magnitude (0-1)
- * @returns Jittered value
+ * Add seeded jitter based on zone number for deterministic placement.
+ * Uses a simple hash so positions don't jump on re-render.
  */
-export function addJitter(value: number, maxJitterPercent: number = 0.1): number {
+export function addJitter(value: number, maxJitterPercent: number = 0.1, seed: number = 0): number {
+  // Simple seeded pseudo-random
+  const hash = Math.sin(seed * 9301 + 49297) * 49297;
+  const rand = hash - Math.floor(hash); // 0..1
   const jitterAmount = Math.abs(value) * maxJitterPercent;
-  return value + (Math.random() - 0.5) * 2 * jitterAmount;
+  return value + (rand - 0.5) * 2 * jitterAmount;
 }
 
 /**
  * Calculate zone bounds from desk coordinates
- * @param xs Array of X coordinates
- * @param zs Array of Z coordinates
- * @returns Zone bounds with min/max/center/dimensions
  */
 export function calculateZoneBoundsFromCoords(xs: number[], zs: number[]): ZoneBounds | null {
   if (xs.length === 0 || zs.length === 0) return null;
@@ -105,25 +131,13 @@ export function calculateZoneBoundsFromCoords(xs: number[], zs: number[]): ZoneB
     maxZ,
     centerX: (minX + maxX) / 2,
     centerZ: (minZ + maxZ) / 2,
-    width: maxX - minX || 2, // Minimum width to avoid division by zero
-    depth: maxZ - minZ || 2, // Minimum depth
+    width: maxX - minX || 2,
+    depth: maxZ - minZ || 2,
   };
 }
 
 /**
  * Distribute equipment evenly within a zone using adaptive grid layout
- *
- * Algorithm:
- * 1. For single item: place at zone center
- * 2. For multiple items: calculate grid dimensions (cols = sqrt(N))
- * 3. Calculate grid spacing (60% of zone dimensions with margins)
- * 4. Place equipment in grid pattern with ±10% jitter for natural look
- * 5. Clamp to building bounds to prevent escaping
- *
- * @param equipment Array of equipment items to distribute
- * @param zoneBounds Zone boundaries calculated from desk positions
- * @param floorY Y-position for the equipment (floor height)
- * @returns Map of equipment.id → EquipmentPosition
  */
 export function distributeEquipmentInZone(
   equipment: Equipment[],
@@ -146,24 +160,20 @@ export function distributeEquipmentInZone(
   }
 
   // Multiple items → adaptive grid
-  // Calculate grid dimensions: cols = ceil(sqrt(N)), rows = ceil(N/cols)
   const cols = Math.ceil(Math.sqrt(count));
   const rows = Math.ceil(count / cols);
 
-  // Calculate spacing: use 60% of zone dimensions to leave margins
-  const usableWidth = zoneBounds.width * 0.6;
-  const usableDepth = zoneBounds.depth * 0.6;
+  const usableWidth = zoneBounds.width * 0.7;
+  const usableDepth = zoneBounds.depth * 0.7;
 
   const spacingX = usableWidth / (cols + 1);
   const spacingZ = usableDepth / (rows + 1);
 
-  // Starting position (center the grid within zone)
   const marginX = (zoneBounds.width - usableWidth) / 2;
   const marginZ = (zoneBounds.depth - usableDepth) / 2;
   const startX = zoneBounds.minX + marginX + spacingX;
   const startZ = zoneBounds.minZ + marginZ + spacingZ;
 
-  // Distribute equipment
   equipment.forEach((eq, idx) => {
     const col = idx % cols;
     const row = Math.floor(idx / cols);
@@ -171,11 +181,10 @@ export function distributeEquipmentInZone(
     let x = startX + col * spacingX;
     let z = startZ + row * spacingZ;
 
-    // Add jitter (±10% of spacing) for natural look
-    x = addJitter(x, 0.1);
-    z = addJitter(z, 0.1);
+    // Seeded jitter for deterministic placement
+    x = addJitter(x, 0.08, idx * 7 + 1);
+    z = addJitter(z, 0.08, idx * 13 + 3);
 
-    // Clamp to building bounds (-14..14 for X, -9..9 for Z)
     x = clamp(x, -14, 14);
     z = clamp(z, -9, 9);
 
@@ -186,33 +195,61 @@ export function distributeEquipmentInZone(
 }
 
 /**
- * Generate synthetic zone bounds for floors without desk data (e.g., B1, R).
- * Creates 5 compass zones (N/E/S/W/C) evenly distributed across the building footprint.
- * Building footprint: X [-14..14], Z [-9..9]
+ * Generate zone bounds for a floor using a grid layout.
+ * Creates up to 25 zone cells (5 cols × 5 rows) across the building footprint.
+ * Building footprint: X [-14..14] (28m), Z [-9..9] (18m)
+ *
+ * Zone numbers 0-24 map to grid positions:
+ *   Row 0 (Z top):    zones 0-4
+ *   Row 1:            zones 5-9
+ *   Row 2 (center):   zones 10-14
+ *   Row 3:            zones 15-19
+ *   Row 4 (Z bottom): zones 20-24
+ */
+const GRID_COLS = 5;
+const GRID_ROWS = 5;
+const BUILDING_MIN_X = -14;
+const BUILDING_MAX_X = 14;
+const BUILDING_MIN_Z = -9;
+const BUILDING_MAX_Z = 9;
+const CELL_WIDTH = (BUILDING_MAX_X - BUILDING_MIN_X) / GRID_COLS;   // 5.6m
+const CELL_DEPTH = (BUILDING_MAX_Z - BUILDING_MIN_Z) / GRID_ROWS;   // 3.6m
+
+function makeZoneBounds(col: number, row: number): ZoneBounds {
+  const minX = BUILDING_MIN_X + col * CELL_WIDTH;
+  const maxX = minX + CELL_WIDTH;
+  const minZ = BUILDING_MIN_Z + row * CELL_DEPTH;
+  const maxZ = minZ + CELL_DEPTH;
+  return {
+    minX, maxX, minZ, maxZ,
+    centerX: (minX + maxX) / 2,
+    centerZ: (minZ + maxZ) / 2,
+    width: CELL_WIDTH,
+    depth: CELL_DEPTH,
+  };
+}
+
+/**
+ * Generate synthetic zone bounds for a floor.
+ * Maps zone numbers (0-99) to grid cells across the building footprint.
+ * Zone number → grid position: col = zoneNum % GRID_COLS, row = floor(zoneNum / GRID_COLS) % GRID_ROWS
  */
 export function generateSyntheticZoneBounds(floorCode: string): Record<string, ZoneBounds> {
   const bounds: Record<string, ZoneBounds> = {};
 
-  // 5 zones: N (top), S (bottom), E (right), W (left), C (center)
-  const zones: Record<string, { minX: number; maxX: number; minZ: number; maxZ: number }> = {
-    N: { minX: -8, maxX: 8, minZ: -9, maxZ: -3 },
-    S: { minX: -8, maxX: 8, minZ: 3, maxZ: 9 },
-    E: { minX: 4, maxX: 14, minZ: -4, maxZ: 4 },
-    W: { minX: -14, maxX: -4, minZ: -4, maxZ: 4 },
-    C: { minX: -5, maxX: 5, minZ: -4, maxZ: 4 },
-  };
+  // Generate bounds for zones 0-24 (covering 5×5 grid)
+  for (let zn = 0; zn < GRID_COLS * GRID_ROWS; zn++) {
+    const col = zn % GRID_COLS;
+    const row = Math.floor(zn / GRID_COLS) % GRID_ROWS;
+    bounds[`Zone-${floorCode}-${zn}`] = makeZoneBounds(col, row);
+  }
 
-  for (const [dir, rect] of Object.entries(zones)) {
-    bounds[`Zone-${floorCode}-${dir}`] = {
-      minX: rect.minX,
-      maxX: rect.maxX,
-      minZ: rect.minZ,
-      maxZ: rect.maxZ,
-      centerX: (rect.minX + rect.maxX) / 2,
-      centerZ: (rect.minZ + rect.maxZ) / 2,
-      width: rect.maxX - rect.minX,
-      depth: rect.maxZ - rect.minZ,
-    };
+  // Also add some higher zone numbers that wrap around
+  // (handles zones like 50, 60 etc. that exceed 25)
+  for (let zn = 25; zn < 100; zn++) {
+    const col = zn % GRID_COLS;
+    const row = Math.floor(zn / GRID_COLS) % GRID_ROWS;
+    bounds[`Zone-${floorCode}-${zn}`] = makeZoneBounds(col, row);
   }
 
   return bounds;

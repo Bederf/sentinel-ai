@@ -35,7 +35,7 @@ export const RecommendationsDashboard: React.FC<
 
   const handleApprove = async (recId: string) => {
     try {
-      await optimizationApi.approve(recId, 'User approved')
+      await optimizationApi.approve(recId, 'dashboard')
       setRecommendations((recs) =>
         recs.filter((r) => r.id !== recId)
       )
@@ -53,7 +53,7 @@ export const RecommendationsDashboard: React.FC<
     }
 
     try {
-      await optimizationApi.reject(recId, rejectionReason)
+      await optimizationApi.reject(recId, 'dashboard', rejectionReason)
       setRecommendations((recs) =>
         recs.filter((r) => r.id !== recId)
       )
