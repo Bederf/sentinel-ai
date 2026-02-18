@@ -10,7 +10,6 @@ import { NotificationSettings } from "./NotificationSettings";
 import { NotificationChannelsSettings } from "./NotificationChannelsSettings";
 import { ThemeSwitcher } from "./ThemeSwitcher";
 import { useModules } from "../contexts/ModuleHooks";
-import { useState } from "react";
 import type { ModuleType } from "../lib/moduleRegistry";
 
 interface SettingsProps {

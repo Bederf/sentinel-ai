@@ -5,6 +5,7 @@
  */
 
 import { fetchApi } from './client';
+import { sitesBatcher } from './batchers';
 
 // ============= Site & Building Types =============
 
@@ -152,10 +153,14 @@ export const sitesApi = {
     fetchApi<SiteListResponse>("/api/sites"),
 
   /**
-   * Get single site
+   * Get single site (batched to prevent 429 rate limit errors)
+   *
+   * Multiple simultaneous getSite calls are automatically batched and sent
+   * in a single POST /api/sites/batch request, preventing rate limiting
+   * when many dashboard components load site data simultaneously.
    */
   getSite: (siteId: string) =>
-    fetchApi<Site>(`/api/sites/${siteId}`),
+    sitesBatcher(siteId),
 
   /**
    * Create new site

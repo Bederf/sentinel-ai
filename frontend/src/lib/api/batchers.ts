@@ -39,3 +39,17 @@ export const conditionBatcher = createBatchAggregator<DeviceCondition>(
     maxBatchSize: 100,
   }
 );
+
+/**
+ * Batch aggregator for sites (Phase 102 rate limiting fix)
+ *
+ * Prevents 429 errors when multiple dashboard components request site data simultaneously.
+ * Groups requests over 50ms window and sends to POST /api/sites/batch
+ */
+export const sitesBatcher = createBatchAggregator<any>(
+  {
+    batchEndpoint: "/api/sites/batch",
+    windowMs: 50,
+    maxBatchSize: 100,
+  }
+);

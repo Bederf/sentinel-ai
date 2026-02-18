@@ -3,11 +3,14 @@
 import json
 import logging
 import re
+from datetime import datetime
 from pathlib import Path
-from typing import List, Optional, Literal
+from typing import Any, Dict, List, Optional, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from app.config.settings import settings
 from app.database.repositories import BuildingRepository
@@ -902,3 +905,119 @@ async def get_site(site_id: str) -> SiteResponse:
         location=site.get("address", ""),
         status=status,
     )
+
+
+# ============= Batch Sites Endpoint =============
+
+
+class BatchSiteRequest(BaseModel):
+    """Request for batch site retrieval."""
+    site_ids: List[str] = Field(
+        ...,
+        min_items=1,
+        max_items=100,
+        description="List of site IDs to retrieve (max 100 per request)"
+    )
+
+
+class BatchSiteResponse(BaseModel):
+    """Response from batch site retrieval."""
+    results: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Dict of site_id -> SiteResponse data"
+    )
+    errors: Dict[str, str] = Field(
+        default_factory=dict,
+        description="Dict of site_id -> error message for missing/failed sites"
+    )
+
+
+@router.post(
+    "/sites/batch",
+    response_model=BatchSiteResponse,
+    summary="Get multiple sites in a single batch request",
+    description="Fetch data for up to 100 sites in one call. "
+                "Prevents 429 rate limit errors when multiple dashboard cards load simultaneously."
+)
+async def batch_get_sites(payload: BatchSiteRequest) -> BatchSiteResponse:
+    """Get multiple sites efficiently in a single request.
+    
+    Deduplicates site IDs and fetches all sites using single Supabase query.
+    Returns dict keyed by site_id for O(1) client-side lookup.
+    
+    Args:
+        payload: BatchSiteRequest with site_ids list (max 100)
+    
+    Returns:
+        BatchSiteResponse with results dict and errors dict
+    
+    Raises:
+        HTTPException: 400 if > 100 sites requested
+    """
+    # Deduplicate site IDs
+    unique_site_ids = list(set(payload.site_ids))
+    
+    if len(unique_site_ids) > 100:
+        raise HTTPException(
+            status_code=400,
+            detail="Maximum 100 unique site IDs per request"
+        )
+    
+    results: Dict[str, Any] = {}
+    errors: Dict[str, str] = {}
+    
+    # Load shared data once
+    alerts = load_alerts()
+    
+    # Fetch each site (try Supabase first, fallback to JSON)
+    for site_id in unique_site_ids:
+        try:
+            # Try Supabase first
+            site, success = get_site_from_supabase(site_id)
+            
+            if success and site:
+                status = "normal"
+                if site.get("alert_count", 0) > 0:
+                    status = "warning"
+                results[site_id] = {
+                    **site,
+                    "location": site.get("address", ""),
+                    "status": status,
+                }
+                continue
+            
+            # Fallback to JSON
+            sites = load_sites()
+            site = next((s for s in sites if s["id"] == site_id), None)
+            if not site:
+                errors[site_id] = "Site not found"
+                continue
+            
+            # Get aggregated asset counts
+            asset_counts = get_json_asset_counts(site_id)
+            
+            # Get alerts for this site
+            site_alerts = [
+                a for a in alerts 
+                if a.get("site_id") == site_id and a.get("status") == "active"
+            ]
+            site_status = calculate_site_status(site_alerts)
+            alert_count = len(site_alerts)
+            
+            # Build response
+            site_response = {
+                **site,
+                "equipment_count": asset_counts["total_assets"],
+                "active_alerts": alert_count,
+                "alert_count": alert_count,
+                "location": site.get("address", ""),
+                "status": site_status,
+                "asset_breakdown": asset_counts["breakdown"],
+            }
+            results[site_id] = site_response
+            
+        except Exception as e:
+            logger.error(f"Error getting site {site_id}: {e}")
+            errors[site_id] = str(e)
+    
+    return BatchSiteResponse(results=results, errors=errors)
