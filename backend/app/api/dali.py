@@ -535,6 +535,106 @@ async def get_dali_simulation(
     return run_dali_simulation(max_day=max_day)
 
 
+@router.get("/live")
+async def get_live_dali_data(
+    site_id: str = Query("site-002", description="Site ID (e.g., 'S002' or 'site-002')"),
+):
+    """
+    Get real-time DALI lighting data from Supabase.
+
+    Returns current occupancy, lighting, and energy data for all zones.
+    Shows live building occupancy and lighting system status, NOT simulation data.
+
+    Args:
+        site_id: Site identifier (e.g., 'S002' or 'site-002')
+
+    Returns:
+        Real-time DALI system metrics including:
+        - Occupancy percentage per zone
+        - Current lighting brightness levels
+        - Power consumption
+        - Energy statistics
+        - Faulty luminaires count
+        - Lux levels (daylight harvesting data)
+
+    Example response:
+    ```json
+    {
+      "site_id": "S002",
+      "data_source": "live",
+      "timestamp": "2026-02-18T14:30:00.123456",
+      "summary": {
+        "total_zones": 12,
+        "avg_occupancy_percent": 45.2,
+        "avg_brightness_level": 58.5,
+        "total_power_w": 8100.0,
+        "total_sensors": 28,
+        "occupied_sensors": 13,
+        "total_luminaires": 135,
+        "faulty_luminaires": 0
+      },
+      "zones": [
+        {
+          "zone_id": "Z-G-01",
+          "occupancy_percent": 95.0,
+          "avg_brightness_level": 75.5,
+          "total_sensors": 3,
+          "occupied_sensors": 3,
+          "total_luminaires": 12,
+          "faulty_luminaires": 0,
+          "power_w": 480.0,
+          "avg_lux": 450.0,
+          "energy_kwh": 12.4
+        }
+      ],
+      "energy_stats": {
+        "total_kwh_24h": 168.5
+      }
+    }
+    ```
+    """
+    from app.services.dali_service import get_dali_service
+
+    try:
+        # Normalize site_id: "site-002" → "S002"
+        normalized_site_id = site_id
+        if site_id.startswith("site-"):
+            num = site_id.split("-")[1]
+            normalized_site_id = f"S{num}"
+
+        service = get_dali_service()
+        live_data = await service.get_live_dali_data(normalized_site_id)
+
+        return live_data
+
+    except Exception as e:
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error fetching live DALI data for {site_id}: {e}")
+
+        from datetime import datetime
+
+        return {
+            "site_id": site_id,
+            "data_source": "live",
+            "timestamp": datetime.now().isoformat(),
+            "error": str(e),
+            "summary": {
+                "total_zones": 0,
+                "avg_occupancy_percent": 0,
+                "avg_brightness_level": 0,
+                "total_power_w": 0,
+                "total_sensors": 0,
+                "occupied_sensors": 0,
+                "total_luminaires": 0,
+                "faulty_luminaires": 0,
+            },
+            "zones": [],
+            "energy_stats": {"total_kwh_24h": 0},
+        }
+
+
 # ============================================================================
 # ZONE-LEVEL ENDPOINTS FOR GRANT DEMO
 # ============================================================================

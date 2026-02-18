@@ -16,17 +16,16 @@ import logging
 import random
 from pathlib import Path
 
-logger = logging.getLogger(__name__)
+from app.database.supabase_client import get_supabase_client
+from app.models.dali import DALIController, DALISensor, DALILuminaire, ZoneOccupancy, ZoneLighting, FloorSummary
 
-from app.models.dali import (
-    DALIController, DALISensor, DALILuminaire,
-    ZoneOccupancy, ZoneLighting, FloorSummary
-)
+logger = logging.getLogger(__name__)
 
 
 @dataclass
 class SiteDALIData:
     """Holds per-site DALI data regardless of source."""
+
     site_id: str
     site_name: str
     source: str  # "json" or "niagara"
@@ -120,7 +119,10 @@ class DALIService:
         self._sites_data[site_id] = site_data
         logger.info(
             "Loaded DALI JSON data for %s: %d controllers, %d sensors, %d luminaires",
-            site_id, len(site_data.controllers), len(site_data.sensors), len(site_data.luminaires),
+            site_id,
+            len(site_data.controllers),
+            len(site_data.sensors),
+            len(site_data.luminaires),
         )
 
     # === Niagara / DeviceManager Loading ===
@@ -140,6 +142,7 @@ class DALIService:
 
         try:
             from app.services.device_abstraction import DeviceManager
+
             dm = DeviceManager()
             if not dm._initialized:
                 logger.warning("DeviceManager not initialized; cannot load Niagara DALI for %s", site_id)
@@ -224,7 +227,10 @@ class DALIService:
 
             logger.info(
                 "Loaded DALI Niagara data for %s: %d controllers, %d sensors, %d luminaires",
-                site_id, len(site_data.controllers), len(site_data.sensors), len(site_data.luminaires),
+                site_id,
+                len(site_data.controllers),
+                len(site_data.sensors),
+                len(site_data.luminaires),
             )
 
         except ImportError:
@@ -411,9 +417,9 @@ class DALIService:
 
     # === Sensor Operations ===
 
-    def get_sensors(self, zone_id: Optional[str] = None,
-                    controller_id: Optional[str] = None,
-                    site_id: Optional[str] = None) -> List[DALISensor]:
+    def get_sensors(
+        self, zone_id: Optional[str] = None, controller_id: Optional[str] = None, site_id: Optional[str] = None
+    ) -> List[DALISensor]:
         """Get sensors with optional filters."""
         site_data = self._get_site_data(site_id)
         if site_data:
@@ -443,9 +449,9 @@ class DALIService:
 
     # === Luminaire Operations ===
 
-    def get_luminaires(self, zone_id: Optional[str] = None,
-                       faulty_only: bool = False,
-                       site_id: Optional[str] = None) -> List[DALILuminaire]:
+    def get_luminaires(
+        self, zone_id: Optional[str] = None, faulty_only: bool = False, site_id: Optional[str] = None
+    ) -> List[DALILuminaire]:
         """Get luminaires with optional filters."""
         site_data = self._get_site_data(site_id)
         if site_data:
@@ -453,9 +459,9 @@ class DALIService:
         else:
             luminaires = self._all_luminaires()
         if zone_id:
-            luminaires = [l for l in luminaires if l.zone_id == zone_id]
+            luminaires = [lum for lum in luminaires if lum.zone_id == zone_id]
         if faulty_only:
-            luminaires = [l for l in luminaires if l.fault_status]
+            luminaires = [lum for lum in luminaires if lum.fault_status]
         return luminaires
 
     def get_luminaire(self, luminaire_id: str) -> Optional[DALILuminaire]:
@@ -524,9 +530,9 @@ class DALIService:
         if not luminaires:
             return None
 
-        active = [l for l in luminaires if l.current_level > 0]
-        faulty = [l for l in luminaires if l.fault_status]
-        avg_dim = round(sum(l.current_level for l in luminaires) / len(luminaires), 1)
+        active = [lum for lum in luminaires if lum.current_level > 0]
+        faulty = [lum for lum in luminaires if lum.fault_status]
+        avg_dim = round(sum(lum.current_level for lum in luminaires) / len(luminaires), 1)
 
         # Energy waste detection: low occupancy but high lighting
         energy_waste = False
@@ -543,7 +549,7 @@ class DALIService:
             total_luminaires=len(luminaires),
             active_luminaires=len(active),
             avg_dim_level=avg_dim,
-            total_power_w=sum(l.power_consumption for l in luminaires),
+            total_power_w=sum(lum.power_consumption for lum in luminaires),
             faulty_count=len(faulty),
             floor=zone.get("floor", ""),
             energy_waste_detected=energy_waste,
@@ -558,7 +564,7 @@ class DALIService:
         lighting = self.get_zone_lighting(zone_id)
         return {
             "occupancy": occupancy.to_dict() if occupancy else None,
-            "lighting": lighting.to_dict() if lighting else None
+            "lighting": lighting.to_dict() if lighting else None,
         }
 
     # === Floor Aggregations ===
@@ -609,11 +615,16 @@ class DALIService:
             return {
                 "building_id": site_id or "",
                 "building_name": "",
-                "total_floors": 0, "total_zones": 0,
-                "total_sensors": 0, "occupied_sensors": 0,
-                "occupancy_percent": 0, "total_luminaires": 0,
-                "faulty_luminaires": 0, "total_power_watts": 0,
-                "energy_waste_zones": 0, "floors": [],
+                "total_floors": 0,
+                "total_zones": 0,
+                "total_sensors": 0,
+                "occupied_sensors": 0,
+                "occupancy_percent": 0,
+                "total_luminaires": 0,
+                "faulty_luminaires": 0,
+                "total_power_watts": 0,
+                "energy_waste_zones": 0,
+                "floors": [],
                 "last_updated": datetime.now().isoformat(),
             }
 
@@ -629,8 +640,8 @@ class DALIService:
 
         all_luminaires = list(luminaires.values())
         total_luminaires = len(all_luminaires)
-        faulty_luminaires_count = sum(1 for l in all_luminaires if l.fault_status)
-        total_power_watts = sum(l.power_consumption for l in all_luminaires)
+        faulty_luminaires_count = sum(1 for lum in all_luminaires if lum.fault_status)
+        total_power_watts = sum(lum.power_consumption for lum in all_luminaires)
 
         energy_waste_zones = 0
         for zone in zones.values():
@@ -687,20 +698,22 @@ class DALIService:
             else:
                 status = "unknown"
 
-            results.append({
-                "site_id": site_id,
-                "source_name": f"{site_data.site_name} DALI Lighting",
-                "source_type": "dali_lighting",
-                "connection_type": "niagara_bacnet" if site_data.source == "niagara" else "file_drop",
-                "status": status,
-                "controllers_online": online_controllers,
-                "controllers_total": len(controllers),
-                "sensors_online": online_sensors,
-                "sensors_total": len(sensors),
-                "luminaires_total": len(site_data.luminaires),
-                "last_poll": site_data.last_loaded,
-                "description": config.get("description", ""),
-            })
+            results.append(
+                {
+                    "site_id": site_id,
+                    "source_name": f"{site_data.site_name} DALI Lighting",
+                    "source_type": "dali_lighting",
+                    "connection_type": "niagara_bacnet" if site_data.source == "niagara" else "file_drop",
+                    "status": status,
+                    "controllers_online": online_controllers,
+                    "controllers_total": len(controllers),
+                    "sensors_online": online_sensors,
+                    "sensors_total": len(sensors),
+                    "luminaires_total": len(site_data.luminaires),
+                    "last_poll": site_data.last_loaded,
+                    "description": config.get("description", ""),
+                }
+            )
         return results
 
     # === Simulation (for demo) ===
@@ -712,9 +725,165 @@ class DALIService:
                 if random.random() < 0.1:
                     sensor.occupancy = not sensor.occupancy
                 if sensor.has_daylight:
-                    sensor.lux_level = max(0, min(2000,
-                        sensor.lux_level + random.uniform(-50, 50)))
+                    sensor.lux_level = max(0, min(2000, sensor.lux_level + random.uniform(-50, 50)))
                 sensor.last_updated = datetime.now().isoformat()
+
+    async def get_live_dali_data(self, site_id: str) -> dict:
+        """
+        Fetch real-time DALI data from Supabase tables.
+
+        Returns current occupancy, lighting, and energy data for all zones.
+        Used for real-time dashboard vs simulation data.
+
+        Args:
+            site_id: Site identifier (e.g., 'S002')
+
+        Returns:
+            dict with keys: summary, zones, energy_stats, last_updated
+        """
+        try:
+            supabase = get_supabase_client()
+
+            # Query live sensor occupancy
+            sensors_response = supabase.table("dali_sensors").select("*").eq("site_id", site_id).execute()
+            sensors = sensors_response.data or []
+
+            # Query live luminaire brightness
+            luminaires_response = supabase.table("dali_luminaires").select("*").eq("site_id", site_id).execute()
+            luminaires = luminaires_response.data or []
+
+            # Query recent energy data (last 1 hour)
+            energy_response = (
+                supabase.table("lighting_energy")
+                .select("*")
+                .eq("site_id", site_id)
+                .order("time", desc=True)
+                .limit(24)
+                .execute()
+            )
+            energy_data = energy_response.data or []
+
+            # Aggregate by zone
+            zones_agg = {}
+
+            # Process sensors
+            for sensor in sensors:
+                zone_id = sensor.get("zone_id", "unknown")
+                if zone_id not in zones_agg:
+                    zones_agg[zone_id] = {
+                        "zone_id": zone_id,
+                        "sensors": [],
+                        "luminaires": [],
+                        "energy_total_kwh": 0,
+                    }
+                zones_agg[zone_id]["sensors"].append(
+                    {
+                        "sensor_id": sensor.get("sensor_id"),
+                        "occupancy": sensor.get("occupancy", False),
+                        "lux_level": sensor.get("lux_level", 0),
+                        "last_updated": sensor.get("last_updated"),
+                    }
+                )
+            # Process luminaires
+            for lum in luminaires:
+                zone_id = lum.get("zone_id", "unknown")
+                if zone_id not in zones_agg:
+                    zones_agg[zone_id] = {
+                        "zone_id": zone_id,
+                        "sensors": [],
+                        "luminaires": [],
+                        "energy_total_kwh": 0,
+                    }
+                zones_agg[zone_id]["luminaires"].append(
+                    {
+                        "luminaire_id": lum.get("id"),
+                        "name": lum.get("name"),
+                        "brightness_level": lum.get("current_level", 0),
+                        "power_consumption_w": lum.get("power_consumption", 0),
+                        "fault_status": lum.get("fault_status", False),
+                    }
+                )
+            # Process energy data
+            for energy in energy_data:
+                zone_id = energy.get("zone_id", "unknown")
+                if zone_id in zones_agg:
+                    zones_agg[zone_id]["energy_total_kwh"] += energy.get("energy_kwh", 0)
+
+            # Calculate zone statistics
+            zones_list = []
+            total_occupancy = 0
+            total_brightness = 0
+            total_power_w = 0
+
+            for zone_id, zone_data in zones_agg.items():
+                sensors = zone_data["sensors"]
+                luminaires = zone_data["luminaires"]
+
+                # Occupancy percentage
+                occupied_sensors = sum(1 for s in sensors if s["occupancy"])
+                occupancy_pct = round(occupied_sensors / len(sensors) * 100, 1) if sensors else 0
+                total_occupancy += occupancy_pct
+
+                # Brightness average
+                brightness_levels = [lum["brightness_level"] for lum in luminaires]
+                avg_brightness = round(sum(brightness_levels) / len(brightness_levels), 1) if brightness_levels else 0
+                total_brightness += avg_brightness
+
+                # Power consumption
+                zone_power_w = sum(lum["power_consumption_w"] for lum in luminaires)
+                total_power_w += zone_power_w
+
+                # Lux level average
+                lux_levels = [s["lux_level"] for s in sensors if s["lux_level"] > 0]
+                avg_lux = round(sum(lux_levels) / len(lux_levels), 1) if lux_levels else 0
+
+                zones_list.append(
+                    {
+                        "zone_id": zone_id,
+                        "occupancy_percent": occupancy_pct,
+                        "avg_brightness_level": avg_brightness,
+                        "total_sensors": len(sensors),
+                        "occupied_sensors": occupied_sensors,
+                        "total_luminaires": len(luminaires),
+                        "faulty_luminaires": sum(1 for lum in luminaires if lum["fault_status"]),
+                        "power_w": round(zone_power_w, 1),
+                        "avg_lux": avg_lux,
+                        "energy_kwh": round(zone_data["energy_total_kwh"], 2),
+                    }
+                )
+
+            return {
+                "site_id": site_id,
+                "data_source": "live",
+                "timestamp": datetime.now().isoformat(),
+                "summary": {
+                    "total_zones": len(zones_list),
+                    "avg_occupancy_percent": round(total_occupancy / len(zones_list), 1) if zones_list else 0,
+                    "avg_brightness_level": round(total_brightness / len(zones_list), 1) if zones_list else 0,
+                    "total_power_w": round(total_power_w, 1),
+                    "total_sensors": len(sensors),
+                    "occupied_sensors": sum(1 for s in sensors if s.get("occupancy", False)),
+                    "total_luminaires": len(luminaires),
+                    "faulty_luminaires": sum(1 for lum in luminaires if lum.get("fault_status", False)),
+                },
+                "zones": zones_list,
+                "energy_stats": {
+                    "total_kwh_24h": round(sum(z["energy_kwh"] for z in zones_list), 2),
+                },
+            }
+
+        except Exception as e:
+            logger.error(f"Error fetching live DALI data for {site_id}: {e}")
+            # Return empty structure on error
+            return {
+                "site_id": site_id,
+                "data_source": "live",
+                "timestamp": datetime.now().isoformat(),
+                "error": str(e),
+                "summary": {},
+                "zones": [],
+                "energy_stats": {},
+            }
 
     async def set_zone_brightness(self, zone_id: str, brightness_percent: int) -> bool:
         """
@@ -757,13 +926,13 @@ class DALIService:
         for luminaire in luminaires:
             # In a real system, this would send BACnet/Modbus/DALI commands to the Tridonic controller
             # For now, update the simulation state
-            luminaire['current_level'] = dali_level
-            luminaire['target_level'] = dali_level
-            luminaire['last_adjusted'] = datetime.now().isoformat()
+            luminaire["current_level"] = dali_level
+            luminaire["target_level"] = dali_level
+            luminaire["last_adjusted"] = datetime.now().isoformat()
 
             # Record the control event for audit trail
-            luminaire['control_source'] = 'ai_optimization'  # AI-driven control
-            luminaire['control_reason'] = 'occupancy_and_daylight_aware'
+            luminaire["control_source"] = "ai_optimization"  # AI-driven control
+            luminaire["control_reason"] = "occupancy_and_daylight_aware"
 
             updated_count += 1
 
@@ -780,7 +949,7 @@ class DALIService:
         if not luminaires:
             return None
 
-        avg_level = sum(l.get('current_level', 0) for l in luminaires) / len(luminaires)
+        avg_level = sum(lum.get("current_level", 0) for lum in luminaires) / len(luminaires)
         return int(avg_level * 100 / 254)  # Convert DALI level back to percentage
 
 
