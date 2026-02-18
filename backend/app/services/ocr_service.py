@@ -15,10 +15,10 @@ import json
 import logging
 import re
 from typing import Dict, Any, List, Optional, Set
-from datetime import datetime
 
 import anthropic
 from app.database.repositories.equipment_repository import EquipmentRepository
+from app.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -177,7 +177,7 @@ For confidence scores: 1.0 = clearly legible, 0.5 = partially readable, 0.0 = gu
             image_b64 = base64.b64encode(image_data).decode()
 
             response = self.client.messages.create(
-                model="claude-sonnet-4-20250514",
+                model=settings.claude_model,
                 max_tokens=4000,
                 temperature=0.1,
                 messages=[

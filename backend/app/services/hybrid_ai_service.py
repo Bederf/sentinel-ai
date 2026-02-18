@@ -17,6 +17,36 @@ from anthropic import RateLimitError
 logger = logging.getLogger(__name__)
 
 
+
+# ============================================================================
+# SAFETY-CRITICAL LOCK: Control Actions Must Use Claude Only
+# ============================================================================
+# Building management systems must FAIL SAFE, not FAIL OPEN:
+# If Claude API is unavailable, reject the action rather than silently
+# routing to Ollama. A local model making control decisions without
+# proper training could cause equipment damage or safety hazards.
+
+SAFETY_CRITICAL_INTENTS = {
+    "control_action",
+    "setpoint_change",
+    "equipment_override",
+    "emergency_stop",
+    "reset_fault",
+    "valve_control",
+    "motor_control",
+    "damper_adjustment",
+}
+
+def is_safety_critical_intent(intent: str) -> bool:
+    """
+    Check if intent involves equipment control that requires Claude.
+
+    Safety-critical actions must NEVER fall back to Ollama.
+    If Claude API is unavailable, reject the action with a clear error.
+    """
+    intent_lower = intent.lower().strip()
+    return any(critical in intent_lower for critical in SAFETY_CRITICAL_INTENTS)
+
 class HybridAIService:
     """
     Routes AI requests to Ollama (local) or Claude (cloud) based on task complexity.
@@ -374,7 +404,11 @@ class HybridAIService:
 
             if not can_use_claude:
                 logger.warning(f"Tool calling requested but Claude unavailable: {reason}")
-                yield f"[Claude unavailable: {reason}] Tool-based actions are not available right now. Please try again in a moment."
+                msg = (
+                    f"[Claude unavailable: {reason}] Tool-based actions are "
+                    "not available right now. Please try again in a moment."
+                )
+                yield msg
                 return
 
             logger.info("Tool calling enabled, using Claude")
@@ -409,7 +443,11 @@ class HybridAIService:
                 logger.error(f"Claude API error during tool calling ({error_type}): {e}")
 
                 if isinstance(e, (APIError, APIConnectionError, APITimeoutError)):
-                    yield f"[Claude unavailable ({error_type})] Tool-based actions are temporarily unavailable. Please try again in a moment."
+                    msg = (
+                        f"[Claude unavailable ({error_type})] Tool-based actions "
+                        "are temporarily unavailable. Please try again in a moment."
+                    )
+                    yield msg
                     return
                 else:
                     # For non-API errors, re-raise
