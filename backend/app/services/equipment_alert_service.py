@@ -16,7 +16,7 @@ from typing import Dict, Any, Optional
 
 from app.database.supabase_client import get_supabase_client
 from app.database.repositories.alert_repository import AlertRepository
-from app.services.clawd_integration.alert_notifier import alert_notifier
+from app.services.sentry_integration.alert_notifier import alert_notifier
 
 logger = logging.getLogger(__name__)
 

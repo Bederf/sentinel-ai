@@ -1,4 +1,4 @@
-"""Clawd bot webhook endpoints for Phase 41 integration.
+"""Sentry bot webhook endpoints for Phase 41 integration.
 
 These endpoints are called by the Clawd Telegram bot when:
 1. Technician responds to work order notification
@@ -23,15 +23,15 @@ from app.middleware.auth_middleware import require_auth
 from pydantic import BaseModel, Field
 from typing import Dict, Any, Optional, List
 
-from app.services.clawd_integration.work_order_notifier import work_order_notifier
+from app.services.sentry_integration.work_order_notifier import work_order_notifier
 from app.services.ocr_service import get_ocr_service
-from app.services.clawd_integration.ocr_correction_handler import get_ocr_correction_handler
+from app.services.sentry_integration.ocr_correction_handler import get_ocr_correction_handler
 from app.models.service_record import ServiceStatus
 from app.database.repositories.service_record_repository import ServiceRecordRepository
-from app.services.clawd_auth_service import get_clawd_jwt_headers
+from app.services.sentry_auth_service import get_sentry_jwt_headers
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/clawd", tags=["clawd"])
+router = APIRouter(prefix="/api/sentry", tags=["sentry"])
 
 # Equipment types blocked from remote reset (safety-critical)
 RESET_BLOCKED_TYPES = {"FIRE", "GEN"}
@@ -64,8 +64,8 @@ async def handle_work_order_response(
         - collected_items: List of collected items
         - is_complete: Whether data collection is complete
     """
-    # Verify Clawd secret (simple auth)
-    if x_clawd_secret and x_clawd_secret != "clawd-bms-phase-41":
+    # Verify Sentry secret (simple auth)
+    if x_clawd_secret and x_clawd_secret != "sentry-bms-phase-41":
         raise HTTPException(status_code=403, detail="Unauthorized")
 
     # Required fields
@@ -129,7 +129,7 @@ async def notify_technician_of_work_order(
         - service_record_code: Generated code
     """
     # Verify auth
-    if x_clawd_secret and x_clawd_secret != "clawd-bms-phase-41":
+    if x_clawd_secret and x_clawd_secret != "sentry-bms-phase-41":
         raise HTTPException(status_code=403, detail="Unauthorized")
 
     # Required fields
@@ -202,7 +202,7 @@ async def reset_equipment_fault(
         - predictions_resolved: int
     """
     # Verify auth
-    if x_clawd_secret and x_clawd_secret != "clawd-bms-phase-41":
+    if x_clawd_secret and x_clawd_secret != "sentry-bms-phase-41":
         raise HTTPException(status_code=403, detail="Unauthorized")
 
     equipment_code = request.equipment_code
@@ -226,7 +226,7 @@ async def reset_equipment_fault(
     previous_health = None
     try:
         async with httpx.AsyncClient(timeout=5) as client:
-            headers = get_clawd_jwt_headers()
+            headers = get_sentry_jwt_headers()
             resp = await client.get(
                 f"http://localhost:9095/api/work-orders/equipment-info/{equipment_code}",
                 headers=headers,
@@ -258,7 +258,7 @@ async def reset_equipment_fault(
             new_health = None
             try:
                 async with httpx.AsyncClient(timeout=5) as client:
-                    headers = get_clawd_jwt_headers()
+                    headers = get_sentry_jwt_headers()
                     resp = await client.get(
                         f"http://localhost:9095/api/work-orders/equipment-info/{equipment_code}",
                         headers=headers,
@@ -341,7 +341,7 @@ async def process_service_sheet_ocr(
         - correction_prompt: First correction prompt (if needs_review)
     """
     # Verify auth
-    if x_clawd_secret and x_clawd_secret != "clawd-bms-phase-41":
+    if x_clawd_secret and x_clawd_secret != "sentry-bms-phase-41":
         raise HTTPException(status_code=403, detail="Unauthorized")
 
     # Decode image
@@ -401,7 +401,7 @@ async def submit_ocr_correction(
     Returns next correction prompt or completion status.
     """
     # Verify auth
-    if x_clawd_secret and x_clawd_secret != "clawd-bms-phase-41":
+    if x_clawd_secret and x_clawd_secret != "sentry-bms-phase-41":
         raise HTTPException(status_code=403, detail="Unauthorized")
 
     correction_handler = get_ocr_correction_handler()
@@ -455,17 +455,17 @@ async def get_pending_work_orders(
     """Get pending work orders that need Telegram notifications.
 
     Returns list of service records with status='notified' that are pending
-    Clawd bot notification delivery. Called by Clawd bot to poll for notifications.
+    Sentry bot notification delivery. Called by Sentry bot to poll for notifications.
 
-    Authentication: Allowed for Clawd bot (requires X-Clawd-Secret header).
+    Authentication: Allowed for Sentry bot (requires X-Sentry-Secret header).
     Anyone without the secret can still call this endpoint as it's PUBLIC.
 
     Returns:
         List of pending service records ready for notification
     """
-    # Clawd bot authentication via header (optional - endpoint is public)
-    if x_clawd_secret and x_clawd_secret != "clawd-bms-phase-41":
-        logger.warning(f"Invalid Clawd secret provided: {x_clawd_secret[:10]}...")
+    # Sentry bot authentication via header (optional - endpoint is public)
+    if x_clawd_secret and x_clawd_secret != "sentry-bms-phase-41":
+        logger.warning(f"Invalid Sentry secret provided: {x_clawd_secret[:10]}...")
 
     service_repo = ServiceRecordRepository()
 
@@ -476,7 +476,7 @@ async def get_pending_work_orders(
         if not pending:
             return {"pending_count": 0, "work_orders": []}
 
-        # Format for Clawd bot
+        # Format for Sentry bot
         formatted_orders = []
         for sr in pending:
             formatted_orders.append({
@@ -490,7 +490,7 @@ async def get_pending_work_orders(
                 "created_at": sr.get("created_at")
             })
 
-        logger.info(f"Clawd bot querying: {len(formatted_orders)} pending work orders")
+        logger.info(f"Sentry bot querying: {len(formatted_orders)} pending work orders")
 
         return {
             "pending_count": len(formatted_orders),
@@ -503,7 +503,7 @@ async def get_pending_work_orders(
 
 
 @router.post("/process-pending-notifications", status_code=status.HTTP_200_OK)
-async def process_pending_clawd_notifications(
+async def process_pending_sentry_notifications(
     x_clawd_secret: Optional[str] = Header(None),
 ):
     """Inspect pending notifications for Clawd delivery.
@@ -515,8 +515,8 @@ async def process_pending_clawd_notifications(
     Status transitions must occur from real technician interaction
     (e.g., "done" reply via /work-order/response).
     """
-    if x_clawd_secret and x_clawd_secret != "clawd-bms-phase-41":
-        logger.warning(f"Invalid Clawd secret for process-pending: {x_clawd_secret[:10]}...")
+    if x_clawd_secret and x_clawd_secret != "sentry-bms-phase-41":
+        logger.warning(f"Invalid Sentry secret for process-pending: {x_clawd_secret[:10]}...")
 
     service_repo = ServiceRecordRepository()
     try:

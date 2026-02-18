@@ -77,7 +77,7 @@ SENTINEL relies primarily on:
 | Field | Details |
 |-------|---------|
 | **Recipient** | Meta Platforms, Inc. / WhatsApp LLC |
-| **Service** | WhatsApp Business API (Clawd bot integration) |
+| **Service** | WhatsApp Business API (Sentry bot integration) |
 | **Destination Country** | United States / Ireland |
 | **PI Transferred** | Technician names, phone numbers, work order details |
 | **Data Subjects** | Building technicians |
@@ -94,7 +94,7 @@ SENTINEL relies primarily on:
 | Field | Details |
 |-------|---------|
 | **Recipient** | Telegram FZ-LLC |
-| **Service** | Telegram Bot API (Clawd bot integration) |
+| **Service** | Telegram Bot API (Sentry bot integration) |
 | **Destination Country** | UAE (Dubai) / Netherlands / Singapore |
 | **PI Transferred** | Technician names, phone numbers, Telegram user IDs, work order details |
 | **Data Subjects** | Building technicians |

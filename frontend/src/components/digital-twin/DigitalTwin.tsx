@@ -629,7 +629,7 @@ export function DigitalTwin() {
             {/* Equipment Detail Panel */}
             {!isEquipmentPanelMinimized && (
               <div className="absolute right-0 top-0 bottom-0 w-96 shadow-2xl overflow-y-auto z-50"
-                style={{ 
+                style={{
                   borderLeft: '2px solid var(--color-sentinel-accent)',
                   borderColor: 'var(--color-sentinel-border)',
                   background: 'var(--color-sentinel-bg-secondary)'

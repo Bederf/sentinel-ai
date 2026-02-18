@@ -70,11 +70,11 @@ class Settings(BaseSettings):
     # JWT refresh token TTL (Phase 65-02: long-lived refresh tokens)
     jwt_refresh_token_ttl_days: int = 7  # 7 days for refresh tokens
 
-    # Clawd webhook secret (required for Telegram bot integration)
-    clawd_webhook_secret: str = ""
+    # Sentry webhook secret (required for Telegram bot integration)
+    sentry_webhook_secret: str = ""
 
-    # Clawd bot API key (for authenticated access to /api/sites/* endpoints)
-    clawd_bot_api_key: str = ""
+    # Sentry bot API key (for authenticated access to /api/sites/* endpoints)
+    sentry_bot_api_key: str = ""
 
     # SIMBIOT Concept Evolution (FSI Public API) credentials
     simbiot_api_key: str = ""

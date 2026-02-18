@@ -21,6 +21,7 @@ import json
 from app.database.supabase_client import get_supabase_client
 from app.services.energy_cost_service import EnergyCostService
 from app.services.lighting_simulation_engine import update_simulation_lighting
+from app.services.water_consumption_engine import update_simulation_water
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +32,7 @@ class ThermalSimulationEngine:
     def __init__(self, building_id: str, consider_equipment_health: bool = False):
         self.building_id = building_id
         self.supabase = get_supabase_client()
-        
+
         # Initialize cost service for tariff calculations
         self.cost_service = EnergyCostService(building_id=building_id)
 
@@ -61,11 +62,11 @@ class ThermalSimulationEngine:
         self.AHU_MAX_POWER = 25.0  # kW at maximum load
         self.CHILLER_COP = 3.5  # Coefficient of Performance (typical value)
         self.CHILLER_MIN_POWER = 15.0  # kW minimum power when running
-        
+
         # Power consumption tracking
         self._hvac_power_cache: Dict[str, float] = {}  # zone_id -> power_kw
         self._chiller_power_cache: float = 0.0  # Total chiller power
-        
+
         # Daily cost tracking (resets each day)
         self._daily_hourly_power: Dict[int, float] = {}  # {hour: total_hvac_kw}
         self._current_simulation_date: Optional[date] = None
@@ -139,7 +140,7 @@ class ThermalSimulationEngine:
                 occupancy_data=occupancy_data,
                 ambient_temp=ambient_temp,
             )
-            
+
             # Track daily power and calculate cost at end of day
             if simulated_date:
                 total_hvac = power_result.get("total_hvac_power", 0.0)
@@ -148,19 +149,28 @@ class ThermalSimulationEngine:
                     total_hvac_power=total_hvac,
                     simulated_date=simulated_date,
                 )
-            
+
             # === Calculate Lighting Energy ===
             # DALI controls reduce lighting during high daylight periods
             daylight_lux = self._estimate_daylight_lux(
                 simulated_hour=simulated_hour,
                 cloud_cover=getattr(self, '_current_cloud_cover', 0.0),
             )
-            
+
             await update_simulation_lighting(
                 building_id=self.building_id,
                 simulated_hour=simulated_hour,
                 occupancy_data=occupancy_data,
                 daylight_lux=daylight_lux,
+                cloud_cover_pct=getattr(self, '_current_cloud_cover', 0.0),
+                is_raining=getattr(self, '_current_is_raining', False),
+                simulated_date=simulated_date,
+            )
+
+            await update_simulation_water(
+                building_id=self.building_id,
+                simulated_hour=simulated_hour,
+                occupancy_data=occupancy_data,
                 cloud_cover_pct=getattr(self, '_current_cloud_cover', 0.0),
                 is_raining=getattr(self, '_current_is_raining', False),
                 simulated_date=simulated_date,
@@ -232,7 +242,7 @@ class ThermalSimulationEngine:
         # Simulates HVAC performance loss due to degraded equipment
         hvac_health_factor = 1.0
         equipment_health_note = ""
-        
+
         if self.CONSIDER_EQUIPMENT_HEALTH:
             # Get equipment serving this zone
             fcu_id = zone_config.get("fcu_id")
@@ -295,19 +305,19 @@ class ThermalSimulationEngine:
     def _estimate_daylight_lux(self, simulated_hour: int, cloud_cover: float) -> float:
         """
         Estimate available daylight in lux based on hour and cloud cover.
-        
+
         Uses simplified solar geometry:
         - Peak daylight: 1000 lux at solar noon (hour 12)
         - Minimum: 0 lux at night (before 6am, after 6pm)
         - Cloud cover reduces by 30-60%
-        
+
         Returns:
             Estimated daylight in lux (0-1000+)
         """
         # No daylight at night
         if simulated_hour < 6 or simulated_hour > 18:
             return 0.0
-        
+
         # Clear sky profile (peak at noon)
         if 6 <= simulated_hour < 12:
             # Morning rise: linear increase
@@ -317,11 +327,11 @@ class ThermalSimulationEngine:
             base_lux = (18.0 - simulated_hour) / 6.0 * 1000.0
         else:
             base_lux = 1000.0
-        
+
         # Reduce for cloud cover (30-60% reduction based on coverage)
         cloud_factor = 1.0 - (cloud_cover / 100.0 * 0.6)
         daylight_lux = base_lux * max(0.1, cloud_factor)  # Min 10% even overcast
-        
+
         return round(daylight_lux, 1)
 
     async def _load_zone_metadata(self) -> None:
@@ -357,10 +367,10 @@ class ThermalSimulationEngine:
     async def _load_equipment_health(self) -> None:
         """
         Load equipment health scores for HVAC equipment.
-        
+
         Used for maintenance/fault simulations to degrade HVAC performance
         based on equipment health degradation.
-        
+
         Health mapping:
         - 100% = Full HVAC response
         - 75% = 75% HVAC response
@@ -556,7 +566,7 @@ class ThermalSimulationEngine:
     ) -> None:
         """
         Write HVAC power consumption to power_meters table.
-        
+
         Updates the active_power_kw field for:
         - HVAC feeder (sum of all zone + chiller)
         - Can be extended to track chiller separately if meter exists
@@ -620,7 +630,7 @@ class ThermalSimulationEngine:
     ) -> None:
         """
         Track hourly power and calculate daily cost at end of day (hour 23).
-        
+
         Called automatically from lifecycle orchestrator each hour.
         """
         try:
@@ -628,23 +638,23 @@ class ThermalSimulationEngine:
             if self._current_simulation_date != simulated_date.date():
                 self._daily_hourly_power = {}
                 self._current_simulation_date = simulated_date.date()
-            
+
             # Track this hour's power
             self._daily_hourly_power[simulated_hour] = round(total_hvac_power, 2)
-            
+
             # At end of day (hour 23), calculate and record daily cost
             if simulated_hour == 23:
                 daily_cost = await self.cost_service.calculate_daily_cost(
                     simulated_date=simulated_date,
                     hourly_power_data=self._daily_hourly_power,
                 )
-                
+
                 # Write to database for dashboard
                 await self.cost_service.write_daily_cost_summary(
                     simulated_date=simulated_date,
                     daily_cost=daily_cost,
                 )
-                
+
                 logger.info(
                     f"[COST] Daily summary for {simulated_date.date()}: "
                     f"{daily_cost['total_energy_kwh']:.1f}kWh = R{daily_cost['total_cost_r']:.2f} "
@@ -664,7 +674,7 @@ def get_thermal_engine(
 ) -> ThermalSimulationEngine:
     """
     Get or create thermal engine for building.
-    
+
     Args:
         building_id: Building identifier
         consider_equipment_health: If True, HVAC response degrades with equipment health
@@ -673,13 +683,13 @@ def get_thermal_engine(
     """
     # Create new engine if needed or if health consideration changes
     cache_key = f"{building_id}:health={consider_equipment_health}"
-    
+
     if building_id not in _thermal_engines:
         _thermal_engines[building_id] = ThermalSimulationEngine(
             building_id,
             consider_equipment_health=consider_equipment_health
         )
-    
+
     return _thermal_engines[building_id]
 
 
@@ -708,7 +718,7 @@ async def update_simulation_temperatures(
 
     Usage in lifecycle_orchestrator:
         from app.services.thermal_simulation_engine import update_simulation_temperatures
-        
+
         # Normal simulation (equipment healthy):
         temps = await update_simulation_temperatures(
             building_id=self.building_id,
@@ -718,7 +728,7 @@ async def update_simulation_temperatures(
             is_night_mode=(hour >= 22 or hour < 6),
             consider_equipment_health=False  # Default
         )
-        
+
         # Maintenance/Fault simulation (equipment can degrade):
         temps = await update_simulation_temperatures(
             building_id=self.building_id,

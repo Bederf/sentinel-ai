@@ -29,7 +29,7 @@ def thermal_engine():
 def mock_supabase(monkeypatch):
     """Mock Supabase client."""
     mock_client = Mock()
-    
+
     # Mock table operations
     mock_table = Mock()
     mock_select = Mock()
@@ -37,7 +37,7 @@ def mock_supabase(monkeypatch):
     mock_table.select = Mock(return_value=mock_select)
     mock_table.insert = Mock(return_value=Mock(execute=Mock()))
     mock_client.table = Mock(return_value=mock_table)
-    
+
     monkeypatch.setattr("app.services.thermal_simulation_engine.get_supabase_client", Mock(return_value=mock_client))
     return mock_client
 
@@ -140,7 +140,7 @@ class TestThermalCalculations:
     def test_solar_gain_increases_afternoon_temperature(self, thermal_engine):
         """Solar gain should increase temperature in afternoon hours."""
         thermal_engine._last_temps["Zone-001"] = 22.0
-        
+
         # Morning (low solar)
         temp_morning = thermal_engine._calculate_zone_temperature(
             zone_id="Zone-001",

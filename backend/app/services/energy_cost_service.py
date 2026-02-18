@@ -27,12 +27,12 @@ class TariffBand:
     band: str  # "peak", "standard", "off_peak"
     energy_rate_c_kwh: float  # c/kWh
     network_rate_c_kwh: float  # c/kWh
-    
+
     @property
     def total_rate_c_kwh(self) -> float:
         """Total rate including both energy and network."""
         return self.energy_rate_c_kwh + self.network_rate_c_kwh
-    
+
     @property
     def total_rate_r_kwh(self) -> float:
         """Convert to ZAR/kWh."""
@@ -60,7 +60,7 @@ class EnergyCostService:
         self.municipality = municipality
         self.supabase = get_supabase_client()
         self.tariff_svc = TariffScheduleService()
-        
+
         # Cache tariff data
         self.tariff_data = self._load_tariff()
         self.demand_charge_r_kva = self._get_demand_charge()
@@ -78,7 +78,7 @@ class EnergyCostService:
                 return tariff.tariff_data
         except Exception as e:
             logger.warning(f"[COST] Failed to load tariff: {e}")
-        
+
         # Fallback to hardcoded rates (City Power 2026)
         return {
             "energy_charge_c_kwh": {
@@ -108,7 +108,7 @@ class EnergyCostService:
     def get_tariff_band(self, hour: int, simulated_date: datetime) -> str:
         """
         Determine tariff band (peak/standard/off_peak) for given hour.
-        
+
         Varies by:
         - Time of day
         - Season (summer/winter)
@@ -116,28 +116,28 @@ class EnergyCostService:
         """
         if not self.tariff_data:
             return self._simple_tariff_band(hour)
-        
+
         try:
             # Determine season
             month = simulated_date.month
             season = "winter" if month in [6, 7, 8] else "summer"
-            
+
             # Get time band definitions
             time_bands = self.tariff_data.get("time_bands", {}).get(season, {})
-            
+
             # Check which band this hour falls into
             time_str = f"{hour:02d}:00"
-            
+
             for band_name in ["peak", "standard", "off_peak"]:
                 bands = time_bands.get(band_name, [])
                 for band_range in bands:
                     start = band_range.get("start")
                     end = band_range.get("end")
-                    
+
                     # Simple check (handles cases where end < start is wrapping to next day)
                     if start <= time_str < end or (end < start and (time_str >= start or time_str < end)):
                         return band_name
-            
+
             return "standard"  # Default fallback
         except Exception as e:
             logger.warning(f"[COST] Error determining tariff band: {e}")
@@ -155,23 +155,23 @@ class EnergyCostService:
     def get_hourly_rate(self, hour: int, simulated_date: datetime) -> TariffBand:
         """
         Get energy and network rates for a given hour.
-        
+
         Returns: TariffBand with energy_rate_c_kwh and network_rate_c_kwh
         """
         if not self.tariff_data:
             return self._get_simple_rate()
-        
+
         try:
             month = simulated_date.month
             season = "winter" if month in [6, 7, 8] else "summer"
             band = self.get_tariff_band(hour, simulated_date)
-            
+
             energy_rates = self.tariff_data.get("energy_charge_c_kwh", {}).get(season, {})
             network_rates = self.tariff_data.get("network_charge_c_kwh", {}).get(season, {})
-            
+
             energy_rate = energy_rates.get(band, 200.0)
             network_rate = network_rates.get(band, 30.0)
-            
+
             return TariffBand(
                 band=band,
                 energy_rate_c_kwh=energy_rate,
@@ -197,26 +197,26 @@ class EnergyCostService:
     ) -> HourlyCost:
         """
         Calculate cost for 1 simulated hour.
-        
+
         Args:
             simulated_hour: Hour of day (0-23)
             power_kw: HVAC power consumption (kW)
             simulated_date: Date for season determination
-        
+
         Returns:
             HourlyCost with breakdown
         """
         # 1 hour of consumption = power_kw kWh
         energy_kwh = power_kw
-        
+
         # Get tariff rate for this hour
         tariff_band = self.get_hourly_rate(simulated_hour, simulated_date)
-        
+
         # Calculate costs
         energy_cost_r = (power_kw * tariff_band.energy_rate_c_kwh) / 100.0
         network_cost_r = (power_kw * tariff_band.network_rate_c_kwh) / 100.0
         total_cost_r = energy_cost_r + network_cost_r
-        
+
         return HourlyCost(
             simulated_hour=simulated_hour,
             power_kw=power_kw,
@@ -235,11 +235,11 @@ class EnergyCostService:
     ) -> Dict[str, Any]:
         """
         Calculate total cost for a simulated day.
-        
+
         Args:
             simulated_date: Date of simulation
             hourly_power_data: Power consumption per hour {0-23: kW}
-        
+
         Returns:
             Daily cost summary
         """
@@ -248,17 +248,17 @@ class EnergyCostService:
         total_energy_cost_r = 0.0
         total_network_cost_r = 0.0
         total_cost_r = 0.0
-        
+
         # Calculate cost for each hour
         for hour in range(24):
             power_kw = hourly_power_data.get(hour, 0.0)
-            
+
             hourly_cost = self.calculate_hourly_cost(
                 simulated_hour=hour,
                 power_kw=power_kw,
                 simulated_date=simulated_date
             )
-            
+
             hourly_costs.append({
                 "hour": hour,
                 "power_kw": round(power_kw, 2),
@@ -269,18 +269,18 @@ class EnergyCostService:
                 "network_cost_r": hourly_cost.network_cost_r,
                 "total_cost_r": hourly_cost.total_cost_r,
             })
-            
+
             total_energy_kwh += hourly_cost.energy_kwh
             total_energy_cost_r += hourly_cost.energy_cost_r
             total_network_cost_r += hourly_cost.network_cost_r
             total_cost_r += hourly_cost.total_cost_r
-        
+
         # Add fixed monthly charges (amortized daily)
         daily_service_charge = self.service_charge_r_month / 30.0
-        
+
         # Get peak demand for the day (used for demand charge if applicable)
         peak_power_kw = max(hourly_power_data.values()) if hourly_power_data else 0.0
-        
+
         return {
             "date": simulated_date.isoformat(),
             "total_energy_kwh": round(total_energy_kwh, 2),
@@ -300,7 +300,7 @@ class EnergyCostService:
     ) -> bool:
         """
         Write daily cost summary to database for dashboard.
-        
+
         Creates records in energy_cost_summary table for tracking
         and dashboard visualization.
         """
@@ -319,18 +319,18 @@ class EnergyCostService:
                 "hourly_data": daily_cost.get("hourly_breakdown"),
                 "timestamp": datetime.utcnow().isoformat() + "Z",
             }
-            
+
             # Upsert into energy_cost_summary table
             self.supabase.table("energy_cost_summary").upsert(
                 record,
                 on_conflict="building_id,date"
             ).execute()
-            
+
             logger.debug(
                 f"[COST] Daily cost recorded for {simulated_date.date()}: "
                 f"{daily_cost['total_energy_kwh']:.1f}kWh = R{daily_cost['total_cost_r']:.2f}"
             )
-            
+
             return True
         except Exception as e:
             logger.error(f"[COST] Failed to write daily cost summary: {e}")
@@ -344,7 +344,7 @@ class EnergyCostService:
     ) -> Dict[str, Any]:
         """
         Get monthly cost summary from daily records.
-        
+
         Aggregates daily_cost_summary records into monthly view.
         """
         try:
@@ -352,22 +352,22 @@ class EnergyCostService:
             response = self.supabase.table("energy_cost_summary").select("*").eq(
                 "building_id", building_id
             ).execute()
-            
+
             if not response.data:
                 return {"days": 0, "total_energy_kwh": 0, "total_cost_r": 0}
-            
+
             # Filter by year/month and sum
             total_energy = 0.0
             total_cost = 0.0
             day_count = 0
-            
+
             for record in response.data:
                 record_date = datetime.fromisoformat(record.get("simulated_date", "")).date()
                 if record_date.year == year and record_date.month == month:
                     total_energy += record.get("total_energy_kwh", 0)
                     total_cost += record.get("total_cost_r", 0)
                     day_count += 1
-            
+
             return {
                 "year": year,
                 "month": month,

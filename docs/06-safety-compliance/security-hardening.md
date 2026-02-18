@@ -58,7 +58,7 @@ async def enforce_authentication(request: Request, call_next):
 | `/api/health`               | Health check                    |
 | `/docs`, `/redoc`           | API documentation               |
 | `/openapi.json`             | OpenAPI schema                  |
-| `/api/clawd-webhooks/*`     | Telegram bot callbacks          |
+| `/api/sentry-webhooks/*`     | Telegram bot callbacks          |
 | `/api/mcp-sse/*`            | MCP SSE transport               |
 
 ### Behaviour by Mode

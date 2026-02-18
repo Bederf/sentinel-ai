@@ -34,7 +34,7 @@ export interface ScenarioInfo {
   auto_repair: boolean;
   repair_delay_hours: number;
   optimization_enabled: boolean;
-  clawd_notifications: boolean;
+  sentry_notifications: boolean;
 }
 
 export interface SimulationStatus {

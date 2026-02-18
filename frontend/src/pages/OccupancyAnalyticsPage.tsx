@@ -1,6 +1,6 @@
 /**
  * OCCUPANCY ANALYTICS PAGE (Phase 5.1)
- * 
+ *
  * Displays occupancy trends, zone utilization, and peak hour analysis
  * for the building across multiple time horizons.
  */
@@ -118,7 +118,7 @@ export function OccupancyAnalyticsPage() {
   // Calculate average occupancy and get current hour occupancy
   const { averageOccupancy, currentHourOccupancy } = useMemo(() => {
     if (!trendData) return { averageOccupancy: 0, currentHourOccupancy: 0 };
-    
+
     const allValues = [
       ...trendData.zones.office,
       ...trendData.zones.meeting,
@@ -127,7 +127,7 @@ export function OccupancyAnalyticsPage() {
       ...trendData.zones.entry,
     ];
     const avg = Math.round(allValues.reduce((a, b) => a + b, 0) / allValues.length);
-    
+
     // Get current hour occupancy from simulation if running
     let currentOccupancy = avg;
     if (isSimulationRunning && simulatedHour !== undefined) {
@@ -143,7 +143,7 @@ export function OccupancyAnalyticsPage() {
         currentOccupancy = Math.round(hourValues.reduce((a, b) => a + b, 0) / hourValues.length);
       }
     }
-    
+
     return { averageOccupancy: avg, currentHourOccupancy: currentOccupancy };
   }, [trendData, isSimulationRunning, simulatedHour]);
 
@@ -169,7 +169,7 @@ export function OccupancyAnalyticsPage() {
               )}
             </div>
             <p className="text-muted-foreground mt-2">
-              {isSimulationRunning 
+              {isSimulationRunning
                 ? 'Real-time occupancy from 365-day simulation'
                 : 'Building-wide occupancy trends, zone utilization, and peak hour analysis'
               }

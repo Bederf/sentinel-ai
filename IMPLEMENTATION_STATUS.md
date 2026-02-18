@@ -109,7 +109,7 @@ curl -X POST http://localhost:9095/api/alerts \
     "message": "Exceeded threshold",
     "reading": 32.5,
     "setpoint": 25,
-    "notify_clawd": false
+    "notify_sentry": false
   }'
 
 # Expected: Alert created with building_id from equipment FK

@@ -14,7 +14,7 @@ Add both endpoints to `_PUBLIC_PREFIXES` in middleware to allow unauthenticated 
 **Added to `_PUBLIC_PREFIXES` tuple:**
 ```python
 _PUBLIC_PREFIXES = (
-    "/api/clawd-webhooks",  # Telegram bot callbacks
+    "/api/sentry-webhooks",  # Telegram bot callbacks
     "/api/mcp/sse",         # Claude Desktop (NEW)
     "/api/mcp/openai",      # ChatGPT/M365 Copilot (NEW)
 )

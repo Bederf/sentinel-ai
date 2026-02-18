@@ -958,21 +958,21 @@ class BackgroundSchedulerService:
             interval_seconds: How often to check pending notifications (default: 30 seconds)
         """
         # Remove existing job if it exists
-        if self.scheduler.get_job('process_clawd_notifications'):
-            self.scheduler.remove_job('process_clawd_notifications')
+        if self.scheduler.get_job('process_sentry_notifications'):
+            self.scheduler.remove_job('process_sentry_notifications')
             logger.info("Removed existing Clawd notification job")
 
         # Add new job
         self.scheduler.add_job(
-            func=self._process_clawd_notifications,
+            func=self._process_sentry_notifications,
             trigger=IntervalTrigger(seconds=interval_seconds),
-            id='process_clawd_notifications',
+            id='process_sentry_notifications',
             name='Process Clawd Notifications',
             replace_existing=True
         )
         logger.info(f"Added Clawd notification job with {interval_seconds}s interval")
 
-    def _process_clawd_notifications(self):
+    def _process_sentry_notifications(self):
         """Wrapper to process pending Clawd notifications (runs in background)."""
         try:
             import asyncio
@@ -987,8 +987,8 @@ class BackgroundSchedulerService:
             async def process():
                 async with httpx.AsyncClient(timeout=10) as client:
                     response = await client.post(
-                        "http://localhost:9095/api/clawd/process-pending-notifications",
-                        headers={"X-Clawd-Secret": "clawd-bms-phase-41"}
+                        "http://localhost:9095/api/sentry/process-pending-notifications",
+                        headers={"X-Sentry-Secret": "sentry-bms-phase-41"}
                     )
                     return response.json()
 

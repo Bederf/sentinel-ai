@@ -8,7 +8,7 @@ import time
 from typing import AsyncGenerator, Dict, Any
 
 # Add clawd tools to path for rate limit tracker
-sys.path.insert(0, '/home/bederf/clawd/tools')
+sys.path.insert(0, '$SENTRY_HOME/tools')
 
 from app.services.claude_service import claude_service
 from app.config.settings import settings

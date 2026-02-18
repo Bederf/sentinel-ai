@@ -54,14 +54,14 @@ Background job every 30 seconds:
     2. For each: Get assigned technician
     3. Get technician's Telegram ID
     4. Format message with equipment code, issue, diagnostics
-    5. Send via Clawd bot
+    5. Send via Sentry bot
     6. Mark service record as sent
     ↓
 Technician receives on phone
     ↓
 Technician types response (or shares photo)
     ↓
-Clawd bot processes reply
+Sentry bot processes reply
     ↓
 Service record marked 'data_collection'
     ↓
@@ -73,15 +73,15 @@ Feedback collection phase begins
 **In `backend/app/api/clawd_webhooks.py`:**
 
 ```python
-@router.post("/api/clawd/process-pending-notifications")
+@router.post("/api/sentry/process-pending-notifications")
 async def process_pending_notifications():
     """Process pending Telegram notifications"""
     # Get all service records with status='notified'
-    # For each: send Telegram via Clawd bot
+    # For each: send Telegram via Sentry bot
     # Mark as sent (status → 'data_collection')
     return {"success": count, "processed": processed_ids}
 
-@router.post("/api/clawd/feedback")
+@router.post("/api/sentry/feedback")
 async def handle_clawd_feedback(payload: ClaudFeedback):
     """Handle feedback submission from Clawd"""
     # Parse technician response
@@ -274,7 +274,7 @@ async def create_alert(...):
 async def receive_work_order_update(payload: dict):
     """Receive work order status update from external system"""
 
-    # Verify webhook signature (CLAWD_WEBHOOK_SECRET)
+    # Verify webhook signature (SENTRY_WEBHOOK_SECRET)
     signature = request.headers.get("X-Signature")
     if not verify_signature(payload, signature):
         raise HTTPException(status_code=403, detail="Invalid signature")

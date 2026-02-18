@@ -91,14 +91,14 @@ async def startup_event(app: FastAPI) -> None:
     except Exception as e:
         _logger.error(f"❌ Device manager initialization failed: {e}")
 
-    # Initialize Clawd bot JWT authentication (non-blocking)
-    from app.services.clawd_auth_service import initialize_clawd_auth, get_clawd_auth_service
+    # Initialize Sentry bot JWT authentication (non-blocking)
+    from app.services.sentry_auth_service import initialize_sentry_auth, get_sentry_auth_service
 
-    clawd_auth = initialize_clawd_auth(api_url=settings.backend_url or "http://localhost:9095")
+    sentry_auth = initialize_sentry_auth(api_url=settings.backend_url or "http://localhost:9095")
 
     # Skip Clawd login during startup to avoid blocking
     # Clawd will attempt login on first use via get_token_or_refresh()
-    _logger.info("ℹ Clawd bot JWT authentication deferred to first use")
+    _logger.info("ℹ Sentry bot JWT authentication deferred to first use")
 
     # Capture the main event loop for cross-thread scheduling (simulation tasks)
     scheduler_service.set_main_loop(asyncio.get_event_loop())
@@ -169,7 +169,7 @@ async def startup_event(app: FastAPI) -> None:
 
     # Start Clawd notification processing (runs every 30 seconds)
     # When equipment health drops to warning/critical, technicians receive Telegram notifications
-    # This background job ensures notifications are sent promptly even if Clawd bot polling is delayed
+    # This background job ensures notifications are sent promptly even if Sentry bot polling is delayed
     # TEMPORARILY DISABLED for testing - uncomment to re-enable
     # if hasattr(scheduler_service, "add_clawd_notification_job"):
     #     scheduler_service.add_clawd_notification_job(interval_seconds=30)  # 30 seconds
@@ -301,7 +301,7 @@ async def startup_event(app: FastAPI) -> None:
             # This prevents deactivating tasks created during the current startup
             from datetime import datetime, timedelta
             cutoff_time = (datetime.utcnow() - timedelta(seconds=5)).isoformat()
-            
+
             queued_tasks = client.table("lifecycle_simulation_tasks") \
                 .select("task_id, created_at") \
                 .eq("status", "queued") \
@@ -361,7 +361,7 @@ async def startup_event(app: FastAPI) -> None:
     # Stores point-in-time health snapshots for trend analysis and historical reporting
     from app.services.system_health_service import SystemHealthService
     health_service = SystemHealthService()
-    
+
     async def store_health_snapshot():
         """Store current health snapshot to database."""
         try:
@@ -370,7 +370,7 @@ async def startup_event(app: FastAPI) -> None:
             _logger.debug("Health snapshot stored successfully")
         except Exception as e:
             _logger.error(f"Failed to store health snapshot: {e}")
-    
+
     # Wrap in try-except as add_job method may not be available
     try:
         scheduler_service.add_job(
@@ -391,7 +391,7 @@ async def startup_event(app: FastAPI) -> None:
                 _logger.info(f"Auto-resolved {resolved_count} stale errors")
         except Exception as e:
             _logger.error(f"Failed to auto-resolve errors: {e}")
-    
+
     # Wrap in try-except as add_job method may not be available
     try:
         scheduler_service.add_job(
@@ -444,11 +444,11 @@ async def shutdown_event(app: FastAPI) -> None:
     It stops background services and closes connections.
     """
     # Stop Clawd JWT token refresh
-    from app.services.clawd_auth_service import get_clawd_auth_service
-    clawd_auth = get_clawd_auth_service()
-    if clawd_auth:
-        await clawd_auth.stop_background_refresh()
-    
+    from app.services.sentry_auth_service import get_sentry_auth_service
+    sentry_auth = get_sentry_auth_service()
+    if sentry_auth:
+        await sentry_auth.stop_background_refresh()
+
     scheduler_service.stop()
     await health_simulation_service.stop()
     await simbiot_service.shutdown()

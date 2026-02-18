@@ -14,12 +14,12 @@ import { useSimulation } from "../../contexts/SimulationContext";
 
 #### 2. Added useSimulation Hook
 ```typescript
-const { 
-  running: isSimulationRunning, 
-  solarEfficiency, 
-  cloudCover, 
-  simulatedHour, 
-  daysSimulated 
+const {
+  running: isSimulationRunning,
+  solarEfficiency,
+  cloudCover,
+  simulatedHour,
+  daysSimulated
 } = useSimulation();
 ```
 

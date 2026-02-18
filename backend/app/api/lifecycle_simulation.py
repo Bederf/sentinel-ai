@@ -512,13 +512,13 @@ async def get_site_simulation_status(site_id: str):
     """
     try:
         from app.services.simulation_orchestrator import _active_simulations
-        
+
         # Look for any running simulation (simulations run site-wide)
         for task_id, orchestrator in _active_simulations.items():
             if orchestrator.running:
                 # Get full status from orchestrator
                 status = orchestrator.get_status()
-                
+
                 return SimulationStatusResponse(
                     running=True,
                     paused=orchestrator.paused,
@@ -542,7 +542,7 @@ async def get_site_simulation_status(site_id: str):
                 )
     except Exception as e:
         logger.debug(f"Error getting simulation status: {e}")
-    
+
     # Return default empty status if no simulation running
     return SimulationStatusResponse(
         running=False,
@@ -667,7 +667,7 @@ async def list_scenarios():
                 "auto_repair": config.auto_repair,
                 "repair_delay_hours": config.repair_delay_hours,
                 "optimization_enabled": config.optimization_enabled,
-                "clawd_notifications": config.clawd_notifications,
+                "sentry_notifications": config.sentry_notifications,
             }
             for key, config in SCENARIOS.items()
         ]

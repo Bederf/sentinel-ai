@@ -24,7 +24,7 @@ export function SolarOverviewPanel({ siteId }: SolarOverviewPanelProps) {
   const [overview, setOverview] = useState<SolarOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Get live simulation data
   const { running, solarEfficiency, simulatedHour } = useSimulation();
 

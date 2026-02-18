@@ -38,12 +38,12 @@ _PUBLIC_PATHS = {
     "/redoc",
     "/health",
     "/api/health",
-    "/api/clawd/work-order/pending",  # Clawd bot polling endpoint
+    "/api/sentry/work-order/pending",  # Sentry bot polling endpoint
     "/api/lifecycle/status",  # Simulation status (frontend health check)
 }
 _PUBLIC_PREFIXES = (
-    "/api/clawd",  # Clawd bot endpoints (work order polling, OCR, equipment reset, etc.)
-    "/api/clawd-webhooks",  # Telegram bot callbacks (authenticated via webhook secret)
+    "/api/clawd",  # Sentry bot endpoints (work order polling, OCR, equipment reset, etc.)
+    "/api/sentry-webhooks",  # Telegram bot callbacks (authenticated via webhook secret)
     "/api/mcp/sse",  # MCP SSE transport for Claude Desktop (authenticated at MCP layer)
     "/api/mcp/openai",  # MCP OpenAI endpoints for ChatGPT/M365 Copilot (authenticated at MCP layer)
     "/api/lifecycle/",  # Lifecycle simulation status endpoints (frontend health checks)
@@ -105,22 +105,22 @@ def _get_cors_headers(request: Request | None = None) -> dict:
     headers = {}
     if not settings.cors_origins:
         return headers
-    
+
     # Check if request has an Origin header and if it's allowed
     origin = request.headers.get("origin") if request else None
-    
+
     if origin and origin in settings.cors_origins:
         # Origin is in allowed list, allow it specifically
         headers["Access-Control-Allow-Origin"] = origin
     elif settings.cors_origins:
         # Allow the first configured origin as fallback
         headers["Access-Control-Allow-Origin"] = settings.cors_origins[0]
-    
+
     # Always allow credentials and methods for configured origins
     headers["Access-Control-Allow-Credentials"] = "true"
     headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
     headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type"
-    
+
     return headers
 
 
@@ -141,7 +141,7 @@ def register_exception_handlers(app: FastAPI) -> None:
     async def global_exception_handler(request: Request, exc: Exception):
         """Catch-all handler that hides internals in production."""
         headers = _get_cors_headers(request)
-        
+
         if settings.debug:
             # In debug mode, return full detail for developer convenience
             return JSONResponse(
@@ -211,11 +211,11 @@ def register_middleware(app: FastAPI) -> None:
         ):
             return await call_next(request)
 
-        # Allow /api/sites/* with Clawd bot API key
-        if path.startswith("/api/sites/") and settings.clawd_bot_api_key:
-            api_key = request.headers.get("X-Clawd-API-Key", "")
-            if api_key == settings.clawd_bot_api_key:
-                _logger.info(f"Clawd bot API key authenticated for {path}")
+        # Allow /api/sites/* with Sentry bot API key
+        if path.startswith("/api/sites/") and settings.sentry_bot_api_key:
+            api_key = request.headers.get("X-Sentry-API-Key", "")
+            if api_key == settings.sentry_bot_api_key:
+                _logger.info(f"Sentry bot API key authenticated for {path}")
                 return await call_next(request)
             # If API key provided but wrong, log it as security event
             if api_key:

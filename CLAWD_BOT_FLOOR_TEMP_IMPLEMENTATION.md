@@ -3,9 +3,9 @@
 ## Overview
 This document provides the complete implementation for adding floor temperature queries to the Clawd Telegram bot.
 
-**Files to modify:** `/home/bederf/clawd/tools/clawd_ai_bridge.py`
+**Files to modify:** `$SENTRY_HOME/tools/clawd_ai_bridge.py`
 
-**Existing functions to wire:** `get_zone_temperatures()` and `format_zone_temperatures()` from `/home/bederf/clawd/tools/bms_query.py`
+**Existing functions to wire:** `get_zone_temperatures()` and `format_zone_temperatures()` from `$SENTRY_HOME/tools/bms_query.py`
 
 ---
 
@@ -130,7 +130,7 @@ async def detect_and_route(
 ### Verification Commands
 
 ```bash
-# After implementing changes, restart Clawd bot
+# After implementing changes, restart Sentry bot
 systemctl restart clawd  # or your restart command
 
 # Test via Telegram
@@ -165,17 +165,17 @@ If Supabase is unavailable, the formatter should fall back to cached/mock data.
 These functions already exist and just need to be wired in:
 
 - **`get_zone_temperatures(site_code)`** — Queries Supabase for zones
-  - Location: `/home/bederf/clawd/tools/bms_query.py` (line ~242)
+  - Location: `$SENTRY_HOME/tools/bms_query.py` (line ~242)
   - Returns dict with zones, timestamps, site info
 
 - **`format_zone_temperatures(zones_data)`** — Formats response for Telegram
-  - Location: `/home/bederf/clawd/tools/bms_query.py` (line ~300+)
+  - Location: `$SENTRY_HOME/tools/bms_query.py` (line ~300+)
   - Returns human-readable text or Markdown
 
 ### Modified Function
 
 - **`detect_and_route()`** — Add floor temp check before AI fallback
-  - Location: `/home/bederf/clawd/tools/clawd_ai_bridge.py`
+  - Location: `$SENTRY_HOME/tools/clawd_ai_bridge.py`
   - Add 3 lines to integrate new handler
 
 ---
@@ -194,7 +194,7 @@ The handler should gracefully handle:
 ## Fallback Behavior
 
 If Supabase is down, the existing `format_zone_temperatures()` function should:
-- Use `/home/bederf/clawd/data/hvac_zones.json` (if available)
+- Use `$SENTRY_HOME/data/hvac_zones.json` (if available)
 - Or return mock data with latest known temperatures
 - Always inform user of data freshness: "Last updated: HH:MM UTC"
 
@@ -221,7 +221,7 @@ If Supabase is down, the existing `format_zone_temperatures()` function should:
 - [ ] Add routing check to `detect_and_route()`
 - [ ] Verify Supabase connection works in test environment
 - [ ] Test all 5 test cases above
-- [ ] Restart Clawd bot service
+- [ ] Restart Sentry bot service
 - [ ] Monitor logs for errors (check `journalctl -u clawd` or bot logs)
 - [ ] Confirm successful responses in Telegram
 

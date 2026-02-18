@@ -23,7 +23,7 @@ This creates realistic sensor readings that feed the AI/ML feedback loop and pro
 ```python
 class ThermalSimulationEngine:
     def __init__(self, building_id, consider_equipment_health=False)
-    
+
     async update_zone_temperatures(
         simulated_hour,      # 0-23
         occupancy_data,      # {zone_id: occupancy_pct}
@@ -244,13 +244,13 @@ consider_equipment_health=False  # Default
 2. **Degrade equipment in database**:
    ```sql
    -- Simulate chiller degradation to 50% health
-   UPDATE equipment 
-   SET health_score = 50 
+   UPDATE equipment
+   SET health_score = 50
    WHERE code = 'S002-CHILLER-B1-001';
-   
+
    -- Or degrade multiple systems
-   UPDATE equipment 
-   SET health_score = 60 
+   UPDATE equipment
+   SET health_score = 60
    WHERE code LIKE 'S002-AHU-%';
    ```
 

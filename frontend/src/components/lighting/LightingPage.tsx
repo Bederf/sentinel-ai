@@ -142,7 +142,7 @@ export function LightingPage() {
                 )}
               </div>
               <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                {isSimulationRunning 
+                {isSimulationRunning
                   ? `Real-time daylight from simulation • Hour ${simulatedHour}:00 (Day ${daysSimulated}/365)`
                   : 'Wardew Tridonic Integration'
                 }
@@ -174,9 +174,9 @@ function DALIZoneCard({ zone }: { zone: Zone }) {
   const handleBrightnessChange = async (newBrightness: number) => {
     setBrightness(newBrightness);
     // TODO: Call API to update brightness
-    // await fetch(`/api/zones/${zone.id}/brightness`, { 
-    //   method: 'POST', 
-    //   body: JSON.stringify({ brightness: newBrightness }) 
+    // await fetch(`/api/zones/${zone.id}/brightness`, {
+    //   method: 'POST',
+    //   body: JSON.stringify({ brightness: newBrightness })
     // });
   };
 

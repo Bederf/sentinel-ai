@@ -12,7 +12,7 @@ from pydantic import BaseModel
 
 # Import simulation service for live alerts
 from app.api.simulation import simulation_service
-from app.services.clawd_integration.alert_notifier import alert_notifier
+from app.services.sentry_integration.alert_notifier import alert_notifier
 
 router = APIRouter()
 
@@ -458,7 +458,7 @@ class CreateAlertRequest(BaseModel):
     zone_name: Optional[str] = None
     reading: Optional[float] = None
     setpoint: Optional[float] = None
-    notify_clawd: bool = True
+    notify_sentry: bool = True
     diagnostic_context: Optional[DiagnosticContextRequest] = None  # For work order data collection
 
 
@@ -474,10 +474,10 @@ class CreateAlertResponse(BaseModel):
 async def recalculate_equipment_health_score(client, equipment_id: str):
     """
     Recalculate equipment health score based on remaining active alerts.
-    
+
     Called after an alert is acknowledged or resolved to update equipment
     health_score and status based on any remaining active alerts.
-    
+
     Health score mapping:
     - No active alerts: 85 (normal)
     - Active warning alerts: 60 (warning)
@@ -485,13 +485,13 @@ async def recalculate_equipment_health_score(client, equipment_id: str):
     """
     if not equipment_id:
         return
-    
+
     try:
         # Get all non-acknowledged, non-resolved alerts for this equipment
         active_alerts = client.table("alerts").select("severity").eq(
             "equipment_id", equipment_id
         ).neq("status", "acknowledged").neq("status", "resolved").execute()
-        
+
         # Determine new health score based on remaining active alerts
         if not active_alerts.data or len(active_alerts.data) == 0:
             # No more active alerts - return to normal health
@@ -509,13 +509,13 @@ async def recalculate_equipment_health_score(client, equipment_id: str):
             else:
                 new_health_score = 85
                 new_status = "normal"
-        
+
         # Update equipment health score and status
         client.table("equipment").update({
             "health_score": new_health_score,
             "status": new_status
         }).eq("id", equipment_id).execute()
-        
+
         import logging
         logger = logging.getLogger(__name__)
         logger.info(
@@ -603,12 +603,12 @@ async def create_alert(http_request: Request, request: CreateAlertRequest) -> Cr
     # - warning alert → health_score = 60 (below 90 threshold)
     try:
         health_score = 30 if request.severity.lower() == "critical" else 60 if request.severity.lower() == "warning" else 85
-        
+
         client.table("equipment").update({
             "health_score": health_score,
             "status": request.severity.lower()  # Also update status to warning/critical
         }).eq("id", eq["id"]).execute()
-        
+
         import logging
         logger = logging.getLogger(__name__)
         logger.info(f"Updated equipment {request.equipment_code} health_score to {health_score} (severity: {request.severity})")
@@ -639,7 +639,7 @@ async def create_alert(http_request: Request, request: CreateAlertRequest) -> Cr
 
     # Send Clawd notification if requested
     clawd_notified = False
-    if request.notify_clawd:
+    if request.notify_sentry:
         clawd_alert = {
             "id": alert_id,
             "building_name": building_name,
@@ -682,10 +682,10 @@ async def acknowledge_alert(request: Request, alert_id: str, acknowledged_by: st
 
         # First, fetch the alert to get equipment_id
         alert_result = client.table("alerts").select("id, equipment_id, severity").eq("id", alert_id).execute()
-        
+
         if not alert_result.data:
             raise HTTPException(status_code=404, detail=f"Alert {alert_id} not found")
-        
+
         alert_data = alert_result.data[0]
         equipment_id = alert_data.get("equipment_id")
 
@@ -738,7 +738,7 @@ async def dispatch_work_order(alert_id: str, request: DispatchWorkOrderRequest):
     so Clawd asks targeted questions based on the detected fault.
     """
     from app.database.supabase_client import get_supabase_client
-    from app.services.clawd_integration.work_order_notifier import work_order_notifier
+    from app.services.sentry_integration.work_order_notifier import work_order_notifier
 
     client = get_supabase_client()
 

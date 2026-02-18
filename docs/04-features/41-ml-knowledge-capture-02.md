@@ -176,18 +176,18 @@ POST /api/ocr/correction/{service_record_id}/cancel
 
 ```bash
 # Service sheet photo upload from Telegram
-POST /api/clawd/ocr/process-service-sheet
+POST /api/sentry/ocr/process-service-sheet
   - JSON body: service_record_id, equipment_id, service_type,
                telegram_user_id, image_data (base64), media_type
   - Returns: prompt (for correction) or extracted_data
 
 # Correction submission from Telegram
-POST /api/clawd/ocr/correction
+POST /api/sentry/ocr/correction
   - JSON body: service_record_id, correction
   - Returns: next prompt or completion
 
 # Check OCR status
-GET /api/clawd/ocr/status/{service_record_id}
+GET /api/sentry/ocr/status/{service_record_id}
 ```
 
 ## Data Flow
@@ -197,9 +197,9 @@ GET /api/clawd/ocr/status/{service_record_id}
 ```
 Technician sends service sheet photo in Telegram
     ↓
-Clawd bot receives photo → Encodes to base64
+Sentry bot receives photo → Encodes to base64
     ↓
-POST /api/clawd/ocr/process-service-sheet
+POST /api/sentry/ocr/process-service-sheet
 {
     "service_record_id": "SR-2026-ABC123",
     "equipment_id": "gen-001",
@@ -272,7 +272,7 @@ Clawd shows: "⚠️ Battery voltage not detected. Please type the value:"
     ↓
 Technician replies: "24.5"
     ↓
-POST /api/clawd/ocr/correction
+POST /api/sentry/ocr/correction
 {
     "service_record_id": "SR-2026-ABC123",
     "correction": "24.5"
@@ -390,7 +390,7 @@ def _determine_final_status(ocr_confidence, validation_score, issues):
 python -c "from app.services.ocr_service import OCRService; print('OK')"
 
 # Test correction handler
-python -c "from app.services.clawd_integration.ocr_correction_handler import OCRCorrectionHandler; print('OK')"
+python -c "from app.services.sentry_integration.ocr_correction_handler import OCRCorrectionHandler; print('OK')"
 
 # Full unit tests
 pytest tests/services/test_ocr_service.py -v
@@ -436,7 +436,7 @@ curl -X POST http://localhost:9095/api/ocr/correction/SR-2026-TEST \
 
 ```bash
 # Simulate Clawd photo upload
-curl -X POST http://localhost:9095/api/clawd/ocr/process-service-sheet \
+curl -X POST http://localhost:9095/api/sentry/ocr/process-service-sheet \
   -H "Content-Type: application/json" \
   -d '{
     "service_record_id": "SR-2026-TEST",
@@ -450,7 +450,7 @@ curl -X POST http://localhost:9095/api/clawd/ocr/process-service-sheet \
 
 ## Security
 
-- Clawd webhook endpoints protected with `X-Clawd-Secret` header
+- Sentry webhook endpoints protected with `X-Sentry-Secret` header
 - File uploads validated by MIME type (image/* only)
 - Equipment ID validated against database
 - Audit trail for all corrections
@@ -496,5 +496,5 @@ Based on `/opt/aimthelaw/backendv2/app/services/receipt_service.py`:
 
 Dependencies:
 - Claude Vision API (via ANTHROPIC_API_KEY)
-- Clawd bot at `/home/bederf/clawd`
+- Sentry bot at `$SENTRY_HOME`
 - ML templates in `ml_data_templates.json`

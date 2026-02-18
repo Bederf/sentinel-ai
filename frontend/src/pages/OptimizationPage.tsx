@@ -25,7 +25,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { useSimulation } from "@/contexts/SimulationContext";
-import { Table, TableHead, TableRow, TableHeaderCell, TableBody, TableCell, Button, TabGroup, TabList, Tab, TabPanels, TabPanel } from "@tremor/react";
+import { Table, TableHead, TableRow, TableHeaderCell, TableBody, TableCell, Button, TabGroup, TabList, Tab, TabPanels, TabPanel, Title, Text } from "@tremor/react";
 import api from '@/lib/api';
 import type { OptimizationScenario, OptimizationStatusResponse, Site } from '@/lib/api';
 import { OptimizationPanelGated } from "../components/OptimizationPanelGated";

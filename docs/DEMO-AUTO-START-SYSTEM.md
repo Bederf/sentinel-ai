@@ -302,7 +302,7 @@ SCENARIOS = {
         auto_repair=True,
         repair_delay_hours=2,
         optimization_enabled=True,
-        clawd_notifications=False,
+        sentry_notifications=False,
         operation_mode=OperationMode.HVAC_DALI_SENTINEL  # Pick appropriate mode
     ),
 }
@@ -317,7 +317,7 @@ SCENARIOS = {
 - `auto_repair`: Auto-complete repair after delay
 - `repair_delay_hours`: Hours after fault before auto-repair
 - `optimization_enabled`: Enable AI optimization recommendations
-- `clawd_notifications`: Send Telegram notifications
+- `sentry_notifications`: Send Telegram notifications
 - `operation_mode`: HVAC_ONLY, HVAC_DALI, HVAC_DALI_SENTINEL, SOLAR_BESS_BASELINE, SOLAR_BESS_SENTINEL
 
 ---

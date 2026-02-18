@@ -58,7 +58,7 @@ export function useOccupancySync({
     // Distribute total occupancy across zones proportionally
     for (const zone of zones) {
       const zoneOccupancy = Math.round((zone.max / totalMaxOccupancy) * totalOccupancy);
-      
+
       simulation.updateZoneTarget({
         zoneId: zone.zoneId,
         targetOccupancy: zoneOccupancy,

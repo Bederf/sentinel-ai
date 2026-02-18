@@ -146,7 +146,7 @@ export function SolarDashboard() {
               className="text-xs"
               style={{ color: "var(--color-sentinel-text-secondary)" }}
             >
-              {isSimulationRunning 
+              {isSimulationRunning
                 ? `Real-time generation from simulation • Hour ${simulatedHour}:00 (Day ${daysSimulated}/365) • ${cloudCover?.toFixed(0)}% cloud cover`
                 : 'Generation, storage, dispatch, and financial performance'
               }

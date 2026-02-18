@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Backend running: `./start-backend.sh` 
+- Backend running: `./start-backend.sh`
 - No authentication required for this test (demo mode)
 
 ## Step 1: Get Available Equipment
@@ -40,7 +40,7 @@ curl -X POST http://localhost:9095/api/alerts \
     "message": "Equipment temperature exceeded safe threshold",
     "reading": 32.5,
     "setpoint": 25,
-    "notify_clawd": false
+    "notify_sentry": false
   }' | jq '{id, status, message}'
 ```
 
@@ -314,7 +314,7 @@ ALERT=$(curl -s -X POST http://localhost:9095/api/alerts \
     "message": "Exceeded threshold",
     "reading": 32.5,
     "setpoint": 25,
-    "notify_clawd": false
+    "notify_sentry": false
   }')
 ALERT_ID=$(echo $ALERT | jq -r '.id')
 echo "Alert created: $ALERT_ID"

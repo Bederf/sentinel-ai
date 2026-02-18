@@ -26,7 +26,7 @@ def register_safety_simulation_routers(app: FastAPI) -> None:
     # Service records and ML data collection
     app.include_router(service_records.router, tags=["service-records"])
 
-    # Clawd integration
+    # Sentry integration
     app.include_router(clawd_webhooks.router, tags=["clawd"])
 
     # OCR for service sheets

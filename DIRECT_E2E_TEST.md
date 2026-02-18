@@ -51,7 +51,7 @@ curl -X POST http://localhost:9095/api/alerts/supabase \
     "message": "Equipment temperature exceeded safe threshold",
     "reading": 32.5,
     "setpoint": 25,
-    "notify_clawd": false
+    "notify_sentry": false
   }' | jq '.id'
 
 # Capture alert ID
@@ -335,7 +335,7 @@ EQUIPMENT_NAME=$(echo $EQUIPMENT | jq -r '.name')
 echo "=== STEP 1: Create Alert ==="
 curl -X POST http://localhost:9095/api/alerts/supabase \
   -H "Content-Type: application/json" \
-  -d '{"equipment_code":"'$EQUIPMENT_NAME'","severity":"warning","type":"temperature","title":"High Temp","message":"Exceeded threshold","reading":32.5,"setpoint":25,"notify_clawd":false}' | jq .
+  -d '{"equipment_code":"'$EQUIPMENT_NAME'","severity":"warning","type":"temperature","title":"High Temp","message":"Exceeded threshold","reading":32.5,"setpoint":25,"notify_sentry":false}' | jq .
 
 echo "=== STEP 2: Verify Health Dropped ==="
 curl -s http://localhost:9095/api/equipment | jq ".equipment[] | select(.id == \"$EQUIPMENT_ID\") | {health_score, status}"

@@ -1,7 +1,7 @@
 """
 Clawd JWT Authentication Service
 
-Manages JWT token generation and refresh for Clawd bot to access SENTINEL API endpoints.
+Manages JWT token generation and refresh for Sentry bot to access SENTINEL API endpoints.
 Runs as a service in the background, automatically refreshing tokens before expiry.
 """
 
@@ -22,26 +22,26 @@ _jwt_cache = {
 }
 
 
-class ClauwdAuthService:
-    """Manages JWT authentication for Clawd bot."""
+class SentryAuthService:
+    """Manages JWT authentication for Sentry bot."""
 
     def __init__(
         self,
         api_url: str = "http://localhost:9095",
-        clawd_username: Optional[str] = None,
-        clawd_password: Optional[str] = None,
+        sentry_username: Optional[str] = None,
+        sentry_password: Optional[str] = None,
     ):
         """
         Initialize Clawd auth service.
 
         Args:
             api_url: SENTINEL backend API URL
-            clawd_username: Clawd service account username (from env or init)
-            clawd_password: Clawd service account password (from env or init)
+            sentry_username: Clawd service account username (from env or init)
+            sentry_password: Clawd service account password (from env or init)
         """
         self.api_url = api_url.rstrip("/")
-        self.clawd_username = clawd_username or self._get_from_env("CLAWD_BOT_USERNAME")
-        self.clawd_password = clawd_password or self._get_from_env("CLAWD_BOT_PASSWORD")
+        self.sentry_username = sentry_username or self._get_from_env("SENTRY_BOT_USERNAME")
+        self.sentry_password = sentry_password or self._get_from_env("SENTRY_BOT_PASSWORD")
         self.refresh_interval = 60 * 60  # Refresh every hour
         self._refresh_task: Optional[asyncio.Task] = None
 
@@ -53,27 +53,27 @@ class ClauwdAuthService:
 
     async def login(self) -> bool:
         """
-        Authenticate Clawd bot and get JWT token.
+        Authenticate Sentry bot and get JWT token.
 
         Returns:
             True if login successful, False otherwise
         """
-        if not self.clawd_username or not self.clawd_password:
+        if not self.sentry_username or not self.sentry_password:
             logger.error(
-                "Clawd bot credentials not configured. "
-                "Set CLAWD_BOT_USERNAME and CLAWD_BOT_PASSWORD in .env"
+                "Sentry bot credentials not configured. "
+                "Set SENTRY_BOT_USERNAME and SENTRY_BOT_PASSWORD in .env"
             )
             return False
 
         try:
             url = f"{self.api_url}/api/auth/login"
             payload = {
-                "username": self.clawd_username,
-                "password": self.clawd_password,
+                "username": self.sentry_username,
+                "password": self.sentry_password,
             }
 
             async with httpx.AsyncClient(timeout=10) as client:
-                logger.info(f"Clawd bot logging in as {self.clawd_username}...")
+                logger.info(f"Sentry bot logging in as {self.sentry_username}...")
                 response = await client.post(url, json=payload)
 
                 if response.status_code == 200:
@@ -87,25 +87,25 @@ class ClauwdAuthService:
                     _jwt_cache["last_refresh"] = datetime.utcnow()
 
                     logger.info(
-                        f"✓ Clawd bot JWT token obtained (expires in {expires_in}s)"
+                        f"✓ Sentry bot JWT token obtained (expires in {expires_in}s)"
                     )
                     return True
                 elif response.status_code == 401:
                     logger.error(
-                        f"Clawd bot login failed: Invalid credentials for {self.clawd_username}"
+                        f"Sentry bot login failed: Invalid credentials for {self.sentry_username}"
                     )
                     return False
                 else:
                     logger.error(
-                        f"Clawd bot login error ({response.status_code}): {response.text}"
+                        f"Sentry bot login error ({response.status_code}): {response.text}"
                     )
                     return False
 
         except httpx.HTTPError as e:
-            logger.error(f"Clawd bot login HTTP error: {e}")
+            logger.error(f"Sentry bot login HTTP error: {e}")
             return False
         except Exception as e:
-            logger.error(f"Clawd bot login unexpected error: {e}")
+            logger.error(f"Sentry bot login unexpected error: {e}")
             return False
 
     def get_token(self) -> Optional[str]:
@@ -181,43 +181,43 @@ class ClauwdAuthService:
 
 
 # Global service instance
-_clawd_auth_service: Optional[ClauwdAuthService] = None
+_sentry_auth_service: Optional[SentryAuthService] = None
 
 
-def initialize_clawd_auth(
+def initialize_sentry_auth(
     api_url: str = "http://localhost:9095",
-    clawd_username: Optional[str] = None,
-    clawd_password: Optional[str] = None,
-) -> ClauwdAuthService:
+    sentry_username: Optional[str] = None,
+    sentry_password: Optional[str] = None,
+) -> SentryAuthService:
     """
     Initialize global Clawd auth service.
 
     Should be called on app startup (in events.py).
     """
-    global _clawd_auth_service
+    global _sentry_auth_service
 
-    _clawd_auth_service = ClauwdAuthService(
+    _sentry_auth_service = SentryAuthService(
         api_url=api_url,
-        clawd_username=clawd_username,
-        clawd_password=clawd_password,
+        sentry_username=sentry_username,
+        sentry_password=sentry_password,
     )
 
     logger.info("Clawd auth service initialized")
-    return _clawd_auth_service
+    return _sentry_auth_service
 
 
-def get_clawd_auth_service() -> Optional[ClauwdAuthService]:
+def get_sentry_auth_service() -> Optional[SentryAuthService]:
     """Get global Clawd auth service instance."""
-    return _clawd_auth_service
+    return _sentry_auth_service
 
 
-async def get_clawd_jwt_token() -> Optional[str]:
+async def get_sentry_jwt_token() -> Optional[str]:
     """
-    Get valid JWT token for Clawd bot API calls.
+    Get valid JWT token for Sentry bot API calls.
 
     Automatically refreshes if expired.
     """
-    service = get_clawd_auth_service()
+    service = get_sentry_auth_service()
     if not service:
         logger.error("Clawd auth service not initialized")
         return None
@@ -225,7 +225,7 @@ async def get_clawd_jwt_token() -> Optional[str]:
     return await service.get_token_or_refresh()
 
 
-def get_clawd_jwt_headers() -> dict:
+def get_sentry_jwt_headers() -> dict:
     """
     Get HTTP headers dict with Clawd JWT token.
 

@@ -46,7 +46,7 @@ Background job wakes every 30 seconds
     ↓
 Processes all pending service records
     ↓
-Clawd bot sends Telegram: Equipment code, issue, diagnostics
+Sentry bot sends Telegram: Equipment code, issue, diagnostics
     ↓
 Technician receives notification on phone
 ```
@@ -60,7 +60,7 @@ Technician arrives on-site
     ↓
 Performs repair/maintenance (filter replacement, sensor calibration)
     ↓
-Submits service feedback via Clawd bot
+Submits service feedback via Sentry bot
     ├─ Templates loaded from ml_data_templates.json
     ├─ Questions: What action? Result? Impact?
     └─ Submits health impact score: positive/neutral/negative/critical
@@ -358,7 +358,7 @@ Hour 24: 06:00 AM - Next day (simulation ends)
    ↓
 7. Background job (30s) processes pending notifications
    ↓
-8. Clawd bot sends Telegram
+8. Sentry bot sends Telegram
    ↓
 9. Technician replies "done" or submits feedback
    ↓

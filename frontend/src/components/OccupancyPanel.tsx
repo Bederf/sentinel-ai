@@ -424,8 +424,8 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
               {displayOccupancy.toFixed(0)}%
             </span>
             <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-              {running 
-                ? "From simulation" 
+              {running
+                ? "From simulation"
                 : `${buildingOccupancy.occupied_sensors} of ${buildingOccupancy.total_sensors} sensors`}
             </span>
           </div>

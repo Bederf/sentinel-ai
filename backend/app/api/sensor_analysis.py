@@ -5,7 +5,7 @@ REST API for phyphox sensor data processing, baseline management, and trend anal
 
 Endpoints:
 - POST /api/sensor-analysis/process - Process phyphox data
-- POST /api/sensor-analysis/clawd/phyphox - Webhook for Clawd bot
+- POST /api/sensor-analysis/clawd/phyphox - Webhook for Sentry bot
 - GET /api/sensor-analysis/instructions/{type} - Get technician instructions
 - POST /api/sensor-analysis/baseline/{equipment_id} - Capture baseline
 - GET /api/sensor-analysis/baseline/{equipment_id} - Get baseline
@@ -21,7 +21,7 @@ from typing import Optional
 
 from fastapi import APIRouter, File, UploadFile, Form, HTTPException, Query
 
-from app.services.clawd_integration.phyphox_handler import get_phyphox_handler
+from app.services.sentry_integration.phyphox_handler import get_phyphox_handler
 from app.services.anomaly_reporter import get_anomaly_reporter
 from app.services.condition_scorer import get_condition_scorer
 from app.services.baseline_comparator import get_baseline_comparator
@@ -136,7 +136,7 @@ async def clawd_phyphox_webhook(
     service_record_id: Optional[str] = Form(None)
 ):
     """
-    Webhook for Clawd bot to submit phyphox data.
+    Webhook for Sentry bot to submit phyphox data.
     Returns formatted message for Telegram.
     """
     file_data = await file.read()

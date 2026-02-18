@@ -261,7 +261,7 @@ scheduler = BackgroundScheduler()
 scheduler.add_job(
     func=process_pending_notifications,
     trigger=IntervalTrigger(seconds=30),
-    id='clawd_notifications',
+    id='sentry_notifications',
     replace_existing=True
 )
 

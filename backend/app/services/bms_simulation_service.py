@@ -14,7 +14,7 @@ from dataclasses import dataclass, asdict
 import logging
 
 from app.services.health_threshold_service import get_health_thresholds
-from app.services.clawd_integration.alert_notifier import alert_notifier
+from app.services.sentry_integration.alert_notifier import alert_notifier
 
 logger = logging.getLogger(__name__)
 

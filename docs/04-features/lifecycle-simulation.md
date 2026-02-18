@@ -319,7 +319,7 @@ SCENARIOS = {
         auto_repair=True,  # Auto-repair after fault
         repair_delay_hours=3,  # How long before repair completes
         optimization_enabled=True,  # Run AI optimization
-        clawd_notifications=True,  # Send Telegram alerts
+        sentry_notifications=True,  # Send Telegram alerts
     ),
 }
 ```
@@ -384,7 +384,7 @@ Here's how Grant's 7-day demo is configured:
     fault_hour=None,  # Override with manual injection
     auto_repair=False,  # Manual repair demonstration
     optimization_enabled=True,  # Show AI recommendations
-    clawd_notifications=True,  # Send FM team alerts
+    sentry_notifications=True,  # Send FM team alerts
 ),
 ```
 
@@ -449,7 +449,7 @@ For executives reviewing portfolio-wide optimization:
     fault_probability=0.05,  # Random low probability
     auto_repair=True,  # Auto-repair to show full lifecycle
     optimization_enabled=True,  # Show all AI recommendations
-    clawd_notifications=True,
+    sentry_notifications=True,
 ),
 ```
 

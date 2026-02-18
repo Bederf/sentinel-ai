@@ -115,7 +115,7 @@ class ScenarioConfig:
     auto_repair: bool = True  # Automatically simulate technician repair
     repair_delay_hours: int = 2  # Hours after fault before repair
     optimization_enabled: bool = True
-    clawd_notifications: bool = True
+    sentry_notifications: bool = True
     operation_mode: Optional[OperationMode] = None
     demo_mode: bool = False  # Enable continuous AI recommendations (lower thresholds, BESS arbitrage)  # Building operation mode for demos
 
@@ -1399,16 +1399,16 @@ class LifecycleOrchestrator:
                 self.pending_repairs[fault_info["equipment_code"]]["work_order_id"] = wo_code
 
             # Notify Clawd if enabled
-            if self.current_scenario and self.current_scenario.clawd_notifications:
-                await self._notify_clawd(equipment, fault_info, wo_code)
+            if self.current_scenario and self.current_scenario.sentry_notifications:
+                await self._notify_sentry(equipment, fault_info, wo_code)
 
         except Exception as e:
             logger.error(f"Alert generation error: {e}")
 
-    async def _notify_clawd(self, equipment: Dict, fault_info: Dict, work_order_code: str):
-        """Send notification to Clawd bot."""
+    async def _notify_sentry(self, equipment: Dict, fault_info: Dict, work_order_code: str):
+        """Send notification to Sentry bot."""
         try:
-            from app.services.clawd_integration.work_order_notifier import notify_technician_of_work_order
+            from app.services.sentry_integration.work_order_notifier import notify_technician_of_work_order
 
             # This would send actual Telegram message
             # For simulation, we just log it

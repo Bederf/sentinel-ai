@@ -17,7 +17,6 @@ import {
   Text,
   Badge,
   Grid,
-  Col,
   ProgressBar,
   Button,
 } from "@tremor/react";
@@ -104,23 +103,23 @@ export function CostValidationCard({
           <Title className="text-lg">Cost Validation</Title>
         </div>
         {varianceAbove15Pct ? (
-          <Badge variant="rose" className="text-xs">
-            🔴 Critical (>{(validation.variance_pct).toFixed(1)}%)
+          <Badge color="rose" className="text-xs">
+            🔴 Critical (&gt;{(validation.variance_pct).toFixed(1)}%)
           </Badge>
         ) : varianceAbove5Pct ? (
-          <Badge variant="warning" className="text-xs">
-            🟡 Warning (>{(validation.variance_pct).toFixed(1)}%)
+          <Badge color="yellow" className="text-xs">
+            🟡 Warning (&gt;{(validation.variance_pct).toFixed(1)}%)
           </Badge>
         ) : (
-          <Badge variant="success" className="text-xs">
+          <Badge color="green" className="text-xs">
             ✓ OK
           </Badge>
         )}
       </div>
 
-      <Grid numCols={2} gap="md" className="mb-4">
+      <Grid className="grid grid-cols-2 gap-4 mb-4">
         {/* Simulated Cost */}
-        <Col>
+        <div>
           <div className="bg-slate-700/50 rounded-lg p-3">
             <Text className="text-xs text-gray-400">Simulated Cost (Monthly)</Text>
             <div className="text-2xl font-bold text-white mt-1">
@@ -132,10 +131,10 @@ export function CostValidationCard({
               Energy + Water + Service
             </Text>
           </div>
-        </Col>
+        </div>
 
         {/* Real Invoice */}
-        <Col>
+        <div>
           <div className="bg-slate-700/50 rounded-lg p-3">
             <Text className="text-xs text-gray-400">Real Invoice</Text>
             {validation.real_cost_r ? (
@@ -159,10 +158,10 @@ export function CostValidationCard({
               </Text>
             )}
           </div>
-        </Col>
+        </div>
 
         {/* Variance Analysis */}
-        <Col>
+        <div>
           <div className="bg-slate-700/50 rounded-lg p-3">
             <div className="flex items-center justify-between mb-2">
               <Text className="text-xs text-gray-400">Variance %</Text>
@@ -197,10 +196,10 @@ export function CostValidationCard({
                 : "Out of range"}
             </Text>
           </div>
-        </Col>
+        </div>
 
         {/* Tariff Adjustment */}
-        <Col>
+        <div>
           <div className="bg-slate-700/50 rounded-lg p-3">
             <Text className="text-xs text-gray-400">Tariff Adjustment</Text>
             <div className="text-lg font-semibold text-white mt-1">
@@ -218,7 +217,7 @@ export function CostValidationCard({
               Confidence: {(validation.confidence * 100).toFixed(0)}%
             </Text>
           </div>
-        </Col>
+        </div>
       </Grid>
 
       {/* Recommendation */}

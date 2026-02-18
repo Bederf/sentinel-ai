@@ -156,7 +156,7 @@ Each checklist item follows the established schema from Phase 55:
 ### Lookup Flow (Clawd Bot)
 ```
 1. Technician assigned work order for S002-CHILLER-B1-001
-2. Clawd requests checklist: GET /api/clawd/inspection-checklist/chiller
+2. Clawd requests checklist: GET /api/sentry/inspection-checklist/chiller
 3. ChecklistService.get_template_for_inspection("chiller", "routine")
 4. Try Supabase → OEM template found (Carrier 30HXC) → return
 5. If not found → fall back to generic JSON chiller_weekly template

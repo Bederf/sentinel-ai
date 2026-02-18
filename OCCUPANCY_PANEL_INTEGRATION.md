@@ -26,7 +26,7 @@ import { useSimulation } from '@/contexts/SimulationContext';
 export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPanelProps) {
   // Get live simulation state when available
   const { running, occupancyPercent: simOccupancyPercent } = useSimulation();
-  
+
   // ... rest of component
 }
 ```
@@ -95,7 +95,7 @@ Component renders with live occupancy bars and stats
   - 18:00-22:00: Declining toward 5-10%
   - 22:00-08:00: Near 0% occupancy
 - All floors show same simulated occupancy (average building)
-- Labels change to indicate "Live Occupancy" 
+- Labels change to indicate "Live Occupancy"
 - Zone details also show simulated occupancy
 
 ---
@@ -147,10 +147,10 @@ import { useSimulation } from '@/contexts/SimulationContext';
 // 2. Call hook at top level
 function MyPage() {
   const { running, occupancyPercent, ambientTemp, solarEfficiency, ...other } = useSimulation();
-  
+
   // 3. Compute display values
   const displayValue = running ? simValue : apiValue;
-  
+
   // 4. Use in render
   return (
     <div>

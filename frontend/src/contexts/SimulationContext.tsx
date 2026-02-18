@@ -12,7 +12,7 @@ export interface SimulationState {
   daysSimulated: number           // 0-365
   cycleNum: number                // Number of cycles completed
   progressPct: number             // 0-100
-  
+
   // Weather & Environment
   ambientTemp: number             // °C
   isRaining: boolean
@@ -20,10 +20,10 @@ export interface SimulationState {
   solarEfficiency: number         // 0-100 (%)
   occupancyPercent: number        // 0-100 (%)
   currentSeason: string           // 'summer' | 'autumn' | 'winter' | 'spring'
-  
+
   // Energy/Load Data
   hvacLoadPercent: number         // 0-100 (%)
-  
+
   // Metadata
   scenario: string | null
   recentEvents: Array<{
@@ -32,7 +32,7 @@ export interface SimulationState {
     description: string
     equipment: string
   }>
-  
+
   // Status flags
   lastUpdated: number             // Timestamp (ms) of last successful poll
   isLoading: boolean
@@ -101,12 +101,12 @@ export function SimulationProvider({ children, siteId = 'site-002' }: Simulation
         currentSeason: data.current_season ?? prev.currentSeason,
         scenario: data.scenario ?? prev.scenario,
         recentEvents: data.recent_events ?? prev.recentEvents,
-        
+
         // Estimate hvacLoadPercent from ambient_temp
-        hvacLoadPercent: data.ambient_temp 
+        hvacLoadPercent: data.ambient_temp
           ? Math.max(0, Math.min(100, 30 + (data.ambient_temp - 22) * 3))
           : prev.hvacLoadPercent,
-        
+
         lastUpdated: Date.now(),
         isLoading: false,
         error: null,
@@ -142,7 +142,7 @@ export function SimulationProvider({ children, siteId = 'site-002' }: Simulation
 /**
  * Hook to access simulation state in components.
  * Returns current simulation state and a refresh function.
- * 
+ *
  * Usage:
  * ```tsx
  * const { simulatedHour, occupancyPercent, running } = useSimulation()

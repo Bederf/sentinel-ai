@@ -394,10 +394,10 @@ s3://sentinel-storage/service-records/SR-2026-ABC123/GEN5_BASELINE_PHOTO_FUEL_SY
 - **SensorAnalysis:** Analyzes vibration patterns for bearing wear, governor hunting
 
 ### API Endpoints
-- `POST /api/clawd/work-order/notify` - Create service record
-- `POST /api/clawd/work-order/response` - Receive attachment
-- `GET /api/clawd/work-order/status/{SR-CODE}` - Track progress
-- `POST /api/clawd/ocr/process-service-sheet` - OCR analysis
+- `POST /api/sentry/work-order/notify` - Create service record
+- `POST /api/sentry/work-order/response` - Receive attachment
+- `GET /api/sentry/work-order/status/{SR-CODE}` - Track progress
+- `POST /api/sentry/ocr/process-service-sheet` - OCR analysis
 - `GET /api/service-records/{equipment_id}` - Get baseline history
 
 ---

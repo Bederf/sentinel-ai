@@ -35,7 +35,7 @@ Clawd is a Telegram/WhatsApp bot that enables technicians and building occupants
 
 ### 1.3 Scope
 
-- **Systems involved:** Clawd bot (`/home/bederf/clawd`), SENTINEL API, WhatsApp Business API (Meta), Telegram Bot API
+- **Systems involved:** Sentry bot (`$SENTRY_HOME`), SENTINEL API, WhatsApp Business API (Meta), Telegram Bot API
 - **Geographic scope:** South Africa (users) with cross-border processing to Meta (US/Ireland) and Telegram (UAE/Netherlands/Singapore) infrastructure
 - **Data subjects:** Building technicians, facilities managers, building occupants
 - **Timeframe:** Ongoing operational use
@@ -73,7 +73,7 @@ Clawd is a Telegram/WhatsApp bot that enables technicians and building occupants
 
 | Source | Description | Lawful Basis |
 |--------|-------------|--------------|
-| Telegram Messages | User messages to Clawd bot | Contract (employment/service agreement) + Consent |
+| Telegram Messages | User messages to Sentry bot | Contract (employment/service agreement) + Consent |
 | WhatsApp Messages | User messages via WhatsApp Business API | Contract (employment/service agreement) + Consent |
 | SENTINEL API | Work order and equipment data | Legitimate interest (building management) |
 | Technician Database | Stored technician contact details | Contract (employment terms) |
@@ -134,7 +134,7 @@ Technician/Occupant (South Africa)
            v
     [WhatsApp/Telegram App]
            |
-           | Message to Clawd bot
+           | Message to Sentry bot
            v
     [WhatsApp Business API / Telegram Bot API]
            |                              |
@@ -190,7 +190,7 @@ Technician/Occupant (South Africa)
 | R2 | Cross-border transfer to multiple jurisdictions (US, Ireland, UAE, NL, SG) | Confidentiality |
 | R3 | Telegram bot messages not end-to-end encrypted | Confidentiality |
 | R4 | Platform data retention policies outside SENTINEL control | Confidentiality |
-| R5 | Unauthorised access to Clawd bot (impersonation) | Integrity |
+| R5 | Unauthorised access to Sentry bot (impersonation) | Integrity |
 | R6 | Work order data exposed via messaging platform | Confidentiality |
 | R7 | Platform security breach affecting technician data | Confidentiality |
 
@@ -220,7 +220,7 @@ Technician/Occupant (South Africa)
 | TC4 | **User authentication** - Telegram user ID verification against registered technicians | R5 | Implemented |
 | TC5 | **Message content sanitisation** - No building occupant names in work orders | R1, R6 | Implemented |
 | TC6 | **30-day message retention** - SENTINEL-side logs purged after 30 days | R4 | Implemented |
-| TC7 | **Secure webhook endpoints** - Clawd webhooks validate signature/tokens | R5 | Implemented |
+| TC7 | **Secure webhook endpoints** - Sentry webhooks validate signature/tokens | R5 | Implemented |
 
 ### 6.2 Organisational Controls
 
@@ -400,7 +400,7 @@ Processing may proceed only if:
 
 ### Appendix C: Clawd Bot Architecture
 
-The Clawd bot (`/home/bederf/clawd`) integrates with SENTINEL via:
+The Sentry bot (`$SENTRY_HOME`) integrates with SENTINEL via:
 - `clawd_ai_bridge.py` - Message routing and AI integration
 - `bms_desk_diagnosis.py` - Desk comfort diagnosis
 - SENTINEL API webhooks for work order management
@@ -424,8 +424,8 @@ The Clawd bot (`/home/bederf/clawd`) integrates with SENTINEL via:
 |----------|----------|
 | SENTINEL Third-Party Security Register | `docs/08-security/third-party-security-register.md` |
 | SENTINEL Consent and Privacy Controls | `docs/08-security/consent-and-privacy.md` |
-| Clawd Integration Documentation | `docs/CLAWD_INTEGRATION.md` |
-| Clawd Bot Code | `/home/bederf/clawd/` |
+| Clawd Integration Documentation | `docs/SENTRY_INTEGRATION.md` |
+| Clawd Bot Code | `$SENTRY_HOME/` |
 | WhatsApp Business Terms | https://www.whatsapp.com/legal/business-terms |
 | Telegram Bot API Terms | https://core.telegram.org/bots/tos |
 | POPIA Section 72 | Cross-border transfer requirements |

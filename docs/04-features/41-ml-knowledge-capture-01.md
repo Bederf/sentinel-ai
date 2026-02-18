@@ -44,7 +44,7 @@ Store in Training Dataset
 
 ### 2. Dual Notification (Simultaneous)
 - **Email**: technician@company.co.za with WO details
-- **Telegram**: Clawd bot sends message to @technician
+- **Telegram**: Sentry bot sends message to @technician
   ```
   🚨 HIGH PRIORITY WORK ORDER
 
@@ -276,13 +276,13 @@ Key flow:
 
 **Webhook API** (`backend/app/api/clawd_webhooks.py`):
 ```python
-POST   /api/clawd/work-order/response      # Handle tech replies
-GET    /api/clawd/work-order/status/{code}  # Get collection status
-POST   /api/clawd/work-order/notify         # Send WO notification
-POST   /api/clawd/work-order/complete/{code}  # Mark complete
+POST   /api/sentry/work-order/response      # Handle tech replies
+GET    /api/sentry/work-order/status/{code}  # Get collection status
+POST   /api/sentry/work-order/notify         # Send WO notification
+POST   /api/sentry/work-order/complete/{code}  # Mark complete
 ```
 
-Protected with `X-Clawd-Secret` header for security.
+Protected with `X-Sentry-Secret` header for security.
 
 ## Data Flow
 
@@ -320,9 +320,9 @@ Reply "done" when you complete the service.
 
 Technician completes service → Telegram reply "done"
 
-Clawd webhook calls BMS:
+Sentry webhook calls BMS:
 ```
-POST /api/clawd/work-order/response
+POST /api/sentry/work-order/response
 {
   "service_record_code": "SR-2026-ABC123",
   "telegram_user_id": "@jsmith",
@@ -479,7 +479,7 @@ python -m pytest tests/api/test_service_records.py::test_create_service_record -
 # Test ML template service
 python -m pytest tests/services/test_ml_template_service.py -v
 
-# Test Clawd webhooks
+# Test Sentry webhooks
 python -m pytest tests/api/test_clawd_webhooks.py -v
 ```
 
@@ -511,10 +511,10 @@ curl -X POST http://localhost:9095/api/service-records/{id}/attachment \
   -F "file=@/path/to/service_sheet.jpg"
 ```
 
-**Simulate Clawd webhook:**
+**Simulate Sentry webhook:**
 ```bash
-curl -X POST http://localhost:9095/api/clawd/work-order/response \
-  -H "X-Clawd-Secret: clawd-bms-phase-41" \
+curl -X POST http://localhost:9095/api/sentry/work-order/response \
+  -H "X-Sentry-Secret: sentry-bms-phase-41" \
   -H "Content-Type: application/json" \
   -d '{
     "service_record_code": "SR-2026-ABC123",
@@ -526,7 +526,7 @@ curl -X POST http://localhost:9095/api/clawd/work-order/response \
 
 ## Security
 
-- Clawd webhook endpoints require `X-Clawd-Secret` header
+- Sentry webhook endpoints require `X-Sentry-Secret` header
 - File uploads validated by MIME type
 - Equipment access checked via repository
 - Audit trail logged for all changes
@@ -556,12 +556,12 @@ curl -X POST http://localhost:9095/api/clawd/work-order/response \
 - `backend/app/services/ml_template_service.py` - Template management + context-aware prompts
 - `backend/app/services/zone_diagnostics.py` - Zone fault analysis and root cause
 - `backend/app/data/ml_data_templates.json` - Equipment templates (19 types)
-- `backend/app/services/clawd_integration/work_order_notifier.py` - Clawd integration + comprehensive response handling
+- `backend/app/services/clawd_integration/work_order_notifier.py` - Sentry integration + comprehensive response handling
 - `backend/app/services/clawd_integration/alert_notifier.py` - Send alerts to Telegram
 - `backend/app/api/clawd_webhooks.py` - Webhook endpoints
 - `backend/app/main.py` - Router inclusion
 
-**Clawd Side** (`/home/bederf/clawd`):
+**Clawd Side** (`$SENTRY_HOME`):
 - `tools/wo_notifier.py` - Send WO notifications to BMS
 - `tools/wo_conversation_handler.py` - Handle technician replies
 - `tools/clawd_ai_bridge.py` - Route WO conversations
@@ -570,7 +570,7 @@ curl -X POST http://localhost:9095/api/clawd/work-order/response \
 ## Usage Example
 
 ```python
-from app.services.clawd_integration.work_order_notifier import work_order_notifier
+from app.services.sentry_integration.work_order_notifier import work_order_notifier
 
 # When critical alert occurs
 await work_order_notifier.notify_technician({
@@ -595,6 +595,6 @@ await work_order_notifier.notify_technician({
 ✅ **IMPLEMENTED** - All components ready for integration testing
 
 Dependencies:
-- Clawd bot at `/home/bederf/clawd` (external)
+- Sentry bot at `$SENTRY_HOME` (external)
 - Telegram notification system
 - Supabase storage for files

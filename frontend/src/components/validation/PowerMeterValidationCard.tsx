@@ -17,7 +17,6 @@ import {
   Text,
   Badge,
   Grid,
-  Col,
   ProgressBar,
 } from "@tremor/react";
 import { AlertTriangle, Zap, TrendingDown } from "lucide-react";
@@ -106,7 +105,7 @@ export function PowerMeterValidationCard({
         </div>
         {isAnomalous && (
           <Badge
-            variant={isCritical ? "rose" : "warning"}
+            color={isCritical ? "rose" : "yellow"}
             className="text-xs"
           >
             {isCritical ? "🔴 Critical" : "🟡 Anomaly"}
@@ -114,9 +113,9 @@ export function PowerMeterValidationCard({
         )}
       </div>
 
-      <Grid numCols={2} gap="md" className="mb-4">
+      <Grid className="grid grid-cols-2 gap-4 mb-4">
         {/* Current Reading */}
-        <Col>
+        <div>
           <div className="bg-slate-700/50 rounded-lg p-3">
             <Text className="text-xs text-gray-400">Current Reading</Text>
             <div className="text-2xl font-bold text-white mt-1">
@@ -127,10 +126,10 @@ export function PowerMeterValidationCard({
               {validation.variance_pct.toFixed(1)}%
             </Text>
           </div>
-        </Col>
+        </div>
 
         {/* Baseline Stats */}
-        <Col>
+        <div>
           <div className="bg-slate-700/50 rounded-lg p-3">
             <Text className="text-xs text-gray-400">Baseline (Mean ± SD)</Text>
             <div className="text-lg font-semibold text-white mt-1">
@@ -140,10 +139,10 @@ export function PowerMeterValidationCard({
               Range: {validation.baseline_min.toFixed(1)} - {validation.baseline_max.toFixed(1)} kW
             </Text>
           </div>
-        </Col>
+        </div>
 
         {/* COP Performance */}
-        <Col>
+        <div>
           <div className="bg-slate-700/50 rounded-lg p-3">
             <div className="flex items-center justify-between mb-2">
               <Text className="text-xs text-gray-400">COP Performance</Text>
@@ -163,19 +162,19 @@ export function PowerMeterValidationCard({
               {copPercent.toFixed(0)}% of Design COP
             </Text>
           </div>
-        </Col>
+        </div>
 
         {/* Status */}
-        <Col>
+        <div>
           <div className="bg-slate-700/50 rounded-lg p-3">
             <Text className="text-xs text-gray-400">Validation Status</Text>
             <div className="mt-2">
               <Badge
-                variant={
+                color={
                   validation.validation_status === "ok"
-                    ? "success"
+                    ? "green"
                     : validation.validation_status === "warning"
-                    ? "warning"
+                    ? "yellow"
                     : "rose"
                 }
               >
@@ -188,7 +187,7 @@ export function PowerMeterValidationCard({
               </Text>
             )}
           </div>
-        </Col>
+        </div>
       </Grid>
 
       {isAnomalous && (

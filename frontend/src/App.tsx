@@ -130,10 +130,10 @@ function App() {
     const checkSimulationStatus = async () => {
       try {
         // Use demo_task_id if available (Grant's 365-day simulation), otherwise fall back to site-002
-        const statusEndpoint = demoTaskId 
+        const statusEndpoint = demoTaskId
           ? `/api/lifecycle/status/${demoTaskId}`
           : '/api/lifecycle/status/site-002';
-        
+
         const response = await fetch(statusEndpoint);
         const data = await response.json();
         setSimulationRunning(data.running === true);

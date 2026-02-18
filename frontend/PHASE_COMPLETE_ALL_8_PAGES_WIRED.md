@@ -244,7 +244,7 @@ const displayLabel = running ? "Live {metric}" : "{metric}";
     │         │         │         │         │
 Dashboard   Occupancy  Solar   ESG       Lighting
 Analytics   Dashboard  Page    Dashboard Page
-Panel       Page                          
+Panel       Page  
     │         │         │         │         │
  (running)  (hour)   (efficiency)(CO2)   (daylight)
  (temp)     (occ%)   (cloud%)   (day%)   (occupancy)

@@ -745,13 +745,13 @@ class WaterAlertService:
                 "message": str(e),
             }
 
-    async def notify_clawd_water_alert(
+    async def notify_sentry_water_alert(
         self,
         alert: WaterAlert,
         work_order_id: str,
         technician_id: Optional[str] = None,
     ) -> Dict:
-        """Notify Clawd bot of water leak alert.
+        """Notify Sentry bot of water leak alert.
 
         Args:
             alert: WaterAlert object

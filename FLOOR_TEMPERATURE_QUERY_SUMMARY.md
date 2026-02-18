@@ -39,9 +39,9 @@ Modified: `/opt/bms-intelligence/backend/app/services/chat_tools.py`
 
 ### Phase 2: Clawd Bot ⏳ READY FOR IMPLEMENTATION
 
-**Implementation guide created:** `CLAWD_BOT_FLOOR_TEMP_IMPLEMENTATION.md`
+**Implementation guide created:** `SENTRY_BOT_FLOOR_TEMP_IMPLEMENTATION.md`
 
-**What needs to be done in `/home/bederf/clawd/tools/clawd_ai_bridge.py`:**
+**What needs to be done in `$SENTRY_HOME/tools/clawd_ai_bridge.py`:**
 
 1. Add floor detection patterns and helper functions:
    - `FLOOR_TEMP_PATTERNS` list with 6 regex patterns
@@ -139,9 +139,9 @@ Modified: `/opt/bms-intelligence/backend/app/services/chat_tools.py`
 | File | Action | Status |
 |------|--------|--------|
 | `/opt/bms-intelligence/backend/app/services/chat_tools.py` | Modified (3 additions) | ✅ COMPLETE |
-| `/opt/bms-intelligence/CLAWD_BOT_FLOOR_TEMP_IMPLEMENTATION.md` | Created (implementation guide) | ✅ COMPLETE |
+| `/opt/bms-intelligence/SENTRY_BOT_FLOOR_TEMP_IMPLEMENTATION.md` | Created (implementation guide) | ✅ COMPLETE |
 | `/opt/bms-intelligence/FLOOR_TEMPERATURE_QUERY_SUMMARY.md` | This file | ✅ COMPLETE |
-| `/home/bederf/clawd/tools/clawd_ai_bridge.py` | Needs manual implementation | ⏳ READY |
+| `$SENTRY_HOME/tools/clawd_ai_bridge.py` | Needs manual implementation | ⏳ READY |
 
 ---
 
@@ -176,7 +176,7 @@ Modified: `/opt/bms-intelligence/backend/app/services/chat_tools.py`
 - Works immediately with existing hvac_zones.json
 
 ### For Clawd Bot (Phase 2 - When Ready)
-- Clawd bot service restart required after clawd_ai_bridge.py changes
+- Sentry bot service restart required after clawd_ai_bridge.py changes
 - No dependencies on Web Chat changes
 - Uses existing bms_query.py functions (no new Supabase queries)
 - Falls back to local data if Supabase unavailable
@@ -195,10 +195,10 @@ Modified: `/opt/bms-intelligence/backend/app/services/chat_tools.py`
    - Open AI Chat in browser
    - Ask about floor temperatures
 
-3. **When ready:** Apply Clawd bot changes from `CLAWD_BOT_FLOOR_TEMP_IMPLEMENTATION.md`
+3. **When ready:** Apply Sentry bot changes from `SENTRY_BOT_FLOOR_TEMP_IMPLEMENTATION.md`
    - Follow the implementation guide
    - Test via Telegram
-   - Restart Clawd bot service
+   - Restart Sentry bot service
 
 ---
 
@@ -207,8 +207,8 @@ Modified: `/opt/bms-intelligence/backend/app/services/chat_tools.py`
 - ✅ Tool definition added to CHAT_TOOLS
 - ✅ Handler registered in TOOL_HANDLERS  
 - ✅ Syntax verified
-- ✅ Clawd bot implementation guide created
-- ⏳ Awaiting Clawd bot manual implementation
+- ✅ Sentry bot implementation guide created
+- ⏳ Awaiting Sentry bot manual implementation
 - ⏳ Testing (both phases)
 
 **Code Quality:** All Python syntax valid, follows existing patterns, no linting issues expected.

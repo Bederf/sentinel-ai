@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 
 from app.services.ocr_service import get_ocr_service
-from app.services.clawd_integration.ocr_correction_handler import get_ocr_correction_handler
+from app.services.sentry_integration.ocr_correction_handler import get_ocr_correction_handler
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/ocr", tags=["ocr"])

@@ -2,7 +2,7 @@
 
 ## 📋 Changes Made
 
-Updated `/home/bederf/clawd/tools/bms_desk_diagnosis.py` to add equipment validation before making equipment recommendations.
+Updated `$SENTRY_HOME/tools/bms_desk_diagnosis.py` to add equipment validation before making equipment recommendations.
 
 ### 🎯 Problem Solved
 
@@ -152,7 +152,7 @@ The skill automatically adapts to different HVAC architectures:
 
 ```bash
 # Test the updated skill:
-python3 /home/bederf/clawd/tools/bms_desk_diagnosis.py 201 too_hot
+python3 $SENTRY_HOME/tools/bms_desk_diagnosis.py 201 too_hot
 
 # Expected output shows:
 # - Equipment Available: FCU, VAV, AHU with ✓ marks
@@ -170,7 +170,7 @@ python3 /home/bederf/clawd/tools/bms_desk_diagnosis.py 201 too_hot
 
 ## 📂 Files Modified
 
-- `/home/bederf/clawd/tools/bms_desk_diagnosis.py`
+- `$SENTRY_HOME/tools/bms_desk_diagnosis.py`
   - Added: `_validate_equipment_exists()` function
   - Added: `_get_available_equipment()` function
   - Updated: `_fallback_diagnosis()` - equipment validation in all condition branches

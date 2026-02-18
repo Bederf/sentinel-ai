@@ -4,7 +4,7 @@ This document describes the integration between Clawd (Telegram AI bot) and SENT
 
 ## Overview
 
-Clawd is a Telegram AI bot located at `/home/bederf/clawd` that integrates with SENTINEL for building management queries. Technicians can ask questions via Telegram and receive BMS-aware responses with actual HVAC readings, diagnostics, and device control capabilities.
+Clawd is a Telegram AI bot located at `$SENTRY_HOME` that integrates with SENTINEL for building management queries. Technicians can ask questions via Telegram and receive BMS-aware responses with actual HVAC readings, diagnostics, and device control capabilities.
 
 **Demo Building:** Sandton - Full DALI lighting + HVAC + Energy Centre integration
 - 300 desks (100 per floor, 20 per zone)
@@ -56,7 +56,7 @@ Clawd is a Telegram AI bot located at `/home/bederf/clawd` that integrates with 
 
 ## Clawd BMS Tools
 
-Located in `/home/bederf/clawd/tools/`:
+Located in `$SENTRY_HOME/tools/`:
 
 | Tool | Purpose | SENTINEL API Used |
 |------|---------|-------------------|
@@ -195,32 +195,32 @@ Pre-configured desks for testing at Sandton:
 
 ```bash
 # Direct API test
-python /home/bederf/clawd/tools/bms_desk_diagnosis.py 201 too_hot
+python $SENTRY_HOME/tools/bms_desk_diagnosis.py 201 too_hot
 
 # With building disambiguation
-python /home/bederf/clawd/tools/bms_desk_diagnosis.py L12-21 too_cold Sandton
+python $SENTRY_HOME/tools/bms_desk_diagnosis.py L12-21 too_cold Sandton
 
 # List available desks
-python /home/bederf/clawd/tools/bms_desk_diagnosis.py list Sandton
+python $SENTRY_HOME/tools/bms_desk_diagnosis.py list Sandton
 ```
 
 ### Test Device Control
 
 ```bash
 # List devices
-python /home/bederf/clawd/tools/bms_control.py list
+python $SENTRY_HOME/tools/bms_control.py list
 
 # Set temperature
-python /home/bederf/clawd/tools/bms_control.py temp S001-FCU-L0-A 22
+python $SENTRY_HOME/tools/bms_control.py temp S001-FCU-L0-A 22
 
 # Check safety
-python /home/bederf/clawd/tools/bms_control.py safety S001-CHILLER-B1-001
+python $SENTRY_HOME/tools/bms_control.py safety S001-CHILLER-B1-001
 ```
 
 ### Test AI Bridge
 
 ```bash
-python /home/bederf/clawd/tools/clawd_ai_bridge.py
+python $SENTRY_HOME/tools/clawd_ai_bridge.py
 ```
 
 ## SENTINEL API Requirements
@@ -374,7 +374,7 @@ Telegram bot commands can only contain letters, numbers, and underscores. Comman
 The alert notifier sends Telegram messages via the `clawdbot` CLI tool.
 
 ```python
-from app.services.clawd_integration.alert_notifier import alert_notifier
+from app.services.sentry_integration.alert_notifier import alert_notifier
 
 # Send alert to FM team
 alert_notifier.send_alert_sync({
@@ -395,7 +395,7 @@ The notifier automatically:
 3. Sends via `clawdbot message send` CLI
 
 **Configuration**:
-- FM Chat ID: Set in `alert_notifier.py` or via `CLAWD_FM_CHAT_ID` env var
+- FM Chat ID: Set in `alert_notifier.py` or via `SENTRY_FM_CHAT_ID` env var
 - Clawdbot must be installed and in PATH
 
 ## Work Order Commands
@@ -602,7 +602,7 @@ Store in service_readings table
 
 ```bash
 # Upload service sheet photo
-POST /api/clawd/ocr/process-service-sheet
+POST /api/sentry/ocr/process-service-sheet
 {
     "service_record_id": "SR-2026-ABC123",
     "equipment_id": "gen-001",
@@ -613,14 +613,14 @@ POST /api/clawd/ocr/process-service-sheet
 }
 
 # Submit correction
-POST /api/clawd/ocr/correction
+POST /api/sentry/ocr/correction
 {
     "service_record_id": "SR-2026-ABC123",
     "correction": "24.5"
 }
 
 # Check OCR status
-GET /api/clawd/ocr/status/{service_record_id}
+GET /api/sentry/ocr/status/{service_record_id}
 ```
 
 ### Correction Flow
@@ -664,7 +664,7 @@ All corrections tracked for ML data quality:
 - `backend/app/api/complaints.py` - Complaint endpoints
 - `backend/app/api/alerts.py` - Alert and dispatch endpoints
 - `backend/app/api/ocr.py` - OCR processing endpoints
-- `backend/app/api/clawd_webhooks.py` - Clawd webhook endpoints (WO + OCR)
+- `backend/app/api/clawd_webhooks.py` - Sentry webhook endpoints (WO + OCR)
 - `backend/app/services/complaint_handler.py` - Diagnosis logic
 - `backend/app/services/zone_diagnostics.py` - Zone fault analysis
 - `backend/app/services/ocr_service.py` - 3-stage OCR pipeline
@@ -675,7 +675,7 @@ All corrections tracked for ML data quality:
 - `backend/app/data/ml_data_templates.json` - Equipment-specific templates (23 types)
 - `backend/app/data/buildings/sandton/zones.json` - Zone definitions
 
-### Clawd (`/home/bederf/clawd`)
+### Clawd (`$SENTRY_HOME`)
 - `tools/bms_desk_diagnosis.py` - Desk diagnosis client
 - `tools/bms_control.py` - Device control client
 - `tools/clawd_ai_bridge.py` - Pattern detection & routing

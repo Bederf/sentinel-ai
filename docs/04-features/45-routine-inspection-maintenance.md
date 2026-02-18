@@ -749,7 +749,7 @@ POST /api/inspection/export-to-cmms
 Technician can trigger notifications:
 
 ```python
-from app.services.clawd_integration.work_order_notifier import WorkOrderNotifier
+from app.services.sentry_integration.work_order_notifier import WorkOrderNotifier
 
 notifier = WorkOrderNotifier()
 
