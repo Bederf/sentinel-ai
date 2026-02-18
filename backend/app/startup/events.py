@@ -66,6 +66,32 @@ async def startup_event(app: FastAPI) -> None:
             "Set JWT_SECRET_KEY for a dedicated signing secret."
         )
 
+    # === PARASITE Autonomous Control Safety Checks ===
+    # Phase 100 Security: Prevent accidental Tier 3 autonomous control in production
+    if settings.parasite_tier3_enabled and settings.environment == "production":
+        _logger.critical(
+            "🚨 PARASITE Tier 3 autonomous control is ENABLED in production — "
+            "refusing to start. Set PARASITE_TIER3_ENABLED=false in your .env file."
+        )
+        raise RuntimeError(
+            "PARASITE Tier 3 autonomous control cannot be enabled in production. "
+            "Set PARASITE_TIER3_ENABLED=false"
+        )
+
+    if not settings.parasite_enabled:
+        _logger.info("✅ PARASITE autonomous control: DISABLED (safe mode)")
+    elif settings.parasite_enabled and not settings.parasite_tier3_enabled:
+        _logger.warning(
+            "⚠️ PARASITE autonomous control: ENABLED (Tier 1-2 supervised only) — "
+            "device control requires manual approval"
+        )
+    elif settings.parasite_tier3_enabled:
+        _logger.warning(
+            "⚠️ PARASITE Tier 3 autonomous control: ENABLED — "
+            "BMS devices may be controlled without human approval. "
+            "Ensure safety boundaries are properly configured."
+        )
+
     _logger.info(f"Environment: {settings.environment}, Demo mode: {settings.demo_mode}")
 
     if testing_mode:
