@@ -7,8 +7,10 @@ import { ThresholdEditor } from "./ThresholdEditor";
 import { SafetyRulesEditor } from "./SafetyRulesEditor";
 import { PasswordModal } from "./PasswordModal";
 import { NotificationSettings } from "./NotificationSettings";
+import { NotificationChannelsSettings } from "./NotificationChannelsSettings";
 import { ThemeSwitcher } from "./ThemeSwitcher";
 import { useModules } from "../contexts/ModuleHooks";
+import { useState } from "react";
 import type { ModuleType } from "../lib/moduleRegistry";
 
 interface SettingsProps {
@@ -327,44 +329,13 @@ export function Settings({ onError }: SettingsProps) {
         </div>
 
         {/* Notification Settings */}
-        <div
-          className="glass-panel overflow-hidden"
-        >
-          <div className="p-4 border-b" style={{ borderColor: "var(--color-sentinel-border)" }}>
-            <div className="flex items-center gap-3">
-              <div
-                className="p-2 rounded"
-                style={{
-                  background: "rgba(245, 158, 11, 0.15)",
-                  color: "var(--color-sentinel-amber)",
-                }}
-              >
-                <Bell className="h-5 w-5" />
-              </div>
-              <div>
-                <h2
-                  className="text-lg font-semibold"
-                  style={{ color: "var(--color-sentinel-text-primary)" }}
-                >
-                  Notification Settings
-                </h2>
-                <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                  Configure alert commands and notification preferences for SENTRY bot
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="p-4">
-            <NotificationSettings
-              onError={onError}
-              onSuccess={() => {
-                setSaveSuccess(true);
-                setTimeout(() => setSaveSuccess(false), 3000);
-              }}
-            />
-          </div>
-        </div>
+        <NotificationSettingsPanel
+          onError={onError}
+          onSuccess={() => {
+            setSaveSuccess(true);
+            setTimeout(() => setSaveSuccess(false), 3000);
+          }}
+        />
 
         {/* Module Management */}
         <div
@@ -755,6 +726,120 @@ function GlassThemeControls() {
         >
           Reset to Default Theme
         </button>
+      </div>
+    </div>
+  );
+}
+
+// ========== Notification Settings Panel Component ==========
+
+/**
+ * Notification Settings Panel - Unified UI for notification configuration
+ * Combines SENTRY bot settings with Phase 102 multi-channel notifications
+ */
+function NotificationSettingsPanel({
+  onError,
+  onSuccess,
+}: {
+  onError?: (msg: string) => void;
+  onSuccess?: () => void;
+}) {
+  const [notifTab, setNotifTab] = useState<"sentry" | "channels">("channels");
+  const currentUserEmail = (() => {
+    try {
+      const raw = localStorage.getItem("sentinel_user");
+      if (!raw) return "";
+      const parsed = JSON.parse(raw) as { email?: string };
+      return parsed.email || "";
+    } catch {
+      return "";
+    }
+  })();
+
+  // Extract technician ID from local storage (for now, use email as ID)
+  // In production, this would come from user context
+  const technicianId = currentUserEmail.split("@")[0] || "technician";
+
+  return (
+    <div className="glass-panel overflow-hidden">
+      <div className="p-4 border-b" style={{ borderColor: "var(--color-sentinel-border)" }}>
+        <div className="flex items-center gap-3">
+          <div
+            className="p-2 rounded"
+            style={{
+              background: "rgba(245, 158, 11, 0.15)",
+              color: "var(--color-sentinel-amber)",
+            }}
+          >
+            <Bell className="h-5 w-5" />
+          </div>
+          <div>
+            <h2
+              className="text-lg font-semibold"
+              style={{ color: "var(--color-sentinel-text-primary)" }}
+            >
+              Notification Settings
+            </h2>
+            <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+              Configure multi-channel notifications and SENTRY bot preferences
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="p-4">
+        {/* Tabs */}
+        <div className="flex gap-2 border-b mb-6" style={{ borderColor: "var(--color-sentinel-border)" }}>
+          <button
+            onClick={() => setNotifTab("channels")}
+            className="px-4 py-2 text-sm font-medium border-b-2 transition-colors"
+            style={{
+              borderColor:
+                notifTab === "channels"
+                  ? "var(--color-sentinel-blue)"
+                  : "transparent",
+              color:
+                notifTab === "channels"
+                  ? "var(--color-sentinel-blue)"
+                  : "var(--color-sentinel-text-secondary)",
+            }}
+          >
+            Multi-Channel (Phase 102)
+          </button>
+          <button
+            onClick={() => setNotifTab("sentry")}
+            className="px-4 py-2 text-sm font-medium border-b-2 transition-colors"
+            style={{
+              borderColor:
+                notifTab === "sentry"
+                  ? "var(--color-sentinel-blue)"
+                  : "transparent",
+              color:
+                notifTab === "sentry"
+                  ? "var(--color-sentinel-blue)"
+                  : "var(--color-sentinel-text-secondary)",
+            }}
+          >
+            SENTRY Bot Alert Commands
+          </button>
+        </div>
+
+        {/* Channels Tab */}
+        {notifTab === "channels" && (
+          <NotificationChannelsSettings
+            technician_id={technicianId}
+            onError={onError}
+            onSuccess={onSuccess}
+          />
+        )}
+
+        {/* SENTRY Bot Tab */}
+        {notifTab === "sentry" && (
+          <NotificationSettings
+            onError={onError}
+            onSuccess={onSuccess}
+          />
+        )}
       </div>
     </div>
   );
