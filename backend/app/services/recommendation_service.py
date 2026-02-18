@@ -186,8 +186,44 @@ class RecommendationService:
         Raises:
             ValueError: If recommendation not in PENDING status
         """
-        # Note: In full implementation, would fetch from repository
-        raise NotImplementedError("Requires repository implementation (Task 4.3)")
+        from app.database.repositories import get_recommendation_repository
+
+        try:
+            repo = get_recommendation_repository()
+            
+            # Fetch recommendation
+            rec = await repo.get(rec_id)
+            if not rec:
+                raise ValueError(f"Recommendation {rec_id} not found")
+            
+            # Verify it's in PENDING status
+            if rec.status != RecommendationStatus.PENDING:
+                raise ValueError(
+                    f"Can only approve PENDING recommendations, got {rec.status.value}"
+                )
+            
+            # Update status and metadata
+            rec.status = RecommendationStatus.APPROVED
+            rec.approved_by = user_id
+            rec.approval_reason = reason
+            
+            # Execute the recommendation
+            await self.execute_recommendation(rec_id, rec)
+            
+            # Save updated recommendation
+            await repo.update(rec_id, rec)
+            
+            logger.info(
+                f"Approved recommendation {rec_id} by {user_id}: {rec.action_type} on {rec.target_equipment}"
+            )
+            
+            return rec
+            
+        except ValueError:
+            raise
+        except Exception as e:
+            logger.error(f"Error approving recommendation {rec_id}: {e}")
+            raise ValueError(f"Failed to approve recommendation: {e}")
 
     async def reject_recommendation(
         self, rec_id: str, user_id: str, reason: str
@@ -208,38 +244,41 @@ class RecommendationService:
         Raises:
             ValueError: If recommendation not in PENDING status
         """
-        # Note: In full implementation, would fetch from repository
-        # For now, create a dummy recommendation to demonstrate learning integration
-        try:
-            # Create a sample recommendation for demonstration
-            rec = Recommendation(
-                id=rec_id,
-                site_id="site-002",
-                action_type="hvac_setpoint_change",
-                target_equipment="S002-AHU-L1-A",
-                action={"point": "setpoint", "value": 20.0},
-                status="pending",
-            )
+        from app.database.repositories import get_recommendation_repository
 
+        try:
+            repo = get_recommendation_repository()
+            
+            # Fetch recommendation
+            rec = await repo.get(rec_id)
+            if not rec:
+                raise ValueError(f"Recommendation {rec_id} not found")
+            
+            # Verify it's in PENDING status
+            if rec.status != RecommendationStatus.PENDING:
+                raise ValueError(
+                    f"Can only reject PENDING recommendations, got {rec.status.value}"
+                )
+            
+            # Update status and metadata
             rec.status = RecommendationStatus.REJECTED
             rec.rejection_reason = reason
-
-            # NEW: Process rejection for learning
-            from app.services.rejection_learning_service import (
-                get_rejection_learning_service,
-            )
-
-            rejection_learning = get_rejection_learning_service()
-            await rejection_learning.process_rejection(rec, reason)
-
+            rec.approved_by = user_id  # Track who rejected it
+            
+            # Save updated recommendation
+            await repo.update(rec_id, rec)
+            
             logger.info(
                 f"Rejected recommendation {rec_id} by {user_id}: {reason}"
             )
-
+            
             return rec
+            
+        except ValueError:
+            raise
         except Exception as e:
             logger.error(f"Error rejecting recommendation {rec_id}: {e}")
-            raise
+            raise ValueError(f"Failed to reject recommendation: {e}")
 
     async def execute_recommendation(
         self, rec_id: str, rec: Recommendation

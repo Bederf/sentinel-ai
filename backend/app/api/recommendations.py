@@ -177,13 +177,28 @@ async def get_recommendation(rec_id: str):
         JSON response with recommendation details
     """
     try:
-        service = get_recommendation_service()
-        # Note: In full implementation, would fetch from repository
-        # For now, return 404 (repository method not yet integrated)
-        raise HTTPException(
-            status_code=501,
-            detail="Requires repository integration (Phase 72.5)"
-        )
+        from app.database.repositories import get_recommendation_repository
+        
+        repo = get_recommendation_repository()
+        rec = await repo.get(rec_id)
+        
+        if not rec:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Recommendation {rec_id} not found"
+            )
+        
+        return {
+            "success": True,
+            "recommendation": rec.to_dict(),
+            "status": rec.status.value,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching recommendation {rec_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
     except HTTPException:
         raise
@@ -214,12 +229,27 @@ async def approve_recommendation(
         user_id = request.headers.get("X-User-Id", "operator")
         service = get_recommendation_service()
 
-        # Note: In full implementation, would fetch and update via repository
-        # For now, return 501 (not yet implemented)
-        raise HTTPException(
-            status_code=501,
-            detail="Requires repository integration (Phase 72.5)"
+        rec = await service.approve_recommendation(
+            rec_id=rec_id,
+            user_id=user_id,
+            reason=body.reason,
         )
+
+        return {
+            "success": True,
+            "recommendation": rec.to_dict(),
+            "status": rec.status.value,
+            "message": f"Recommendation approved and executed by {user_id}",
+        }
+
+    except ValueError as e:
+        logger.error(f"Validation error approving recommendation {rec_id}: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error approving recommendation {rec_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
     except HTTPException:
         raise
@@ -250,12 +280,27 @@ async def reject_recommendation(
         user_id = request.headers.get("X-User-Id", "operator")
         service = get_recommendation_service()
 
-        # Note: In full implementation, would fetch and update via repository
-        # For now, return 501 (not yet implemented)
-        raise HTTPException(
-            status_code=501,
-            detail="Requires repository integration (Phase 72.5)"
+        rec = await service.reject_recommendation(
+            rec_id=rec_id,
+            user_id=user_id,
+            reason=body.reason,
         )
+
+        return {
+            "success": True,
+            "recommendation": rec.to_dict(),
+            "status": rec.status.value,
+            "message": f"Recommendation rejected by {user_id}",
+        }
+
+    except ValueError as e:
+        logger.error(f"Validation error rejecting recommendation {rec_id}: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error rejecting recommendation {rec_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
     except HTTPException:
         raise
