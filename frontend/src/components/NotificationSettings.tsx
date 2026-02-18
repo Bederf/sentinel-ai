@@ -1,7 +1,7 @@
 /**
  * NotificationSettings Component
  *
- * Manages alert command configuration for Clawd Telegram bot:
+ * Manages alert command configuration for SENTRY Telegram bot:
  * - Toggle which commands appear on alert messages (reset, info, note, wo)
  * - Configure alert cooldown period
  * - Configure equipment types blocked from remote reset

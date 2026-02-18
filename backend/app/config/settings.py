@@ -74,8 +74,7 @@ class Settings(BaseSettings):
     sentry_webhook_secret: str = ""
 
     # Sentry bot API key (for authenticated access to /api/sites/* endpoints)
-    # Maps from CLAWD_BOT_API_KEY (legacy) or SENTRY_BOT_API_KEY (current) env var
-    sentry_bot_api_key: str = Field(default="", validation_alias="CLAWD_BOT_API_KEY")
+    sentry_bot_api_key: str = Field(default="", validation_alias="SENTRY_BOT_API_KEY")
 
     # SIMBIOT Concept Evolution (FSI Public API) credentials
     simbiot_api_key: str = ""

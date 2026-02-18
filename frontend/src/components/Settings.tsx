@@ -349,7 +349,7 @@ export function Settings({ onError }: SettingsProps) {
                   Notification Settings
                 </h2>
                 <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                  Configure alert commands and notification preferences for Clawd bot
+                  Configure alert commands and notification preferences for SENTRY bot
                 </p>
               </div>
             </div>

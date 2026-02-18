@@ -1,12 +1,12 @@
 """
-Clawd AI Bridge Integration for Work Orders.
+SENTRY AI Bridge Integration for Work Orders.
 
-This script shows how to integrate with the existing clawd_ai_bridge.py
+This script shows how to integrate with the existing sentry_ai_bridge.py
 
-Add these patterns and handlers to $SENTRY_HOME/tools/clawd_ai_bridge.py
+Add these patterns and handlers to $SENTRY_HOME/tools/sentry_ai_bridge.py
 """
 
-# PATTERNS TO ADD TO clawd_ai_bridge.py:
+# PATTERNS TO ADD TO sentry_ai_bridge.py:
 
 """
 work_order_patterns = [
@@ -46,7 +46,7 @@ def is_work_order_message(message: str) -> tuple[bool, str | None]:
     return False, None
 """
 
-# HANDLERS TO ADD TO clawd_ai_bridge.py:
+# HANDLERS TO ADD TO sentry_ai_bridge.py:
 
 """
 from tools.wo_conversation_handler import WOConversationHandler
@@ -123,7 +123,7 @@ def handle_wo_status(service_record_code: str, telegram_user_id: str) -> str:
         return f"❌ Error: {str(e)}"
 """
 
-# INTEGRATION POINTS IN clawd_ai_bridge.py:
+# INTEGRATION POINTS IN sentry_ai_bridge.py:
 
 # Add to detect_and_route() function:
 """

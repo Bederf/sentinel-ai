@@ -822,7 +822,7 @@ function EquipmentWorkflowDetail({
               className="text-xs mt-2"
               style={{ color: 'var(--color-sentinel-text-secondary)' }}
             >
-              Technicians submit service feedback via Clawd bot after completing repairs.
+              Technicians submit service feedback via SENTRY bot after completing repairs.
               Feedback includes readings, photos, and observations that update equipment health.
             </p>
           </div>
