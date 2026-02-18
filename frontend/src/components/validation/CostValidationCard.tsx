@@ -95,6 +95,19 @@ export function CostValidationCard({
 
   if (!validation) return null;
 
+  // Check if we have at least simulated cost data
+  if (validation.simulated_cost_r === undefined) {
+    return (
+      <Card className={className}>
+        <div className="bg-yellow-900/20 border border-yellow-700/30 rounded-lg p-4">
+          <Text className="text-yellow-300 text-sm">
+            ⚠️ Cost Validation data not yet available. Please ensure building energy data is being collected.
+          </Text>
+        </div>
+      </Card>
+    );
+  }
+
   const varianceAbove5Pct =
     validation.variance_pct !== undefined && Math.abs(validation.variance_pct) > 5;
   const varianceAbove15Pct =

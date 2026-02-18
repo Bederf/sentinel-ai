@@ -102,6 +102,19 @@ export function PowerMeterValidationCard({
 
   if (!validation) return null;
 
+  // Check if we have required baseline data
+  if (validation.baseline_mean === undefined || validation.baseline_stdev === undefined) {
+    return (
+      <Card className={className}>
+        <div className="bg-yellow-900/20 border border-yellow-700/30 rounded-lg p-4">
+          <Text className="text-yellow-300 text-sm">
+            ⚠️ Power Meter Baseline data not yet available. Please ensure power meter data is being collected.
+          </Text>
+        </div>
+      </Card>
+    );
+  }
+
   const copPercent =
     validation.cop_current && validation.cop_design
       ? (validation.cop_current / validation.cop_design) * 100
