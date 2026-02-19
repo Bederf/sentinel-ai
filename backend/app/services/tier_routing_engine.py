@@ -14,7 +14,8 @@ Every decision is logged to parasite_decisions table with full context.
 """
 
 import logging
-from dataclasses import dataclass
+import uuid
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Dict, Tuple, Optional
 from enum import Enum
@@ -49,6 +50,7 @@ class TierRoutingResult:
     reason: str
     equipment_type: str
     risk_level: str
+    decision_id: str = field(default_factory=lambda: str(uuid.uuid4()))
 
 
 class TierRoutingEngine:
@@ -77,9 +79,7 @@ class TierRoutingEngine:
         self._auto_executions_this_hour = 0
         self._hour_start = datetime.utcnow()
 
-    async def route_recommendation(
-        self, recommendation: Dict
-    ) -> TierRoutingResult:
+    async def route_recommendation(self, recommendation: Dict) -> TierRoutingResult:
         """Route a recommendation to the appropriate autonomy tier.
 
         Implements the complete routing logic:
@@ -128,16 +128,11 @@ class TierRoutingEngine:
         #    Only reached if PARASITE is enabled
         if self.model_registry is None:
             self.model_registry = await get_model_registry()
-        tier2_threshold, tier3_threshold, threshold_source = await self.get_effective_thresholds(
-            equipment_type
-        )
+        tier2_threshold, tier3_threshold, threshold_source = await self.get_effective_thresholds(equipment_type)
 
         # 4. Risk level override: critical/high never auto-execute
         if risk_level in ("critical", "high"):
-            logger.info(
-                f"Risk level {risk_level} overrides to Tier 2 minimum "
-                f"(never auto-execute critical actions)"
-            )
+            logger.info(f"Risk level {risk_level} overrides to Tier 2 minimum (never auto-execute critical actions)")
             tier3_threshold = 999.0  # Impossible to reach Tier 3
 
         # 5. Tier 3 gate: disabled if not enabled in settings
@@ -152,13 +147,11 @@ class TierRoutingEngine:
 
         executions_remaining = max(
             0,
-            self.settings.parasite_max_auto_executions_per_hour
-            - self._auto_executions_this_hour,
+            self.settings.parasite_max_auto_executions_per_hour - self._auto_executions_this_hour,
         )
         if executions_remaining <= 0:
             logger.warning(
-                f"Rate limit reached ({self.settings.parasite_max_auto_executions_per_hour}/hour), "
-                "capping at Tier 2"
+                f"Rate limit reached ({self.settings.parasite_max_auto_executions_per_hour}/hour), capping at Tier 2"
             )
             tier3_threshold = 999.0  # Impossible to reach Tier 3
 
@@ -183,15 +176,11 @@ class TierRoutingEngine:
             tier = TierLevel.TIER3.value
             tier_num = 3
             action = "auto_execute"
-            reason = (
-                f"Confidence {confidence_score:.2f} meets Tier 3 threshold "
-                f"{tier3_threshold:.2f} - auto-executing"
-            )
+            reason = f"Confidence {confidence_score:.2f} meets Tier 3 threshold {tier3_threshold:.2f} - auto-executing"
             self._auto_executions_this_hour += 1
 
         logger.info(
-            f"Routed {equipment_type} to {tier} "
-            f"(confidence={confidence_score:.2f}, risk={risk_level}): {reason}"
+            f"Routed {equipment_type} to {tier} (confidence={confidence_score:.2f}, risk={risk_level}): {reason}"
         )
 
         # 8. Log decision to parasite_decisions
@@ -201,7 +190,7 @@ class TierRoutingEngine:
             {
                 "site_id": site_id,
                 "equipment_code": equipment_code,
-                "decision_type": f"tier{tier_num}_{'advisory' if tier_num == 1 else 'supervised' if tier_num == 2 else 'auto_execute'}",
+                "decision_type": f"tier{tier_num}_{action}",
                 "tier": f"tier{tier_num}",
                 "confidence_score": confidence_score,
                 "contributing_factors": {
@@ -233,9 +222,7 @@ class TierRoutingEngine:
             risk_level=risk_level,
         )
 
-    async def get_effective_thresholds(
-        self, equipment_type: str
-    ) -> Tuple[float, float, str]:
+    async def get_effective_thresholds(self, equipment_type: str) -> Tuple[float, float, str]:
         """Get effective thresholds, using stricter-of-two logic.
 
         Reads thresholds from TWO sources:
@@ -292,20 +279,13 @@ class TierRoutingEngine:
         """
         recent_decisions = await self.parasite_repo.get_recent_decisions(limit=100)
 
-        tier1_count = sum(
-            1 for d in recent_decisions if d.get("tier") == "tier1"
-        )
-        tier2_count = sum(
-            1 for d in recent_decisions if d.get("tier") == "tier2"
-        )
-        tier3_count = sum(
-            1 for d in recent_decisions if d.get("tier") == "tier3"
-        )
+        tier1_count = sum(1 for d in recent_decisions if d.get("tier") == "tier1")
+        tier2_count = sum(1 for d in recent_decisions if d.get("tier") == "tier2")
+        tier3_count = sum(1 for d in recent_decisions if d.get("tier") == "tier3")
 
         executions_remaining = max(
             0,
-            self.settings.parasite_max_auto_executions_per_hour
-            - self._auto_executions_this_hour,
+            self.settings.parasite_max_auto_executions_per_hour - self._auto_executions_this_hour,
         )
 
         return {
