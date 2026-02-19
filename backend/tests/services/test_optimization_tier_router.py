@@ -15,7 +15,7 @@ Total: 28 tests
 
 import pytest
 
-from backend.app.services.optimization_tier_router import (
+from app.services.optimization_tier_router import (
     OptimizationTierRouter,
     RoutingTier,
     get_tier_router,
@@ -174,14 +174,14 @@ class TestResolveControlTier:
         assert result == "auto_execute"
 
     def test_fallback_supervised_to_human_in_loop(self):
-        from backend.app.models.optimization import OptimizationSettings
+        from app.models.optimization import OptimizationSettings
 
         settings = OptimizationSettings(mode="supervised")
         result = OptimizationTierRouter.resolve_control_tier(None, settings)
         assert result == "human_in_loop"
 
     def test_fallback_automatic_to_auto_execute(self):
-        from backend.app.models.optimization import OptimizationSettings
+        from app.models.optimization import OptimizationSettings
 
         settings = OptimizationSettings(mode="automatic")
         result = OptimizationTierRouter.resolve_control_tier(None, settings)
@@ -285,14 +285,14 @@ class TestSingleton:
     """Test the module-level singleton accessor."""
 
     def test_get_tier_router_returns_instance(self):
-        import backend.app.services.optimization_tier_router as mod
+        import app.services.optimization_tier_router as mod
 
         mod._router_instance = None  # Reset
         router = get_tier_router()
         assert isinstance(router, OptimizationTierRouter)
 
     def test_get_tier_router_returns_same_instance(self):
-        import backend.app.services.optimization_tier_router as mod
+        import app.services.optimization_tier_router as mod
 
         mod._router_instance = None  # Reset
         r1 = get_tier_router()
