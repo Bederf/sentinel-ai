@@ -827,6 +827,61 @@ POST /api/optimization/mv/verify
 
 ---
 
+## Financial ROI Recommendations (Phase A)
+
+Phase A adds financial recommendation endpoints that analyze consumption and
+validation data to produce ranked recommendations with payback periods and
+confidence scores.
+
+### Recommendation Types
+
+| Type | Input Signal | Savings Range | Confidence |
+|------|-------------|---------------|------------|
+| `lighting_optimization` | Daily lighting kWh > baseline | R8k-15k/year | 0.75-0.85 |
+| `water_efficiency` | Daily water > benchmark liters | R2k-8k/year | 0.65-0.80 |
+| `hvac_maintenance` | COP < 3.0 (degraded from 3.5) | R30k-50k/year | 0.85-0.95 |
+| `occupancy_optimization` | Low occupancy + high consumption | R5k-12k/year | 0.60-0.75 |
+
+### ROI Calculation
+
+```
+payback_months = investment_cost_r / (annual_savings_r / 12)
+roi_pct = (annual_savings_r / investment_cost_r) * 100
+```
+
+Recommendations are sorted by ROI descending (best return first).
+
+### Priority Assignment
+
+| Condition | Priority | Urgency |
+|-----------|----------|---------|
+| COP degraded > 15% | urgent | critical |
+| Savings > R20k/year | high | high |
+| Payback < 12 months | high | medium |
+| All others | medium | low |
+
+### Integration with Tier Router (Phase 82)
+
+Recommendation confidence scores feed into the Phase 82 tier router:
+- Confidence >= 0.85 maps to Tier 3 (auto-execute eligible)
+- Confidence 0.60-0.85 maps to Tier 2 (requires approval)
+- Confidence < 0.60 maps to Tier 1 (advisory only)
+
+This means high-confidence HVAC maintenance recommendations (0.92) can
+auto-execute in `auto_execute` mode, while lower-confidence occupancy
+recommendations (0.65) require human approval.
+
+### API Endpoints
+
+See [Energy Consumption API Reference](../03-api-reference/energy-consumption.md)
+for full endpoint documentation:
+
+- `POST /api/recommendations/ai` -- Full ranked recommendations with ROI
+- `GET /api/recommendations/dashboard` -- Top 3 for dashboard cards
+- `GET /api/recommendations/by-type` -- Detailed single recommendation
+
+---
+
 ## Related Documents
 
 - [Load Shedding Optimization](../14-south-africa-context/load-shedding-optimization.md) - South African load shedding context
