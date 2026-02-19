@@ -871,14 +871,23 @@ async def approve_optimization(request: Request, body: ApproveRequest = Body(...
     """
     Apply approved optimization recommendations to building systems.
 
-    Validates setpoints against safety rules, applies changes via device
-    control API, and logs to audit trail.
+    Validates setpoints against safety rules and routing tiers, applies
+    changes via device control API, and logs to audit trail.
+
+    When routing is enforced (optimization_routing_enforced=True):
+    - Rejects blocked recommendations (confidence too low)
+    - Rejects advisory-only recommendations (tier1)
+    - Accepts tier2_approval and tier3_auto_execute with pending_approval
+    - Returns idempotent success for already auto-executed items
+
+    When routing is in shadow mode (default):
+    - Logs routing checks but allows all approvals (existing behavior)
 
     Args:
         body: Approval request with recommendation_id, site_id, and setpoints
 
     Returns:
-        Success/failure result with details
+        Success/failure result with approved/rejected/already_executed breakdown
     """
     try:
         logger.info(
@@ -897,11 +906,107 @@ async def approve_optimization(request: Request, body: ApproveRequest = Body(...
         # Extract user from headers
         user = request.headers.get("X-User-Id", "operator")
 
+        # --- Routing tier validation (Phase 82-03) ---
+        # Load routing details from the last recommendation stored on the site
+        sites = load_sites() or []
+        site = next((s for s in sites if s.get("id") == body.site_id), None)
+        last_recommendation = {}
+        if site:
+            last_recommendation = site.get("last_recommendation") or {}
+        routing_details = last_recommendation.get("routing_details", [])
+        routing_enforced = settings.optimization_routing_enforced
+
+        # Pre-classify each setpoint against its routing decision
+        approved_setpoints = []  # Will be applied
+        rejected_setpoints = []  # Blocked/advisory — not applied
+        already_executed = []  # Auto-executed in analyze — idempotent
+
+        for idx, setpoint in enumerate(body.setpoints_to_apply):
+            device_id = setpoint.get("device_id")
+            point_name = setpoint.get("point_name")
+
+            # Find matching routing decision by index or device_id/point_name
+            routing_decision = None
+            if idx < len(routing_details):
+                routing_decision = routing_details[idx]
+            else:
+                # Fallback: search by point_name match
+                for rd in routing_details:
+                    if rd.get("point_name") == point_name:
+                        routing_decision = rd
+                        break
+
+            if routing_decision and routing_enforced:
+                tier = routing_decision.get("tier", "")
+                action = routing_decision.get("action", "")
+
+                if tier == "blocked":
+                    rejected_setpoints.append(
+                        {
+                            "device_id": device_id,
+                            "point_name": point_name,
+                            "reason": "Cannot approve blocked recommendation (confidence too low)",
+                            "tier": tier,
+                            "action": action,
+                        }
+                    )
+                    logger.info(f"Approval REJECTED for {device_id}/{point_name}: blocked (confidence too low)")
+                    continue
+                elif tier == "tier1_advisory":
+                    rejected_setpoints.append(
+                        {
+                            "device_id": device_id,
+                            "point_name": point_name,
+                            "reason": "Cannot approve advisory-only recommendation",
+                            "tier": tier,
+                            "action": action,
+                        }
+                    )
+                    logger.info(f"Approval REJECTED for {device_id}/{point_name}: advisory-only (tier1)")
+                    continue
+                elif action == "auto_execute":
+                    # Already auto-executed in analyze flow — idempotent success
+                    already_executed.append(
+                        {
+                            "device_id": device_id,
+                            "point_name": point_name,
+                            "note": "Already auto-executed during analysis",
+                            "tier": tier,
+                            "action": action,
+                        }
+                    )
+                    logger.info(f"Approval IDEMPOTENT for {device_id}/{point_name}: already auto-executed")
+                    continue
+                # tier2_approval or tier3 with pending_approval — allow approval
+            elif routing_decision and not routing_enforced:
+                # Shadow mode: log the routing check but allow all approvals
+                tier = routing_decision.get("tier", "unknown")
+                action = routing_decision.get("action", "unknown")
+                logger.info(
+                    f"Approval SHADOW check for {device_id}/{point_name}: "
+                    f"tier={tier}, action={action} (would "
+                    f"{'reject' if tier in ('blocked', 'tier1_advisory') else 'accept'})"
+                )
+
+            approved_setpoints.append(setpoint)
+
+        # If all setpoints were rejected (enforce mode), return early
+        if not approved_setpoints and not already_executed:
+            return {
+                "success": False,
+                "approved": [],
+                "rejected": rejected_setpoints,
+                "already_executed": [],
+                "results": [],
+                "message": (f"All {len(rejected_setpoints)} setpoints rejected by routing tier validation"),
+            }
+
+        # --- Apply approved setpoints ---
         audit_logger = AuditLogger()
         results = []
         all_success = True
 
-        for setpoint in body.setpoints_to_apply:
+        for setpoint in approved_setpoints:
             device_id = setpoint.get("device_id")
             point_name = setpoint.get("point_name")
             value = setpoint.get("value")
@@ -941,7 +1046,7 @@ async def approve_optimization(request: Request, body: ApproveRequest = Body(...
                         device_id=device_id,
                         point_name=point_name,
                         user=user,
-                        old_value=None,  # Could fetch current value if needed
+                        old_value=None,
                         new_value=value,
                         result=AuditResultType.SUCCESS,
                         metadata={
@@ -951,7 +1056,11 @@ async def approve_optimization(request: Request, body: ApproveRequest = Body(...
                     )
                 else:
                     results.append(
-                        {"device_id": device_id, "success": False, "error": f"Failed to write {value} to {point_name}"}
+                        {
+                            "device_id": device_id,
+                            "success": False,
+                            "error": f"Failed to write {value} to {point_name}",
+                        }
                     )
                     all_success = False
 
@@ -963,15 +1072,10 @@ async def approve_optimization(request: Request, body: ApproveRequest = Body(...
         # Flush audit log
         audit_logger.flush()
 
-        # Update site status
-        sites = load_sites() or []
-        site = next((s for s in sites if s.get("id") == body.site_id), None)
-        # Record M&V verification task for approved recommendations
-        if all_success:
+        # Record M&V verification task for approved recommendations that succeeded
+        successfully_applied = [r for r in results if r.get("success")]
+        if successfully_applied:
             try:
-                last_rec_for_mv = {}
-                if site:
-                    last_rec_for_mv = site.get("last_recommendation") or {}
                 setpoints_for_mv = [
                     {
                         "device_id": sp.get("device_id"),
@@ -979,23 +1083,41 @@ async def approve_optimization(request: Request, body: ApproveRequest = Body(...
                         "old_value": None,
                         "new_value": sp.get("value"),
                     }
-                    for sp in body.setpoints_to_apply
+                    for sp in approved_setpoints
+                    if any(r.get("device_id") == sp.get("device_id") and r.get("success") for r in results)
                 ]
-                mv_service = get_mv_verification_service()
-                mv_service.record_applied_recommendation(
-                    site_id=body.site_id,
-                    recommendation_id=body.recommendation_id,
-                    projected_savings=last_rec_for_mv.get("projected_savings", {}),
-                    setpoints_applied=setpoints_for_mv,
-                )
+                if setpoints_for_mv:
+                    # Build routing metadata for M&V
+                    routing_metadata = None
+                    if routing_details:
+                        # Use the first approved routing decision as representative
+                        for rd in routing_details:
+                            if rd.get("action") in ("pending_approval",):
+                                routing_metadata = {
+                                    "routing_tier": rd.get("tier"),
+                                    "control_tier": last_recommendation.get("control_tier", "unknown"),
+                                    "effective_confidence": rd.get("effective_confidence"),
+                                }
+                                break
+
+                    mv_service = get_mv_verification_service()
+                    mv_service.record_applied_recommendation(
+                        site_id=body.site_id,
+                        recommendation_id=body.recommendation_id,
+                        projected_savings=last_recommendation.get("projected_savings", {}),
+                        setpoints_applied=setpoints_for_mv,
+                        routing_metadata=routing_metadata,
+                    )
             except Exception as mv_err:
                 logger.warning(f"M&V recording failed (non-blocking): {mv_err}")
 
+        # Determine overall success (approved setpoints all succeeded)
+        approval_success = all_success and len(approved_setpoints) > 0
+
         if site:
-            if all_success:
+            if approval_success:
                 # Capture projected savings before clearing recommendation
-                last_rec = site.get("last_recommendation") or {}
-                projected_savings = last_rec.get("projected_savings", {}) if last_rec else {}
+                projected_savings = last_recommendation.get("projected_savings", {})
                 savings_per_hour = projected_savings.get("cost_zar_per_hour", 0)
 
                 site["optimization_status"] = OptimizationStatus.OPTIMIZED.value
@@ -1014,7 +1136,9 @@ async def approve_optimization(request: Request, body: ApproveRequest = Body(...
                     user=user,
                     details={
                         "recommendation_id": body.recommendation_id,
-                        "setpoints_applied": len(body.setpoints_to_apply),
+                        "setpoints_applied": len(successfully_applied),
+                        "setpoints_rejected": len(rejected_setpoints),
+                        "already_executed": len(already_executed),
                         "projected_savings_zar_per_hour": savings_per_hour,
                     },
                 )
@@ -1046,11 +1170,21 @@ async def approve_optimization(request: Request, body: ApproveRequest = Body(...
             save_sites(sites)
 
         return {
-            "success": all_success,
+            "success": approval_success,
+            "approved": [r for r in results if r.get("success")],
+            "rejected": rejected_setpoints,
+            "already_executed": already_executed,
             "results": results,
-            "message": f"Applied {len([r for r in results if r['success']])} of {len(results)} setpoints",
+            "message": (
+                f"Applied {len(successfully_applied)} of "
+                f"{len(body.setpoints_to_apply)} setpoints"
+                + (f", {len(rejected_setpoints)} rejected by routing" if rejected_setpoints else "")
+                + (f", {len(already_executed)} already executed" if already_executed else "")
+            ),
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error approving optimization: {e}")
         raise HTTPException(status_code=500, detail=str(e))
