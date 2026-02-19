@@ -2,7 +2,8 @@
 
 import json
 import logging
-from datetime import datetime, timedelta
+import calendar
+from datetime import datetime, timedelta, date
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 
@@ -14,6 +15,7 @@ from app.services.ai_optimizer import get_ai_optimizer
 from app.services.device_abstraction import device_manager
 from app.services.audit_logger import AuditLogger
 from app.services.eskomsepush_service import eskomsepush_service
+from app.services.mv_verification_service import get_mv_verification_service
 from app.models.audit_log import AuditResultType
 from app.models.optimization import (
     OptimizationStatus,
@@ -21,6 +23,8 @@ from app.models.optimization import (
 )
 from app.database.repositories import BuildingRepository
 from app.config.settings import settings
+from app.services.optimization_tier_router import get_tier_router
+from app.services.profile_service import get_profile_service
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +40,7 @@ DATA_DIR = Path(__file__).parent.parent / "data"
 # Pydantic models for request/response validation
 class LoadSheddingStage(BaseModel):
     """Model for load shedding stage information."""
+
     stage: int
     start_time: str
     end_time: str
@@ -43,6 +48,7 @@ class LoadSheddingStage(BaseModel):
 
 class EskomStatusResponse(BaseModel):
     """Response model for Eskom status endpoint."""
+
     current_stage: int
     updated_at: str
     next_stages: List[LoadSheddingStage]
@@ -52,6 +58,7 @@ class EskomStatusResponse(BaseModel):
 
 class SiteScheduleResponse(BaseModel):
     """Response model for site-specific schedule endpoint."""
+
     site_id: str
     site_name: str
     current_stage: int
@@ -73,7 +80,7 @@ def get_site_name(site_id: str) -> str:
         "site-007": "Pavilion",
         "site-008": "N1 City",
         "site-009": "Blue Route",
-        "site-010": "Cresta"
+        "site-010": "Cresta",
     }
     return site_names.get(site_id, f"Site {site_id}")
 
@@ -131,11 +138,13 @@ async def get_eskom_status():
                     start_time = ts
                     end_time = ""
 
-                next_stages.append(LoadSheddingStage(
-                    stage=int(ns.get("stage", 0)),
-                    start_time=start_time,
-                    end_time=end_time,
-                ))
+                next_stages.append(
+                    LoadSheddingStage(
+                        stage=int(ns.get("stage", 0)),
+                        start_time=start_time,
+                        end_time=end_time,
+                    )
+                )
 
             # Build area schedules from area events
             area_schedules: Dict[str, List[LoadSheddingStage]] = {}
@@ -195,11 +204,13 @@ async def get_site_eskom_status(site_id: str):
             schedules: List[LoadSheddingStage] = []
             if current_stage > 0 and combined.area_events:
                 for event in combined.area_events:
-                    schedules.append(LoadSheddingStage(
-                        stage=event.stage,
-                        start_time=_format_iso_time(event.start),
-                        end_time=_format_iso_time(event.end),
-                    ))
+                    schedules.append(
+                        LoadSheddingStage(
+                            stage=event.stage,
+                            start_time=_format_iso_time(event.start),
+                            end_time=_format_iso_time(event.end),
+                        )
+                    )
 
             # Find next upcoming outage
             now = datetime.now()
@@ -265,10 +276,7 @@ async def search_eskomsepush_areas(text: str):
         List of matching areas with id, name, region
     """
     if not eskomsepush_service.is_configured:
-        raise HTTPException(
-            status_code=503,
-            detail="EskomSePush API not configured. Set ESKOMSEPUSH_API_TOKEN in .env"
-        )
+        raise HTTPException(status_code=503, detail="EskomSePush API not configured. Set ESKOMSEPUSH_API_TOKEN in .env")
 
     try:
         areas = await eskomsepush_service.search_areas(text)
@@ -282,10 +290,7 @@ async def search_eskomsepush_areas(text: str):
 async def get_eskomsepush_allowance():
     """Check remaining EskomSePush API quota."""
     if not eskomsepush_service.is_configured:
-        raise HTTPException(
-            status_code=503,
-            detail="EskomSePush API not configured. Set ESKOMSEPUSH_API_TOKEN in .env"
-        )
+        raise HTTPException(status_code=503, detail="EskomSePush API not configured. Set ESKOMSEPUSH_API_TOKEN in .env")
 
     try:
         return await eskomsepush_service.get_allowance()
@@ -295,11 +300,7 @@ async def get_eskomsepush_allowance():
 
 
 @router.get("/optimization/thermal-runway")
-async def calculate_thermal_runway(
-    site_id: str,
-    current_temp: float = 22.4,
-    comfort_limit: float = 26.0
-):
+async def calculate_thermal_runway(site_id: str, current_temp: float = 22.4, comfort_limit: float = 26.0):
     """
     Calculate thermal runway for a building during load shedding.
 
@@ -335,25 +336,13 @@ async def calculate_thermal_runway(
             "thermal_runway_minutes": runway_minutes,
             "comfort_breach_time": None,
             "calculation_method": "fallback",
-            "building_params": {
-                "thermal_mass": 0.8,
-                "insulation_factor": 0.6,
-                "internal_heat_gain": 0.5
-            }
+            "building_params": {"thermal_mass": 0.8, "insulation_factor": 0.6, "internal_heat_gain": 0.5},
         }
 
     # Use thermal model service
-    building_params = {
-        "thermal_mass": 0.8,
-        "insulation_factor": 0.6,
-        "internal_heat_gain": 0.5
-    }
+    building_params = {"thermal_mass": 0.8, "insulation_factor": 0.6, "internal_heat_gain": 0.5}
 
-    weather_forecast = {
-        "outside_temp": 32.0,
-        "solar_load": 0.7,
-        "humidity": 65
-    }
+    weather_forecast = {"outside_temp": 32.0, "solar_load": 0.7, "humidity": 65}
 
     runway_minutes = calc_runway(current_temp, comfort_limit, building_params, weather_forecast)
 
@@ -370,7 +359,7 @@ async def calculate_thermal_runway(
         "comfort_breach_time": breach_time.isoformat(),
         "calculation_method": "thermal_model",
         "building_params": building_params,
-        "weather_forecast": weather_forecast
+        "weather_forecast": weather_forecast,
     }
 
 
@@ -378,8 +367,10 @@ async def calculate_thermal_runway(
 # AI Optimization Endpoints (Phase 8)
 # ============================================================================
 
+
 class AnalyzeRequest(BaseModel):
     """Request model for analyze endpoint."""
+
     site_id: str
     current_conditions: Optional[Dict[str, Any]] = None
     weather_forecast: Optional[Dict[str, Any]] = None
@@ -388,6 +379,7 @@ class AnalyzeRequest(BaseModel):
 
 class LoadSheddingAnalyzeRequest(BaseModel):
     """Request model for load shedding analysis endpoint."""
+
     site_id: str
     load_shedding_stage: int  # 1-4, higher = more severe
     current_conditions: Optional[Dict[str, Any]] = None
@@ -395,6 +387,7 @@ class LoadSheddingAnalyzeRequest(BaseModel):
 
 class ApproveRequest(BaseModel):
     """Request model for approve endpoint."""
+
     recommendation_id: str
     site_id: str
     setpoints_to_apply: List[Dict[str, Any]]
@@ -402,6 +395,7 @@ class ApproveRequest(BaseModel):
 
 class ToggleRequest(BaseModel):
     """Request model for toggle endpoint."""
+
     enabled: bool
 
 
@@ -467,7 +461,7 @@ def save_sites(sites: List[Dict[str, Any]]):
 
     # Fallback to legacy JSON file
     filepath = DATA_DIR / "_legacy" / "sites.json"
-    with open(filepath, 'w') as f:
+    with open(filepath, "w") as f:
         json.dump(sites, f, indent=2)
 
 
@@ -501,9 +495,7 @@ async def analyze_optimization(request: AnalyzeRequest) -> Dict[str, Any]:
         )
 
         # Validate recommendation against safety rules
-        validation = await get_ai_optimizer().validate_recommendation(
-            request.site_id, recommendation
-        )
+        validation = await get_ai_optimizer().validate_recommendation(request.site_id, recommendation)
 
         # Build response summary
         rec_dict = recommendation.to_dict()
@@ -517,31 +509,93 @@ async def analyze_optimization(request: AnalyzeRequest) -> Dict[str, Any]:
 
         # Check if site is in automatic mode (auto-apply without human approval)
         site_mode = "supervised"
+        site_settings = {}
         if site:
             site_settings = site.get("optimization_settings") or {}
             site_mode = site_settings.get("mode", "supervised")
 
+        # --- Tier Routing (Phase 82-02) ---
+        # Compute routing decisions per recommendation via the tier router.
+        tier_router = get_tier_router(settings)
+        control_tier = tier_router.resolve_control_tier(
+            site_profile=site,
+            optimization_settings=type("_Opts", (), {"mode": site_mode})(),
+        )
+
+        routing_decisions = []
+        recommendations_list = rec_dict.get("recommendations", [])
+        for rec_item in recommendations_list:
+            system = rec_item.get("system", rec_item.get("equipment_type", "HVAC"))
+            point = rec_item.get("point_name", rec_item.get("setpoint", ""))
+            confidence = rec_item.get("confidence", recommendation.confidence)
+            decision = tier_router.route_recommendation(
+                confidence=confidence,
+                system=system,
+                point_name=point,
+                site_id=request.site_id,
+                control_tier=control_tier,
+            )
+            routing_decisions.append(decision)
+
+        routing_summary = tier_router.get_routing_summary(routing_decisions, control_tier)
+
+        if settings.optimization_routing_enforced:
+            logger.info(
+                f"Tier routing ENFORCED for site {request.site_id}: "
+                f"blocked={routing_summary.blocked}, advisory={routing_summary.advisory}, "
+                f"pending={routing_summary.pending_approval}, auto={routing_summary.auto_executed}"
+            )
+        else:
+            logger.info(
+                f"Tier routing SHADOW for site {request.site_id}: "
+                f"blocked={routing_summary.blocked}, advisory={routing_summary.advisory}, "
+                f"pending={routing_summary.pending_approval}, auto={routing_summary.auto_executed}"
+            )
+
         auto_applied = False
         auto_apply_results = []
+        execution_summary = {"attempted": 0, "succeeded": 0, "failed": 0}
 
-        # Auto-apply if in automatic mode and validation passes
-        if site_mode == "automatic" and validation["allowed"] and rec_dict.get("recommendations"):
-            logger.info(f"Automatic mode: auto-applying {len(rec_dict['recommendations'])} recommendations for site {request.site_id}")
+        # Determine which recommendations to auto-apply
+        if settings.optimization_routing_enforced:
+            # ENFORCE MODE: routing determines which recommendations get auto-applied
+            # Only auto-apply if: routing says auto_execute AND validation passes
+            should_auto_apply = (
+                validation["allowed"]
+                and recommendations_list
+                and any(d.action == "auto_execute" for d in routing_decisions)
+            )
+        else:
+            # SHADOW MODE: existing behavior — auto-apply if site is in automatic mode
+            should_auto_apply = site_mode == "automatic" and validation["allowed"] and bool(recommendations_list)
+
+        if should_auto_apply:
+            logger.info(f"Auto-applying recommendations for site {request.site_id}")
             audit_logger = AuditLogger()
 
-            for rec_item in rec_dict["recommendations"]:
+            for idx, rec_item in enumerate(recommendations_list):
+                # In enforce mode, skip recommendations not routed to auto_execute
+                if settings.optimization_routing_enforced:
+                    if idx < len(routing_decisions) and routing_decisions[idx].action != "auto_execute":
+                        continue
+
                 device_id = rec_item.get("equipment_id")
                 point_name = rec_item.get("point_name")
                 value = rec_item.get("recommended_value")
 
                 if not all([device_id, point_name, value is not None]):
-                    auto_apply_results.append({
-                        "device_id": device_id,
-                        "success": False,
-                        "error": "Missing required fields",
-                    })
+                    auto_apply_results.append(
+                        {
+                            "device_id": device_id,
+                            "success": False,
+                            "error": "Missing required fields",
+                        }
+                    )
+                    execution_summary["attempted"] += 1
+                    execution_summary["failed"] += 1
                     continue
 
+                execution_summary["attempted"] += 1
                 try:
                     success = await device_manager.write_device_value(
                         device_id=device_id,
@@ -549,13 +603,16 @@ async def analyze_optimization(request: AnalyzeRequest) -> Dict[str, Any]:
                         value=value,
                         user="SENTINEL",
                     )
-                    auto_apply_results.append({
-                        "device_id": device_id,
-                        "point_name": point_name,
-                        "success": bool(success),
-                        "value": value,
-                    })
+                    auto_apply_results.append(
+                        {
+                            "device_id": device_id,
+                            "point_name": point_name,
+                            "success": bool(success),
+                            "value": value,
+                        }
+                    )
                     if success:
+                        execution_summary["succeeded"] += 1
                         audit_logger.log_control_action(
                             device_id=device_id,
                             point_name=point_name,
@@ -566,18 +623,51 @@ async def analyze_optimization(request: AnalyzeRequest) -> Dict[str, Any]:
                             metadata={
                                 "source": "sentinel_auto_optimization",
                                 "confidence": recommendation.confidence,
+                                "routing_action": routing_decisions[idx].action
+                                if idx < len(routing_decisions)
+                                else "unknown",
                             },
                         )
+                    else:
+                        execution_summary["failed"] += 1
                 except Exception as apply_err:
                     logger.error(f"Auto-apply failed for {device_id}/{point_name}: {apply_err}")
-                    auto_apply_results.append({
-                        "device_id": device_id,
-                        "success": False,
-                        "error": str(apply_err),
-                    })
+                    auto_apply_results.append(
+                        {
+                            "device_id": device_id,
+                            "success": False,
+                            "error": str(apply_err),
+                        }
+                    )
+                    execution_summary["failed"] += 1
 
             audit_logger.flush()
             auto_applied = all(r.get("success") for r in auto_apply_results) and len(auto_apply_results) > 0
+
+        # Record M&V verification task for auto-applied recommendations
+        if auto_applied:
+            try:
+                systems = list({r.get("system", "hvac") or "hvac" for r in rec_dict.get("recommendations", [])})
+                setpoints_for_mv = [
+                    {
+                        "device_id": r.get("device_id") or r.get("equipment_id"),
+                        "point_name": r.get("point_name"),
+                        "old_value": r.get("current_value"),
+                        "new_value": r.get("value") or r.get("recommended_value"),
+                    }
+                    for r in auto_apply_results
+                    if r.get("success")
+                ]
+                mv_service = get_mv_verification_service()
+                mv_service.record_applied_recommendation(
+                    site_id=request.site_id,
+                    recommendation_id=rec_dict.get("timestamp", "unknown"),
+                    projected_savings=rec_dict.get("projected_savings", {}),
+                    setpoints_applied=setpoints_for_mv,
+                    recommendation_systems=systems,
+                )
+            except Exception as mv_err:
+                logger.warning(f"M&V recording failed (non-blocking): {mv_err}")
 
         if site:
             if auto_applied:
@@ -616,8 +706,10 @@ async def analyze_optimization(request: AnalyzeRequest) -> Dict[str, Any]:
                     "cross_system_recommendations": cross_system_count,
                     "auto_applied": auto_applied,
                     "mode": site_mode,
-                    "projected_savings_zar_per_hour": projected_savings.get("cost_zar_per_hour", 0) if auto_applied else 0,
-                }
+                    "projected_savings_zar_per_hour": projected_savings.get("cost_zar_per_hour", 0)
+                    if auto_applied
+                    else 0,
+                },
             )
             site["optimization_history"].append(history_entry.to_dict())
 
@@ -673,12 +765,11 @@ async def analyze_load_shedding(request: LoadSheddingAnalyzeRequest) -> Dict[str
     try:
         # Validate stage
         if request.load_shedding_stage < 1 or request.load_shedding_stage > 4:
-            raise HTTPException(
-                status_code=400,
-                detail="load_shedding_stage must be between 1 and 4"
-            )
+            raise HTTPException(status_code=400, detail="load_shedding_stage must be between 1 and 4")
 
-        logger.info(f"Analyzing load shedding optimization for site {request.site_id}, stage {request.load_shedding_stage}")
+        logger.info(
+            f"Analyzing load shedding optimization for site {request.site_id}, stage {request.load_shedding_stage}"
+        )
 
         # Call AI optimizer service with load shedding awareness
         recommendation = await get_ai_optimizer().analyze_building_load_shedding(
@@ -688,9 +779,7 @@ async def analyze_load_shedding(request: LoadSheddingAnalyzeRequest) -> Dict[str
         )
 
         # Validate recommendation against safety rules
-        validation = await get_ai_optimizer().validate_recommendation(
-            request.site_id, recommendation
-        )
+        validation = await get_ai_optimizer().validate_recommendation(request.site_id, recommendation)
 
         return {
             "success": True,
@@ -716,10 +805,7 @@ async def analyze_load_shedding(request: LoadSheddingAnalyzeRequest) -> Dict[str
 
 
 @router.post("/optimization/approve")
-async def approve_optimization(
-    request: Request,
-    body: ApproveRequest = Body(...)
-) -> Dict[str, Any]:
+async def approve_optimization(request: Request, body: ApproveRequest = Body(...)) -> Dict[str, Any]:
     """
     Apply approved optimization recommendations to building systems.
 
@@ -733,14 +819,15 @@ async def approve_optimization(
         Success/failure result with details
     """
     try:
-        logger.info(f"Approving optimization for site {body.site_id}, recommendation {body.recommendation_id}, setpoints: {len(body.setpoints_to_apply)}")
+        logger.info(
+            f"Approving optimization for site {body.site_id}, "
+            f"recommendation {body.recommendation_id}, "
+            f"setpoints: {len(body.setpoints_to_apply)}"
+        )
 
         # Validate setpoints array is not empty
         if not body.setpoints_to_apply:
-            raise HTTPException(
-                status_code=422,
-                detail="setpoints_to_apply cannot be empty"
-            )
+            raise HTTPException(status_code=422, detail="setpoints_to_apply cannot be empty")
 
         # Extract user from headers
         user = request.headers.get("X-User-Id", "operator")
@@ -755,11 +842,13 @@ async def approve_optimization(
             value = setpoint.get("value")
 
             if not all([device_id, point_name, value is not None]):
-                results.append({
-                    "device_id": device_id,
-                    "success": False,
-                    "error": "Missing required fields: device_id, point_name, value"
-                })
+                results.append(
+                    {
+                        "device_id": device_id,
+                        "success": False,
+                        "error": "Missing required fields: device_id, point_name, value",
+                    }
+                )
                 all_success = False
                 continue
 
@@ -773,12 +862,14 @@ async def approve_optimization(
                 )
 
                 if success:
-                    results.append({
-                        "device_id": device_id,
-                        "point_name": point_name,
-                        "success": True,
-                        "value": value,
-                    })
+                    results.append(
+                        {
+                            "device_id": device_id,
+                            "point_name": point_name,
+                            "success": True,
+                            "value": value,
+                        }
+                    )
 
                     # Log to audit trail
                     audit_logger.log_control_action(
@@ -791,23 +882,17 @@ async def approve_optimization(
                         metadata={
                             "source": "ai_optimization",
                             "recommendation_id": body.recommendation_id,
-                        }
+                        },
                     )
                 else:
-                    results.append({
-                        "device_id": device_id,
-                        "success": False,
-                        "error": f"Failed to write {value} to {point_name}"
-                    })
+                    results.append(
+                        {"device_id": device_id, "success": False, "error": f"Failed to write {value} to {point_name}"}
+                    )
                     all_success = False
 
             except Exception as e:
                 logger.error(f"Error applying setpoint to {device_id}: {e}")
-                results.append({
-                    "device_id": device_id,
-                    "success": False,
-                    "error": str(e)
-                })
+                results.append({"device_id": device_id, "success": False, "error": str(e)})
                 all_success = False
 
         # Flush audit log
@@ -816,6 +901,31 @@ async def approve_optimization(
         # Update site status
         sites = load_sites() or []
         site = next((s for s in sites if s.get("id") == body.site_id), None)
+        # Record M&V verification task for approved recommendations
+        if all_success:
+            try:
+                last_rec_for_mv = {}
+                if site:
+                    last_rec_for_mv = site.get("last_recommendation") or {}
+                setpoints_for_mv = [
+                    {
+                        "device_id": sp.get("device_id"),
+                        "point_name": sp.get("point_name"),
+                        "old_value": None,
+                        "new_value": sp.get("value"),
+                    }
+                    for sp in body.setpoints_to_apply
+                ]
+                mv_service = get_mv_verification_service()
+                mv_service.record_applied_recommendation(
+                    site_id=body.site_id,
+                    recommendation_id=body.recommendation_id,
+                    projected_savings=last_rec_for_mv.get("projected_savings", {}),
+                    setpoints_applied=setpoints_for_mv,
+                )
+            except Exception as mv_err:
+                logger.warning(f"M&V recording failed (non-blocking): {mv_err}")
+
         if site:
             if all_success:
                 # Capture projected savings before clearing recommendation
@@ -841,7 +951,7 @@ async def approve_optimization(
                         "recommendation_id": body.recommendation_id,
                         "setpoints_applied": len(body.setpoints_to_apply),
                         "projected_savings_zar_per_hour": savings_per_hour,
-                    }
+                    },
                 )
                 site["optimization_history"].append(history_entry.to_dict())
 
@@ -864,7 +974,7 @@ async def approve_optimization(
                     details={
                         "recommendation_id": body.recommendation_id,
                         "error": "Some setpoints failed to apply",
-                    }
+                    },
                 )
                 site["optimization_history"].append(history_entry.to_dict())
 
@@ -873,7 +983,7 @@ async def approve_optimization(
         return {
             "success": all_success,
             "results": results,
-            "message": f"Applied {len([r for r in results if r['success']])} of {len(results)} setpoints"
+            "message": f"Applied {len([r for r in results if r['success']])} of {len(results)} setpoints",
         }
 
     except Exception as e:
@@ -881,34 +991,64 @@ async def approve_optimization(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+def _count_total_weekdays(year: int, month: int) -> int:
+    """Count total weekdays in a given month."""
+    _, days_in_month = calendar.monthrange(year, month)
+    return sum(1 for d in range(1, days_in_month + 1) if date(year, month, d).weekday() < 5)
+
+
+def _estimate_operating_hours(year: int, month: int) -> Dict[str, Any]:
+    """Estimate operating hours for a month with SA TOU breakdown."""
+    weekdays = _count_total_weekdays(year, month)
+    hours_per_day = 10  # 07:00-17:00
+
+    # Operating window split
+    # Peak: 07:00-10:00 => 3h/day
+    # Standard: 10:00-17:00 => 7h/day
+    peak_hours_per_day = 3
+    standard_hours_per_day = 7
+
+    total_hours = weekdays * hours_per_day
+    peak_hours = weekdays * peak_hours_per_day
+    standard_hours = weekdays * standard_hours_per_day
+
+    # SA TOU rates (City Power commercial)
+    peak_rate = 3.50
+    standard_rate = 2.50
+
+    weighted_rate = (
+        (peak_hours * peak_rate + standard_hours * standard_rate) / total_hours if total_hours > 0 else standard_rate
+    )
+
+    return {
+        "total_hours": total_hours,
+        "peak_hours": peak_hours,
+        "standard_hours": standard_hours,
+        "off_peak_hours": 0,
+        "weekdays": weekdays,
+        "weighted_rate_zar_per_kwh": round(weighted_rate, 2),
+    }
+
+
 def calculate_monthly_savings(optimization_history: Optional[List[Dict[str, Any]]]) -> Dict[str, Any]:
-    """Calculate total savings for the current month from optimization history.
+    """Calculate current-month savings using schedule-aware operating hours."""
+    now = datetime.now()
+    operating = _estimate_operating_hours(now.year, now.month)
 
-    Sums up projected_savings_zar_per_hour from approved/auto_applied entries
-    and estimates monthly savings based on operating hours.
-
-    Args:
-        optimization_history: List of optimization history entries (can be None)
-
-    Returns:
-        Dict with monthly_savings_zar and breakdown
-    """
-    # Handle None or empty history
     if not optimization_history:
         return {
             "monthly_savings_zar": 0.0,
             "savings_per_hour_zar": 0.0,
             "applied_recommendations": 0,
+            "operating_hours": operating,
         }
 
-    now = datetime.now()
     current_month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
     total_savings_per_hour = 0.0
     applied_count = 0
 
     for entry in optimization_history:
-        # Check if entry is from current month
         try:
             entry_time = datetime.fromisoformat(entry.get("timestamp", ""))
             if entry_time < current_month_start:
@@ -916,7 +1056,6 @@ def calculate_monthly_savings(optimization_history: Optional[List[Dict[str, Any]
         except (ValueError, TypeError):
             continue
 
-        # Only count approved or auto_applied entries
         action = entry.get("action", "")
         result = entry.get("result", "")
         if action in ("approved", "auto_applied") and result == "success":
@@ -927,14 +1066,13 @@ def calculate_monthly_savings(optimization_history: Optional[List[Dict[str, Any]
                     total_savings_per_hour += float(savings)
                     applied_count += 1
 
-    # Estimate monthly savings (assuming 10 hours/day operating, 22 working days)
-    operating_hours_per_month = 10 * 22  # 220 hours
-    monthly_savings = total_savings_per_hour * operating_hours_per_month
+    monthly_savings = total_savings_per_hour * operating["total_hours"]
 
     return {
         "monthly_savings_zar": round(monthly_savings, 2),
         "savings_per_hour_zar": round(total_savings_per_hour, 2),
         "applied_recommendations": applied_count,
+        "operating_hours": operating,
     }
 
 
@@ -1043,7 +1181,7 @@ async def toggle_optimization(site_id: str, request: ToggleRequest) -> Dict[str,
             "site_id": site_id,
             "optimization_enabled": request.enabled,
             "optimization_settings": site["optimization_settings"],
-            "message": f"Optimization {'enabled' if request.enabled else 'disabled'} for {site.get('name', site_id)}"
+            "message": f"Optimization {'enabled' if request.enabled else 'disabled'} for {site.get('name', site_id)}",
         }
 
     except HTTPException:
@@ -1063,11 +1201,14 @@ _precooling_state: Dict[str, Dict[str, Any]] = {}
 
 class PrecoolingRequest(BaseModel):
     """Request model for starting precooling."""
+
     scenario_id: Optional[str] = None
 
 
 @router.post("/optimization/precooling/{site_id}/start")
-async def start_precooling(site_id: str, request: PrecoolingRequest = Body(default=PrecoolingRequest())) -> Dict[str, Any]:
+async def start_precooling(
+    site_id: str, request: PrecoolingRequest = Body(default=PrecoolingRequest())
+) -> Dict[str, Any]:
     """
     Start pre-cooling sequence for a site before a load shedding event.
 
@@ -1116,10 +1257,30 @@ async def start_precooling(site_id: str, request: PrecoolingRequest = Body(defau
         # Fallback to default actions if no scenario found
         if not precooling_actions:
             precooling_actions = [
-                {"time": "now", "action": "lower_chw_setpoint", "value": "5°C", "description": "Reduce chilled water setpoint"},
-                {"time": "+5min", "action": "increase_ahu_fan_speed", "value": "85%", "description": "Increase AHU fan speed"},
-                {"time": "+15min", "action": "activate_night_purge", "value": "enabled", "description": "Enable outside air cooling"},
-                {"time": "+30min", "action": "optimize_vav_positions", "value": "balanced", "description": "Uniform cooling distribution"},
+                {
+                    "time": "now",
+                    "action": "lower_chw_setpoint",
+                    "value": "5°C",
+                    "description": "Reduce chilled water setpoint",
+                },
+                {
+                    "time": "+5min",
+                    "action": "increase_ahu_fan_speed",
+                    "value": "85%",
+                    "description": "Increase AHU fan speed",
+                },
+                {
+                    "time": "+15min",
+                    "action": "activate_night_purge",
+                    "value": "enabled",
+                    "description": "Enable outside air cooling",
+                },
+                {
+                    "time": "+30min",
+                    "action": "optimize_vav_positions",
+                    "value": "balanced",
+                    "description": "Uniform cooling distribution",
+                },
             ]
 
         # Apply precooling setpoints via device manager
@@ -1148,10 +1309,9 @@ async def start_precooling(site_id: str, request: PrecoolingRequest = Body(defau
             if device_info:
                 try:
                     # Try to find and control the device
-                    devices = device_manager.get_all_devices() if hasattr(device_manager, 'get_all_devices') else []
+                    devices = device_manager.get_all_devices() if hasattr(device_manager, "get_all_devices") else []
                     target_device = next(
-                        (d for d in devices if device_info["type"] in getattr(d, 'device_type', '').lower()),
-                        None
+                        (d for d in devices if device_info["type"] in getattr(d, "device_type", "").lower()), None
                     )
                     if target_device:
                         success = await device_manager.write_device_value(
@@ -1248,10 +1408,9 @@ async def stop_precooling(site_id: str) -> Dict[str, Any]:
         }
 
         try:
-            devices = device_manager.get_all_devices() if hasattr(device_manager, 'get_all_devices') else []
+            devices = device_manager.get_all_devices() if hasattr(device_manager, "get_all_devices") else []
             target_device = next(
-                (d for d in devices if restore_info["type"] in getattr(d, 'device_type', '').lower()),
-                None
+                (d for d in devices if restore_info["type"] in getattr(d, "device_type", "").lower()), None
             )
             if target_device:
                 success = await device_manager.write_device_value(
@@ -1296,7 +1455,9 @@ async def stop_precooling(site_id: str) -> Dict[str, Any]:
         "status": "stopped",
         "site_id": site_id,
         "reverted_actions": reverted_actions,
-        "message": f"Pre-cooling stopped for {get_site_name(site_id)} — {len(reverted_actions)} setpoints restored to normal",
+        "message": (
+            f"Pre-cooling stopped for {get_site_name(site_id)} — {len(reverted_actions)} setpoints restored to normal"
+        ),
     }
 
 
@@ -1316,17 +1477,17 @@ async def get_precooling_status(site_id: str) -> Dict[str, Any]:
 # Profile Management Endpoints (Phase 72)
 # ============================================================================
 
-from app.services.profile_service import get_profile_service
-
 
 class ProfileUpdateRequest(BaseModel):
     """Request model for updating site profile configuration."""
+
     active_profile: str
     control_tier: str
 
 
 class ZoneOverrideRequest(BaseModel):
     """Request model for zone profile override."""
+
     zone_id: str
     profile: str
     reason: str
@@ -1368,10 +1529,7 @@ async def get_profile_settings(request: Request, site_id: str) -> Dict[str, Any]
         config = profile_service.load_site_profile_config(site_id)
 
         if not config:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Profile config not found for site {site_id}"
-            )
+            raise HTTPException(status_code=404, detail=f"Profile config not found for site {site_id}")
 
         return {
             "success": True,
@@ -1388,9 +1546,7 @@ async def get_profile_settings(request: Request, site_id: str) -> Dict[str, Any]
 @limiter.limit("10/minute")
 @router.put("/optimization/settings/{site_id}")
 async def update_profile_settings(
-    request: Request,
-    site_id: str,
-    config_request: ProfileUpdateRequest
+    request: Request, site_id: str, config_request: ProfileUpdateRequest
 ) -> Dict[str, Any]:
     """
     Update site profile configuration.
@@ -1408,25 +1564,21 @@ async def update_profile_settings(
         # Load current config
         config = profile_service.load_site_profile_config(site_id)
         if not config:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Profile config not found for site {site_id}"
-            )
+            raise HTTPException(status_code=404, detail=f"Profile config not found for site {site_id}")
 
         # Validate profile exists
         available_profiles = [p["id"] for p in profile_service.list_profiles()]
         if config_request.active_profile not in available_profiles:
             raise HTTPException(
                 status_code=400,
-                detail=f"Invalid profile: {config_request.active_profile}. Available: {available_profiles}"
+                detail=f"Invalid profile: {config_request.active_profile}. Available: {available_profiles}",
             )
 
         # Validate control tier
         valid_tiers = ["monitor", "human_in_loop", "auto_execute"]
         if config_request.control_tier not in valid_tiers:
             raise HTTPException(
-                status_code=400,
-                detail=f"Invalid control_tier: {config_request.control_tier}. Valid: {valid_tiers}"
+                status_code=400, detail=f"Invalid control_tier: {config_request.control_tier}. Valid: {valid_tiers}"
             )
 
         # Update config
@@ -1436,12 +1588,11 @@ async def update_profile_settings(
         # Save
         success = profile_service.save_site_profile_config(site_id, config)
         if not success:
-            raise HTTPException(
-                status_code=500,
-                detail="Failed to save profile configuration"
-            )
+            raise HTTPException(status_code=500, detail="Failed to save profile configuration")
 
-        logger.info(f"Updated profile for site {site_id}: {config_request.active_profile} / {config_request.control_tier}")
+        logger.info(
+            f"Updated profile for site {site_id}: {config_request.active_profile} / {config_request.control_tier}"
+        )
 
         return {
             "success": True,
@@ -1458,10 +1609,7 @@ async def update_profile_settings(
 
 
 @router.post("/optimization/settings/{site_id}/zone-override")
-async def add_zone_override(
-    site_id: str,
-    request: ZoneOverrideRequest
-) -> Dict[str, Any]:
+async def add_zone_override(site_id: str, request: ZoneOverrideRequest) -> Dict[str, Any]:
     """
     Add or update a zone profile override.
 
@@ -1479,8 +1627,7 @@ async def add_zone_override(
         available_profiles = [p["id"] for p in profile_service.list_profiles()]
         if request.profile not in available_profiles:
             raise HTTPException(
-                status_code=400,
-                detail=f"Invalid profile: {request.profile}. Available: {available_profiles}"
+                status_code=400, detail=f"Invalid profile: {request.profile}. Available: {available_profiles}"
             )
 
         # Update override
@@ -1492,10 +1639,7 @@ async def add_zone_override(
         )
 
         if not success:
-            raise HTTPException(
-                status_code=500,
-                detail="Failed to save zone override"
-            )
+            raise HTTPException(status_code=500, detail="Failed to save zone override")
 
         config = profile_service.load_site_profile_config(site_id)
 
@@ -1532,10 +1676,7 @@ async def remove_zone_override(site_id: str, zone_id: str) -> Dict[str, Any]:
 
         success = profile_service.remove_zone_override(site_id, zone_id)
         if not success:
-            raise HTTPException(
-                status_code=500,
-                detail="Failed to remove zone override"
-            )
+            raise HTTPException(status_code=500, detail="Failed to remove zone override")
 
         config = profile_service.load_site_profile_config(site_id)
 
@@ -1552,4 +1693,40 @@ async def remove_zone_override(site_id: str, zone_id: str) -> Dict[str, Any]:
         raise
     except Exception as e:
         logger.error(f"Error removing zone override: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# M&V (Measurement & Verification) Endpoints
+# ============================================================================
+
+
+@router.get("/optimization/mv/summary/{site_id}")
+@limiter.limit("30/minute")
+async def get_mv_summary(site_id: str, request: Request) -> Dict[str, Any]:
+    """Get M&V verification summary for a site."""
+    try:
+        mv_service = get_mv_verification_service()
+        summary = mv_service.get_verification_summary(site_id)
+        return {"success": True, **summary}
+    except Exception as e:
+        logger.error(f"Error getting M&V summary: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/optimization/mv/verify")
+@limiter.limit("10/minute")
+async def run_mv_verifications(request: Request) -> Dict[str, Any]:
+    """Trigger pending M&V verifications."""
+    try:
+        mv_service = get_mv_verification_service()
+        verified = await mv_service.run_pending_verifications()
+        return {
+            "success": True,
+            "verified_count": len(verified),
+            "tasks": [t.to_dict() for t in verified],
+            "pending_remaining": mv_service.get_pending_count(),
+        }
+    except Exception as e:
+        logger.error(f"Error running M&V verifications: {e}")
         raise HTTPException(status_code=500, detail=str(e))
