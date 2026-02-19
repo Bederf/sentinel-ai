@@ -697,6 +697,16 @@ The **PARASITE Decision Pipeline** dashboard (`infrastructure/grafana/provisioni
 
 **Dashboard UID:** `sentinel-parasite-decisions`
 
+The **Security Operations** dashboard (`infrastructure/grafana/provisioning/dashboards/sentinel-security-operations.json`) covers:
+
+- **Failed Login Rate by IP** — Timeseries with alert thresholds (>5 in 5min = red)
+- **Suspicious User Agent Frequency** — Scanner tools (sqlmap, burp, nikto) and path traversal
+- **Device Control Rate by User** — BMS device control actions grouped by user identity
+- **API Error Spikes (5xx)** — Backend error rate with threshold coloring
+- **Failed Login Events / Suspicious Request Detail** — Searchable log panels
+
+**Dashboard UID:** `sentinel-security-operations`
+
 ### Querying decision events in Loki
 
 ```logql

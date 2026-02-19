@@ -160,6 +160,13 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 ### 🔧 Development
 - [Tool Use Best Practices](12-development/tool-use-best-practices.md) - Development workflow
 
+### 🔧 Operations
+- **[Monitoring Stack](09-operations/monitoring-stack.md)** - Loki + Promtail + Grafana deployment, config management, scrape jobs, dashboard provisioning
+
+### 🩺 Troubleshooting
+- [ML Model Health](05-troubleshooting/ml-model-health.md) - ML model issues
+- **[Logging & Observability](05-troubleshooting/logging-observability.md)** - Promtail/Loki/Grafana pipeline diagnostics, common issues
+
 ### 🧪 Testing
 - [Testing Strategy](11-testing/testing-strategy.md) - Test architecture
 - [E2E Testing](11-testing/e2e-testing.md) - End-to-end tests

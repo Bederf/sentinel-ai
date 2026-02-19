@@ -529,8 +529,8 @@ flowchart TB
 
 - **Ports:** Backend 9095, Frontend 9096
 - **Deployment:** Docker (optional)
-- **Monitoring:** Health endpoints, audit logs, Grafana dashboards (PARASITE Decision Pipeline)
-- **Logging:** Structured JSON → RotatingFileHandler → Promtail → Loki (sentinel.audit, sentinel.decisions)
+- **Monitoring:** Health endpoints, audit logs, Grafana dashboards (PARASITE Decision Pipeline, Security Operations)
+- **Logging:** Structured JSON → RotatingFileHandler → Promtail → Loki (sentinel-audit, sentinel-security, sentinel-decisions)
 - **Backup:** JSON seed data for demo mode
 
 ## Key Decisions & Rationale

@@ -277,6 +277,17 @@ SENTINEL provisions Grafana dashboards via `infrastructure/grafana/provisioning/
 
 **Template variables:** `correlation_id` (textbox), `tier` (query), `stage` (query)
 
+**Security Operations** (`sentinel-security-operations`):
+- Security Overview (24h stat — total AUTH_FAILURE/ACCESS_DENIED/SUSPICIOUS events)
+- Failed Login Rate by IP (timeseries with threshold coloring: green < 3, yellow 3-5, red > 5)
+- Suspicious User Agent Frequency (timeseries: scanner tools, SQLi patterns, path traversal)
+- Device Control Rate by User (timeseries: BMS control actions grouped by user identity)
+- API Error Spikes (timeseries with threshold: green < 5, yellow 5-10, red > 10 errors/5min)
+- Failed Login Events (log detail view with search)
+- Suspicious Request Detail (log detail view: sqlmap, burp, nikto patterns)
+
+**Data sources:** Panels use dual queries — `sentinel-security` job labels where available, with `systemd-journal` unit filter fallback for comprehensive coverage.
+
 ## Retention Policy
 
 | Log Type | Retention | Justification |
