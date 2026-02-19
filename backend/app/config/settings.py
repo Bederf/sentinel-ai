@@ -149,6 +149,13 @@ class Settings(BaseSettings):
     rate_limit_login_rpm: int = 5  # Login endpoint: 5 per 15 minutes
     rate_limit_login_window_minutes: int = 15  # Login rate limit window
 
+    # Optimization Tier Routing (Phase 82)
+    optimization_routing_enforced: bool = False  # Phase A: shadow mode (log only). Phase B: enforce.
+    optimization_tier_block_min: float = 0.30  # Below this -> blocked
+    optimization_tier2_min: float = 0.60  # Below this -> tier1_advisory, above -> tier2_approval
+    optimization_tier3_min: float = 0.85  # Above this -> tier3_auto_execute
+    optimization_fcu_confidence_cap: float = 0.45  # FCU actions capped at this confidence
+
     @property
     def recommendation_interval(self) -> int:
         """Recommendation generation interval in seconds.
