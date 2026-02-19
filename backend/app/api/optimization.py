@@ -1319,17 +1319,25 @@ async def get_optimization_status(site_id: str, request: Request) -> Dict[str, A
             "last_analysis": None,
             "analysis_interval_minutes": 15,
         }
+
+        # Extract routing info from last recommendation (Phase 82-04)
+        last_recommendation = site.get("last_recommendation")
+        routing_summary = last_recommendation.get("routing_summary") if last_recommendation else None
+        control_tier = last_recommendation.get("control_tier") if last_recommendation else None
+
         status = {
             "site_id": site.get("id"),
             "site_name": site.get("name"),
             "optimization_enabled": site.get("optimization_enabled") or False,
             "optimization_status": site.get("optimization_status") or OptimizationStatus.UNKNOWN.value,
             "optimization_settings": site.get("optimization_settings") or default_settings,
-            "last_recommendation": site.get("last_recommendation"),
+            "last_recommendation": last_recommendation,
             "last_optimization": site.get("last_optimization"),
             "optimization_history": history,
             "error_message": site.get("error_message"),
             "monthly_savings": savings_summary,
+            "routing_summary": routing_summary,
+            "control_tier": control_tier,
         }
 
         return status
