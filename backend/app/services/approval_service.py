@@ -550,6 +550,8 @@ class ApprovalService:
         change_description: str,
         execution_status: str,
         cov_verified: bool,
+        correlation_id: str = "",
+        decision_id: str = "",
     ) -> None:
         """Create audit log entry for approval action.
 
@@ -561,6 +563,8 @@ class ApprovalService:
             change_description: What changed
             execution_status: Result status
             cov_verified: Whether COV feedback was verified
+            correlation_id: End-to-end trace ID linking recommendation → decision → audit
+            decision_id: PARASITE decision ID
         """
         try:
             audit_entry = {
@@ -572,6 +576,8 @@ class ApprovalService:
                 "change_description": change_description,
                 "execution_status": execution_status,
                 "verified_by_cov": cov_verified,
+                "correlation_id": correlation_id,
+                "decision_id": decision_id,
             }
 
             await self.audit_repo.log_action(audit_entry)
@@ -645,6 +651,7 @@ class ApprovalService:
                 await parasite_repo.record_decision(
                     {
                         "id": routing_result.decision_id,
+                        "correlation_id": routing_result.correlation_id,
                         "recommendation_id": recommendation_id,
                         "tier": "tier3",
                         "decision_type": "tier3_auto_execute",
@@ -688,6 +695,7 @@ class ApprovalService:
                 await parasite_repo.record_decision(
                     {
                         "id": routing_result.decision_id,
+                        "correlation_id": routing_result.correlation_id,
                         "recommendation_id": recommendation_id,
                         "tier": "tier3",
                         "decision_type": "tier3_auto_execute",
@@ -753,8 +761,14 @@ class ApprovalService:
 
             # Schedule outcome measurement for 10-minute learning window
             await cov_monitor.schedule_outcome_measurement(
-                recommendation_id=recommendation_id,
-                measurement_window_seconds=600,  # 10 minutes
+                decision_id=routing_result.decision_id,
+                equipment_id=equipment_id,
+                expected_outcome={
+                    "control_point": control_point,
+                    "target_value": target_value,
+                    "original_value": original_value,
+                },
+                window_minutes=10,
             )
 
             # Update recommendation status to AUTO_EXECUTED
@@ -788,6 +802,8 @@ class ApprovalService:
                 change_description=f"{control_point} = {target_value}",
                 execution_status="success",
                 cov_verified=cov_result.verified,
+                correlation_id=routing_result.correlation_id,
+                decision_id=routing_result.decision_id,
             )
 
             self._record_module_feedback(
@@ -802,6 +818,7 @@ class ApprovalService:
                 metadata={
                     "source": "approval_service.auto_execute_recommendation",
                     "decision_id": routing_result.decision_id,
+                    "correlation_id": routing_result.correlation_id,
                     "confidence_score": routing_result.confidence_score,
                 },
             )
@@ -811,6 +828,7 @@ class ApprovalService:
             await parasite_repo.record_decision(
                 {
                     "id": routing_result.decision_id,
+                    "correlation_id": routing_result.correlation_id,
                     "recommendation_id": recommendation_id,
                     "tier": "tier3",
                     "decision_type": "tier3_auto_execute",
@@ -925,11 +943,11 @@ class ApprovalService:
 
             # Update parasite_decisions record
             parasite_repo = ParasiteDecisionRepository()
-            await parasite_repo.update_decision_rollback(
+            await parasite_repo.mark_rolled_back(
                 decision_id=decision_id,
-                rolled_back=True,
-                rollback_reason=(
-                    f"COV verification failed: expected={cov_result.expected_value}, actual={cov_result.actual_value}"
+                reason=(
+                    f"COV verification failed: expected={cov_result.expected_value}, "
+                    f"actual={cov_result.actual_value}"
                 ),
             )
 

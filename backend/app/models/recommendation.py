@@ -85,6 +85,7 @@ class Recommendation:
     executed_at: Optional[datetime] = None
     execution_result: Optional[Dict[str, Any]] = None
     rejection_reason: Optional[str] = None
+    correlation_id: str = field(default_factory=lambda: str(uuid.uuid4()))
 
     def get_numeric_confidence(self) -> float:
         """Return numeric confidence, converting string if needed.

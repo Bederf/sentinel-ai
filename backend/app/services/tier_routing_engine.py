@@ -51,6 +51,7 @@ class TierRoutingResult:
     equipment_type: str
     risk_level: str
     decision_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    correlation_id: str = ""  # Populated from recommendation.correlation_id
 
 
 class TierRoutingEngine:
@@ -104,10 +105,11 @@ class TierRoutingEngine:
         Returns:
             TierRoutingResult with tier, action, thresholds, and reasoning
         """
-        # 1. Extract basics (equipment type, risk level, confidence)
+        # 1. Extract basics (equipment type, risk level, confidence, correlation_id)
         equipment_type = self._extract_equipment_type(recommendation)
         risk_level = recommendation.get("risk_level", "medium")
         confidence_score = self._extract_confidence(recommendation)
+        correlation_id = recommendation.get("correlation_id", "")
 
         # 2. Master switch check
         if not self.settings.parasite_enabled:
@@ -122,6 +124,7 @@ class TierRoutingEngine:
                 reason="PARASITE master switch is disabled",
                 equipment_type=equipment_type,
                 risk_level=risk_level,
+                correlation_id=correlation_id,
             )
 
         # 3. Get thresholds from TWO sources, use stricter (lazy-load model_registry)
@@ -190,6 +193,7 @@ class TierRoutingEngine:
             {
                 "site_id": site_id,
                 "equipment_code": equipment_code,
+                "correlation_id": correlation_id,
                 "decision_type": f"tier{tier_num}_{action}",
                 "tier": f"tier{tier_num}",
                 "confidence_score": confidence_score,
@@ -220,6 +224,7 @@ class TierRoutingEngine:
             reason=reason,
             equipment_type=equipment_type,
             risk_level=risk_level,
+            correlation_id=correlation_id,
         )
 
     async def get_effective_thresholds(self, equipment_type: str) -> Tuple[float, float, str]:
