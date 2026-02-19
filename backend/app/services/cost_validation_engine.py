@@ -149,6 +149,119 @@ class CostValidationEngine:
             "total_cost_r": round(total_cost, 2),
         }
 
+    async def validate_daily_cost(
+        self,
+        simulated_date: datetime,
+        daily_cost: Any,
+    ) -> Dict[str, Any]:
+        """Validate daily cost against running average.
+
+        Called by thermal engine at hour 23 after daily cost is calculated.
+        Compares today's cost to the running average to detect anomalies.
+
+        Args:
+            simulated_date: The date being validated
+            daily_cost: Daily cost dict from EnergyCostService (or numeric value)
+
+        Returns:
+            Validation result dict with status and variance
+        """
+        try:
+            # Extract the cost value
+            if isinstance(daily_cost, dict):
+                cost_r = float(daily_cost.get("total_cost_r", 0))
+            elif isinstance(daily_cost, (int, float)):
+                cost_r = float(daily_cost)
+            else:
+                return {
+                    "validation_status": "skipped",
+                    "reason": "invalid_cost_data",
+                    "date": simulated_date.date().isoformat()
+                    if hasattr(simulated_date, "date")
+                    else str(simulated_date),
+                }
+
+            if cost_r <= 0:
+                return {
+                    "validation_status": "skipped",
+                    "reason": "zero_cost",
+                    "date": simulated_date.date().isoformat()
+                    if hasattr(simulated_date, "date")
+                    else str(simulated_date),
+                }
+
+            # Get expected daily cost from invoices / running average
+            expected_daily_cost = await self._get_expected_daily_cost()
+
+            # Calculate variance
+            if expected_daily_cost > 0:
+                variance_pct = abs(cost_r - expected_daily_cost) / expected_daily_cost * 100
+            else:
+                variance_pct = 0.0
+
+            # Determine status
+            if variance_pct > COST_CRITICAL_VARIANCE_PCT:
+                status = "critical"
+                severity = "critical"
+            elif variance_pct > COST_VARIANCE_THRESHOLD_PCT:
+                status = "warning"
+                severity = "warning"
+            else:
+                status = "validated"
+                severity = "healthy"
+
+            result_date = simulated_date.date().isoformat() if hasattr(simulated_date, "date") else str(simulated_date)
+
+            return {
+                "validation_status": status,
+                "severity": severity,
+                "date": result_date,
+                "daily_cost_r": round(cost_r, 2),
+                "expected_daily_cost_r": round(expected_daily_cost, 2),
+                "variance_pct": round(variance_pct, 2),
+                "variance_direction": "over" if cost_r > expected_daily_cost else "under",
+            }
+
+        except Exception as e:
+            logger.warning(f"Error in validate_daily_cost: {e}")
+            return {
+                "validation_status": "error",
+                "error": str(e),
+                "date": simulated_date.date().isoformat() if hasattr(simulated_date, "date") else str(simulated_date),
+                "variance_pct": 0.0,
+            }
+
+    async def _get_expected_daily_cost(self) -> float:
+        """Get expected daily cost from invoices or demo data.
+
+        Returns average daily cost from the most recent invoice data.
+        Falls back to demo fixtures if no real data available.
+        """
+        try:
+            # Try to get from real invoice data in database
+            response = (
+                self.client.table("cost_validations")
+                .select("real_cost_r, period_start, period_end")
+                .eq("site_id", self.building_id)
+                .order("period_end", desc=True)
+                .limit(3)
+                .execute()
+            )
+
+            records = response.data or []
+            if records:
+                # Average the monthly costs and divide by 30 for daily
+                monthly_costs = [float(r["real_cost_r"]) for r in records if r.get("real_cost_r")]
+                if monthly_costs:
+                    return mean(monthly_costs) / 30.0
+
+        except Exception as e:
+            logger.debug(f"Could not get real invoice data: {e}")
+
+        # Fallback: estimate from typical commercial rate
+        # ~315 kWh/day * R5/kWh = ~R1,575/day
+        return 1575.0
+
     async def validate_monthly_cost(
         self,
         month: int,
@@ -199,9 +312,7 @@ class CostValidationEngine:
                 severity = "healthy"
 
             # Generate recommendation
-            recommendation = self._get_cost_recommendation(
-                variance_pct, simulated_cost_r, real_invoice_cost_r
-            )
+            recommendation = self._get_cost_recommendation(variance_pct, simulated_cost_r, real_invoice_cost_r)
 
             result = {
                 "validation_status": status,
@@ -320,11 +431,7 @@ class CostValidationEngine:
             }
 
         try:
-            variances = [
-                v["variance_pct"]
-                for v in historical_validations
-                if v.get("variance_pct") is not None
-            ]
+            variances = [v["variance_pct"] for v in historical_validations if v.get("variance_pct") is not None]
 
             if not variances:
                 return {

@@ -172,9 +172,7 @@ class PowerMeterValidationEngine:
             severity = "healthy"
 
         # Generate recommendation
-        recommendation = self._get_recommendation(
-            variance_pct, simulated_power_kw, real_power_kw, baseline
-        )
+        recommendation = self._get_recommendation(variance_pct, simulated_power_kw, real_power_kw, baseline)
 
         result = {
             "validation_status": status,
@@ -187,9 +185,7 @@ class PowerMeterValidationEngine:
             "date": simulated_date.date().isoformat(),
             "baseline_mean_kw": baseline["mean_kw"],
             "baseline_stdev_kw": baseline["stdev_kw"],
-            "zscore": round(
-                (real_power_kw - baseline["mean_kw"]) / max(baseline["stdev_kw"], 0.1), 2
-            ),
+            "zscore": round((real_power_kw - baseline["mean_kw"]) / max(baseline["stdev_kw"], 0.1), 2),
             "recommendation": recommendation,
         }
 
@@ -347,6 +343,86 @@ class PowerMeterValidationEngine:
                 "error": str(e),
             }
 
+    async def validate_daily_power(
+        self,
+        simulated_date: datetime,
+        hourly_power_data: Dict[int, float],
+    ) -> Dict[str, Any]:
+        """Validate a full day of power data against baseline.
+
+        Aggregates hourly power, compares to baseline stats, and returns
+        a daily validation result. Used by thermal engine at hour 23.
+
+        Args:
+            simulated_date: The date being validated
+            hourly_power_data: {hour: total_hvac_kw} for each hour of the day
+
+        Returns:
+            Validation result dict with status, variance, recommendations
+        """
+        try:
+            if not hourly_power_data:
+                return {
+                    "validation_status": "skipped",
+                    "reason": "no_hourly_data",
+                    "date": simulated_date.date().isoformat()
+                    if hasattr(simulated_date, "date")
+                    else str(simulated_date),
+                }
+
+            # Aggregate daily totals
+            total_kwh = sum(hourly_power_data.values())
+            hours_recorded = len(hourly_power_data)
+            avg_kw = total_kwh / max(hours_recorded, 1)
+
+            # Get baseline (tries real data first, falls back to demo/default)
+            meter_id = "S002-MTR-B1-MAIN"  # Default main meter
+            baseline = await self.get_power_baseline(meter_id)
+
+            baseline_mean = baseline.get("mean_kw", 0)
+            baseline_stdev = baseline.get("stdev_kw", 1)
+
+            # Calculate variance from baseline
+            if baseline_mean > 0:
+                variance_pct = abs(avg_kw - baseline_mean) / baseline_mean * 100
+            else:
+                variance_pct = 0.0
+
+            # Determine status
+            if variance_pct > CRITICAL_VARIANCE_PCT:
+                status = "critical"
+                severity = "critical"
+            elif variance_pct > VARIANCE_THRESHOLD_PCT:
+                status = "anomaly"
+                severity = "warning"
+            else:
+                status = "normal"
+                severity = "normal"
+
+            result_date = simulated_date.date().isoformat() if hasattr(simulated_date, "date") else str(simulated_date)
+
+            return {
+                "validation_status": status,
+                "severity": severity,
+                "date": result_date,
+                "total_kwh": round(total_kwh, 2),
+                "avg_kw": round(avg_kw, 2),
+                "hours_recorded": hours_recorded,
+                "baseline_mean_kw": round(baseline_mean, 2),
+                "baseline_stdev_kw": round(baseline_stdev, 2),
+                "variance_pct": round(variance_pct, 2),
+                "meter_id": meter_id,
+            }
+
+        except Exception as e:
+            logger.warning(f"Error in validate_daily_power: {e}")
+            return {
+                "validation_status": "error",
+                "error": str(e),
+                "date": simulated_date.date().isoformat() if hasattr(simulated_date, "date") else str(simulated_date),
+                "variance_pct": 0.0,
+            }
+
     async def get_daily_validation_summary(
         self,
         meter_id: str,
@@ -404,7 +480,8 @@ class PowerMeterValidationEngine:
             overall_status = (
                 "healthy"
                 if len(critical) == 0 and len(anomalies) <= 2
-                else "warning" if len(anomalies) > 2
+                else "warning"
+                if len(anomalies) > 2
                 else "critical"
             )
 

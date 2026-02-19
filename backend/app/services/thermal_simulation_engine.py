@@ -21,6 +21,8 @@ from app.database.supabase_client import get_supabase_client
 from app.services.energy_cost_service import EnergyCostService
 from app.services.lighting_simulation_engine import update_simulation_lighting
 from app.services.water_consumption_engine import update_simulation_water
+from app.services.power_meter_validation_engine import get_power_meter_validation_engine
+from app.services.cost_validation_engine import get_cost_validation_engine
 
 logger = logging.getLogger(__name__)
 
@@ -153,7 +155,7 @@ class ThermalSimulationEngine:
             # DALI controls reduce lighting during high daylight periods
             daylight_lux = self._estimate_daylight_lux(
                 simulated_hour=simulated_hour,
-                cloud_cover=getattr(self, '_current_cloud_cover', 0.0),
+                cloud_cover=getattr(self, "_current_cloud_cover", 0.0),
             )
 
             await update_simulation_lighting(
@@ -161,8 +163,8 @@ class ThermalSimulationEngine:
                 simulated_hour=simulated_hour,
                 occupancy_data=occupancy_data,
                 daylight_lux=daylight_lux,
-                cloud_cover_pct=getattr(self, '_current_cloud_cover', 0.0),
-                is_raining=getattr(self, '_current_is_raining', False),
+                cloud_cover_pct=getattr(self, "_current_cloud_cover", 0.0),
+                is_raining=getattr(self, "_current_is_raining", False),
                 simulated_date=simulated_date,
             )
 
@@ -170,8 +172,8 @@ class ThermalSimulationEngine:
                 building_id=self.building_id,
                 simulated_hour=simulated_hour,
                 occupancy_data=occupancy_data,
-                cloud_cover_pct=getattr(self, '_current_cloud_cover', 0.0),
-                is_raining=getattr(self, '_current_is_raining', False),
+                cloud_cover_pct=getattr(self, "_current_cloud_cover", 0.0),
+                is_raining=getattr(self, "_current_is_raining", False),
                 simulated_date=simulated_date,
             )
 
@@ -336,9 +338,16 @@ class ThermalSimulationEngine:
     async def _load_zone_metadata(self) -> None:
         """Load zone configuration (setpoint, occupancy, fan speed) from database."""
         try:
-            response = self.supabase.table("hvac_zones").select(
-                "id, zone_id, zone_name, floor, typical_occupancy, area_sqm, setpoint, heating_setpoint, cooling_setpoint, fan_speed, status, fcu_id"
-            ).eq("building_id", self.building_id).execute()
+            response = (
+                self.supabase.table("hvac_zones")
+                .select(
+                    "id, zone_id, zone_name, floor, typical_occupancy, "
+                    "area_sqm, setpoint, heating_setpoint, cooling_setpoint, "
+                    "fan_speed, status, fcu_id"
+                )
+                .eq("building_id", self.building_id)
+                .execute()
+            )
 
             for zone in response.data:
                 self._zone_cache[zone["zone_id"]] = {
@@ -378,11 +387,13 @@ class ThermalSimulationEngine:
         """
         try:
             # Get all HVAC equipment (FCU, AHU, CHILLER, VAV) for this building
-            response = self.supabase.table("equipment").select(
-                "id, code, type, health_score"
-            ).eq("building_id", self.building_id).in_(
-                "type", ["FCU", "AHU", "CHILLER", "VAV", "fcu", "ahu", "chiller", "vav"]
-            ).execute()
+            response = (
+                self.supabase.table("equipment")
+                .select("id, code, type, health_score")
+                .eq("building_id", self.building_id)
+                .in_("type", ["FCU", "AHU", "CHILLER", "VAV", "fcu", "ahu", "chiller", "vav"])
+                .execute()
+            )
 
             for equipment in response.data:
                 eq_id = equipment["id"]
@@ -391,8 +402,7 @@ class ThermalSimulationEngine:
 
                 if health < 100:
                     logger.info(
-                        f"[THERMAL] Equipment {equipment['code']} health: {health}% "
-                        f"(HVAC response will be reduced)"
+                        f"[THERMAL] Equipment {equipment['code']} health: {health}% (HVAC response will be reduced)"
                     )
 
             logger.debug(f"[THERMAL] Loaded health for {len(self._equipment_health_cache)} equipment items")
@@ -455,8 +465,7 @@ class ThermalSimulationEngine:
                 self.supabase.table("sensor_readings").insert(sensor_readings).execute()
 
                 logger.debug(
-                    f"[THERMAL] Inserted {len(sensor_readings)} sensor readings "
-                    f"for hour {simulated_hour:02d}:00"
+                    f"[THERMAL] Inserted {len(sensor_readings)} sensor readings for hour {simulated_hour:02d}:00"
                 )
 
         except Exception as e:
@@ -515,7 +524,7 @@ class ThermalSimulationEngine:
                 # Apply equipment health factor if enabled
                 if self.CONSIDER_EQUIPMENT_HEALTH and fcu_id in self._equipment_health_cache:
                     health_score = self._equipment_health_cache[fcu_id]
-                    hvac_power *= (health_score / 100.0)
+                    hvac_power *= health_score / 100.0
 
                 # Only consume power if occupancy > 0 or temp deviation > 1°C
                 if occupancy_pct < 5 and temp_offset < 1.0:
@@ -583,10 +592,7 @@ class ThermalSimulationEngine:
             }
 
             # Upsert into power_meters table
-            response = self.supabase.table("power_meters").upsert(
-                hvac_feeder_update,
-                on_conflict="meter_id"
-            ).execute()
+            self.supabase.table("power_meters").upsert(hvac_feeder_update, on_conflict="meter_id").execute()
 
             # Also track hourly energy consumption
             # Convert kW * 1 hour to kWh
@@ -607,9 +613,7 @@ class ThermalSimulationEngine:
 
             # Insert into energy_consumption_history
             try:
-                self.supabase.table("energy_consumption_history").insert(
-                    energy_record
-                ).execute()
+                self.supabase.table("energy_consumption_history").insert(energy_record).execute()
             except Exception as e:
                 logger.warning(f"[POWER] Could not record energy history: {e}")
 
@@ -659,6 +663,38 @@ class ThermalSimulationEngine:
                     f"{daily_cost['total_energy_kwh']:.1f}kWh = R{daily_cost['total_cost_r']:.2f} "
                     f"(avg {daily_cost['average_rate_r_kwh']:.3f}R/kWh)"
                 )
+
+                # After writing daily cost summary, run validation engines
+                try:
+                    # A.3: Validate power meter readings against baseline
+                    pmv_engine = get_power_meter_validation_engine(self.building_id)
+                    validation_result = await pmv_engine.validate_daily_power(
+                        simulated_date=simulated_date,
+                        hourly_power_data=self._daily_hourly_power,
+                    )
+                    if validation_result:
+                        logger.info(
+                            f"[VALIDATION] Power meter: {validation_result.get('validation_status', 'unknown')} "
+                            f"(variance: {validation_result.get('variance_pct', 0):.1f}%)"
+                        )
+                except Exception as e:
+                    logger.warning(f"[VALIDATION] Power meter validation skipped: {e}")
+
+                try:
+                    # A.4: Validate cost against expected (monthly boundary check)
+                    cv_engine = get_cost_validation_engine(self.building_id)
+                    cost_validation = await cv_engine.validate_daily_cost(
+                        simulated_date=simulated_date,
+                        daily_cost=daily_cost,
+                    )
+                    if cost_validation:
+                        logger.info(
+                            f"[VALIDATION] Cost: {cost_validation.get('validation_status', 'unknown')} "
+                            f"(variance: {cost_validation.get('variance_pct', 0):.1f}%)"
+                        )
+                except Exception as e:
+                    logger.warning(f"[VALIDATION] Cost validation skipped: {e}")
+
         except Exception as e:
             logger.error(f"[COST] Failed to track/calculate daily cost: {e}", exc_info=True)
 
@@ -667,10 +703,7 @@ class ThermalSimulationEngine:
 _thermal_engines: Dict[str, ThermalSimulationEngine] = {}
 
 
-def get_thermal_engine(
-    building_id: str,
-    consider_equipment_health: bool = False
-) -> ThermalSimulationEngine:
+def get_thermal_engine(building_id: str, consider_equipment_health: bool = False) -> ThermalSimulationEngine:
     """
     Get or create thermal engine for building.
 
@@ -681,12 +714,9 @@ def get_thermal_engine(
                                   Default False for normal simulations
     """
     # Create new engine if needed or if health consideration changes
-    cache_key = f"{building_id}:health={consider_equipment_health}"
-
     if building_id not in _thermal_engines:
         _thermal_engines[building_id] = ThermalSimulationEngine(
-            building_id,
-            consider_equipment_health=consider_equipment_health
+            building_id, consider_equipment_health=consider_equipment_health
         )
 
     return _thermal_engines[building_id]
