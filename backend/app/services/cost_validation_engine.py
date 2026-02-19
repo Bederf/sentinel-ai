@@ -13,11 +13,16 @@ Integration: Called daily at hour 23 with invoice data when available.
 Output: Cost variance reports, tariff adjustment recommendations.
 """
 
+import json
 import logging
 from datetime import datetime
+from pathlib import Path
 from typing import Dict, Optional, Any, List
 from statistics import mean, stdev
 from app.database.supabase_client import get_supabase_client
+
+# Demo fixture path
+_DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 
 logger = logging.getLogger(__name__)
 
@@ -258,7 +263,21 @@ class CostValidationEngine:
         except Exception as e:
             logger.debug(f"Could not get real invoice data: {e}")
 
-        # Fallback: estimate from typical commercial rate
+        # Fallback: try demo fixtures (3-tier: Supabase -> Cache -> JSON)
+        try:
+            fixture_path = _DATA_DIR / "demo_monthly_invoices.json"
+            if fixture_path.exists():
+                with open(fixture_path) as f:
+                    invoices = json.load(f)
+                if invoices:
+                    monthly_costs = [float(inv["total_cost_r"]) for inv in invoices if inv.get("total_cost_r")]
+                    if monthly_costs:
+                        avg_monthly = mean(monthly_costs)
+                        return avg_monthly / 30.0
+        except Exception as e:
+            logger.debug(f"Could not load demo invoices: {e}")
+
+        # Hardcoded fallback: estimate from typical commercial rate
         # ~315 kWh/day * R5/kWh = ~R1,575/day
         return 1575.0
 

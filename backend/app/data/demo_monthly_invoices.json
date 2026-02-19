@@ -1,0 +1,35 @@
+[
+  {
+    "site_id": "site-002",
+    "period_start": "2025-11-01",
+    "period_end": "2025-11-30",
+    "total_kwh": 9462.0,
+    "total_cost_r": 47310.0,
+    "demand_kva": 425,
+    "power_factor": 0.92,
+    "utility": "City Power",
+    "tariff": "Commercial TOU"
+  },
+  {
+    "site_id": "site-002",
+    "period_start": "2025-12-01",
+    "period_end": "2025-12-31",
+    "total_kwh": 10234.0,
+    "total_cost_r": 51170.0,
+    "demand_kva": 445,
+    "power_factor": 0.91,
+    "utility": "City Power",
+    "tariff": "Commercial TOU"
+  },
+  {
+    "site_id": "site-002",
+    "period_start": "2026-01-01",
+    "period_end": "2026-01-31",
+    "total_kwh": 9875.0,
+    "total_cost_r": 49375.0,
+    "demand_kva": 438,
+    "power_factor": 0.93,
+    "utility": "City Power",
+    "tariff": "Commercial TOU"
+  }
+]

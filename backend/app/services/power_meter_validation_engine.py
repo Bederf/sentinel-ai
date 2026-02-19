@@ -13,11 +13,16 @@ Integration: Called hourly when real meter data available.
 Output: Validation records, anomaly alerts, COP adjustment recommendations.
 """
 
+import json
 import logging
 from datetime import datetime, timedelta, date
+from pathlib import Path
 from typing import Dict, Optional, Any
 from statistics import mean, stdev
 from app.database.supabase_client import get_supabase_client
+
+# Demo fixture path
+_DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +112,33 @@ class PowerMeterValidationEngine:
             return self._get_default_baseline()
 
     def _get_default_baseline(self) -> Dict[str, float]:
-        """Get default baseline when real data unavailable."""
+        """Get default baseline when real data unavailable.
+
+        Falls back to demo_power_baseline.json fixture if available,
+        otherwise uses hardcoded defaults.
+        """
+        # Try loading from demo fixture (3-tier fallback: Supabase -> Cache -> JSON)
+        try:
+            fixture_path = _DATA_DIR / "demo_power_baseline.json"
+            if fixture_path.exists():
+                with open(fixture_path) as f:
+                    demo = json.load(f)
+                stats = demo.get("baseline_stats", {})
+                return {
+                    "mean_kw": stats.get("mean_kwh", 315.4),
+                    "stdev_kw": stats.get("stdev_kwh", 42.1),
+                    "min_kw": stats.get("min_kwh", 245.0),
+                    "max_kw": stats.get("max_kwh", 412.0),
+                    "median_kw": round((stats.get("mean_kwh", 315.4) + stats.get("p95_kwh", 385.0)) / 2, 2),
+                    "p95_kw": stats.get("p95_kwh", 385.0),
+                    "samples": 168,
+                    "lookback_days": 7,
+                    "source": "demo_fixture",
+                }
+        except Exception as e:
+            logger.debug(f"Could not load demo baseline: {e}")
+
+        # Hardcoded fallback
         return {
             "mean_kw": 28.2,  # Typical HVAC peak
             "stdev_kw": 8.5,
