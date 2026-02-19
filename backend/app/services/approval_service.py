@@ -21,6 +21,7 @@ from app.database.repositories.audit_repository import AuditRepository
 
 from app.services.tier_routing_engine import TierRoutingResult
 from app.services.cov_monitor_service import get_cov_monitor_service, COVVerificationResult
+from app.services.decision_event_logger import emit_decision_event
 from app.database.repositories.parasite_decision_repository import ParasiteDecisionRepository
 from app.config.settings import settings
 
@@ -642,6 +643,17 @@ class ApprovalService:
             )
             safety_result = await self._validate_safety(equipment_id, proposed_value)
 
+            emit_decision_event(
+                "safety.validated",
+                correlation_id=routing_result.correlation_id,
+                decision_id=routing_result.decision_id,
+                recommendation_id=recommendation_id,
+                equipment_code=equipment_id,
+                tier="tier3",
+                status="passed" if safety_result["is_safe"] else "failed",
+                details={"reason": safety_result.get("reason", "")},
+            )
+
             if not safety_result["is_safe"]:
                 logger.warning(
                     f"Tier 3 auto-execute: SafetyEngine rejected {recommendation_id}: {safety_result.get('reason')}"
@@ -689,6 +701,22 @@ class ApprovalService:
                 equipment_id=equipment_id, point_name=control_point, target_value=target_value
             )
 
+            emit_decision_event(
+                "device.write",
+                correlation_id=routing_result.correlation_id,
+                decision_id=routing_result.decision_id,
+                recommendation_id=recommendation_id,
+                equipment_code=equipment_id,
+                tier="tier3",
+                status="success" if write_result["success"] else "failed",
+                details={
+                    "control_point": control_point,
+                    "target_value": target_value,
+                    "original_value": original_value,
+                    "error": write_result.get("error", ""),
+                },
+            )
+
             if not write_result["success"]:
                 logger.error(f"Tier 3 auto-execute: Device write failed: {write_result.get('error')}")
                 parasite_repo = ParasiteDecisionRepository()
@@ -720,6 +748,21 @@ class ApprovalService:
             logger.info(
                 f"Tier 3 auto-execute: COV verification result for {equipment_id}.{control_point}: "
                 f"verified={cov_result.verified}, actual={cov_result.actual_value}"
+            )
+
+            emit_decision_event(
+                "cov.verified",
+                correlation_id=routing_result.correlation_id,
+                decision_id=routing_result.decision_id,
+                recommendation_id=recommendation_id,
+                equipment_code=equipment_id,
+                tier="tier3",
+                status="verified" if cov_result.verified else "failed",
+                details={
+                    "expected_value": str(cov_result.expected_value),
+                    "actual_value": str(cov_result.actual_value),
+                    "control_point": control_point,
+                },
             )
 
             # Auto-rollback on COV failure if enabled
@@ -841,6 +884,23 @@ class ApprovalService:
                 }
             )
 
+            emit_decision_event(
+                "pipeline.complete",
+                correlation_id=routing_result.correlation_id,
+                decision_id=routing_result.decision_id,
+                recommendation_id=recommendation_id,
+                equipment_code=equipment_id,
+                tier="tier3",
+                status="success",
+                details={
+                    "control_point": control_point,
+                    "target_value": target_value,
+                    "original_value": original_value,
+                    "cov_verified": cov_result.verified,
+                    "confidence_score": routing_result.confidence_score,
+                },
+            )
+
             logger.info(f"Tier 3 auto-execute: Successfully completed for {recommendation_id}")
 
             return ApprovalResult(
@@ -949,6 +1009,22 @@ class ApprovalService:
                     f"COV verification failed: expected={cov_result.expected_value}, "
                     f"actual={cov_result.actual_value}"
                 ),
+            )
+
+            emit_decision_event(
+                "rollback.executed",
+                correlation_id=getattr(recommendation, "correlation_id", ""),
+                decision_id=decision_id,
+                recommendation_id=recommendation.id,
+                equipment_code=equipment_id,
+                tier="tier3",
+                status="success",
+                details={
+                    "control_point": control_point,
+                    "original_value": str(original_value),
+                    "failed_value": str(cov_result.actual_value),
+                    "rollback_cov_verified": rollback_cov_result.verified,
+                },
             )
 
             logger.info(f"Auto-rollback: Successfully completed for {recommendation.id}")

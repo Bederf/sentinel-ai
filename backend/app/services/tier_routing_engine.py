@@ -25,6 +25,7 @@ from app.ml.models.model_registry_db import get_model_registry
 from app.database.repositories.parasite_decision_repository import (
     get_parasite_decision_repository,
 )
+from app.services.decision_event_logger import emit_decision_event
 
 logger = logging.getLogger(__name__)
 
@@ -189,6 +190,24 @@ class TierRoutingEngine:
         # 8. Log decision to parasite_decisions
         equipment_code = recommendation.get("target_equipment", "unknown")
         site_id = recommendation.get("site_id", "unknown")
+
+        # Emit structured lifecycle event
+        emit_decision_event(
+            "tier_routing.decided",
+            correlation_id=correlation_id,
+            equipment_code=equipment_code,
+            site_id=site_id,
+            tier=tier,
+            status=action,
+            details={
+                "confidence_score": confidence_score,
+                "tier2_threshold": tier2_threshold,
+                "tier3_threshold": tier3_threshold,
+                "threshold_source": threshold_source,
+                "risk_level": risk_level,
+                "reason": reason,
+            },
+        )
         await self.parasite_repo.record_decision(
             {
                 "site_id": site_id,
