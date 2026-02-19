@@ -4,7 +4,7 @@ type: "architecture"
 status: "approved"
 version: "1.0.0"
 created: "2026-01-30"
-updated: "2026-02-01"
+updated: "2026-02-19"
 author: "Sentinel Development Team"
 tags: ["architecture", "system-design", "components"]
 related: ["device-abstraction-layer.md", "database-schema.md", "../03-api-reference/rest-api-endpoints.md"]
@@ -138,8 +138,8 @@ backend/app/
 ### Key Components
 
 **FastAPI Application (`main.py`)**
-- 20+ REST API routers
-- Audit middleware (auto-logs all requests)
+- 70+ REST API routers (decomposed into 4 startup modules — v14.0)
+- Audit middleware (auto-logs all requests, encrypted at rest — v14.0)
 - Background scheduler (recurring tasks)
 - CORS configuration
 - Exception handlers
@@ -157,6 +157,9 @@ backend/app/
 - Thermal modeling (load shedding)
 - Vision analysis (Claude Vision API)
 - **Demand-Aware Coordinator** (Phase 081) - Peak demand monitoring and multi-module coordination
+- **PARASITE Decision Pipeline** (v14.0) - Tier 1/2/3 autonomy with audit trail, COV verification, auto-rollback
+- **Optimization Tier Router** (v14.0) - Confidence-based recommendation routing (blocked/advisory/approval/auto-execute)
+- **Energy Validation Engines** (v14.0) - Power meter validation, cost validation, lighting simulation, water consumption, AI recommendations with ROI
   - Runs every 5 minutes
   - Monitors current demand vs NMD limit from database
   - Generates AI recommendations for peak shaving

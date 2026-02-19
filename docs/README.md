@@ -4,7 +4,7 @@ type: "guide"
 status: "approved"
 version: "1.0.0"
 created: "2026-01-30"
-updated: "2026-02-06"
+updated: "2026-02-19"
 author: "Sentinel Development Team"
 tags: ["documentation", "overview"]
 domain: "general"
@@ -35,6 +35,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - [Background ML Model Retraining](02-architecture/background-ml-retraining.md) - Automated background training, APScheduler integration, production deployment (Phase 45-01)
 
 ### 📚 API Reference
+- **[Energy Consumption API](03-api-reference/energy-consumption.md)** - Water, power validation, cost validation, AI recommendation endpoints (Phase A, v14.0)
 - [MCP Tools Reference](03-api-reference/mcp-tools-reference.md) - Model Context Protocol tools
 - [Module Integration API](03-api-reference/module-integration-api.md) - Query, activate, and monitor cross-module integrations
 - [Service Feedback API](03-api-reference/service-feedback-api.md) - Technician feedback collection with health scoring (Phase 41-01)
@@ -67,6 +68,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - **[AI Operations & Monitoring](04-features/ai-operations-monitoring.md)** - Day-to-day AI monitoring & recommendations (control-aware)
 - **[Health Scoring System](04-features/health-scoring-system.md)** - Equipment health calculation with configurable thresholds
 - **[72: Profile-Based Optimization](04-features/72-profile-based-optimization.md)** - Three business-aligned optimization profiles (SWEAT ASSETS, COMFORT, COST) with multi-objective scoring, control tiers, and feedback loop (Phase 72)
+- **[82: Optimization Tier Router](04-features/phase-implementations.md#phase-82-optimization-tier-router)** - Confidence-based recommendation routing (blocked/advisory/approval/auto-execute) with shadow/enforce modes (Phase 82, v14.0)
 - **[44-02: Explainable AI for ML Predictions](04-features/44-02-explainable-ai.md)** - Natural language explanations for AI predictions (Phase 44-02)
 - **[44-03: Conversational Interface](04-features/44-03-conversational-interface.md)** - Natural language queries over ML predictions via local Ollama LLM (Phase 44-03)
 - **[45-01: Online Learning & Automated Retraining](04-features/45-01-online-learning.md)** - Model freshness monitoring, auto-retraining, A/B testing (Phase 45-01)
@@ -125,6 +127,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 ### 🔒 Security & Governance
 - **[Security Documentation Suite](08-security/README.md)** - Complete security policy suite for FSR supplier onboarding
 - **[FSR Gap Analysis - Updated](FSR_GAP_ANALYSIS_UPDATE.md)** - Current assessment against FSR V8 questionnaire
+- **Encryption at Rest** - Fernet AES-128-CBC for audit logs (Phase 81, v14.0)
 - [Information Security Framework](08-security/information-security-framework.md) - Governance structure, ISO role, policy hierarchy
 - [Information Security Strategy](08-security/information-security-strategy.md) - Maturity targets, remediation roadmap
 - [Information Security Policy](08-security/information-security-policy.md) - Overarching policy covering all 18 FSR domains

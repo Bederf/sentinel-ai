@@ -97,6 +97,76 @@ All phases organized by number with implementation status, completion date, and 
 
 ---
 
+### Phase 67: PARASITE Niagara BMS — Technical Debt Remediation
+
+**Status:** ✅ Complete (v14.0) | **Date:** 2026-02-11
+
+**Achievement:** Eliminated 11,321 LOC of technical debt through god file decomposition, main.py modularization, import cycle fixes, and blocking I/O removal.
+
+**Key deliverables:**
+- main.py decomposed from 364 to 40 lines (89% reduction) into 4 startup modules
+- 3 god files split: api.ts (4,397 LOC), MCP server (4,450 LOC), chat_tools (2,474 LOC)
+- CI/CD automation for import cycle detection and file size prevention
+- 2 blocking HTTP calls removed from async endpoints
+- API docs for 11 critical routers
+
+---
+
+### Phase 80: PARASITE Implementation Gap Fill
+
+**Status:** ✅ Complete (v14.0) | **Date:** 2026-02-12
+
+**Achievement:** Implemented 5 missing PARASITE components connecting AI decision-making to device control with full autonomy pipeline.
+
+**Key deliverables:**
+- `parasite_decisions` table + `ParasiteDecisionRepository` (9 methods) for decision audit trail
+- `TierRoutingEngine` (368 LOC) — Confidence-based Tier 1/2/3 routing with stricter-of-two thresholds
+- `COVMonitorService` (564 LOC) — Post-write verification with outcome measurement
+- Tier 3 auto-execute with auto-rollback on COV failure
+- PARASITE Decisions API (5 endpoints) for operator visibility
+- ModularDashboard integrated into admin sidebar (16 modules)
+
+---
+
+### Phase 81: Security Encryption Remediation
+
+**Status:** ✅ Complete (v14.0) | **Date:** 2026-02-19
+
+**Achievement:** Enabled encryption at rest for audit logs and completed comprehensive secrets audit.
+
+**Key deliverables:**
+- Fernet encryption (AES-128-CBC + HMAC-SHA256) for audit log entries
+- 1,000 existing audit entries migrated from plaintext to encrypted
+- .env removed from git tracking
+- 31 env keys audited, 14 missing keys documented in .env.example
+- TODO.md security section updated (7/18 domains compliant, 92 checklist items)
+
+---
+
+### Phase 82: Optimization Tier Router
+
+**Status:** ✅ Complete (v14.0) | **Date:** 2026-02-19
+
+**Achievement:** Implemented confidence-based routing for optimization recommendations with shadow and enforce modes.
+
+**Key deliverables:**
+- `OptimizationTierRouter` service (342 LOC) with feature flags
+- Control tier matrix: blocked / advisory / approval / auto-execute
+- Shadow mode (default) for safe production rollout, enforce mode for active routing
+- FCU confidence capped at 0.45 (advisory-only, models less reliable)
+- Wired into `/optimization/analyze` with routing metadata in response
+- Approval path hardened: blocked/advisory rejected in enforce mode
+- M&V alignment: verification tasks only for executed setpoints
+- 62 tests (29 unit + 33 integration)
+
+**Key files:**
+- `backend/app/services/optimization_tier_router.py`
+- `backend/app/services/optimization_tier_settings.py`
+- `backend/tests/services/test_optimization_tier_router.py`
+- `backend/tests/api/test_optimization_tier_integration.py`
+
+---
+
 ### Phase A: Geometric abstraction and floor plan sanitization
 
 **Status:** ✅ Production Ready | **Date:** 2026-02-09
@@ -135,15 +205,18 @@ All phases organized by number with implementation status, completion date, and 
 
 #### Phase A.1: Energy consumption model
 
-**Status:** 🟡 In Progress | **Component:** Lighting simulation engine
+**Status:** ✅ Complete (v14.0) | **Date:** 2026-02-19
 
-**Objective:** Add dynamic lighting energy based on occupancy and daylight.
+**Objective:** Activate lighting, water, power validation, cost validation, and AI recommendation engines.
 
 **Deliverables:**
-- Occupancy-aware lighting power calculation
-- Daylight harvesting energy reduction
-- Hourly lighting energy simulation
-- Energy comparison to HVAC
+- 5 services activated: lighting simulation, water consumption, power meter validation, cost validation, AI recommendations
+- DB migrations: `power_meter_validations` + `cost_validations` tables
+- Thermal engine validation wiring at hour 23
+- Demo fixtures: power baseline (24-hour profile), monthly invoices (3 months)
+- 124 tests (87 unit + 37 integration) covering all 11 API endpoints
+- Financial ROI recommendations with payback periods and CO2 savings
+- API docs: `docs/03-api-reference/energy-consumption.md`
 
 #### Phase A.2: Occupancy analytics dashboard
 
@@ -186,6 +259,17 @@ All phases organized by number with implementation status, completion date, and 
 - **Phase 088**: Module gating framework for controls
 - **Phase 090-092**: Module toggle refinement and auth
 - **Phase 093**: Energy verification and calculations
+- **Phase 082**: Optimization tier router (v14.0)
+
+### Autonomous Control & PARASITE
+
+- **Phase 067**: Technical debt remediation (v14.0)
+- **Phase 080**: PARASITE implementation gap fill (v14.0)
+- **Phase 082**: Confidence-based tier routing (v14.0)
+
+### Security & Compliance
+
+- **Phase 081**: Encryption at rest + secrets audit (v14.0)
 
 ### Occupancy & People Flow
 
@@ -197,7 +281,7 @@ All phases organized by number with implementation status, completion date, and 
 
 ### Lighting & Daylight
 
-- **Phase A.1**: Lighting simulation engine
+- **Phase A.1**: Lighting simulation engine + validation pipeline (v14.0)
 - **Phase A.3**: Daylight harvesting ROI
 
 ### Digital Twin & Visualization
@@ -208,6 +292,7 @@ All phases organized by number with implementation status, completion date, and 
 ### Energy & Cost
 
 - **Phase 093**: Energy calculation verification
+- **Phase A.1**: Energy consumption validation model (v14.0)
 - **Phase A.3**: Energy-occupancy correlation
 - **Phase 5.6**: Tariff integration (TOU rates, network charges)
 
@@ -217,12 +302,17 @@ All phases organized by number with implementation status, completion date, and 
 
 | Phase | Feature | Status | Date | Impact |
 |-------|---------|--------|------|--------|
+| 067 | Tech debt remediation | ✅ Complete | 2026-02-11 | 11,321 LOC eliminated |
+| 068 | Frontend test quality | ✅ Partial | 2026-02-12 | 95.3% pass rate |
+| 080 | PARASITE gap fill | ✅ Complete | 2026-02-12 | Tier 1-3 autonomy |
+| 081 | Encryption remediation | ✅ Complete | 2026-02-19 | Audit log encryption |
+| 082 | Optimization tier router | ✅ Complete | 2026-02-19 | Confidence-based routing |
 | 088 | Frontend module gating | ✅ Complete | 2026-02-15 | Feature access control |
 | 090 | Toggle debugging | ✅ Fixed | 2026-02-16 | OPERATOR permissions |
 | 092 | Toggle fixes | ✅ Complete | 2026-02-16 | Module dependency cascade |
 | 093 | Energy verification | ✅ Verified | 2026-02-16 | R575k/year baseline |
 | A | Floor plan sanitization | ✅ Ready | 2026-02-09 | Security-first 3D |
-| A.1 | Lighting simulation | 🟡 In Progress | — | Dynamic energy model |
+| A.1 | Energy consumption model | ✅ Complete | 2026-02-19 | 5 services, 124 tests |
 | A.2 | Occupancy analytics | ✅ Complete | 2026-02-16 | Occupancy dashboard |
 | A.3 | Energy correlation | ✅ Complete | 2026-02-16 | Savings analysis |
 | A.4 | 3D animations | ✅ Complete | 2026-02-17 | Visual engagement |
