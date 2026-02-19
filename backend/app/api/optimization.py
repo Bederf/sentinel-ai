@@ -672,6 +672,7 @@ async def analyze_optimization(request: AnalyzeRequest) -> Dict[str, Any]:
             auto_applied = all(r.get("success") for r in auto_apply_results) and len(auto_apply_results) > 0
 
         # Record M&V verification task for auto-applied recommendations
+        # Only create M&V tasks for setpoints that were actually executed successfully
         if auto_applied:
             try:
                 systems = list({r.get("system", "hvac") or "hvac" for r in rec_dict.get("recommendations", [])})
@@ -685,6 +686,16 @@ async def analyze_optimization(request: AnalyzeRequest) -> Dict[str, Any]:
                     for r in auto_apply_results
                     if r.get("success")
                 ]
+                # Build routing metadata from the first auto-executed routing decision
+                routing_metadata = None
+                for idx, d in enumerate(routing_decisions):
+                    if d.action == "auto_execute":
+                        routing_metadata = {
+                            "routing_tier": d.tier.value,
+                            "control_tier": control_tier,
+                            "effective_confidence": d.effective_confidence,
+                        }
+                        break
                 mv_service = get_mv_verification_service()
                 mv_service.record_applied_recommendation(
                     site_id=request.site_id,
@@ -692,6 +703,7 @@ async def analyze_optimization(request: AnalyzeRequest) -> Dict[str, Any]:
                     projected_savings=rec_dict.get("projected_savings", {}),
                     setpoints_applied=setpoints_for_mv,
                     recommendation_systems=systems,
+                    routing_metadata=routing_metadata,
                 )
             except Exception as mv_err:
                 logger.warning(f"M&V recording failed (non-blocking): {mv_err}")
