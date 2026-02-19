@@ -1,0 +1,232 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "SENTINEL security event monitoring: failed logins, suspicious requests, device control activity, and API error rates.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "title": "Security Overview (24h)",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 24, "x": 0, "y": 0 },
+      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+      "targets": [
+        {
+          "expr": "count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"AUTH_FAILURE|ACCESS_DENIED|SUSPICIOUS\" [24h])",
+          "legendFormat": "Security Events (24h)",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": ["sum"],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area"
+      }
+    },
+    {
+      "title": "Failed Login Rate by IP",
+      "description": "Failed authentication attempts grouped by source IP. Alert threshold: >5 in 5 minutes.",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+      "targets": [
+        {
+          "expr": "sum by (source_ip) (count_over_time({job=\"sentinel-security\", event_type=\"AUTH_FAILURE\"} [5m]))",
+          "legendFormat": "{{source_ip}}",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"AUTH_FAILURE\" [5m]))",
+          "legendFormat": "Total (journal)",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 60,
+            "stacking": { "mode": "normal" }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 3 },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Suspicious User Agent Frequency",
+      "description": "Requests from automated tools and scanners (sqlmap, burp, nikto, curl with suspicious patterns).",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({job=\"sentinel-security\", event_type=\"SUSPICIOUS_USER_AGENT\"} [15m]))",
+          "legendFormat": "Suspicious User Agents",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(count_over_time({job=\"sentinel-security\", event_type=\"SUSPICIOUS_PATH\"} [15m]))",
+          "legendFormat": "Suspicious Paths (SQLi/Traversal)",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"SUSPICIOUS\" [15m]))",
+          "legendFormat": "Total Suspicious (journal)",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 50,
+            "stacking": { "mode": "normal" }
+          },
+          "color": { "mode": "palette-classic" }
+        }
+      }
+    },
+    {
+      "title": "Device Control Rate by User",
+      "description": "BMS device control actions grouped by user identity. Unusual spikes may indicate unauthorized activity.",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+      "targets": [
+        {
+          "expr": "sum by (user) (count_over_time({job=\"sentinel-audit\"} | json | action=\"device_control\" [1h]))",
+          "legendFormat": "{{user}}",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"BMS_CONTROL_ACTION\" [1h]))",
+          "legendFormat": "Total Controls (journal)",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 40,
+            "stacking": { "mode": "normal" }
+          }
+        }
+      }
+    },
+    {
+      "title": "API Error Spikes (5xx)",
+      "description": "Backend error rate. Alert threshold: >10 errors in 5 minutes (1% of traffic).",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"ERROR|CRITICAL\" [5m]))",
+          "legendFormat": "Errors (5min window)",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(count_over_time({job=\"sentinel-security\", event_type=\"SERVER_ERROR\"} [5m]))",
+          "legendFormat": "5xx Responses",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "pointSize": 5,
+            "showPoints": "auto"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 5 },
+              { "color": "red", "value": 10 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Failed Login Events (Detail)",
+      "type": "logs",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 20 },
+      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+      "targets": [
+        {
+          "expr": "{job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"AUTH_FAILURE|ACCESS_DENIED|Failed password\"",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": true,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": true,
+        "enableLogDetails": true,
+        "sortOrder": "Descending"
+      }
+    },
+    {
+      "title": "Suspicious Request Detail",
+      "type": "logs",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 28 },
+      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+      "targets": [
+        {
+          "expr": "{job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"SUSPICIOUS_PATH|SUSPICIOUS_USER_AGENT|sqlmap|burp|nikto\"",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": true,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": true,
+        "enableLogDetails": true,
+        "sortOrder": "Descending"
+      }
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["sentinel", "security", "observability"],
+  "templating": {
+    "list": []
+  },
+  "time": { "from": "now-24h", "to": "now" },
+  "timepicker": {},
+  "timezone": "Africa/Johannesburg",
+  "title": "SENTINEL Security Operations",
+  "uid": "sentinel-security-operations",
+  "version": 1
+}

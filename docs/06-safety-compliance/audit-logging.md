@@ -629,8 +629,93 @@ SELECT cleanup_old_login_logs(90);
 SELECT cleanup_old_login_logs(30);
 ```
 
+## Decision pipeline events
+
+In addition to device control and login auditing, SENTINEL logs structured lifecycle events for the PARASITE autonomous decision pipeline. These events provide end-to-end traceability from recommendation generation through execution and verification.
+
+### Correlation ID threading
+
+Every recommendation is assigned a `correlation_id` (UUID) at creation time. This ID is threaded through all downstream components:
+
+```
+Recommendation (correlation_id)
+  → TierRoutingResult (correlation_id + decision_id)
+    → parasite_decisions record
+      → audit log entries
+        → ML feedback metadata
+```
+
+Use the `correlation_id` to trace a single recommendation through all pipeline stages in Grafana/Loki.
+
+### Pipeline stages
+
+The `DecisionEventLogger` (`backend/app/services/decision_event_logger.py`) emits structured JSON events at each pipeline stage:
+
+| Stage | Emitted When | Status Values |
+|-------|-------------|---------------|
+| `tier_routing.decided` | After tier classification | `tier1_advisory`, `tier2_approval`, `tier3_auto_execute` |
+| `safety.validated` | After safety engine check | `passed`, `failed` |
+| `device.write` | After device point write | `success`, `failed` |
+| `cov.verified` | After COV outcome measurement | `passed`, `failed` |
+| `rollback.executed` | After auto-rollback on failure | `success`, `failed` |
+| `pipeline.complete` | After successful Tier 3 execution | `success` |
+| `approval.decided` | After Tier 2 human decision | `approved`, `rejected` |
+
+### Event format
+
+```json
+{
+  "timestamp": "2026-02-19T14:30:00.000000+02:00",
+  "stage": "tier_routing.decided",
+  "correlation_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "decision_id": "d1e2f3a4-b5c6-7890-abcd-ef1234567890",
+  "recommendation_id": "rec-001",
+  "equipment_code": "S002-CHILLER-B1-001",
+  "site_id": "S002",
+  "tier": "tier3",
+  "status": "tier3_auto_execute",
+  "details": {"confidence_score": 0.85, "threshold_source": "database"},
+  "component": "sentinel-parasite"
+}
+```
+
+### Log collection
+
+Events are written to `/var/log/sentinel/decisions.log` via Python's `RotatingFileHandler` (10MB max, 5 rotations). Promtail collects from this file and ships to Loki with labels: `stage`, `tier`, `status`.
+
+### Grafana dashboard
+
+The **PARASITE Decision Pipeline** dashboard (`infrastructure/grafana/provisioning/dashboards/parasite-decisions.json`) provides:
+
+- **Decision Pipeline Overview** — Total events (24h) stat panel
+- **Events by Stage/Tier/Status** — Pie chart breakdowns
+- **Pipeline Event Timeline** — Chronological log view
+- **Correlation ID Trace** — Enter a correlation_id to see all events for one recommendation
+- **Failed Decisions** — Log panel filtering for failed/rejected/rollback events
+- **Tier 3 Auto-Execute Rate** — Time series of successful auto-executes vs safety rejections vs rollbacks
+- **Tier 2 Approval Rate** — Time series of approved vs rejected decisions
+
+**Dashboard UID:** `sentinel-parasite-decisions`
+
+### Querying decision events in Loki
+
+```logql
+# All events for a specific correlation_id
+{job="sentinel-decisions"} | json | correlation_id = "a1b2c3d4-..."
+
+# All safety failures in last 24h
+{job="sentinel-decisions", stage="safety.validated", status="failed"}
+
+# Tier 3 auto-executes
+{job="sentinel-decisions", stage="pipeline.complete"}
+
+# All rollbacks
+{job="sentinel-decisions", stage="rollback.executed"}
+```
+
 ## Related documents
 
 - [Safety Interlocks Engine](safety-interlocks-engine.md) - Safety validation logging
 - [Device Abstraction Layer](../02-architecture/device-abstraction-layer.md) - Device control logging
 - [MCP Tools Reference](../03-api-reference/mcp-tools-reference.md) - MCP tool audit integration
+- [Logging Architecture](../08-security/logging-architecture.md) - Full logging pipeline (Promtail → Loki → Grafana)

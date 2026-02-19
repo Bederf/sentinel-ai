@@ -158,6 +158,7 @@ backend/app/
 - Vision analysis (Claude Vision API)
 - **Demand-Aware Coordinator** (Phase 081) - Peak demand monitoring and multi-module coordination
 - **PARASITE Decision Pipeline** (v14.0) - Tier 1/2/3 autonomy with audit trail, COV verification, auto-rollback
+- **PARASITE Observability** (v14.0) - End-to-end decision traceability with correlation_id threading, structured lifecycle events via `decision_event_logger`, Promtail → Loki ingestion, and Grafana dashboard for pipeline analysis
 - **Optimization Tier Router** (v14.0) - Confidence-based recommendation routing (blocked/advisory/approval/auto-execute)
 - **Energy Validation Engines** (v14.0) - Power meter validation, cost validation, lighting simulation, water consumption, AI recommendations with ROI
   - Runs every 5 minutes
@@ -528,7 +529,8 @@ flowchart TB
 
 - **Ports:** Backend 9095, Frontend 9096
 - **Deployment:** Docker (optional)
-- **Monitoring:** Health endpoints, audit logs
+- **Monitoring:** Health endpoints, audit logs, Grafana dashboards (PARASITE Decision Pipeline)
+- **Logging:** Structured JSON → RotatingFileHandler → Promtail → Loki (sentinel.audit, sentinel.decisions)
 - **Backup:** JSON seed data for demo mode
 
 ## Key Decisions & Rationale

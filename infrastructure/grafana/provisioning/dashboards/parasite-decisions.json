@@ -23,7 +23,7 @@
       "title": "Decision Pipeline Overview",
       "type": "stat",
       "gridPos": { "h": 4, "w": 24, "x": 0, "y": 0 },
-      "datasource": { "type": "loki", "uid": "loki" },
+      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
       "targets": [
         {
           "expr": "count_over_time({job=\"sentinel-decisions\"} [24h])",
@@ -45,7 +45,7 @@
       "title": "Events by Pipeline Stage",
       "type": "piechart",
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 4 },
-      "datasource": { "type": "loki", "uid": "loki" },
+      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
       "targets": [
         {
           "expr": "sum by (stage) (count_over_time({job=\"sentinel-decisions\"} [24h]))",
@@ -58,7 +58,7 @@
       "title": "Events by Tier",
       "type": "piechart",
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 4 },
-      "datasource": { "type": "loki", "uid": "loki" },
+      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
       "targets": [
         {
           "expr": "sum by (tier) (count_over_time({job=\"sentinel-decisions\"} [24h]))",
@@ -71,7 +71,7 @@
       "title": "Events by Status",
       "type": "piechart",
       "gridPos": { "h": 8, "w": 8, "x": 16, "y": 4 },
-      "datasource": { "type": "loki", "uid": "loki" },
+      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
       "targets": [
         {
           "expr": "sum by (status) (count_over_time({job=\"sentinel-decisions\"} [24h]))",
@@ -84,7 +84,7 @@
       "title": "Pipeline Event Timeline",
       "type": "logs",
       "gridPos": { "h": 10, "w": 24, "x": 0, "y": 12 },
-      "datasource": { "type": "loki", "uid": "loki" },
+      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
       "targets": [
         {
           "expr": "{job=\"sentinel-decisions\"} |= `$correlation_id`",
@@ -107,7 +107,7 @@
       "description": "Enter a correlation_id to see all pipeline events for a single recommendation",
       "type": "logs",
       "gridPos": { "h": 12, "w": 24, "x": 0, "y": 22 },
-      "datasource": { "type": "loki", "uid": "loki" },
+      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
       "targets": [
         {
           "expr": "{job=\"sentinel-decisions\"} | json | correlation_id = `$correlation_id`",
@@ -129,7 +129,7 @@
       "title": "Failed Decisions (Last 24h)",
       "type": "logs",
       "gridPos": { "h": 8, "w": 24, "x": 0, "y": 34 },
-      "datasource": { "type": "loki", "uid": "loki" },
+      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
       "targets": [
         {
           "expr": "{job=\"sentinel-decisions\", status=~\"failed|rejected|rollback\"}",
@@ -149,7 +149,7 @@
       "title": "Tier 3 Auto-Execute Rate",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 42 },
-      "datasource": { "type": "loki", "uid": "loki" },
+      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
       "targets": [
         {
           "expr": "sum(count_over_time({job=\"sentinel-decisions\", stage=\"pipeline.complete\"} [1h]))",
@@ -181,7 +181,7 @@
       "title": "Tier 2 Approval Rate",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 42 },
-      "datasource": { "type": "loki", "uid": "loki" },
+      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
       "targets": [
         {
           "expr": "sum(count_over_time({job=\"sentinel-decisions\", stage=\"approval.decided\", status=\"approved\"} [1h]))",
@@ -221,7 +221,7 @@
       },
       {
         "current": { "selected": true, "text": "All", "value": "$__all" },
-        "datasource": { "type": "loki", "uid": "loki" },
+        "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
         "definition": "label_values({job=\"sentinel-decisions\"}, tier)",
         "label": "Tier",
         "multi": true,
@@ -232,7 +232,7 @@
       },
       {
         "current": { "selected": true, "text": "All", "value": "$__all" },
-        "datasource": { "type": "loki", "uid": "loki" },
+        "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
         "definition": "label_values({job=\"sentinel-decisions\"}, stage)",
         "label": "Stage",
         "multi": true,

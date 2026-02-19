@@ -122,12 +122,14 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 
 ### 🛡️ Safety & Compliance
 - [Safety Interlocks Engine](06-safety-compliance/safety-interlocks-engine.md) - Safety validation
+- [Audit Logging](06-safety-compliance/audit-logging.md) - Device control, login, and decision pipeline audit trail
 - **[Data Privacy & Security Architecture](SECURITY-PRIVACY.md)** - Data sovereignty, local AI, air-gapped deployment, POPIA compliance
 
 ### 🔒 Security & Governance
 - **[Security Documentation Suite](08-security/README.md)** - Complete security policy suite for FSR supplier onboarding
 - **[FSR Gap Analysis - Updated](FSR_GAP_ANALYSIS_UPDATE.md)** - Current assessment against FSR V8 questionnaire
 - **Encryption at Rest** - Fernet AES-128-CBC for audit logs (Phase 81, v14.0)
+- **[Logging Architecture](08-security/logging-architecture.md)** - Promtail → Loki pipeline, security events, decision pipeline observability, Grafana dashboards
 - [Information Security Framework](08-security/information-security-framework.md) - Governance structure, ISO role, policy hierarchy
 - [Information Security Strategy](08-security/information-security-strategy.md) - Maturity targets, remediation roadmap
 - [Information Security Policy](08-security/information-security-policy.md) - Overarching policy covering all 18 FSR domains

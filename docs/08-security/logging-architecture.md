@@ -41,6 +41,7 @@ SENTINEL BMS Intelligence Platform implements centralised log aggregation with S
           | - Syslog       |       |
           | - Audit logs   |<------+
           | - Security log |
+          | - Decisions log|
           +--------+-------+
                    |
                    | push (HTTP)
@@ -105,8 +106,12 @@ SENTINEL BMS Intelligence Platform implements centralised log aggregation with S
 **Configuration file:** `/opt/aimthelaw/config/promtail-config.yml`
 
 SENTINEL-specific scrape jobs in Promtail:
+- `sentinel-security` — Tails `/var/log/sentinel/security.log` with JSON parsing, extracting `event_type` and `severity` as labels
 - `sentinel-audit` — Tails `/opt/bms-intelligence/backend/app/data/audit_log.json` with multiline JSON parsing, extracting `action` and `result` as labels
+- `sentinel-decisions` — Tails `/var/log/sentinel/decisions.log` with JSON parsing, extracting `stage`, `tier`, `status`, `correlation_id`, `decision_id`, `equipment_code` as labels
 - `journal` (shared) — Captures systemd journal including `sentinel-backend.service` logs via `unit` label
+
+**SENTINEL-specific Promtail config:** `infrastructure/promtail/promtail-config.yaml` (in this repository)
 
 ### Grafana (Visualisation and Alerting)
 
@@ -215,6 +220,62 @@ Structured JSON audit events from the enhanced AuditLogger:
 | `CONFIG_CHANGE` | System configuration change |
 
 **Also persisted to:** `backend/app/data/audit_log.json` (file-based backup)
+
+### 6. SENTINEL Decision Pipeline Events
+
+**Source:** Python `sentinel.decisions` logger → `/var/log/sentinel/decisions.log`
+**Label:** `job=sentinel-decisions, component=parasite`
+
+Structured JSON lifecycle events from the PARASITE autonomous decision pipeline (`DecisionEventLogger`):
+
+| Stage | Description |
+|-------|-------------|
+| `tier_routing.decided` | Recommendation classified into Tier 1/2/3 |
+| `safety.validated` | Safety engine check result (passed/failed) |
+| `device.write` | Device point write attempt result |
+| `cov.verified` | Change-of-Value outcome measurement |
+| `rollback.executed` | Auto-rollback after COV failure |
+| `pipeline.complete` | Successful Tier 3 auto-execution end-to-end |
+| `approval.decided` | Tier 2 human approval/rejection |
+
+**Event format:**
+```json
+{
+  "timestamp": "2026-02-19T14:30:00.000000+02:00",
+  "stage": "tier_routing.decided",
+  "correlation_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "decision_id": "d1e2f3a4-b5c6-7890-abcd-ef1234567890",
+  "equipment_code": "S002-CHILLER-B1-001",
+  "tier": "tier3",
+  "status": "tier3_auto_execute",
+  "details": {"confidence_score": 0.85},
+  "component": "sentinel-parasite"
+}
+```
+
+**Pipeline stages:**
+- JSON parsing of stage, correlation_id, decision_id, equipment_code, tier, status
+- Label extraction for stage, tier, status
+- Timestamp parsing with timezone offset format
+
+**Key traceability feature:** The `correlation_id` links all events for a single recommendation across the entire pipeline, enabling end-to-end trace queries in Grafana/Loki.
+
+**Log rotation:** `RotatingFileHandler` — 10MB max per file, 5 backup rotations, configured by `backend/app/logging_config.py`
+
+### Grafana Dashboards
+
+SENTINEL provisions Grafana dashboards via `infrastructure/grafana/provisioning/dashboards/`:
+
+**PARASITE Decision Pipeline** (`sentinel-parasite-decisions`):
+- Decision Pipeline Overview (24h stat)
+- Events by Stage / Tier / Status (pie charts)
+- Pipeline Event Timeline (chronological log)
+- Correlation ID Trace (enter ID to see all events for one recommendation)
+- Failed Decisions (filtered for failed/rejected/rollback)
+- Tier 3 Auto-Execute Rate (stacked bar: success vs safety rejection vs rollback)
+- Tier 2 Approval Rate (stacked bar: approved vs rejected)
+
+**Template variables:** `correlation_id` (textbox), `tier` (query), `stage` (query)
 
 ## Retention Policy
 
@@ -377,7 +438,12 @@ curl -s http://admin:admin@127.0.0.1:3001/api/v1/provisioning/alert-rules | jq '
 | `backend/app/middleware/security_logging.py` | Security event detection and structured logging |
 | `backend/app/services/audit_logger.py` | Enhanced audit logger with JSON output |
 | `backend/app/services/encryption_service.py` | Fernet encryption for audit log entries at rest |
+| `backend/app/services/decision_event_logger.py` | Structured lifecycle event emitter for PARASITE pipeline |
+| `backend/app/logging_config.py` | RotatingFileHandler setup for sentinel.audit + sentinel.decisions |
 | `backend/app/middleware/audit_middleware.py` | Existing audit middleware for control actions |
+| `infrastructure/grafana/provisioning/dashboards/parasite-decisions.json` | PARASITE Decision Pipeline Grafana dashboard |
+| `infrastructure/grafana/provisioning/dashboards/dashboards.yaml` | Dashboard provisioning config |
+| `infrastructure/promtail/promtail-config.yaml` | Promtail config with sentinel-decisions scrape job |
 
 ---
 

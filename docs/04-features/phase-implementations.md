@@ -252,6 +252,46 @@ All phases organized by number with implementation status, completion date, and 
 
 ---
 
+### PARASITE Observability Phase
+
+**Status:** ✅ Complete (v14.0) | **Date:** 2026-02-19
+
+**Achievement:** End-to-end decision pipeline traceability with correlation_id threading, structured lifecycle events, Tier 2 decision persistence, log pipeline fix, and Grafana dashboard.
+
+**Key deliverables:**
+- **P0 Hotfix**: Fixed `log_decision()` → `record_decision()` crash in 3 call sites, added `decision_id` to `TierRoutingResult`
+- **Correlation Foundation**: `correlation_id` (UUID) threaded from `Recommendation` model through `TierRoutingResult` → `parasite_decisions` → audit log → ML feedback
+- **Structured Lifecycle Events**: `DecisionEventLogger` emitting JSON events at 10 pipeline stages (`tier_routing.decided`, `safety.validated`, `device.write`, `cov.verified`, `rollback.executed`, `pipeline.complete`, `approval.decided`, etc.)
+- **Tier 2 Persistence**: Approve/reject decisions now recorded to `parasite_decisions` table
+- **Log Pipeline Fix**: `RotatingFileHandler` (10MB, 5 rotations) for `sentinel.audit` → `security.log` and `sentinel.decisions` → `decisions.log`
+- **Grafana Dashboard**: 9-panel dashboard with correlation ID trace, stage/tier/status breakdowns, failed decisions log, Tier 3 auto-execute rate, Tier 2 approval rate
+
+**Bug fixes (4 runtime crashes):**
+1. `log_decision()` → `record_decision()` (AttributeError at 3 call sites)
+2. `schedule_outcome_measurement()` called with wrong parameters
+3. `update_decision_rollback()` → `mark_rolled_back()` wrong method name
+4. Missing `decision_id` field on `TierRoutingResult`
+
+**Tests:** 32 tests across 3 test files (13 + 15 + 4)
+
+**Key files:**
+- `backend/app/services/decision_event_logger.py` — Structured lifecycle event emitter
+- `backend/app/services/tier_routing_engine.py` — decision_id + correlation_id threading
+- `backend/app/services/approval_service.py` — Tier 2 persistence + lifecycle events
+- `backend/app/logging_config.py` — RotatingFileHandler configuration
+- `infrastructure/promtail/promtail-config.yaml` — sentinel-decisions scrape job
+- `infrastructure/grafana/provisioning/dashboards/parasite-decisions.json` — Grafana dashboard
+
+**Commits (6):**
+- `026ce3fd` — fix(parasite): add decision_id to TierRoutingResult + regression tests
+- `b72f5c76` — feat(observability): add correlation_id threading + fix 2 runtime bugs
+- `1c317196` — feat(observability): add structured lifecycle events for decision pipeline
+- `cd065b91` — feat(observability): persist Tier 2 approve/reject to parasite_decisions
+- `90cf4a8f` — feat(observability): fix log pipeline with file handlers + Promtail config
+- `36db5482` — feat(observability): add Grafana dashboard for PARASITE decision pipeline
+
+---
+
 ## Phase grouping by feature area
 
 ### HVAC & Climate Control
@@ -266,6 +306,7 @@ All phases organized by number with implementation status, completion date, and 
 - **Phase 067**: Technical debt remediation (v14.0)
 - **Phase 080**: PARASITE implementation gap fill (v14.0)
 - **Phase 082**: Confidence-based tier routing (v14.0)
+- **Observability**: Decision pipeline traceability, correlation_id, lifecycle events, Grafana dashboard (v14.0)
 
 ### Security & Compliance
 
@@ -307,6 +348,7 @@ All phases organized by number with implementation status, completion date, and 
 | 080 | PARASITE gap fill | ✅ Complete | 2026-02-12 | Tier 1-3 autonomy |
 | 081 | Encryption remediation | ✅ Complete | 2026-02-19 | Audit log encryption |
 | 082 | Optimization tier router | ✅ Complete | 2026-02-19 | Confidence-based routing |
+| — | PARASITE Observability | ✅ Complete | 2026-02-19 | E2E decision traceability |
 | 088 | Frontend module gating | ✅ Complete | 2026-02-15 | Feature access control |
 | 090 | Toggle debugging | ✅ Fixed | 2026-02-16 | OPERATOR permissions |
 | 092 | Toggle fixes | ✅ Complete | 2026-02-16 | Module dependency cascade |
