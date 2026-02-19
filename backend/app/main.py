@@ -3,9 +3,13 @@
 from fastapi import FastAPI
 
 from app.config.settings import settings
+from app.logging_config import setup_logging
 from app.startup.middleware import register_middleware, register_exception_handlers
 from app.startup.events import register_events
 from app.startup.routes import register_all_routes
+
+# Configure structured logging (file handlers for Promtail/Loki)
+setup_logging()
 
 # =============================================================================
 # Application Factory
@@ -30,6 +34,7 @@ register_events(app)
 
 # 4. Register API routes (70 routers across 4 domains)
 register_all_routes(app)
+
 
 # =============================================================================
 # Root Endpoint
