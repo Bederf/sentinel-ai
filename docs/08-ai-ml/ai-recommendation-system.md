@@ -2,9 +2,9 @@
 title: "AI Recommendation System"
 type: "technical"
 status: "approved"
-version: "1.0.0"
+version: "2.0.0"
 created: "2026-02-02"
-updated: "2026-02-11"
+updated: "2026-02-19"
 author: "Sentinel Development Team"
 tags: ["ai", "optimization", "recommendations", "claude", "zone-aware", "background-jobs"]
 related: ["./background-recommendation-generation.md", "../14-south-africa-context/load-shedding-optimization.md", "../06-safety-compliance/safety-interlocks-engine.md", "../08-ai-ml/hybrid-ai-routing.md", "../03-api-reference/recommendations-api.md"]
@@ -73,10 +73,12 @@ graph TB
 
 | Component | File | Responsibility |
 |-----------|------|----------------|
-| **Optimization API** | `backend/app/api/optimization.py` | REST endpoints for optimization |
+| **Optimization API** | `backend/app/api/ai_recommendations.py` | REST endpoints for optimization |
 | **AI Optimizer Service** | `backend/app/services/ai_optimizer.py` | Core recommendation logic |
 | **Claude Service** | `backend/app/services/claude_service.py` | AI analysis integration |
 | **Safety Engine** | `backend/app/services/safety_interlocks.py` | Validation |
+| **M&V Verification** | `backend/app/services/mv_verification_service.py` | Post-action outcome tracking |
+| **Recommendation Scorer** | `backend/app/services/recommendation_scorer.py` | Multi-objective scoring |
 
 ### Frontend Components
 
@@ -120,13 +122,17 @@ P5 (Lowest)     → Parking, Plant Rooms - Aggressive optimization for energy sa
 
 #### Exposure Directions (Southern Hemisphere)
 
+In South Africa, the sun tracks through the **northern** sky. North-facing zones receive maximum direct solar radiation.
+
 ```
-South-facing → +1.5°C modifier (max solar gain midday)
-West-facing  → +1.0°C modifier (afternoon heat)
-East-facing  → +1.0°C modifier (morning heat)
-North-facing → 0°C modifier (minimal direct sun)
+North-facing → +1.5°C modifier (max solar gain, sun in north sky in SA)
+West-facing  → +1.0°C modifier (afternoon heat, 14:00-18:00)
+East-facing  → +1.0°C modifier (morning heat, 06:00-10:00)
+South-facing → +0.3°C modifier (minimal direct sun, diffuse/reflected only)
 Interior     → -0.5°C modifier (less cooling needed)
 ```
+
+> **Note:** Modifiers only apply when outdoor temp > 25°C and are time-of-day dependent.
 
 ### Zone-Specific Setpoint Limits
 
@@ -144,10 +150,12 @@ Interior     → -0.5°C modifier (less cooling needed)
 ### Floor Level Adjustments
 
 ```
-Top floor (FL3+)  → ×0.7 adjustment (roof heat gain)
+Top floor (FL3+)  → ×1.2 adjustment (roof heat gain = occupants more tolerant, optimize aggressively)
 Ground floor      → ×0.9 adjustment (entry infiltration)
 Basement (B1)     → ×1.0 adjustment (stable temperature)
 ```
+
+> **Rationale:** Top floors are already warmer due to roof heat gain. Occupants acclimate to the slightly higher baseline, allowing more aggressive setpoint increases for energy savings.
 
 ---
 
@@ -184,15 +192,23 @@ if outdoor_temp > 28.0:
 
 ### 3. Humidity Optimization
 
-Reduces dehumidification energy when outdoor humidity drops:
+Reduces dehumidification energy when outdoor humidity drops. Includes seasonal guard for South African wet/dry seasons:
 
 ```python
-# Rule: If humidity < 50%, allow humidity to rise
-if humidity < 50.0:
-    new_humidity = min(current_humidity + 3.0, 60.0)
+# Seasonal guard: SA wet season (Oct-Mar) has high ambient humidity
+is_wet_season = current_month in (10, 11, 12, 1, 2, 3)
+humidity_threshold = 40.0 if is_wet_season else 50.0  # More conservative in wet season
+humidity_cap = 55.0 if is_wet_season else 60.0
 
-    # Result: 55% → 58% RH (reduces dehumidification load)
+# Rule: If humidity < threshold, allow humidity to rise
+if humidity < humidity_threshold:
+    new_humidity = min(current_humidity + 3.0, humidity_cap)
+
+    # Dry season: 55% → 58% RH (reduces dehumidification load)
+    # Wet season: Only triggers below 40%, caps at 55% (prevents mold risk)
 ```
+
+> **Why seasonal guard?** In Gauteng's humid summers (Oct-Mar), outdoor humidity is already high. Raising the humidity setpoint risks condensation and mold growth. The guard tightens the threshold to 40% and caps at 55% during wet months.
 
 ### 4. Fan Speed Optimization
 
@@ -283,10 +299,185 @@ def _analyze_with_rules(site_id, conditions, weather, prices, devices):
         timestamp=datetime.now().isoformat(),
         recommendations=recommendations,
         projected_savings=calculate_savings(recommendations, prices),
-        confidence=0.7 + (0.05 * len(recommendations)),
-        reasoning=generate_reasoning(recommendations)
+        confidence=max(0.1, 0.7 + (0.05 * len(recs)) - data_quality_penalty),
+        reasoning=generate_reasoning(recommendations),
+        data_quality={"sources": data_sources, "penalty_applied": penalty},
     )
 ```
+
+---
+
+## Data Quality & Confidence Scoring
+
+### Sensor-Health Confidence Penalty
+
+When sensor data falls back to hardcoded defaults (22°C indoor, 28°C outdoor, 55% humidity), the system penalizes confidence to prevent acting on assumed data:
+
+| Data Source | Penalty if Defaulted | Rationale |
+|-------------|---------------------|-----------|
+| Indoor temp | -0.08 | Most critical — wrong temp = wrong setpoint |
+| Outdoor temp | -0.06 | Drives rule triggers (temp_diff > 3°C) |
+| Occupancy (DALI) | -0.05 | Affects lighting + unoccupied zone rules |
+| Humidity | -0.03 | Affects humidity rule only |
+| Solar PV | -0.02 | Affects BESS charging decisions |
+| BESS | -0.01 | Affects BESS dispatch only |
+| **Max total** | **-0.25** | All defaults → confidence 0.7 drops to 0.45 |
+
+Each reading is tracked as `"live"` (from sensor) or `"default"` (hardcoded fallback). The penalty is included in the response `data_quality` field:
+
+```json
+{
+  "data_quality": {
+    "sources": {
+      "indoor_temp": "live",
+      "outdoor_temp": "default",
+      "humidity": "default",
+      "occupancy": "live",
+      "solar": "unavailable",
+      "bess": "unavailable"
+    },
+    "penalty_applied": 0.12
+  }
+}
+```
+
+### Confidence-Based Tier Routing (Phase 82)
+
+Recommendations are routed to action tiers based on their effective confidence
+score and the site's control tier setting. This routing is implemented by
+`OptimizationTierRouter` in `backend/app/services/optimization_tier_router.py`.
+
+#### Routing Thresholds
+
+| Confidence | Tier | Enum Value | Behavior |
+|------------|------|------------|----------|
+| < 0.30 | Blocked | `blocked` | Rejected entirely. Cannot be approved. |
+| 0.30 - 0.60 | Advisory (Tier 1) | `tier1_advisory` | Display only, informational. |
+| 0.60 - 0.85 | Approval (Tier 2) | `tier2_approval` | Requires human approval before execution. |
+| >= 0.85 | Auto-Execute (Tier 3) | `tier3_auto_execute` | Auto-applied when safety passes (in auto_execute mode). |
+
+Thresholds are configurable via environment variables:
+- `OPTIMIZATION_TIER_BLOCK_MIN` (default: 0.30)
+- `OPTIMIZATION_TIER2_MIN` (default: 0.60)
+- `OPTIMIZATION_TIER3_MIN` (default: 0.85)
+
+#### FCU Confidence Cap
+
+FCU (Fan Coil Unit) recommendations have their confidence capped at 0.45
+(`OPTIMIZATION_FCU_CONFIDENCE_CAP`), regardless of the model's raw confidence.
+This forces all FCU recommendations to tier1_advisory at most, preventing
+automatic execution of FCU setpoint changes which carry higher comfort risk.
+
+Example: A model reports 0.92 confidence for an FCU recommendation. The
+effective confidence becomes `min(0.92, 0.45) = 0.45`, routing it to
+tier1_advisory instead of tier3_auto_execute.
+
+#### Control Tier Execution Matrix
+
+The final action for each recommendation depends on both its routing tier
+and the site's control tier:
+
+| Routing Tier | monitor | human_in_loop | auto_execute |
+|---|---|---|---|
+| Blocked | blocked | blocked | blocked |
+| Tier 1 (Advisory) | log_only | advisory | advisory |
+| Tier 2 (Approval) | log_only | pending_approval | pending_approval |
+| Tier 3 (Auto-Execute) | log_only | pending_approval | auto_execute |
+
+- **monitor**: All recommendations logged but no actions taken.
+- **human_in_loop**: Tier 2/3 require approval; Tier 1 is advisory-only.
+- **auto_execute**: Tier 3 auto-applies; Tier 2 requires approval; Tier 1 is advisory.
+
+#### M&V Routing Metadata
+
+When M&V verification tasks are created for executed recommendations, they
+include routing metadata fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `routing_tier` | string | The routing tier that was applied (e.g., `tier3_auto_execute`) |
+| `control_tier` | string | The site's control tier at execution time |
+| `effective_confidence` | float | The confidence score after caps (e.g., FCU cap) |
+
+This metadata allows M&V analysis to correlate prediction accuracy with
+routing tier decisions over time.
+
+---
+
+## Measurement & Verification (M&V)
+
+### Overview
+
+After recommendations are applied (auto or approved), the M&V service tracks whether predicted savings match actual energy consumption:
+
+```
+Recommendation Applied → Record Verification Task → Wait Measurement Window → Verify → Outcome
+```
+
+### Measurement Windows
+
+| System | Window | Rationale |
+|--------|--------|-----------|
+| Lighting (DALI) | 30 min | Immediate effect |
+| BESS dispatch | 15 min | Immediate power effect |
+| HVAC setpoint | 2 hours | Thermal response time |
+| Chiller CHW temp | 3 hours | Thermal inertia |
+| Power equipment | 1 hour | Moderate response |
+
+### Variance Thresholds
+
+| Threshold | Value | Action |
+|-----------|-------|--------|
+| Warning | >10% variance | Logged, flagged for review |
+| Rollback | >25% variance | Rollback recommended |
+| Comfort violation | >1.5°C drift from setpoint | Rollback recommended |
+
+### API Endpoints
+
+```bash
+# Get M&V verification summary for a site
+GET /api/optimization/mv/summary/{site_id}
+
+# Trigger pending verifications (call periodically)
+POST /api/optimization/mv/verify
+```
+
+### Files
+
+| File | Purpose |
+|------|---------|
+| `backend/app/services/mv_verification_service.py` | Core M&V service |
+| `backend/app/models/outcome.py` | Outcome model (predicted vs actual) |
+| `backend/app/data/mv_verifications.json` | Verification task storage |
+
+---
+
+## Monthly Savings Projection
+
+### Schedule-Aware Calculation
+
+Savings projections use actual weekday counts and TOU-weighted rates instead of a static 220h/month:
+
+```python
+# Actual weekdays in the month (varies: Feb=20, Jul=23)
+weekdays = count_weekdays(year, month)
+
+# Operating hours: 07:00-17:00 (10h/day)
+# Peak window:     07:00-10:00 (3h/day, R3.50/kWh)
+# Standard window: 10:00-17:00 (7h/day, R2.50/kWh)
+
+total_hours = weekdays * 10
+weighted_rate = (peak_hours * 3.50 + standard_hours * 2.50) / total_hours
+# → R2.80/kWh weighted average
+
+monthly_savings = savings_per_hour * total_hours
+```
+
+| Month | Weekdays | Operating Hours | vs Static 220h |
+|-------|----------|-----------------|-----------------|
+| Jan 2026 | 22 | 220h | Same |
+| Feb 2026 | 20 | 200h | -9% (static overestimates) |
+| Jul 2026 | 23 | 230h | +5% (static underestimates) |
 
 ---
 
@@ -383,7 +574,7 @@ Content-Type: application/json
         "current_value": 22.0,
         "recommended_value": 23.5,
         "unit": "°C",
-        "reason": "Increase 1.5°C (open_office zone, South-facing) as outdoor temp rising to 28°C - reduces cooling load while maintaining comfort"
+        "reason": "Increase 1.5°C (open_office zone, North-facing) as outdoor temp rising to 28°C - reduces cooling load while maintaining comfort"
       }
     ],
     "projected_savings": {
@@ -392,7 +583,11 @@ Content-Type: application/json
       "percentage_improvement": 8.5
     },
     "confidence": 0.85,
-    "reasoning": "Rising outdoor temperatures (28°C) require proactive optimization. Recommendations include: zone setpoint adjustment. Zone-aware adjustments applied for: open_office zones. All recommendations within safety limits and sorted by zone priority."
+    "reasoning": "Rising outdoor temperatures (28°C) require proactive optimization. Recommendations include: zone setpoint adjustment. Zone-aware adjustments applied for: open_office zones. All recommendations within safety limits and sorted by zone priority.",
+    "data_quality": {
+      "sources": {"indoor_temp": "live", "outdoor_temp": "live", "humidity": "default", "occupancy": "live", "solar": "unavailable", "bess": "unavailable"},
+      "penalty_applied": 0.06
+    }
   },
   "validation": {
     "allowed": true,
@@ -578,15 +773,22 @@ Always review AI recommendations before approval:
 
 ### 4. Monitor Results
 
-Track actual savings vs projected:
+The M&V verification service automatically tracks actual vs predicted savings:
 
 ```python
-# After optimization, compare actual vs predicted
-actual_savings = measure_energy_consumption(before_hours, after_hours)
-projected_savings = recommendation.projected_savings
+# M&V service records a verification task when recommendations are applied
+# After the measurement window elapses, it compares predicted vs actual
 
-accuracy = actual_savings / projected_savings
-# Target: >80% accuracy
+# Manual check:
+GET /api/optimization/mv/summary/site-002
+
+# Response includes:
+# - average_accuracy: 0.87 (87% prediction accuracy)
+# - rollbacks_recommended: 1
+# - recent_outcomes: [{predicted: 12.5 kWh, actual: 11.2 kWh, accuracy: 0.90}]
+
+# Trigger pending verifications:
+POST /api/optimization/mv/verify
 ```
 
 ---
@@ -638,4 +840,5 @@ accuracy = actual_savings / projected_savings
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 2.0.0 | 2026-02-19 | Fixed Southern Hemisphere exposure (NORTH=max gain); top-floor modifier (0.7→1.2x); sensor-health confidence penalty; schedule-aware savings; M&V verification loop; humidity seasonal guard |
 | 1.0.0 | 2026-02-02 | Initial documentation |
