@@ -215,6 +215,7 @@ class ApprovalService:
             await self.recommendations_repo.upsert(recommendation)
 
             # Create audit log entry
+            correlation_id = getattr(recommendation, "correlation_id", "")
             await self._create_audit_log(
                 action_type="equipment_approval",
                 equipment_code=equipment_id,
@@ -223,6 +224,45 @@ class ApprovalService:
                 change_description=f"{control_point} = {target_value}",
                 execution_status="success",
                 cov_verified=cov_verified,
+                correlation_id=correlation_id,
+            )
+
+            # Record Tier 2 decision in parasite_decisions
+            parasite_repo = ParasiteDecisionRepository()
+            await parasite_repo.record_decision(
+                {
+                    "correlation_id": correlation_id,
+                    "recommendation_id": recommendation_id,
+                    "site_id": recommendation.site_id,
+                    "equipment_code": equipment_id,
+                    "tier": "tier2",
+                    "decision_type": "tier2_approved",
+                    "write_status": "success",
+                    "cov_verified": cov_verified,
+                    "control_point": control_point,
+                    "target_value": target_value,
+                    "original_value": original_value,
+                    "contributing_factors": {
+                        "approved_by": approved_by,
+                        "approval_notes": approval_notes or "",
+                    },
+                }
+            )
+
+            emit_decision_event(
+                "approval.decided",
+                correlation_id=correlation_id,
+                recommendation_id=recommendation_id,
+                equipment_code=equipment_id,
+                site_id=recommendation.site_id,
+                tier="tier2",
+                status="approved",
+                details={
+                    "approved_by": approved_by,
+                    "control_point": control_point,
+                    "target_value": target_value,
+                    "cov_verified": cov_verified,
+                },
             )
 
             self._record_module_feedback(
@@ -237,6 +277,7 @@ class ApprovalService:
                 metadata={
                     "source": "approval_service.execute_approval",
                     "approved_by": approved_by,
+                    "correlation_id": correlation_id,
                 },
             )
 
@@ -298,6 +339,7 @@ class ApprovalService:
             await self.recommendations_repo.upsert(recommendation)
 
             # Create audit log entry
+            correlation_id = getattr(recommendation, "correlation_id", "")
             await self._create_audit_log(
                 action_type="equipment_rejection",
                 equipment_code=recommendation.target_equipment,
@@ -306,6 +348,39 @@ class ApprovalService:
                 change_description=f"Rejected: {recommendation.action}",
                 execution_status="rejected",
                 cov_verified=False,
+                correlation_id=correlation_id,
+            )
+
+            # Record Tier 2 rejection in parasite_decisions
+            parasite_repo = ParasiteDecisionRepository()
+            await parasite_repo.record_decision(
+                {
+                    "correlation_id": correlation_id,
+                    "recommendation_id": recommendation_id,
+                    "site_id": recommendation.site_id,
+                    "equipment_code": recommendation.target_equipment,
+                    "tier": "tier2",
+                    "decision_type": "tier2_rejected",
+                    "write_status": "rejected",
+                    "contributing_factors": {
+                        "rejected_by": rejected_by,
+                        "reason": reason,
+                    },
+                }
+            )
+
+            emit_decision_event(
+                "approval.decided",
+                correlation_id=correlation_id,
+                recommendation_id=recommendation_id,
+                equipment_code=recommendation.target_equipment,
+                site_id=recommendation.site_id,
+                tier="tier2",
+                status="rejected",
+                details={
+                    "rejected_by": rejected_by,
+                    "reason": reason,
+                },
             )
 
             self._record_module_feedback(
@@ -316,6 +391,7 @@ class ApprovalService:
                 metadata={
                     "source": "approval_service.reject_approval",
                     "rejected_by": rejected_by,
+                    "correlation_id": correlation_id,
                 },
             )
 
@@ -1006,8 +1082,7 @@ class ApprovalService:
             await parasite_repo.mark_rolled_back(
                 decision_id=decision_id,
                 reason=(
-                    f"COV verification failed: expected={cov_result.expected_value}, "
-                    f"actual={cov_result.actual_value}"
+                    f"COV verification failed: expected={cov_result.expected_value}, actual={cov_result.actual_value}"
                 ),
             )
 
