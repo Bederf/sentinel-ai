@@ -45,8 +45,8 @@ def load_equipment() -> list[dict]:
 
     while True:
         result = (
-            client.table('equipment')
-            .select('*, buildings(code, name)')
+            client.table("equipment")
+            .select("*, buildings(code, name)")
             .range(offset, offset + batch_size - 1)
             .execute()
         )
@@ -63,17 +63,19 @@ def load_equipment() -> list[dict]:
     # Map to the format expected by generate_energy_data
     equipment = []
     for eq in all_equipment:
-        building = eq.get('buildings')
+        building = eq.get("buildings")
         if building:
-            equipment.append({
-                'id': eq.get('id'),
-                'site_id': building.get('code'),  # Use building code instead of UUID
-                'type': eq.get('type'),
-                'name': eq.get('name'),
-                'manufacturer': eq.get('manufacturer'),
-                'model': eq.get('model'),
-                'capacity': eq.get('capacity') or eq.get('rated_capacity') or '10kW',
-            })
+            equipment.append(
+                {
+                    "id": eq.get("id"),
+                    "site_id": building.get("code"),  # Use building code instead of UUID
+                    "type": eq.get("type"),
+                    "name": eq.get("name"),
+                    "manufacturer": eq.get("manufacturer"),
+                    "model": eq.get("model"),
+                    "capacity": eq.get("capacity") or eq.get("rated_capacity") or "10kW",
+                }
+            )
 
     return equipment
 
@@ -163,6 +165,7 @@ def _estimate_occupancy(dt: datetime, site_id: str) -> int:
     """
     try:
         from app.services.lifecycle_orchestrator import get_lifecycle_orchestrator
+
         orchestrator = get_lifecycle_orchestrator()
         if orchestrator.building_state:
             occupancy = orchestrator.building_state.get("occupancy_percent")
@@ -200,6 +203,7 @@ def _estimate_daylight(dt: datetime, site_id: str) -> int:
     """
     try:
         from app.services.lifecycle_orchestrator import get_lifecycle_orchestrator
+
         orchestrator = get_lifecycle_orchestrator()
         if orchestrator.building_state:
             daylight = orchestrator.building_state.get("daylight_factor")
@@ -240,6 +244,7 @@ def _estimate_chiller_load(site_id: str) -> int:
     """
     try:
         from app.services.lifecycle_orchestrator import get_lifecycle_orchestrator
+
         orchestrator = get_lifecycle_orchestrator()
         if orchestrator.building_state:
             chiller_load = orchestrator.building_state.get("chiller_load_percent")
@@ -302,6 +307,7 @@ def _get_seasonal_temp(month: int) -> float:
     """
     try:
         from app.services.seasonal_modeler import get_seasonal_modeler
+
         modeler = get_seasonal_modeler()
         if modeler:
             return modeler.get_temperature_for_month(month)
@@ -310,20 +316,24 @@ def _get_seasonal_temp(month: int) -> float:
 
     # Fallback: SA seasonal averages (Johannesburg-like)
     seasonal_temps = {
-        1: 24, 2: 24, 3: 23,  # Summer
-        4: 21, 5: 19, 6: 13,  # Autumn to winter
-        7: 13, 8: 15,          # Winter
-        9: 18, 10: 21,         # Spring
-        11: 22, 12: 24         # Early summer
+        1: 24,
+        2: 24,
+        3: 23,  # Summer
+        4: 21,
+        5: 19,
+        6: 13,  # Autumn to winter
+        7: 13,
+        8: 15,  # Winter
+        9: 18,
+        10: 21,  # Spring
+        11: 22,
+        12: 24,  # Early summer
     }
 
     return float(seasonal_temps.get(month, 20))
 
 
-def _apply_rules_output(
-    actual_metrics: EnergyMetrics,
-    rules_output
-) -> EnergyMetrics:
+def _apply_rules_output(actual_metrics: EnergyMetrics, rules_output) -> EnergyMetrics:
     """Apply rules output savings to actual metrics, creating sentinel metrics."""
     # Get breakdown of savings by system
     by_system = rules_output.by_system
@@ -375,9 +385,6 @@ def generate_energy_data(
     # Filter sites if site_id specified
     if site_id:
         sites = [s for s in sites if s["id"] == site_id]
-
-    # Build site lookup
-    site_lookup = {s["id"]: s for s in sites}
 
     # Build equipment by site
     equipment_by_site = {}
@@ -492,7 +499,7 @@ def get_energy_from_supabase(
             return [], False
 
         # Get building info from Supabase for names
-        result = client.table('buildings').select('code, name').execute()
+        result = client.table("buildings").select("code, name").execute()
         building_names = {}
         for b in result.data or []:
             building_names[b.get("code")] = b.get("name") or b.get("code")
@@ -561,14 +568,16 @@ async def get_energy(
 
     try:
         client = get_supabase_client()
-        result = client.table('buildings').select('code, name, sqm').execute()
+        result = client.table("buildings").select("code, name, sqm").execute()
         sites = []
         for b in result.data or []:
-            sites.append({
-                "id": b.get("code"),
-                "name": b.get("name"),
-                "sqm": b.get("sqm") or 1000,
-            })
+            sites.append(
+                {
+                    "id": b.get("code"),
+                    "name": b.get("name"),
+                    "sqm": b.get("sqm") or 1000,
+                }
+            )
     except Exception as e:
         logger.warning(f"Failed to load buildings from Supabase: {e}")
         sites = []
@@ -579,7 +588,7 @@ async def get_energy(
         buildings = building_loader.get_all_buildings()
 
         for b in buildings:
-            if hasattr(b, 'to_dict'):
+            if hasattr(b, "to_dict"):
                 b_dict = b.to_dict()
             elif isinstance(b, dict):
                 b_dict = b
@@ -590,11 +599,13 @@ async def get_energy(
             if not isinstance(metadata, dict):
                 metadata = {}
 
-            sites.append({
-                "id": b_dict.get("id"),
-                "name": b_dict.get("display_name") or b_dict.get("name") or b_dict.get("id"),
-                "sqm": metadata.get("sqm", 1000),
-            })
+            sites.append(
+                {
+                    "id": b_dict.get("id"),
+                    "name": b_dict.get("display_name") or b_dict.get("name") or b_dict.get("id"),
+                    "sqm": metadata.get("sqm", 1000),
+                }
+            )
 
     equipment = load_equipment()
 
@@ -632,9 +643,9 @@ async def seed_energy_data(
 
         # Get buildings from Supabase (has all 10 sites)
         if building_id:
-            result = client.table('buildings').select('id, code, name, sqm').eq('code', building_id).execute()
+            result = client.table("buildings").select("id, code, name, sqm").eq("code", building_id).execute()
         else:
-            result = client.table('buildings').select('id, code, name, sqm').execute()
+            result = client.table("buildings").select("id, code, name, sqm").execute()
 
         if not result.data:
             raise HTTPException(status_code=404, detail=f"Building {building_id} not found")
@@ -655,11 +666,13 @@ async def seed_energy_data(
             building_codes.append(building_code)
 
             # Prepare site data for energy generator
-            sites = [{
-                "id": building_code,  # Use building code as site_id
-                "name": building.get("name", building_code),
-                "sqm": building.get("sqm") or 1000,
-            }]
+            sites = [
+                {
+                    "id": building_code,  # Use building code as site_id
+                    "name": building.get("name", building_code),
+                    "sqm": building.get("sqm") or 1000,
+                }
+            ]
 
             # Generate mock data for this building
             mock_data = generate_energy_data(sites, equipment, days=days, site_id=building_code)
@@ -667,13 +680,15 @@ async def seed_energy_data(
             # Batch upsert for efficiency
             batch_records = []
             for point in mock_data:
-                batch_records.append({
-                    "building_id": point.site_id,
-                    "date": point.date,
-                    "hvac_kwh": point.hvac_kwh,
-                    "lighting_kwh": point.lighting_kwh,
-                    "other_kwh": point.other_kwh,
-                })
+                batch_records.append(
+                    {
+                        "building_id": point.site_id,
+                        "date": point.date,
+                        "hvac_kwh": point.hvac_kwh,
+                        "lighting_kwh": point.lighting_kwh,
+                        "other_kwh": point.other_kwh,
+                    }
+                )
 
             if batch_records:
                 repo.batch_upsert(batch_records)
@@ -692,7 +707,6 @@ async def seed_energy_data(
     except Exception as e:
         logger.error(f"Failed to seed energy data: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
 
 
 @router.get("/energy/actual", response_model=EnergyActual)
@@ -898,13 +912,14 @@ async def get_energy_comparison_summary(
                 tariff_band=_get_tariff_band(now.hour, now.month),
                 ambient_temp_c=_get_seasonal_temp(now.month),
                 site_id=site_id,
-                date=now.isoformat()
+                date=now.isoformat(),
             )
 
             # Get active modules for conditional DALI rule
             active_modules = []
             try:
                 from app.services.module_registry_service import module_registry
+
                 modules = module_registry.get_active_modules(site_id)
                 active_modules = [m.module_type.value for m in modules] if modules else []
             except Exception:
@@ -912,11 +927,7 @@ async def get_energy_comparison_summary(
 
             # Evaluate rules
             engine = get_energy_rules_engine(site_id)
-            rules_output = engine.evaluate_rules(
-                building_state,
-                active_modules,
-                baseline_kwh=actual_metrics.total_kwh
-            )
+            rules_output = engine.evaluate_rules(building_state, active_modules, baseline_kwh=actual_metrics.total_kwh)
 
             # Apply rules output to actual metrics to get sentinel metrics
             sentinel_metrics = _apply_rules_output(actual_metrics, rules_output)
@@ -955,10 +966,10 @@ async def get_energy_comparison_summary(
     # Calculate comparison metrics
     daily_savings_zar = actual_metrics.total_cost_zar - sentinel_metrics.total_cost_zar
     daily_savings_percent = (
-        (actual_metrics.total_kwh - sentinel_metrics.total_kwh)
-        / actual_metrics.total_kwh
-        * 100
-    ) if actual_metrics.total_kwh > 0 else 0
+        ((actual_metrics.total_kwh - sentinel_metrics.total_kwh) / actual_metrics.total_kwh * 100)
+        if actual_metrics.total_kwh > 0
+        else 0
+    )
 
     # Progress to target (assume 35% total savings target)
     progress_to_target_percent = min(daily_savings_percent / 35.0 * 100, 100.0)
@@ -1013,25 +1024,24 @@ async def get_energy_comparison(
                 "name": "Baseline (No DALI)",
                 "kwh": round(baseline_kwh, 2),
                 "description": "Traditional lighting controls",
-                "savings_percent": 0
+                "savings_percent": 0,
             },
             {
                 "name": "With DALI (Tridonic)",
                 "kwh": round(with_dali_kwh, 2),
                 "description": "Occupancy & daylight harvesting",
                 "savings_percent": 20,
-                "savings_kwh": round(baseline_kwh - with_dali_kwh, 2)
+                "savings_kwh": round(baseline_kwh - with_dali_kwh, 2),
             },
             {
                 "name": "With SENTINEL (AI)",
                 "kwh": round(with_sentinel_kwh, 2),
                 "description": "AI optimization on top of DALI",
                 "savings_percent": 30,
-                "savings_kwh": round(baseline_kwh - with_sentinel_kwh, 2)
-            }
-        ]
+                "savings_kwh": round(baseline_kwh - with_sentinel_kwh, 2),
+            },
+        ],
     }
-
 
 
 @router.get("/energy/simulated")
@@ -1077,7 +1087,7 @@ async def get_energy_simulated(
                 "power_percent": 0.0,
                 "timestamp": datetime.now().isoformat(),
                 "simulated": False,
-                "message": "No active simulation"
+                "message": "No active simulation",
             }
 
         # Get current simulated state from orchestrator
@@ -1172,13 +1182,14 @@ async def get_energy_simulated(
             "power_percent": 0.0,
             "timestamp": datetime.now().isoformat(),
             "simulated": False,
-            "error": str(e)
+            "error": str(e),
         }
 
 
 # ============================================================================
 # Phase 5.6: Tariff Integration - Simulated Energy Cost Endpoints
 # ============================================================================
+
 
 @router.get("/energy/simulated-costs")
 async def get_simulated_energy_costs(
@@ -1213,19 +1224,21 @@ async def get_simulated_energy_costs(
         from app.database.supabase_client import get_supabase_client
 
         supabase = get_supabase_client()
-        cost_svc = EnergyCostService(building_id=site_id)
+        EnergyCostService(building_id=site_id)  # validate tariff loads
 
         # Query energy_cost_summary table for recent days
         end_date = datetime.now().date()
         start_date = end_date - timedelta(days=days - 1)
 
-        response = supabase.table("energy_cost_summary").select("*").gte(
-            "date", start_date.isoformat()
-        ).lte(
-            "date", end_date.isoformat()
-        ).eq(
-            "building_id", site_id
-        ).order("date", desc=False).execute()
+        response = (
+            supabase.table("energy_cost_summary")
+            .select("*")
+            .gte("date", start_date.isoformat())
+            .lte("date", end_date.isoformat())
+            .eq("building_id", site_id)
+            .order("date", desc=False)
+            .execute()
+        )
 
         if not response.data:
             logger.info(f"[COST] No cost data for {site_id} in last {days} days")
@@ -1235,7 +1248,7 @@ async def get_simulated_energy_costs(
                 "daily_costs": [],
                 "period_start": start_date.isoformat(),
                 "period_end": end_date.isoformat(),
-                "message": "No cost data available (simulation not run yet)"
+                "message": "No cost data available (simulation not run yet)",
             }
 
         # Format response
@@ -1244,17 +1257,19 @@ async def get_simulated_energy_costs(
         total_cost = 0.0
 
         for record in response.data:
-            daily_costs.append({
-                "date": record.get("date"),
-                "energy_kwh": round(record.get("total_energy_kwh", 0), 2),
-                "energy_cost_r": round(record.get("energy_cost_r", 0), 2),
-                "network_cost_r": round(record.get("network_cost_r", 0), 2),
-                "service_charge_r": round(record.get("service_charge_r", 0), 2),
-                "total_cost_r": round(record.get("total_cost_r", 0), 2),
-                "peak_power_kw": round(record.get("peak_power_kw", 0), 2),
-                "average_rate_r_kwh": round(record.get("average_rate_r_kwh", 0), 3),
-                "hourly_data": record.get("hourly_data"),  # Optional detailed breakdown
-            })
+            daily_costs.append(
+                {
+                    "date": record.get("date"),
+                    "energy_kwh": round(record.get("total_energy_kwh", 0), 2),
+                    "energy_cost_r": round(record.get("energy_cost_r", 0), 2),
+                    "network_cost_r": round(record.get("network_cost_r", 0), 2),
+                    "service_charge_r": round(record.get("service_charge_r", 0), 2),
+                    "total_cost_r": round(record.get("total_cost_r", 0), 2),
+                    "peak_power_kw": round(record.get("peak_power_kw", 0), 2),
+                    "average_rate_r_kwh": round(record.get("average_rate_r_kwh", 0), 3),
+                    "hourly_data": record.get("hourly_data"),  # Optional detailed breakdown
+                }
+            )
 
             total_kwh += record.get("total_energy_kwh", 0)
             total_cost += record.get("total_cost_r", 0)
@@ -1484,9 +1499,7 @@ async def get_simulated_water_consumption(
         # Group by date
         from collections import defaultdict
 
-        daily_data = defaultdict(
-            lambda: {"records": [], "total_liters": 0.0, "flow_rates": []}
-        )
+        daily_data = defaultdict(lambda: {"records": [], "total_liters": 0.0, "flow_rates": []})
         for record in records:
             record_date = (
                 datetime.fromisoformat(record["timestamp"]).date()
@@ -1506,17 +1519,13 @@ async def get_simulated_water_consumption(
             total_liters = day_info["total_liters"]
 
             # Johannesburg tiered tariff
-            tier_1_liters = min(
-                total_liters, 100000 / 30
-            )  # Daily allocation of tier 1
+            tier_1_liters = min(total_liters, 100000 / 30)  # Daily allocation of tier 1
             tier_1_cost = tier_1_liters * 0.00795  # R7.95 per 1000L
 
             tier_2_liters = 0.0
             tier_2_cost = 0.0
             if total_liters > 100000 / 30:
-                tier_2_liters = min(
-                    total_liters - (100000 / 30), (500000 - 100000) / 30
-                )
+                tier_2_liters = min(total_liters - (100000 / 30), (500000 - 100000) / 30)
                 tier_2_cost = tier_2_liters * 0.01250  # R12.50 per 1000L
 
             tier_3_liters = 0.0
@@ -1547,27 +1556,17 @@ async def get_simulated_water_consumption(
                     "peak_hour_consumption_lpm": round(max(day_info["flow_rates"]), 2)
                     if day_info["flow_rates"]
                     else 0.0,
-                    "average_rate_r_liter": round(day_cost / total_liters, 4)
-                    if total_liters > 0
-                    else 0.0,
+                    "average_rate_r_liter": round(day_cost / total_liters, 4) if total_liters > 0 else 0.0,
                 }
             )
 
-        avg_daily_liters = (
-            sum(d["total_liters"] for d in daily_costs) / len(daily_costs)
-            if daily_costs
-            else 0.0
-        )
-        avg_daily_cost = (
-            total_cost / len(daily_costs) if daily_costs else 0.0
-        )
+        avg_daily_liters = sum(d["total_liters"] for d in daily_costs) / len(daily_costs) if daily_costs else 0.0
+        avg_daily_cost = total_cost / len(daily_costs) if daily_costs else 0.0
 
         return {
             "site_id": site_id,
             "period_days": days,
-            "total_liters": round(
-                sum(d["total_liters"] for d in daily_costs), 2
-            ),
+            "total_liters": round(sum(d["total_liters"] for d in daily_costs), 2),
             "total_cost_r": round(total_cost, 2),
             "average_daily_liters": round(avg_daily_liters, 2),
             "average_daily_cost_r": round(avg_daily_cost, 2),
@@ -1638,9 +1637,7 @@ async def get_water_tariff_info(site_id: str = "site-002") -> Dict[str, Any]:
             },
             "tier_2": {
                 "annual_liters": (500000 - 100000) * 12,
-                "annual_cost_r": round(
-                    ((500000 - 100000) / 1000 * 12.50) * 12, 2
-                ),
+                "annual_cost_r": round(((500000 - 100000) / 1000 * 12.50) * 12, 2),
             },
         },
         "notes": [
@@ -1999,9 +1996,7 @@ async def get_tariff_adjustment_recommendation(
             },
         ]
 
-        result = await engine.get_tariff_adjustment_recommendation(
-            mock_validations[:months_analyzed]
-        )
+        result = await engine.get_tariff_adjustment_recommendation(mock_validations[:months_analyzed])
 
         return result
 
@@ -2143,7 +2138,7 @@ async def get_recommendations_dashboard(
                     "payback_months": rec.get("payback_months"),
                     "urgency": rec.get("messaging", {}).get("urgency", "medium"),
                     "short_message": rec.get("messaging", {}).get("short", ""),
-                    "button_text": self._get_button_text(rec.get("type")),
+                    "button_text": _get_button_text(rec.get("type")),
                     "button_action": rec.get("type"),
                 }
             )
@@ -2155,7 +2150,8 @@ async def get_recommendations_dashboard(
             "total_savings_r_annual": round(full_recs.get("total_annual_savings_r", 0), 2),
             "total_investment_r": round(full_recs.get("total_investment_r", 0), 2),
             "call_to_action": (
-                f"Implement {len(top_3)} recommendations to save R{full_recs.get('total_annual_savings_r', 0):,.0f}/year"
+                f"Implement {len(top_3)} recommendations to save"
+                f" R{full_recs.get('total_annual_savings_r', 0):,.0f}/year"
             ),
         }
 
@@ -2163,15 +2159,16 @@ async def get_recommendations_dashboard(
         logger.error(f"[RECOMMENDATIONS] Error getting dashboard: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-    def _get_button_text(self, rec_type: str) -> str:
-        """Get CTA button text for recommendation type."""
-        buttons = {
-            "lighting_optimization": "Get Quote",
-            "water_efficiency": "View Details",
-            "hvac_maintenance": "Schedule Now",
-            "occupancy_optimization": "Learn More",
-        }
-        return buttons.get(rec_type, "Learn More")
+
+def _get_button_text(rec_type: str) -> str:
+    """Get CTA button text for recommendation type."""
+    buttons = {
+        "lighting_optimization": "Get Quote",
+        "water_efficiency": "View Details",
+        "hvac_maintenance": "Schedule Now",
+        "occupancy_optimization": "Learn More",
+    }
+    return buttons.get(rec_type, "Learn More")
 
 
 @router.get("/recommendations/by-type")
