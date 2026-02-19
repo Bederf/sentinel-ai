@@ -2,9 +2,9 @@
 title: "SENTINEL Security Documentation"
 type: "reference"
 status: "approved"
-version: "1.0.0"
+version: "1.1.0"
 created: "2026-02-04"
-updated: "2026-02-04"
+updated: "2026-02-19"
 author: "SENTINEL Security Office"
 tags: ["security", "governance", "index", "FSR"]
 domain: "security"
@@ -32,40 +32,47 @@ This directory contains the SENTINEL Information Security Policy Suite -- the go
 
 | Document | Description | Status |
 |---|---|---|
-| Access Control Policy | Logical access control, IAM, RBAC, PAM, MFA, password standards | Planned |
-| Application Security Policy | SSDLC, SAST/DAST, WAF, code review, penetration testing | Planned |
-| Secure Coding Standards | Python/FastAPI and TypeScript/React secure development practices | Planned |
+| [Logical Access Control Policy](logical-access-control-policy.md) | Logical access control, IAM, RBAC, PAM, MFA, password standards | Complete |
+| [Application Security Policy](application-security-policy.md) | SSDLC, SAST/DAST, WAF, code review, penetration testing | Complete |
+| [Secure Coding Standards](secure-coding-standards.md) | Python/FastAPI and TypeScript/React secure development practices | Complete |
+| [Password Security Standard](password-security-standard.md) | Password complexity, rotation, and storage requirements | Complete |
 
 ### Vulnerability & Incident Management (Phase 64-03)
 
 | Document | Description | Status |
 |---|---|---|
-| Vulnerability Management Policy | Scanning schedules, remediation SLAs, dependency monitoring | Planned |
-| Incident Response Policy | Detection, containment, eradication, recovery, notification procedures | Planned |
+| [Vulnerability Management Process](vulnerability-management-process.md) | Scanning schedules, remediation SLAs, dependency monitoring | Complete |
+| [Incident Response Policy](incident-response-policy.md) | Detection, containment, eradication, recovery, notification procedures | Complete |
+| [Incident Response Process](incident-response-process.md) | Operational runbooks for incident handling | Complete |
 
 ### Business Continuity & Third Parties (Phase 64-04)
 
 | Document | Description | Status |
 |---|---|---|
-| Business Continuity & DR Policy | BIA, RTO/RPO, DR procedures, annual testing | Planned |
-| Third-Party Security Policy | Supplier register, compliance framework, review cadence | Planned |
+| [Business Continuity Policy](business-continuity-policy.md) | BIA, RTO/RPO, DR procedures, annual testing | Complete |
+| [Third-Party Security Register](third-party-security-register.md) | Supplier register, compliance framework, review cadence | Complete |
 
 ### Risk & Privacy (Phase 64-05)
 
 | Document | Description | Status |
 |---|---|---|
-| Risk Management Policy | Risk register, annual assessment, acceptance criteria | Planned |
-| Data Privacy & Classification Policy | Classification scheme, POPIA compliance, data handling rules | Planned |
+| [Information Security Risk Register](information-security-risk-register.md) | Risk register, annual assessment, acceptance criteria | Complete |
+| [Data Privacy Policy](data-privacy-policy.md) | POPIA compliance, data handling rules, privacy notices | Complete |
+| [Information Classification Policy](information-classification-policy.md) | Classification scheme, labelling, handling procedures | Complete |
+| [Privacy Impact Assessment Template](privacy-impact-assessment-template.md) | PIA template for new systems/features | Complete |
+| [PIA: Claude API](pia-claude-api.md) | Privacy impact assessment for Claude API integration | Complete |
+| [PIA: Clawd Messaging](pia-clawd-messaging.md) | Privacy impact assessment for Telegram/WhatsApp messaging | Complete |
+| [POPIA Cross-Border Register](popia-cross-border-register.md) | Register of cross-border data transfers | Complete |
 
 ### HR, Crypto, Assets & Audit (Phase 64-06)
 
 | Document | Description | Status |
 |---|---|---|
-| HR Security Policy | Vetting, training, joiners/leavers, disciplinary process | Planned |
-| Cryptography & Key Management Policy | Algorithms, key rotation, secrets management | Planned |
+| [HR Security Policy](hr-security-policy.md) | Vetting, training, joiners/leavers, disciplinary process | Complete |
+| [Cryptography & Key Management Policy](cryptography-key-management-policy.md) | Algorithms, key rotation, secrets management, Fernet encryption at rest | Complete |
 | Asset Register | Infrastructure components, ownership, disposal procedures | Planned |
 | Security Awareness Training Programme | Training content, completion tracking, annual cadence | Planned |
-| Security Audit Procedure | Audit cadence, findings tracking, remediation monitoring | Planned |
+| [Security Audit Programme](security-audit-programme.md) | Audit cadence, findings tracking, remediation monitoring | Complete |
 
 ### Technical Implementation Evidence (Phase 63)
 
@@ -93,18 +100,18 @@ The following table maps each FSR security domain to the SENTINEL governance doc
 | 4.4 | Human Resource Security | HR Security Policy, Training Programme | 3.0 | 3.8 | MEDIUM |
 | 4.5 | Physical Access Security | (Provider attestations) | 4.0 | 4.0 | LOW |
 | 4.6 | Network Security | Information Security Policy s3.6 | 4.0 | 4.5 | LOW |
-| 4.7 | Logical Access Control | Access Control Policy | 3.0 | 4.0 | HIGH |
+| 4.7 | Logical Access Control | Access Control Policy | 3.8 | 4.0 | LOW |
 | 4.8 | System Security | Information Security Policy s3.8 | 3.5 | 4.0 | MEDIUM |
-| 4.9 | Application Security | Application Security Policy, Secure Coding Standards | 2.5 | 4.0 | HIGH |
-| 4.10 | Vulnerability Management | Vulnerability Management Policy | 3.0 | 4.0 | MEDIUM |
+| 4.9 | Application Security | Application Security Policy, Secure Coding Standards | 3.5 | 4.0 | LOW |
+| 4.10 | Vulnerability Management | Vulnerability Management Policy | 3.5 | 4.0 | LOW |
 | 4.11 | Communication Management | Information Security Policy s3.11 | 4.0 | 4.0 | LOW |
 | 4.12 | Cryptography & Key Management | Cryptography & Key Management Policy | 4.0 | 4.5 | LOW |
-| 4.13 | Incident Detection | Incident Response Policy, Logging Architecture | 3.0 | 4.0 | HIGH |
+| 4.13 | Incident Detection | Incident Response Policy, Logging Architecture | 3.5 | 4.0 | LOW |
 | 4.14 | Incident Management | Incident Response Policy | 3.0 | 4.0 | MEDIUM |
 | 4.15 | Business Continuity | BCP/DR Policy, BCP/DR Procedures | 3.0 | 4.0 | MEDIUM |
 | 4.16 | Third Party Management | Third-Party Security Policy | 3.5 | 4.0 | MEDIUM |
 | 4.17 | Risk & Compliance | Risk Management Policy | 3.0 | 4.0 | MEDIUM |
-| 4.18 | Information Security Audit | Security Audit Procedure | 2.0 | 3.5 | HIGH |
+| 4.18 | Information Security Audit | Security Audit Procedure | 2.5 | 3.5 | MEDIUM |
 
 ## Gap Analysis Reference
 

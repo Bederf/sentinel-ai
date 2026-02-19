@@ -1,9 +1,9 @@
 # SENTINEL Logging Architecture
 
-**Version:** 1.0
-**Date:** 2026-02-04
+**Version:** 1.1
+**Date:** 2026-02-19
 **FSR Reference:** Domain 4.13 - Information Security Incident Detection
-**Current Maturity:** 3.0 (target: 4.0 HIGH)
+**Current Maturity:** 3.5 (target: 4.0 LOW)
 
 ## Overview
 
@@ -78,38 +78,46 @@ SENTINEL BMS Intelligence Platform implements centralised log aggregation with S
 
 ## Infrastructure Components
 
+> **Note:** SENTINEL shares the monitoring stack hosted at `/opt/aimthelaw`. Loki, Promtail, Grafana, and Prometheus run as Docker containers managed by `/opt/aimthelaw/docker-compose.monitoring.yml`. SENTINEL-specific scrape jobs and alert rules are added to this shared stack.
+
 ### Grafana Loki (Log Storage)
 
 | Property | Value |
 |----------|-------|
 | **Image** | `grafana/loki:2.9.3` |
-| **Port** | 3100 (internal only, not exposed to host) |
+| **Port** | 3100 (localhost only) |
 | **Storage** | Filesystem with BoltDB-Shipper indexing |
 | **Retention** | 90 days (2,160 hours) - FSR compliant |
 | **Compaction** | Every 10 minutes with retention enforcement |
-| **Index** | Daily rotation with `sentinel_loki_index_` prefix |
+| **Container** | `aimthelaw_loki_1` |
 
-**Configuration file:** `infrastructure/loki/loki-config.yaml`
+**Configuration file:** `/opt/aimthelaw/config/loki-config.yml`
 
 ### Promtail (Log Collector)
 
 | Property | Value |
 |----------|-------|
-| **Image** | `grafana/promtail:2.9.3` |
+| **Image** | `grafana/promtail:latest` |
 | **Port** | 9080 (metrics) |
 | **Push target** | `http://loki:3100/loki/api/v1/push` |
+| **Container** | `aimthelaw_promtail_1` |
 
-**Configuration file:** `infrastructure/promtail/promtail-config.yaml`
+**Configuration file:** `/opt/aimthelaw/config/promtail-config.yml`
+
+SENTINEL-specific scrape jobs in Promtail:
+- `sentinel-audit` — Tails `/opt/bms-intelligence/backend/app/data/audit_log.json` with multiline JSON parsing, extracting `action` and `result` as labels
+- `journal` (shared) — Captures systemd journal including `sentinel-backend.service` logs via `unit` label
 
 ### Grafana (Visualisation and Alerting)
 
 | Property | Value |
 |----------|-------|
-| **Datasource** | Loki (auto-provisioned) |
-| **Alert rules** | 6 security rules (auto-provisioned) |
+| **Datasource** | Loki (UID: `P8E80F9AEF21F6940`) |
+| **SENTINEL alert rules** | 5 security rules (auto-provisioned) |
+| **Port** | 3001 (localhost only) |
+| **Container** | `aimthelaw_grafana_1` |
 
-**Datasource config:** `infrastructure/grafana/provisioning/datasources/loki.yaml`
-**Alert rules:** `infrastructure/grafana/provisioning/alerting/security-alerts.yaml`
+**Alert rules:** `/opt/aimthelaw/config/grafana/provisioning/alerting/sentinel-security-alert-rules.yml`
 
 ## Log Sources
 
@@ -229,16 +237,15 @@ Structured JSON audit events from the enhanced AuditLogger:
 
 ## Alert Rules
 
-Six SIEM-equivalent alerting rules are provisioned in Grafana:
+Five SENTINEL-specific alerting rules are provisioned in Grafana via `/opt/aimthelaw/config/grafana/provisioning/alerting/sentinel-security-alert-rules.yml`:
 
 | # | Rule | Trigger | Severity |
 |---|------|---------|----------|
-| 1 | Failed Login Attempts | >5 auth failures from same IP in 5 min | High |
-| 2 | Suspicious Path Patterns | Any SQL injection or path traversal | High |
-| 3 | Unusual API Activity | >100 requests from single IP in 1 min | Medium |
-| 4 | After-Hours Access | Sensitive endpoint access outside 06:00-22:00 SAST | Medium |
-| 5 | Error Spike | >10 HTTP 5xx responses in 5 min | High |
-| 6 | Audit Log Gap | No audit entries for >30 min during business hours | Critical |
+| 1 | Brute Force Attempt | >5 failed logins in 5 min | Critical |
+| 2 | MFA Brute Force | >3 failed MFA attempts in 5 min | Critical |
+| 3 | Error Spike | >10 ERROR/CRITICAL logs in 5 min | Warning |
+| 4 | Suspicious Request Pattern | SQL injection or scanner tool patterns in 15 min | Warning |
+| 5 | Audit Log Flow Check | Monitors audit log data pipeline to Loki (24h) | Warning |
 
 **Notification channels:**
 - Grafana built-in alerting log (default)
@@ -325,46 +332,51 @@ Create an incident report including:
 ### Prerequisites
 
 - Docker and Docker Compose installed on Contabo VPS
-- Ports 3100 (Loki) and 9080 (Promtail) available internally
-- Cloudflare Tunnel configured for Grafana access (optional)
+- Shared monitoring stack running at `/opt/aimthelaw` (Loki, Promtail, Grafana, Prometheus)
+- SENTINEL data directory mounted in Promtail container
 
 ### Deployment Steps
 
 ```bash
-# Start the full stack including Loki and Promtail
-cd /opt/bms-intelligence
-docker compose up -d loki promtail
+# Start/restart the shared monitoring stack
+cd /opt/aimthelaw
+docker compose -f docker-compose.monitoring.yml up -d
 
 # Verify Loki is ready
 curl -s http://localhost:3100/ready
 
-# Verify Promtail is collecting
-curl -s http://localhost:9080/targets
+# Verify Promtail is collecting SENTINEL logs
+docker logs aimthelaw_promtail_1 2>&1 | grep sentinel
 ```
 
 ### Verification
 
 ```bash
-# Check Loki label values (should show sentinel-docker, sentinel-system, etc.)
-curl -s http://localhost:3100/loki/api/v1/labels | jq
-
-# Query recent logs
+# Check Loki has SENTINEL audit data
 curl -s 'http://localhost:3100/loki/api/v1/query_range' \
-  --data-urlencode 'query={job="sentinel-docker"}' \
-  --data-urlencode 'limit=5' | jq '.data.result[0].values[:3]'
+  --data-urlencode 'query={job="sentinel-audit"}' \
+  --data-urlencode 'limit=5' | jq '.data.result | length'
+
+# Check SENTINEL backend logs via systemd journal
+curl -s 'http://localhost:3100/loki/api/v1/query_range' \
+  --data-urlencode 'query={job="systemd-journal", unit="sentinel-backend.service"}' \
+  --data-urlencode 'limit=5' | jq '.data.result | length'
+
+# Verify Grafana alert rules are active
+curl -s http://admin:admin@127.0.0.1:3001/api/v1/provisioning/alert-rules | jq '.[].title'
 ```
 
 ## Related Files
 
 | File | Purpose |
 |------|---------|
-| `docker-compose.yml` | Loki and Promtail service definitions |
-| `infrastructure/loki/loki-config.yaml` | Loki storage, retention, and compaction config |
-| `infrastructure/promtail/promtail-config.yaml` | Log collection and pipeline config |
-| `infrastructure/grafana/provisioning/datasources/loki.yaml` | Grafana Loki datasource |
-| `infrastructure/grafana/provisioning/alerting/security-alerts.yaml` | 6 SIEM alerting rules |
+| `/opt/aimthelaw/docker-compose.monitoring.yml` | Shared monitoring stack (Loki, Promtail, Grafana, Prometheus) |
+| `/opt/aimthelaw/config/loki-config.yml` | Loki storage, retention, and compaction config |
+| `/opt/aimthelaw/config/promtail-config.yml` | Log collection and pipeline config (includes SENTINEL scrape jobs) |
+| `/opt/aimthelaw/config/grafana/provisioning/alerting/sentinel-security-alert-rules.yml` | 5 SENTINEL security alert rules |
 | `backend/app/middleware/security_logging.py` | Security event detection and structured logging |
 | `backend/app/services/audit_logger.py` | Enhanced audit logger with JSON output |
+| `backend/app/services/encryption_service.py` | Fernet encryption for audit log entries at rest |
 | `backend/app/middleware/audit_middleware.py` | Existing audit middleware for control actions |
 
 ---
@@ -372,4 +384,4 @@ curl -s 'http://localhost:3100/loki/api/v1/query_range' \
 *Document: SENTINEL Logging Architecture*
 *FSR Domain: 4.13 - Information Security Incident Detection*
 *Platform: Contabo VPS (Ubuntu 24), Docker Compose, FastAPI, Cloudflare Tunnel*
-*Last updated: 2026-02-04*
+*Last updated: 2026-02-19*

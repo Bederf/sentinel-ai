@@ -80,3 +80,6 @@ cryptography>=42.0.0  # AES-256 encryption for audit logs and PII at rest
 # AutoCAD/CAD drawing support for equipment extraction
 ezdxf>=1.3.0                   # Read/write AutoCAD DXF files (all versions R12-2024)
 numpy>=1.24.0                  # Numeric calculations for geometry transformations
+
+# Agent Framework (LangGraph)
+langgraph>=0.2.0               # StateGraph with checkpointing for multi-turn agents

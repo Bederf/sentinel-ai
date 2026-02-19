@@ -52,6 +52,7 @@ async def ensure_device_manager_initialized() -> None:
 
             # Load all building equipment (including monitoring-only solar/meters)
             from app.api.devices import load_equipment_from_buildings
+
             building_devices = await load_equipment_from_buildings()
 
             # Merge building devices with mock devices (dedup by ID)
@@ -81,6 +82,7 @@ def load_sites() -> List[Dict[str, Any]]:
     if not settings.use_json_storage:
         try:
             from app.database.repositories.building_repository import BuildingRepository
+
             repo = BuildingRepository()
             buildings = repo.get_all()
             if buildings:
@@ -184,12 +186,6 @@ class AIOptimizerService:
         # Categorize equipment by type - this is site-specific
         equipment_inventory = self._categorize_equipment(all_devices)
 
-        # For backwards compatibility, extract commonly used categories
-        hvac_devices = equipment_inventory.get("hvac", [])
-        lighting_devices = equipment_inventory.get("lighting", [])
-        power_devices = equipment_inventory.get("power", [])
-        security_devices = equipment_inventory.get("security", [])
-
         logger.info(f"Site {site_id} equipment inventory: {self._summarize_inventory(equipment_inventory)}")
 
         # Fetch DALI lighting zone data
@@ -200,6 +196,7 @@ class AIOptimizerService:
         profile = None
         try:
             from app.services.profile_service import get_profile_service
+
             profile_service = get_profile_service()
             profile = profile_service.get_site_profile(site_id)
             if profile:
@@ -211,8 +208,7 @@ class AIOptimizerService:
 
         # Build optimization prompt for Claude with ALL available equipment
         prompt = self._build_optimization_prompt(
-            site, current_conditions, weather_forecast, energy_prices,
-            equipment_inventory, dali_zones, profile=profile
+            site, current_conditions, weather_forecast, energy_prices, equipment_inventory, dali_zones, profile=profile
         )
 
         try:
@@ -224,8 +220,13 @@ class AIOptimizerService:
             else:
                 # Fall back to rule-based optimization
                 recommendation = self._analyze_with_rules(
-                    site_id, current_conditions, weather_forecast, energy_prices,
-                    equipment_inventory, dali_zones, profile
+                    site_id,
+                    current_conditions,
+                    weather_forecast,
+                    energy_prices,
+                    equipment_inventory,
+                    dali_zones,
+                    profile,
                 )
 
             # Apply recommendation scoring and ranking with profile weights
@@ -238,8 +239,7 @@ class AIOptimizerService:
             logger.error(f"Error analyzing building {site_id}: {e}")
             # Fall back to rule-based optimization
             rec = self._analyze_with_rules(
-                site_id, current_conditions, weather_forecast, energy_prices,
-                equipment_inventory, dali_zones, profile
+                site_id, current_conditions, weather_forecast, energy_prices, equipment_inventory, dali_zones, profile
             )
             # Apply scoring to fallback recommendations too
             if profile:
@@ -259,19 +259,92 @@ class AIOptimizerService:
                 "equipment_status": "normal",
                 "timestamp": datetime.now().isoformat(),
                 "zone_occupancy": {},  # Real occupancy from DALI
+                # Track which readings are defaults vs live sensor data
+                "_data_sources": {
+                    "indoor_temp": "default",
+                    "outdoor_temp": "default",
+                    "humidity": "default",
+                    "occupancy": "default",
+                    "solar": "unavailable",
+                    "bess": "unavailable",
+                    "dali": "unavailable",
+                },
             }
 
-            # Try to get actual readings from devices
+            # Try to get actual readings from HVAC devices
+            found_indoor_temp = False
+            found_outdoor_temp = False
+            found_humidity = False
+
             for device in devices:
-                if device.device_type == DeviceType.HVAC:
-                    for point_name, point in device.points.items():
-                        if "temp" in point_name.lower():
-                            try:
-                                value = await device_manager.read_device_value(device.id, point_name)
-                                conditions["indoor_temp"] = value.value
-                                break
-                            except Exception:
-                                pass
+                if device.device_type != DeviceType.HVAC:
+                    continue
+
+                for point_name in device.points:
+                    point_name_lower = point_name.lower()
+
+                    # Ignore writable targets; we only want sensor values.
+                    if "setpoint" in point_name_lower or point_name_lower.endswith("_sp"):
+                        continue
+
+                    target_key: Optional[str] = None
+
+                    if not found_humidity and (
+                        "humidity" in point_name_lower or point_name_lower.endswith("_rh") or point_name_lower == "rh"
+                    ):
+                        target_key = "humidity"
+                    elif not found_outdoor_temp and any(
+                        token in point_name_lower
+                        for token in (
+                            "outdoor_temp",
+                            "outside_temp",
+                            "ambient_temp",
+                            "outside_air_temp",
+                            "outdoor_air_temp",
+                            "oa_temp",
+                        )
+                    ):
+                        target_key = "outdoor_temp"
+                    elif not found_indoor_temp and "temp" in point_name_lower:
+                        if any(
+                            token in point_name_lower
+                            for token in (
+                                "outdoor",
+                                "outside",
+                                "ambient",
+                                "supply",
+                                "chw",
+                                "coil",
+                                "leaving",
+                                "entering",
+                            )
+                        ):
+                            continue
+                        target_key = "indoor_temp"
+
+                    if not target_key:
+                        continue
+
+                    try:
+                        value = await device_manager.read_device_value(device.id, point_name)
+                        if value and isinstance(value.value, (int, float)):
+                            conditions[target_key] = float(value.value)
+                            conditions["_data_sources"][target_key] = "live"
+
+                            if target_key == "indoor_temp":
+                                found_indoor_temp = True
+                            elif target_key == "outdoor_temp":
+                                found_outdoor_temp = True
+                            elif target_key == "humidity":
+                                found_humidity = True
+                    except Exception:
+                        pass
+
+                    if found_indoor_temp and found_outdoor_temp and found_humidity:
+                        break
+
+                if found_indoor_temp and found_outdoor_temp and found_humidity:
+                    break
 
             # Get real occupancy data from DALI service
             try:
@@ -303,6 +376,8 @@ class AIOptimizerService:
 
                 # Calculate overall occupancy level from zone data
                 if total_zones > 0:
+                    conditions["_data_sources"]["occupancy"] = "live"
+                    conditions["_data_sources"]["dali"] = "live"
                     occupancy_ratio = total_occupied / total_zones
                     if occupancy_ratio > 0.7:
                         conditions["occupancy"] = "high"
@@ -361,6 +436,7 @@ class AIOptimizerService:
 
                 if solar_total_kw > 0 or grid_solar_kw is not None:
                     conditions["solar_generation_kw"] = round(solar_total_kw, 1)
+                    conditions["_data_sources"]["solar"] = "live"
                     if solar_efficiencies:
                         conditions["solar_avg_efficiency_pct"] = round(
                             sum(solar_efficiencies) / len(solar_efficiencies), 1
@@ -391,6 +467,7 @@ class AIOptimizerService:
                             conditions["bess_power_kw"] = bess_data.get("power")
                             conditions["bess_mode"] = bess_data.get("mode")
                             conditions["bess_temperature"] = bess_data.get("temperature")
+                            conditions["_data_sources"]["bess"] = "live"
                             break  # Only first BESS device
 
             except Exception as e:
@@ -463,8 +540,6 @@ class AIOptimizerService:
         # Extract equipment by type for specific sections
         hvac_devices = equipment_inventory.get("hvac", [])
         lighting_devices = equipment_inventory.get("lighting", [])
-        power_devices = equipment_inventory.get("power", [])
-        meter_devices = equipment_inventory.get("meter", [])
 
         # Get controllable equipment only
         controllable = self._get_controllable_equipment(equipment_inventory)
@@ -481,15 +556,15 @@ class AIOptimizerService:
             profile_weights = profile.get("weights", {})
             profile_thresholds = profile.get("thresholds", {})
             profile_section = f"""
-**ACTIVE OPTIMIZATION PROFILE: {profile.get('name', 'Default')}**
-{profile.get('description', 'No description available')}
+**ACTIVE OPTIMIZATION PROFILE: {profile.get("name", "Default")}**
+{profile.get("description", "No description available")}
 
 **Optimization Weights (priorities):**
-- Runtime/Equipment Health: {profile_weights.get('runtime', 0.25):.0%}
-- Comfort: {profile_weights.get('comfort', 0.25):.0%}
-- Cost: {profile_weights.get('cost', 0.25):.0%}
-- Maintenance: {profile_weights.get('maintenance', 0.15):.0%}
-- Energy: {profile_weights.get('energy', 0.10):.0%}
+- Runtime/Equipment Health: {profile_weights.get("runtime", 0.25):.0%}
+- Comfort: {profile_weights.get("comfort", 0.25):.0%}
+- Cost: {profile_weights.get("cost", 0.25):.0%}
+- Maintenance: {profile_weights.get("maintenance", 0.15):.0%}
+- Energy: {profile_weights.get("energy", 0.10):.0%}
 
 **Profile-Specific Decision Guidance:**
 """
@@ -519,27 +594,37 @@ class AIOptimizerService:
 **Your optimization must respect these profile priorities above all else.**
 """
 
-        prompt = f"""You are an expert building optimization engineer. Analyze this building's equipment and recommend optimal setpoints for energy efficiency and occupant comfort.
+        prompt = (
+            "You are an expert building optimization engineer. "
+            "Analyze this building's equipment and recommend optimal "
+            "setpoints for energy efficiency and occupant comfort.\n\n"
+            "**IMPORTANT:** This building has a SPECIFIC equipment "
+            "inventory. Only recommend changes for equipment that "
+            "EXISTS at this site. Different buildings have different "
+            "equipment combinations.\n\n"
+        )
 
-**IMPORTANT:** This building has a SPECIFIC equipment inventory. Only recommend changes for equipment that EXISTS at this site. Different buildings have different equipment combinations.
+        op_hours = site.get("operating_hours", {})
+        op_start = op_hours.get("start", "08:00")
+        op_end = op_hours.get("end", "18:00")
 
-**Building:** {site['name']} ({site['id']})
-- Type: {site.get('type', 'commercial')}
-- Size: {site.get('sqm', 5000)} sqm
-- Floors: {site.get('floors', 1)}
-- Operating hours: {site.get('operating_hours', {}).get('start', '08:00')} - {site.get('operating_hours', {}).get('end', '18:00')}
-- Region: {site.get('region', 'Gauteng')}
+        prompt += f"""**Building:** {site["name"]} ({site["id"]})
+- Type: {site.get("type", "commercial")}
+- Size: {site.get("sqm", 5000)} sqm
+- Floors: {site.get("floors", 1)}
+- Operating hours: {op_start} - {op_end}
+- Region: {site.get("region", "Gauteng")}
 
 **Equipment Inventory at This Site:**
 {chr(10).join(inventory_summary) if inventory_summary else "No equipment registered"}
 {profile_section}
 
 **Current Conditions:**
-- Indoor temperature: {current_conditions.get('indoor_temp', 22)}°C
-- Outdoor temperature: {current_conditions.get('outdoor_temp', 28)}°C
-- Humidity: {current_conditions.get('humidity', 55)}%
-- Occupancy: {current_conditions.get('occupancy', 'unknown')}
-- Equipment status: {current_conditions.get('equipment_status', 'normal')}
+- Indoor temperature: {current_conditions.get("indoor_temp", 22)}°C
+- Outdoor temperature: {current_conditions.get("outdoor_temp", 28)}°C
+- Humidity: {current_conditions.get("humidity", 55)}%
+- Occupancy: {current_conditions.get("occupancy", "unknown")}
+- Equipment status: {current_conditions.get("equipment_status", "normal")}
 
 {self._format_solar_bess_telemetry(current_conditions)}
 **Weather Forecast (next 4 hours):**
@@ -557,8 +642,8 @@ class AIOptimizerService:
 
 **Zone-Aware Optimization Rules (Southern Hemisphere - South Africa):**
 - Executive/Server zones (P1): Maintain tighter comfort bands, never sacrifice cooling
-- South/West-facing zones: Account for afternoon solar heat gain (+1-2°C adjustment)
-- Top floor zones: Roof heat gain requires 0.5-1°C lower setpoints
+- North/West-facing zones: Account for strongest direct and afternoon solar heat gain
+- Top floor zones: Apply stronger optimization response due to roof-driven heat gain
 - Meeting rooms (P2): Pre-condition 15 min before scheduled meetings
 - Load shedding: Prioritize by zone_priority (P1 = critical, P5 = shed first)
 - Plant rooms (P5): Can accept wider temperature ranges for energy savings
@@ -609,7 +694,10 @@ BESS (Battery Storage):
 6. CRITICAL: Use EXACT point_name from "All Available Control Points" above
 7. Project energy savings in ZAR per hour (breakdown by system)
 8. Ensure all recommendations are within safety limits
-9. Prioritize cross-system coordination (unoccupied zones: raise HVAC AND dim lights; peak solar: charge BESS; load shedding: BESS before generator)
+9. Prioritize cross-system coordination:
+   - Unoccupied zones: raise HVAC AND dim lights
+   - Peak solar: charge BESS
+   - Load shedding: BESS before generator
 
 **Response Format (JSON):**
 ```json
@@ -757,9 +845,7 @@ Provide ONLY the JSON response, no additional text."""
             raise
 
     def _score_and_rank_recommendations(
-        self,
-        recommendation: OptimizationRecommendation,
-        profile: Dict[str, Any]
+        self, recommendation: OptimizationRecommendation, profile: Dict[str, Any]
     ) -> OptimizationRecommendation:
         """Score and rank recommendations using profile weights.
 
@@ -815,13 +901,13 @@ Provide ONLY the JSON response, no additional text."""
     def _find_device_by_type(self, hvac_devices: List[Device], hvac_type: str) -> Optional[Device]:
         """Find a device by its hvac_type (zone_controller, chiller, chw_system, etc.)."""
         for device in hvac_devices:
-            if hasattr(device, 'hvac_type') and device.hvac_type == hvac_type:
+            if hasattr(device, "hvac_type") and device.hvac_type == hvac_type:
                 return device
         return None
 
     def _find_devices_by_type(self, hvac_devices: List[Device], hvac_type: str) -> List[Device]:
         """Find ALL devices of a specific hvac_type."""
-        return [d for d in hvac_devices if hasattr(d, 'hvac_type') and d.hvac_type == hvac_type]
+        return [d for d in hvac_devices if hasattr(d, "hvac_type") and d.hvac_type == hvac_type]
 
     def _find_devices_with_point(self, hvac_devices: List[Device], point_name: str) -> List[Device]:
         """Find ALL devices that have a specific point."""
@@ -844,8 +930,8 @@ Provide ONLY the JSON response, no additional text."""
             return "No HVAC devices found"
         lines = []
         for d in hvac_devices:
-            hvac_type = getattr(d, 'hvac_type', 'unknown')
-            location = getattr(d, 'location', 'unknown location')
+            hvac_type = getattr(d, "hvac_type", "unknown")
+            location = getattr(d, "location", "unknown location")
             lines.append(f"- {d.id}: {d.name} ({hvac_type}) at {location}")
         return "\n".join(lines)
 
@@ -911,10 +997,7 @@ Provide ONLY the JSON response, no additional text."""
         for device_type, devices in inventory.items():
             controllable_devices = []
             for device in devices:
-                writable_points = [
-                    name for name, point in device.points.items()
-                    if point.writable
-                ]
+                writable_points = [name for name, point in device.points.items() if point.writable]
                 if writable_points:
                     controllable_devices.append(device)
 
@@ -933,18 +1016,18 @@ Provide ONLY the JSON response, no additional text."""
             # Get type-specific attributes
             extra_info = ""
             if equipment_type == "hvac":
-                hvac_type = getattr(d, 'hvac_type', 'unknown')
+                hvac_type = getattr(d, "hvac_type", "unknown")
                 extra_info = f" ({hvac_type})"
             elif equipment_type == "power":
                 # For generators, UPS, ATS, meters
-                power_type = getattr(d, 'equipment', {})
-                if hasattr(power_type, 'get'):
+                power_type = getattr(d, "equipment", {})
+                if hasattr(power_type, "get"):
                     extra_info = f" ({power_type.get('type', 'unknown')})"
             elif equipment_type == "meter":
                 extra_info = " (energy meter)"
 
-            location = getattr(d, 'location', 'unknown location')
-            if hasattr(d, 'device_location') and d.device_location:
+            location = getattr(d, "location", "unknown location")
+            if hasattr(d, "device_location") and d.device_location:
                 loc = d.device_location
                 location = f"{getattr(loc, 'building', '')}/{getattr(loc, 'floor', '')}/{getattr(loc, 'zone', '')}"
 
@@ -1002,7 +1085,9 @@ Provide ONLY the JSON response, no additional text."""
         """Group devices by their zone name for coordinated optimization."""
         zones: Dict[str, List[Device]] = {}
         for device in hvac_devices:
-            zone = getattr(device.device_location, 'zone', 'Unknown') if hasattr(device, 'device_location') else 'Unknown'
+            zone = (
+                getattr(device.device_location, "zone", "Unknown") if hasattr(device, "device_location") else "Unknown"
+            )
             if zone not in zones:
                 zones[zone] = []
             zones[zone].append(device)
@@ -1012,7 +1097,9 @@ Provide ONLY the JSON response, no additional text."""
         """Group devices by floor level."""
         floors: Dict[str, List[Device]] = {}
         for device in hvac_devices:
-            floor = getattr(device.device_location, 'floor', 'Unknown') if hasattr(device, 'device_location') else 'Unknown'
+            floor = (
+                getattr(device.device_location, "floor", "Unknown") if hasattr(device, "device_location") else "Unknown"
+            )
             if floor not in floors:
                 floors[floor] = []
             floors[floor].append(device)
@@ -1020,20 +1107,20 @@ Provide ONLY the JSON response, no additional text."""
 
     def _get_zone_priority(self, device: Device) -> int:
         """Get zone priority for load shedding ordering (1=highest priority, 5=lowest)."""
-        if hasattr(device, 'device_location') and device.device_location:
-            return getattr(device.device_location, 'zone_priority', 3)
+        if hasattr(device, "device_location") and device.device_location:
+            return getattr(device.device_location, "zone_priority", 3)
         return 3  # Default to middle priority
 
     def _get_zone_type(self, device: Device) -> Optional[ZoneType]:
         """Get the zone type for a device."""
-        if hasattr(device, 'device_location') and device.device_location:
-            return getattr(device.device_location, 'zone_type', None)
+        if hasattr(device, "device_location") and device.device_location:
+            return getattr(device.device_location, "zone_type", None)
         return None
 
     def _get_exposure(self, device: Device) -> Optional[ExposureDirection]:
         """Get the exposure direction for a device."""
-        if hasattr(device, 'device_location') and device.device_location:
-            return getattr(device.device_location, 'exposure', None)
+        if hasattr(device, "device_location") and device.device_location:
+            return getattr(device.device_location, "exposure", None)
         return None
 
     def _get_floor_level(self, device: Device) -> int:
@@ -1042,17 +1129,17 @@ Provide ONLY the JSON response, no additional text."""
         Returns:
             Floor level as integer (-1=basement, 0=ground, 1+=upper floors)
         """
-        if not hasattr(device, 'device_location') or not device.device_location:
+        if not hasattr(device, "device_location") or not device.device_location:
             return 0
 
-        floor = getattr(device.device_location, 'floor', 'Ground')
-        if floor == 'Basement':
+        floor = getattr(device.device_location, "floor", "Ground")
+        if floor == "Basement":
             return -1
-        elif floor == 'Ground':
+        elif floor == "Ground":
             return 0
-        elif floor == 'Roof':
+        elif floor == "Roof":
             return 99  # High number for roof
-        elif floor.startswith('FL'):
+        elif floor.startswith("FL"):
             try:
                 return int(floor[2:])
             except ValueError:
@@ -1062,9 +1149,10 @@ Provide ONLY the JSON response, no additional text."""
     def _get_exposure_modifier(self, device: Device, outdoor_temp: float) -> float:
         """Get temperature adjustment based on exposure direction and outdoor temp.
 
-        In the Southern Hemisphere (South Africa):
-        - South-facing zones receive maximum solar radiation
-        - North-facing zones receive minimal direct sun
+        In the Southern Hemisphere (South Africa), the sun tracks through the
+        NORTHERN sky:
+        - North-facing zones receive maximum direct solar radiation
+        - South-facing zones receive minimal direct sun (mostly diffuse)
         - East gets morning sun, West gets afternoon sun
 
         Args:
@@ -1084,13 +1172,63 @@ Provide ONLY the JSON response, no additional text."""
 
         hour = datetime.now().hour
         modifiers = {
-            ExposureDirection.SOUTH: 1.5 if 10 <= hour <= 16 else 0.5,  # Max solar gain midday
-            ExposureDirection.WEST: 1.0 if 14 <= hour <= 18 else 0.0,   # Afternoon heat
-            ExposureDirection.EAST: 1.0 if 6 <= hour <= 10 else 0.0,    # Morning heat
-            ExposureDirection.NORTH: 0.0,                                # Minimal gain in SA
-            ExposureDirection.INTERIOR: -0.5,                            # Slightly less cooling needed
+            ExposureDirection.NORTH: 1.5 if 10 <= hour <= 16 else 0.5,  # Max solar gain (sun in north sky in SA)
+            ExposureDirection.WEST: 1.0 if 14 <= hour <= 18 else 0.0,  # Afternoon heat
+            ExposureDirection.EAST: 1.0 if 6 <= hour <= 10 else 0.0,  # Morning heat
+            ExposureDirection.SOUTH: 0.3 if 10 <= hour <= 16 else 0.0,  # Minimal direct, some diffuse/reflected
+            ExposureDirection.INTERIOR: -0.5,  # Slightly less cooling needed
         }
         return modifiers.get(exposure, 0.0)
+
+    def _calculate_data_quality_penalty(self, conditions: Dict[str, Any]) -> float:
+        """Calculate a confidence penalty based on how much sensor data is defaulted.
+
+        When sensors fail and we fall back to hardcoded defaults (22C indoor,
+        28C outdoor, 55% humidity), we should trust the resulting recommendations
+        less. This returns a penalty (0.0 to 0.25) to subtract from confidence.
+
+        Penalty weights reflect how much each data source affects recommendation
+        quality:
+        - indoor_temp: 0.08 (most critical - wrong indoor temp = wrong setpoint)
+        - outdoor_temp: 0.06 (drives rule triggers like temp_diff > 3C)
+        - humidity: 0.03 (affects humidity rule only)
+        - occupancy/dali: 0.05 (affects lighting + unoccupied zone rules)
+        - solar: 0.02 (affects BESS charging decisions)
+        - bess: 0.01 (affects BESS dispatch only)
+
+        Max penalty: 0.25 (all defaults = confidence drops from 0.7 to 0.45)
+
+        Args:
+            conditions: Current conditions dict with _data_sources metadata
+
+        Returns:
+            Penalty value to subtract from confidence (0.0 to 0.25)
+        """
+        sources = conditions.get("_data_sources", {})
+        if not sources:
+            return 0.0  # No tracking metadata - legacy call, no penalty
+
+        penalty_weights = {
+            "indoor_temp": 0.08,
+            "outdoor_temp": 0.06,
+            "humidity": 0.03,
+            "occupancy": 0.05,
+            "solar": 0.02,
+            "bess": 0.01,
+        }
+
+        penalty = 0.0
+        defaulted_sources = []
+        for source, weight in penalty_weights.items():
+            status = sources.get(source, "default")
+            if status != "live":
+                penalty += weight
+                defaulted_sources.append(source)
+
+        if defaulted_sources:
+            logger.info(f"Data quality penalty: -{penalty:.2f} confidence (defaulted: {', '.join(defaulted_sources)})")
+
+        return penalty
 
     def _sort_recommendations_by_priority(
         self,
@@ -1116,8 +1254,8 @@ Provide ONLY the JSON response, no additional text."""
             exposure = self._get_exposure(device)
             priority = self._get_zone_priority(device)
 
-            zone_type_str = zone_type.value if zone_type else 'unknown'
-            exposure_str = exposure.value if exposure else 'unknown'
+            zone_type_str = zone_type.value if zone_type else "unknown"
+            exposure_str = exposure.value if exposure else "unknown"
             key = f"{zone_type_str}|{exposure_str}|P{priority}"
 
             if key not in zones_by_type:
@@ -1172,8 +1310,9 @@ Provide ONLY the JSON response, no additional text."""
                     "is_occupied": occupancy.occupancy_percent > 10 if occupancy else True,
                     "has_high_daylight": occupancy.avg_lux_level > 500 if occupancy else False,
                     "is_over_lit": (
-                        lighting.avg_dim_level > 50 and
-                        occupancy.occupancy_percent < 20 if (lighting and occupancy) else False
+                        lighting.avg_dim_level > 50 and occupancy.occupancy_percent < 20
+                        if (lighting and occupancy)
+                        else False
                     ),
                 }
 
@@ -1296,8 +1435,8 @@ Provide ONLY the JSON response, no additional text."""
             return "No lighting devices found"
         lines = []
         for d in lighting_devices:
-            lighting_type = getattr(d, 'lighting_type', 'unknown')
-            location = getattr(d, 'location', 'unknown location')
+            lighting_type = getattr(d, "lighting_type", "unknown")
+            location = getattr(d, "location", "unknown location")
             lines.append(f"- {d.id}: {d.name} ({lighting_type}) at {location}")
         return "\n".join(lines)
 
@@ -1310,9 +1449,7 @@ Provide ONLY the JSON response, no additional text."""
             return True  # Never reduce cooling in server rooms
         return False
 
-    def _get_zone_specific_setpoint_limits(
-        self, device: Device, zone_type: Optional[ZoneType]
-    ) -> tuple:
+    def _get_zone_specific_setpoint_limits(self, device: Device, zone_type: Optional[ZoneType]) -> tuple:
         """Get zone-specific setpoint min/max limits.
 
         Returns:
@@ -1368,8 +1505,8 @@ Provide ONLY the JSON response, no additional text."""
 
         # Floor level adjustments
         if floor_level >= 3 or floor_level == 99:  # Top floor or roof
-            # Reduce setpoint increase due to roof heat gain
-            adjusted_change *= 0.7
+            # Apply stronger optimization on top floors/roof per policy tuning.
+            adjusted_change *= 1.2
         elif floor_level == 0:  # Ground floor
             # Account for entry air infiltration
             adjusted_change *= 0.9
@@ -1413,8 +1550,6 @@ Provide ONLY the JSON response, no additional text."""
         # Extract equipment by type from inventory
         hvac_devices = equipment_inventory.get("hvac", [])
         power_devices = equipment_inventory.get("power", [])
-        lighting_devices = equipment_inventory.get("lighting", [])
-        meter_devices = equipment_inventory.get("meter", [])
 
         indoor_temp = current_conditions.get("indoor_temp", 22.0)
         outdoor_temp = current_conditions.get("outdoor_temp", 28.0)
@@ -1430,17 +1565,17 @@ Provide ONLY the JSON response, no additional text."""
         if not zone_controllers:
             # Fall back to devices with zone_cooling_setpoint or cooling_setpoint that aren't FCUs
             zone_controllers = [
-                d for d in hvac_devices
+                d
+                for d in hvac_devices
                 if self._has_any_point(d, ["zone_cooling_setpoint", "cooling_setpoint"])
-                and getattr(d, 'hvac_type', '') != 'fcu'
+                and getattr(d, "hvac_type", "") != "fcu"
             ]
 
         chw_systems = self._find_devices_by_type(hvac_devices, "chw_system")
         if not chw_systems:
             # Fall back to devices with CHW setpoint
             chw_systems = [
-                d for d in hvac_devices
-                if self._has_any_point(d, ["chw_supply_temp_setpoint", "supply_temp_setpoint"])
+                d for d in hvac_devices if self._has_any_point(d, ["chw_supply_temp_setpoint", "supply_temp_setpoint"])
             ]
 
         fcus = self._find_devices_by_type(hvac_devices, "fcu")
@@ -1454,15 +1589,17 @@ Provide ONLY the JSON response, no additional text."""
             pair = (device.id, point_name)
             if pair not in recommended_pairs:
                 recommended_pairs.add(pair)
-                recommendations.append({
-                    "equipment_id": device.id,
-                    "equipment_name": device.name,
-                    "point_name": point_name,
-                    "current_value": current_value,
-                    "recommended_value": recommended_value,
-                    "unit": "°C",
-                    "reason": reason,
-                })
+                recommendations.append(
+                    {
+                        "equipment_id": device.id,
+                        "equipment_name": device.name,
+                        "point_name": point_name,
+                        "current_value": current_value,
+                        "recommended_value": recommended_value,
+                        "unit": "°C",
+                        "reason": reason,
+                    }
+                )
 
         # Rule 1: Zone temperature optimization for ALL zone controllers (ZONE-AWARE)
         # If outdoor > indoor + 3°C, recommend increasing cooling setpoint based on zone type
@@ -1483,9 +1620,7 @@ Provide ONLY the JSON response, no additional text."""
                     current_value = current_point.default_value if current_point else indoor_temp
 
                     # Apply zone-aware adjustment to base 1.5°C increase
-                    adjusted_change = self._apply_zone_aware_adjustments(
-                        zone_controller, 1.5, outdoor_temp
-                    )
+                    adjusted_change = self._apply_zone_aware_adjustments(zone_controller, 1.5, outdoor_temp)
 
                     if adjusted_change > 0.1:  # Only recommend if meaningful change
                         # Get zone-specific limits
@@ -1498,23 +1633,39 @@ Provide ONLY the JSON response, no additional text."""
                             point_name,
                             current_value,
                             round(new_setpoint, 1),
-                            f"Increase setpoint {adjusted_change:.1f}°C{zone_info} as outdoor temp rising to {outdoor_temp}°C - reduces cooling load while maintaining comfort",
+                            f"Increase setpoint {adjusted_change:.1f}"
+                            f"°C{zone_info} as outdoor temp rising"
+                            f" to {outdoor_temp}°C - reduces "
+                            f"cooling load while maintaining comfort",
                         )
 
         # Rule 2: Humidity optimization for ALL zone controllers with humidity setpoint
-        if humidity < 50.0:
+        # Guard: Only raise humidity setpoint during dry conditions (winter/dry season).
+        # In Gauteng's wet summers (Oct-Mar), outdoor humidity is already high and
+        # raising the setpoint risks condensation and mold growth.
+        current_month = datetime.now().month
+        is_wet_season = current_month in (10, 11, 12, 1, 2, 3)  # Oct-Mar (SA wet season)
+
+        # Only recommend humidity raise if: dry conditions AND dry season OR very dry
+        humidity_threshold = 40.0 if is_wet_season else 50.0
+        humidity_cap = 55.0 if is_wet_season else 60.0
+
+        if humidity < humidity_threshold:
             for zone_controller in zone_controllers:
                 if "humidity_setpoint" in zone_controller.points:
                     current_humidity_sp = zone_controller.points.get("humidity_setpoint")
                     current_value = current_humidity_sp.default_value if current_humidity_sp else 55.0
-                    new_humidity = min(current_value + 3.0, 60.0)
+                    new_humidity = min(current_value + 3.0, humidity_cap)
 
+                    season_note = " (wet season: conservative cap)" if is_wet_season else ""
                     add_recommendation(
                         zone_controller,
                         "humidity_setpoint",
                         current_value,
                         new_humidity,
-                        "Allow humidity to rise 3% as outdoor humidity drops - reduces dehumidification energy",
+                        f"Allow humidity to rise 3% as outdoor "
+                        f"humidity drops{season_note}"
+                        f" - reduces dehumidification energy",
                     )
 
         # Rule 3: CHW temperature optimization for ALL chillers
@@ -1573,14 +1724,23 @@ Provide ONLY the JSON response, no additional text."""
                             cooling_point.name,
                             current_value,
                             round(new_setpoint, 1),
-                            f"Increase FCU setpoint {adjusted_change:.1f}°C{zone_info}{exposure_info} to reduce cooling load during high outdoor temps ({outdoor_temp}°C)",
+                            f"Increase FCU setpoint "
+                            f"{adjusted_change:.1f}°C"
+                            f"{zone_info}{exposure_info}"
+                            f" to reduce cooling load during"
+                            f" high outdoor temps"
+                            f" ({outdoor_temp}°C)",
                         )
                         # Mark as advisory - add low confidence to route to Tier 1
                         recommendations[-1]["confidence"] = 0.45  # Below tier2_min (~0.6)
 
                 # Optimize fan speed if available and conditions warrant
                 # Don't reduce fan speed in executive zones (comfort priority)
-                if "fan_speed" in fcu.points and temp_diff < 5.0 and zone_type not in [ZoneType.EXECUTIVE, ZoneType.SERVER_ROOM]:
+                if (
+                    "fan_speed" in fcu.points
+                    and temp_diff < 5.0
+                    and zone_type not in [ZoneType.EXECUTIVE, ZoneType.SERVER_ROOM]
+                ):
                     current_speed = fcu.points.get("fan_speed")
                     current_value = current_speed.default_value if current_speed else 75.0
                     # Reduce fan speed slightly if temp difference is moderate
@@ -1592,7 +1752,9 @@ Provide ONLY the JSON response, no additional text."""
                             "fan_speed",
                             current_value,
                             new_speed,
-                            "Reduce fan speed 10% for energy savings - moderate temperature differential allows lower airflow",
+                            "Reduce fan speed 10% for energy savings"
+                            " - moderate temperature differential"
+                            " allows lower airflow",
                         )
                         # Mark as advisory - add low confidence to route to Tier 1
                         recommendations[-1]["confidence"] = 0.45  # Below tier2_min (~0.6)
@@ -1630,26 +1792,36 @@ Provide ONLY the JSON response, no additional text."""
                         power_saved = total_power * (1 - target_dim / 254)
                         lighting_savings_kw += power_saved / 1000
 
-                        lighting_recommendations.append({
-                            "equipment_id": zone_id,
-                            "equipment_name": zone_name,
-                            "point_name": "dim_level",
-                            "current_value": int(current_dim * 254 / 100),  # Convert % to DALI level
-                            "recommended_value": target_dim,
-                            "unit": "level",
-                            "reason": f"Zone unoccupied ({occupancy.get('occupancy_percent', 0):.0f}% sensors active) - dim to {target_dim * 100 // 254}% for safety lighting",
-                            "system": "lighting",
-                        })
+                        lighting_recommendations.append(
+                            {
+                                "equipment_id": zone_id,
+                                "equipment_name": zone_name,
+                                "point_name": "dim_level",
+                                "current_value": int(current_dim * 254 / 100),  # Convert % to DALI level
+                                "recommended_value": target_dim,
+                                "unit": "level",
+                                "reason": (
+                                    f"Zone unoccupied "
+                                    f"({occupancy.get('occupancy_percent', 0):.0f}%"
+                                    f" sensors active) - dim to "
+                                    f"{target_dim * 100 // 254}%"
+                                    f" for safety lighting"
+                                ),
+                                "system": "lighting",
+                            }
+                        )
 
                         # Add cross-system recommendation for coordinated action
-                        cross_system_recommendations.append({
-                            "zone_id": zone_id,
-                            "zone_name": zone_name,
-                            "hvac_action": "Raise setpoint +2°C",
-                            "lighting_action": f"Dim to {target_dim * 100 // 254}%",
-                            "reason": "Zone unoccupied - coordinated energy savings",
-                            "combined_savings_kw": round(power_saved / 1000 + 0.5, 2),  # Estimate HVAC savings
-                        })
+                        cross_system_recommendations.append(
+                            {
+                                "zone_id": zone_id,
+                                "zone_name": zone_name,
+                                "hvac_action": "Raise setpoint +2°C",
+                                "lighting_action": f"Dim to {target_dim * 100 // 254}%",
+                                "reason": "Zone unoccupied - coordinated energy savings",
+                                "combined_savings_kw": round(power_saved / 1000 + 0.5, 2),  # Estimate HVAC savings
+                            }
+                        )
 
                 # Rule 6: Daylight harvesting
                 # If lux > setpoint (500), dim proportionally
@@ -1664,16 +1836,22 @@ Provide ONLY the JSON response, no additional text."""
                         power_saved = total_power * dim_reduction / 100
                         lighting_savings_kw += power_saved / 1000
 
-                        lighting_recommendations.append({
-                            "equipment_id": zone_id,
-                            "equipment_name": zone_name,
-                            "point_name": "dim_level",
-                            "current_value": int(current_dim * 254 / 100),
-                            "recommended_value": int(target_dim * 254 / 100),
-                            "unit": "level",
-                            "reason": f"Daylight harvesting - avg lux {avg_lux:.0f} exceeds setpoint 500, dim to {target_dim:.0f}%",
-                            "system": "lighting",
-                        })
+                        lighting_recommendations.append(
+                            {
+                                "equipment_id": zone_id,
+                                "equipment_name": zone_name,
+                                "point_name": "dim_level",
+                                "current_value": int(current_dim * 254 / 100),
+                                "recommended_value": int(target_dim * 254 / 100),
+                                "unit": "level",
+                                "reason": (
+                                    f"Daylight harvesting - avg lux"
+                                    f" {avg_lux:.0f} exceeds setpoint"
+                                    f" 500, dim to {target_dim:.0f}%"
+                                ),
+                                "system": "lighting",
+                            }
+                        )
 
         # ============================================================
         # Power Equipment Rules (Generators, UPS, ATS)
@@ -1693,20 +1871,26 @@ Provide ONLY the JSON response, no additional text."""
                     # This is informational - we don't change generator state automatically
                     if "mode" in device.points or "run_mode" in device.points:
                         point_name = "mode" if "mode" in device.points else "run_mode"
-                        current_mode = device.points[point_name].default_value if device.points[point_name].default_value else "standby"
+                        current_mode = (
+                            device.points[point_name].default_value
+                            if device.points[point_name].default_value
+                            else "standby"
+                        )
 
                         # Don't recommend starting generator unless load shedding
                         # Just confirm standby mode is appropriate
-                        power_recommendations.append({
-                            "equipment_id": device.id,
-                            "equipment_name": device.name,
-                            "point_name": point_name,
-                            "current_value": current_mode,
-                            "recommended_value": "standby",
-                            "unit": "mode",
-                            "reason": "No load shedding - maintain standby mode for efficiency",
-                            "system": "power",
-                        })
+                        power_recommendations.append(
+                            {
+                                "equipment_id": device.id,
+                                "equipment_name": device.name,
+                                "point_name": point_name,
+                                "current_value": current_mode,
+                                "recommended_value": "standby",
+                                "unit": "mode",
+                                "reason": "No load shedding - maintain standby mode for efficiency",
+                                "system": "power",
+                            }
+                        )
 
                 # UPS optimization
                 elif "ups" in device_type:
@@ -1718,16 +1902,18 @@ Provide ONLY the JSON response, no additional text."""
                         # Enable eco mode during off-peak hours for efficiency
                         energy_period = energy_prices.get("period", "standard")
                         if energy_period == "off_peak" and not current_value:
-                            power_recommendations.append({
-                                "equipment_id": device.id,
-                                "equipment_name": device.name,
-                                "point_name": "eco_mode",
-                                "current_value": current_value,
-                                "recommended_value": True,
-                                "unit": "bool",
-                                "reason": "Enable UPS eco mode during off-peak hours for efficiency",
-                                "system": "power",
-                            })
+                            power_recommendations.append(
+                                {
+                                    "equipment_id": device.id,
+                                    "equipment_name": device.name,
+                                    "point_name": "eco_mode",
+                                    "current_value": current_value,
+                                    "recommended_value": True,
+                                    "unit": "bool",
+                                    "reason": "Enable UPS eco mode during off-peak hours for efficiency",
+                                    "system": "power",
+                                }
+                            )
 
                 # ATS (Automatic Transfer Switch) - monitoring only
                 elif "ats" in device_type:
@@ -1750,40 +1936,48 @@ Provide ONLY the JSON response, no additional text."""
                 # Solar inverter monitoring
                 if "inv" in device_name or "inverter" in device_name or "solar" in device_name:
                     # Check efficiency/performance ratio
-                    efficiency_point = self._find_point_on_device(
-                        device, ["efficiency", "performance_ratio", "pr"]
-                    )
+                    efficiency_point = self._find_point_on_device(device, ["efficiency", "performance_ratio", "pr"])
                     if efficiency_point:
-                        efficiency = efficiency_point.default_value if efficiency_point.default_value is not None else 95.0
+                        efficiency = (
+                            efficiency_point.default_value if efficiency_point.default_value is not None else 95.0
+                        )
                         if efficiency < 90.0:
-                            solar_recommendations.append({
-                                "equipment_id": device.id,
-                                "equipment_name": device.name,
-                                "point_name": efficiency_point.name,
-                                "current_value": efficiency,
-                                "recommended_value": "investigate",
-                                "unit": "%",
-                                "reason": f"Inverter efficiency {efficiency:.1f}% below 90% threshold - check for shading, soiling, or inverter fault",
-                                "system": "solar",
-                            })
+                            solar_recommendations.append(
+                                {
+                                    "equipment_id": device.id,
+                                    "equipment_name": device.name,
+                                    "point_name": efficiency_point.name,
+                                    "current_value": efficiency,
+                                    "recommended_value": "investigate",
+                                    "unit": "%",
+                                    "reason": (
+                                        f"Inverter efficiency "
+                                        f"{efficiency:.1f}% below 90%"
+                                        f" threshold - check for "
+                                        f"shading, soiling, or"
+                                        f" inverter fault"
+                                    ),
+                                    "system": "solar",
+                                }
+                            )
 
                     # Check status
-                    status_point = self._find_point_on_device(
-                        device, ["status", "operating_status", "state"]
-                    )
+                    status_point = self._find_point_on_device(device, ["status", "operating_status", "state"])
                     if status_point:
                         status = status_point.default_value if status_point.default_value is not None else "running"
                         if isinstance(status, str) and status.lower() in ["offline", "fault", "error", "stopped"]:
-                            solar_recommendations.append({
-                                "equipment_id": device.id,
-                                "equipment_name": device.name,
-                                "point_name": status_point.name,
-                                "current_value": status,
-                                "recommended_value": "investigate",
-                                "unit": "status",
-                                "reason": f"Solar inverter {status} - investigate for potential generation loss",
-                                "system": "solar",
-                            })
+                            solar_recommendations.append(
+                                {
+                                    "equipment_id": device.id,
+                                    "equipment_name": device.name,
+                                    "point_name": status_point.name,
+                                    "current_value": status,
+                                    "recommended_value": "investigate",
+                                    "unit": "status",
+                                    "reason": f"Solar inverter {status} - investigate for potential generation loss",
+                                    "system": "solar",
+                                }
+                            )
 
         # ============================================================
         # BESS Rules (Battery Dispatch, SOC Management)
@@ -1810,17 +2004,21 @@ Provide ONLY the JSON response, no additional text."""
                 soc = soc_point.default_value if soc_point and soc_point.default_value is not None else 50.0
 
                 # Find mode point
-                mode_point = self._find_point_on_device(
-                    device, ["mode", "dispatch_mode", "operating_mode"]
+                mode_point = self._find_point_on_device(device, ["mode", "dispatch_mode", "operating_mode"])
+                current_mode = (
+                    mode_point.default_value if mode_point and mode_point.default_value is not None else "idle"
                 )
-                current_mode = mode_point.default_value if mode_point and mode_point.default_value is not None else "idle"
                 mode_point_name = mode_point.name if mode_point else "mode"
 
                 # BESS dispatch rules (priority order)
                 if is_load_shedding and soc > 15:
                     # Load shedding: discharge BESS before starting generator
                     recommended_mode = "discharging"
-                    reason = f"Load shedding active - discharge BESS (SOC {soc:.0f}%) to critical loads before generator start"
+                    reason = (
+                        f"Load shedding active - discharge BESS"
+                        f" (SOC {soc:.0f}%) to critical loads"
+                        f" before generator start"
+                    )
                     bess_savings_kw += 50.0  # Significant savings by avoiding generator
                 elif is_peak and soc > 20:
                     # Peak TOU: discharge to reduce grid import
@@ -1847,28 +2045,32 @@ Provide ONLY the JSON response, no additional text."""
                     reason = f"Standard period with SOC at {soc:.0f}% - maintain idle for battery longevity"
 
                 if str(current_mode).lower() != recommended_mode:
-                    bess_recommendations.append({
-                        "equipment_id": device.id,
-                        "equipment_name": device.name,
-                        "point_name": mode_point_name,
-                        "current_value": current_mode,
-                        "recommended_value": recommended_mode,
-                        "unit": "mode",
-                        "reason": reason,
-                        "system": "bess",
-                    })
+                    bess_recommendations.append(
+                        {
+                            "equipment_id": device.id,
+                            "equipment_name": device.name,
+                            "point_name": mode_point_name,
+                            "current_value": current_mode,
+                            "recommended_value": recommended_mode,
+                            "unit": "mode",
+                            "reason": reason,
+                            "system": "bess",
+                        }
+                    )
                 else:
                     # Even if mode matches, include as confirmation
-                    bess_recommendations.append({
-                        "equipment_id": device.id,
-                        "equipment_name": device.name,
-                        "point_name": mode_point_name,
-                        "current_value": current_mode,
-                        "recommended_value": recommended_mode,
-                        "unit": "mode",
-                        "reason": reason,
-                        "system": "bess",
-                    })
+                    bess_recommendations.append(
+                        {
+                            "equipment_id": device.id,
+                            "equipment_name": device.name,
+                            "point_name": mode_point_name,
+                            "current_value": current_mode,
+                            "recommended_value": recommended_mode,
+                            "unit": "mode",
+                            "reason": reason,
+                            "system": "bess",
+                        }
+                    )
 
         # Merge lighting recommendations with HVAC recommendations
         for rec in lighting_recommendations:
@@ -1938,7 +2140,9 @@ Provide ONLY the JSON response, no additional text."""
                 if zone_type and zone_type.value not in zone_context:
                     zone_context.append(zone_type.value)
 
-        reasoning = f"Rising outdoor temperatures ({outdoor_temp}°C) with current conditions require proactive optimization. "
+        reasoning = (
+            f"Rising outdoor temperatures ({outdoor_temp}°C) with current conditions require proactive optimization. "
+        )
         if reasoning_parts:
             reasoning += f"Recommendations include: {', '.join(reasoning_parts)}. "
         if zone_context:
@@ -1962,6 +2166,8 @@ Provide ONLY the JSON response, no additional text."""
                 "estimated_savings_kw": round(lighting_savings_kw, 2),
             }
 
+        data_quality_penalty = self._calculate_data_quality_penalty(current_conditions)
+
         return OptimizationRecommendation(
             site_id=site_id,
             timestamp=datetime.now().isoformat(),
@@ -1977,12 +2183,16 @@ Provide ONLY the JSON response, no additional text."""
                 "cost_zar_per_hour": round(cost_savings, 2),
                 "percentage_improvement": round(percentage, 1),
             },
-            confidence=confidence + (0.05 * len(recommendations)),  # Higher confidence with more recommendations
+            confidence=max(0.1, confidence + (0.05 * len(recommendations)) - data_quality_penalty),
             reasoning=reasoning,
             cross_system_recommendations=cross_system_recommendations if cross_system_recommendations else None,
             lighting_summary=lighting_summary,
             profile=profile.get("name") if profile else None,
             profile_applied=bool(profile),
+            data_quality={
+                "sources": current_conditions.get("_data_sources", {}),
+                "penalty_applied": data_quality_penalty,
+            },
         )
 
     async def analyze_building_load_shedding(
@@ -2050,7 +2260,9 @@ Provide ONLY the JSON response, no additional text."""
         savings_multiplier = 1.0 + (load_shedding_stage * 0.2)  # 1.2x to 1.8x
         adjusted_savings = recommendation.projected_savings.copy()
         adjusted_savings["energy_kwh"] = round(adjusted_savings.get("energy_kwh", 0) * savings_multiplier, 1)
-        adjusted_savings["cost_zar_per_hour"] = round(adjusted_savings.get("cost_zar_per_hour", 0) * savings_multiplier, 2)
+        adjusted_savings["cost_zar_per_hour"] = round(
+            adjusted_savings.get("cost_zar_per_hour", 0) * savings_multiplier, 2
+        )
         adjusted_savings["percentage_improvement"] = round(
             min(adjusted_savings.get("percentage_improvement", 0) * savings_multiplier, 25.0), 1
         )
@@ -2061,9 +2273,15 @@ Provide ONLY the JSON response, no additional text."""
             recommendations=filtered_recs,
             projected_savings=adjusted_savings,
             confidence=recommendation.confidence,
-            reasoning=f"Load shedding Stage {load_shedding_stage}: Maintaining P1-P{max_priority_to_maintain} zones at normal comfort. "
-                      f"Lower priority zones (P{max_priority_to_maintain + 1}-P5) receive more aggressive optimization. "
-                      f"{recommendation.reasoning}",
+            reasoning=(
+                f"Load shedding Stage {load_shedding_stage}: "
+                f"Maintaining P1-P{max_priority_to_maintain} "
+                f"zones at normal comfort. "
+                f"Lower priority zones "
+                f"(P{max_priority_to_maintain + 1}-P5) receive "
+                f"more aggressive optimization. "
+                f"{recommendation.reasoning}"
+            ),
         )
 
     def _get_device_zone_priority(self, device_id: str) -> int:
@@ -2101,12 +2319,14 @@ Provide ONLY the JSON response, no additional text."""
                 # Find device
                 device = next((d for d in devices if d.id == equipment_id), None)
                 if not device:
-                    validation_results.append({
-                        "equipment_id": equipment_id,
-                        "point_name": point_name,
-                        "allowed": False,
-                        "reason": f"Device {equipment_id} not found",
-                    })
+                    validation_results.append(
+                        {
+                            "equipment_id": equipment_id,
+                            "point_name": point_name,
+                            "allowed": False,
+                            "reason": f"Device {equipment_id} not found",
+                        }
+                    )
                     all_allowed = False
                     continue
 
@@ -2116,13 +2336,15 @@ Provide ONLY the JSON response, no additional text."""
 
                 safety_result = await safety_engine.validate_control(device, point_name, value)
 
-                validation_results.append({
-                    "equipment_id": equipment_id,
-                    "point_name": point_name,
-                    "allowed": safety_result["allowed"],
-                    "reason": safety_result.get("message", ""),
-                    "warnings": safety_result.get("warnings", []),
-                })
+                validation_results.append(
+                    {
+                        "equipment_id": equipment_id,
+                        "point_name": point_name,
+                        "allowed": safety_result["allowed"],
+                        "reason": safety_result.get("message", ""),
+                        "warnings": safety_result.get("warnings", []),
+                    }
+                )
 
                 if not safety_result["allowed"]:
                     all_allowed = False
@@ -2143,6 +2365,7 @@ Provide ONLY the JSON response, no additional text."""
 
 # Singleton instance
 _ai_optimizer_instance = None
+
 
 def get_ai_optimizer():
     """Get or create the singleton AI optimizer instance."""

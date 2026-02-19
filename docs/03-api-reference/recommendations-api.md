@@ -693,10 +693,104 @@ curl -X POST http://localhost:9095/api/optimization/analyze \
 
 ---
 
+### Agent Trigger
+
+#### POST /recommendations/{site_id}/process-pending
+Trigger the LangGraph recommendation agent to process pending recommendations for a site.
+
+The agent validates, assesses impact, checks schedule conflicts, routes through the tier engine, and either auto-executes (Tier 3), requests approval (Tier 2), or logs as advisory (Tier 1).
+
+**Parameters:**
+- `site_id` (path, required): Site identifier (e.g., "S002")
+
+**Request Body:**
+```json
+{
+  "channel": "system",
+  "trigger": "manual"
+}
+```
+
+| Field | Type | Default | Values |
+|-------|------|---------|--------|
+| `channel` | string | `"system"` | `"system"`, `"whatsapp"`, `"telegram"`, `"chat"` |
+| `trigger` | string | `"manual"` | `"manual"`, `"scheduled"`, `"health_alert"` |
+
+**Response (Tier 1 Advisory):**
+```json
+{
+  "success": true,
+  "site_id": "S002",
+  "response": "[ADVISORY] S002-FCU-201 (Level 2, Zone A)\nAction: hvac_setpoint_change\n...",
+  "tier": "tier1",
+  "recommendation_id": "rec-abc123",
+  "needs_input": false,
+  "processing_complete": true
+}
+```
+
+**Response (Tier 2 Approval Required):**
+```json
+{
+  "success": true,
+  "site_id": "S002",
+  "response": "🔧 *Approval Required*\n\nEquipment: S002-FCU-201...\n\nReply: APPROVE rec-abc1 or REJECT rec-abc1 <reason>",
+  "tier": "tier2",
+  "recommendation_id": "rec-abc123",
+  "needs_input": true,
+  "processing_complete": false
+}
+```
+
+**Response (Tier 3 Auto-Executed):**
+```json
+{
+  "success": true,
+  "site_id": "S002",
+  "response": "✅ Auto-executed: S002-FCU-201 hvac_setpoint_change\nCOV verified: true",
+  "tier": "tier3",
+  "recommendation_id": "rec-abc123",
+  "needs_input": false,
+  "processing_complete": true
+}
+```
+
+**Response (No Pending):**
+```json
+{
+  "success": true,
+  "site_id": "S002",
+  "response": "Processing complete.",
+  "tier": null,
+  "recommendation_id": null,
+  "needs_input": false,
+  "processing_complete": true
+}
+```
+
+**Rate Limit:** 10 requests/minute
+
+**Status Codes:**
+- `200 OK` — Processing complete or approval requested
+- `501 Not Implemented` — LangGraph not installed
+- `500 Internal Server Error` — Agent processing error
+
+**Example:**
+```bash
+curl -X POST "http://localhost:9095/api/recommendations/S002/process-pending" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"channel": "whatsapp", "trigger": "manual"}'
+```
+
+---
+
 ## See Also
 
 - [Profile-Based Optimization Architecture](../02-architecture/profile-based-optimization.md)
 - [Module Connectivity](../02-architecture/module-connectivity.md)
+- [AI Recommendation System](../08-ai-ml/ai-recommendation-system.md) - Full agent architecture
+- [Recommendation Agent Feature Doc](../04-features/recommendation-agent.md)
 - [Authentication](auth.md)
 
 ---
@@ -705,4 +799,5 @@ curl -X POST http://localhost:9095/api/optimization/analyze \
 
 | Revision | Date | Change | Author |
 |----------|------|--------|--------|
+| 1.1 | 2026-02-19 | Added process-pending agent trigger endpoint | SENTINEL Team |
 | 1.0 | 2026-02-09 | Initial publication | SENTINEL Team |

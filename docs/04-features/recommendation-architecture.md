@@ -230,14 +230,29 @@ PATCH /api/recommendations/{id}/approve
 
 ---
 
+## Recommendation Validation & Execution Agent
+
+The tactical layer is now orchestrated by a **LangGraph StateGraph agent** that proactively processes pending recommendations through the complete lifecycle. This bridges the gap between recommendation generation and action.
+
+See: [Recommendation Agent Feature Doc](recommendation-agent.md) for full specification.
+
+**Key additions:**
+- Proactive agent processes pending recommendations on schedule or trigger
+- 3-tier routing: Tier 1 advisory, Tier 2 human approval (WhatsApp/Telegram), Tier 3 auto-execute
+- ML feedback loop closes the learning cycle after every recommendation outcome
+- API endpoint: `POST /api/recommendations/{site_id}/process-pending`
+
+---
+
 ## Conclusion
 
 The two-tier architecture provides:
 
-✅ **Strategic layer** for investment planning and financial analysis
-✅ **Tactical layer** for real-time optimization and control
-✅ **Clear separation** preventing scope creep and maintaining performance
-✅ **Extensible foundation** for future ML models and decision engines
+- **Strategic layer** for investment planning and financial analysis
+- **Tactical layer** for real-time optimization and control
+- **Agent orchestration** for proactive recommendation processing with human-in-the-loop
+- **Clear separation** preventing scope creep and maintaining performance
+- **Extensible foundation** for future ML models and decision engines
 
 This pattern is intentional and reflects best practices in building automation:
 - **Energy management systems** (EMS) typically have investment analysis separate from control
@@ -246,6 +261,6 @@ This pattern is intentional and reflects best practices in building automation:
 
 ---
 
-**Last Updated**: 2026-02-18
-**Applies to**: Phase A.5 (AIRecommendationEngine) and RecommendationService integration
+**Last Updated**: 2026-02-19
+**Applies to**: Phase A.5 (AIRecommendationEngine), RecommendationService, and Recommendation Agent
 **Status**: Architecture validated ✅

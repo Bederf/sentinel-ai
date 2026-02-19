@@ -9,9 +9,12 @@ Uses in-memory storage for demo scope.
 """
 
 import logging
+import json
 from datetime import datetime
-from typing import Dict, List, Optional
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
+from app.config.settings import settings
 from app.models.ml_feedback import (
     MLFeedbackRecord,
     TrainingDataPoint,
@@ -20,6 +23,11 @@ from app.models.ml_feedback import (
 )
 
 logger = logging.getLogger(__name__)
+
+DATA_DIR = Path(__file__).parent.parent / "data"
+ML_FEEDBACK_FILE = DATA_DIR / "ml_feedback_records.json"
+ML_FEEDBACK_STATE_TABLE = "ml_feedback_state"
+ML_FEEDBACK_STATE_KEY = "global"
 
 
 class MLFeedbackService:
@@ -35,11 +43,14 @@ class MLFeedbackService:
 
     def __init__(self):
         """Initialize with in-memory storage."""
+        self._client = None
         self._feedback_records: List[MLFeedbackRecord] = []
         self._training_data: List[TrainingDataPoint] = []
         self._prediction_accuracy: Dict[str, PredictionAccuracy] = {}
         self._record_counter: int = 0
+        self._scoring_inputs: Dict[str, Dict[str, Any]] = {}
 
+        self._load_state()
         logger.info("MLFeedbackService initialized")
 
     # ========================================================================
@@ -116,6 +127,7 @@ class MLFeedbackService:
 
         # 4. Store feedback record
         self._feedback_records.append(record)
+        self._save_state()
 
         # 5. Log
         logger.info(
@@ -124,6 +136,114 @@ class MLFeedbackService:
             f"successful={repair_successful}"
         )
 
+        return record
+
+    def record_module_outcome(
+        self,
+        *,
+        site_id: str,
+        module_type: str,
+        recommendation_id: str,
+        action_type: str,
+        successful: bool,
+        outcome_status: str,
+        predicted_impact: Optional[Dict[str, Any]] = None,
+        actual_impact: Optional[Dict[str, Any]] = None,
+        confidence_score: Optional[float] = None,
+        equipment_id: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Optional[MLFeedbackRecord]:
+        """Record module-level recommendation outcome into the shared ML loop.
+
+        This keeps base-package ML feedback active while adding module-specific
+        outcome learning as add-ons are activated.
+        """
+        module_type_normalized = self._normalize_module_type(module_type)
+        if not module_type_normalized:
+            return None
+
+        if not self._is_module_eligible_for_feedback(site_id, module_type_normalized):
+            logger.info(
+                "Skipping module feedback for inactive module: site=%s module=%s",
+                site_id,
+                module_type_normalized,
+            )
+            return None
+
+        predicted = predicted_impact or {}
+        actual = actual_impact or {}
+        extra = metadata or {}
+        effective_equipment_id = equipment_id or f"{site_id}-{module_type_normalized}-module"
+        effective_score = self._compute_effectiveness_score(
+            successful=successful,
+            predicted_impact=predicted,
+            actual_impact=actual,
+        )
+
+        self._record_counter += 1
+        record_id = f"mlf-mod-{datetime.now().strftime('%Y%m%d%H%M%S')}-{self._record_counter:04d}"
+
+        record = MLFeedbackRecord(
+            id=record_id,
+            equipment_id=effective_equipment_id,
+            work_order_id=recommendation_id or f"module-{record_id}",
+            feedback_type="module_outcome",
+            repair_successful=successful,
+            effectiveness_score=effective_score,
+            prediction_id=recommendation_id or None,
+            prediction_was_correct=successful,
+            recorded_at=datetime.now(),
+            metadata={
+                "site_id": site_id,
+                "module_type": module_type_normalized,
+                "action_type": action_type,
+                "outcome_status": outcome_status,
+                "predicted_impact": predicted,
+                "actual_impact": actual,
+                "confidence_score": confidence_score,
+                **extra,
+            },
+        )
+
+        self._feedback_records.append(record)
+
+        training_features: Dict[str, float] = {
+            "effectiveness_score": float(effective_score),
+            "success_flag": 1.0 if successful else 0.0,
+        }
+        if isinstance(confidence_score, (int, float)):
+            training_features["confidence_score"] = float(confidence_score)
+
+        predicted_energy = predicted.get("energy_kwh")
+        actual_energy = actual.get("energy_kwh")
+        if isinstance(predicted_energy, (int, float)):
+            training_features["predicted_energy_kwh"] = float(predicted_energy)
+        if isinstance(actual_energy, (int, float)):
+            training_features["actual_energy_kwh"] = float(actual_energy)
+            if isinstance(predicted_energy, (int, float)):
+                training_features["energy_delta_kwh"] = float(actual_energy) - float(predicted_energy)
+
+        self._training_data.append(
+            TrainingDataPoint(
+                equipment_id=effective_equipment_id,
+                equipment_type=module_type_normalized,
+                features=training_features,
+                label="successful" if successful else "failed",
+                repair_effectiveness=effective_score,
+                source="module_outcome",
+            )
+        )
+        self._save_state()
+
+        logger.info(
+            "Module feedback recorded: id=%s site=%s module=%s action=%s status=%s success=%s",
+            record_id,
+            site_id,
+            module_type_normalized,
+            action_type,
+            outcome_status,
+            successful,
+        )
         return record
 
     # ========================================================================
@@ -147,14 +267,8 @@ class MLFeedbackService:
             List of TrainingDataPoints for ML model retraining
         """
         if equipment_type:
-            filtered = [
-                tp for tp in self._training_data
-                if tp.equipment_type.lower() == equipment_type.lower()
-            ]
-            logger.info(
-                f"Generated {len(filtered)} training data points "
-                f"for equipment type '{equipment_type}'"
-            )
+            filtered = [tp for tp in self._training_data if tp.equipment_type.lower() == equipment_type.lower()]
+            logger.info(f"Generated {len(filtered)} training data points for equipment type '{equipment_type}'")
             return filtered
 
         logger.info(f"Generated {len(self._training_data)} total training data points")
@@ -181,35 +295,29 @@ class MLFeedbackService:
             PredictionAccuracy with calculated metrics
         """
         # Filter records with predictions
-        prediction_records = [
-            r for r in self._feedback_records
-            if r.prediction_id is not None
-        ]
+        prediction_records = [r for r in self._feedback_records if r.prediction_id is not None]
 
         if not prediction_records:
-            accuracy = self._prediction_accuracy.get(
-                model_type,
-                PredictionAccuracy(model_type=model_type)
-            )
+            accuracy = self._prediction_accuracy.get(model_type, PredictionAccuracy(model_type=model_type))
             return accuracy
 
         # Calculate metrics
         total = len(prediction_records)
         correct = sum(1 for r in prediction_records if r.prediction_was_correct)
         false_positives = sum(
-            1 for r in prediction_records
-            if r.prediction_was_correct is False and not r.repair_successful
+            1 for r in prediction_records if r.prediction_was_correct is False and not r.repair_successful
         )
         false_negatives = sum(
-            1 for r in prediction_records
-            if r.prediction_was_correct is False and r.repair_successful
+            1 for r in prediction_records if r.prediction_was_correct is False and r.repair_successful
         )
 
         # True positives: prediction said failure, and there was a failure
         true_positives = correct
 
         # Precision: TP / (TP + FP)
-        precision = true_positives / (true_positives + false_positives) if (true_positives + false_positives) > 0 else 0.0
+        precision = (
+            true_positives / (true_positives + false_positives) if (true_positives + false_positives) > 0 else 0.0
+        )
 
         # Recall: TP / (TP + FN)
         recall = true_positives / (true_positives + false_negatives) if (true_positives + false_negatives) > 0 else 0.0
@@ -227,11 +335,9 @@ class MLFeedbackService:
         )
 
         self._prediction_accuracy[model_type] = accuracy
+        self._save_state()
 
-        logger.info(
-            f"Prediction accuracy for {model_type}: "
-            f"{accuracy.accuracy_percent}% ({correct}/{total})"
-        )
+        logger.info(f"Prediction accuracy for {model_type}: {accuracy.accuracy_percent}% ({correct}/{total})")
 
         return accuracy
 
@@ -247,20 +353,32 @@ class MLFeedbackService:
             MLFeedbackSummary with overall statistics
         """
         total = len(self._feedback_records)
-        repair_outcomes = sum(
-            1 for r in self._feedback_records
-            if r.feedback_type == "repair_outcome"
-        )
-        predictions_evaluated = sum(
-            1 for r in self._feedback_records
-            if r.prediction_id is not None
-        )
+        repair_outcomes = sum(1 for r in self._feedback_records if r.feedback_type == "repair_outcome")
+        predictions_evaluated = sum(1 for r in self._feedback_records if r.prediction_id is not None)
+        module_feedback_records = [r for r in self._feedback_records if r.feedback_type == "module_outcome"]
+
+        module_feedback_counts: Dict[str, int] = {}
+        module_success_counts: Dict[str, int] = {}
+        for record in module_feedback_records:
+            module_name = self._normalize_module_type(record.metadata.get("module_type", ""))
+            if not module_name:
+                continue
+            module_feedback_counts[module_name] = module_feedback_counts.get(module_name, 0) + 1
+            if record.repair_successful:
+                module_success_counts[module_name] = module_success_counts.get(module_name, 0) + 1
+
+        module_success_rates: Dict[str, float] = {}
+        for module_name, total_count in module_feedback_counts.items():
+            success_count = module_success_counts.get(module_name, 0)
+            module_success_rates[module_name] = (
+                round((success_count / total_count) * 100, 2) if total_count > 0 else 0.0
+            )
 
         # Calculate average accuracy across all model types
         if self._prediction_accuracy:
-            avg_accuracy = sum(
-                a.accuracy_percent for a in self._prediction_accuracy.values()
-            ) / len(self._prediction_accuracy)
+            avg_accuracy = sum(a.accuracy_percent for a in self._prediction_accuracy.values()) / len(
+                self._prediction_accuracy
+            )
         else:
             avg_accuracy = 0.0
 
@@ -271,8 +389,42 @@ class MLFeedbackService:
             avg_prediction_accuracy=round(avg_accuracy, 2),
             model_accuracies=dict(self._prediction_accuracy),
             training_data_points=len(self._training_data),
+            module_feedback_records=len(module_feedback_records),
+            module_feedback_counts=module_feedback_counts,
+            module_success_rates=module_success_rates,
             last_retrain_date=None,
         )
+
+    def get_module_feedback_summary(
+        self,
+        site_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Get module-outcome feedback summary, optionally scoped to a site."""
+        module_records = [r for r in self._feedback_records if r.feedback_type == "module_outcome"]
+        if site_id:
+            module_records = [r for r in module_records if r.metadata.get("site_id") == site_id]
+
+        counts: Dict[str, int] = {}
+        success_counts: Dict[str, int] = {}
+        for record in module_records:
+            module_name = self._normalize_module_type(record.metadata.get("module_type", ""))
+            if not module_name:
+                continue
+            counts[module_name] = counts.get(module_name, 0) + 1
+            if record.repair_successful:
+                success_counts[module_name] = success_counts.get(module_name, 0) + 1
+
+        success_rates = {
+            module_name: round((success_counts.get(module_name, 0) / total) * 100, 2) if total else 0.0
+            for module_name, total in counts.items()
+        }
+
+        return {
+            "site_id": site_id,
+            "records": len(module_records),
+            "counts": counts,
+            "success_rates": success_rates,
+        }
 
     def get_feedback_for_equipment(
         self,
@@ -287,16 +439,212 @@ class MLFeedbackService:
         Returns:
             List of MLFeedbackRecord for the equipment
         """
-        records = [
-            r for r in self._feedback_records
-            if r.equipment_id == equipment_id
-        ]
+        records = [r for r in self._feedback_records if r.equipment_id == equipment_id]
         logger.info(f"Retrieved {len(records)} feedback records for {equipment_id}")
         return records
+
+    def refresh_scoring_inputs(self, site_id: Optional[str] = None) -> Dict[str, Any]:
+        """Refresh feedback-derived scoring inputs (module multipliers).
+
+        Converts module success rates into ranking multipliers used by
+        recommendation scoring to prioritize modules performing well and
+        de-emphasize modules with weak realized outcomes.
+        """
+        site_ids: set[str] = set()
+        if site_id:
+            site_ids.add(site_id)
+        else:
+            for record in self._feedback_records:
+                if record.feedback_type != "module_outcome":
+                    continue
+                sid = record.metadata.get("site_id")
+                if isinstance(sid, str) and sid.strip():
+                    site_ids.add(sid.strip())
+
+        refreshed: Dict[str, Dict[str, Any]] = {}
+        for sid in site_ids:
+            module_summary = self.get_module_feedback_summary(site_id=sid)
+            success_rates = module_summary.get("success_rates", {})
+            multipliers = {
+                module_name: self._success_rate_to_multiplier(rate) for module_name, rate in success_rates.items()
+            }
+            refreshed[sid] = {
+                "site_id": sid,
+                "module_multipliers": multipliers,
+                "module_success_rates": success_rates,
+                "records": module_summary.get("records", 0),
+                "refreshed_at": datetime.now().isoformat(),
+            }
+
+        if refreshed:
+            self._scoring_inputs.update(refreshed)
+            self._save_state()
+
+        return {
+            "refreshed_sites": len(refreshed),
+            "site_ids": sorted(list(refreshed.keys())),
+        }
+
+    def get_scoring_inputs(self, site_id: str) -> Dict[str, Any]:
+        """Get feedback-derived scoring inputs for a site."""
+        if not site_id:
+            return {}
+        site_inputs = self._scoring_inputs.get(site_id)
+        if isinstance(site_inputs, dict):
+            return site_inputs
+        return {}
 
     # ========================================================================
     # Private Helper Methods
     # ========================================================================
+
+    @property
+    def client(self):
+        """Lazy-load Supabase client (disabled when JSON-only mode is set)."""
+        if settings.use_json_storage:
+            return None
+        if self._client is None:
+            try:
+                from app.database.supabase_client import get_supabase_client
+
+                self._client = get_supabase_client()
+            except Exception as e:
+                logger.warning("ML feedback Supabase client unavailable, using JSON fallback: %s", e)
+                self._client = None
+        return self._client
+
+    def _load_state(self) -> None:
+        """Load ML feedback state from Supabase first, then JSON fallback."""
+        loaded_from_supabase = self._load_state_supabase()
+        if loaded_from_supabase:
+            # Keep JSON backup synced to latest source of truth.
+            self._save_state_json()
+            return
+        self._load_state_json()
+
+    def _load_state_supabase(self) -> bool:
+        """Load ML feedback state payload from Supabase."""
+        client = self.client
+        if client is None:
+            return False
+
+        try:
+            result = (
+                client.table(ML_FEEDBACK_STATE_TABLE)
+                .select("payload")
+                .eq("state_key", ML_FEEDBACK_STATE_KEY)
+                .limit(1)
+                .execute()
+            )
+            rows = result.data or []
+            if not rows:
+                return False
+
+            payload = rows[0].get("payload")
+            if not isinstance(payload, dict):
+                logger.warning("Invalid ML feedback payload format in Supabase")
+                return False
+
+            self._hydrate_from_payload(payload)
+            logger.info(
+                "Loaded ML feedback state from Supabase: records=%s training=%s models=%s",
+                len(self._feedback_records),
+                len(self._training_data),
+                len(self._prediction_accuracy),
+            )
+            return True
+        except Exception as e:
+            logger.warning("Failed to load ML feedback state from Supabase: %s", e)
+            return False
+
+    def _load_state_json(self) -> None:
+        """Load ML feedback state from local JSON backup."""
+        try:
+            if not ML_FEEDBACK_FILE.exists():
+                return
+
+            with open(ML_FEEDBACK_FILE, "r") as f:
+                payload = json.load(f)
+            self._hydrate_from_payload(payload)
+            logger.info(
+                "Loaded ML feedback state from JSON backup: records=%s training=%s models=%s",
+                len(self._feedback_records),
+                len(self._training_data),
+                len(self._prediction_accuracy),
+            )
+        except Exception as e:
+            logger.warning("Failed to load ML feedback state, starting fresh: %s", e)
+            self._feedback_records = []
+            self._training_data = []
+            self._prediction_accuracy = {}
+            self._record_counter = 0
+
+    def _save_state(self) -> None:
+        """Persist ML feedback to Supabase (source of truth) and JSON backup."""
+        payload = self._build_state_payload()
+
+        saved_to_supabase = self._save_state_supabase(payload)
+        if not saved_to_supabase and not settings.use_json_storage:
+            logger.warning("ML feedback state not saved to Supabase; JSON backup only for this update")
+
+        self._save_state_json(payload)
+
+    def _save_state_supabase(self, payload: Dict[str, Any]) -> bool:
+        """Persist ML feedback state payload to Supabase."""
+        client = self.client
+        if client is None:
+            return False
+
+        try:
+            client.table(ML_FEEDBACK_STATE_TABLE).upsert(
+                {
+                    "state_key": ML_FEEDBACK_STATE_KEY,
+                    "payload": payload,
+                },
+                on_conflict="state_key",
+            ).execute()
+            return True
+        except Exception as e:
+            logger.warning("Failed to persist ML feedback state to Supabase: %s", e)
+            return False
+
+    def _save_state_json(self, payload: Optional[Dict[str, Any]] = None) -> None:
+        """Persist ML feedback state payload to JSON backup."""
+        try:
+            DATA_DIR.mkdir(parents=True, exist_ok=True)
+            state_payload = payload if payload is not None else self._build_state_payload()
+            with open(ML_FEEDBACK_FILE, "w") as f:
+                json.dump(state_payload, f, indent=2)
+        except Exception as e:
+            logger.warning("Failed to persist ML feedback JSON backup: %s", e)
+
+    def _build_state_payload(self) -> Dict[str, Any]:
+        """Build serialized state payload for Supabase/JSON persistence."""
+        return {
+            "feedback_records": [r.model_dump(mode="json") for r in self._feedback_records[-2000:]],
+            "training_data": [t.model_dump(mode="json") for t in self._training_data[-5000:]],
+            "prediction_accuracy": {
+                model_name: metrics.model_dump(mode="json") for model_name, metrics in self._prediction_accuracy.items()
+            },
+            "scoring_inputs": self._scoring_inputs,
+            "record_counter": self._record_counter,
+            "updated_at": datetime.now().isoformat(),
+        }
+
+    def _hydrate_from_payload(self, payload: Dict[str, Any]) -> None:
+        """Hydrate in-memory state from serialized payload."""
+        records = payload.get("feedback_records", [])
+        training = payload.get("training_data", [])
+        accuracy = payload.get("prediction_accuracy", {})
+
+        self._feedback_records = [MLFeedbackRecord.model_validate(item) for item in records]
+        self._training_data = [TrainingDataPoint.model_validate(item) for item in training]
+        self._prediction_accuracy = {
+            model_name: PredictionAccuracy.model_validate(model_data) for model_name, model_data in accuracy.items()
+        }
+        scoring_inputs = payload.get("scoring_inputs", {})
+        self._scoring_inputs = scoring_inputs if isinstance(scoring_inputs, dict) else {}
+        self._record_counter = int(payload.get("record_counter", len(self._feedback_records)))
 
     def _update_prediction_accuracy_from_record(self, record: MLFeedbackRecord):
         """Update prediction accuracy tracking from a single feedback record."""
@@ -304,9 +652,7 @@ class MLFeedbackService:
         model_type = self._infer_model_type(record.prediction_id)
 
         if model_type not in self._prediction_accuracy:
-            self._prediction_accuracy[model_type] = PredictionAccuracy(
-                model_type=model_type
-            )
+            self._prediction_accuracy[model_type] = PredictionAccuracy(model_type=model_type)
 
         acc = self._prediction_accuracy[model_type]
         acc.total_predictions += 1
@@ -320,9 +666,7 @@ class MLFeedbackService:
 
         # Recalculate metrics
         if acc.total_predictions > 0:
-            acc.accuracy_percent = round(
-                (acc.correct_predictions / acc.total_predictions) * 100, 2
-            )
+            acc.accuracy_percent = round((acc.correct_predictions / acc.total_predictions) * 100, 2)
         tp = acc.correct_predictions
         if (tp + acc.false_positives) > 0:
             acc.precision = round(tp / (tp + acc.false_positives), 4)
@@ -363,7 +707,8 @@ class MLFeedbackService:
         """
         try:
             from app.services.element_trend_service import get_element_trend_service
-            trend_service = get_element_trend_service()
+
+            get_element_trend_service()  # ensure service initialized
 
             # For demo scope, return basic features
             # In production, this would query real-time sensor data
@@ -374,6 +719,102 @@ class MLFeedbackService:
         except Exception as e:
             logger.debug(f"Could not get features for {equipment_id}: {e}")
             return {}
+
+    def _normalize_module_type(self, module_type: str) -> str:
+        """Normalize module type to lowercase canonical value."""
+        if not isinstance(module_type, str):
+            return ""
+        normalized = module_type.strip().lower()
+        aliases = {
+            "power": "energy",
+            "bess": "solar",
+            "battery": "solar",
+            "pv": "solar",
+        }
+        return aliases.get(normalized, normalized)
+
+    def _candidate_site_ids(self, site_id: str) -> List[str]:
+        """Return site-id variants used across legacy/new storage formats."""
+        if not isinstance(site_id, str):
+            return []
+        sid = site_id.strip()
+        if not sid:
+            return []
+
+        candidates = [sid]
+        lower = sid.lower()
+        if lower.startswith("site-"):
+            suffix = sid.split("-", 1)[1] if "-" in sid else ""
+            if suffix.isdigit():
+                candidates.append(f"S{suffix}")
+        elif sid.startswith("S") and sid[1:].isdigit():
+            candidates.append(f"site-{sid[1:]}")
+
+        deduped: List[str] = []
+        for item in candidates:
+            if item and item not in deduped:
+                deduped.append(item)
+        return deduped
+
+    def _is_module_eligible_for_feedback(self, site_id: str, module_type: str) -> bool:
+        """Return True if module feedback should be recorded for this site/module."""
+        if not site_id or not module_type:
+            return False
+
+        try:
+            from app.models.module_registry import ModuleType
+            from app.services.module_registry_service import NON_DEACTIVATABLE_MODULES, module_registry
+
+            try:
+                module_enum = ModuleType(module_type)
+            except ValueError:
+                return False
+
+            # Base pack modules are always eligible for the shared ML loop.
+            if module_enum in NON_DEACTIVATABLE_MODULES:
+                return True
+
+            # For add-on modules, resolve across site-id variants and fail closed.
+            for candidate in self._candidate_site_ids(site_id):
+                site_config = module_registry.get_site_config(candidate)
+                if site_config is None:
+                    continue
+                if module_registry.is_module_active(candidate, module_enum):
+                    return True
+
+            return False
+        except Exception as e:
+            logger.debug("Module eligibility check failed for %s/%s: %s", site_id, module_type, e)
+            return False
+
+    def _compute_effectiveness_score(
+        self,
+        *,
+        successful: bool,
+        predicted_impact: Dict[str, Any],
+        actual_impact: Dict[str, Any],
+    ) -> float:
+        """Compute a normalized 0-100 effectiveness score for module outcomes."""
+        predicted_energy = predicted_impact.get("energy_kwh")
+        actual_energy = actual_impact.get("energy_kwh")
+        if isinstance(predicted_energy, (int, float)) and float(predicted_energy) > 0:
+            if isinstance(actual_energy, (int, float)):
+                variance_pct = abs(float(predicted_energy) - float(actual_energy)) / float(predicted_energy) * 100.0
+                return round(max(0.0, 100.0 - variance_pct), 2)
+        return 100.0 if successful else 0.0
+
+    def _success_rate_to_multiplier(self, success_rate: float) -> float:
+        """Map module success rate (%) to a recommendation score multiplier."""
+        rate = float(success_rate)
+        if rate >= 90.0:
+            return 1.1
+        if rate >= 80.0:
+            return 1.05
+        if rate >= 65.0:
+            return 1.0
+        if rate >= 50.0:
+            return 0.9
+        return 0.8
 
 
 # ============================================================================

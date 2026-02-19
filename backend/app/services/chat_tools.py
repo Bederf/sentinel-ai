@@ -41,10 +41,7 @@ def load_json(filename: str) -> list | dict:
     return []
 
 
-async def list_devices(
-    device_type: str | None = None,
-    site_id: str | None = None
-) -> dict[str, Any]:
+async def list_devices(device_type: str | None = None, site_id: str | None = None) -> dict[str, Any]:
     """
     List available devices with optional filtering.
 
@@ -67,27 +64,21 @@ async def list_devices(
         # Convert to simplified format for Claude
         device_list = []
         for device in devices:
-            device_list.append({
-                "id": device.id,
-                "name": device.name,
-                "type": device.device_type.value,
-                "status": device.status.value,
-                "location": device.location,
-                "site_id": device.site_id,
-            })
+            device_list.append(
+                {
+                    "id": device.id,
+                    "name": device.name,
+                    "type": device.device_type.value,
+                    "status": device.status.value,
+                    "location": device.location,
+                    "site_id": device.site_id,
+                }
+            )
 
-        return {
-            "success": True,
-            "count": len(device_list),
-            "devices": device_list
-        }
+        return {"success": True, "count": len(device_list), "devices": device_list}
     except Exception as e:
         logger.error(f"Error listing devices: {e}")
-        return {
-            "success": False,
-            "error": str(e),
-            "devices": []
-        }
+        return {"success": False, "error": str(e), "devices": []}
 
 
 async def get_device_details(device_id: str) -> dict[str, Any]:
@@ -103,10 +94,7 @@ async def get_device_details(device_id: str) -> dict[str, Any]:
     try:
         device = await device_manager.get_device(device_id)
         if not device:
-            return {
-                "success": False,
-                "error": f"Device '{device_id}' not found"
-            }
+            return {"success": False, "error": f"Device '{device_id}' not found"}
 
         # Get adapter for reading current values
         adapter = await device_manager.get_adapter(device_id)
@@ -121,7 +109,7 @@ async def get_device_details(device_id: str) -> dict[str, Any]:
                         "value": value.value,
                         "unit": value.unit,
                         "timestamp": value.timestamp,
-                        "quality": value.quality
+                        "quality": value.quality,
                     }
                 except Exception as e:
                     point_values[point_name] = {"error": str(e)}
@@ -141,7 +129,7 @@ async def get_device_details(device_id: str) -> dict[str, Any]:
                 "writable": point.writable,
                 "min_value": point.min_value,
                 "max_value": point.max_value,
-                "current_value": point_values.get(name, {}).get("value")
+                "current_value": point_values.get(name, {}).get("value"),
             }
 
         return {
@@ -159,21 +147,15 @@ async def get_device_details(device_id: str) -> dict[str, Any]:
                 "last_seen": device.last_seen,
             },
             "points": points_info,
-            "safety_status": safety_status
+            "safety_status": safety_status,
         }
     except Exception as e:
         logger.error(f"Error getting device details for {device_id}: {e}")
-        return {
-            "success": False,
-            "error": str(e)
-        }
+        return {"success": False, "error": str(e)}
 
 
 async def control_device(
-    device_id: str,
-    point: str,
-    value: Any,
-    reason: str = "AI assistant control"
+    device_id: str, point: str, value: Any, reason: str = "AI assistant control"
 ) -> dict[str, Any]:
     """
     Execute a control action on a device.
@@ -193,16 +175,13 @@ async def control_device(
     try:
         device = await device_manager.get_device(device_id)
         if not device:
-            return {
-                "success": False,
-                "error": f"Device '{device_id}' not found"
-            }
+            return {"success": False, "error": f"Device '{device_id}' not found"}
 
         # Check device is online
         if device.status not in [DeviceStatus.ONLINE, DeviceStatus.STANDBY]:
             return {
                 "success": False,
-                "error": f"Device '{device.name}' is {device.status.value} and cannot be controlled"
+                "error": f"Device '{device.name}' is {device.status.value} and cannot be controlled",
             }
 
         # Check point exists and is writable
@@ -211,14 +190,11 @@ async def control_device(
             available_points = [p for p in device.points.keys()]
             return {
                 "success": False,
-                "error": f"Point '{point}' not found on device '{device.name}'. Available points: {available_points}"
+                "error": f"Point '{point}' not found on device '{device.name}'. Available points: {available_points}",
             }
 
         if not device_point.writable:
-            return {
-                "success": False,
-                "error": f"Point '{point}' is read-only and cannot be controlled"
-            }
+            return {"success": False, "error": f"Point '{point}' is read-only and cannot be controlled"}
 
         # Get current value for response
         old_value = None
@@ -231,10 +207,7 @@ async def control_device(
         # Execute control with safety validation (uses user="ai-assistant")
         # The write_device_value method handles safety validation and audit logging
         success = await device_manager.write_device_value(
-            device_id=device_id,
-            point_name=point,
-            value=value,
-            user="ai-assistant"
+            device_id=device_id, point_name=point, value=value, user="ai-assistant"
         )
 
         if success:
@@ -247,13 +220,10 @@ async def control_device(
                 "new_value": value,
                 "unit": device_point.unit,
                 "message": f"Successfully set {point} to {value}{device_point.unit} on {device.name}",
-                "reason": reason
+                "reason": reason,
             }
         else:
-            return {
-                "success": False,
-                "error": "Failed to write value to device. The device may be unresponsive."
-            }
+            return {"success": False, "error": "Failed to write value to device. The device may be unresponsive."}
 
     except ValueError as e:
         # Safety validation failures come as ValueError
@@ -265,14 +235,11 @@ async def control_device(
             "error": error_msg,
             "device_id": device_id,
             "point": point,
-            "attempted_value": value
+            "attempted_value": value,
         }
     except Exception as e:
         logger.error(f"Error controlling device {device_id}.{point}={value}: {e}")
-        return {
-            "success": False,
-            "error": str(e)
-        }
+        return {"success": False, "error": str(e)}
 
 
 async def get_system_status(site_id: str | None = None) -> dict[str, Any]:
@@ -301,7 +268,7 @@ async def get_system_status(site_id: str | None = None) -> dict[str, Any]:
                 return {
                     "success": False,
                     "error": f"Site '{site_id}' not found in the system",
-                    "available_sites": "Use get_equipment_health without site_id to see all sites"
+                    "available_sites": "Use get_equipment_health without site_id to see all sites",
                 }
 
         # Get equipment for site
@@ -319,9 +286,13 @@ async def get_system_status(site_id: str | None = None) -> dict[str, Any]:
         alerts = alerts_resp.data if alerts_resp.data else []
 
         # Get predictions for site
-        pred_query = client.table("predictions").select(
-            "id, equipment_id, prediction_type, probability_percent, status, equipment(code, name, building_id)"
-        ).eq("status", "active")
+        pred_query = (
+            client.table("predictions")
+            .select(
+                "id, equipment_id, prediction_type, probability_percent, status, equipment(code, name, building_id)"
+            )
+            .eq("status", "active")
+        )
         pred_resp = pred_query.execute()
         predictions = pred_resp.data if pred_resp.data else []
         if building_uuid:
@@ -338,7 +309,9 @@ async def get_system_status(site_id: str | None = None) -> dict[str, Any]:
 
         # Equipment health summary
         healthy_equipment = [e for e in equipment if (e.get("health_score") or 100) >= thresholds["healthy"]]
-        degraded_equipment = [e for e in equipment if thresholds["warning"] <= (e.get("health_score") or 100) < thresholds["healthy"]]
+        degraded_equipment = [
+            e for e in equipment if thresholds["warning"] <= (e.get("health_score") or 100) < thresholds["healthy"]
+        ]
         critical_equipment = [e for e in equipment if (e.get("health_score") or 100) < thresholds["warning"]]
 
         # High-priority predictions
@@ -367,54 +340,66 @@ async def get_system_status(site_id: str | None = None) -> dict[str, Any]:
 
         # Add critical issues
         for alert in critical_alerts[:5]:
-            status["critical_issues"].append({
-                "type": "alert",
-                "id": alert["id"],
-                "severity": "critical",
-                "title": alert.get("type", "Alert"),
-                "message": alert.get("message"),
-                "equipment_id": alert.get("equipment_id"),
-            })
+            status["critical_issues"].append(
+                {
+                    "type": "alert",
+                    "id": alert["id"],
+                    "severity": "critical",
+                    "title": alert.get("type", "Alert"),
+                    "message": alert.get("message"),
+                    "equipment_id": alert.get("equipment_id"),
+                }
+            )
 
         for eq in critical_equipment[:5]:
-            status["critical_issues"].append({
-                "type": "equipment_health",
-                "id": eq.get("code") or eq["id"],
-                "name": eq["name"],
-                "health_score": eq.get("health_score", 0),
-                "status": eq.get("status"),
-                "last_service": eq.get("last_service"),
-            })
+            status["critical_issues"].append(
+                {
+                    "type": "equipment_health",
+                    "id": eq.get("code") or eq["id"],
+                    "name": eq["name"],
+                    "health_score": eq.get("health_score", 0),
+                    "status": eq.get("status"),
+                    "last_service": eq.get("last_service"),
+                }
+            )
 
         # Add proactive recommendations based on system state
         if len(critical_alerts) > 0:
-            status["recommendations"].append({
-                "priority": "high",
-                "action": "Address critical alerts immediately",
-                "details": f"{len(critical_alerts)} critical alerts require immediate attention",
-            })
+            status["recommendations"].append(
+                {
+                    "priority": "high",
+                    "action": "Address critical alerts immediately",
+                    "details": f"{len(critical_alerts)} critical alerts require immediate attention",
+                }
+            )
 
         if len(critical_equipment) > 0:
-            status["recommendations"].append({
-                "priority": "high",
-                "action": "Schedule maintenance for critical equipment",
-                "details": f"{len(critical_equipment)} equipment items below {thresholds['warning']}% health",
-            })
+            status["recommendations"].append(
+                {
+                    "priority": "high",
+                    "action": "Schedule maintenance for critical equipment",
+                    "details": f"{len(critical_equipment)} equipment items below {thresholds['warning']}% health",
+                }
+            )
 
         if len(degraded_equipment) > 0:
-            status["recommendations"].append({
-                "priority": "medium",
-                "action": "Plan preventive maintenance",
-                "details": f"{len(degraded_equipment)} equipment items showing degradation",
-            })
+            status["recommendations"].append(
+                {
+                    "priority": "medium",
+                    "action": "Plan preventive maintenance",
+                    "details": f"{len(degraded_equipment)} equipment items showing degradation",
+                }
+            )
 
         for pred in urgent_predictions[:3]:
             eq_info = pred.get("equipment", {}) or {}
-            status["recommendations"].append({
-                "priority": "medium",
-                "action": f"Preventive maintenance: {eq_info.get('name', 'Unknown')}",
-                "details": f"{pred.get('probability_percent', 0)}% failure probability predicted",
-            })
+            status["recommendations"].append(
+                {
+                    "priority": "medium",
+                    "action": f"Preventive maintenance: {eq_info.get('name', 'Unknown')}",
+                    "details": f"{pred.get('probability_percent', 0)}% failure probability predicted",
+                }
+            )
 
         return status
 
@@ -449,7 +434,7 @@ async def get_optimization_recommendations(site_id: str) -> dict[str, Any]:
             "projected_savings": recommendation.projected_savings,
             "confidence": recommendation.confidence,
             "reasoning": recommendation.reasoning,
-            "note": "These are AI-generated recommendations. Use control_device to apply them after review."
+            "note": "These are AI-generated recommendations. Use control_device to apply them after review.",
         }
     except ValueError as e:
         return {"success": False, "error": str(e)}
@@ -459,9 +444,7 @@ async def get_optimization_recommendations(site_id: str) -> dict[str, Any]:
 
 
 async def get_equipment_health(
-    site_id: str | None = None,
-    equipment_id: str | None = None,
-    status_filter: str | None = None
+    site_id: str | None = None, equipment_id: str | None = None, status_filter: str | None = None
 ) -> dict[str, Any]:
     """
     Get equipment health status and maintenance information from Supabase.
@@ -492,12 +475,7 @@ async def get_equipment_health(
                 building_uuid = building_resp.data[0]["id"]
                 query = query.eq("building_id", building_uuid)
             else:
-                return {
-                    "success": False,
-                    "error": f"Site '{site_id}' not found",
-                    "count": 0,
-                    "equipment": []
-                }
+                return {"success": False, "error": f"Site '{site_id}' not found", "count": 0, "equipment": []}
 
         # Filter by equipment ID if provided
         if equipment_id:
@@ -517,9 +495,9 @@ async def get_equipment_health(
         equipment_data = equipment_resp.data if equipment_resp.data else []
 
         # Get predictions from Supabase
-        pred_query = client.table("predictions").select(
-            "equipment_id, probability_percent, status"
-        ).eq("status", "active")
+        pred_query = (
+            client.table("predictions").select("equipment_id, probability_percent, status").eq("status", "active")
+        )
         pred_resp = pred_query.execute()
         predictions = pred_resp.data if pred_resp.data else []
 
@@ -693,7 +671,9 @@ async def get_equipment_health(
         # Get building info for site summary
         building_info = {}
         if site_id:
-            building_resp = client.table("buildings").select("name, code, floors, sqm, address").eq("code", site_id).execute()
+            building_resp = (
+                client.table("buildings").select("name, code, floors, sqm, address").eq("code", site_id).execute()
+            )
             if building_resp.data:
                 b = building_resp.data[0]
                 building_info = {
@@ -707,8 +687,11 @@ async def get_equipment_health(
         # Calculate summaries for different sensor/equipment types
 
         # Temperature sensors
-        temp_readings = [e.get("current_reading") for e in equipment_list
-            if e.get("current_reading") is not None and "temperature" in e.get("name", "").lower()]
+        temp_readings = [
+            e.get("current_reading")
+            for e in equipment_list
+            if e.get("current_reading") is not None and "temperature" in e.get("name", "").lower()
+        ]
         temp_summary = {}
         if temp_readings:
             temp_summary = {
@@ -716,12 +699,15 @@ async def get_equipment_health(
                 "min": min(temp_readings),
                 "max": max(temp_readings),
                 "sensor_count": len(temp_readings),
-                "unit": "°C"
+                "unit": "°C",
             }
 
         # CO2 sensors
-        co2_readings = [e.get("current_reading") for e in equipment_list
-            if e.get("current_reading") is not None and "co2" in e.get("name", "").lower()]
+        co2_readings = [
+            e.get("current_reading")
+            for e in equipment_list
+            if e.get("current_reading") is not None and "co2" in e.get("name", "").lower()
+        ]
         co2_summary = {}
         if co2_readings:
             co2_summary = {
@@ -729,7 +715,7 @@ async def get_equipment_health(
                 "min": min(co2_readings),
                 "max": max(co2_readings),
                 "sensor_count": len(co2_readings),
-                "unit": "ppm"
+                "unit": "ppm",
             }
 
         # Occupancy
@@ -742,7 +728,7 @@ async def get_equipment_health(
                 "zones_occupied": occupied_count,
                 "zones_vacant": len(occ_sensors) - occupied_count,
                 "total_occupants": total_occupants,
-                "occupancy_rate_percent": round(occupied_count / len(occ_sensors) * 100)
+                "occupancy_rate_percent": round(occupied_count / len(occ_sensors) * 100),
             }
 
         # Lighting
@@ -751,12 +737,14 @@ async def get_equipment_health(
         if light_groups:
             lights_on = [e for e in light_groups if e.get("is_on")]
             total_power = sum(e.get("power_watts", 0) for e in lights_on)
-            avg_brightness = round(sum(e.get("brightness_percent", 0) for e in lights_on) / len(lights_on)) if lights_on else 0
+            avg_brightness = (
+                round(sum(e.get("brightness_percent", 0) for e in lights_on) / len(lights_on)) if lights_on else 0
+            )
             lighting_summary = {
                 "zones_on": len(lights_on),
                 "zones_off": len(light_groups) - len(lights_on),
                 "average_brightness_percent": avg_brightness,
-                "total_power_watts": total_power
+                "total_power_watts": total_power,
             }
 
         # Daylight sensors
@@ -767,7 +755,7 @@ async def get_equipment_health(
                 "average_lux": round(sum(lux_readings) / len(lux_readings)),
                 "min_lux": min(lux_readings),
                 "max_lux": max(lux_readings),
-                "sensor_count": len(lux_readings)
+                "sensor_count": len(lux_readings),
             }
 
         # HVAC (chillers)
@@ -778,7 +766,7 @@ async def get_equipment_health(
                 "count": len(chillers),
                 "avg_load_percent": round(sum(e.get("load_percent", 0) for e in chillers) / len(chillers)),
                 "total_power_kw": sum(e.get("power_kw", 0) for e in chillers),
-                "avg_chw_supply_temp": round(sum(e.get("chw_supply_temp", 0) for e in chillers) / len(chillers), 1)
+                "avg_chw_supply_temp": round(sum(e.get("chw_supply_temp", 0) for e in chillers) / len(chillers), 1),
             }
 
         # Energy (power meters)
@@ -788,7 +776,7 @@ async def get_equipment_health(
             energy_summary = {
                 "total_kw": round(sum(e.get("kw", 0) for e in meters), 1),
                 "total_kwh_today": sum(e.get("kwh_today", 0) for e in meters),
-                "avg_power_factor": round(sum(e.get("power_factor", 0) for e in meters) / len(meters), 2)
+                "avg_power_factor": round(sum(e.get("power_factor", 0) for e in meters) / len(meters), 2),
             }
 
         # Generators (DSE8610)
@@ -801,17 +789,21 @@ async def get_equipment_health(
                 "count": len(generators),
                 "status": "all_standby" if not running_gens else f"{len(running_gens)}_running",
                 "running_count": len(running_gens),
-                "avg_fuel_level_percent": round(sum(e.get("fuel_level_percent", 0) for e in generators) / len(generators)),
+                "avg_fuel_level_percent": round(
+                    sum(e.get("fuel_level_percent", 0) for e in generators) / len(generators)
+                ),
                 "total_kwh": sum(e.get("kwh_total", 0) for e in generators),
                 "total_runtime_hours": sum(e.get("runtime_hours", 0) for e in generators),
                 "mains_healthy": all(e.get("mains_healthy", True) for e in generators),
                 "load_transfer_status": generators[0].get("load_transfer_status") if generators else None,
                 "alarms_active": len(alarm_gens),
-                "comms_online": len([g for g in generators if g.get("comms_status") == "online"])
+                "comms_online": len([g for g in generators if g.get("comms_status") == "online"]),
             }
             if running_gens:
                 generator_summary["total_output_kw"] = sum(g.get("output_kw", 0) for g in running_gens)
-                generator_summary["avg_frequency_hz"] = round(sum(g.get("frequency_hz", 0) for g in running_gens) / len(running_gens), 1)
+                generator_summary["avg_frequency_hz"] = round(
+                    sum(g.get("frequency_hz", 0) for g in running_gens) / len(running_gens), 1
+                )
 
         # BMS/SCADA (Desigo CC)
         bms_systems = [e for e in equipment_list if e.get("total_data_points") is not None]
@@ -835,7 +827,7 @@ async def get_equipment_health(
                 "active_users": bms.get("active_users"),
                 "uptime_days": bms.get("uptime_days"),
                 "controllers": len(bms_controllers),
-                "total_controller_points": sum(c.get("points_configured", 0) for c in bms_controllers)
+                "total_controller_points": sum(c.get("points_configured", 0) for c in bms_controllers),
             }
 
         return {
@@ -846,7 +838,9 @@ async def get_equipment_health(
             "equipment": equipment_list,
             "health_summary": {
                 "critical_count": len([e for e in equipment_list if e["health_score"] < thresholds["critical"]]),
-                "warning_count": len([e for e in equipment_list if thresholds["critical"] <= e["health_score"] < thresholds["healthy"]]),
+                "warning_count": len(
+                    [e for e in equipment_list if thresholds["critical"] <= e["health_score"] < thresholds["healthy"]]
+                ),
                 "healthy_count": len([e for e in equipment_list if e["health_score"] >= thresholds["healthy"]]),
                 "maintenance_due_count": len([e for e in equipment_list if e.get("maintenance_due")]),
             },
@@ -859,8 +853,8 @@ async def get_equipment_health(
                 "chillers": chiller_summary,
                 "energy": energy_summary,
                 "generators": generator_summary,
-                "bms_scada": bms_summary
-            }
+                "bms_scada": bms_summary,
+            },
         }
     except Exception as e:
         logger.error(f"Error getting equipment health: {e}")
@@ -868,9 +862,7 @@ async def get_equipment_health(
 
 
 async def get_alerts_and_anomalies(
-    site_id: str | None = None,
-    severity: str | None = None,
-    include_resolved: bool = False
+    site_id: str | None = None, severity: str | None = None, include_resolved: bool = False
 ) -> dict[str, Any]:
     """
     Get active alerts and detected anomalies from Supabase.
@@ -910,17 +902,20 @@ async def get_alerts_and_anomalies(
         alerts_data = alerts_resp.data if alerts_resp.data else []
 
         # Build predictions query (as anomalies)
-        pred_query = client.table("predictions").select(
-            "id, equipment_id, prediction_type, probability_percent, contributing_factors, "
-            "recommended_action, status, created_at, equipment(code, name, building_id)"
-        ).eq("status", "active")
+        pred_query = (
+            client.table("predictions")
+            .select(
+                "id, equipment_id, prediction_type, probability_percent, contributing_factors, "
+                "recommended_action, status, created_at, equipment(code, name, building_id)"
+            )
+            .eq("status", "active")
+        )
 
         if building_uuid:
             # Filter by equipment's building
             pred_resp = pred_query.execute()
             predictions_data = [
-                p for p in (pred_resp.data or [])
-                if p.get("equipment", {}).get("building_id") == building_uuid
+                p for p in (pred_resp.data or []) if p.get("equipment", {}).get("building_id") == building_uuid
             ]
         else:
             pred_resp = pred_query.limit(10).execute()
@@ -931,34 +926,42 @@ async def get_alerts_and_anomalies(
         for alert in alerts_data:
             building_info = alert.get("buildings", {}) or {}
             equipment_info = alert.get("equipment", {}) or {}
-            formatted_alerts.append({
-                "id": alert["id"],
-                "severity": alert.get("severity"),
-                "title": alert.get("type", "Alert"),
-                "description": alert.get("message"),
-                "site_id": building_info.get("code"),
-                "site_name": building_info.get("name"),
-                "equipment_id": equipment_info.get("code"),
-                "equipment_name": equipment_info.get("name"),
-                "status": alert.get("status"),
-                "created_at": alert.get("created_at"),
-            })
+            formatted_alerts.append(
+                {
+                    "id": alert["id"],
+                    "severity": alert.get("severity"),
+                    "title": alert.get("type", "Alert"),
+                    "description": alert.get("message"),
+                    "site_id": building_info.get("code"),
+                    "site_name": building_info.get("name"),
+                    "equipment_id": equipment_info.get("code"),
+                    "equipment_name": equipment_info.get("name"),
+                    "status": alert.get("status"),
+                    "created_at": alert.get("created_at"),
+                }
+            )
 
         # Format predictions as anomalies
         formatted_anomalies = []
         for pred in predictions_data[:10]:
             equipment_info = pred.get("equipment", {}) or {}
-            formatted_anomalies.append({
-                "id": pred["id"],
-                "type": pred.get("prediction_type"),
-                "urgency": "critical" if pred.get("probability_percent", 0) > 80 else "high" if pred.get("probability_percent", 0) > 60 else "medium",
-                "equipment_id": equipment_info.get("code"),
-                "equipment_name": equipment_info.get("name"),
-                "predicted_failure": pred.get("prediction_type"),
-                "probability_percent": pred.get("probability_percent"),
-                "contributing_factors": pred.get("contributing_factors"),
-                "recommended_action": pred.get("recommended_action"),
-            })
+            formatted_anomalies.append(
+                {
+                    "id": pred["id"],
+                    "type": pred.get("prediction_type"),
+                    "urgency": "critical"
+                    if pred.get("probability_percent", 0) > 80
+                    else "high"
+                    if pred.get("probability_percent", 0) > 60
+                    else "medium",
+                    "equipment_id": equipment_info.get("code"),
+                    "equipment_name": equipment_info.get("name"),
+                    "predicted_failure": pred.get("prediction_type"),
+                    "probability_percent": pred.get("probability_percent"),
+                    "contributing_factors": pred.get("contributing_factors"),
+                    "recommended_action": pred.get("recommended_action"),
+                }
+            )
 
         return {
             "success": True,
@@ -976,7 +979,7 @@ async def get_alerts_and_anomalies(
                 "critical_alerts": len([a for a in formatted_alerts if a.get("severity") == "critical"]),
                 "warning_alerts": len([a for a in formatted_alerts if a.get("severity") == "warning"]),
                 "high_risk_predictions": len([a for a in formatted_anomalies if a.get("probability_percent", 0) > 70]),
-            }
+            },
         }
     except Exception as e:
         logger.error(f"Error getting alerts and anomalies: {e}")
@@ -1011,17 +1014,14 @@ async def get_energy_analysis(site_id: str) -> dict[str, Any]:
                 for point_name in device.points:
                     try:
                         value = await adapter.read_value(point_name)
-                        device_readings[point_name] = {
-                            "value": value.value,
-                            "unit": value.unit
-                        }
+                        device_readings[point_name] = {"value": value.value, "unit": value.unit}
                     except Exception:
                         pass
                 if device_readings:
                     readings[device.id] = {
                         "device_name": device.name,
                         "type": device.device_type.value,
-                        "readings": device_readings
+                        "readings": device_readings,
                     }
 
         # Generate energy insights based on readings
@@ -1036,21 +1036,31 @@ async def get_energy_analysis(site_id: str) -> dict[str, Any]:
                 if "supply_temp" in r and "return_temp" in r:
                     diff = r["return_temp"]["value"] - r["supply_temp"]["value"]
                     if diff < 4:
-                        insights.append(f"{data['device_name']}: Low temperature differential ({diff:.1f}°C) indicates reduced cooling efficiency")
+                        insights.append(
+                            f"{data['device_name']}: Low temperature differential"
+                            f" ({diff:.1f}°C) indicates reduced cooling efficiency"
+                        )
                         suggestions.append(f"Check {data['device_name']} for coil fouling or low refrigerant")
 
                 # Check setpoints
                 if "setpoint" in r:
                     setpoint = r["setpoint"]["value"]
                     if setpoint < 22:
-                        suggestions.append(f"Consider raising {data['device_name']} setpoint from {setpoint}°C to 23°C for energy savings")
+                        suggestions.append(
+                            f"Consider raising {data['device_name']} setpoint"
+                            f" from {setpoint}°C to 23°C for energy savings"
+                        )
 
         # Check lighting usage
         for device_id, data in readings.items():
             if data["type"] == "lighting":
                 r = data["readings"]
                 if "brightness" in r and r["brightness"]["value"] > 80:
-                    suggestions.append(f"Consider reducing {data['device_name']} brightness from {r['brightness']['value']}% during off-peak hours")
+                    suggestions.append(
+                        f"Consider reducing {data['device_name']} brightness"
+                        f" from {r['brightness']['value']}%"
+                        " during off-peak hours"
+                    )
 
         return {
             "success": True,
@@ -1059,18 +1069,17 @@ async def get_energy_analysis(site_id: str) -> dict[str, Any]:
             "timestamp": datetime.now().isoformat(),
             "current_readings": readings,
             "insights": insights if insights else ["System operating within normal parameters"],
-            "efficiency_suggestions": suggestions if suggestions else ["No immediate efficiency improvements identified"],
-            "tip": "Use get_optimization_recommendations for AI-powered setpoint optimization"
+            "efficiency_suggestions": suggestions
+            if suggestions
+            else ["No immediate efficiency improvements identified"],
+            "tip": "Use get_optimization_recommendations for AI-powered setpoint optimization",
         }
     except Exception as e:
         logger.error(f"Error getting energy analysis: {e}")
         return {"success": False, "error": str(e)}
 
 
-async def get_floor_temperatures(
-    floor: str | None = None,
-    site_id: str | None = None
-) -> dict:
+async def get_floor_temperatures(floor: str | None = None, site_id: str | None = None) -> dict:
     """Get zone temperatures filtered by floor. Called when user asks about floor temps.
 
     Args:
@@ -1132,56 +1141,64 @@ async def lookup_desk(desk_id: str, building: str | None = None) -> dict[str, An
             return {
                 "success": False,
                 "error": "Desk data not available",
-                "prompt_user": "I don't have desk mapping data loaded. Which building and zone is the user in?"
+                "prompt_user": "I don't have desk mapping data loaded. Which building and zone is the user in?",
             }
 
         # Normalize desk ID - extract number from various formats
         import re
-        desk_num = re.sub(r'[^0-9]', '', str(desk_id))
+
+        desk_num = re.sub(r"[^0-9]", "", str(desk_id))
         if not desk_num:
             return {
                 "success": False,
                 "error": f"Invalid desk ID format: {desk_id}",
-                "prompt_user": f"I couldn't parse desk ID '{desk_id}'. Can you provide just the desk number (e.g., 201, 25)?"
+                "prompt_user": (
+                    f"I couldn't parse desk ID '{desk_id}'. Can you provide just the desk number (e.g., 201, 25)?"
+                ),
             }
 
         # Find desk - try exact match first, then partial
         desk = None
         for d in desks:
-            d_num = re.sub(r'[^0-9]', '', str(d.get('desk_id', '')))
+            d_num = re.sub(r"[^0-9]", "", str(d.get("desk_id", "")))
             if d_num == desk_num:
                 desk = d
                 break
 
         if not desk:
             # Desk not found - prompt for more info
-            available_desks = [d.get('desk_id') for d in desks[:10]]
+            available_desks = [d.get("desk_id") for d in desks[:10]]
             return {
                 "success": False,
                 "error": f"Desk {desk_id} not found in mapping",
-                "prompt_user": f"I don't have desk {desk_id} in my database. Can you confirm the desk number? Available desks include: {', '.join(available_desks)}...",
-                "available_sample": available_desks
+                "prompt_user": (
+                    f"I don't have desk {desk_id} in my database."
+                    " Can you confirm the desk number?"
+                    f" Available desks include: {', '.join(available_desks)}..."
+                ),
+                "available_sample": available_desks,
             }
 
         # Get zone info
-        zone_id = desk.get('zone_id')
-        zone = next((z for z in zones if z.get('zone_id') == zone_id), None)
+        zone_id = desk.get("zone_id")
+        zone = next((z for z in zones if z.get("zone_id") == zone_id), None)
 
         # Get DALI/occupancy context for Sandton
         dali_context = {}
         try:
             from app.services.cross_system_analyzer import get_cross_system_analyzer
+
             analyzer = get_cross_system_analyzer()
 
             # Get zone occupancy from DALI sensors
             if zone_id:
                 zone_analysis = analyzer.dali.get_zone_analysis(zone_id)
                 dali_context = {
-                    "occupancy_percent": zone_analysis.get('occupancy_percent', 0),
-                    "avg_lux": zone_analysis.get('average_lux', 0),
-                    "sensors_active": zone_analysis.get('occupied_count', 0),
-                    "total_sensors": zone_analysis.get('total_sensors', 0),
-                    "high_daylight": zone_analysis.get('average_lux', 0) > 800,
+                    "occupancy_percent": zone_analysis.get("occupancy_percent", 0),
+                    "avg_lux": zone_analysis.get("average_lux", 0),
+                    "sensors_active": zone_analysis.get("occupied_count", 0),
+                    "total_sensors": zone_analysis.get("total_sensors", 0),
+                    "high_daylight": zone_analysis.get("average_lux", 0) > 800,
                 }
         except Exception as e:
             logger.warning(f"Could not get DALI context: {e}")
@@ -1191,44 +1208,44 @@ async def lookup_desk(desk_id: str, building: str | None = None) -> dict[str, An
         response = {
             "success": True,
             "desk": {
-                "desk_id": desk.get('desk_id'),
-                "floor": desk.get('floor'),
-                "building": desk.get('building', 'Sandton'),
+                "desk_id": desk.get("desk_id"),
+                "floor": desk.get("floor"),
+                "building": desk.get("building", "Sandton"),
                 "zone_id": zone_id,
-                "near_window": desk.get('near_window', False),
-                "near_diffuser": desk.get('near_diffuser', False),
-                "near_printer": desk.get('near_printer', False),
+                "near_window": desk.get("near_window", False),
+                "near_diffuser": desk.get("near_diffuser", False),
+                "near_printer": desk.get("near_printer", False),
             },
             "zone": None,
             "hvac": None,
             "dali": dali_context,
-            "context_flags": []
+            "context_flags": [],
         }
 
         # Add context flags for diagnosis
-        if desk.get('near_window'):
+        if desk.get("near_window"):
             response["context_flags"].append("NEAR_WINDOW - Check for solar heat gain")
-        if desk.get('near_diffuser'):
+        if desk.get("near_diffuser"):
             response["context_flags"].append("NEAR_DIFFUSER - May experience direct airflow")
-        if desk.get('near_printer'):
+        if desk.get("near_printer"):
             response["context_flags"].append("NEAR_PRINTER - Local heat source")
-        if dali_context.get('high_daylight'):
+        if dali_context.get("high_daylight"):
             response["context_flags"].append("HIGH_DAYLIGHT - Solar gain likely")
 
         # Add zone info if available
         if zone:
             response["zone"] = {
-                "zone_id": zone.get('zone_id'),
-                "zone_name": zone.get('zone_name'),
-                "floor": zone.get('floor'),
-                "setpoint": zone.get('setpoint'),
-                "current_temp": zone.get('current_temp'),
-                "status": zone.get('status'),
+                "zone_id": zone.get("zone_id"),
+                "zone_name": zone.get("zone_name"),
+                "floor": zone.get("floor"),
+                "setpoint": zone.get("setpoint"),
+                "current_temp": zone.get("current_temp"),
+                "status": zone.get("status"),
             }
             response["hvac"] = {
-                "fcu_id": zone.get('fcu_id'),
-                "vav_id": zone.get('vav_id'),
-                "sensors": zone.get('sensors', []),
+                "fcu_id": zone.get("fcu_id"),
+                "vav_id": zone.get("vav_id"),
+                "sensors": zone.get("sensors", []),
             }
 
         return response
@@ -1238,15 +1255,14 @@ async def lookup_desk(desk_id: str, building: str | None = None) -> dict[str, An
         return {
             "success": False,
             "error": str(e),
-            "prompt_user": "I encountered an error looking up that desk. Can you provide more details about the location?"
+            "prompt_user": (
+                "I encountered an error looking up that desk. Can you provide more details about the location?"
+            ),
         }
 
 
 async def diagnose_comfort_complaint(
-    desk_id: str,
-    complaint_type: str,
-    building: str | None = None,
-    additional_info: str | None = None
+    desk_id: str, complaint_type: str, building: str | None = None, additional_info: str | None = None
 ) -> dict[str, Any]:
     """
     Diagnose a comfort complaint for a specific desk.
@@ -1272,6 +1288,7 @@ async def diagnose_comfort_complaint(
 
         # Get current time for solar analysis
         from datetime import datetime
+
         current_hour = datetime.now().hour
         is_afternoon = 12 <= current_hour <= 18
 
@@ -1292,7 +1309,6 @@ async def diagnose_comfort_complaint(
             "dispatch_required": False,
         }
 
-        context_flags = desk_info.get("context_flags", [])
         zone = desk_info.get("zone", {}) or {}
         dali = desk_info.get("dali", {}) or {}
         desk = desk_info.get("desk", {}) or {}
@@ -1306,7 +1322,12 @@ async def diagnose_comfort_complaint(
             if desk.get("near_window") and is_afternoon:
                 diagnosis["root_cause"] = "Solar heat gain from window"
                 diagnosis["confidence"] = "high"
-                diagnosis["diagnosis"] = f"Desk {desk_id} is near a window and it's {current_hour}:00 (afternoon). Solar radiation is likely causing localized heating despite HVAC working correctly."
+                diagnosis["diagnosis"] = (
+                    f"Desk {desk_id} is near a window and it's"
+                    f" {current_hour}:00 (afternoon). Solar radiation"
+                    " is likely causing localized heating"
+                    " despite HVAC working correctly."
+                )
                 diagnosis["suggested_actions"] = [
                     "Close blinds/shades near the desk",
                     "Temporarily boost zone cooling by 2°C for 2 hours",
@@ -1315,7 +1336,12 @@ async def diagnose_comfort_complaint(
             elif dali.get("high_daylight"):
                 diagnosis["root_cause"] = "High daylight/solar gain detected by DALI sensors"
                 diagnosis["confidence"] = "high"
-                diagnosis["diagnosis"] = f"DALI sensors show {dali.get('avg_lux', 0)} lux at this location - significantly above normal. This indicates direct sunlight causing heat gain."
+                diagnosis["diagnosis"] = (
+                    f"DALI sensors show {dali.get('avg_lux', 0)} lux"
+                    " at this location - significantly above"
+                    " normal. This indicates direct sunlight"
+                    " causing heat gain."
+                )
                 diagnosis["suggested_actions"] = [
                     "Reduce lighting levels (daylight harvesting)",
                     "Close blinds to reduce solar load",
@@ -1324,7 +1350,11 @@ async def diagnose_comfort_complaint(
             elif temp_diff > 1.5:
                 diagnosis["root_cause"] = "Zone temperature above setpoint"
                 diagnosis["confidence"] = "high"
-                diagnosis["diagnosis"] = f"Zone is {temp_diff:.1f}°C above setpoint ({current_temp}°C vs {setpoint}°C target). HVAC may be undersized or equipment fault."
+                diagnosis["diagnosis"] = (
+                    f"Zone is {temp_diff:.1f}°C above setpoint"
+                    f" ({current_temp}°C vs {setpoint}°C target)."
+                    " HVAC may be undersized or equipment fault."
+                )
                 diagnosis["suggested_actions"] = [
                     f"Check FCU {zone.get('fcu_id', 'unknown')} for faults",
                     "Verify supply air temperature",
@@ -1334,7 +1364,11 @@ async def diagnose_comfort_complaint(
             elif desk.get("near_printer"):
                 diagnosis["root_cause"] = "Local heat source (printer/equipment)"
                 diagnosis["confidence"] = "medium"
-                diagnosis["diagnosis"] = f"Desk {desk_id} is near a printer or other heat-generating equipment. This creates a localized hot spot."
+                diagnosis["diagnosis"] = (
+                    f"Desk {desk_id} is near a printer or other"
+                    " heat-generating equipment. This creates"
+                    " a localized hot spot."
+                )
                 diagnosis["suggested_actions"] = [
                     "Relocate printer or add local extraction",
                     "Consider desk relocation",
@@ -1343,7 +1377,11 @@ async def diagnose_comfort_complaint(
             else:
                 diagnosis["root_cause"] = "Unknown - requires investigation"
                 diagnosis["confidence"] = "low"
-                diagnosis["diagnosis"] = f"No obvious cause found. Zone temp is {current_temp}°C (setpoint {setpoint}°C). May need on-site inspection."
+                diagnosis["diagnosis"] = (
+                    f"No obvious cause found. Zone temp is"
+                    f" {current_temp}°C (setpoint {setpoint}°C)."
+                    " May need on-site inspection."
+                )
                 diagnosis["suggested_actions"] = [
                     "Check for blocked diffusers near desk",
                     "Verify VAV damper position",
@@ -1355,7 +1393,11 @@ async def diagnose_comfort_complaint(
             if desk.get("near_diffuser"):
                 diagnosis["root_cause"] = "Direct airflow from supply diffuser"
                 diagnosis["confidence"] = "high"
-                diagnosis["diagnosis"] = f"Desk {desk_id} is directly under or near a supply diffuser. Cold supply air is causing discomfort."
+                diagnosis["diagnosis"] = (
+                    f"Desk {desk_id} is directly under or near a"
+                    " supply diffuser. Cold supply air is"
+                    " causing discomfort."
+                )
                 diagnosis["suggested_actions"] = [
                     f"Adjust VAV damper {zone.get('vav_id', 'unknown')} to reduce airflow",
                     "Install diffuser deflector",
@@ -1365,7 +1407,11 @@ async def diagnose_comfort_complaint(
             elif temp_diff < -1.5:
                 diagnosis["root_cause"] = "Zone overcooling"
                 diagnosis["confidence"] = "high"
-                diagnosis["diagnosis"] = f"Zone is {abs(temp_diff):.1f}°C below setpoint ({current_temp}°C vs {setpoint}°C). Possible control issue."
+                diagnosis["diagnosis"] = (
+                    f"Zone is {abs(temp_diff):.1f}°C below setpoint"
+                    f" ({current_temp}°C vs {setpoint}°C)."
+                    " Possible control issue."
+                )
                 diagnosis["suggested_actions"] = [
                     "Raise zone setpoint by 1-2°C",
                     "Check cooling valve position",
@@ -1374,7 +1420,11 @@ async def diagnose_comfort_complaint(
             else:
                 diagnosis["root_cause"] = "Personal comfort preference"
                 diagnosis["confidence"] = "medium"
-                diagnosis["diagnosis"] = f"Zone temperature ({current_temp}°C) is close to setpoint ({setpoint}°C). May be personal preference."
+                diagnosis["diagnosis"] = (
+                    f"Zone temperature ({current_temp}°C) is close"
+                    f" to setpoint ({setpoint}°C)."
+                    " May be personal preference."
+                )
                 diagnosis["suggested_actions"] = [
                     "Offer desk heater (temporary)",
                     "Check for drafts from windows/doors",
@@ -1385,7 +1435,12 @@ async def diagnose_comfort_complaint(
             if dali.get("occupancy_percent", 0) > 70:
                 diagnosis["root_cause"] = "High occupancy causing CO2 buildup"
                 diagnosis["confidence"] = "high"
-                diagnosis["diagnosis"] = f"Zone occupancy is {dali.get('occupancy_percent', 0):.0f}% - high density is likely causing poor air quality."
+                diagnosis["diagnosis"] = (
+                    f"Zone occupancy is"
+                    f" {dali.get('occupancy_percent', 0):.0f}%"
+                    " - high density is likely causing"
+                    " poor air quality."
+                )
                 diagnosis["suggested_actions"] = [
                     "Increase fresh air damper on AHU",
                     "Check CO2 sensor readings",
@@ -1394,7 +1449,9 @@ async def diagnose_comfort_complaint(
             else:
                 diagnosis["root_cause"] = "Insufficient ventilation"
                 diagnosis["confidence"] = "medium"
-                diagnosis["diagnosis"] = "Air quality complaint despite normal occupancy. May be ventilation equipment issue."
+                diagnosis[
+                    "diagnosis"
+                ] = "Air quality complaint despite normal occupancy. May be ventilation equipment issue."
                 diagnosis["suggested_actions"] = [
                     f"Check FCU {zone.get('fcu_id', 'unknown')} fan status",
                     "Verify fresh air damper position",
@@ -1405,7 +1462,9 @@ async def diagnose_comfort_complaint(
         elif complaint_type in ["drafty", "draft", "windy"]:
             diagnosis["root_cause"] = "Excessive airflow or infiltration"
             diagnosis["confidence"] = "medium"
-            diagnosis["diagnosis"] = f"Draft complaint at desk {desk_id}. Could be supply diffuser, window seals, or door proximity."
+            diagnosis[
+                "diagnosis"
+            ] = f"Draft complaint at desk {desk_id}. Could be supply diffuser, window seals, or door proximity."
             diagnosis["suggested_actions"] = [
                 "Check nearby diffuser airflow direction",
                 "Inspect window seals for gaps",
@@ -1422,13 +1481,14 @@ async def diagnose_comfort_complaint(
         return {
             "success": False,
             "error": str(e),
-            "prompt_user": "I encountered an error during diagnosis. Can you provide more details about the complaint?"
+            "prompt_user": "I encountered an error during diagnosis. Can you provide more details about the complaint?",
         }
 
 
 # ---------------------------------------------------------------------------
 # Niagara point discovery chat tools (Phase 60-03)
 # ---------------------------------------------------------------------------
+
 
 async def discover_niagara_points(
     device_ip: str,
@@ -1471,9 +1531,7 @@ async def discover_niagara_points(
 
         # Auto-generate mappings
         classified_points = classifier.classify_points(result.raw_points)
-        mappings = mapping_service.map_points_to_equipment(
-            classified_points, site_id
-        )
+        mappings = mapping_service.map_points_to_equipment(classified_points, site_id)
         mapping_service.save_mappings(result.discovery_id, mappings, site_id)
 
         # Build summary
@@ -1546,9 +1604,7 @@ async def review_point_mapping(
         for eid, mapping in mappings.items():
             if eid == "UNASSIGNED":
                 for p in mapping.points:
-                    low_confidence_items.append(
-                        f"  - {p.get('original_name', 'unknown')}: unclassified"
-                    )
+                    low_confidence_items.append(f"  - {p.get('original_name', 'unknown')}: unclassified")
                 continue
 
             point_count = len(mapping.points)
@@ -1715,7 +1771,7 @@ SENTINEL calculates equipment health using a **weighted multi-factor model**:
 | **Operational Performance** | 35% | Real-time sensor readings vs design specs, efficiency ratios, runtime hours |
 | **Maintenance History** | 25% | Work order frequency, repeat failures, parts replacement cycles |
 | **Asset Age & Lifecycle** | 20% | Installation date vs expected lifespan, manufacturer degradation curves |
-| **Anomaly Indicators** | 20% | Vibration analysis, temperature trends, pressure deviations, power consumption patterns |
+| **Anomaly Indicators** | 20% | Vibration, temperature trends, pressure deviations, power patterns |
 
 **Health Score Thresholds:**
 - **80-100%**: Healthy - Normal operation, no action needed
@@ -1726,7 +1782,7 @@ SENTINEL calculates equipment health using a **weighted multi-factor model**:
 
 SENTINEL uses **machine learning models** trained on historical failure data:
 
-1. **Pattern Recognition**: Analyzes sensor trends (temperature, vibration, pressure) against known pre-failure signatures
+1. **Pattern Recognition**: Analyzes sensor trends (temperature, vibration, pressure) against pre-failure signatures
 2. **Historical Correlation**: Compares current equipment behavior to similar assets that have failed
 3. **Contributing Factors**: Weights multiple indicators:
    - Repeat work orders (same issue recurring)
@@ -1785,7 +1841,12 @@ async def get_system_methodology(password: str, topic: str | None = None) -> dic
         return {
             "success": False,
             "access_denied": True,
-            "message": "Access denied. Incorrect password. Please contact your system administrator for access to proprietary methodology documentation."
+            "message": (
+                "Access denied. Incorrect password."
+                " Please contact your system administrator"
+                " for access to proprietary methodology"
+                " documentation."
+            ),
         }
 
     logger.info(f"Methodology access granted for topic: {topic or 'all'}")
@@ -1797,23 +1858,18 @@ async def get_system_methodology(password: str, topic: str | None = None) -> dic
 
         for section in sections:
             if topic_lower in section.lower():
-                return {
-                    "success": True,
-                    "topic": topic,
-                    "documentation": "### " + section.strip()
-                }
+                return {"success": True, "topic": topic, "documentation": "### " + section.strip()}
 
         return {
             "success": True,
             "topic": topic,
-            "documentation": f"Topic '{topic}' not found. Available topics: health_score, predictions, optimization, safety",
-            "full_documentation": SYSTEM_METHODOLOGY
+            "documentation": (
+                f"Topic '{topic}' not found. Available topics: health_score, predictions, optimization, safety"
+            ),
+            "full_documentation": SYSTEM_METHODOLOGY,
         }
 
-    return {
-        "success": True,
-        "documentation": SYSTEM_METHODOLOGY
-    }
+    return {"success": True, "documentation": SYSTEM_METHODOLOGY}
 
 
 async def get_fire_system_status() -> dict[str, Any]:
@@ -1826,6 +1882,7 @@ async def get_fire_system_status() -> dict[str, Any]:
     """
     try:
         from app.services.fire_system_service import get_fire_system_service
+
         svc = get_fire_system_service()
 
         status = svc.get_system_status()
@@ -1838,35 +1895,64 @@ async def get_fire_system_status() -> dict[str, Any]:
         sections = []
 
         # Panel status
-        sections.append(f"## Fire Alarm Panel\n- Status: {status.panel_status.value.upper()}\n- Battery: {status.battery_voltage}V\n- Last Test: {status.last_test_date or 'Unknown'}")
+        panel_st = status.panel_status.value.upper()
+        last_test = status.last_test_date or "Unknown"
+        sections.append(
+            f"## Fire Alarm Panel\n- Status: {panel_st}\n- Battery: {status.battery_voltage}V\n- Last Test: {last_test}"
+        )
 
         # Active alarms
         if status.active_alarms:
             alarm_lines = []
             for a in status.active_alarms:
-                alarm_lines.append(f"  - [{a.severity.value.upper()}] {a.alarm_type.value}: {a.description} (Zone: {a.zone_id})")
-            sections.append(f"## Active Alarms ({len(status.active_alarms)})\n" + "\n".join(alarm_lines))
+                alarm_lines.append(
+                    f"  - [{a.severity.value.upper()}] {a.alarm_type.value}: {a.description} (Zone: {a.zone_id})"
+                )
+            alarm_count = len(status.active_alarms)
+            alarm_text = "\n".join(alarm_lines)
+            sections.append(f"## Active Alarms ({alarm_count})\n" + alarm_text)
         else:
             sections.append("## Active Alarms\nNone - all zones normal")
 
         # Zones summary
         zones_with_alarms = sum(1 for z in zones if any(a.zone_id == z.zone_id for a in status.active_alarms))
-        total_detectors = sum(z.smoke_detectors + z.heat_detectors + z.beam_detectors + z.manual_call_points for z in zones)
-        sections.append(f"## Zones\n- Total: {len(zones)} zones across 3 floors\n- With active alarms: {zones_with_alarms}\n- Total detectors: {total_detectors}")
+        total_detectors = sum(
+            z.smoke_detectors + z.heat_detectors + z.beam_detectors + z.manual_call_points for z in zones
+        )
+        sections.append(
+            f"## Zones\n- Total: {len(zones)} zones"
+            " across 3 floors"
+            f"\n- With active alarms: {zones_with_alarms}"
+            f"\n- Total detectors: {total_detectors}"
+        )
 
         # Dampers
         fault_dampers = [d for d in dampers if d.status.value == "fault"]
         if fault_dampers:
-            damper_lines = [f"  - {d.damper_id}: STUCK at {d.position}% (target {d.target_position}%)" for d in fault_dampers]
-            sections.append(f"## Smoke Dampers\n- Total: {len(dampers)}\n- Faults: {len(fault_dampers)}\n" + "\n".join(damper_lines))
+            damper_lines = [
+                f"  - {d.damper_id}: STUCK at {d.position}% (target {d.target_position}%)" for d in fault_dampers
+            ]
+            damper_text = "\n".join(damper_lines)
+            sections.append(
+                f"## Smoke Dampers\n- Total: {len(dampers)}\n- Faults: {len(fault_dampers)}\n" + damper_text
+            )
         else:
             sections.append(f"## Smoke Dampers\n- Total: {len(dampers)}\n- All healthy (open position)")
 
         # Pressurization
-        sections.append(f"## Stairwell Pressurization\n- Fans: {len(press)}\n- Status: {'All standby' if all(p.fan_status.value == 'off' for p in press) else 'Active'}")
+        all_standby = all(p.fan_status.value == "off" for p in press)
+        press_status = "All standby" if all_standby else "Active"
+        sections.append(f"## Stairwell Pressurization\n- Fans: {len(press)}\n- Status: {press_status}")
 
         # Health
-        sections.append(f"## System Health\n- Overall: {health.overall_health.value.upper()}\n- Panel Comms: {health.panel_comms}\n- Battery: {health.battery_status}\n- Detector Faults: {health.detector_faults}\n- Damper Faults: {health.damper_faults}")
+        overall = health.overall_health.value.upper()
+        sections.append(
+            f"## System Health\n- Overall: {overall}"
+            f"\n- Panel Comms: {health.panel_comms}"
+            f"\n- Battery: {health.battery_status}"
+            f"\n- Detector Faults: {health.detector_faults}"
+            f"\n- Damper Faults: {health.damper_faults}"
+        )
 
         return {
             "success": True,
@@ -1954,7 +2040,9 @@ async def get_security_status() -> dict[str, Any]:
             if zone_occ.get("occupancy_count", 0) > 0:
                 occ_lines.append(f"  - {zone_occ['zone_name']}: {zone_occ['occupancy_count']} people")
         if occ_lines:
-            sections.append(f"## Occupancy\nTotal: {building_occ.get('total_occupancy', 0)} people\n" + "\n".join(occ_lines))
+            sections.append(
+                f"## Occupancy\nTotal: {building_occ.get('total_occupancy', 0)} people\n" + "\n".join(occ_lines)
+            )
         else:
             sections.append(f"## Occupancy\nTotal: {building_occ.get('total_occupancy', 0)} people")
 
@@ -1987,6 +2075,7 @@ async def get_solar_overview(site_id: str = "site-002") -> dict[str, Any]:
     """Get solar site overview — generation, BESS, grid, savings."""
     try:
         from app.services.solar_ingestion_service import get_solar_ingestion_service
+
         svc = get_solar_ingestion_service()
         overview = await svc.get_site_overview(site_id)
         if not overview:
@@ -2001,6 +2090,7 @@ async def get_bess_status_chat(site_id: str = "site-002") -> dict[str, Any]:
     """Get BESS battery status — SOC, mode, health."""
     try:
         from app.services.solar_ingestion_service import get_solar_ingestion_service
+
         svc = get_solar_ingestion_service()
         bess = await svc.get_bess_status(site_id)
         if not bess:
@@ -2018,6 +2108,7 @@ async def get_solar_savings(
     """Get solar savings — monthly/YTD financial summary."""
     try:
         from app.services.solar_financial_service import get_solar_financial_service
+
         svc = get_solar_financial_service()
         summary = svc.get_financial_summary(site_id, period=period)
         return {"success": True, **summary.to_dict()}
@@ -2030,6 +2121,7 @@ async def get_solar_diagnostics(site_id: str = "site-002") -> dict[str, Any]:
     """Get solar diagnostics — underperformers, issues, maintenance."""
     try:
         from app.services.solar_performance_service import get_solar_performance_service
+
         perf = get_solar_performance_service()
         report = await perf.get_diagnostic_summary(site_id)
         if not report:
@@ -2038,6 +2130,7 @@ async def get_solar_diagnostics(site_id: str = "site-002") -> dict[str, Any]:
         # Add maintenance recommendations
         try:
             from app.services.solar_maintenance_service import get_solar_maintenance_service
+
             maint = get_solar_maintenance_service()
             recs = await maint.evaluate_maintenance_needs(site_id)
             result["maintenance_recommendations"] = [r.to_dict() for r in recs[:5]]
@@ -2056,6 +2149,7 @@ async def get_solar_forecast(
     """Get solar generation forecast — next 24h with confidence."""
     try:
         from app.services.solar_forecast_service import get_solar_forecast_service
+
         svc = get_solar_forecast_service()
         forecast = svc.get_forecast(site_id, hours_ahead=hours)
         return {"success": True, **forecast.to_dict()}
@@ -2064,405 +2158,620 @@ async def get_solar_forecast(
         return {"error": str(e)}
 
 
+async def handle_comfort_complaint(
+    user_message: str,
+    user_id: str = "chat_user",
+    channel: str = "chat",
+) -> dict[str, Any]:
+    """
+    Route a free-text comfort complaint to the LangGraph desk complaint agent.
+
+    Handles multi-turn conversations via checkpointed state.
+    Returns response text and whether further input is needed.
+    """
+    try:
+        from langchain_core.messages import HumanMessage
+
+        from app.agents import get_desk_complaint_graph
+
+        agent = get_desk_complaint_graph()
+        config = {"configurable": {"thread_id": f"{user_id}_{channel}"}}
+        result = agent.invoke(
+            {
+                "messages": [HumanMessage(content=user_message)],
+                "user_id": user_id,
+                "channel": channel,
+            },
+            config=config,
+        )
+        return {
+            "success": True,
+            "response": result.get("response", ""),
+            "needs_input": result.get("needs_input", False),
+        }
+    except Exception as e:
+        logger.error(f"handle_comfort_complaint error: {e}")
+        return {"success": False, "error": str(e)}
+
+
 CHAT_TOOLS = [
     {
         "name": "list_devices",
-        "description": "List available building devices. Use this to discover what devices can be controlled or monitored. You can filter by device type (hvac, lighting, security, power) or site ID.",
+        "description": (
+            "List available building devices. Use this to discover"
+            " what devices can be controlled or monitored."
+            " You can filter by device type"
+            " (hvac, lighting, security, power) or site ID."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
                 "device_type": {
                     "type": "string",
-                    "description": "Filter by device type: hvac, lighting, security, fire_safety, access_control, power, other",
-                    "enum": ["hvac", "lighting", "security", "fire_safety", "access_control", "power", "other"]
+                    "description": (
+                        "Filter by device type: hvac, lighting, security, fire_safety, access_control, power, other"
+                    ),
+                    "enum": [
+                        "hvac",
+                        "lighting",
+                        "security",
+                        "fire_safety",
+                        "access_control",
+                        "power",
+                        "other",
+                    ],
                 },
-                "site_id": {
-                    "type": "string",
-                    "description": "Filter by site ID (e.g., 'site-001')"
-                }
+                "site_id": {"type": "string", "description": "Filter by site ID (e.g., 'site-001')"},
             },
-            "required": []
-        }
+            "required": [],
+        },
     },
     {
         "name": "get_device_details",
-        "description": "Get detailed information about a specific device including its current values, available control points, and safety status. Use this before controlling a device to understand its current state.",
+        "description": (
+            "Get detailed information about a specific device"
+            " including its current values, available control"
+            " points, and safety status. Use this before"
+            " controlling a device to understand its"
+            " current state."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
                 "device_id": {
                     "type": "string",
-                    "description": "The device ID to look up (e.g., 'S002-CHILLER-B1-001')"
+                    "description": ("The device ID to look up (e.g., 'S002-CHILLER-B1-001')"),
                 }
             },
-            "required": ["device_id"]
-        }
+            "required": ["device_id"],
+        },
     },
     {
         "name": "control_device",
-        "description": "Execute a control action on a building device. This will set a value on a device point (like temperature setpoint or on/off state). All actions are validated against safety rules and logged to the audit trail. If safety validation fails, the action will be blocked and you'll receive an error explaining why.",
+        "description": (
+            "Execute a control action on a building device."
+            " This will set a value on a device point"
+            " (like temperature setpoint or on/off state)."
+            " All actions are validated against safety rules"
+            " and logged to the audit trail. If safety"
+            " validation fails, the action will be blocked"
+            " and you'll receive an error explaining why."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
                 "device_id": {
                     "type": "string",
-                    "description": "The device ID to control (e.g., 'S002-CHILLER-B1-001')"
+                    "description": "The device ID to control (e.g., 'S002-CHILLER-B1-001')",
                 },
                 "point": {
                     "type": "string",
-                    "description": "The point name to control (e.g., 'setpoint', 'state', 'mode')"
+                    "description": "The point name to control (e.g., 'setpoint', 'state', 'mode')",
                 },
                 "value": {
-                    "description": "The value to set. For temperature setpoints use a number. For on/off states use true/false or 1/0."
+                    "description": (
+                        "The value to set. For temperature"
+                        " setpoints use a number. For on/off"
+                        " states use true/false or 1/0."
+                    )
                 },
                 "reason": {
                     "type": "string",
                     "description": "Brief explanation of why this control action is being performed",
-                    "default": "User requested via AI assistant"
-                }
+                    "default": "User requested via AI assistant",
+                },
             },
-            "required": ["device_id", "point", "value"]
-        }
+            "required": ["device_id", "point", "value"],
+        },
     },
     {
         "name": "get_system_status",
-        "description": "Get overall BMS system status including active alerts, equipment health summary, predicted failures, and prioritized recommendations. Use this to understand the current state of the building and identify issues that need attention.",
+        "description": (
+            "Get overall BMS system status including active"
+            " alerts, equipment health summary, predicted"
+            " failures, and prioritized recommendations."
+            " Use this to understand the current state of"
+            " the building and identify issues that need"
+            " attention."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
                 "site_id": {
                     "type": "string",
-                    "description": "Optional site ID to filter status (e.g., 'site-001'). If not provided, returns status for all sites."
+                    "description": (
+                        "Optional site ID to filter status"
+                        " (e.g., 'site-001'). If not provided,"
+                        " returns status for all sites."
+                    ),
                 }
             },
-            "required": []
-        }
+            "required": [],
+        },
     },
     {
         "name": "get_optimization_recommendations",
-        "description": "Get AI-powered optimization recommendations for HVAC setpoints based on current conditions, weather forecast, and energy pricing. Returns specific setpoint changes with projected energy and cost savings.",
+        "description": (
+            "Get AI-powered optimization recommendations"
+            " for HVAC setpoints based on current conditions,"
+            " weather forecast, and energy pricing. Returns"
+            " specific setpoint changes with projected"
+            " energy and cost savings."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
                 "site_id": {
                     "type": "string",
-                    "description": "The site ID to analyze for optimization (e.g., 'site-001')"
+                    "description": "The site ID to analyze for optimization (e.g., 'site-001')",
                 }
             },
-            "required": ["site_id"]
-        }
+            "required": ["site_id"],
+        },
     },
     {
         "name": "get_equipment_health",
-        "description": "Get equipment health status, maintenance history, and failure predictions. Helps identify equipment that needs attention and prioritize maintenance activities.",
+        "description": (
+            "Get equipment health status, maintenance"
+            " history, and failure predictions. Helps"
+            " identify equipment that needs attention"
+            " and prioritize maintenance activities."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "site_id": {
-                    "type": "string",
-                    "description": "Filter by site ID"
-                },
-                "equipment_id": {
-                    "type": "string",
-                    "description": "Get details for specific equipment"
-                },
+                "site_id": {"type": "string", "description": "Filter by site ID"},
+                "equipment_id": {"type": "string", "description": "Get details for specific equipment"},
                 "status_filter": {
                     "type": "string",
                     "description": "Filter by health status",
-                    "enum": ["critical", "warning", "normal"]
-                }
+                    "enum": ["critical", "warning", "normal"],
+                },
             },
-            "required": []
-        }
+            "required": [],
+        },
     },
     {
         "name": "get_alerts_and_anomalies",
-        "description": "Get active alerts and detected anomalies/predicted failures. Alerts are current issues, anomalies are AI-predicted future problems. Includes cost estimates for repairs and potential damage.",
+        "description": (
+            "Get active alerts and detected"
+            " anomalies/predicted failures. Alerts are"
+            " current issues, anomalies are AI-predicted"
+            " future problems. Includes cost estimates"
+            " for repairs and potential damage."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "site_id": {
-                    "type": "string",
-                    "description": "Filter by site ID"
-                },
+                "site_id": {"type": "string", "description": "Filter by site ID"},
                 "severity": {
                     "type": "string",
                     "description": "Filter alerts by severity",
-                    "enum": ["critical", "warning", "info"]
+                    "enum": ["critical", "warning", "info"],
                 },
                 "include_resolved": {
                     "type": "boolean",
                     "description": "Include resolved/acknowledged alerts (default: false)",
-                    "default": False
-                }
+                    "default": False,
+                },
             },
-            "required": []
-        }
+            "required": [],
+        },
     },
     {
         "name": "get_energy_analysis",
-        "description": "Get energy consumption analysis for a site including current device readings, efficiency insights, and suggestions for reducing energy costs.",
+        "description": (
+            "Get energy consumption analysis for a site"
+            " including current device readings, efficiency"
+            " insights, and suggestions for reducing"
+            " energy costs."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
                 "site_id": {
                     "type": "string",
-                    "description": "The site ID to analyze (e.g., 'site-001')"
+                    "description": ("The site ID to analyze (e.g., 'site-001')"),
                 }
             },
-            "required": ["site_id"]
-        }
+            "required": ["site_id"],
+        },
     },
     {
         "name": "get_system_methodology",
-        "description": "Get proprietary SENTINEL system methodology documentation explaining how health scores are calculated, how failure predictions work, optimization algorithms, and safety validation. REQUIRES ADMIN PASSWORD. If user asks about methodology without providing password, tell them this is proprietary information and ask for the admin password.",
+        "description": (
+            "Get proprietary SENTINEL system methodology"
+            " documentation explaining how health scores"
+            " are calculated, how failure predictions work,"
+            " optimization algorithms, and safety"
+            " validation. REQUIRES ADMIN PASSWORD. If user"
+            " asks about methodology without providing"
+            " password, tell them this is proprietary"
+            " information and ask for the admin password."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
                 "password": {
                     "type": "string",
-                    "description": "Admin password required to access proprietary methodology documentation"
+                    "description": "Admin password required to access proprietary methodology documentation",
                 },
                 "topic": {
                     "type": "string",
-                    "description": "Optional specific topic: health_score, predictions, optimization, safety, or leave empty for all",
-                    "enum": ["health_score", "predictions", "optimization", "safety"]
-                }
+                    "description": (
+                        "Optional specific topic:"
+                        " health_score, predictions,"
+                        " optimization, safety,"
+                        " or leave empty for all"
+                    ),
+                    "enum": ["health_score", "predictions", "optimization", "safety"],
+                },
             },
-            "required": ["password"]
-        }
+            "required": ["password"],
+        },
     },
     {
         "name": "lookup_desk",
-        "description": "Look up a desk location and get its HVAC zone, temperature, and sensor data. Use this when a technician reports a comfort complaint from a user at a specific desk. Returns zone info, HVAC equipment IDs, and DALI sensor data (Sandton has DALI integration). If the desk isn't found, ask the technician for clarification.",
+        "description": (
+            "Look up a desk location and get its HVAC zone,"
+            " temperature, and sensor data. Use this when a"
+            " technician reports a comfort complaint from a"
+            " user at a specific desk. Returns zone info,"
+            " HVAC equipment IDs, and DALI sensor data"
+            " (Sandton has DALI integration). If the desk"
+            " isn't found, ask the technician for"
+            " clarification."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
                 "desk_id": {
                     "type": "string",
-                    "description": "The desk identifier. Can be formats like '201', 'L12-25', 'Desk 25', or just '25'"
+                    "description": "The desk identifier. Can be formats like '201', 'L12-25', 'Desk 25', or just '25'",
                 },
                 "building": {
                     "type": "string",
-                    "description": "Optional building name if working across multiple sites. For Sandton (which has DALI), this is automatic."
-                }
+                    "description": (
+                        "Optional building name if working"
+                        " across multiple sites. For Sandton"
+                        " (which has DALI), this is automatic."
+                    ),
+                },
             },
-            "required": ["desk_id"]
-        }
+            "required": ["desk_id"],
+        },
     },
     {
         "name": "diagnose_comfort_complaint",
-        "description": "Diagnose a comfort complaint (too hot, too cold, stuffy, drafty) for a specific desk. Analyzes desk location, HVAC zone, DALI sensors (occupancy, daylight), and context (near window, diffuser, printer) to determine root cause and suggest actions. Use this when a technician says something like 'user at desk 201 says it's too hot'. Returns diagnosis with confidence level and recommended actions.",
+        "description": (
+            "Diagnose a comfort complaint (too hot, too cold,"
+            " stuffy, drafty) for a specific desk. Analyzes"
+            " desk location, HVAC zone, DALI sensors"
+            " (occupancy, daylight), and context (near"
+            " window, diffuser, printer) to determine root"
+            " cause and suggest actions. Use this when a"
+            " technician says something like 'user at desk"
+            " 201 says it's too hot'. Returns diagnosis"
+            " with confidence level and recommended actions."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "desk_id": {
-                    "type": "string",
-                    "description": "The desk identifier (e.g., '201', 'L12-25', 'Desk 25')"
-                },
+                "desk_id": {"type": "string", "description": "The desk identifier (e.g., '201', 'L12-25', 'Desk 25')"},
                 "complaint_type": {
                     "type": "string",
                     "description": "Type of comfort complaint",
-                    "enum": ["too_hot", "too_cold", "stuffy", "drafty"]
+                    "enum": ["too_hot", "too_cold", "stuffy", "drafty"],
                 },
                 "building": {
                     "type": "string",
-                    "description": "Optional building name if technician is working across multiple sites"
+                    "description": "Optional building name if technician is working across multiple sites",
                 },
                 "additional_info": {
                     "type": "string",
-                    "description": "Any additional context from the technician (e.g., 'user says it's been like this all morning')"
+                    "description": (
+                        "Any additional context from the technician (e.g., 'user says it's been like this all morning')"
+                    ),
+                },
+            },
+            "required": ["desk_id", "complaint_type"],
+        },
+    },
+    {
+        "name": "handle_comfort_complaint",
+        "description": (
+            "Handle a free-text comfort complaint using the multi-turn desk complaint agent. "
+            "Unlike diagnose_comfort_complaint (which needs structured desk_id + complaint_type), "
+            "this tool accepts natural language like 'it's freezing at desk 25' and extracts the "
+            "desk and complaint type automatically. If info is missing, it returns a follow-up "
+            "question (needs_input=true). Use this for user-reported complaints in chat."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "user_message": {
+                    "type": "string",
+                    "description": ("The user's free-text comfort complaint message"),
                 }
             },
-            "required": ["desk_id", "complaint_type"]
-        }
+            "required": ["user_message"],
+        },
     },
     {
         "name": "discover_niagara_points",
-        "description": "Scan a Niagara BACnet device to discover all BMS points. Uses AI classification with Haystack/Brick ontology to identify equipment types (chiller, AHU, FCU, VAV, pump, etc.) and point types (sensor, setpoint, command, status). Returns a discovery_id for reviewing and approving the mapping. Use this when an FM team needs to onboard a new building or BMS controller.",
+        "description": (
+            "Scan a Niagara BACnet device to discover all"
+            " BMS points. Uses AI classification with"
+            " Haystack/Brick ontology to identify equipment"
+            " types (chiller, AHU, FCU, VAV, pump, etc.)"
+            " and point types (sensor, setpoint, command,"
+            " status). Returns a discovery_id for reviewing"
+            " and approving the mapping. Use this when an"
+            " FM team needs to onboard a new building or"
+            " BMS controller."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
                 "device_ip": {
                     "type": "string",
-                    "description": "IP address of the BACnet device to scan (e.g., '192.168.1.100')"
+                    "description": "IP address of the BACnet device to scan (e.g., '192.168.1.100')",
                 },
                 "site_id": {
                     "type": "string",
                     "description": "SENTINEL site ID (e.g., 'site-002')",
-                    "default": "site-002"
-                }
+                    "default": "site-002",
+                },
             },
-            "required": ["device_ip"]
-        }
+            "required": ["device_ip"],
+        },
     },
     {
         "name": "review_point_mapping",
-        "description": "Get a summary of discovered Niagara points and their AI classification for review. Shows equipment groupings, confidence levels, and items needing manual review. Use this after discover_niagara_points to let the FM team verify the auto-classification before approving.",
+        "description": (
+            "Get a summary of discovered Niagara points"
+            " and their AI classification for review."
+            " Shows equipment groupings, confidence levels,"
+            " and items needing manual review. Use this"
+            " after discover_niagara_points to let the FM"
+            " team verify the auto-classification before"
+            " approving."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
                 "discovery_id": {
                     "type": "string",
-                    "description": "Discovery ID returned from discover_niagara_points"
+                    "description": ("Discovery ID returned from discover_niagara_points"),
                 }
             },
-            "required": ["discovery_id"]
-        }
+            "required": ["discovery_id"],
+        },
     },
     {
         "name": "approve_point_mapping",
-        "description": "Approve a Niagara point mapping after review. This activates the auto-generated equipment models in SENTINEL for monitoring and control. Only use after reviewing the mapping with review_point_mapping.",
+        "description": (
+            "Approve a Niagara point mapping after review."
+            " This activates the auto-generated equipment"
+            " models in SENTINEL for monitoring and"
+            " control. Only use after reviewing the"
+            " mapping with review_point_mapping."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "discovery_id": {
-                    "type": "string",
-                    "description": "Discovery ID to approve"
-                },
+                "discovery_id": {"type": "string", "description": "Discovery ID to approve"},
                 "approved_by": {
                     "type": "string",
                     "description": "Name of the person approving (defaults to 'chat_user')",
-                    "default": "chat_user"
-                }
+                    "default": "chat_user",
+                },
             },
-            "required": ["discovery_id"]
-        }
+            "required": ["discovery_id"],
+        },
     },
     {
         "name": "correct_point_classification",
-        "description": "Manually correct a point that was misclassified by the AI. Use this when reviewing a mapping and finding incorrect equipment assignment or point type. You can move a point to a different equipment, change its type, or fix the equipment type.",
+        "description": (
+            "Manually correct a point that was misclassified"
+            " by the AI. Use this when reviewing a mapping"
+            " and finding incorrect equipment assignment or"
+            " point type. You can move a point to a"
+            " different equipment, change its type, or fix"
+            " the equipment type."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "discovery_id": {
-                    "type": "string",
-                    "description": "Discovery ID containing the point"
-                },
+                "discovery_id": {"type": "string", "description": "Discovery ID containing the point"},
                 "point_name": {
                     "type": "string",
-                    "description": "Original BACnet point name to correct (e.g., 'CH-1_CHW_Supply_Temp')"
+                    "description": ("Original BACnet point name to correct (e.g., 'CH-1_CHW_Supply_Temp')"),
                 },
                 "correct_equipment_id": {
                     "type": "string",
-                    "description": "New equipment ID to assign the point to (optional)"
+                    "description": "New equipment ID to assign the point to (optional)",
                 },
                 "correct_point_type": {
                     "type": "string",
                     "description": "Corrected point type",
-                    "enum": ["sensor", "setpoint", "command", "status", "alarm"]
+                    "enum": ["sensor", "setpoint", "command", "status", "alarm"],
                 },
                 "correct_equipment_type": {
                     "type": "string",
-                    "description": "Corrected equipment type (chiller, ahu, fcu, vav, pump, boiler, etc.)"
-                }
+                    "description": ("Corrected equipment type (chiller, ahu, fcu, vav, pump, boiler, etc.)"),
+                },
             },
-            "required": ["discovery_id", "point_name"]
-        }
+            "required": ["discovery_id", "point_name"],
+        },
     },
     {
         "name": "get_fire_system_status",
-        "description": "Get fire and life safety system status including active alarms, damper positions, stairwell pressurization, and system health. Use this when someone asks about fire safety, fire alarms, smoke dampers, or life safety systems. Returns panel status, active alarm count, zone summary, damper health, pressurization status, and battery voltage.",
-        "input_schema": {
-            "type": "object",
-            "properties": {},
-            "required": []
-        }
+        "description": (
+            "Get fire and life safety system status"
+            " including active alarms, damper positions,"
+            " stairwell pressurization, and system health."
+            " Use this when someone asks about fire safety,"
+            " fire alarms, smoke dampers, or life safety"
+            " systems. Returns panel status, active alarm"
+            " count, zone summary, damper health,"
+            " pressurization status, and battery voltage."
+        ),
+        "input_schema": {"type": "object", "properties": {}, "required": []},
     },
     {
         "name": "get_security_status",
-        "description": "Get security system status including access control doors, CCTV cameras, alarm zones, building occupancy from badge events, denied access events, and after-hours access. Use this when someone asks about security, access control, cameras, CCTV, who is in the building, occupancy, or alarm zones.",
-        "input_schema": {
-            "type": "object",
-            "properties": {},
-            "required": []
-        }
+        "description": (
+            "Get security system status including access"
+            " control doors, CCTV cameras, alarm zones,"
+            " building occupancy from badge events, denied"
+            " access events, and after-hours access. Use"
+            " this when someone asks about security, access"
+            " control, cameras, CCTV, who is in the"
+            " building, occupancy, or alarm zones."
+        ),
+        "input_schema": {"type": "object", "properties": {}, "required": []},
     },
     # Solar chat tools (34-09)
     {
         "name": "get_solar_overview",
-        "description": "Get solar site overview including current generation (kW), daily yield (kWh), BESS State of Charge, grid import/export, performance ratio, and estimated savings. Use this when someone asks 'How much solar did we generate today?', about solar output, PV panels, or the solar dashboard.",
+        "description": (
+            "Get solar site overview including current"
+            " generation (kW), daily yield (kWh), BESS"
+            " State of Charge, grid import/export,"
+            " performance ratio, and estimated savings."
+            " Use this when someone asks 'How much solar"
+            " did we generate today?', about solar output,"
+            " PV panels, or the solar dashboard."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
                 "site_id": {
                     "type": "string",
-                    "description": "Solar site ID (default: site-002)",
-                    "default": "site-002"
+                    "description": ("Solar site ID (default: site-002)"),
+                    "default": "site-002",
                 }
             },
-            "required": []
-        }
+            "required": [],
+        },
     },
     {
         "name": "get_bess_status",
-        "description": "Get BESS (Battery) status including State of Charge (SOC%), current mode (charging/discharging/idle), health, power flow, and cycle count. Use this when someone asks 'What is the battery level?', about BESS, battery storage, or energy storage status.",
+        "description": (
+            "Get BESS (Battery) status including State of"
+            " Charge (SOC%), current mode"
+            " (charging/discharging/idle), health, power"
+            " flow, and cycle count. Use this when someone"
+            " asks 'What is the battery level?', about"
+            " BESS, battery storage, or energy storage"
+            " status."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
                 "site_id": {
                     "type": "string",
-                    "description": "Solar site ID (default: site-002)",
-                    "default": "site-002"
+                    "description": ("Solar site ID (default: site-002)"),
+                    "default": "site-002",
                 }
             },
-            "required": []
-        }
+            "required": [],
+        },
     },
     {
         "name": "get_solar_savings",
-        "description": "Get solar and BESS financial savings summary including arbitrage, demand charge, self-consumption, and diesel avoidance savings. Returns YTD totals, monthly breakdown, and ROI. Use this when someone asks 'How much have we saved this month?', about solar ROI, financial performance, or cost savings.",
+        "description": (
+            "Get solar and BESS financial savings summary"
+            " including arbitrage, demand charge,"
+            " self-consumption, and diesel avoidance"
+            " savings. Returns YTD totals, monthly"
+            " breakdown, and ROI. Use this when someone"
+            " asks 'How much have we saved this month?',"
+            " about solar ROI, financial performance,"
+            " or cost savings."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
                 "site_id": {
                     "type": "string",
                     "description": "Solar site ID (default: site-002)",
-                    "default": "site-002"
+                    "default": "site-002",
                 },
-                "period": {
-                    "type": "string",
-                    "description": "Period: ytd or month",
-                    "default": "ytd"
-                }
+                "period": {"type": "string", "description": "Period: ytd or month", "default": "ytd"},
             },
-            "required": []
-        }
+            "required": [],
+        },
     },
     {
         "name": "get_solar_diagnostics",
-        "description": "Get solar diagnostics including underperforming inverters, string anomalies, maintenance recommendations, and cost impact. Use this when someone asks 'Which inverters are underperforming?', about solar problems, faults, or maintenance needs.",
+        "description": (
+            "Get solar diagnostics including"
+            " underperforming inverters, string anomalies,"
+            " maintenance recommendations, and cost"
+            " impact. Use this when someone asks 'Which"
+            " inverters are underperforming?', about solar"
+            " problems, faults, or maintenance needs."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
                 "site_id": {
                     "type": "string",
-                    "description": "Solar site ID (default: site-002)",
-                    "default": "site-002"
+                    "description": ("Solar site ID (default: site-002)"),
+                    "default": "site-002",
                 }
             },
-            "required": []
-        }
+            "required": [],
+        },
     },
     {
         "name": "get_solar_forecast",
-        "description": "Get solar generation forecast for the next 24-72 hours with confidence bands. Returns hourly predicted output in kW. Use this when someone asks 'What is tomorrow's generation forecast?', about expected solar production, or upcoming generation.",
+        "description": (
+            "Get solar generation forecast for the next"
+            " 24-72 hours with confidence bands. Returns"
+            " hourly predicted output in kW. Use this when"
+            " someone asks 'What is tomorrow's generation"
+            " forecast?', about expected solar production,"
+            " or upcoming generation."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
                 "site_id": {
                     "type": "string",
                     "description": "Solar site ID (default: site-002)",
-                    "default": "site-002"
+                    "default": "site-002",
                 },
                 "hours": {
                     "type": "integer",
-                    "description": "Forecast horizon in hours (default: 24)",
-                    "default": 24
-                }
+                    "description": ("Forecast horizon in hours (default: 24)"),
+                    "default": 24,
+                },
             },
-            "required": []
-        }
+            "required": [],
+        },
     },
     {
         "name": "get_floor_temperatures",
@@ -2477,17 +2786,13 @@ CHAT_TOOLS = [
                 "floor": {
                     "type": "string",
                     "description": "Floor level to filter by: 'L0', 'L1', or 'L2'. Omit for all floors.",
-                    "enum": ["L0", "L1", "L2"]
+                    "enum": ["L0", "L1", "L2"],
                 },
-                "site_id": {
-                    "type": "string",
-                    "description": "Site ID (default: site-002)",
-                    "default": "site-002"
-                }
+                "site_id": {"type": "string", "description": "Site ID (default: site-002)", "default": "site-002"},
             },
-            "required": []
-        }
-    }
+            "required": [],
+        },
+    },
 ]
 
 
@@ -2495,20 +2800,16 @@ CHAT_TOOLS = [
 TOOL_MODULE_REQUIREMENTS: dict[str, ModuleType] = {
     # Control/automation tools (require CONTROL module)
     "control_device": ModuleType.CONTROL,
-
     # Maintenance/work order tools (require MAINTENANCE module)
     "create_work_order": ModuleType.MAINTENANCE,
-
     # SIMBIOT / onboarding workflows
     "discover_niagara_points": ModuleType.SIMBIOT,
     "review_point_mapping": ModuleType.SIMBIOT,
     "approve_point_mapping": ModuleType.SIMBIOT,
     "correct_point_classification": ModuleType.SIMBIOT,
-
     # Security & life safety workflows
     "get_security_status": ModuleType.SECURITY,
     "get_fire_system_status": ModuleType.FIRE,
-
     # Solar / BESS workflows
     "get_solar_overview": ModuleType.SOLAR,
     "get_bess_status": ModuleType.SOLAR,
@@ -2586,6 +2887,61 @@ def _is_tool_allowed_for_site(
     return True
 
 
+async def process_recommendation(
+    site_id: str | None = None,
+    recommendation_id: str | None = None,
+    channel: str = "chat",
+) -> dict[str, Any]:
+    """
+    Trigger the recommendation agent to process pending recommendations.
+
+    Uses the LangGraph recommendation agent to validate, assess impact,
+    route through tier engine, and execute/request approval.
+
+    Args:
+        site_id: Building identifier (e.g., "S002")
+        recommendation_id: Optional specific recommendation to process
+        channel: Output channel ("chat", "system", "whatsapp", "telegram")
+
+    Returns:
+        Dictionary with processing result
+    """
+    try:
+        from langchain_core.messages import HumanMessage
+        from app.agents import get_recommendation_graph
+
+        agent = get_recommendation_graph()
+        thread_id = f"rec_{site_id}_{recommendation_id or 'batch'}"
+        config = {"configurable": {"thread_id": thread_id}}
+
+        result = await agent.ainvoke(
+            {
+                "messages": [HumanMessage(content="process")],
+                "site_id": site_id or "S002",
+                "channel": channel,
+                "trigger": "manual",
+            },
+            config=config,
+        )
+
+        return {
+            "success": True,
+            "response": result.get("response", ""),
+            "tier": result.get("tier"),
+            "needs_input": result.get("needs_input", False),
+            "processing_complete": result.get("processing_complete", False),
+        }
+
+    except ImportError:
+        return {
+            "success": False,
+            "error": "LangGraph not available. Install langgraph to use the recommendation agent.",
+        }
+    except Exception as e:
+        logger.error(f"Error processing recommendation: {e}")
+        return {"success": False, "error": str(e)}
+
+
 # Tool handler dispatch
 TOOL_HANDLERS = {
     "list_devices": list_devices,
@@ -2599,6 +2955,7 @@ TOOL_HANDLERS = {
     "get_system_methodology": get_system_methodology,
     "lookup_desk": lookup_desk,
     "diagnose_comfort_complaint": diagnose_comfort_complaint,
+    "handle_comfort_complaint": handle_comfort_complaint,
     "discover_niagara_points": discover_niagara_points,
     "review_point_mapping": review_point_mapping,
     "approve_point_mapping": approve_point_mapping,
@@ -2612,6 +2969,7 @@ TOOL_HANDLERS = {
     "get_solar_diagnostics": get_solar_diagnostics,
     "get_solar_forecast": get_solar_forecast,
     "get_floor_temperatures": get_floor_temperatures,
+    "process_recommendation": process_recommendation,
 }
 
 

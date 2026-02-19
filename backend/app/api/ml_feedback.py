@@ -14,7 +14,7 @@ prediction accuracy for continuous ML model improvement.
 """
 
 import logging
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Query
 
@@ -35,6 +35,7 @@ router = APIRouter(prefix="/api/ml-feedback", tags=["ml-feedback"])
 # ============================================================================
 # API Endpoints
 # ============================================================================
+
 
 @router.post("/record", response_model=MLFeedbackRecord, status_code=201)
 async def record_feedback(request: RecordFeedbackRequest) -> MLFeedbackRecord:
@@ -71,9 +72,7 @@ async def record_feedback(request: RecordFeedbackRequest) -> MLFeedbackRecord:
 
 @router.get("/training-data", response_model=List[TrainingDataPoint])
 async def get_training_data(
-    equipment_type: Optional[str] = Query(
-        None, description="Filter by equipment type (e.g., chiller, ahu, fcu)"
-    )
+    equipment_type: Optional[str] = Query(None, description="Filter by equipment type (e.g., chiller, ahu, fcu)"),
 ) -> List[TrainingDataPoint]:
     """
     Generate training dataset for ML model retraining.
@@ -107,10 +106,7 @@ async def get_prediction_accuracy(model_type: str) -> PredictionAccuracy:
     """
     valid_types = ["lstm", "autoencoder", "survival", "random_forest"]
     if model_type not in valid_types:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid model type '{model_type}'. Valid types: {valid_types}"
-        )
+        raise HTTPException(status_code=400, detail=f"Invalid model type '{model_type}'. Valid types: {valid_types}")
 
     try:
         service = get_ml_feedback_service()
@@ -158,4 +154,17 @@ async def get_feedback_summary() -> MLFeedbackSummary:
 
     except Exception as e:
         logger.error(f"Error getting feedback summary: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/module-summary")
+async def get_module_feedback_summary(
+    site_id: Optional[str] = Query(None, description="Optional site filter (e.g., site-002)"),
+) -> Dict[str, Any]:
+    """Get module outcome summary for integrated cross-module feedback."""
+    try:
+        service = get_ml_feedback_service()
+        return service.get_module_feedback_summary(site_id=site_id)
+    except Exception as e:
+        logger.error(f"Error getting module feedback summary: {e}")
         raise HTTPException(status_code=500, detail=str(e))

@@ -16,6 +16,7 @@ import uuid
 
 class DeviceStatus(Enum):
     """Device operational status."""
+
     ONLINE = "online"
     OFFLINE = "offline"
     FAULT = "fault"
@@ -25,6 +26,7 @@ class DeviceStatus(Enum):
 
 class DeviceType(Enum):
     """Types of building automation devices."""
+
     HVAC = "hvac"
     LIGHTING = "lighting"
     SECURITY = "security"
@@ -43,6 +45,7 @@ class DeviceType(Enum):
 
 class ProtocolType(Enum):
     """Communication protocols supported."""
+
     BACNET = "bacnet"
     MODBUS = "modbus"
     MOCK = "mock"
@@ -52,36 +55,39 @@ class ProtocolType(Enum):
 
 class ZoneType(Enum):
     """Types of building zones for optimization prioritization."""
-    EXECUTIVE = "executive"          # Priority 1 - always comfortable
-    SERVER_ROOM = "server_room"      # Priority 1 - critical cooling
-    MEETING_ROOM = "meeting_room"    # Priority 2 - when occupied
-    OPEN_OFFICE = "open_office"      # Priority 3 - standard comfort
-    LOBBY = "lobby"                  # Priority 4 - public facing
-    PLANT_ROOM = "plant_room"        # Priority 5 - equipment only
-    PARKING = "parking"              # Priority 6 - minimal HVAC
-    BANKING_HALL = "banking_hall"    # Priority 2 - customer facing
-    STAIRWELL = "stairwell"          # Priority 6 - minimal HVAC
-    CORRIDOR = "corridor"            # Priority 5 - circulation
-    RESTROOM = "restroom"            # Priority 4 - hygiene
-    KITCHEN = "kitchen"              # Priority 3 - staff amenity
-    STORAGE = "storage"              # Priority 6 - minimal HVAC
-    RECEPTION = "reception"          # Priority 3 - visitor facing
-    ROOF = "roof"                    # Priority 6 - equipment only
-    BASEMENT = "basement"            # Priority 5 - varies
-    UNKNOWN = "unknown"              # Default for unclassified zones
+
+    EXECUTIVE = "executive"  # Priority 1 - always comfortable
+    SERVER_ROOM = "server_room"  # Priority 1 - critical cooling
+    MEETING_ROOM = "meeting_room"  # Priority 2 - when occupied
+    OPEN_OFFICE = "open_office"  # Priority 3 - standard comfort
+    LOBBY = "lobby"  # Priority 4 - public facing
+    PLANT_ROOM = "plant_room"  # Priority 5 - equipment only
+    PARKING = "parking"  # Priority 6 - minimal HVAC
+    BANKING_HALL = "banking_hall"  # Priority 2 - customer facing
+    STAIRWELL = "stairwell"  # Priority 6 - minimal HVAC
+    CORRIDOR = "corridor"  # Priority 5 - circulation
+    RESTROOM = "restroom"  # Priority 4 - hygiene
+    KITCHEN = "kitchen"  # Priority 3 - staff amenity
+    STORAGE = "storage"  # Priority 6 - minimal HVAC
+    RECEPTION = "reception"  # Priority 3 - visitor facing
+    ROOF = "roof"  # Priority 6 - equipment only
+    BASEMENT = "basement"  # Priority 5 - varies
+    UNKNOWN = "unknown"  # Default for unclassified zones
 
 
 class ExposureDirection(Enum):
     """Exterior exposure direction for solar heat gain calculations."""
-    NORTH = "north"           # Minimal solar gain (Southern Hemisphere)
-    SOUTH = "south"           # Maximum solar gain (Southern Hemisphere)
-    EAST = "east"             # Morning solar gain
-    WEST = "west"             # Afternoon solar gain
-    INTERIOR = "interior"     # No exterior exposure
+
+    NORTH = "north"  # Maximum direct solar gain (Southern Hemisphere)
+    SOUTH = "south"  # Minimal direct solar gain (Southern Hemisphere)
+    EAST = "east"  # Morning solar gain
+    WEST = "west"  # Afternoon solar gain
+    INTERIOR = "interior"  # No exterior exposure
 
 
 class PointType(Enum):
     """Types of data points on devices."""
+
     ANALOG_INPUT = "analog_input"
     ANALOG_OUTPUT = "analog_output"
     ANALOG_VALUE = "analog_value"
@@ -96,6 +102,7 @@ class PointType(Enum):
 @dataclass
 class DevicePoint:
     """A data point on a device (sensor, actuator, value)."""
+
     name: str
     point_type: PointType
     description: str = ""
@@ -131,6 +138,7 @@ class DevicePoint:
 @dataclass
 class DeviceValue:
     """A value read from or written to a device point."""
+
     point_name: str
     value: Any
     unit: str = ""
@@ -150,7 +158,7 @@ class DeviceValue:
             "unit": self.unit,
             "timestamp": self.timestamp,
             "quality": self.quality,
-            **self.metadata
+            **self.metadata,
         }
 
 
@@ -161,6 +169,7 @@ class DeviceLocation:
     Links devices to zones for zone-based control and analysis.
     A zone contains multiple devices/equipment (AHU, VAV, FCU, luminaires, etc.).
     """
+
     building: str  # Full building name
     floor: str  # FL1, FL2, Basement, Roof, Ground
     zone: str  # Q1-Q4 or directional (North, South, East, West)
@@ -168,8 +177,8 @@ class DeviceLocation:
     description: str  # Human-readable location string
     zone_id: Optional[str] = None  # References hvac_zones.zone_id for device-to-zone mapping
     # Zone-aware optimization fields
-    zone_type: Optional['ZoneType'] = None  # Type of zone for optimization priority
-    exposure: Optional['ExposureDirection'] = None  # Exterior exposure for solar gain
+    zone_type: Optional["ZoneType"] = None  # Type of zone for optimization priority
+    exposure: Optional["ExposureDirection"] = None  # Exterior exposure for solar gain
     zone_priority: int = 3  # 1=critical (always maintain), 5=lowest (shed first)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -183,7 +192,7 @@ class DeviceLocation:
             "zone_id": self.zone_id,
             "zone_type": self.zone_type.value if self.zone_type else None,
             "exposure": self.exposure.value if self.exposure else None,
-            "zone_priority": self.zone_priority
+            "zone_priority": self.zone_priority,
         }
 
     def compact_display(self) -> str:
@@ -220,10 +229,11 @@ class DeviceLocation:
             "WR": "Washroom",
             "KR": "Kitchen",
             "LR": "Lobby/Reception",
-            "ST": "Storage"
+            "ST": "Storage",
         }
         # Extract room type code (letters before numbers)
         import re
+
         match = re.match(r"([A-Z]+)(\d+)", self.room)
         if match:
             code, number = match.groups()
@@ -235,6 +245,7 @@ class DeviceLocation:
 @dataclass
 class DeviceEquipment:
     """Equipment make, model, and specifications."""
+
     manufacturer: str  # Manufacturer name
     model: str  # Model number/name
     serial_number: Optional[str] = None  # Asset serial number
@@ -250,13 +261,14 @@ class DeviceEquipment:
             "serial_number": self.serial_number,
             "installation_year": self.installation_year,
             "capacity_kw": self.capacity_kw,
-            "specifications": self.specifications
+            "specifications": self.specifications,
         }
 
 
 @dataclass
 class Device:
     """Base device model."""
+
     id: str
     name: str
     device_type: DeviceType
@@ -316,7 +328,7 @@ class Device:
             "metadata": self.metadata,
             "last_seen": self.last_seen,
             "created_at": self.created_at,
-            "updated_at": self.updated_at
+            "updated_at": self.updated_at,
         }
 
     def _point_to_dict(self, point: DevicePoint) -> Dict[str, Any]:
@@ -331,7 +343,7 @@ class Device:
             "default_value": point.default_value,
             "writable": point.writable,
             "priority": point.priority,
-            "metadata": point.metadata
+            "metadata": point.metadata,
         }
 
     def get_point(self, point_name: str) -> Optional[DevicePoint]:
@@ -349,6 +361,7 @@ class Device:
 @dataclass
 class HVACDevice(Device):
     """HVAC-specific device (chillers, AHUs, fans, pumps)."""
+
     hvac_type: str = ""  # chiller, ahu, fan, pump, vav, etc.
     capacity: Optional[float] = None  # kW or tons
     efficiency: Optional[float] = None  # COP or efficiency rating
@@ -362,6 +375,7 @@ class HVACDevice(Device):
 @dataclass
 class LightingDevice(Device):
     """Lighting control device."""
+
     lighting_type: str = ""  # panel, dimmer, switch, sensor
     circuit_count: int = 1
     total_wattage: Optional[float] = None
@@ -375,6 +389,7 @@ class LightingDevice(Device):
 @dataclass
 class SecurityDevice(Device):
     """Security system device."""
+
     security_type: str = ""  # camera, reader, sensor, panel
     zone: str = ""
     armed: bool = False
@@ -425,7 +440,7 @@ def create_device_from_dict(data: Dict[str, Any]) -> Device:
             floor="Ground",
             zone="Q1",
             room=data["location"],
-            description=data["location"]
+            description=data["location"],
         )
     else:
         # Default location
@@ -434,7 +449,7 @@ def create_device_from_dict(data: Dict[str, Any]) -> Device:
             floor="Ground",
             zone="Q1",
             room="Unknown",
-            description="Unknown location"
+            description="Unknown location",
         )
 
     # Handle equipment (new structured format)
@@ -442,10 +457,7 @@ def create_device_from_dict(data: Dict[str, Any]) -> Device:
         data["equipment"] = DeviceEquipment(**data["equipment"])
     else:
         # Create equipment from legacy manufacturer/model fields
-        data["equipment"] = DeviceEquipment(
-            manufacturer=data.get("manufacturer", ""),
-            model=data.get("model", "")
-        )
+        data["equipment"] = DeviceEquipment(manufacturer=data.get("manufacturer", ""), model=data.get("model", ""))
 
     # Also set location string from metadata if not provided (backward compatibility)
     if "location" not in data and "metadata" in data:

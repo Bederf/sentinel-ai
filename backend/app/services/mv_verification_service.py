@@ -65,6 +65,7 @@ class VerificationTask:
     predicted_savings_kwh: float = 0.0
     predicted_savings_zar: float = 0.0
     baseline_power_kw: Optional[float] = None
+    recommendation_systems: List[str] = field(default_factory=list)
     setpoints_applied: List[Dict[str, Any]] = field(default_factory=list)
     # Filled after verification
     actual_power_kw: Optional[float] = None
@@ -93,6 +94,7 @@ class VerificationTask:
             "predicted_savings_kwh": self.predicted_savings_kwh,
             "predicted_savings_zar": self.predicted_savings_zar,
             "baseline_power_kw": self.baseline_power_kw,
+            "recommendation_systems": self.recommendation_systems,
             "setpoints_applied": self.setpoints_applied,
             "actual_power_kw": self.actual_power_kw,
             "actual_savings_kwh": self.actual_savings_kwh,
@@ -121,6 +123,7 @@ class VerificationTask:
             predicted_savings_kwh=data.get("predicted_savings_kwh", 0.0),
             predicted_savings_zar=data.get("predicted_savings_zar", 0.0),
             baseline_power_kw=data.get("baseline_power_kw"),
+            recommendation_systems=data.get("recommendation_systems", []),
             setpoints_applied=data.get("setpoints_applied", []),
             actual_power_kw=data.get("actual_power_kw"),
             actual_savings_kwh=data.get("actual_savings_kwh"),
@@ -246,6 +249,7 @@ class MVVerificationService:
             predicted_savings_kwh=projected_savings.get("energy_kwh", 0) or projected_savings.get("total_kwh", 0),
             predicted_savings_zar=projected_savings.get("cost_zar_per_hour", 0),
             baseline_power_kw=baseline_power_kw,
+            recommendation_systems=systems,
             setpoints_applied=setpoints_applied,
             routing_tier=routing_tier,
             control_tier=control_tier_val,
@@ -425,7 +429,46 @@ class MVVerificationService:
         )
         self._outcomes.append(outcome)
 
-        # 6. Log to audit trail
+        # 6. Feed verified outcomes into shared ML feedback loop per module.
+        try:
+            from app.services.ml_feedback_service import get_ml_feedback_service
+
+            ml_feedback = get_ml_feedback_service()
+            module_names = [s.lower() for s in (task.recommendation_systems or ["hvac"])]
+            primary_equipment = None
+            if task.setpoints_applied:
+                primary_equipment = task.setpoints_applied[0].get("device_id")
+
+            for module_name in module_names:
+                ml_feedback.record_module_outcome(
+                    site_id=task.site_id,
+                    module_type=module_name,
+                    recommendation_id=task.recommendation_id,
+                    action_type="optimization_mv_verification",
+                    successful=task.status == "verified" and not task.rollback_recommended,
+                    outcome_status=task.status,
+                    predicted_impact={
+                        "energy_kwh": task.predicted_savings_kwh,
+                        "cost_zar_per_hour": task.predicted_savings_zar,
+                    },
+                    actual_impact={
+                        "energy_kwh": task.actual_savings_kwh,
+                        "variance_pct": task.variance_pct,
+                        "comfort_violations": len(comfort_violations),
+                    },
+                    confidence_score=task.effective_confidence,
+                    equipment_id=primary_equipment,
+                    metadata={
+                        "source": "mv_verification",
+                        "rollback_recommended": task.rollback_recommended,
+                        "routing_tier": task.routing_tier,
+                        "control_tier": task.control_tier,
+                    },
+                )
+        except Exception as e:
+            logger.warning(f"M&V: Failed to record ML module feedback for {task.id}: {e}")
+
+        # 7. Log to audit trail
         try:
             audit = AuditLogger()
             audit.log_system_event(

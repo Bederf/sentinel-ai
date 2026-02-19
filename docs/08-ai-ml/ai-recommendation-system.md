@@ -882,8 +882,107 @@ for full endpoint documentation:
 
 ---
 
+## Recommendation Validation & Execution Agent (LangGraph)
+
+### Overview
+
+The Recommendation Agent is a **system-initiated (proactive)** LangGraph StateGraph that takes pending recommendations through the complete lifecycle: validate → assess impact → check schedule → route tier → execute or approve → feedback. Unlike the desk complaint agent (user-initiated, reactive), this agent runs on a schedule or trigger and drives each recommendation to completion — including human-in-the-loop approval via WhatsApp/Telegram for Tier 2 actions.
+
+**Key characteristics:**
+- **LLM usage:** Zero — all nodes are pure Python wrapping existing services
+- **Framework:** LangGraph StateGraph with MemorySaver checkpointing
+- **Channels:** system, chat, WhatsApp, Telegram
+- **Triggers:** manual, scheduled, health_alert
+
+### Graph Architecture
+
+```
+START → fetch_pending
+         │
+         ├─ (no recs) → format_result → END
+         │
+         └─ validate_relevance
+              │
+              ├─ (stale) → mark_expired → END
+              │
+              └─ assess_impact → check_schedule
+                                    │
+                                    ├─ (conflict) → defer → END
+                                    │
+                                    └─ route_tier
+                                         │
+                                  ┌──────┼──────────┐
+                                  ▼      ▼          ▼
+                            log_advisory  request_approval  auto_execute
+                            (Tier 1)      (Tier 2)          (Tier 3)
+                                  │       │                 │
+                                  │  [needs_input=True]     │
+                                  │       │ (resume)        │
+                                  │  handle_approval_response
+                                  │       │                 │
+                                  └───► submit_feedback ◄───┘
+                                            │
+                                       format_result → END
+```
+
+### Agent Files
+
+| File | Purpose |
+|------|---------|
+| `backend/app/agents/recommendation_graph.py` | LangGraph StateGraph with 13 nodes, conditional edges, MemorySaver |
+| `backend/app/agents/recommendation_tools.py` | Async service wrappers (11 functions) — no new business logic |
+| `backend/app/agents/recommendation_formatters.py` | Channel-specific output formatting (WhatsApp, Telegram, chat, system) |
+| `backend/app/agents/__init__.py` | Exports `get_recommendation_graph()` singleton |
+
+### Nodes
+
+| Node | Service Called | What It Does |
+|------|---------------|--------------|
+| `fetch_pending` | `RecommendationService` | Gets next PENDING recommendation for site |
+| `validate_relevance` | `HealthSimulationService` | Checks freshness (max 30min) and equipment health |
+| `mark_expired` | `RecommendationRepository` | Marks stale rec as expired |
+| `assess_impact` | `EnergyCostService` | Calculates cost/energy/comfort impact |
+| `check_schedule` | `WorkOrderRepository` | Checks for open work orders on equipment |
+| `route_tier` | `TierRoutingEngine` | Routes through PARASITE tier engine |
+| `log_advisory` | — | Formats Tier 1 advisory for appropriate channel |
+| `request_approval` | `WhatsAppService` | Sends Tier 2 approval request, sets `needs_input=True` |
+| `auto_execute` | `ApprovalService` | Executes with safety + COV + rollback |
+| `handle_approval_response` | `ApprovalService` | Processes APPROVE/REJECT reply on resume |
+| `submit_feedback` | `MLFeedbackService` | Closes ML learning loop |
+| `format_result` | — | Sets `processing_complete=True` |
+
+### Tier 2 Approval Flow (Multi-Turn)
+
+1. Agent processes recommendation → routes to Tier 2
+2. `request_approval` sends WhatsApp/Telegram message with APPROVE/REJECT CTA
+3. Graph ends with `needs_input=True`, state checkpointed
+4. User replies via WhatsApp ("APPROVE") or Telegram ("/approve rec-id")
+5. Agent resumes from checkpoint → `handle_approval_response`
+6. If approved → `ApprovalService.execute_approval()` → `submit_feedback`
+7. If rejected → `ApprovalService.reject_approval()` → `submit_feedback`
+
+### Integration Points
+
+| Integration | Endpoint/Handler |
+|-------------|-----------------|
+| **API trigger** | `POST /api/recommendations/{site_id}/process-pending` |
+| **Chat tool** | `process_recommendation` registered in `chat_tools.py` |
+| **WhatsApp approval** | `route_incoming_message()` in `whatsapp_webhooks.py` detects APPROVE/REJECT |
+| **Telegram approval** | `handle_telegram_recommendation_approval()` in `work_order_notifier.py` |
+
+### Tests
+
+| File | Tests | Coverage |
+|------|-------|----------|
+| `tests/agents/test_recommendation_graph.py` | 59 unit tests | All nodes, edges, formatters, tools |
+| `tests/agents/test_recommendation_routing.py` | 13 integration tests | Full graph traversal for all tier paths |
+| **Total** | **72 tests** | All passing |
+
+---
+
 ## Related Documents
 
+- [Recommendation Agent Feature Doc](../04-features/recommendation-agent.md) - Full feature specification
 - [Load Shedding Optimization](../14-south-africa-context/load-shedding-optimization.md) - South African load shedding context
 - [Safety Interlocks Engine](../06-safety-compliance/safety-interlocks-engine.md) - Safety validation
 - [Hybrid AI Routing](../08-ai-ml/hybrid-ai-routing.md) - Claude vs Ollama routing
@@ -895,5 +994,6 @@ for full endpoint documentation:
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 3.0.0 | 2026-02-19 | Added Recommendation Validation & Execution Agent (LangGraph): 13-node StateGraph, 3-tier routing, WhatsApp/Telegram approval flow, ML feedback loop, 72 tests |
 | 2.0.0 | 2026-02-19 | Fixed Southern Hemisphere exposure (NORTH=max gain); top-floor modifier (0.7→1.2x); sensor-health confidence penalty; schedule-aware savings; M&V verification loop; humidity seasonal guard |
 | 1.0.0 | 2026-02-02 | Initial documentation |

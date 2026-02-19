@@ -16,10 +16,18 @@ from typing import List, Dict, Any, Optional
 import uuid
 
 from app.models.module_registry import (
-    ModuleType, ModuleStatus, ModuleDefinition, ModuleInstance,
-    CrossModuleLink, AIRecommendation, ModuleIntegrationEvent,
-    SiteModuleConfig, RecommendationType, RecommendationPriority,
-    MODULE_DEFINITIONS, INTEGRATION_DEFINITIONS
+    ModuleType,
+    ModuleStatus,
+    ModuleDefinition,
+    ModuleInstance,
+    CrossModuleLink,
+    AIRecommendation,
+    ModuleIntegrationEvent,
+    SiteModuleConfig,
+    RecommendationType,
+    RecommendationPriority,
+    MODULE_DEFINITIONS,
+    INTEGRATION_DEFINITIONS,
 )
 from app.services.health_threshold_service import get_health_thresholds
 
@@ -28,22 +36,22 @@ logger = logging.getLogger(__name__)
 # Core infrastructure modules (non-deactivatable base features)
 # These are always active and provide the foundation for all monitoring and automation
 NON_DEACTIVATABLE_MODULES = {
-    ModuleType.KPI,           # Dashboard KPI metrics
-    ModuleType.ML,            # Risk intelligence and predictions
-    ModuleType.HVAC,          # HVAC monitoring (read-only in base, control via CONTROL module)
-    ModuleType.ENERGY,        # Energy monitoring (read-only in base, control via CONTROL module)
-    ModuleType.ASSETS,        # Asset visibility and lifecycle
-    ModuleType.SIMBIOT,       # BMS connection and SIMBIOT wizard
+    ModuleType.KPI,  # Dashboard KPI metrics
+    ModuleType.ML,  # Risk intelligence and predictions
+    ModuleType.HVAC,  # HVAC monitoring (read-only in base, control via CONTROL module)
+    ModuleType.ENERGY,  # Energy monitoring (read-only in base, control via CONTROL module)
+    ModuleType.ASSETS,  # Asset visibility and lifecycle
+    ModuleType.SIMBIOT,  # BMS connection and SIMBIOT wizard
     ModuleType.INTEGRATIONS,  # System health and integration monitoring
-    ModuleType.NOTIFICATIONS, # Notification management
+    ModuleType.NOTIFICATIONS,  # Notification management
 }
 
 # Module dependency map: modules that require other modules to be active
 # Format: {dependent_module: required_module}
 # E.g., SOLAR requires CONTROL to be active to function
 MODULE_DEPENDENCIES = {
-    ModuleType.SOLAR: ModuleType.CONTROL,      # BESS arbitrage needs control authority
-    ModuleType.LIGHTING: ModuleType.CONTROL,   # Occupancy automation needs HVAC/DALI control
+    ModuleType.SOLAR: ModuleType.CONTROL,  # BESS arbitrage needs control authority
+    ModuleType.LIGHTING: ModuleType.CONTROL,  # Occupancy automation needs HVAC/DALI control
 }
 
 
@@ -84,7 +92,7 @@ class ModuleRegistryService:
             data = {}
             for site_id, config in self._site_configs.items():
                 data[site_id] = self._serialize_site_config(config)
-            with open(config_file, 'w') as f:
+            with open(config_file, "w") as f:
                 json.dump(data, f, indent=2)
         except Exception as e:
             logger.error(f"Error saving module configs: {e}")
@@ -119,23 +127,23 @@ class ModuleRegistryService:
                     config=m.get("config", {}),
                     health_score=m.get("health_score", 100.0),
                     last_telemetry=m.get("last_telemetry"),
-                    error_message=m.get("error_message")
+                    error_message=m.get("error_message"),
                 )
                 for m in data.get("active_modules", [])
             ],
             cross_module_links=[
                 CrossModuleLink(
-                    link_id=l["link_id"],
-                    source_module=ModuleType(l["source_module"]),
-                    target_module=ModuleType(l["target_module"]),
-                    integration_type=l["integration_type"],
-                    enabled=l.get("enabled", True),
-                    config=l.get("config", {})
+                    link_id=lnk["link_id"],
+                    source_module=ModuleType(lnk["source_module"]),
+                    target_module=ModuleType(lnk["target_module"]),
+                    integration_type=lnk["integration_type"],
+                    enabled=lnk.get("enabled", True),
+                    config=lnk.get("config", {}),
                 )
-                for l in data.get("cross_module_links", [])
+                for lnk in data.get("cross_module_links", [])
             ],
             ai_enabled=data.get("ai_enabled", True),
-            auto_integration=data.get("auto_integration", True)
+            auto_integration=data.get("auto_integration", True),
         )
 
     def _serialize_site_config(self, config: SiteModuleConfig) -> Dict:
@@ -153,23 +161,23 @@ class ModuleRegistryService:
                     "config": m.config,
                     "health_score": m.health_score,
                     "last_telemetry": m.last_telemetry,
-                    "error_message": m.error_message
+                    "error_message": m.error_message,
                 }
                 for m in config.active_modules
             ],
             "cross_module_links": [
                 {
-                    "link_id": l.link_id,
-                    "source_module": l.source_module.value,
-                    "target_module": l.target_module.value,
-                    "integration_type": l.integration_type,
-                    "enabled": l.enabled,
-                    "config": l.config
+                    "link_id": lnk.link_id,
+                    "source_module": lnk.source_module.value,
+                    "target_module": lnk.target_module.value,
+                    "integration_type": lnk.integration_type,
+                    "enabled": lnk.enabled,
+                    "config": lnk.config,
                 }
-                for l in config.cross_module_links
+                for lnk in config.cross_module_links
             ],
             "ai_enabled": config.ai_enabled,
-            "auto_integration": config.auto_integration
+            "auto_integration": config.auto_integration,
         }
 
     # ==================== Module Management ====================
@@ -199,11 +207,7 @@ class ModuleRegistryService:
         return any(m.module_type == module_type for m in modules)
 
     def activate_module(
-        self,
-        site_id: str,
-        site_name: str,
-        module_type: ModuleType,
-        config: Optional[Dict[str, Any]] = None
+        self, site_id: str, site_name: str, module_type: ModuleType, config: Optional[Dict[str, Any]] = None
     ) -> ModuleInstance:
         """
         Activate a module for a site.
@@ -216,10 +220,7 @@ class ModuleRegistryService:
         """
         # Get or create site config
         if site_id not in self._site_configs:
-            self._site_configs[site_id] = SiteModuleConfig(
-                site_id=site_id,
-                site_name=site_name
-            )
+            self._site_configs[site_id] = SiteModuleConfig(site_id=site_id, site_name=site_name)
 
         site_config = self._site_configs[site_id]
 
@@ -227,8 +228,7 @@ class ModuleRegistryService:
         if module_type in MODULE_DEPENDENCIES:
             required_module = MODULE_DEPENDENCIES[module_type]
             is_required_active = any(
-                m.module_type == required_module and m.status == ModuleStatus.ACTIVE
-                for m in site_config.active_modules
+                m.module_type == required_module and m.status == ModuleStatus.ACTIVE for m in site_config.active_modules
             )
             if not is_required_active:
                 raise ValueError(
@@ -237,10 +237,7 @@ class ModuleRegistryService:
                 )
 
         # Check if module already active
-        existing = next(
-            (m for m in site_config.active_modules if m.module_type == module_type),
-            None
-        )
+        existing = next((m for m in site_config.active_modules if m.module_type == module_type), None)
         if existing:
             existing.status = ModuleStatus.ACTIVE
             existing.error_message = None
@@ -254,7 +251,7 @@ class ModuleRegistryService:
             module_type=module_type,
             status=ModuleStatus.ACTIVE,
             activated_at=datetime.utcnow().isoformat(),
-            config=config or {}
+            config=config or {},
         )
 
         site_config.active_modules.append(instance)
@@ -311,7 +308,8 @@ class ModuleRegistryService:
             # CASCADE: Deactivate dependent modules
             # Find all modules that depend on the deactivated module
             dependent_modules = [
-                dep_module for dep_module, required_module in MODULE_DEPENDENCIES.items()
+                dep_module
+                for dep_module, required_module in MODULE_DEPENDENCIES.items()
                 if required_module == module_type
             ]
 
@@ -359,7 +357,7 @@ class ModuleRegistryService:
             "activated": [],
             "deactivated": [],
             "errors": [],
-            "messaging": preset.get("savings_messaging", "")
+            "messaging": preset.get("savings_messaging", ""),
         }
 
         # Get site name for module activation
@@ -403,7 +401,12 @@ class ModuleRegistryService:
             except Exception as e:
                 result["errors"].append(f"Failed to activate {module_name}: {str(e)}")
 
-        logger.info(f"Applied preset '{preset_name}' to site {site_id}: {len(result['activated'])} activated, {len(result['deactivated'])} deactivated, {len(result['errors'])} errors")
+        logger.info(
+            f"Applied preset '{preset_name}' to site {site_id}:"
+            f" {len(result['activated'])} activated,"
+            f" {len(result['deactivated'])} deactivated,"
+            f" {len(result['errors'])} errors"
+        )
 
         return result
 
@@ -425,21 +428,16 @@ class ModuleRegistryService:
             target = integration_def["target"]
 
             # Check if this integration applies to the new module and another active module
-            if (source == new_module and target in active_types) or \
-               (target == new_module and source in active_types):
-
+            if (source == new_module and target in active_types) or (target == new_module and source in active_types):
                 # Check if link already exists
-                existing = any(
-                    l.integration_type == integration_id
-                    for l in config.cross_module_links
-                )
+                existing = any(lnk.integration_type == integration_id for lnk in config.cross_module_links)
                 if not existing:
                     link = CrossModuleLink(
                         link_id=f"{site_id}-{integration_id}",
                         source_module=source,
                         target_module=target,
                         integration_type=integration_id,
-                        enabled=True
+                        enabled=True,
                     )
                     config.cross_module_links.append(link)
                     logger.info(f"Created integration link: {integration_id} for site {site_id}")
@@ -466,7 +464,7 @@ class ModuleRegistryService:
         module_filter: Optional[List[ModuleType]] = None,
         priority_filter: Optional[List[RecommendationPriority]] = None,
         include_resolved: bool = False,
-        limit: int = 50
+        limit: int = 50,
     ) -> List[AIRecommendation]:
         """Get AI recommendations for a site with optional filters."""
         recs = self._recommendations.get(site_id, [])
@@ -488,7 +486,7 @@ class ModuleRegistryService:
             RecommendationPriority.CRITICAL: 0,
             RecommendationPriority.HIGH: 1,
             RecommendationPriority.MEDIUM: 2,
-            RecommendationPriority.LOW: 3
+            RecommendationPriority.LOW: 3,
         }
         recs.sort(key=lambda r: (priority_order.get(r.priority, 99), r.timestamp), reverse=True)
 
@@ -509,14 +507,54 @@ class ModuleRegistryService:
         for rec in recs:
             if rec.recommendation_id == recommendation_id:
                 rec.resolved = True
+                self._record_module_feedback_event(
+                    site_id=site_id,
+                    recommendation=rec,
+                    outcome_status="resolved",
+                    successful=True,
+                )
                 return True
         return False
 
-    def _process_cross_module_recommendation(
+    def _record_module_feedback_event(
         self,
+        *,
         site_id: str,
-        recommendation: AIRecommendation
+        recommendation: AIRecommendation,
+        outcome_status: str,
+        successful: bool,
     ) -> None:
+        """Record module registry recommendation lifecycle outcome into ML feedback."""
+        try:
+            from app.services.ml_feedback_service import get_ml_feedback_service
+
+            ml_feedback = get_ml_feedback_service()
+            ml_feedback.record_module_outcome(
+                site_id=site_id,
+                module_type=recommendation.source_module.value,
+                recommendation_id=recommendation.recommendation_id,
+                action_type=recommendation.recommendation_type.value,
+                successful=successful,
+                outcome_status=outcome_status,
+                predicted_impact={
+                    "confidence": recommendation.confidence,
+                },
+                actual_impact={},
+                confidence_score=recommendation.confidence,
+                metadata={
+                    "source": "module_registry",
+                    "priority": recommendation.priority.value,
+                    "auto_actionable": recommendation.auto_actionable,
+                },
+            )
+        except Exception as e:
+            logger.warning(
+                "Non-blocking module feedback recording failed for registry recommendation %s: %s",
+                recommendation.recommendation_id,
+                e,
+            )
+
+    def _process_cross_module_recommendation(self, site_id: str, recommendation: AIRecommendation) -> None:
         """Process recommendation for cross-module actions."""
         if recommendation.recommendation_type != RecommendationType.CROSS_SYSTEM:
             return
@@ -532,11 +570,16 @@ class ModuleRegistryService:
 
             # Find enabled link between source and related module
             link = next(
-                (l for l in config.cross_module_links
-                 if l.enabled and
-                 ((l.source_module == recommendation.source_module and l.target_module == related_module) or
-                  (l.source_module == related_module and l.target_module == recommendation.source_module))),
-                None
+                (
+                    lnk
+                    for lnk in config.cross_module_links
+                    if lnk.enabled
+                    and (
+                        (lnk.source_module == recommendation.source_module and lnk.target_module == related_module)
+                        or (lnk.source_module == related_module and lnk.target_module == recommendation.source_module)
+                    )
+                ),
+                None,
             )
 
             if link and recommendation.auto_actionable:
@@ -549,10 +592,12 @@ class ModuleRegistryService:
                     event_type="action_request",
                     payload={
                         "recommendation_id": recommendation.recommendation_id,
-                        "action": recommendation.suggested_action
-                    }
+                        "action": recommendation.suggested_action,
+                    },
                 )
-                logger.info(f"Cross-module event: {event.event_id} - {recommendation.source_module} -> {related_module}")
+                logger.info(
+                    f"Cross-module event: {event.event_id} - {recommendation.source_module} -> {related_module}"
+                )
 
     # ==================== Telemetry Integration ====================
 
@@ -570,7 +615,7 @@ class ModuleRegistryService:
             "site_id": site_id,
             "timestamp": datetime.utcnow().isoformat(),
             "modules": {},
-            "cross_module_status": {}
+            "cross_module_status": {},
         }
 
         active_modules = self.get_active_modules(site_id)
@@ -583,7 +628,7 @@ class ModuleRegistryService:
                     "health_score": module.health_score,
                     "last_telemetry": module.last_telemetry,
                     "capabilities": [c.capability_id for c in module_def.capabilities],
-                    "ai_features": module_def.ai_features
+                    "ai_features": module_def.ai_features,
                 }
 
         # Add cross-module integration status
@@ -592,17 +637,13 @@ class ModuleRegistryService:
                 telemetry["cross_module_status"][link.integration_type] = {
                     "source": link.source_module.value,
                     "target": link.target_module.value,
-                    "enabled": link.enabled
+                    "enabled": link.enabled,
                 }
 
         return telemetry
 
     def update_module_health(
-        self,
-        site_id: str,
-        module_type: ModuleType,
-        health_score: float,
-        telemetry_timestamp: Optional[str] = None
+        self, site_id: str, module_type: ModuleType, health_score: float, telemetry_timestamp: Optional[str] = None
     ) -> None:
         """Update health score and telemetry timestamp for a module."""
         config = self._site_configs.get(site_id)
@@ -624,12 +665,14 @@ class ModuleRegistryService:
                             timestamp=datetime.utcnow().isoformat(),
                             source_module=module_type,
                             recommendation_type=RecommendationType.MAINTENANCE,
-                            priority=RecommendationPriority.HIGH if health_score < thresholds["critical"] else RecommendationPriority.MEDIUM,
+                            priority=RecommendationPriority.HIGH
+                            if health_score < thresholds["critical"]
+                            else RecommendationPriority.MEDIUM,
                             title=f"{module_type.value.upper()} Module Health Warning",
                             description=f"Module health at {health_score:.0f}%. Investigation recommended.",
                             confidence=0.9,
-                            telemetry_context={"health_score": health_score}
-                        )
+                            telemetry_context={"health_score": health_score},
+                        ),
                     )
                 break
 
@@ -655,26 +698,26 @@ class ModuleRegistryService:
             target = integration_def["target"]
 
             link = next(
-                (l for l in config.cross_module_links if l.integration_type == integration_id),
-                None
+                (lnk for lnk in config.cross_module_links if lnk.integration_type == integration_id),
+                None,
             )
 
             if source in active_types and target in active_types:
                 if link and link.enabled:
-                    active_integrations.append({
-                        "id": integration_id,
-                        "name": integration_def["name"],
-                        "description": integration_def["description"],
-                        "source": source.value,
-                        "target": target.value
-                    })
+                    active_integrations.append(
+                        {
+                            "id": integration_id,
+                            "name": integration_def["name"],
+                            "description": integration_def["description"],
+                            "source": source.value,
+                            "target": target.value,
+                        }
+                    )
             elif source in active_types or target in active_types:
                 missing = target if source in active_types else source
-                potential_integrations.append({
-                    "id": integration_id,
-                    "name": integration_def["name"],
-                    "requires_module": missing.value
-                })
+                potential_integrations.append(
+                    {"id": integration_id, "name": integration_def["name"], "requires_module": missing.value}
+                )
 
         return {
             "site_id": site_id,
@@ -684,17 +727,16 @@ class ModuleRegistryService:
                     "type": m.module_type.value,
                     "name": MODULE_DEFINITIONS[m.module_type].name,
                     "health": m.health_score,
-                    "status": m.status.value
+                    "status": m.status.value,
                 }
                 for m in active_modules
             ],
             "active_integrations": active_integrations,
             "potential_integrations": potential_integrations,
             "ai_enabled": config.ai_enabled,
-            "pending_recommendations": len([
-                r for r in self._recommendations.get(site_id, [])
-                if not r.resolved and not r.acknowledged
-            ])
+            "pending_recommendations": len(
+                [r for r in self._recommendations.get(site_id, []) if not r.resolved and not r.acknowledged]
+            ),
         }
 
 

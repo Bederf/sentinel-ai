@@ -230,7 +230,10 @@ class LifecycleOrchestrator:
     """
     Orchestrates a 24-hour building simulation.
 
-    Integrates:
+    Integrates health simulation, work order automation, AI optimization,
+    and multi-day seasonal patterns into a unified lifecycle loop.
+    """
+
     def __init__(self, task_id: Optional[str] = None):
         self.task_id = task_id  # For database task tracking
         self.running = False
@@ -250,7 +253,7 @@ class LifecycleOrchestrator:
         self.device_control_service = get_device_control_service()
         self._task: Optional[asyncio.Task] = None
         self._callbacks: List[Callable[[LifecycleEvent], None]] = []
-        
+
         # Energy tracking
         self.total_energy_kwh: float = 0.0  # Cumulative energy consumption
         self.current_hour_power_kw: float = 0.0  # Current hour's power in kW
@@ -452,6 +455,7 @@ class LifecycleOrchestrator:
 
     def pause(self):
         """Pause the simulation."""
+
     def get_status(self) -> Dict[str, Any]:
         """Get current simulation status including weather and seasonal data."""
         elapsed_real = (datetime.now() - self.real_start_time).total_seconds() if self.real_start_time else 0
@@ -508,12 +512,6 @@ class LifecycleOrchestrator:
                 {
                     "hour": e.simulated_hour,
                     "type": e.event_type.value,
-                    "description": e.description,
-                    "equipment": e.equipment_name,
-                }
-                for e in self.events[-10:]
-            ],
-        }           "type": e.event_type.value,
                     "description": e.description,
                     "equipment": e.equipment_name,
                 }

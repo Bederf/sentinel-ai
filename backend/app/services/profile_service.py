@@ -6,6 +6,7 @@ profile configurations including zone and schedule overrides.
 
 import json
 import logging
+import copy
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 
@@ -66,11 +67,28 @@ class ProfileService:
         if not config:
             return None
 
-        return self.profiles.get(config.active_profile)
+        base_profile = self.profiles.get(config.active_profile)
+        if not base_profile:
+            return None
 
-    def get_zone_profile(
-        self, site_id: str, zone_id: str
-    ) -> Optional[Dict[str, Any]]:
+        # Copy to avoid mutating global profile definitions.
+        profile = copy.deepcopy(base_profile)
+
+        # Merge feedback-derived scoring inputs for dynamic recommendation ranking.
+        try:
+            from app.services.ml_feedback_service import get_ml_feedback_service
+
+            scoring_inputs = get_ml_feedback_service().get_scoring_inputs(site_id)
+            module_multipliers = scoring_inputs.get("module_multipliers", {})
+            if isinstance(module_multipliers, dict):
+                profile["module_multipliers"] = module_multipliers
+                profile["feedback_scoring_refreshed_at"] = scoring_inputs.get("refreshed_at")
+        except Exception as e:
+            logger.debug(f"Could not load feedback scoring inputs for {site_id}: {e}")
+
+        return profile
+
+    def get_zone_profile(self, site_id: str, zone_id: str) -> Optional[Dict[str, Any]]:
         """Get profile for specific zone (handles overrides).
 
         If a zone has an override, returns the override profile. Otherwise,
@@ -95,9 +113,7 @@ class ProfileService:
         # Fall back to site profile
         return self.get_site_profile(site_id)
 
-    def get_profile_params(
-        self, profile: str, module: str
-    ) -> Dict[str, Any]:
+    def get_profile_params(self, profile: str, module: str) -> Dict[str, Any]:
         """Get module-specific parameters for a profile.
 
         Extracts parameters relevant to a specific module (e.g., hvac, lighting).
@@ -124,9 +140,7 @@ class ProfileService:
 
         return module_params
 
-    def save_site_profile_config(
-        self, site_id: str, config: SiteProfileConfig
-    ) -> bool:
+    def save_site_profile_config(self, site_id: str, config: SiteProfileConfig) -> bool:
         """Save profile configuration to building.json.
 
         Persists the profile configuration to the building's JSON file.
@@ -139,13 +153,7 @@ class ProfileService:
             True if successful, False otherwise
         """
         try:
-            building_path = (
-                Path(__file__).parent.parent
-                / "data"
-                / "buildings"
-                / site_id
-                / "building.json"
-            )
+            building_path = Path(__file__).parent.parent / "data" / "buildings" / site_id / "building.json"
 
             if not building_path.exists():
                 logger.warning(f"Building file not found: {building_path}")
@@ -186,13 +194,7 @@ class ProfileService:
             return self.site_configs[site_id]
 
         try:
-            building_path = (
-                Path(__file__).parent.parent
-                / "data"
-                / "buildings"
-                / site_id
-                / "building.json"
-            )
+            building_path = Path(__file__).parent.parent / "data" / "buildings" / site_id / "building.json"
 
             if not building_path.exists():
                 logger.warning(f"Building file not found: {building_path}")
@@ -241,9 +243,7 @@ class ProfileService:
             )
         return profiles_list
 
-    def update_zone_override(
-        self, site_id: str, zone_id: str, profile: str, reason: str
-    ) -> bool:
+    def update_zone_override(self, site_id: str, zone_id: str, profile: str, reason: str) -> bool:
         """Add or update a zone profile override.
 
         Args:
@@ -260,15 +260,11 @@ class ProfileService:
             return False
 
         # Remove existing override for this zone if present
-        config.zone_overrides = [
-            zo for zo in config.zone_overrides if zo.zone_id != zone_id
-        ]
+        config.zone_overrides = [zo for zo in config.zone_overrides if zo.zone_id != zone_id]
 
         # Add new override
         if profile:  # Only add if profile is not empty
-            config.zone_overrides.append(
-                ZoneProfileOverride(zone_id=zone_id, profile=profile, reason=reason)
-            )
+            config.zone_overrides.append(ZoneProfileOverride(zone_id=zone_id, profile=profile, reason=reason))
 
         return self.save_site_profile_config(site_id, config)
 
@@ -286,9 +282,7 @@ class ProfileService:
         if not config:
             return False
 
-        config.zone_overrides = [
-            zo for zo in config.zone_overrides if zo.zone_id != zone_id
-        ]
+        config.zone_overrides = [zo for zo in config.zone_overrides if zo.zone_id != zone_id]
 
         return self.save_site_profile_config(site_id, config)
 

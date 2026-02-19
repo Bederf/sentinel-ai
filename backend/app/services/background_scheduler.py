@@ -38,12 +38,18 @@ class BackgroundSchedulerService:
 
     def __init__(self):
         """Initialize background scheduler."""
-        if hasattr(self, '_initialized'):
+        if hasattr(self, "_initialized"):
             return
 
         self._initialized = True
         self.scheduler = BackgroundScheduler()
         self._main_loop = None  # Will be set during startup
+        self._feedback_retraining_last_trigger: dict[str, datetime] = {}
+        self._feedback_retraining_policy = {
+            "min_records": 10,
+            "min_success_rate": 70.0,
+            "cooldown_hours": 24,
+        }
         logger.info("Background scheduler initialized")
 
     def set_main_loop(self, loop: asyncio.AbstractEventLoop):
@@ -71,17 +77,17 @@ class BackgroundSchedulerService:
             interval_seconds: How often to generate demo data (default: 60 seconds)
         """
         # Remove existing job if it exists
-        if self.scheduler.get_job('generate_demo_audit_data'):
-            self.scheduler.remove_job('generate_demo_audit_data')
+        if self.scheduler.get_job("generate_demo_audit_data"):
+            self.scheduler.remove_job("generate_demo_audit_data")
             logger.info("Removed existing demo data job")
 
         # Add new job
         self.scheduler.add_job(
             func=self._generate_demo_audit_data,
             trigger=IntervalTrigger(seconds=interval_seconds),
-            id='generate_demo_audit_data',
-            name='Generate Demo Audit Data',
-            replace_existing=True
+            id="generate_demo_audit_data",
+            name="Generate Demo Audit Data",
+            replace_existing=True,
         )
         logger.info(f"Added demo data job with {interval_seconds}s interval")
 
@@ -103,15 +109,25 @@ class BackgroundSchedulerService:
                 if equipment_list:
                     # Sample controllable equipment types for realistic audit logs
                     controllable_types = [
-                        'fcu', 'ahu', 'vav', 'chiller', 'pump',
-                        'dali_controller', 'luminaire', 'luminaire_group',
-                        'generator', 'ups', 'ats', 'transformer',
-                        'lv_switchboard', 'power_meter',
+                        "fcu",
+                        "ahu",
+                        "vav",
+                        "chiller",
+                        "pump",
+                        "dali_controller",
+                        "luminaire",
+                        "luminaire_group",
+                        "generator",
+                        "ups",
+                        "ats",
+                        "transformer",
+                        "lv_switchboard",
+                        "power_meter",
                     ]
                     demo_devices = [
-                        eq.get('code') or eq.get('equipment_id') or eq.get('id')
+                        eq.get("code") or eq.get("equipment_id") or eq.get("id")
                         for eq in equipment_list
-                        if any(t in (eq.get('type', '') or '').lower() for t in controllable_types)
+                        if any(t in (eq.get("type", "") or "").lower() for t in controllable_types)
                     ][:20]  # Limit to 20 devices
             except Exception as e:
                 logger.warning(f"Could not fetch site-002 equipment: {e}")
@@ -119,17 +135,34 @@ class BackgroundSchedulerService:
             # Fallback to real Sandton City equipment codes if Supabase unavailable
             if not demo_devices:
                 demo_devices = [
-                    "S002-CHILLER-B1-001", "S002-CHILLER-B1-002", "S002-CHILLER-B1-003",
-                    "S002-AHU-L0-01", "S002-AHU-L1-01", "S002-AHU-L2-01",
-                    "S002-FCU-L0-A", "S002-FCU-L1-A", "S002-FCU-L1-C",
-                    "S002-FCU-L2-A", "S002-FCU-L2-C",
-                    "S002-VAV-L0-C", "S002-VAV-L1-A", "S002-VAV-L1-E",
-                    "S002-VAV-L2-A", "S002-VAV-L2-E",
-                    "S002-DALI-L0-01", "S002-DALI-L1-01", "S002-DALI-L2-05",
-                    "S002-LUM-L0-A", "S002-LUM-L1-A", "S002-LUM-L2-E",
-                    "S002-GEN-B1-001", "S002-GEN-B1-002",
-                    "S002-UPS-B1-001", "S002-ATS-B1-001",
-                    "S002-TX-B1-001", "S002-MTR-B1-MAIN",
+                    "S002-CHILLER-B1-001",
+                    "S002-CHILLER-B1-002",
+                    "S002-CHILLER-B1-003",
+                    "S002-AHU-L0-01",
+                    "S002-AHU-L1-01",
+                    "S002-AHU-L2-01",
+                    "S002-FCU-L0-A",
+                    "S002-FCU-L1-A",
+                    "S002-FCU-L1-C",
+                    "S002-FCU-L2-A",
+                    "S002-FCU-L2-C",
+                    "S002-VAV-L0-C",
+                    "S002-VAV-L1-A",
+                    "S002-VAV-L1-E",
+                    "S002-VAV-L2-A",
+                    "S002-VAV-L2-E",
+                    "S002-DALI-L0-01",
+                    "S002-DALI-L1-01",
+                    "S002-DALI-L2-05",
+                    "S002-LUM-L0-A",
+                    "S002-LUM-L1-A",
+                    "S002-LUM-L2-E",
+                    "S002-GEN-B1-001",
+                    "S002-GEN-B1-002",
+                    "S002-UPS-B1-001",
+                    "S002-ATS-B1-001",
+                    "S002-TX-B1-001",
+                    "S002-MTR-B1-MAIN",
                     "S002-CO2-L1-E",
                 ]
 
@@ -168,8 +201,7 @@ class BackgroundSchedulerService:
                     result = ART.SUCCESS
                 else:
                     result = random.choices(
-                        [ART.SUCCESS, ART.WARNING, ART.BLOCKED, ART.FAILED],
-                        weights=[70, 15, 10, 5]
+                        [ART.SUCCESS, ART.WARNING, ART.BLOCKED, ART.FAILED], weights=[70, 15, 10, 5]
                     )[0]
 
                 safety_validation = None
@@ -180,7 +212,7 @@ class BackgroundSchedulerService:
                         "rules_checked": ["temperature_range", "pressure_limits"],
                         "passed_rules": ["temperature_range"],
                         "failed_rules": ["pressure_limits"],
-                        "details": "Pressure exceeds safe operating limits"
+                        "details": "Pressure exceeds safe operating limits",
                     }
                     error_message = "Safety validation failed: Pressure limit exceeded"
                 elif result == ART.WARNING:
@@ -188,13 +220,13 @@ class BackgroundSchedulerService:
                         "rules_checked": ["temperature_range", "minimum_runtime"],
                         "passed_rules": ["temperature_range"],
                         "warnings": ["minimum_runtime"],
-                        "details": "Minimum runtime requirement not met (warning only)"
+                        "details": "Minimum runtime requirement not met (warning only)",
                     }
                 elif result == ART.SUCCESS:
                     safety_validation = {
                         "rules_checked": ["temperature_range", "pressure_limits"],
                         "passed_rules": ["temperature_range", "pressure_limits"],
-                        "details": "All safety checks passed"
+                        "details": "All safety checks passed",
                     }
 
                 # Build metadata - SENTINEL entries include AI optimization context
@@ -236,17 +268,17 @@ class BackgroundSchedulerService:
             interval_seconds: How often to run analysis (default: 900 seconds = 15 minutes)
         """
         # Remove existing job if it exists
-        if self.scheduler.get_job('run_optimization_analysis'):
-            self.scheduler.remove_job('run_optimization_analysis')
+        if self.scheduler.get_job("run_optimization_analysis"):
+            self.scheduler.remove_job("run_optimization_analysis")
             logger.info("Removed existing optimization analysis job")
 
         # Add new job
         self.scheduler.add_job(
             func=self._run_optimization_analysis,
             trigger=IntervalTrigger(seconds=interval_seconds),
-            id='run_optimization_analysis',
-            name='Run Optimization Analysis',
-            replace_existing=True
+            id="run_optimization_analysis",
+            name="Run Optimization Analysis",
+            replace_existing=True,
         )
         logger.info(f"Added optimization analysis job with {interval_seconds}s interval")
 
@@ -259,6 +291,7 @@ class BackgroundSchedulerService:
 
             # Load sites
             import json
+
             sites_file = DATA_DIR / "sites.json"
             if not sites_file.exists():
                 logger.warning("sites.json not found, skipping optimization analysis")
@@ -277,6 +310,7 @@ class BackgroundSchedulerService:
             logger.info(f"Running optimization analysis for {len(enabled_sites)} enabled sites")
 
             import asyncio
+
             results = []
 
             # Run analysis for each enabled site
@@ -289,9 +323,7 @@ class BackgroundSchedulerService:
                     loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(loop)
 
-                    recommendation = loop.run_until_complete(
-                        get_ai_optimizer().analyze_building(site_id)
-                    )
+                    recommendation = loop.run_until_complete(get_ai_optimizer().analyze_building(site_id))
 
                     loop.close()
 
@@ -310,32 +342,43 @@ class BackgroundSchedulerService:
                     if validation["allowed"] and len(recommendation.recommendations) > 0:
                         site["optimization_status"] = OptimizationStatus.RECOMMENDATION_PENDING.value
                         site["last_recommendation"] = recommendation.to_dict()
-                        results.append({
-                            "site_id": site_id,
-                            "site_name": site_name,
-                            "status": "success",
-                            "confidence": recommendation.confidence,
-                            "recommendations_count": len(recommendation.recommendations),
-                        })
+                        results.append(
+                            {
+                                "site_id": site_id,
+                                "site_name": site_name,
+                                "status": "success",
+                                "confidence": recommendation.confidence,
+                                "recommendations_count": len(recommendation.recommendations),
+                            }
+                        )
                     elif validation["allowed"] and len(recommendation.recommendations) == 0:
                         # No actionable recommendations - don't show notification
                         site["optimization_status"] = OptimizationStatus.OPTIMIZED.value
                         site["last_recommendation"] = None  # Clear any old recommendation
-                        results.append({
-                            "site_id": site_id,
-                            "site_name": site_name,
-                            "status": "skipped",
-                            "reason": "No actionable adjustments available (building has no controllable HVAC assets or conditions don't warrant changes)",
-                        })
+                        results.append(
+                            {
+                                "site_id": site_id,
+                                "site_name": site_name,
+                                "status": "skipped",
+                                "reason": (
+                                    "No actionable adjustments available"
+                                    " (building has no controllable HVAC"
+                                    " assets or conditions don't warrant"
+                                    " changes)"
+                                ),
+                            }
+                        )
                     else:
                         site["optimization_status"] = OptimizationStatus.WARNING.value
                         site["last_recommendation"] = recommendation.to_dict()
-                        results.append({
-                            "site_id": site_id,
-                            "site_name": site_name,
-                            "status": "warning",
-                            "reason": "Safety validation failed",
-                        })
+                        results.append(
+                            {
+                                "site_id": site_id,
+                                "site_name": site_name,
+                                "status": "warning",
+                                "reason": "Safety validation failed",
+                            }
+                        )
 
                     # Update last_analysis timestamp
                     if "optimization_settings" not in site:
@@ -348,6 +391,7 @@ class BackgroundSchedulerService:
                         site["optimization_history"] = []
 
                     from app.models.optimization import OptimizationHistoryEntry
+
                     history_entry = OptimizationHistoryEntry(
                         timestamp=datetime.now().isoformat(),
                         action="analyzed",
@@ -357,7 +401,7 @@ class BackgroundSchedulerService:
                             "confidence": recommendation.confidence,
                             "validation_passed": validation["allowed"],
                             "recommendations_count": len(recommendation.recommendations),
-                        }
+                        },
                     )
                     site["optimization_history"].append(history_entry.to_dict())
 
@@ -369,15 +413,17 @@ class BackgroundSchedulerService:
                     logger.error(f"Error analyzing site {site_id}: {e}")
                     site["optimization_status"] = OptimizationStatus.ERROR.value
                     site["error_message"] = str(e)
-                    results.append({
-                        "site_id": site_id,
-                        "site_name": site_name,
-                        "status": "error",
-                        "error": str(e),
-                    })
+                    results.append(
+                        {
+                            "site_id": site_id,
+                            "site_name": site_name,
+                            "status": "error",
+                            "error": str(e),
+                        }
+                    )
 
             # Save updated sites back to file
-            with open(sites_file, 'w') as f:
+            with open(sites_file, "w") as f:
                 json.dump(sites, f, indent=2)
 
             # Log summary
@@ -393,7 +439,6 @@ class BackgroundSchedulerService:
         except Exception as e:
             logger.error(f"Failed to run optimization analysis: {e}")
 
-
     def add_prediction_generation_job(self, interval_seconds: int = 300):
         """
         Add a job to generate predictions periodically.
@@ -404,17 +449,17 @@ class BackgroundSchedulerService:
             interval_seconds: How often to run (default: 300 seconds = 5 minutes)
         """
         # Remove existing job if it exists
-        if self.scheduler.get_job('generate_predictions'):
-            self.scheduler.remove_job('generate_predictions')
+        if self.scheduler.get_job("generate_predictions"):
+            self.scheduler.remove_job("generate_predictions")
             logger.info("Removed existing prediction generation job")
 
         # Add new job
         self.scheduler.add_job(
             func=self._run_prediction_generation,
             trigger=IntervalTrigger(seconds=interval_seconds),
-            id='generate_predictions',
-            name='Generate Predictions for At-Risk Equipment',
-            replace_existing=True
+            id="generate_predictions",
+            name="Generate Predictions for At-Risk Equipment",
+            replace_existing=True,
         )
         logger.info(f"Added prediction generation job with {interval_seconds}s interval")
 
@@ -437,9 +482,7 @@ class BackgroundSchedulerService:
             asyncio.set_event_loop(loop)
 
             try:
-                result = loop.run_until_complete(
-                    generator.generate_predictions_for_all_sites()
-                )
+                result = loop.run_until_complete(generator.generate_predictions_for_all_sites())
                 logger.info(
                     f"Prediction generation complete: {result['generated']} generated, "
                     f"{result['skipped_duplicate']} skipped (duplicate), "
@@ -461,17 +504,17 @@ class BackgroundSchedulerService:
             interval_seconds: How often to run (default: 600 seconds = 10 minutes)
         """
         # Remove existing job if it exists
-        if self.scheduler.get_job('generate_recommendations'):
-            self.scheduler.remove_job('generate_recommendations')
+        if self.scheduler.get_job("generate_recommendations"):
+            self.scheduler.remove_job("generate_recommendations")
             logger.info("Removed existing recommendation generation job")
 
         # Add new job
         self.scheduler.add_job(
             func=self._run_recommendation_generation,
             trigger=IntervalTrigger(seconds=interval_seconds),
-            id='generate_recommendations',
-            name='Generate AI Recommendations for At-Risk Equipment',
-            replace_existing=True
+            id="generate_recommendations",
+            name="Generate AI Recommendations for At-Risk Equipment",
+            replace_existing=True,
         )
         logger.info(f"Added recommendation generation job with {interval_seconds}s interval")
 
@@ -485,7 +528,10 @@ class BackgroundSchedulerService:
             from app.services.maintenance_recommender import get_maintenance_recommender
             from app.services.module_registry_service import ModuleRegistryService
             from app.models.module_registry import (
-                AIRecommendation, ModuleType, RecommendationType, RecommendationPriority
+                AIRecommendation,
+                ModuleType,
+                RecommendationType,
+                RecommendationPriority,
             )
             import uuid
             from datetime import datetime, timedelta
@@ -497,10 +543,14 @@ class BackgroundSchedulerService:
             module_registry = ModuleRegistryService()
 
             # Get ALL equipment - generate recommendations for all, not just degraded
-            response = client.table("equipment").select(
-                "id, code, name, type, health_score, building_id, status, "
-                "install_date, last_service, manufacturer, model"
-            ).execute()
+            response = (
+                client.table("equipment")
+                .select(
+                    "id, code, name, type, health_score, building_id, status, "
+                    "install_date, last_service, manufacturer, model"
+                )
+                .execute()
+            )
 
             all_equipment = response.data if response.data else []
             at_risk = len([eq for eq in all_equipment if eq.get("health_score", 100) < 90])
@@ -513,22 +563,33 @@ class BackgroundSchedulerService:
                     equipment_id = eq.get("id")
 
                     # Get building/site code
-                    building_response = client.table("buildings").select("code, name").eq("id", eq.get("building_id")).execute()
+                    building_response = (
+                        client.table("buildings").select("code, name").eq("id", eq.get("building_id")).execute()
+                    )
                     site_code = building_response.data[0]["code"] if building_response.data else "unknown"
                     building_name = building_response.data[0]["name"] if building_response.data else "Unknown Building"
 
                     # Get recent alerts for this equipment (last 30 days)
-                    alerts_response = client.table("alerts").select(
-                        "type, severity, created_at, message"
-                    ).eq("equipment_id", equipment_id).gte(
-                        "created_at", (datetime.now() - timedelta(days=30)).isoformat()
-                    ).order("created_at", desc=True).limit(5).execute()
+                    alerts_response = (
+                        client.table("alerts")
+                        .select("type, severity, created_at, message")
+                        .eq("equipment_id", equipment_id)
+                        .gte("created_at", (datetime.now() - timedelta(days=30)).isoformat())
+                        .order("created_at", desc=True)
+                        .limit(5)
+                        .execute()
+                    )
                     recent_alerts = alerts_response.data if alerts_response.data else []
 
                     # Get existing prediction for this equipment
-                    prediction_response = client.table("predictions").select(
-                        "probability_percent, contributing_factors, evidence, recommended_action"
-                    ).eq("equipment_id", equipment_id).eq("status", "active").limit(1).execute()
+                    prediction_response = (
+                        client.table("predictions")
+                        .select("probability_percent, contributing_factors, evidence, recommended_action")
+                        .eq("equipment_id", equipment_id)
+                        .eq("status", "active")
+                        .limit(1)
+                        .execute()
+                    )
                     prediction = prediction_response.data[0] if prediction_response.data else None
 
                     # Calculate days since last service
@@ -537,7 +598,7 @@ class BackgroundSchedulerService:
                         try:
                             last_service_date = datetime.fromisoformat(eq["last_service"].replace("Z", "+00:00"))
                             days_since_service = (datetime.now(last_service_date.tzinfo) - last_service_date).days
-                        except:
+                        except (ValueError, TypeError):
                             pass
 
                     # Calculate equipment age in years
@@ -546,7 +607,7 @@ class BackgroundSchedulerService:
                         try:
                             install_date = datetime.fromisoformat(eq["install_date"].replace("Z", "+00:00"))
                             equipment_age_years = (datetime.now(install_date.tzinfo) - install_date).days / 365
-                        except:
+                        except (ValueError, TypeError):
                             pass
 
                     # Build context-aware description
@@ -590,7 +651,9 @@ class BackgroundSchedulerService:
                         # Service-based recommendations
                         if days_since_service:
                             if days_since_service > 90:
-                                enhanced_actions.append(f"Schedule preventive maintenance (last service {days_since_service} days ago)")
+                                enhanced_actions.append(
+                                    f"Schedule preventive maintenance (last service {days_since_service} days ago)"
+                                )
                             if days_since_service > 180:
                                 enhanced_actions.append("Filter/belt inspection recommended")
                         else:
@@ -598,15 +661,19 @@ class BackgroundSchedulerService:
 
                         # Type-specific optimization suggestions
                         if "chiller" in eq_type:
-                            enhanced_actions.extend([
-                                "Review chilled water setpoint for optimization",
-                                "Check condenser approach temperature",
-                            ])
+                            enhanced_actions.extend(
+                                [
+                                    "Review chilled water setpoint for optimization",
+                                    "Check condenser approach temperature",
+                                ]
+                            )
                         elif "ahu" in eq_type or "fcu" in eq_type:
-                            enhanced_actions.extend([
-                                "Verify economizer operation",
-                                "Check supply air temperature setpoint",
-                            ])
+                            enhanced_actions.extend(
+                                [
+                                    "Verify economizer operation",
+                                    "Check supply air temperature setpoint",
+                                ]
+                            )
                         elif "vav" in eq_type:
                             enhanced_actions.append("Review zone airflow minimums")
                         elif "lighting" in eq_type or "luminaire" in eq_type:
@@ -628,7 +695,7 @@ class BackgroundSchedulerService:
                             equipment_id=eq.get("code", eq["id"]),
                             equipment_type=eq.get("type", "unknown"),
                             risk_level=risk_level,
-                            predicted_failure="health_degradation"
+                            predicted_failure="health_degradation",
                         )
 
                         enhanced_actions = list(recommendation.immediate_actions)
@@ -637,7 +704,9 @@ class BackgroundSchedulerService:
                         if recent_alerts and len(recent_alerts) >= 3:
                             enhanced_actions.insert(0, "Review recurring alert pattern")
                         if prediction and prediction.get("probability_percent", 0) > 70:
-                            enhanced_actions.insert(0, prediction.get("recommended_action", "Address predicted failure"))
+                            enhanced_actions.insert(
+                                0, prediction.get("recommended_action", "Address predicted failure")
+                            )
 
                         # Determine priority based on multiple factors
                         priority = RecommendationPriority.MEDIUM
@@ -685,7 +754,9 @@ class BackgroundSchedulerService:
                             "evidence": [
                                 f"Health at {health}%",
                                 f"{len(recent_alerts)} alerts in 30 days" if recent_alerts else "No recent alerts",
-                                f"Service overdue by {days_since_service - 180} days" if days_since_service and days_since_service > 180 else None,
+                                f"Service overdue by {days_since_service - 180} days"
+                                if days_since_service and days_since_service > 180
+                                else None,
                                 f"Failure probability {prediction.get('probability_percent')}%" if prediction else None,
                             ],
                         },
@@ -715,17 +786,17 @@ class BackgroundSchedulerService:
             interval_seconds: How often to run (default: 300 seconds = 5 minutes)
         """
         # Remove existing job if it exists
-        if self.scheduler.get_job('demand_aware_coordination'):
-            self.scheduler.remove_job('demand_aware_coordination')
+        if self.scheduler.get_job("demand_aware_coordination"):
+            self.scheduler.remove_job("demand_aware_coordination")
             logger.info("Removed existing demand coordination job")
 
         # Add new job
         self.scheduler.add_job(
             func=self._run_demand_aware_coordination,
             trigger=IntervalTrigger(seconds=interval_seconds),
-            id='demand_aware_coordination',
-            name='Demand-Aware Coordination for Peak Shaving',
-            replace_existing=True
+            id="demand_aware_coordination",
+            name="Demand-Aware Coordination for Peak Shaving",
+            replace_existing=True,
         )
         logger.info(f"Added demand coordination job with {interval_seconds}s interval")
 
@@ -763,9 +834,7 @@ class BackgroundSchedulerService:
                     asyncio.set_event_loop(loop)
 
                     try:
-                        recommendation = loop.run_until_complete(
-                            coordinator.evaluate_current_state(site_id)
-                        )
+                        recommendation = loop.run_until_complete(coordinator.evaluate_current_state(site_id))
 
                         if recommendation:
                             logger.info(
@@ -786,6 +855,7 @@ class BackgroundSchedulerService:
         """Get all configured sites for demand coordination."""
         try:
             import json
+
             sites_file = DATA_DIR / "sites.json"
             if sites_file.exists():
                 with open(sites_file) as f:
@@ -807,20 +877,19 @@ class BackgroundSchedulerService:
             interval_seconds: How often to check for stale models (default: 86400 = 24 hours)
         """
         # Remove existing job if it exists
-        if self.scheduler.get_job('auto_retrain_stale_models'):
-            self.scheduler.remove_job('auto_retrain_stale_models')
+        if self.scheduler.get_job("auto_retrain_stale_models"):
+            self.scheduler.remove_job("auto_retrain_stale_models")
             logger.info("Removed existing ML retraining job")
 
         # Add new job
         self.scheduler.add_job(
             func=self._run_ml_retraining,
             trigger=IntervalTrigger(seconds=interval_seconds),
-            id='auto_retrain_stale_models',
-            name='Auto-Retrain Stale ML Models',
-            replace_existing=True
+            id="auto_retrain_stale_models",
+            name="Auto-Retrain Stale ML Models",
+            replace_existing=True,
         )
         logger.info(f"Added ML retraining job with {interval_seconds}s interval (checks daily for stale models)")
-
 
     def add_drift_detection_job(self, interval_seconds: int = 3600):
         """
@@ -837,17 +906,17 @@ class BackgroundSchedulerService:
             interval_seconds: How often to check for drift (default: 3600 = 1 hour)
         """
         # Remove existing job if it exists
-        if self.scheduler.get_job('drift_detection_monitor'):
-            self.scheduler.remove_job('drift_detection_monitor')
+        if self.scheduler.get_job("drift_detection_monitor"):
+            self.scheduler.remove_job("drift_detection_monitor")
             logger.info("Removed existing drift detection job")
 
         # Add new job
         self.scheduler.add_job(
             func=self._run_drift_detection,
             trigger=IntervalTrigger(seconds=interval_seconds),
-            id='drift_detection_monitor',
-            name='Drift Detection & Auto-Retrain Monitor',
-            replace_existing=True
+            id="drift_detection_monitor",
+            name="Drift Detection & Auto-Retrain Monitor",
+            replace_existing=True,
         )
         logger.info(f"Added drift detection job with {interval_seconds}s interval (monitors for data/model drift)")
 
@@ -913,7 +982,9 @@ class BackgroundSchedulerService:
             logger.info(
                 f"Found {len(stale_models)} stale/underperforming models. "
                 f"Retraining priority: {priority_model['equipment_type']} ({priority_model['model_type']}) - "
-                f"Status: {priority_model['status']}, Age: {priority_model['age_days']}d, R²: {priority_model.get('r2_score', 'N/A')}"
+                f"Status: {priority_model['status']},"
+                f" Age: {priority_model['age_days']}d,"
+                f" R²: {priority_model.get('r2_score', 'N/A')}"
             )
 
             # Trigger retraining for ONE model only (others will be retrained in subsequent cycles)
@@ -929,22 +1000,216 @@ class BackgroundSchedulerService:
                     f"New model ID: {retrain_result.new_model_id}"
                 )
             else:
-                logger.error(
-                    f"❌ Failed to trigger retraining: {retrain_result.error}"
-                )
+                logger.error(f"❌ Failed to trigger retraining: {retrain_result.error}")
 
             # Log summary of remaining stale models (for monitoring)
             if len(stale_models) > 1:
                 remaining = stale_models[1:]
-                remaining_strs = [
-                    f"{m['equipment_type']} ({m['status']})" for m in remaining
-                ]
-                logger.info(
-                    f"Remaining stale models ({len(remaining)}): {', '.join(remaining_strs)}"
-                )
+                remaining_strs = [f"{m['equipment_type']} ({m['status']})" for m in remaining]
+                logger.info(f"Remaining stale models ({len(remaining)}): {', '.join(remaining_strs)}")
 
         except Exception as e:
             logger.error(f"Failed to run ML model retraining check: {e}", exc_info=True)
+
+    def add_mv_verification_job(self, interval_seconds: int = 900):
+        """Add periodic M&V verification job for applied recommendations."""
+        if self.scheduler.get_job("mv_verification"):
+            self.scheduler.remove_job("mv_verification")
+            logger.info("Removed existing M&V verification job")
+
+        self.scheduler.add_job(
+            func=self._run_mv_verifications,
+            trigger=IntervalTrigger(seconds=interval_seconds),
+            id="mv_verification",
+            name="Run Pending M&V Verifications",
+            replace_existing=True,
+        )
+        logger.info(f"Added M&V verification job with {interval_seconds}s interval")
+
+    def _run_mv_verifications(self):
+        """Execute pending M&V verifications whose measurement window has elapsed."""
+        try:
+            from app.services.mv_verification_service import get_mv_verification_service
+
+            mv_service = get_mv_verification_service()
+
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                verified = loop.run_until_complete(mv_service.run_pending_verifications())
+            finally:
+                loop.close()
+
+            if verified:
+                logger.info(
+                    "M&V verification cycle complete: verified=%s pending=%s",
+                    len(verified),
+                    mv_service.get_pending_count(),
+                )
+            else:
+                logger.debug("M&V verification cycle complete: no tasks ready")
+
+        except Exception as e:
+            logger.error(f"Failed to run M&V verification cycle: {e}", exc_info=True)
+
+    def add_feedback_scoring_refresh_job(self, interval_seconds: int = 900):
+        """Add periodic refresh of feedback-derived scoring inputs."""
+        if self.scheduler.get_job("feedback_scoring_refresh"):
+            self.scheduler.remove_job("feedback_scoring_refresh")
+            logger.info("Removed existing feedback scoring refresh job")
+
+        self.scheduler.add_job(
+            func=self._run_feedback_scoring_refresh,
+            trigger=IntervalTrigger(seconds=interval_seconds),
+            id="feedback_scoring_refresh",
+            name="Refresh Feedback Scoring Inputs",
+            replace_existing=True,
+        )
+        logger.info(f"Added feedback scoring refresh job with {interval_seconds}s interval")
+
+    def _run_feedback_scoring_refresh(self):
+        """Refresh module score multipliers from latest verified outcomes."""
+        try:
+            from app.services.ml_feedback_service import get_ml_feedback_service
+
+            result = get_ml_feedback_service().refresh_scoring_inputs()
+            refreshed_sites = result.get("refreshed_sites", 0)
+            if refreshed_sites > 0:
+                logger.info(
+                    "Feedback scoring inputs refreshed for %s site(s): %s",
+                    refreshed_sites,
+                    ", ".join(result.get("site_ids", [])),
+                )
+            else:
+                logger.debug("Feedback scoring inputs refresh skipped: no module outcomes yet")
+        except Exception as e:
+            logger.error(f"Failed to refresh feedback scoring inputs: {e}", exc_info=True)
+
+    def add_feedback_retraining_job(
+        self,
+        interval_seconds: int = 3600,
+        min_records: int = 10,
+        min_success_rate: float = 70.0,
+        cooldown_hours: int = 24,
+    ):
+        """Add periodic feedback-driven retraining trigger job."""
+        if self.scheduler.get_job("feedback_retraining_trigger"):
+            self.scheduler.remove_job("feedback_retraining_trigger")
+            logger.info("Removed existing feedback-driven retraining job")
+
+        self._feedback_retraining_policy = {
+            "min_records": int(min_records),
+            "min_success_rate": float(min_success_rate),
+            "cooldown_hours": int(cooldown_hours),
+        }
+
+        self.scheduler.add_job(
+            func=self._run_feedback_retraining,
+            trigger=IntervalTrigger(seconds=interval_seconds),
+            id="feedback_retraining_trigger",
+            name="Feedback-Driven ML Retraining Trigger",
+            replace_existing=True,
+        )
+        logger.info(
+            "Added feedback retraining job: interval=%ss min_records=%s min_success_rate=%s%% cooldown=%sh",
+            interval_seconds,
+            min_records,
+            min_success_rate,
+            cooldown_hours,
+        )
+
+    def _run_feedback_retraining(self):
+        """Trigger retraining when module outcome success drops below threshold."""
+        try:
+            from app.services.ml_feedback_service import get_ml_feedback_service
+            from ml.training.retraining_scheduler import get_retraining_scheduler
+
+            policy = self._feedback_retraining_policy
+            min_records = int(policy["min_records"])
+            min_success_rate = float(policy["min_success_rate"])
+            cooldown_hours = int(policy["cooldown_hours"])
+            cooldown_seconds = cooldown_hours * 3600
+
+            summary = get_ml_feedback_service().get_module_feedback_summary()
+            counts = summary.get("counts", {})
+            success_rates = summary.get("success_rates", {})
+
+            if not counts:
+                logger.debug("Feedback retraining check skipped: no module outcomes")
+                return
+
+            # Map module outcomes to model equipment types supported by retraining scheduler.
+            module_to_equipment = {
+                "hvac": ["chiller", "ahu", "fcu", "vav", "pump"],
+                "energy": ["generator", "ups", "pump"],
+                "power": ["generator", "ups", "pump"],
+                "bess": ["ups"],
+                "solar": ["generator"],
+            }
+
+            candidates = []
+            for module_name, total_records in counts.items():
+                rate = float(success_rates.get(module_name, 0.0))
+                if int(total_records) >= min_records and rate < min_success_rate:
+                    candidates.append((module_name, int(total_records), rate))
+
+            if not candidates:
+                logger.debug("Feedback retraining check complete: no modules below success threshold")
+                return
+
+            candidates.sort(key=lambda item: item[2])  # lowest success rate first
+            retraining = get_retraining_scheduler()
+
+            # Trigger at most one retraining per cycle to avoid overload.
+            for module_name, total_records, rate in candidates:
+                equipment_types = module_to_equipment.get(module_name, [])
+                if not equipment_types:
+                    continue
+
+                for equipment_type in equipment_types:
+                    cooldown_key = f"{module_name}:{equipment_type}:lstm"
+                    if self._is_feedback_retraining_in_cooldown(cooldown_key, cooldown_seconds):
+                        continue
+
+                    reason = (
+                        f"feedback_loop_{module_name}: success_rate={rate:.1f}% "
+                        f"records={total_records} threshold<{min_success_rate:.1f}%"
+                    )
+                    result = retraining.trigger_retraining(
+                        model_type="lstm",
+                        equipment_type=equipment_type,
+                        reason=reason,
+                    )
+
+                    if result.success:
+                        self._feedback_retraining_last_trigger[cooldown_key] = datetime.now()
+                        logger.info(
+                            "Feedback retraining triggered: module=%s equipment=%s success_rate=%.1f%% records=%s",
+                            module_name,
+                            equipment_type,
+                            rate,
+                            total_records,
+                        )
+                    else:
+                        logger.warning(
+                            "Feedback retraining trigger failed: module=%s equipment=%s error=%s",
+                            module_name,
+                            equipment_type,
+                            result.error,
+                        )
+                    return
+
+            logger.debug("Feedback retraining check complete: candidates exist but all in cooldown or unmapped")
+        except Exception as e:
+            logger.error(f"Failed to run feedback retraining check: {e}", exc_info=True)
+
+    def _is_feedback_retraining_in_cooldown(self, key: str, cooldown_seconds: int) -> bool:
+        """Return True when feedback-triggered retraining is still in cooldown window."""
+        last_trigger = self._feedback_retraining_last_trigger.get(key)
+        if not last_trigger:
+            return False
+        elapsed_seconds = (datetime.now() - last_trigger).total_seconds()
+        return elapsed_seconds < float(cooldown_seconds)
 
     def add_sentry_notification_job(self, interval_seconds: int = 30):
         """
@@ -957,17 +1222,17 @@ class BackgroundSchedulerService:
             interval_seconds: How often to check pending notifications (default: 30 seconds)
         """
         # Remove existing job if it exists
-        if self.scheduler.get_job('process_sentry_notifications'):
-            self.scheduler.remove_job('process_sentry_notifications')
+        if self.scheduler.get_job("process_sentry_notifications"):
+            self.scheduler.remove_job("process_sentry_notifications")
             logger.info("Removed existing Sentry notification job")
 
         # Add new job
         self.scheduler.add_job(
             func=self._process_sentry_notifications,
             trigger=IntervalTrigger(seconds=interval_seconds),
-            id='process_sentry_notifications',
-            name='Process Sentry Notifications',
-            replace_existing=True
+            id="process_sentry_notifications",
+            name="Process Sentry Notifications",
+            replace_existing=True,
         )
         logger.info(f"Added Sentry notification job with {interval_seconds}s interval")
 
@@ -987,7 +1252,7 @@ class BackgroundSchedulerService:
                 async with httpx.AsyncClient(timeout=10) as client:
                     response = await client.post(
                         "http://localhost:9095/api/sentry/process-pending-notifications",
-                        headers={"X-Sentry-Secret": "sentry-bms-phase-41"}
+                        headers={"X-Sentry-Secret": "sentry-bms-phase-41"},
                     )
                     return response.json()
 
@@ -1003,7 +1268,6 @@ class BackgroundSchedulerService:
 
         except Exception as e:
             logger.error(f"Failed to process Sentry notifications: {e}", exc_info=True)
-
 
     def add_simulation_queue_processor_job(self, interval_seconds: int = 10) -> None:
         """
@@ -1035,9 +1299,7 @@ class BackgroundSchedulerService:
         try:
             # Use the main event loop (uvicorn's loop) so background asyncio tasks survive
             if self._main_loop and self._main_loop.is_running():
-                future = asyncio.run_coroutine_threadsafe(
-                    self._process_simulation_queue_async(), self._main_loop
-                )
+                future = asyncio.run_coroutine_threadsafe(self._process_simulation_queue_async(), self._main_loop)
                 # Wait for the queue check to complete (not the simulation itself)
                 future.result(timeout=300)
                 logger.warning(">>> Queue processor completed on main event loop")
@@ -1070,7 +1332,7 @@ class BackgroundSchedulerService:
             try:
                 test_response = supabase.table("lifecycle_simulation_tasks").select("count", count="exact").execute()
                 logger.warning(f">>> TEST: Count query succeeded, response: {test_response}")
-                if hasattr(test_response, 'count'):
+                if hasattr(test_response, "count"):
                     logger.warning(f">>> TEST: Total tasks in table: {test_response.count}")
             except Exception as test_err:
                 logger.error(f">>> TEST: Count query failed: {test_err}", exc_info=True)
@@ -1078,8 +1340,16 @@ class BackgroundSchedulerService:
             # Test: Get ALL tasks to see what's in the database
             logger.warning(">>> TEST: Querying ALL tasks (no filters) to see what's in database...")
             try:
-                all_tasks_response = supabase.table("lifecycle_simulation_tasks").select("task_id,status,simulation_type,scenario").limit(5).execute()
-                logger.warning(f">>> TEST: All tasks query returned {len(all_tasks_response.data) if all_tasks_response.data else 0} rows")
+                all_tasks_response = (
+                    supabase.table("lifecycle_simulation_tasks")
+                    .select("task_id,status,simulation_type,scenario")
+                    .limit(5)
+                    .execute()
+                )
+                logger.warning(
+                    ">>> TEST: All tasks query returned"
+                    f" {len(all_tasks_response.data) if all_tasks_response.data else 0} rows"
+                )
                 if all_tasks_response.data:
                     for task in all_tasks_response.data:
                         logger.warning(f">>>   Task: {task}")
@@ -1090,12 +1360,14 @@ class BackgroundSchedulerService:
             logger.warning(">>> Querying for queued simulations with status='queued', simulation_type='lifecycle'")
             logger.warning(">>> Building query...")
             try:
-                query_builder = supabase.table("lifecycle_simulation_tasks") \
-                    .select("*") \
-                    .eq("status", "queued") \
-                    .eq("simulation_type", "lifecycle") \
-                    .order("created_at", desc=False) \
+                query_builder = (
+                    supabase.table("lifecycle_simulation_tasks")
+                    .select("*")
+                    .eq("status", "queued")
+                    .eq("simulation_type", "lifecycle")
+                    .order("created_at", desc=False)
                     .limit(1)
+                )
                 logger.warning(f">>> Query builder created: {type(query_builder)}")
 
                 logger.warning(">>> Executing query...")
@@ -1103,17 +1375,17 @@ class BackgroundSchedulerService:
                 logger.warning(f">>> Query returned, response type: {type(response)}")
                 logger.warning(f">>> Response object: {response}")
                 logger.warning(f">>> Response has data attr: {hasattr(response, 'data')}")
-                if hasattr(response, 'data'):
+                if hasattr(response, "data"):
                     logger.warning(f">>> Response.data type: {type(response.data)}")
                     logger.warning(f">>> Response.data value: {response.data}")
-                if hasattr(response, 'error'):
+                if hasattr(response, "error"):
                     logger.warning(f">>> Response.error: {response.error}")
             except Exception as query_err:
                 logger.error(f">>> Query FAILED: {query_err}", exc_info=True)
                 raise
 
             logger.warning(f">>> After query - response is: {response is not None}")
-            if response and hasattr(response, 'data'):
+            if response and hasattr(response, "data"):
                 logger.warning(f">>> Response.data length: {len(response.data) if response.data else 0}")
 
             if not response.data:
@@ -1131,10 +1403,7 @@ class BackgroundSchedulerService:
 
             # Mark as running
             logger.warning(f">>> Marking task {task_id} as running in database...")
-            supabase.table("lifecycle_simulation_tasks") \
-                .update({"status": "running"}) \
-                .eq("task_id", task_id) \
-                .execute()
+            supabase.table("lifecycle_simulation_tasks").update({"status": "running"}).eq("task_id", task_id).execute()
             logger.warning(">>> Task marked as running")
 
             logger.warning(f">>> ✅ Starting lifecycle simulation task {task_id}")
@@ -1158,9 +1427,7 @@ class BackgroundSchedulerService:
         except Exception as e:
             logger.error(f"❌ Error in simulation queue processor: {e}", exc_info=True)
 
-    async def _run_simulation_task(
-        self, task_id: str, orchestrator, scenario: str, duration_minutes: float
-    ) -> None:
+    async def _run_simulation_task(self, task_id: str, orchestrator, scenario: str, duration_minutes: float) -> None:
         """
         Run a lifecycle simulation task and update database on completion.
         Supports crash recovery by loading state from checkpoint if available.
@@ -1181,10 +1448,9 @@ class BackgroundSchedulerService:
 
         try:
             # Check if this is a crash recovery (has state_snapshot)
-            response = supabase.table("lifecycle_simulation_tasks") \
-                .select("state_snapshot") \
-                .eq("task_id", task_id) \
-                .execute()
+            response = (
+                supabase.table("lifecycle_simulation_tasks").select("state_snapshot").eq("task_id", task_id).execute()
+            )
 
             state_snapshot = None
             if response.data and response.data[0].get("state_snapshot"):
@@ -1212,6 +1478,7 @@ class BackgroundSchedulerService:
                 # For annual simulations, restore seasonal modeler
                 if orchestrator.seasonal_modeler is None and orchestrator.days_simulated > 0:
                     from app.services.seasonal_modeler import SeasonalModeler
+
                     orchestrator.seasonal_modeler = SeasonalModeler(seed=orchestrator._occupancy_seed)
 
                 # Set up for simulation restart
@@ -1239,14 +1506,13 @@ class BackgroundSchedulerService:
                 logger.info(f"🔄 Simulation task {task_id} started - Running in persistent loop mode (365 days × ∞)")
                 # Mark as running in database
                 try:
-                    supabase.table("lifecycle_simulation_tasks") \
-                        .update({
+                    supabase.table("lifecycle_simulation_tasks").update(
+                        {
                             "status": "running",
                             "progress_pct": 0,
                             "days_completed": 0,
-                        }) \
-                        .eq("task_id", task_id) \
-                        .execute()
+                        }
+                    ).eq("task_id", task_id).execute()
                     logger.info(f"📊 Task {task_id} marked as running in persistent loop mode")
                 except Exception as db_error:
                     logger.error(f"Failed to update task status to running: {db_error}")
@@ -1260,21 +1526,19 @@ class BackgroundSchedulerService:
 
             # Mark as failed with error message
             try:
-                supabase.table("lifecycle_simulation_tasks") \
-                    .update({
+                supabase.table("lifecycle_simulation_tasks").update(
+                    {
                         "status": "failed",
                         "error_message": str(e)[:500],  # Truncate long errors
                         "completed_at": "now()",
-                    }) \
-                    .eq("task_id", task_id) \
-                    .execute()
+                    }
+                ).eq("task_id", task_id).execute()
             except Exception as db_error:
                 logger.error(f"Failed to update task status in DB: {db_error}")
 
         finally:
             # Always unregister from active simulations
             unregister_simulation(task_id)
-
 
     def add_integration_sync_job(self, interval_seconds: int = 900):
         """
@@ -1286,16 +1550,16 @@ class BackgroundSchedulerService:
         Args:
             interval_seconds: How often to sync (default: 900 seconds = 15 minutes)
         """
-        if self.scheduler.get_job('integration_sync'):
-            self.scheduler.remove_job('integration_sync')
+        if self.scheduler.get_job("integration_sync"):
+            self.scheduler.remove_job("integration_sync")
             logger.info("Removed existing integration sync job")
 
         self.scheduler.add_job(
             func=self._run_integration_sync,
             trigger=IntervalTrigger(seconds=interval_seconds),
-            id='integration_sync',
-            name='Integration Sync - Update log source timestamps',
-            replace_existing=True
+            id="integration_sync",
+            name="Integration Sync - Update log source timestamps",
+            replace_existing=True,
         )
         logger.info(f"Added integration sync job with {interval_seconds}s interval")
 
@@ -1311,7 +1575,7 @@ class BackgroundSchedulerService:
 
             # Get all active log sources
             try:
-                response = repo.client.table('log_sources').select("id, name").eq('is_active', True).execute()
+                response = repo.client.table("log_sources").select("id, name").eq("is_active", True).execute()
                 sources = response.data or []
             except Exception:
                 sources = []
@@ -1322,11 +1586,11 @@ class BackgroundSchedulerService:
 
             synced = 0
             for source in sources:
-                source_id = source.get('id')
+                source_id = source.get("id")
                 if not source_id:
                     continue
                 try:
-                    repo.update_sync_status(source_id, status='success', records=0)
+                    repo.update_sync_status(source_id, status="success", records=0)
                     synced += 1
                 except Exception as e:
                     logger.warning(f"Failed to update sync for source {source.get('name')}: {e}")

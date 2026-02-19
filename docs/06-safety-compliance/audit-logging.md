@@ -2,9 +2,9 @@
 title: "Audit Logging"
 type: "architecture"
 status: "approved"
-version: "1.0.0"
+version: "1.1.0"
 created: "2026-01-30"
-updated: "2026-01-30"
+updated: "2026-02-19"
 author: "Sentinel Development Team"
 tags: ["audit", "compliance", "logging", "security", "traceability"]
 related: ["safety-interlocks-engine.md", "../02-architecture/device-abstraction-layer.md"]
@@ -448,6 +448,12 @@ audit_logger.max_entries = 100000  # ~3 months at high activity
 # Or implement archival to external storage
 audit_logger.archive_to_s3(bucket="sentinel-audit-archive")
 ```
+
+### Encryption at rest
+
+As of Phase 81-01 (2026-02-19), sensitive fields in audit log entries are encrypted at rest using Fernet symmetric encryption (AES-128-CBC + HMAC-SHA256) via the Python `cryptography` library. The `EncryptionService` in `backend/app/services/encryption_service.py` encrypts fields such as `user`, `device_id`, and `metadata` before writing to `audit_log.json`. The encryption key is stored in the `ENCRYPTION_KEY` environment variable and must never be committed to source control.
+
+Encrypted entries contain a `"encrypted": true` flag. The API layer transparently decrypts entries when serving audit log queries.
 
 ### Data protection
 

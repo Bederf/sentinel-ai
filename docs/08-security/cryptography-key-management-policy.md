@@ -1,7 +1,7 @@
 # Cryptography and Key Management Policy
 
 **Document ID:** SENTINEL-CKM-001
-**Version:** 1.0
+**Version:** 1.1
 **Effective Date:** 2026-02-04
 **Review Cadence:** Annual, or on cryptographic standard update
 **Owner:** SENTINEL Platform Team
@@ -73,6 +73,7 @@ The following cryptographic controls are currently deployed in SENTINEL:
 | JWT tokens for API authentication | httpOnly, secure flag, signed tokens | Backend API |
 | bcrypt password hashing | Cost factor 12+, per-user salt | Backend API |
 | SHA-256 consent record hashing | Application-level hashing with salt (Phase 63-06) | Consent service |
+| Fernet encryption at rest (audit logs) | AES-128-CBC + HMAC-SHA256 via Python `cryptography` library (Phase 81-01) | Backend audit service |
 | Pre-commit secret detection | detect-secrets and gitleaks hooks (Phase 63-03) | CI/CD pipeline |
 | Environment variables for runtime secrets | No hardcoded secrets in source code | All environments |
 
@@ -318,6 +319,7 @@ The following key types are currently in use across SENTINEL:
 | CKM-DB-001 | PostgreSQL Encryption Key | AES-256 | Supabase-managed | Provider schedule | Supabase |
 | CKM-DB-002 | InfluxDB Encryption Key | AES-256 | Docker volume | 2027-02-04 | System Administrator |
 | CKM-CST-001 | Consent Hashing Salt | SHA-256 salt | .env | 2027-02-04 | System Administrator |
+| CKM-AUD-001 | Audit Log Encryption Key | Fernet (AES-128-CBC) | .env (ENCRYPTION_KEY) | 2027-02-19 | System Administrator |
 
 ---
 
@@ -326,6 +328,7 @@ The following key types are currently in use across SENTINEL:
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 1.0 | 2026-02-04 | SENTINEL Platform Team | Initial cryptography and key management policy |
+| 1.1 | 2026-02-19 | SENTINEL Platform Team | Added Fernet encryption at rest for audit logs (Phase 81-01) |
 
 ---
 

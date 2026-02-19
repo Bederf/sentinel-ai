@@ -305,8 +305,7 @@ class ComfortComplaintHandler:
 
             if solar_issue and "solar" not in enhanced_root_cause.lower():
                 enhanced_root_cause = (
-                    f"Solar heat gain likely - desk near {solar_direction} window. "
-                    f"{enhanced_root_cause}"
+                    f"Solar heat gain likely - desk near {solar_direction} window. {enhanced_root_cause}"
                 )
                 enhanced_confidence = "high"
                 # Use actual BMS controls: FCU setpoint and zone lighting
@@ -324,8 +323,7 @@ class ComfortComplaintHandler:
         # Under diffuser + too_cold = direct airflow
         if desk.near_diffuser and complaint_type == "too_cold":
             enhanced_root_cause = (
-                f"Direct airflow from diffuser {desk.near_diffuser}. "
-                f"Desk is directly under supply air outlet."
+                f"Direct airflow from diffuser {desk.near_diffuser}. Desk is directly under supply air outlet."
             )
             enhanced_confidence = "high"
             enhanced_suggestions = [
@@ -337,16 +335,9 @@ class ComfortComplaintHandler:
         # Near printer + too_hot = heat source
         if desk.near_printer and complaint_type == "too_hot":
             if "printer" not in enhanced_root_cause.lower():
-                enhanced_root_cause = (
-                    f"Heat source detected - desk is near printer/copier. "
-                    f"{enhanced_root_cause}"
-                )
-                enhanced_suggestions.insert(
-                    0, f"Increase VAV {zone.vav_id} airflow to dissipate printer heat"
-                )
-                enhanced_suggestions.insert(
-                    1, f"Lower FCU {zone.fcu_id} setpoint by 1°C"
-                )
+                enhanced_root_cause = f"Heat source detected - desk is near printer/copier. {enhanced_root_cause}"
+                enhanced_suggestions.insert(0, f"Increase VAV {zone.vav_id} airflow to dissipate printer heat")
+                enhanced_suggestions.insert(1, f"Lower FCU {zone.fcu_id} setpoint by 1°C")
 
         # Check if zone has fault
         needs_dispatch = zone.status == "fault"
@@ -404,6 +395,33 @@ class ComfortComplaintHandler:
         # Sort by timestamp descending
         complaints.sort(key=lambda c: c.timestamp, reverse=True)
         return complaints
+
+    def get_complaint_history_summary(
+        self,
+        desk_id: str,
+        days: int = 7,
+        complaint_types: Optional[List[str]] = None,
+    ) -> Dict:
+        """
+        Summarize recent complaints for a desk - used by agent for escalation logic.
+
+        Returns dict with count, same-type match count, last complaint timestamp,
+        and whether escalation is recommended (3+ in 7 days).
+        """
+        history = self.get_complaint_history(desk_id=desk_id)
+        cutoff = datetime.now() - timedelta(days=days)
+        recent = [c for c in history if c.timestamp >= cutoff]
+
+        same_type_count = 0
+        if complaint_types and recent:
+            same_type_count = sum(1 for c in recent if c.complaint_type in complaint_types)
+
+        return {
+            "count": len(recent),
+            "same_type_count": same_type_count,
+            "last_complaint": recent[0].timestamp.isoformat() if recent else None,
+            "escalation_recommended": len(recent) >= 3,
+        }
 
     def get_recent_complaints(self, hours: int = 24) -> List[ComfortComplaint]:
         """Get recent complaints across all zones."""

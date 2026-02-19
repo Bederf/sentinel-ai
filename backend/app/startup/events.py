@@ -120,7 +120,7 @@ async def startup_event(app: FastAPI) -> None:
     # Initialize Sentry bot JWT authentication (non-blocking)
     from app.services.sentry_auth_service import initialize_sentry_auth
 
-    sentry_auth = initialize_sentry_auth(api_url=settings.backend_url or "http://localhost:9095")
+    initialize_sentry_auth(api_url=settings.backend_url or "http://localhost:9095")
 
     # Skip Sentry login during startup to avoid blocking
     # Sentry will attempt login on first use via get_token_or_refresh()
@@ -208,6 +208,35 @@ async def startup_event(app: FastAPI) -> None:
         _logger.info("✅ Drift detection job initialized - monitors hourly for model/data drift")
     except Exception as e:
         _logger.warning(f"⚠️ Drift detection job initialization failed: {e}")
+
+    # Start M&V verification job (runs every 15 minutes)
+    # Verifies expected-vs-actual outcomes for applied optimization recommendations
+    try:
+        scheduler_service.add_mv_verification_job(interval_seconds=900)  # 15 minutes
+        _logger.info("✅ M&V verification job initialized - checks pending verification windows")
+    except Exception as e:
+        _logger.warning(f"⚠️ M&V verification job initialization failed: {e}")
+
+    # Start feedback scoring refresh job (runs every 15 minutes)
+    # Rebuilds feedback-derived module score multipliers used by recommendation ranking
+    try:
+        scheduler_service.add_feedback_scoring_refresh_job(interval_seconds=900)  # 15 minutes
+        _logger.info("✅ Feedback scoring refresh job initialized - updates module multipliers")
+    except Exception as e:
+        _logger.warning(f"⚠️ Feedback scoring refresh job initialization failed: {e}")
+
+    # Start feedback-driven retraining trigger job (runs hourly)
+    # Triggers model retraining when realized module outcomes degrade below threshold
+    try:
+        scheduler_service.add_feedback_retraining_job(
+            interval_seconds=3600,  # 1 hour
+            min_records=10,
+            min_success_rate=70.0,
+            cooldown_hours=24,
+        )
+        _logger.info("✅ Feedback retraining job initialized - monitors module outcome success rates")
+    except Exception as e:
+        _logger.warning(f"⚠️ Feedback retraining job initialization failed: {e}")
 
     # Phase 083: Recover crashed simulations from database
     # Queries for any tasks marked as 'running' and resumes from checkpoint

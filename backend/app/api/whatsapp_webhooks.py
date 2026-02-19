@@ -8,6 +8,8 @@ from app.handlers.whatsapp_handler import get_whatsapp_handler
 from app.integrations.whatsapp_service import get_whatsapp_service
 import logging
 from typing import Any, Dict
+import json
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/whatsapp", tags=["whatsapp"])
@@ -16,11 +18,53 @@ whatsapp_service = get_whatsapp_service()
 whatsapp_handler = get_whatsapp_handler()
 
 
+def _parse_approval_command(content: str) -> Dict[str, str]:
+    """Parse APPROVE/REJECT command text into action/id/reason fields."""
+    parts = content.strip().split(maxsplit=2)
+    if not parts:
+        return {"action": "", "token": "", "reason": ""}
+    action = parts[0].upper()
+    token = parts[1].strip() if len(parts) > 1 else ""
+    reason = parts[2].strip() if len(parts) > 2 else ""
+    return {"action": action, "token": token, "reason": reason}
+
+
+async def _resolve_recommendation_id(token: str) -> str:
+    """Resolve full recommendation ID from full/prefix token."""
+    if not token:
+        return ""
+
+    try:
+        from app.database.repositories import get_recommendation_repository
+
+        repo = get_recommendation_repository()
+        rec = await repo.get(token)
+        if rec:
+            return token
+    except Exception:
+        pass
+
+    # Fallback: match prefix from JSON backup when available.
+    try:
+        data_path = Path(__file__).parent.parent / "data" / "recommendations.json"
+        if data_path.exists():
+            with open(data_path) as f:
+                data = json.load(f)
+            recs = data.get("recommendations", {})
+            for rec_id in recs.keys():
+                if rec_id.startswith(token):
+                    return rec_id
+    except Exception:
+        pass
+
+    return ""
+
+
 @router.get("/webhooks")
 async def verify_whatsapp_webhook(
     hub_mode: str = Query(None, alias="hub.mode"),
     hub_verify_token: str = Query(None, alias="hub.verify_token"),
-    hub_challenge: str = Query(None, alias="hub.challenge")
+    hub_challenge: str = Query(None, alias="hub.challenge"),
 ) -> int:
     """
     WhatsApp webhook verification endpoint (GET) — Phase 102.
@@ -88,10 +132,7 @@ async def handle_whatsapp_message(request: Request) -> Dict[str, str]:
             content = button_reply.get("title", "")
 
         content_preview = content[:50] if content else "N/A"
-        logger.info(
-            f"[WhatsApp] Incoming from {from_number}: type={message_type}, "
-            f"content={content_preview}"
-        )
+        logger.info(f"[WhatsApp] Incoming from {from_number}: type={message_type}, content={content_preview}")
 
         if not content:
             logger.debug("Message received but no extractable content")
@@ -107,16 +148,13 @@ async def handle_whatsapp_message(request: Request) -> Dict[str, str]:
         return {"status": "error", "message": str(e)}
 
 
-async def route_incoming_message(
-    from_number: str,
-    content: str,
-    message_type: str,
-    message_id: str
-) -> None:
+async def route_incoming_message(from_number: str, content: str, message_type: str, message_id: str) -> None:
     """
     Route incoming WhatsApp message to appropriate handler.
 
     Supports:
+    - Active comfort complaint session → Continue multi-turn agent
+    - Comfort complaint detected → Start desk complaint agent
     - "WO-XXXXX" → Show work order details
     - "Status" or "Summary" → Show facility status
     - "Help" or "?" → Show available commands
@@ -126,6 +164,117 @@ async def route_incoming_message(
         # Log interaction
         logger.debug(f"Routing message from {from_number}: {content}")
 
+        # --- Comfort complaint agent (multi-turn) ---
+        try:
+            from langchain_core.messages import HumanMessage
+
+            from app.agents import get_desk_complaint_graph
+            from app.agents.complaint_nlp import detect_comfort_complaint
+
+            agent = get_desk_complaint_graph()
+            thread_id = f"wa_{from_number}"
+            config = {"configurable": {"thread_id": thread_id}}
+
+            # 1. Check for active multi-turn session
+            state = agent.get_state(config)
+            if state.values and state.values.get("needs_input"):
+                result = agent.invoke(
+                    {"messages": [HumanMessage(content=content)]},
+                    config=config,
+                )
+                await whatsapp_service.send_text_message(from_number, result.get("response", ""))
+                return
+
+            # 2. Detect new comfort complaint
+            if detect_comfort_complaint(content):
+                result = agent.invoke(
+                    {
+                        "messages": [HumanMessage(content=content)],
+                        "user_id": from_number,
+                        "channel": "whatsapp",
+                    },
+                    config=config,
+                )
+                await whatsapp_service.send_text_message(from_number, result.get("response", ""))
+                return
+        except ImportError:
+            logger.debug("LangGraph not available, skipping comfort complaint agent")
+        except Exception as e:
+            logger.warning(f"Comfort complaint agent error: {e}")
+
+        # --- Recommendation approval agent (Tier 2 reply) ---
+        try:
+            content_upper = content.strip().upper()
+            if content_upper.startswith("APPROVE") or content_upper.startswith("REJECT"):
+                from langchain_core.messages import HumanMessage
+                from app.agents import get_recommendation_graph
+                from app.agents.recommendation_tools import (
+                    execute_approved_recommendation,
+                    reject_recommendation,
+                )
+
+                agent = get_recommendation_graph()
+                thread_id = f"rec_wa_{from_number}"
+                config = {"configurable": {"thread_id": thread_id}}
+
+                state = await agent.aget_state(config)
+                if state.values and state.values.get("needs_input"):
+                    result = await agent.ainvoke(
+                        {"messages": [HumanMessage(content=content)]},
+                        config=config,
+                    )
+                    await whatsapp_service.send_text_message(from_number, result.get("response", ""))
+                    return
+
+                # Fallback: no active checkpoint session, execute command directly by rec-id.
+                parsed = _parse_approval_command(content)
+                action = parsed["action"]
+                token = parsed["token"]
+                reason = parsed["reason"] or "Rejected via WhatsApp"
+                if not token:
+                    await whatsapp_service.send_text_message(
+                        from_number,
+                        "Include recommendation ID, e.g. APPROVE rec-... or REJECT rec-... <reason>.",
+                    )
+                    return
+
+                rec_id = await _resolve_recommendation_id(token)
+                if not rec_id:
+                    await whatsapp_service.send_text_message(
+                        from_number,
+                        f"Recommendation '{token}' not found. Use the full recommendation ID.",
+                    )
+                    return
+
+                if action == "APPROVE":
+                    result = await execute_approved_recommendation(
+                        recommendation_id=rec_id,
+                        approved_by=f"whatsapp:{from_number}",
+                        notes="Approved via WhatsApp fallback",
+                    )
+                    if result.get("success"):
+                        message = f"Recommendation {rec_id[:8]} executed successfully."
+                    else:
+                        message = f"Could not execute {rec_id[:8]}: {result.get('error_message') or 'unknown error'}"
+                else:
+                    result = await reject_recommendation(
+                        recommendation_id=rec_id,
+                        rejected_by=f"whatsapp:{from_number}",
+                        reason=reason,
+                    )
+                    if result.get("success"):
+                        message = f"Recommendation {rec_id[:8]} rejected: {reason}"
+                    else:
+                        message = f"Could not reject {rec_id[:8]}: {result.get('error_message') or 'unknown error'}"
+
+                await whatsapp_service.send_text_message(from_number, message)
+                return
+        except ImportError:
+            logger.debug("LangGraph not available, skipping recommendation approval")
+        except Exception as e:
+            logger.warning(f"Recommendation approval agent error: {e}")
+
+        # --- Existing routing ---
         if content.startswith("WO-"):
             await handle_work_order_query(from_number, content)
         elif content.lower() in ["status", "summary", "health"]:
@@ -141,8 +290,7 @@ async def route_incoming_message(
         logger.error(f"Error routing WhatsApp message: {e}")
         try:
             await whatsapp_service.send_text_message(
-                from_number,
-                "Sorry, there was an error processing your message. Try again later."
+                from_number, "Sorry, there was an error processing your message. Try again later."
             )
         except Exception as e2:
             logger.error(f"Error sending error message: {e2}")
@@ -239,5 +387,5 @@ async def whatsapp_status() -> Dict[str, Any]:
     return {
         "service": whatsapp_service.get_status(),
         "handler": whatsapp_handler.get_status(),
-        "enabled": whatsapp_service.enabled
+        "enabled": whatsapp_service.enabled,
     }

@@ -15,6 +15,7 @@ from app.models.recommendation import (
 )
 from app.services.profile_service import get_profile_service
 from app.services.device_abstraction import device_manager
+from app.services.ml_feedback_service import get_ml_feedback_service
 
 logger = logging.getLogger(__name__)
 
@@ -100,9 +101,7 @@ class RecommendationService:
 
         return rec
 
-    async def get_pending_recommendations(
-        self, site_id: str, limit: int = 10
-    ) -> List[Recommendation]:
+    async def get_pending_recommendations(self, site_id: str, limit: int = 10) -> List[Recommendation]:
         """Get pending recommendations for a site (Tier 2 approval queue).
 
         Args:
@@ -168,9 +167,7 @@ class RecommendationService:
             logger.error(f"Error fetching recommendation history for {site_id}: {e}")
             return []
 
-    async def approve_recommendation(
-        self, rec_id: str, user_id: str, reason: Optional[str] = None
-    ) -> Recommendation:
+    async def approve_recommendation(self, rec_id: str, user_id: str, reason: Optional[str] = None) -> Recommendation:
         """Operator approves recommendation (Tier 2).
 
         Changes status to APPROVED, then executes the recommendation.
@@ -190,44 +187,38 @@ class RecommendationService:
 
         try:
             repo = get_recommendation_repository()
-            
+
             # Fetch recommendation
             rec = await repo.get(rec_id)
             if not rec:
                 raise ValueError(f"Recommendation {rec_id} not found")
-            
+
             # Verify it's in PENDING status
             if rec.status != RecommendationStatus.PENDING:
-                raise ValueError(
-                    f"Can only approve PENDING recommendations, got {rec.status.value}"
-                )
-            
+                raise ValueError(f"Can only approve PENDING recommendations, got {rec.status.value}")
+
             # Update status and metadata
             rec.status = RecommendationStatus.APPROVED
             rec.approved_by = user_id
             rec.approval_reason = reason
-            
+
             # Execute the recommendation
             await self.execute_recommendation(rec_id, rec)
-            
+
             # Save updated recommendation
             await repo.update(rec_id, rec)
-            
-            logger.info(
-                f"Approved recommendation {rec_id} by {user_id}: {rec.action_type} on {rec.target_equipment}"
-            )
-            
+
+            logger.info(f"Approved recommendation {rec_id} by {user_id}: {rec.action_type} on {rec.target_equipment}")
+
             return rec
-            
+
         except ValueError:
             raise
         except Exception as e:
             logger.error(f"Error approving recommendation {rec_id}: {e}")
             raise ValueError(f"Failed to approve recommendation: {e}")
 
-    async def reject_recommendation(
-        self, rec_id: str, user_id: str, reason: str
-    ) -> Recommendation:
+    async def reject_recommendation(self, rec_id: str, user_id: str, reason: str) -> Recommendation:
         """Operator rejects recommendation (Tier 2).
 
         Changes status to REJECTED and logs feedback.
@@ -248,41 +239,43 @@ class RecommendationService:
 
         try:
             repo = get_recommendation_repository()
-            
+
             # Fetch recommendation
             rec = await repo.get(rec_id)
             if not rec:
                 raise ValueError(f"Recommendation {rec_id} not found")
-            
+
             # Verify it's in PENDING status
             if rec.status != RecommendationStatus.PENDING:
-                raise ValueError(
-                    f"Can only reject PENDING recommendations, got {rec.status.value}"
-                )
-            
+                raise ValueError(f"Can only reject PENDING recommendations, got {rec.status.value}")
+
             # Update status and metadata
             rec.status = RecommendationStatus.REJECTED
             rec.rejection_reason = reason
             rec.approved_by = user_id  # Track who rejected it
-            
+
+            self._record_module_feedback(
+                rec=rec,
+                successful=False,
+                outcome_status=RecommendationStatus.REJECTED.value,
+                actual_impact={"reason": reason},
+                metadata={"rejected_by": user_id},
+            )
+
             # Save updated recommendation
             await repo.update(rec_id, rec)
-            
-            logger.info(
-                f"Rejected recommendation {rec_id} by {user_id}: {reason}"
-            )
-            
+
+            logger.info(f"Rejected recommendation {rec_id} by {user_id}: {reason}")
+
             return rec
-            
+
         except ValueError:
             raise
         except Exception as e:
             logger.error(f"Error rejecting recommendation {rec_id}: {e}")
             raise ValueError(f"Failed to reject recommendation: {e}")
 
-    async def execute_recommendation(
-        self, rec_id: str, rec: Recommendation
-    ) -> Dict[str, Any]:
+    async def execute_recommendation(self, rec_id: str, rec: Recommendation) -> Dict[str, Any]:
         """Execute recommendation via device manager.
 
         Calls device manager to apply the action to the BMS.
@@ -298,9 +291,7 @@ class RecommendationService:
             Exception: If execution fails
         """
         try:
-            logger.info(
-                f"Executing recommendation {rec_id}: {rec.action_type} on {rec.target_equipment}"
-            )
+            logger.info(f"Executing recommendation {rec_id}: {rec.action_type} on {rec.target_equipment}")
 
             # Call device manager to apply action
             result = await device_manager.apply_action(rec.target_equipment, rec.action)
@@ -308,6 +299,13 @@ class RecommendationService:
             rec.status = RecommendationStatus.EXECUTED
             rec.executed_at = datetime.utcnow()
             rec.execution_result = result
+
+            self._record_module_feedback(
+                rec=rec,
+                successful=True,
+                outcome_status=RecommendationStatus.EXECUTED.value,
+                actual_impact=result if isinstance(result, dict) else {"result": str(result)},
+            )
 
             logger.info(f"Successfully executed recommendation {rec_id}")
 
@@ -317,7 +315,90 @@ class RecommendationService:
             logger.error(f"Failed to execute recommendation {rec_id}: {e}")
             rec.status = RecommendationStatus.FAILED
             rec.execution_result = {"error": str(e)}
+            self._record_module_feedback(
+                rec=rec,
+                successful=False,
+                outcome_status=RecommendationStatus.FAILED.value,
+                actual_impact={"error": str(e)},
+            )
             raise
+
+    def _record_module_feedback(
+        self,
+        *,
+        rec: Recommendation,
+        successful: bool,
+        outcome_status: str,
+        actual_impact: Optional[Dict[str, Any]] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Record recommendation outcome into module-aware ML feedback."""
+        try:
+            module_type = self._infer_module_type(rec)
+            confidence = rec.get_numeric_confidence()
+            ml_feedback = get_ml_feedback_service()
+            ml_feedback.record_module_outcome(
+                site_id=rec.site_id,
+                module_type=module_type,
+                recommendation_id=rec.id,
+                action_type=rec.action_type,
+                successful=successful,
+                outcome_status=outcome_status,
+                predicted_impact=rec.expected_impact or {},
+                actual_impact=actual_impact or {},
+                confidence_score=confidence,
+                equipment_id=rec.target_equipment or None,
+                metadata={
+                    "source": "recommendation_service",
+                    "risk_level": rec.risk_level.value
+                    if isinstance(rec.risk_level, ActionRiskLevel)
+                    else str(rec.risk_level),
+                    "requires_approval": rec.requires_approval,
+                    **(metadata or {}),
+                },
+            )
+        except Exception as e:
+            logger.warning("Non-blocking module feedback recording failed for %s: %s", rec.id, e)
+
+    def _infer_module_type(self, rec: Recommendation) -> str:
+        """Infer module type for recommendation outcome attribution."""
+        action = (rec.action_type or "").lower()
+        target = (rec.target_equipment or "").lower()
+        action_meta = rec.action or {}
+
+        explicit = action_meta.get("module_type") or action_meta.get("source_module")
+        if isinstance(explicit, str) and explicit.strip():
+            return explicit.strip().lower()
+
+        if any(k in action for k in ["lighting", "dali", "luminaire"]):
+            return "lighting"
+        if any(k in action for k in ["solar", "bess", "pv", "battery"]):
+            return "solar"
+        if any(k in action for k in ["water", "leak", "hydro"]):
+            return "water"
+        if any(k in action for k in ["fire", "smoke"]):
+            return "fire"
+        if "access" in action:
+            return "access"
+        if "security" in action:
+            return "security"
+        if any(k in action for k in ["sustain", "carbon", "esg"]):
+            return "sustainability"
+        if any(k in action for k in ["contract", "sla", "budget"]):
+            return "contracts"
+        if any(k in action for k in ["energy", "generator", "ups", "power"]):
+            return "energy"
+
+        if any(k in target for k in ["chiller", "ahu", "fcu", "vav", "hvac"]):
+            return "hvac"
+        if any(k in target for k in ["light", "dali", "luminaire"]):
+            return "lighting"
+        if any(k in target for k in ["meter", "ups", "generator", "transformer", "energy"]):
+            return "energy"
+        if any(k in target for k in ["solar", "pv", "bess", "battery"]):
+            return "solar"
+
+        return "hvac"
 
     def _classify_risk(self, action_type: str) -> ActionRiskLevel:
         """Classify action risk level.
@@ -387,9 +468,7 @@ class RecommendationService:
         # Default to requiring approval for safety
         return True
 
-    async def _process_rejection_feedback(
-        self, rec: Recommendation, reason: str
-    ) -> None:
+    async def _process_rejection_feedback(self, rec: Recommendation, reason: str) -> None:
         """Learn from rejected recommendations.
 
         Placeholder for Phase 5: Feedback Loop.

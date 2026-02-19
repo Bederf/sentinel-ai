@@ -41,6 +41,7 @@ class RecommendationScorer:
 
         # Extract weights, defaulting to uniform distribution if not provided
         weights = profile.get("weights", {})
+        self.module_multipliers = profile.get("module_multipliers", {}) or {}
         total_weight = sum(weights.values()) if weights else 0
 
         if total_weight == 0:
@@ -86,26 +87,28 @@ class RecommendationScorer:
         # (impact values are typically -2 to +2 or -100 to +100)
         comfort_norm = min(1.0, max(0.0, (comfort_impact + 2) / 4))  # -2..+2 → 0..1
         cost_norm = min(1.0, max(0.0, (cost_impact + 100) / 200))  # -100..+100 → 0..1
-        health_norm = min(1.0, max(0.0, (health_impact + 2) / 4))   # -2..+2 → 0..1
+        health_norm = min(1.0, max(0.0, (health_impact + 2) / 4))  # -2..+2 → 0..1
         energy_norm = min(1.0, max(0.0, (energy_impact + 50) / 100))  # -50..+50 → 0..1
         maintenance_norm = min(1.0, max(0.0, (maintenance_impact + 2) / 4))  # -2..+2 → 0..1
 
         # Apply profile weights
         score = (
-            comfort_norm * self.weights.get("comfort", 0.2) +
-            cost_norm * self.weights.get("cost", 0.2) +
-            health_norm * self.weights.get("runtime", 0.2) +
-            energy_norm * self.weights.get("energy", 0.2) +
-            maintenance_norm * self.weights.get("maintenance", 0.2)
+            comfort_norm * self.weights.get("comfort", 0.2)
+            + cost_norm * self.weights.get("cost", 0.2)
+            + health_norm * self.weights.get("runtime", 0.2)
+            + energy_norm * self.weights.get("energy", 0.2)
+            + maintenance_norm * self.weights.get("maintenance", 0.2)
         )
+
+        # Apply module performance multiplier from feedback loop.
+        module_key = self._infer_module_key(recommendation)
+        multiplier = float(self.module_multipliers.get(module_key, 1.0))
+        score *= multiplier
 
         # Clamp final score to 0-1 range
         return min(1.0, max(0.0, score))
 
-    def rank_recommendations(
-        self,
-        recommendations: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
+    def rank_recommendations(self, recommendations: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Rank recommendations by multi-objective score.
 
         Scores all recommendations and sorts them by score in descending order
@@ -121,12 +124,43 @@ class RecommendationScorer:
         # Score all recommendations
         for rec in recommendations:
             rec["multi_objective_score"] = self.score_recommendation(rec)
+            rec["score_module_multiplier"] = float(self.module_multipliers.get(self._infer_module_key(rec), 1.0))
 
         # Sort by score descending (highest value first)
-        sorted_recs = sorted(
-            recommendations,
-            key=lambda r: r.get("multi_objective_score", 0),
-            reverse=True
-        )
+        sorted_recs = sorted(recommendations, key=lambda r: r.get("multi_objective_score", 0), reverse=True)
 
         return sorted_recs
+
+    def _infer_module_key(self, recommendation: Dict[str, Any]) -> str:
+        """Infer module key used for module_multipliers lookup."""
+        for key in ("system", "module", "source_module", "equipment_type", "target_module"):
+            value = recommendation.get(key)
+            if isinstance(value, str) and value.strip():
+                return self._normalize_module_alias(value.strip().lower())
+
+        systems = recommendation.get("recommendation_systems")
+        if isinstance(systems, list):
+            for value in systems:
+                if isinstance(value, str) and value.strip():
+                    return self._normalize_module_alias(value.strip().lower())
+
+        action = str(recommendation.get("action_type", "")).lower()
+        if any(token in action for token in ("light", "dali", "dim", "lux", "occupancy")):
+            return "lighting"
+        if any(token in action for token in ("bess", "battery", "soc", "charge", "discharge")):
+            return "solar"
+        if any(token in action for token in ("solar", "pv")):
+            return "solar"
+        if any(token in action for token in ("power", "load", "demand", "peak", "generator", "ups", "nmd")):
+            return "energy"
+        return "hvac"
+
+    def _normalize_module_alias(self, module_name: str) -> str:
+        """Normalize module aliases to canonical keys used by feedback multipliers."""
+        aliases = {
+            "power": "energy",
+            "bess": "solar",
+            "battery": "solar",
+            "pv": "solar",
+        }
+        return aliases.get(module_name, module_name)

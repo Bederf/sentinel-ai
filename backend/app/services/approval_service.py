@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from app.models.recommendation import Recommendation, RecommendationStatus
 from app.services.safety_interlocks import SafetyEngine
 from app.services.device_abstraction import device_manager
+from app.services.ml_feedback_service import get_ml_feedback_service
 from app.database.repositories.recommendation_repository import RecommendationRepository
 from app.database.repositories.audit_repository import AuditRepository
 
@@ -29,6 +30,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ApprovalResult:
     """Result of an approval/rejection action."""
+
     success: bool
     recommendation_id: str
     status: str  # "approved", "rejected", "executed", "failed"
@@ -48,11 +50,7 @@ class ApprovalService:
         self.recommendations_repo = RecommendationRepository()
         self.audit_repo = AuditRepository()
 
-    async def validate_approval(
-        self,
-        recommendation_id: str,
-        approved_by: str
-    ) -> Tuple[bool, str]:
+    async def validate_approval(self, recommendation_id: str, approved_by: str) -> Tuple[bool, str]:
         """Validate that a recommendation can be approved.
 
         Args:
@@ -83,10 +81,7 @@ class ApprovalService:
             return False, f"Validation error: {str(e)}"
 
     async def execute_approval(
-        self,
-        recommendation_id: str,
-        approved_by: str,
-        approval_notes: Optional[str] = None
+        self, recommendation_id: str, approved_by: str, approval_notes: Optional[str] = None
     ) -> ApprovalResult:
         """Execute an approved recommendation with safety validation and device control.
 
@@ -116,7 +111,7 @@ class ApprovalService:
                     success=False,
                     recommendation_id=recommendation_id,
                     status="failed",
-                    error_message=f"Recommendation {recommendation_id} not found"
+                    error_message=f"Recommendation {recommendation_id} not found",
                 )
 
             if recommendation.status != RecommendationStatus.PENDING:
@@ -124,7 +119,7 @@ class ApprovalService:
                     success=False,
                     recommendation_id=recommendation_id,
                     status="failed",
-                    error_message=f"Recommendation is {recommendation.status.value}, not pending"
+                    error_message=f"Recommendation is {recommendation.status.value}, not pending",
                 )
 
             # CRITICAL: Run SafetyEngine validation AGAIN before write
@@ -136,14 +131,12 @@ class ApprovalService:
             safety_result = await self._validate_safety(equipment_id, proposed_value)
 
             if not safety_result["is_safe"]:
-                logger.warning(
-                    f"SafetyEngine rejected approval for {recommendation_id}: {safety_result.get('reason')}"
-                )
+                logger.warning(f"SafetyEngine rejected approval for {recommendation_id}: {safety_result.get('reason')}")
                 return ApprovalResult(
                     success=False,
                     recommendation_id=recommendation_id,
                     status="rejected",
-                    error_message=f"Safety constraint violation: {safety_result.get('reason')}"
+                    error_message=f"Safety constraint violation: {safety_result.get('reason')}",
                 )
 
             # Extract control change from recommendation
@@ -155,17 +148,16 @@ class ApprovalService:
                     success=False,
                     recommendation_id=recommendation_id,
                     status="failed",
-                    error_message="Recommendation action missing point or value"
+                    error_message="Recommendation action missing point or value",
                 )
 
             # Read current value for rollback capability
             original_value = None
             try:
                 # Try to read current value if device_manager supports it
-                if hasattr(self.device_manager, 'read_value'):
+                if hasattr(self.device_manager, "read_value"):
                     current_result = await self.device_manager.read_value(
-                        equipment_id=equipment_id,
-                        point_name=control_point
+                        equipment_id=equipment_id, point_name=control_point
                     )
                     original_value = current_result.get("value") if current_result.get("success") else None
             except Exception as e:
@@ -173,15 +165,11 @@ class ApprovalService:
                 # Continue with approval even if we can't read the original value
 
             # Execute write to Niagara device
-            logger.info(
-                f"Writing to device {equipment_id}: {control_point} = {target_value}"
-            )
+            logger.info(f"Writing to device {equipment_id}: {control_point} = {target_value}")
             write_result = {"success": True, "message": "Demo mode - device write simulated"}
             try:
                 write_result = await self._execute_device_write(
-                    equipment_id=equipment_id,
-                    point_name=control_point,
-                    target_value=target_value
+                    equipment_id=equipment_id, point_name=control_point, target_value=target_value
                 )
             except Exception as e:
                 logger.warning(f"Device write not available in demo mode: {e}")
@@ -193,26 +181,20 @@ class ApprovalService:
                     success=False,
                     recommendation_id=recommendation_id,
                     status="failed",
-                    error_message=f"Device write failed: {write_result.get('error')}"
+                    error_message=f"Device write failed: {write_result.get('error')}",
                 )
 
             # Verify COV feedback (confirm device actually accepted the change)
             cov_verified = True  # Default to verified in demo mode
             try:
                 cov_verified = await self._verify_cov_feedback(
-                    equipment_id=equipment_id,
-                    point_name=control_point,
-                    expected_value=target_value
+                    equipment_id=equipment_id, point_name=control_point, expected_value=target_value
                 )
             except Exception as e:
-                logger.warning(
-                    f"COV feedback verification not available: {e}, proceeding with approval"
-                )
+                logger.warning(f"COV feedback verification not available: {e}, proceeding with approval")
 
             if not cov_verified:
-                logger.warning(
-                    f"COV feedback verification failed for {equipment_id}.{control_point}"
-                )
+                logger.warning(f"COV feedback verification failed for {equipment_id}.{control_point}")
 
             # Update recommendation status
             recommendation.status = RecommendationStatus.EXECUTED
@@ -226,7 +208,7 @@ class ApprovalService:
                 "original_value": original_value,
                 "target_value": target_value,
                 "control_point": control_point,
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.utcnow().isoformat(),
             }
 
             await self.recommendations_repo.upsert(recommendation)
@@ -239,7 +221,22 @@ class ApprovalService:
                 approval_notes=approval_notes,
                 change_description=f"{control_point} = {target_value}",
                 execution_status="success",
-                cov_verified=cov_verified
+                cov_verified=cov_verified,
+            )
+
+            self._record_module_feedback(
+                recommendation=recommendation,
+                successful=True,
+                outcome_status=RecommendationStatus.EXECUTED.value,
+                actual_impact={
+                    "cov_verified": cov_verified,
+                    "device_write": write_result,
+                    "target_value": target_value,
+                },
+                metadata={
+                    "source": "approval_service.execute_approval",
+                    "approved_by": approved_by,
+                },
             )
 
             logger.info(f"Approval executed successfully for {recommendation_id}")
@@ -250,7 +247,7 @@ class ApprovalService:
                 status="executed",
                 executed_at=recommendation.executed_at,
                 cov_verified=cov_verified,
-                execution_result=recommendation.execution_result
+                execution_result=recommendation.execution_result,
             )
 
         except Exception as e:
@@ -259,15 +256,10 @@ class ApprovalService:
                 success=False,
                 recommendation_id=recommendation_id,
                 status="failed",
-                error_message=f"Approval execution error: {str(e)}"
+                error_message=f"Approval execution error: {str(e)}",
             )
 
-    async def reject_approval(
-        self,
-        recommendation_id: str,
-        rejected_by: str,
-        reason: str
-    ) -> ApprovalResult:
+    async def reject_approval(self, recommendation_id: str, rejected_by: str, reason: str) -> ApprovalResult:
         """Reject a pending recommendation.
 
         Args:
@@ -286,7 +278,7 @@ class ApprovalService:
                     success=False,
                     recommendation_id=recommendation_id,
                     status="failed",
-                    error_message=f"Recommendation {recommendation_id} not found"
+                    error_message=f"Recommendation {recommendation_id} not found",
                 )
 
             if recommendation.status != RecommendationStatus.PENDING:
@@ -294,7 +286,7 @@ class ApprovalService:
                     success=False,
                     recommendation_id=recommendation_id,
                     status="failed",
-                    error_message=f"Cannot reject {recommendation.status.value} recommendation"
+                    error_message=f"Cannot reject {recommendation.status.value} recommendation",
                 )
 
             # Update recommendation status
@@ -312,16 +304,23 @@ class ApprovalService:
                 approval_notes=reason,
                 change_description=f"Rejected: {recommendation.action}",
                 execution_status="rejected",
-                cov_verified=False
+                cov_verified=False,
+            )
+
+            self._record_module_feedback(
+                recommendation=recommendation,
+                successful=False,
+                outcome_status=RecommendationStatus.REJECTED.value,
+                actual_impact={"reason": reason},
+                metadata={
+                    "source": "approval_service.reject_approval",
+                    "rejected_by": rejected_by,
+                },
             )
 
             logger.info(f"Recommendation {recommendation_id} rejected by {rejected_by}")
 
-            return ApprovalResult(
-                success=True,
-                recommendation_id=recommendation_id,
-                status="rejected"
-            )
+            return ApprovalResult(success=True, recommendation_id=recommendation_id, status="rejected")
 
         except Exception as e:
             logger.error(f"Error rejecting recommendation {recommendation_id}: {str(e)}")
@@ -329,14 +328,11 @@ class ApprovalService:
                 success=False,
                 recommendation_id=recommendation_id,
                 status="failed",
-                error_message=f"Rejection error: {str(e)}"
+                error_message=f"Rejection error: {str(e)}",
             )
 
     async def rollback_approval(
-        self,
-        recommendation_id: str,
-        rollback_reason: Optional[str] = None,
-        initiated_by: Optional[str] = None
+        self, recommendation_id: str, rollback_reason: Optional[str] = None, initiated_by: Optional[str] = None
     ) -> ApprovalResult:
         """Rollback an executed approval to its original state.
 
@@ -356,7 +352,7 @@ class ApprovalService:
                     success=False,
                     recommendation_id=recommendation_id,
                     status="failed",
-                    error_message=f"Recommendation {recommendation_id} not found"
+                    error_message=f"Recommendation {recommendation_id} not found",
                 )
 
             if recommendation.status != RecommendationStatus.EXECUTED:
@@ -364,7 +360,10 @@ class ApprovalService:
                     success=False,
                     recommendation_id=recommendation_id,
                     status="failed",
-                    error_message=f"Cannot rollback {recommendation.status.value} recommendation. Only executed recommendations can be rolled back."
+                    error_message=(
+                        f"Cannot rollback {recommendation.status.value} recommendation."
+                        " Only executed recommendations can be rolled back."
+                    ),
                 )
 
             # Extract rollback details from execution_result
@@ -381,17 +380,13 @@ class ApprovalService:
                     success=False,
                     recommendation_id=recommendation_id,
                     status="failed",
-                    error_message="Cannot rollback: missing original state information"
+                    error_message="Cannot rollback: missing original state information",
                 )
 
             # Execute rollback write to restore original value
-            logger.info(
-                f"Rolling back device {equipment_id}: {control_point} = {original_value}"
-            )
+            logger.info(f"Rolling back device {equipment_id}: {control_point} = {original_value}")
             rollback_result = await self._execute_device_write(
-                equipment_id=equipment_id,
-                point_name=control_point,
-                target_value=original_value
+                equipment_id=equipment_id, point_name=control_point, target_value=original_value
             )
 
             if not rollback_result["success"]:
@@ -400,20 +395,16 @@ class ApprovalService:
                     success=False,
                     recommendation_id=recommendation_id,
                     status="failed",
-                    error_message=f"Device rollback failed: {rollback_result.get('error')}"
+                    error_message=f"Device rollback failed: {rollback_result.get('error')}",
                 )
 
             # Verify COV feedback for rollback
             cov_verified = await self._verify_cov_feedback(
-                equipment_id=equipment_id,
-                point_name=control_point,
-                expected_value=original_value
+                equipment_id=equipment_id, point_name=control_point, expected_value=original_value
             )
 
             if not cov_verified:
-                logger.warning(
-                    f"COV feedback verification failed for rollback of {equipment_id}.{control_point}"
-                )
+                logger.warning(f"COV feedback verification failed for rollback of {equipment_id}.{control_point}")
 
             # Update recommendation status to rolled back
             recommendation.status = RecommendationStatus.ROLLED_BACK
@@ -422,7 +413,7 @@ class ApprovalService:
                 "rollback_initiated_by": initiated_by,
                 "rollback_reason": rollback_reason,
                 "rollback_executed_at": datetime.utcnow().isoformat(),
-                "rollback_cov_verified": cov_verified
+                "rollback_cov_verified": cov_verified,
             }
 
             await self.recommendations_repo.upsert(recommendation)
@@ -433,9 +424,26 @@ class ApprovalService:
                 equipment_code=equipment_id,
                 approved_by=initiated_by or "system",
                 approval_notes=rollback_reason,
-                change_description=f"Rollback: {control_point} from {exec_result.get('target_value')} back to {original_value}",
+                change_description=(
+                    f"Rollback: {control_point} from {exec_result.get('target_value')} back to {original_value}"
+                ),
                 execution_status="success",
-                cov_verified=cov_verified
+                cov_verified=cov_verified,
+            )
+
+            self._record_module_feedback(
+                recommendation=recommendation,
+                successful=False,
+                outcome_status=RecommendationStatus.ROLLED_BACK.value,
+                actual_impact={
+                    "rollback_reason": rollback_reason,
+                    "cov_verified": cov_verified,
+                    "restored_value": original_value,
+                },
+                metadata={
+                    "source": "approval_service.rollback_approval",
+                    "initiated_by": initiated_by or "system",
+                },
             )
 
             logger.info(f"Rollback completed successfully for {recommendation_id}")
@@ -445,7 +453,7 @@ class ApprovalService:
                 recommendation_id=recommendation_id,
                 status="rolled_back",
                 executed_at=datetime.utcnow(),
-                cov_verified=cov_verified
+                cov_verified=cov_verified,
             )
 
         except Exception as e:
@@ -454,7 +462,7 @@ class ApprovalService:
                 success=False,
                 recommendation_id=recommendation_id,
                 status="failed",
-                error_message=f"Rollback error: {str(e)}"
+                error_message=f"Rollback error: {str(e)}",
             )
 
     async def _validate_safety(self, equipment_id: str, proposed_value: Any) -> Dict[str, Any]:
@@ -474,12 +482,7 @@ class ApprovalService:
             logger.error(f"Error in safety validation: {str(e)}")
             return {"is_safe": False, "reason": f"Safety validation error: {str(e)}"}
 
-    async def _execute_device_write(
-        self,
-        equipment_id: str,
-        point_name: str,
-        target_value: Any
-    ) -> Dict[str, Any]:
+    async def _execute_device_write(self, equipment_id: str, point_name: str, target_value: Any) -> Dict[str, Any]:
         """Execute write to Niagara device.
 
         Args:
@@ -492,14 +495,12 @@ class ApprovalService:
         """
         try:
             # In demo mode or if method doesn't exist, just return success
-            if not hasattr(self.device_manager, 'set_value'):
+            if not hasattr(self.device_manager, "set_value"):
                 logger.info(f"Demo mode: simulating write to {equipment_id}.{point_name} = {target_value}")
                 return {"success": True, "message": "Demo mode - device write simulated"}
 
             result = await self.device_manager.set_value(
-                equipment_id=equipment_id,
-                point_name=point_name,
-                value=target_value
+                equipment_id=equipment_id, point_name=point_name, value=target_value
             )
             return result
         except Exception as e:
@@ -508,12 +509,7 @@ class ApprovalService:
             # In demo mode, return success to allow workflow to continue
             return {"success": True, "message": f"Demo mode - simulated write: {str(e)}"}
 
-    async def _verify_cov_feedback(
-        self,
-        equipment_id: str,
-        point_name: str,
-        expected_value: Any
-    ) -> bool:
+    async def _verify_cov_feedback(self, equipment_id: str, point_name: str, expected_value: Any) -> bool:
         """Verify COV feedback (confirm device accepted the change).
 
         Args:
@@ -525,10 +521,7 @@ class ApprovalService:
             True if verified, False otherwise
         """
         try:
-            result = await self.device_manager.read_value(
-                equipment_id=equipment_id,
-                point_name=point_name
-            )
+            result = await self.device_manager.read_value(equipment_id=equipment_id, point_name=point_name)
 
             if result.get("success"):
                 actual_value = result.get("value")
@@ -536,8 +529,7 @@ class ApprovalService:
 
                 if not verified:
                     logger.warning(
-                        f"COV mismatch for {equipment_id}.{point_name}: "
-                        f"wrote {expected_value}, read {actual_value}"
+                        f"COV mismatch for {equipment_id}.{point_name}: wrote {expected_value}, read {actual_value}"
                     )
 
                 return verified
@@ -557,7 +549,7 @@ class ApprovalService:
         approval_notes: Optional[str],
         change_description: str,
         execution_status: str,
-        cov_verified: bool
+        cov_verified: bool,
     ) -> None:
         """Create audit log entry for approval action.
 
@@ -579,7 +571,7 @@ class ApprovalService:
                 "approval_notes": approval_notes or "",
                 "change_description": change_description,
                 "execution_status": execution_status,
-                "verified_by_cov": cov_verified
+                "verified_by_cov": cov_verified,
             }
 
             await self.audit_repo.log_action(audit_entry)
@@ -623,7 +615,7 @@ class ApprovalService:
                     success=False,
                     recommendation_id=recommendation_id,
                     status="failed",
-                    error_message=f"Recommendation {recommendation_id} not found"
+                    error_message=f"Recommendation {recommendation_id} not found",
                 )
 
             if recommendation.status != RecommendationStatus.PENDING:
@@ -631,7 +623,7 @@ class ApprovalService:
                     success=False,
                     recommendation_id=recommendation_id,
                     status="failed",
-                    error_message=f"Recommendation is {recommendation.status.value}, not pending"
+                    error_message=f"Recommendation is {recommendation.status.value}, not pending",
                 )
 
             # CRITICAL: Run SafetyEngine validation AGAIN before write (defense-in-depth)
@@ -650,19 +642,22 @@ class ApprovalService:
                 )
                 # Log to parasite_decisions as failure
                 parasite_repo = ParasiteDecisionRepository()
-                await parasite_repo.log_decision(
-                    decision_id=routing_result.decision_id,
-                    recommendation_id=recommendation_id,
-                    tier="tier3",
-                    decision_type="tier3_auto_execute",
-                    success=False,
-                    failure_reason=f"Safety constraint violation: {safety_result.get('reason')}"
+                await parasite_repo.record_decision(
+                    {
+                        "id": routing_result.decision_id,
+                        "recommendation_id": recommendation_id,
+                        "tier": "tier3",
+                        "decision_type": "tier3_auto_execute",
+                        "write_status": "failed",
+                        "failure_reason": f"Safety constraint violation: {safety_result.get('reason')}",
+                        "equipment_code": equipment_id,
+                    }
                 )
                 return ApprovalResult(
                     success=False,
                     recommendation_id=recommendation_id,
                     status="failed",
-                    error_message=f"Safety constraint violation: {safety_result.get('reason')}"
+                    error_message=f"Safety constraint violation: {safety_result.get('reason')}",
                 )
 
             # Extract control change from recommendation
@@ -674,50 +669,44 @@ class ApprovalService:
                     success=False,
                     recommendation_id=recommendation_id,
                     status="failed",
-                    error_message="Recommendation action missing point or value"
+                    error_message="Recommendation action missing point or value",
                 )
 
             # Read current value for rollback capability
-            current_result = await self.device_manager.read_value(
-                equipment_id=equipment_id,
-                point_name=control_point
-            )
+            current_result = await self.device_manager.read_value(equipment_id=equipment_id, point_name=control_point)
             original_value = current_result.get("value") if current_result.get("success") else None
 
             # Execute write to Niagara device
-            logger.info(
-                f"Tier 3 auto-execute: Writing to device {equipment_id}: {control_point} = {target_value}"
-            )
+            logger.info(f"Tier 3 auto-execute: Writing to device {equipment_id}: {control_point} = {target_value}")
             write_result = await self._execute_device_write(
-                equipment_id=equipment_id,
-                point_name=control_point,
-                target_value=target_value
+                equipment_id=equipment_id, point_name=control_point, target_value=target_value
             )
 
             if not write_result["success"]:
                 logger.error(f"Tier 3 auto-execute: Device write failed: {write_result.get('error')}")
                 parasite_repo = ParasiteDecisionRepository()
-                await parasite_repo.log_decision(
-                    decision_id=routing_result.decision_id,
-                    recommendation_id=recommendation_id,
-                    tier="tier3",
-                    decision_type="tier3_auto_execute",
-                    success=False,
-                    failure_reason=f"Device write failed: {write_result.get('error')}"
+                await parasite_repo.record_decision(
+                    {
+                        "id": routing_result.decision_id,
+                        "recommendation_id": recommendation_id,
+                        "tier": "tier3",
+                        "decision_type": "tier3_auto_execute",
+                        "write_status": "failed",
+                        "failure_reason": f"Device write failed: {write_result.get('error')}",
+                        "equipment_code": equipment_id,
+                    }
                 )
                 return ApprovalResult(
                     success=False,
                     recommendation_id=recommendation_id,
                     status="failed",
-                    error_message=f"Device write failed: {write_result.get('error')}"
+                    error_message=f"Device write failed: {write_result.get('error')}",
                 )
 
             # COV verification via dedicated service
             cov_monitor = get_cov_monitor_service()
             cov_result = await cov_monitor.verify_write(
-                equipment_id=equipment_id,
-                point_name=control_point,
-                expected_value=target_value
+                equipment_id=equipment_id, point_name=control_point, expected_value=target_value
             )
 
             logger.info(
@@ -737,7 +726,7 @@ class ApprovalService:
                         recommendation=recommendation,
                         original_value=original_value,
                         cov_result=cov_result,
-                        decision_id=routing_result.decision_id
+                        decision_id=routing_result.decision_id,
                     )
 
                     if auto_rolled_back:
@@ -746,8 +735,12 @@ class ApprovalService:
                             success=False,
                             recommendation_id=recommendation_id,
                             status="rolled_back",
-                            error_message=f"COV verification failed, auto-rollback initiated: expected={cov_result.expected_value}, actual={cov_result.actual_value}",
-                            cov_verified=False
+                            error_message=(
+                                "COV verification failed, auto-rollback initiated:"
+                                f" expected={cov_result.expected_value},"
+                                f" actual={cov_result.actual_value}"
+                            ),
+                            cov_verified=False,
                         )
                     else:
                         logger.error("Tier 3 auto-execute: Auto-rollback failed")
@@ -755,19 +748,21 @@ class ApprovalService:
                             success=False,
                             recommendation_id=recommendation_id,
                             status="failed",
-                            error_message="COV verification failed and auto-rollback failed"
+                            error_message="COV verification failed and auto-rollback failed",
                         )
 
             # Schedule outcome measurement for 10-minute learning window
             await cov_monitor.schedule_outcome_measurement(
                 recommendation_id=recommendation_id,
-                measurement_window_seconds=600  # 10 minutes
+                measurement_window_seconds=600,  # 10 minutes
             )
 
             # Update recommendation status to AUTO_EXECUTED
             recommendation.status = RecommendationStatus.AUTO_EXECUTED
             recommendation.approved_by = "system"
-            recommendation.approval_reason = f"Tier 3 autonomous execution (confidence: {routing_result.confidence_score})"
+            recommendation.approval_reason = (
+                f"Tier 3 autonomous execution (confidence: {routing_result.confidence_score})"
+            )
             recommendation.executed_at = datetime.utcnow()
             recommendation.execution_result = {
                 "success": True,
@@ -779,7 +774,7 @@ class ApprovalService:
                 "timestamp": datetime.utcnow().isoformat(),
                 "execution_type": "tier3_auto_execute",
                 "decision_id": routing_result.decision_id,
-                "confidence_score": routing_result.confidence_score
+                "confidence_score": routing_result.confidence_score,
             }
 
             await self.recommendations_repo.upsert(recommendation)
@@ -792,18 +787,40 @@ class ApprovalService:
                 approval_notes=f"Tier 3 auto-execute (confidence: {routing_result.confidence_score})",
                 change_description=f"{control_point} = {target_value}",
                 execution_status="success",
-                cov_verified=cov_result.verified
+                cov_verified=cov_result.verified,
+            )
+
+            self._record_module_feedback(
+                recommendation=recommendation,
+                successful=True,
+                outcome_status=RecommendationStatus.AUTO_EXECUTED.value,
+                actual_impact={
+                    "cov_verified": cov_result.verified,
+                    "device_write": write_result,
+                    "target_value": target_value,
+                },
+                metadata={
+                    "source": "approval_service.auto_execute_recommendation",
+                    "decision_id": routing_result.decision_id,
+                    "confidence_score": routing_result.confidence_score,
+                },
             )
 
             # Log to parasite_decisions as success
             parasite_repo = ParasiteDecisionRepository()
-            await parasite_repo.log_decision(
-                decision_id=routing_result.decision_id,
-                recommendation_id=recommendation_id,
-                tier="tier3",
-                decision_type="tier3_auto_execute",
-                success=True,
-                cov_verified=cov_result.verified
+            await parasite_repo.record_decision(
+                {
+                    "id": routing_result.decision_id,
+                    "recommendation_id": recommendation_id,
+                    "tier": "tier3",
+                    "decision_type": "tier3_auto_execute",
+                    "write_status": "success",
+                    "cov_verified": cov_result.verified,
+                    "equipment_code": equipment_id,
+                    "control_point": control_point,
+                    "target_value": target_value,
+                    "original_value": original_value,
+                }
             )
 
             logger.info(f"Tier 3 auto-execute: Successfully completed for {recommendation_id}")
@@ -814,7 +831,7 @@ class ApprovalService:
                 status="auto_executed",
                 executed_at=recommendation.executed_at,
                 cov_verified=cov_result.verified,
-                execution_result=recommendation.execution_result
+                execution_result=recommendation.execution_result,
             )
 
         except Exception as e:
@@ -823,7 +840,7 @@ class ApprovalService:
                 success=False,
                 recommendation_id=recommendation_id,
                 status="failed",
-                error_message=f"Tier 3 auto-execute error: {str(e)}"
+                error_message=f"Tier 3 auto-execute error: {str(e)}",
             )
 
     async def _auto_rollback(
@@ -861,9 +878,7 @@ class ApprovalService:
 
             # Write original value back to device
             rollback_result = await self._execute_device_write(
-                equipment_id=equipment_id,
-                point_name=control_point,
-                target_value=original_value
+                equipment_id=equipment_id, point_name=control_point, target_value=original_value
             )
 
             if not rollback_result["success"]:
@@ -873,15 +888,11 @@ class ApprovalService:
             # Verify rollback via COV
             cov_monitor = get_cov_monitor_service()
             rollback_cov_result = await cov_monitor.verify_write(
-                equipment_id=equipment_id,
-                point_name=control_point,
-                expected_value=original_value
+                equipment_id=equipment_id, point_name=control_point, expected_value=original_value
             )
 
             if not rollback_cov_result.verified:
-                logger.warning(
-                    f"Auto-rollback: COV verification failed for rollback of {equipment_id}.{control_point}"
-                )
+                logger.warning(f"Auto-rollback: COV verification failed for rollback of {equipment_id}.{control_point}")
                 # Continue anyway - rollback write was issued, but read-back didn't confirm
 
             # Update recommendation status to ROLLED_BACK
@@ -889,10 +900,12 @@ class ApprovalService:
             recommendation.execution_result = {
                 **(recommendation.execution_result or {}),
                 "rolled_back": True,
-                "rollback_reason": f"COV verification failed: expected={cov_result.expected_value}, actual={cov_result.actual_value}",
+                "rollback_reason": (
+                    f"COV verification failed: expected={cov_result.expected_value}, actual={cov_result.actual_value}"
+                ),
                 "rollback_executed_at": datetime.utcnow().isoformat(),
                 "rollback_cov_verified": rollback_cov_result.verified,
-                "decision_id": decision_id
+                "decision_id": decision_id,
             }
 
             await self.recommendations_repo.upsert(recommendation)
@@ -903,9 +916,11 @@ class ApprovalService:
                 equipment_code=equipment_id,
                 approved_by="system",
                 approval_notes="Auto-rollback triggered by COV failure",
-                change_description=f"Auto-rollback: {control_point} from {cov_result.actual_value} back to {original_value}",
+                change_description=(
+                    f"Auto-rollback: {control_point} from {cov_result.actual_value} back to {original_value}"
+                ),
                 execution_status="success",
-                cov_verified=rollback_cov_result.verified
+                cov_verified=rollback_cov_result.verified,
             )
 
             # Update parasite_decisions record
@@ -913,7 +928,9 @@ class ApprovalService:
             await parasite_repo.update_decision_rollback(
                 decision_id=decision_id,
                 rolled_back=True,
-                rollback_reason=f"COV verification failed: expected={cov_result.expected_value}, actual={cov_result.actual_value}"
+                rollback_reason=(
+                    f"COV verification failed: expected={cov_result.expected_value}, actual={cov_result.actual_value}"
+                ),
             )
 
             logger.info(f"Auto-rollback: Successfully completed for {recommendation.id}")
@@ -924,10 +941,7 @@ class ApprovalService:
             return False
 
     async def execute_multi_module_approval(
-        self,
-        recommendation_id: str,
-        approved_by: str,
-        approval_notes: Optional[str] = None
+        self, recommendation_id: str, approved_by: str, approval_notes: Optional[str] = None
     ) -> Dict[str, Any]:
         """Execute a multi-module peak shaving recommendation.
 
@@ -946,9 +960,7 @@ class ApprovalService:
             Dict with execution details including module_actions, reductions, etc.
         """
         try:
-            logger.info(
-                f"Executing multi-module approval {recommendation_id} by {approved_by}"
-            )
+            logger.info(f"Executing multi-module approval {recommendation_id} by {approved_by}")
 
             # In a real system, load recommendation details from storage
             # For MVP, this is called from peak_demand API which has the full recommendation
@@ -975,17 +987,89 @@ class ApprovalService:
                 "details": {
                     "approved_by": approved_by,
                     "approval_time": datetime.utcnow().isoformat(),
-                    "approval_notes": approval_notes
-                }
+                    "approval_notes": approval_notes,
+                },
             }
 
         except Exception as e:
             logger.error(f"Error executing multi-module approval: {str(e)}")
-            return {
-                "success": False,
-                "error": str(e),
-                "recommendation_id": recommendation_id
-            }
+            return {"success": False, "error": str(e), "recommendation_id": recommendation_id}
+
+    def _record_module_feedback(
+        self,
+        *,
+        recommendation: Recommendation,
+        successful: bool,
+        outcome_status: str,
+        actual_impact: Optional[Dict[str, Any]] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Record approval-path outcomes into module-aware ML feedback."""
+        try:
+            module_type = self._infer_module_type(recommendation)
+            confidence_score = recommendation.get_numeric_confidence()
+            ml_feedback = get_ml_feedback_service()
+            ml_feedback.record_module_outcome(
+                site_id=recommendation.site_id,
+                module_type=module_type,
+                recommendation_id=recommendation.id,
+                action_type=recommendation.action_type,
+                successful=successful,
+                outcome_status=outcome_status,
+                predicted_impact=recommendation.expected_impact or {},
+                actual_impact=actual_impact or {},
+                confidence_score=confidence_score,
+                equipment_id=recommendation.target_equipment or None,
+                metadata={
+                    "source_path": "approval_service",
+                    **(metadata or {}),
+                },
+            )
+        except Exception as e:
+            logger.warning(
+                "Non-blocking module feedback recording failed for recommendation %s: %s",
+                recommendation.id,
+                e,
+            )
+
+    def _infer_module_type(self, recommendation: Recommendation) -> str:
+        """Infer module type from action/equipment metadata."""
+        action_type = (recommendation.action_type or "").lower()
+        target = (recommendation.target_equipment or "").lower()
+        action_data = recommendation.action or {}
+        explicit = action_data.get("module_type") or action_data.get("source_module")
+        if isinstance(explicit, str) and explicit.strip():
+            return explicit.strip().lower()
+
+        if any(k in action_type for k in ["lighting", "dali", "luminaire"]):
+            return "lighting"
+        if any(k in action_type for k in ["solar", "bess", "pv", "battery"]):
+            return "solar"
+        if any(k in action_type for k in ["water", "leak"]):
+            return "water"
+        if any(k in action_type for k in ["fire", "smoke"]):
+            return "fire"
+        if "access" in action_type:
+            return "access"
+        if "security" in action_type:
+            return "security"
+        if any(k in action_type for k in ["sustain", "carbon", "esg"]):
+            return "sustainability"
+        if any(k in action_type for k in ["contract", "sla", "budget"]):
+            return "contracts"
+        if any(k in action_type for k in ["energy", "generator", "ups", "power"]):
+            return "energy"
+
+        if any(k in target for k in ["chiller", "ahu", "fcu", "vav", "hvac"]):
+            return "hvac"
+        if any(k in target for k in ["light", "dali", "luminaire"]):
+            return "lighting"
+        if any(k in target for k in ["meter", "ups", "generator", "transformer", "energy"]):
+            return "energy"
+        if any(k in target for k in ["solar", "pv", "bess", "battery"]):
+            return "solar"
+
+        return "control"
 
 
 # Singleton instance

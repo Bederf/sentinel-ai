@@ -48,9 +48,7 @@ class CreateRecommendationRequest(BaseModel):
 
 @limiter.limit("20/minute")
 @router.get("/{site_id}")
-async def get_pending_recommendations(
-    request: Request, site_id: str, limit: int = Query(10, ge=1, le=100)
-):
+async def get_pending_recommendations(request: Request, site_id: str, limit: int = Query(10, ge=1, le=100)):
     """Get pending recommendations for a site (Tier 2 approval queue).
 
     Returns recommendations awaiting operator approval, newest first.
@@ -74,9 +72,7 @@ async def get_pending_recommendations(
 
     except Exception as e:
         logger.error(f"Error fetching pending recommendations for {site_id}: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Error fetching recommendations: {e}"
-        )
+        raise HTTPException(status_code=500, detail=f"Error fetching recommendations: {e}")
 
 
 @limiter.limit("20/minute")
@@ -126,9 +122,7 @@ async def get_recommendation_history(
 
     except Exception as e:
         logger.error(f"Error fetching recommendation history for {site_id}: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Error fetching recommendation history: {e}"
-        )
+        raise HTTPException(status_code=500, detail=f"Error fetching recommendation history: {e}")
 
 
 @limiter.limit("15/minute")
@@ -161,9 +155,7 @@ async def create_recommendation(req: Request, request: CreateRecommendationReque
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Error creating recommendation: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Error creating recommendation: {e}"
-        )
+        raise HTTPException(status_code=500, detail=f"Error creating recommendation: {e}")
 
 
 @router.get("/detail/{rec_id}")
@@ -178,27 +170,18 @@ async def get_recommendation(rec_id: str):
     """
     try:
         from app.database.repositories import get_recommendation_repository
-        
+
         repo = get_recommendation_repository()
         rec = await repo.get(rec_id)
-        
+
         if not rec:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Recommendation {rec_id} not found"
-            )
-        
+            raise HTTPException(status_code=404, detail=f"Recommendation {rec_id} not found")
+
         return {
             "success": True,
             "recommendation": rec.to_dict(),
             "status": rec.status.value,
         }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error fetching recommendation {rec_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
 
     except HTTPException:
         raise
@@ -251,12 +234,6 @@ async def approve_recommendation(
         logger.error(f"Error approving recommendation {rec_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error approving recommendation {rec_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
 
 @router.post("/{rec_id}/reject")
 async def reject_recommendation(
@@ -302,8 +279,67 @@ async def reject_recommendation(
         logger.error(f"Error rejecting recommendation {rec_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-    except HTTPException:
-        raise
+
+class ProcessPendingRequest(BaseModel):
+    """Request body for triggering recommendation processing."""
+
+    channel: str = "system"
+    trigger: str = "manual"
+
+
+@limiter.limit("10/minute")
+@router.post("/{site_id}/process-pending")
+async def trigger_recommendation_processing(
+    request: Request,
+    site_id: str,
+    body: ProcessPendingRequest = ProcessPendingRequest(),
+):
+    """Trigger the recommendation agent to process pending recommendations.
+
+    Invokes the LangGraph recommendation agent to validate, assess impact,
+    route through tier engine, and execute or request approval for
+    pending recommendations.
+
+    Args:
+        site_id: Building identifier (e.g., "S002")
+        body: Optional channel and trigger configuration
+
+    Returns:
+        JSON response with processing result
+    """
+    try:
+        from langchain_core.messages import HumanMessage
+        from app.agents import get_recommendation_graph
+
+        agent = get_recommendation_graph()
+        thread_id = f"rec_api_{site_id}"
+        config = {"configurable": {"thread_id": thread_id}}
+
+        result = await agent.ainvoke(
+            {
+                "messages": [HumanMessage(content="process")],
+                "site_id": site_id,
+                "channel": body.channel,
+                "trigger": body.trigger,
+            },
+            config=config,
+        )
+
+        return {
+            "success": True,
+            "site_id": site_id,
+            "response": result.get("response", ""),
+            "tier": result.get("tier"),
+            "recommendation_id": result.get("recommendation_id"),
+            "needs_input": result.get("needs_input", False),
+            "processing_complete": result.get("processing_complete", False),
+        }
+
+    except ImportError:
+        raise HTTPException(
+            status_code=501,
+            detail="LangGraph not available. Install langgraph to use the recommendation agent.",
+        )
     except Exception as e:
-        logger.error(f"Error rejecting recommendation {rec_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error processing recommendations for {site_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Error processing recommendations: {e}")
