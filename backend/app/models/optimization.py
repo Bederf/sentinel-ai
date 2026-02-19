@@ -111,14 +111,8 @@ class SiteProfileConfig:
             site_id=data.get("site_id", ""),
             active_profile=data.get("active_profile", "cost"),
             control_tier=data.get("control_tier", "human_in_loop"),
-            zone_overrides=[
-                ZoneProfileOverride.from_dict(zo)
-                for zo in data.get("zone_overrides", [])
-            ],
-            schedule_overrides=[
-                ScheduleProfileOverride.from_dict(so)
-                for so in data.get("schedule_overrides", [])
-            ],
+            zone_overrides=[ZoneProfileOverride.from_dict(zo) for zo in data.get("zone_overrides", [])],
+            schedule_overrides=[ScheduleProfileOverride.from_dict(so) for so in data.get("schedule_overrides", [])],
         )
 
 
@@ -155,6 +149,8 @@ class OptimizationRecommendation:
     profile_applied: bool = False  # Whether profile was applied to recommendations
     # Phase 72.3: Multi-objective scoring
     scoring_summary: Optional[Dict[str, Any]] = None  # Scoring statistics: total_recommendations, top_score, avg_score
+    # Data quality tracking: which sensors were live vs defaulted
+    data_quality: Optional[Dict[str, Any]] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
@@ -174,6 +170,8 @@ class OptimizationRecommendation:
             result["lighting_summary"] = self.lighting_summary
         if self.scoring_summary:
             result["scoring_summary"] = self.scoring_summary
+        if self.data_quality:
+            result["data_quality"] = self.data_quality
         return result
 
     @classmethod
@@ -191,6 +189,7 @@ class OptimizationRecommendation:
             profile=data.get("profile"),
             profile_applied=data.get("profile_applied", False),
             scoring_summary=data.get("scoring_summary"),
+            data_quality=data.get("data_quality"),
         )
 
 
@@ -232,16 +231,20 @@ class OptimizationHistoryEntry:
     result: str  # "success", "warning", "error"
     user: str = "system"
     details: Dict[str, Any] = field(default_factory=dict)
+    routing_summary: Optional[Dict[str, Any]] = None  # Phase 82-02: tier routing metadata
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
-        return {
+        result = {
             "timestamp": self.timestamp,
             "action": self.action,
             "result": self.result,
             "user": self.user,
             "details": self.details,
         }
+        if self.routing_summary is not None:
+            result["routing_summary"] = self.routing_summary
+        return result
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "OptimizationHistoryEntry":
@@ -252,6 +255,7 @@ class OptimizationHistoryEntry:
             result=data.get("result", "success"),
             user=data.get("user", "system"),
             details=data.get("details", {}),
+            routing_summary=data.get("routing_summary"),
         )
 
 
@@ -290,11 +294,9 @@ class SiteOptimizationStatus:
             status=status,
             settings=OptimizationSettings.from_dict(data.get("settings", {})),
             last_recommendation=OptimizationRecommendation.from_dict(data.get("last_recommendation", {}))
-            if data.get("last_recommendation") else None,
+            if data.get("last_recommendation")
+            else None,
             last_optimization=data.get("last_optimization"),
-            history=[
-                OptimizationHistoryEntry.from_dict(entry)
-                for entry in data.get("history", [])
-            ],
+            history=[OptimizationHistoryEntry.from_dict(entry) for entry in data.get("history", [])],
             error_message=data.get("error_message"),
         )

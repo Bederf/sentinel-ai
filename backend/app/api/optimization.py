@@ -21,9 +21,11 @@ from app.models.optimization import (
     OptimizationStatus,
     OptimizationHistoryEntry,
 )
+from app.models.module_registry import ModuleType
 from app.database.repositories import BuildingRepository
 from app.config.settings import settings
 from app.services.optimization_tier_router import get_tier_router
+from app.services.module_registry_service import module_registry
 from app.services.profile_service import get_profile_service
 
 logger = logging.getLogger(__name__)
@@ -399,6 +401,22 @@ class ToggleRequest(BaseModel):
     enabled: bool
 
 
+def _controls_module_active(site_id: str) -> bool:
+    """Return whether control automation add-on is active for a site."""
+    return module_registry.is_module_active(site_id, ModuleType.CONTROL)
+
+
+def _raise_controls_module_required(site_id: str) -> None:
+    """Raise a standardized 403 when control add-on is not active."""
+    raise HTTPException(
+        status_code=403,
+        detail=(
+            f"Control module is not active for site '{site_id}'. "
+            "Base package supports monitoring and AI recommendations only."
+        ),
+    )
+
+
 def load_sites():
     """Load sites from Supabase, with fallback to legacy JSON file."""
     # Try Supabase first
@@ -513,6 +531,7 @@ async def analyze_optimization(request: AnalyzeRequest) -> Dict[str, Any]:
         if site:
             site_settings = site.get("optimization_settings") or {}
             site_mode = site_settings.get("mode", "supervised")
+        controls_module_active = _controls_module_active(request.site_id)
 
         # --- Tier Routing (Phase 82-02) ---
         # Compute routing decisions per recommendation via the tier router.
@@ -557,17 +576,25 @@ async def analyze_optimization(request: AnalyzeRequest) -> Dict[str, Any]:
         execution_summary = {"attempted": 0, "succeeded": 0, "failed": 0}
 
         # Determine which recommendations to auto-apply
-        if settings.optimization_routing_enforced:
-            # ENFORCE MODE: routing determines which recommendations get auto-applied
-            # Only auto-apply if: routing says auto_execute AND validation passes
-            should_auto_apply = (
-                validation["allowed"]
-                and recommendations_list
-                and any(d.action == "auto_execute" for d in routing_decisions)
-            )
+        if controls_module_active:
+            if settings.optimization_routing_enforced:
+                # ENFORCE MODE: routing determines which recommendations get auto-applied
+                # Only auto-apply if: routing says auto_execute AND validation passes
+                should_auto_apply = (
+                    validation["allowed"]
+                    and recommendations_list
+                    and any(d.action == "auto_execute" for d in routing_decisions)
+                )
+            else:
+                # SHADOW MODE: existing behavior — auto-apply if site is in automatic mode
+                should_auto_apply = site_mode == "automatic" and validation["allowed"] and bool(recommendations_list)
         else:
-            # SHADOW MODE: existing behavior — auto-apply if site is in automatic mode
-            should_auto_apply = site_mode == "automatic" and validation["allowed"] and bool(recommendations_list)
+            should_auto_apply = False
+            if site_mode == "automatic":
+                logger.info(
+                    "Skipping auto-apply for site %s because control module is inactive",
+                    request.site_id,
+                )
 
         if should_auto_apply:
             logger.info(f"Auto-applying recommendations for site {request.site_id}")
@@ -669,6 +696,35 @@ async def analyze_optimization(request: AnalyzeRequest) -> Dict[str, Any]:
             except Exception as mv_err:
                 logger.warning(f"M&V recording failed (non-blocking): {mv_err}")
 
+        # --- Persist routing metadata on rec_dict (Phase 82-02) ---
+        routing_details_list = [
+            {
+                "index": i,
+                "tier": d.tier.value,
+                "action": d.action,
+                "reason": d.reason,
+                "effective_confidence": d.effective_confidence,
+                "original_confidence": d.original_confidence,
+            }
+            for i, d in enumerate(routing_decisions)
+        ]
+        routing_summary_dict = {
+            "blocked": routing_summary.blocked,
+            "advisory": routing_summary.advisory,
+            "pending_approval": routing_summary.pending_approval,
+            "auto_executed": routing_summary.auto_executed,
+            "control_tier": control_tier,
+            "thresholds": {
+                "block_min": settings.optimization_tier_block_min,
+                "tier2_min": settings.optimization_tier2_min,
+                "tier3_min": settings.optimization_tier3_min,
+            },
+        }
+        rec_dict["routing_details"] = routing_details_list
+        rec_dict["routing_summary"] = routing_summary_dict
+        rec_dict["control_tier"] = control_tier
+        rec_dict["execution_summary"] = execution_summary
+
         if site:
             if auto_applied:
                 # Automatic mode: setpoints were auto-applied
@@ -706,10 +762,11 @@ async def analyze_optimization(request: AnalyzeRequest) -> Dict[str, Any]:
                     "cross_system_recommendations": cross_system_count,
                     "auto_applied": auto_applied,
                     "mode": site_mode,
-                    "projected_savings_zar_per_hour": projected_savings.get("cost_zar_per_hour", 0)
-                    if auto_applied
-                    else 0,
+                    "projected_savings_zar_per_hour": (
+                        projected_savings.get("cost_zar_per_hour", 0) if auto_applied else 0
+                    ),
                 },
+                routing_summary=routing_summary_dict,
             )
             site["optimization_history"].append(history_entry.to_dict())
 
@@ -724,8 +781,13 @@ async def analyze_optimization(request: AnalyzeRequest) -> Dict[str, Any]:
             "recommendation": rec_dict,
             "validation": validation,
             "auto_applied": auto_applied,
-            "auto_apply_results": auto_apply_results if auto_applied else None,
+            "auto_apply_results": (auto_apply_results if auto_applied else None),
             "mode": site_mode,
+            "controls_module_active": controls_module_active,
+            "control_tier": control_tier,
+            "routing_summary": routing_summary_dict,
+            "routing_details": routing_details_list,
+            "execution_summary": execution_summary,
             "summary": {
                 "hvac_recommendations": hvac_count,
                 "lighting_recommendations": lighting_count,
@@ -824,6 +886,9 @@ async def approve_optimization(request: Request, body: ApproveRequest = Body(...
             f"recommendation {body.recommendation_id}, "
             f"setpoints: {len(body.setpoints_to_apply)}"
         )
+
+        if not _controls_module_active(body.site_id):
+            _raise_controls_module_required(body.site_id)
 
         # Validate setpoints array is not empty
         if not body.setpoints_to_apply:
@@ -1223,6 +1288,9 @@ async def start_precooling(
         Precooling status with applied actions
     """
     try:
+        if not _controls_module_active(site_id):
+            _raise_controls_module_required(site_id)
+
         # Check if already running
         existing = _precooling_state.get(site_id)
         if existing and existing.get("status") == "running":
@@ -1375,6 +1443,9 @@ async def start_precooling(
 @router.post("/optimization/precooling/{site_id}/stop")
 async def stop_precooling(site_id: str) -> Dict[str, Any]:
     """Stop pre-cooling for a site and revert setpoints to normal values."""
+    if not _controls_module_active(site_id):
+        _raise_controls_module_required(site_id)
+
     existing = _precooling_state.get(site_id)
     if not existing or existing.get("status") != "running":
         return {
