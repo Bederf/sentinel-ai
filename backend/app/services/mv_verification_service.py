@@ -412,7 +412,32 @@ class MVVerificationService:
             if task.variance_pct is not None and task.variance_pct > ENERGY_VARIANCE_WARNING_PCT:
                 task.notes = f"Warning: variance {task.variance_pct:.1f}% above {ENERGY_VARIANCE_WARNING_PCT}%"
 
-        # 5. Create Outcome record for feedback loop
+        # 5. Evaluate quality gate for context on this outcome
+        quality_gate_status = None
+        quality_snapshot_id = None
+        ingestion_mode_str = None
+        try:
+            import uuid
+            from app.config.settings import settings
+            from app.services.quality_gate_evaluator import QualityGateEvaluator
+
+            evaluator = QualityGateEvaluator()
+            mode = settings.resolved_ingestion_mode.value
+            ingestion_mode_str = mode
+            qg_metrics = await evaluator.collect_metrics(task.site_id)
+            qg_result = evaluator.evaluate(mode, qg_metrics)
+            quality_gate_status = qg_result.overall.value
+            quality_snapshot_id = str(uuid.uuid4())
+        except Exception as e:
+            logger.warning(f"M&V: Failed to evaluate quality gate for outcome context: {e}")
+
+        # 6. Create Outcome record for feedback loop (with quality context)
+        action_time = None
+        try:
+            action_time = datetime.fromisoformat(task.applied_at)
+        except (ValueError, TypeError):
+            pass
+
         outcome = Outcome(
             recommendation_id=task.recommendation_id,
             predicted={
@@ -426,10 +451,15 @@ class MVVerificationService:
             accuracy=task.accuracy or 0.0,
             verified_at=now,
             notes=task.notes,
+            quality_gate_status_at_action=quality_gate_status,
+            quality_snapshot_id=quality_snapshot_id,
+            ingestion_mode_at_action=ingestion_mode_str,
+            action_time=action_time,
+            outcome_time=now,
         )
         self._outcomes.append(outcome)
 
-        # 6. Feed verified outcomes into shared ML feedback loop per module.
+        # 7. Feed verified outcomes into shared ML feedback loop per module.
         try:
             from app.services.ml_feedback_service import get_ml_feedback_service
 
@@ -468,7 +498,7 @@ class MVVerificationService:
         except Exception as e:
             logger.warning(f"M&V: Failed to record ML module feedback for {task.id}: {e}")
 
-        # 7. Log to audit trail
+        # 8. Log to audit trail
         try:
             audit = AuditLogger()
             audit.log_system_event(
