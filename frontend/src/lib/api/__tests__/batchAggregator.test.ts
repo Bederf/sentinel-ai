@@ -50,7 +50,7 @@ function createBatchResponse(deviceIds: string[]): Record<string, MockBatchItem>
 
 describe('BatchAggregator - Initialization', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
   });
 
   it('should require endpoint option', () => {
@@ -76,8 +76,6 @@ describe('BatchAggregator - Initialization', () => {
   });
 
   it('should use default windowMs of 50ms', () => {
-    (apiFetch as any).mockResolvedValueOnce({ 'id-1': { id: 'id-1', value: 'test' } });
-
     const batcher = createBatchAggregator<MockBatchItem>({
       endpoint: '/api/batch',
     });
@@ -87,8 +85,6 @@ describe('BatchAggregator - Initialization', () => {
   });
 
   it('should use default maxBatchSize of 100', () => {
-    (apiFetch as any).mockResolvedValueOnce({});
-
     const batcher = createBatchAggregator<MockBatchItem>({
       endpoint: '/api/batch',
       maxBatchSize: 100,
@@ -100,22 +96,30 @@ describe('BatchAggregator - Initialization', () => {
 
 describe('BatchAggregator - Basic Operation', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
   });
 
   afterEach(() => {
     // Clean up
   });
 
-  it('should return promise for batched request', () => {
+  it('should return promise for batched request', async () => {
+    (apiFetch as any).mockImplementation(async (endpoint: string, options: any) => {
+      const body = JSON.parse(options.body);
+      return createBatchResponse(body.device_ids);
+    });
+
     const batcher = createBatchAggregator<MockBatchItem>({
       endpoint: '/api/batch',
-      windowMs: 50,
+      windowMs: 5,
     });
 
     const promise = batcher('id-1');
 
     expect(promise).toBeInstanceOf(Promise);
+
+    // Await to prevent orphaned timer
+    await promise;
   });
 
   it('should accept batchEndpoint configuration', () => {
@@ -128,22 +132,25 @@ describe('BatchAggregator - Basic Operation', () => {
   });
 
   it('should call apiFetch with POST method', async () => {
-    (apiFetch as any).mockResolvedValueOnce({ 'id-1': {} });
+    (apiFetch as any).mockImplementation(async (endpoint: string, options: any) => {
+      const body = JSON.parse(options.body);
+      return createBatchResponse(body.device_ids);
+    });
 
     const batcher = createBatchAggregator<MockBatchItem>({
       endpoint: '/api/batch',
-      windowMs: 50,
+      windowMs: 5,
     });
 
-    batcher('id-1');
-    // Don't use fake timers here - just verify configuration
-    expect(typeof batcher).toBe('function');
+    // Await the result to ensure timer fires and completes within this test
+    const result = await batcher('id-1');
+    expect(apiFetch).toHaveBeenCalled();
   });
 });
 
 describe('BatchAggregator - Batch Window Aggregation', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
   });
 
   afterEach(() => {
@@ -171,7 +178,7 @@ describe('BatchAggregator - Batch Window Aggregation', () => {
 
     expect(apiFetch).toHaveBeenCalled();
     expect(result.id).toBe('id-1');
-  }, { timeout: 20000 });
+  }, 20000);
 
   it('should aggregate multiple requests in single batch', async () => {
     let flushCount = 0;
@@ -211,7 +218,7 @@ describe('BatchAggregator - Batch Window Aggregation', () => {
 
 describe('BatchAggregator - ID Deduplication', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
   });
 
   afterEach(() => {
@@ -318,7 +325,7 @@ describe('BatchAggregator - ID Deduplication', () => {
 
 describe('BatchAggregator - Max Batch Size', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
   });
 
   afterEach(() => {
@@ -392,25 +399,28 @@ describe('BatchAggregator - Max Batch Size', () => {
 
 describe('BatchAggregator - Error Handling', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
   });
 
-  afterEach(() => {
-    // Clean up
+  afterEach(async () => {
+    // Reset mock to safe default so lingering timers don't hit error mock
+    (apiFetch as any).mockImplementation(async () => ({}));
+    // Drain any pending timers to prevent cross-test interference
+    await new Promise(r => setTimeout(r, 20));
   });
 
   it('should reject promises when batch API call fails', async () => {
-    (apiFetch as any).mockRejectedValueOnce(
-      new ApiError(500, 'Server error'),
-    );
+    (apiFetch as any).mockRejectedValue(new ApiError(500, 'Server error'));
 
+    // Use maxBatchSize to trigger immediate flush (avoids timer-based unhandled rejection)
     const batcher = createBatchAggregator<MockBatchItem>({
       endpoint: '/api/batch',
-      windowMs: 5,
+      windowMs: 5000,
+      maxBatchSize: 2,
     });
 
     const p1 = batcher('id-1');
-    const p2 = batcher('id-2');
+    const p2 = batcher('id-2'); // Triggers immediate flush
 
     const results = await Promise.allSettled([p1, p2]);
 
@@ -421,18 +431,18 @@ describe('BatchAggregator - Error Handling', () => {
   it('should call onError callback for each failed item', async () => {
     const errorHandler = vi.fn();
 
-    (apiFetch as any).mockRejectedValueOnce(
-      new ApiError(500, 'Server error'),
-    );
+    (apiFetch as any).mockRejectedValue(new ApiError(500, 'Server error'));
 
+    // Use maxBatchSize to trigger immediate flush (avoids timer-based unhandled rejection)
     const batcher = createBatchAggregator<MockBatchItem>({
       endpoint: '/api/batch',
-      windowMs: 5,
+      windowMs: 5000,
+      maxBatchSize: 2,
       onError: errorHandler,
     });
 
     const p1 = batcher('id-1');
-    const p2 = batcher('id-2');
+    const p2 = batcher('id-2'); // Triggers immediate flush
 
     await Promise.allSettled([p1, p2]);
 
@@ -475,7 +485,7 @@ describe('BatchAggregator - Error Handling', () => {
 
 describe('BatchAggregator - Recursive Flush', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
   });
 
   afterEach(() => {
@@ -573,7 +583,7 @@ describe('BatchAggregator - Recursive Flush', () => {
 
 describe('BatchAggregator - Request Payload', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
   });
 
   afterEach(() => {

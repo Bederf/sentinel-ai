@@ -193,9 +193,14 @@ class WorkOrderNotifier:
         if not to_email or "@" not in to_email:
             return False
 
-        helper_path = "$SENTRY_HOME/tools/gmail_helper.py"
+        sentry_home = os.environ.get("SENTRY_HOME", "")
+        if not sentry_home:
+            logger.info("SENTRY_HOME not set — skipping gmail helper fallback")
+            return False
+
+        helper_path = os.path.join(sentry_home, "tools", "gmail_helper.py")
         if not os.path.exists(helper_path):
-            logger.warning("Gmail helper not found at %s", helper_path)
+            logger.info("Gmail helper not found at %s — skipping fallback", helper_path)
             return False
 
         try:

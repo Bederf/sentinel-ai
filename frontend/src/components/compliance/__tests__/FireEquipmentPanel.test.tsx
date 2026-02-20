@@ -8,8 +8,34 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import React from 'react'
 import { FireEquipmentPanel } from '../FireEquipmentPanel'
 import * as complianceApi from '@/lib/api/compliance'
+
+vi.mock('@tremor/react', async () => {
+  const { createTremorMocks } = await import('@/test-utils/mockTremor')
+  return {
+    ...createTremorMocks(),
+    Title: ({ children, ...props }: any) =>
+      React.createElement('h3', { 'data-testid': 'title', ...props }, children),
+    Text: ({ children, ...props }: any) =>
+      React.createElement('span', { 'data-testid': 'text', ...props }, children),
+    Button: ({ children, onClick, size, ...props }: any) =>
+      React.createElement('button', { onClick, ...props }, children),
+    Table: ({ children, ...props }: any) =>
+      React.createElement('table', props, children),
+    TableHead: ({ children }: any) =>
+      React.createElement('thead', null, children),
+    TableBody: ({ children }: any) =>
+      React.createElement('tbody', null, children),
+    TableRow: ({ children }: any) =>
+      React.createElement('tr', null, children),
+    TableHeaderCell: ({ children }: any) =>
+      React.createElement('th', null, children),
+    TableCell: ({ children, ...props }: any) =>
+      React.createElement('td', props, children),
+  }
+})
 
 vi.mock('@/lib/api/compliance')
 
@@ -23,6 +49,23 @@ describe('FireEquipmentPanel', () => {
         mutations: { retry: false },
       },
     })
+
+    // Default mock for mutation hook so destructuring doesn't fail
+    vi.mocked(complianceApi.useScheduleFireInspection).mockReturnValue({
+      mutate: vi.fn(),
+      mutateAsync: vi.fn(),
+      isPending: false,
+      isError: false,
+      error: null,
+      isSuccess: false,
+      status: 'idle' as const,
+      reset: vi.fn(),
+      failureCount: 0,
+      failureReason: null,
+      context: undefined,
+      data: undefined,
+      variables: undefined,
+    } as any)
   })
 
   const renderComponent = () => {
@@ -56,7 +99,7 @@ describe('FireEquipmentPanel', () => {
   })
 
   it('displays equipment with OK status when inspection is current', async () => {
-    jest.mocked(complianceApi.useFireEquipment).mockReturnValue({
+    vi.mocked(complianceApi.useFireEquipment).mockReturnValue({
       data: [
         {
           id: 'equip-001',
@@ -86,14 +129,14 @@ describe('FireEquipmentPanel', () => {
     renderComponent()
 
     await waitFor(() => {
-      expect(screen.getByText(/extinguisher/i)).toBeInTheDocument()
+      expect(screen.getByText('extinguisher')).toBeInTheDocument()
       expect(screen.getByText('Zone B1 - Basement')).toBeInTheDocument()
       expect(screen.getByText('OK')).toBeInTheDocument()
     })
   })
 
   it('shows DUE SOON badge for inspections within 30 days', async () => {
-    jest.mocked(complianceApi.useFireEquipment).mockReturnValue({
+    vi.mocked(complianceApi.useFireEquipment).mockReturnValue({
       data: [
         {
           id: 'equip-002',
@@ -128,7 +171,7 @@ describe('FireEquipmentPanel', () => {
   })
 
   it('shows OVERDUE badge for past due inspections', async () => {
-    jest.mocked(complianceApi.useFireEquipment).mockReturnValue({
+    vi.mocked(complianceApi.useFireEquipment).mockReturnValue({
       data: [
         {
           id: 'equip-003',
@@ -219,7 +262,7 @@ describe('FireEquipmentPanel', () => {
   })
 
   it('shows no equipment message when list is empty', async () => {
-    jest.mocked(complianceApi.useFireEquipment).mockReturnValue({
+    vi.mocked(complianceApi.useFireEquipment).mockReturnValue({
       data: [],
       isLoading: false,
       error: null,
@@ -244,7 +287,7 @@ describe('FireEquipmentPanel', () => {
   })
 
   it('shows loading state', () => {
-    jest.mocked(complianceApi.useFireEquipment).mockReturnValue({
+    vi.mocked(complianceApi.useFireEquipment).mockReturnValue({
       data: undefined,
       isLoading: true,
       error: null,
