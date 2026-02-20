@@ -16,6 +16,7 @@ from enum import Enum
 
 class ModuleType(str, Enum):
     """Available module types."""
+
     # Core infrastructure (non-deactivatable)
     KPI = "kpi"
     ML = "ml"
@@ -44,6 +45,7 @@ class ModuleType(str, Enum):
 
 class ModuleStatus(str, Enum):
     """Module operational status."""
+
     ACTIVE = "active"
     INACTIVE = "inactive"
     ERROR = "error"
@@ -52,6 +54,7 @@ class ModuleStatus(str, Enum):
 
 class RecommendationType(str, Enum):
     """AI recommendation types."""
+
     OPTIMIZATION = "optimization"
     MAINTENANCE = "maintenance"
     ALERT = "alert"
@@ -61,6 +64,7 @@ class RecommendationType(str, Enum):
 
 class RecommendationPriority(str, Enum):
     """Recommendation priority levels."""
+
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
@@ -70,6 +74,7 @@ class RecommendationPriority(str, Enum):
 @dataclass
 class ModuleCapability:
     """Defines what a module can do."""
+
     capability_id: str
     name: str
     description: str
@@ -79,6 +84,7 @@ class ModuleCapability:
 @dataclass
 class ModuleDefinition:
     """Static definition of a module type."""
+
     module_type: ModuleType
     name: str
     version: str
@@ -92,6 +98,7 @@ class ModuleDefinition:
 @dataclass
 class ModuleInstance:
     """Instance of a module activated for a specific site."""
+
     instance_id: str
     site_id: str
     module_type: ModuleType
@@ -106,6 +113,7 @@ class ModuleInstance:
 @dataclass
 class CrossModuleLink:
     """Defines integration between two modules."""
+
     link_id: str
     source_module: ModuleType
     target_module: ModuleType
@@ -117,6 +125,7 @@ class CrossModuleLink:
 @dataclass
 class AIRecommendation:
     """AI-generated recommendation from telemetry analysis."""
+
     recommendation_id: str
     timestamp: str
     source_module: ModuleType
@@ -136,6 +145,7 @@ class AIRecommendation:
 @dataclass
 class ModuleIntegrationEvent:
     """Event when modules interact."""
+
     event_id: str
     timestamp: str
     source_module: ModuleType
@@ -148,6 +158,7 @@ class ModuleIntegrationEvent:
 @dataclass
 class SiteModuleConfig:
     """Complete module configuration for a site."""
+
     site_id: str
     site_name: str
     active_modules: List[ModuleInstance] = field(default_factory=list)
@@ -169,7 +180,7 @@ MODULE_DEFINITIONS: Dict[ModuleType, ModuleDefinition] = {
         ],
         integrates_with=[ModuleType.HVAC, ModuleType.ENERGY, ModuleType.LIGHTING, ModuleType.SECURITY],
         telemetry_points=["control_events", "rules_active"],
-        ai_features=["control_optimization"]
+        ai_features=["control_optimization"],
     ),
     ModuleType.ASSETS: ModuleDefinition(
         module_type=ModuleType.ASSETS,
@@ -182,7 +193,7 @@ MODULE_DEFINITIONS: Dict[ModuleType, ModuleDefinition] = {
         ],
         integrates_with=[ModuleType.HVAC, ModuleType.ENERGY, ModuleType.SOLAR],
         telemetry_points=["asset_status", "work_orders"],
-        ai_features=["maintenance_planning"]
+        ai_features=["maintenance_planning"],
     ),
     ModuleType.SIMBIOT: ModuleDefinition(
         module_type=ModuleType.SIMBIOT,
@@ -195,7 +206,7 @@ MODULE_DEFINITIONS: Dict[ModuleType, ModuleDefinition] = {
         ],
         integrates_with=[ModuleType.INTEGRATIONS],
         telemetry_points=["connection_status"],
-        ai_features=["integration_guidance"]
+        ai_features=["integration_guidance"],
     ),
     ModuleType.INTEGRATIONS: ModuleDefinition(
         module_type=ModuleType.INTEGRATIONS,
@@ -208,7 +219,7 @@ MODULE_DEFINITIONS: Dict[ModuleType, ModuleDefinition] = {
         ],
         integrates_with=[ModuleType.CONTROL, ModuleType.ASSETS, ModuleType.HVAC, ModuleType.ENERGY],
         telemetry_points=["integration_health", "data_quality_score"],
-        ai_features=["anomaly_detection"]
+        ai_features=["anomaly_detection"],
     ),
     ModuleType.NOTIFICATIONS: ModuleDefinition(
         module_type=ModuleType.NOTIFICATIONS,
@@ -221,7 +232,7 @@ MODULE_DEFINITIONS: Dict[ModuleType, ModuleDefinition] = {
         ],
         integrates_with=[ModuleType.SECURITY, ModuleType.ENERGY, ModuleType.HVAC],
         telemetry_points=["alerts_sent", "alerts_acknowledged"],
-        ai_features=["alert_prioritization"]
+        ai_features=["alert_prioritization"],
     ),
     ModuleType.HVAC: ModuleDefinition(
         module_type=ModuleType.HVAC,
@@ -236,7 +247,7 @@ MODULE_DEFINITIONS: Dict[ModuleType, ModuleDefinition] = {
         ],
         integrates_with=[ModuleType.ENERGY, ModuleType.SECURITY, ModuleType.LIGHTING],
         telemetry_points=["zone_temp", "zone_setpoint", "ahu_supply_temp", "chiller_kw", "occupancy"],
-        ai_features=["predictive_comfort", "load_optimization", "fault_detection", "setpoint_tuning"]
+        ai_features=["predictive_comfort", "load_optimization", "fault_detection", "setpoint_tuning"],
     ),
     ModuleType.ENERGY: ModuleDefinition(
         module_type=ModuleType.ENERGY,
@@ -244,7 +255,9 @@ MODULE_DEFINITIONS: Dict[ModuleType, ModuleDefinition] = {
         version="1.0.0",
         description="Generator, power metering, UPS, and electrical distribution monitoring",
         capabilities=[
-            ModuleCapability("generator_scada", "Generator SCADA", "Monitor generator fleet with predictive maintenance"),
+            ModuleCapability(
+                "generator_scada", "Generator SCADA", "Monitor generator fleet with predictive maintenance"
+            ),
             ModuleCapability("ats_monitoring", "ATS Monitoring", "Transfer switch position and history"),
             ModuleCapability("power_metering", "Power Metering", "Real-time power consumption and quality"),
             ModuleCapability("ups_monitoring", "UPS Monitoring", "UPS status and battery health"),
@@ -252,7 +265,12 @@ MODULE_DEFINITIONS: Dict[ModuleType, ModuleDefinition] = {
         ],
         integrates_with=[ModuleType.HVAC, ModuleType.SECURITY, ModuleType.LIGHTING],
         telemetry_points=["gen_kw", "gen_fuel", "ats_position", "main_power_kw", "pf", "ups_battery", "tx_load"],
-        ai_features=["generator_predictive", "load_shedding_optimization", "power_quality_analysis", "fuel_forecasting"]
+        ai_features=[
+            "generator_predictive",
+            "load_shedding_optimization",
+            "power_quality_analysis",
+            "fuel_forecasting",
+        ],
     ),
     ModuleType.SECURITY: ModuleDefinition(
         module_type=ModuleType.SECURITY,
@@ -267,7 +285,7 @@ MODULE_DEFINITIONS: Dict[ModuleType, ModuleDefinition] = {
         ],
         integrates_with=[ModuleType.HVAC, ModuleType.ENERGY, ModuleType.LIGHTING],
         telemetry_points=["door_status", "badge_events", "occupancy_count", "alarm_zones", "camera_status"],
-        ai_features=["occupancy_prediction", "anomaly_detection", "access_pattern_analysis", "emergency_response"]
+        ai_features=["occupancy_prediction", "anomaly_detection", "access_pattern_analysis", "emergency_response"],
     ),
     ModuleType.LIGHTING: ModuleDefinition(
         module_type=ModuleType.LIGHTING,
@@ -282,7 +300,7 @@ MODULE_DEFINITIONS: Dict[ModuleType, ModuleDefinition] = {
         ],
         integrates_with=[ModuleType.HVAC, ModuleType.ENERGY, ModuleType.SECURITY],
         telemetry_points=["luminaire_level", "scene_active", "lux_level", "emergency_status", "power_consumption"],
-        ai_features=["occupancy_based_control", "energy_optimization", "circadian_lighting", "fault_detection"]
+        ai_features=["occupancy_based_control", "energy_optimization", "circadian_lighting", "fault_detection"],
     ),
     ModuleType.SOLAR: ModuleDefinition(
         module_type=ModuleType.SOLAR,
@@ -294,11 +312,26 @@ MODULE_DEFINITIONS: Dict[ModuleType, ModuleDefinition] = {
             ModuleCapability("bess_management", "BESS Management", "Battery SOC, dispatch, and health tracking"),
             ModuleCapability("energy_arbitrage", "Energy Arbitrage", "TOU tariff-based charge/discharge optimisation"),
             ModuleCapability("grid_compliance", "Grid Compliance", "NRS 097-2-1 compliance monitoring"),
-            ModuleCapability("performance_analytics", "Performance Analytics", "PR calculation and inverter peer comparison"),
+            ModuleCapability(
+                "performance_analytics", "Performance Analytics", "PR calculation and inverter peer comparison"
+            ),
         ],
         integrates_with=[ModuleType.ENERGY, ModuleType.HVAC],
-        telemetry_points=["pv_power_kw", "bess_soc", "bess_mode", "grid_import_kw", "grid_export_kw", "inverter_status", "pr_ratio"],
-        ai_features=["generation_forecast", "arbitrage_optimisation", "fault_detection", "self_consumption_maximisation"]
+        telemetry_points=[
+            "pv_power_kw",
+            "bess_soc",
+            "bess_mode",
+            "grid_import_kw",
+            "grid_export_kw",
+            "inverter_status",
+            "pr_ratio",
+        ],
+        ai_features=[
+            "generation_forecast",
+            "arbitrage_optimisation",
+            "fault_detection",
+            "self_consumption_maximisation",
+        ],
     ),
     ModuleType.WATER: ModuleDefinition(
         module_type=ModuleType.WATER,
@@ -306,14 +339,18 @@ MODULE_DEFINITIONS: Dict[ModuleType, ModuleDefinition] = {
         version="1.0.0",
         description="Water consumption monitoring, leak detection, and trending analysis",
         capabilities=[
-            ModuleCapability("consumption_monitoring", "Consumption Monitoring", "Track water consumption and flow rates"),
-            ModuleCapability("leak_detection", "Leak Detection", "Three-algorithm leak detection (continuous flow, Z-score, spike)"),
+            ModuleCapability(
+                "consumption_monitoring", "Consumption Monitoring", "Track water consumption and flow rates"
+            ),
+            ModuleCapability(
+                "leak_detection", "Leak Detection", "Three-algorithm leak detection (continuous flow, Z-score, spike)"
+            ),
             ModuleCapability("trending_analysis", "Trending Analysis", "Period-over-period consumption comparison"),
             ModuleCapability("alert_management", "Alert Management", "Leak alert creation, resolution, and tracking"),
         ],
         integrates_with=[ModuleType.SUSTAINABILITY, ModuleType.ENERGY],
         telemetry_points=["flow_rate_lpm", "volume_liters", "pulse_count", "leak_alerts"],
-        ai_features=["leak_detection", "consumption_forecasting", "pattern_anomaly_detection"]
+        ai_features=["leak_detection", "consumption_forecasting", "pattern_anomaly_detection"],
     ),
     ModuleType.ML: ModuleDefinition(
         module_type=ModuleType.ML,
@@ -328,7 +365,7 @@ MODULE_DEFINITIONS: Dict[ModuleType, ModuleDefinition] = {
         ],
         integrates_with=[ModuleType.HVAC, ModuleType.ENERGY, ModuleType.SOLAR],
         telemetry_points=["model_accuracy", "inference_latency", "anomaly_score", "drift_metric"],
-        ai_features=["cross_site_benchmarking", "model_retraining", "explainable_predictions", "fleet_health_scoring"]
+        ai_features=["cross_site_benchmarking", "model_retraining", "explainable_predictions", "fleet_health_scoring"],
     ),
     ModuleType.SUSTAINABILITY: ModuleDefinition(
         module_type=ModuleType.SUSTAINABILITY,
@@ -343,7 +380,7 @@ MODULE_DEFINITIONS: Dict[ModuleType, ModuleDefinition] = {
         ],
         integrates_with=[ModuleType.ENERGY, ModuleType.SOLAR, ModuleType.HVAC],
         telemetry_points=["carbon_emissions_kg", "energy_intensity", "water_usage", "waste_diversion_rate"],
-        ai_features=["emissions_forecasting", "reduction_recommendations", "benchmark_comparison", "report_generation"]
+        ai_features=["emissions_forecasting", "reduction_recommendations", "benchmark_comparison", "report_generation"],
     ),
     ModuleType.FIRE: ModuleDefinition(
         module_type=ModuleType.FIRE,
@@ -356,7 +393,7 @@ MODULE_DEFINITIONS: Dict[ModuleType, ModuleDefinition] = {
         ],
         integrates_with=[ModuleType.SECURITY],
         telemetry_points=["fire_alarm_status"],
-        ai_features=["alarm_correlation"]
+        ai_features=["alarm_correlation"],
     ),
     ModuleType.ACCESS: ModuleDefinition(
         module_type=ModuleType.ACCESS,
@@ -369,7 +406,7 @@ MODULE_DEFINITIONS: Dict[ModuleType, ModuleDefinition] = {
         ],
         integrates_with=[ModuleType.SECURITY],
         telemetry_points=["badge_events", "door_status"],
-        ai_features=["access_anomaly_detection"]
+        ai_features=["access_anomaly_detection"],
     ),
     ModuleType.CONTRACTS: ModuleDefinition(
         module_type=ModuleType.CONTRACTS,
@@ -382,7 +419,47 @@ MODULE_DEFINITIONS: Dict[ModuleType, ModuleDefinition] = {
         ],
         integrates_with=[ModuleType.ASSETS, ModuleType.ENERGY],
         telemetry_points=["sla_status", "contract_margin"],
-        ai_features=["risk_scoring"]
+        ai_features=["risk_scoring"],
+    ),
+    ModuleType.MAINTENANCE: ModuleDefinition(
+        module_type=ModuleType.MAINTENANCE,
+        name="Maintenance",
+        version="1.0.0",
+        description="Work order lifecycle, preventive scheduling, and service execution tracking",
+        capabilities=[
+            ModuleCapability("work_orders", "Work Orders", "Create, assign, and track work orders"),
+            ModuleCapability("preventive_scheduling", "Preventive Scheduling", "Schedule recurring maintenance tasks"),
+            ModuleCapability("service_tracking", "Service Tracking", "Track technician service execution"),
+        ],
+        integrates_with=[ModuleType.ASSETS, ModuleType.HVAC, ModuleType.ENERGY],
+        telemetry_points=["work_order_count", "mttr_hours", "first_fix_rate"],
+        ai_features=["work_order_prioritization", "technician_dispatch"],
+    ),
+    ModuleType.DIGITAL_TWIN: ModuleDefinition(
+        module_type=ModuleType.DIGITAL_TWIN,
+        name="Digital Twin",
+        version="1.0.0",
+        description="3D/2D spatial visualization of assets and telemetry overlays",
+        capabilities=[
+            ModuleCapability("floor_plan_view", "Floor Plan View", "2D floor plan with live overlays"),
+            ModuleCapability("3d_model", "3D Model", "Interactive 3D building visualization"),
+        ],
+        integrates_with=[ModuleType.HVAC, ModuleType.LIGHTING, ModuleType.SECURITY],
+        telemetry_points=["spatial_events"],
+        ai_features=["spatial_anomaly_detection"],
+    ),
+    ModuleType.KPI: ModuleDefinition(
+        module_type=ModuleType.KPI,
+        name="KPI Dashboard",
+        version="1.0.0",
+        description="Portfolio and site-level KPI scorecards",
+        capabilities=[
+            ModuleCapability("site_kpis", "Site KPIs", "Per-site health and performance scorecards"),
+            ModuleCapability("portfolio_kpis", "Portfolio KPIs", "Cross-site portfolio metrics"),
+        ],
+        integrates_with=[ModuleType.ENERGY, ModuleType.HVAC, ModuleType.ASSETS],
+        telemetry_points=["kpi_scores"],
+        ai_features=["trend_analysis"],
     ),
 }
 

@@ -2,9 +2,9 @@
 title: "Bolt-on Module Registry"
 type: "architecture"
 status: "approved"
-version: "1.0.0"
+version: "1.1.0"
 created: "2026-01-31"
-updated: "2026-01-31"
+updated: "2026-02-20"
 author: "Sentinel Development Team"
 tags: ["modules", "architecture", "integration", "ai"]
 domain: "general"
@@ -68,6 +68,9 @@ graph TB
 | **Lighting** | `lighting` | DALI lighting control | Luminaire control, scene management, daylight harvesting, emergency lighting |
 | **Fire** | `fire` | Fire & life safety (read-only) | Alarm monitoring, damper positions, HVAC shutdown |
 | **Access** | `access` | Access control standalone | Door status, badge events, after-hours scheduling |
+| **Maintenance** | `maintenance` | Work order lifecycle & service tracking | Work orders, preventive scheduling, service tracking |
+| **Digital Twin** | `digital_twin` | 3D/2D spatial visualization | Floor plan view, 3D model, telemetry overlays |
+| **KPI Dashboard** | `kpi` | Portfolio & site-level KPI scorecards | Site KPIs, portfolio KPIs, trend analysis |
 
 ## Cross-Module Integrations
 

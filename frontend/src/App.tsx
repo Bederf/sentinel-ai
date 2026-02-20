@@ -9,7 +9,7 @@ import { useRecommendationToasts, RecommendationCard } from "./components/Recomm
 // Security: Prevent console logging in production (Phase 75-07)
 import { initializeSecurityProtections } from "./lib/api/security-utils";
 import { Chat } from "./components/Chat";
-import TechnicianChat from "./components/TechnicianChat";
+import { TechnicianPortalGated } from "./components/TechnicianPortalGated";
 import { Dashboard } from "./components/Dashboard";
 import { DigitalTwin } from "./components/digital-twin";
 import { ControlDashboard } from "./components/ControlDashboard";
@@ -796,7 +796,7 @@ function App() {
             </div>
           ) : currentView === "technician" ? (
             <div className="h-full">
-              <TechnicianChat />
+              <TechnicianPortalGated />
             </div>
           ) : currentView === "integrations" ? (
             <div className="h-full overflow-y-auto">

@@ -143,7 +143,7 @@ export const ADDON_NAV_ITEMS: NavItem[] = [
   { id: "workflow", label: "Asset Workflow", icon: GitBranch, description: "Lifecycle Management", category: "addon", requiredModule: "assets", defaultOrder: 2 },
   { id: "simbiot", label: "SIMBIOT", icon: Plug, description: "BMS Connection Wizard", category: "addon", requiredModule: "simbiot", defaultOrder: 3 },
   // Building system modules
-  { id: "technician", label: "Tech Chat", icon: Wrench, description: "Fault Diagnosis", category: "addon", requiredModule: "assets", defaultOrder: 10 },
+  { id: "technician", label: "Tech Chat", icon: Wrench, description: "Fault Diagnosis", category: "addon", requiredModule: "maintenance", defaultOrder: 10 },
   { id: "optimization", label: "Loadshedding", icon: Zap, description: "Load Shedding AI", category: "addon", requiredModule: "energy", defaultOrder: 11 },
   { id: "occupancy", label: "Occupancy", icon: Users, description: "Occupancy Monitoring", category: "addon", requiredModule: "lighting", defaultOrder: 12 },
   { id: "occupancy-analytics", label: "Occupancy Analytics", icon: BarChart3, description: "Occupancy Trends & Insights", category: "addon", requiredModule: "lighting", defaultOrder: 12.2 },
