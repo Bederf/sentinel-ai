@@ -23,6 +23,16 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/lifecycle", tags=["lifecycle-simulation"])
 
 
+def _numeric_or_default(value, default=0):
+    """Return numeric value or default for mocks/invalid types."""
+    if isinstance(value, (int, float)):
+        return value
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
 # ============================================================================
 # Request/Response Models
 # ============================================================================
@@ -32,13 +42,39 @@ class StartSimulationRequest(BaseModel):
     """Request to start lifecycle simulation."""
 
     scenario: str = Field(
-        default="fault_day",
-        description="Scenario name: normal_day, fault_day, chiller_failure, multi_fault, maintenance_day",
+        default="normal_day",
+        description=(
+            "Scenario name: normal_day, fault_day, chiller_failure, multi_fault, "
+            "maintenance_day, grant_hvac_dali_ai_annual, grant_solar_bess_ai_annual"
+        ),
     )
     duration_minutes: float = Field(
-        default=3650.0, ge=1.0, le=11000.0, description="Total real-time minutes for 365 days (3650 = 10 min/day, 25s/hour)"
+        default=3650.0,
+        ge=1.0,
+        le=11000.0,
+        description="Total real-time minutes for 365 days (3650 = 10 min/day, 25s/hour)",
     )
     start_hour: int = Field(default=6, ge=0, le=23, description="Simulated hour to start (0-23)")
+    speed_multiplier: float = Field(
+        default=10.0,
+        ge=0.1,
+        le=10000.0,
+        description="Speed factor: 1x=real-time, 10x=10x faster, 100x=100x faster",
+    )
+    start_date: Optional[str] = Field(
+        default=None,
+        description="ISO date string for simulation start date (e.g. '2025-06-15')",
+    )
+
+
+class SpeedChangeRequest(BaseModel):
+    """Request to change simulation speed while running."""
+
+    speed_multiplier: float = Field(
+        ge=0.1,
+        le=10000.0,
+        description="New speed multiplier (0.1 to 10000)",
+    )
 
 
 class SimulationStatusResponse(BaseModel):
@@ -46,23 +82,32 @@ class SimulationStatusResponse(BaseModel):
 
     running: bool
     paused: bool
-    scenario: Optional[str]
-    simulated_time: Optional[str]
-    simulated_hour: Optional[int]
-    real_elapsed_seconds: float
-    events_count: int
-    active_faults: int
-    pending_repairs: int
-    recent_events: List[dict]
+    scenario: Optional[str] = None
+    simulated_time: Optional[str] = None
+    simulated_hour: Optional[int] = None
+    real_elapsed_seconds: float = 0
+    events_count: int = 0
+    active_faults: int = 0
+    pending_repairs: int = 0
+    recent_events: List[dict] = []
     progress_pct: int = 0  # Progress percentage (0-100)
     days_simulated: int = 0
+    # Speed control fields
+    speed_multiplier: Optional[float] = None
+    seconds_per_hour: Optional[float] = None
+    # Schedule state fields
+    schedule_state: Optional[str] = None
+    hvac_mode: Optional[str] = None
+    chiller_staging: Optional[str] = None
+    target_occupancy: Optional[float] = None
+    lighting_mode: Optional[str] = None
     # Weather and environment fields
     ambient_temp: Optional[float] = None
     is_raining: Optional[bool] = None
     cloud_cover: Optional[float] = None
     solar_efficiency: Optional[float] = None
     current_season: Optional[str] = None
-    occupancy_percent: Optional[float] = None  # Days completed in annual simulation
+    occupancy_percent: Optional[float] = None
     # Energy consumption fields
     total_energy_kwh: Optional[float] = None  # Cumulative kWh consumed
     current_hour_power_kw: Optional[float] = None  # Current hour's power in kW
@@ -101,7 +146,7 @@ class EventResponse(BaseModel):
 @router.post("/start")
 async def start_simulation(request: StartSimulationRequest):
     """
-    Start a 24-hour building lifecycle simulation (task-queued).
+    Start a building lifecycle simulation (task-queued).
 
     Creates a task in the database and returns immediately.
     Background processor picks up queued tasks and runs simulations sequentially.
@@ -112,18 +157,19 @@ async def start_simulation(request: StartSimulationRequest):
     - Progress tracking via polling /status/{task_id}
 
     **Scenarios:**
-    - `normal_day`: Typical operations, 10% fault chance
+    - `normal_day`: Typical operations, 10% fault chance (default)
     - `fault_day`: Guaranteed fault at 11am with auto-repair
     - `chiller_failure`: Chiller fault scenario
     - `multi_fault`: Multiple equipment issues
     - `maintenance_day`: Scheduled maintenance, no faults
-    - `grant_hvac_dali_ai_annual`: 365-day annual simulation (demo mode with continuous AI)
+    - `grant_hvac_dali_ai_annual`: 365-day annual simulation (demo mode)
+    - `grant_solar_bess_ai_annual`: 365-day solar+BESS annual simulation
 
-    **Time Compression:**
-    - `duration_minutes=24`: 1 real minute = 1 simulated hour
-    - `duration_minutes=12`: 30 real seconds = 1 simulated hour
-    - `duration_minutes=2.4`: 6 real seconds = 1 simulated hour (fast demo)
-    - `duration_minutes=240`: 4 hours real time for 365-day simulation (default)
+    **Speed Control:**
+    - `speed_multiplier=1`: Real-time (1 hour = 60 seconds)
+    - `speed_multiplier=10`: 10x speed (1 hour = 6 seconds) [default]
+    - `speed_multiplier=100`: 100x speed (1 hour = 0.6 seconds)
+    - `speed_multiplier=1000`: 1000x speed (1 hour = 0.06 seconds)
     """
     if request.scenario not in SCENARIOS:
         raise HTTPException(
@@ -135,7 +181,7 @@ async def start_simulation(request: StartSimulationRequest):
         task_id = str(uuid.uuid4())
 
         # Create task in database (status='queued')
-        response = (
+        (
             client.table("lifecycle_simulation_tasks")
             .insert(
                 {
@@ -152,14 +198,18 @@ async def start_simulation(request: StartSimulationRequest):
             .execute()
         )
 
-        logger.info(f"Created lifecycle simulation task {task_id}: {request.scenario}")
+        logger.info(
+            f"Created lifecycle simulation task {task_id}: {request.scenario} at {request.speed_multiplier}x speed"
+        )
 
         return {
             "success": True,
             "task_id": task_id,
             "status": "queued",
             "scenario": request.scenario,
+            "speed_multiplier": request.speed_multiplier,
             "duration_minutes": request.duration_minutes,
+            "start_date": request.start_date,
             "message": "Simulation queued. Poll /status/{task_id} to track progress.",
         }
 
@@ -184,7 +234,7 @@ async def stop_simulation(task_id: str):
 
         if orchestrator:
             # Simulation is running - stop it
-            result = await orchestrator.stop()
+            await orchestrator.stop()
             return {"success": True, "status": "cancelled", "message": "Simulation stopped successfully"}
         else:
             # Simulation not running - try to update database status to cancelled
@@ -249,6 +299,67 @@ async def resume_simulation(task_id: str):
     except Exception as e:
         logger.error(f"Failed to resume simulation {task_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to resume: {str(e)}")
+
+
+@router.post("/speed/{task_id}")
+async def change_simulation_speed(task_id: str, request: SpeedChangeRequest):
+    """
+    Change the speed of a running simulation.
+
+    Args:
+        task_id: Task identifier from /start endpoint
+        request: SpeedChangeRequest with new speed_multiplier
+
+    Returns:
+        New speed settings
+    """
+    try:
+        orchestrator = get_simulation_by_task_id(task_id)
+
+        if not orchestrator or not orchestrator.running:
+            raise HTTPException(status_code=400, detail="No simulation running")
+
+        result = orchestrator.set_speed(request.speed_multiplier)
+        return {
+            "success": True,
+            **result,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to change speed for {task_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to change speed: {str(e)}")
+
+
+@router.post("/speed")
+async def change_default_speed(request: SpeedChangeRequest):
+    """
+    Change the speed of the default/singleton simulation.
+
+    Args:
+        request: SpeedChangeRequest with new speed_multiplier
+
+    Returns:
+        New speed settings
+    """
+    try:
+        from app.services.lifecycle_orchestrator import get_lifecycle_orchestrator
+
+        orchestrator = get_lifecycle_orchestrator()
+
+        if not orchestrator.running:
+            raise HTTPException(status_code=400, detail="No simulation running")
+
+        result = orchestrator.set_speed(request.speed_multiplier)
+        return {
+            "success": True,
+            **result,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to change speed: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to change speed: {str(e)}")
 
 
 @router.get("/status/{task_id}", response_model=SimulationStatusResponse)
@@ -331,8 +442,42 @@ async def get_simulation_status(task_id: str):
         if orchestrator and orchestrator.running:
             # Simulation is running - get live status from orchestrator
             status = orchestrator.get_status()
-            days = getattr(orchestrator, 'days_simulated', 0)
+            days = _numeric_or_default(getattr(orchestrator, "days_simulated", None), -1)
+            if days < 0:
+                days = _numeric_or_default(task.get("days_completed", 0) if task else 0, 0)
+
             progress_pct = int((days / 365) * 100) if days > 0 else 0
+            if progress_pct <= 0:
+                progress_pct = int(
+                    _numeric_or_default(
+                        status.get("progress_percent"),
+                        _numeric_or_default(
+                            status.get("progress_pct"),
+                            _numeric_or_default(task.get("progress_pct", 0) if task else 0, 0),
+                        ),
+                    )
+                )
+            progress_pct = max(0, min(100, progress_pct))
+
+            # Get schedule state for enriched status
+            schedule_state_str = None
+            hvac_mode_str = None
+            chiller_staging_str = None
+            target_occupancy_val = None
+            lighting_mode_str = None
+            try:
+                sched = orchestrator.building_schedule.get_state(
+                    orchestrator.simulated_time.hour,
+                    orchestrator.simulated_time.weekday(),
+                )
+                schedule_state_str = sched.state.value
+                hvac_mode_str = sched.hvac_mode.value
+                chiller_staging_str = sched.chiller_staging.value
+                target_occupancy_val = sched.target_occupancy_pct
+                lighting_mode_str = sched.lighting_mode.value
+            except Exception:
+                pass
+
             return SimulationStatusResponse(
                 running=True,
                 paused=orchestrator.paused,
@@ -350,7 +495,7 @@ async def get_simulation_status(task_id: str):
                         "timestamp": e.timestamp.isoformat(),
                         "event_type": e.event_type.value,
                         "equipment_id": e.equipment_id,
-                        "description": e.message,
+                        "description": getattr(e, "description", ""),
                         "simulated_hour": getattr(e, "simulated_hour", 0),
                         "details": getattr(e, "details", {}),
                     }
@@ -358,6 +503,15 @@ async def get_simulation_status(task_id: str):
                 ],
                 progress_pct=progress_pct,
                 days_simulated=days,
+                # Speed control
+                speed_multiplier=orchestrator.speed_multiplier,
+                seconds_per_hour=orchestrator.seconds_per_simulated_hour,
+                # Schedule state
+                schedule_state=schedule_state_str,
+                hvac_mode=hvac_mode_str,
+                chiller_staging=chiller_staging_str,
+                target_occupancy=target_occupancy_val,
+                lighting_mode=lighting_mode_str,
                 # Weather data from orchestrator's get_status()
                 ambient_temp=status.get("ambient_temp"),
                 is_raining=status.get("is_raining"),
@@ -385,13 +539,13 @@ async def get_simulation_status(task_id: str):
                 try:
                     dt = datetime.fromisoformat(simulated_time_str.replace("Z", "+00:00"))
                     simulated_hour = dt.hour
-                except:
+                except (ValueError, TypeError):
                     simulated_hour = None
 
             # For completed simulations, also use progress_pct from database
             # If task is completed and progress > 0, update simulated_time from completion timestamp
             task_status = task.get("status") if task else "unknown"
-            progress_pct = task.get("progress_pct", 0) if task else 0
+            progress_pct = _numeric_or_default(task.get("progress_pct", 0) if task else 0, 0)
 
             # If simulation is completed but has progress, derive simulated_time from completion date
             if task_status == "completed" and progress_pct > 0 and not simulated_time_str:
@@ -401,13 +555,13 @@ async def get_simulation_status(task_id: str):
                         dt = datetime.fromisoformat(str(completed_at).replace("Z", "+00:00"))
                         simulated_time_str = dt.isoformat()
                         simulated_hour = dt.hour
-                    except:
+                    except (ValueError, TypeError):
                         pass
 
             # Get days from database or derive from state snapshot
-            days_completed = task.get("days_completed", 0) if task else 0
+            days_completed = _numeric_or_default(task.get("days_completed", 0) if task else 0, 0)
             if not days_completed and isinstance(state_snapshot, dict):
-                days_completed = state_snapshot.get("days_simulated", 0)
+                days_completed = _numeric_or_default(state_snapshot.get("days_simulated", 0), 0)
 
             # Compute weather data from simulated_time using SeasonalModeler
             ambient_temp = None
@@ -418,6 +572,7 @@ async def get_simulation_status(task_id: str):
             if simulated_time_str:
                 try:
                     from app.services.seasonal_modeler import SeasonalModeler
+
                     sim_dt = datetime.fromisoformat(simulated_time_str.replace("Z", "+00:00"))
                     sim_hour = sim_dt.hour
                     modeler = SeasonalModeler()
@@ -456,7 +611,9 @@ async def get_simulation_status(task_id: str):
                 solar_efficiency=solar_efficiency,
                 current_season=current_season,
                 total_energy_kwh=state_snapshot.get("total_energy_kwh") if isinstance(state_snapshot, dict) else None,
-                current_hour_power_kw=state_snapshot.get("current_hour_power_kw") if isinstance(state_snapshot, dict) else None,
+                current_hour_power_kw=state_snapshot.get("current_hour_power_kw")
+                if isinstance(state_snapshot, dict)
+                else None,
             )
 
     except HTTPException:
@@ -546,6 +703,9 @@ async def get_site_simulation_status(site_id: str):
                     solar_efficiency=status.get("solar_efficiency"),
                     current_season=status.get("current_season"),
                     occupancy_percent=status.get("occupancy_percent"),
+                    # Energy consumption fields
+                    total_energy_kwh=status.get("total_energy_kwh"),
+                    current_hour_power_kw=status.get("current_hour_power_kw"),
                 )
     except Exception as e:
         logger.debug(f"Error getting simulation status: {e}")
@@ -755,10 +915,10 @@ async def trigger_repair_manually(equipment_code: str):
 @router.post("/demo/quick-cycle")
 async def run_quick_demo_cycle():
     """
-    Run a quick 5-minute demo cycle showing the full lifecycle.
+    Run a quick demo cycle at 100x speed showing the full lifecycle.
 
-    This compresses 24 hours into 5 minutes with a guaranteed fault
-    at simulated 11am and repair at 2pm.
+    At 100x speed: 24 hours in ~14.4 seconds with a guaranteed fault
+    at simulated 11am and repair at 1pm.
     """
     orchestrator = get_simulation_by_task_id("default")
 
@@ -766,20 +926,21 @@ async def run_quick_demo_cycle():
     if orchestrator.running:
         await orchestrator.stop()
 
-    # Start fast demo
+    # Start fast demo at 100x speed
     result = await orchestrator.start(
         scenario="fault_day",
-        duration_minutes=5.0,  # 5 minutes for full day
+        speed_multiplier=100.0,
         start_hour=6,
     )
 
     return {
         **result,
         "demo_info": {
-            "total_duration": "5 minutes",
-            "time_per_hour": "12.5 seconds",
-            "fault_expected_at": "~1 minute (simulated 11am)",
-            "repair_expected_at": "~3 minutes (simulated 2pm)",
+            "speed": "100x",
+            "time_per_hour": "0.6 seconds",
+            "total_duration": "~14 seconds",
+            "fault_expected_at": "simulated 11am",
+            "repair_expected_at": "simulated 1pm",
             "watch_events_at": "/api/lifecycle/events",
         },
     }
@@ -788,22 +949,27 @@ async def run_quick_demo_cycle():
 @router.post("/demo/ultra-fast")
 async def run_ultra_fast_demo():
     """
-    Run an ultra-fast 2-minute demo.
+    Run an ultra-fast demo at 1000x speed.
 
-    24 hours in 2 minutes = 5 seconds per simulated hour.
+    24 hours in ~1.4 seconds.
     """
     orchestrator = get_simulation_by_task_id("default")
 
     if orchestrator.running:
         await orchestrator.stop()
 
-    result = await orchestrator.start(scenario="fault_day", duration_minutes=2.0, start_hour=6)
+    result = await orchestrator.start(
+        scenario="fault_day",
+        speed_multiplier=1000.0,
+        start_hour=6,
+    )
 
     return {
         **result,
         "demo_info": {
-            "total_duration": "2 minutes",
-            "time_per_hour": "5 seconds",
+            "speed": "1000x",
+            "time_per_hour": "0.06 seconds",
+            "total_duration": "~1.4 seconds",
             "watch_events_at": "/api/lifecycle/events",
         },
     }
