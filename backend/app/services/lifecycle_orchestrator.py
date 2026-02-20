@@ -32,8 +32,15 @@ from app.services.feedback_collection_service import (
 from app.services.device_control_service import get_device_control_service
 from app.services.seasonal_modeler import SeasonalModeler
 from app.services.thermal_simulation_engine import update_simulation_temperatures
+from app.services.building_schedule import (
+    BuildingSchedule,
+    BuildingState,
+    HVACMode,
+    ScheduleState,
+)
 from app.services.power_meter_validation_engine import get_power_meter_validation_engine
 from app.services.cost_validation_engine import get_cost_validation_engine
+from app.services.simulation_persistence import get_simulation_persistence
 from app.models.recommendation import (
     Recommendation,
     RecommendationStatus,
@@ -267,6 +274,12 @@ class LifecycleOrchestrator:
         # Seasonal modeler for annual simulations
         self.seasonal_modeler: Optional[SeasonalModeler] = None
         self.days_simulated: int = 0  # Track days for annual simulations
+
+        # Building schedule engine for time-of-day operating states
+        self.building_schedule = BuildingSchedule()
+
+        # Supabase persistence for dashboard visibility (104-02)
+        self.persistence = get_simulation_persistence(site_id=site_id)
 
     def reset(self):
         """Reset orchestrator state for a fresh demo.
@@ -635,12 +648,23 @@ class LifecycleOrchestrator:
             self.running = False
 
     async def _process_hour(self, hour: int):
-        """Process events for the given simulated hour - Lightweight version (no faults/repairs)."""
+        """Process a simulated hour using the building schedule engine.
+
+        Equipment behavior (chiller staging, AHU fan speed, VAV damper positions,
+        FCU valve positions, DALI lighting levels) is keyed off schedule state +
+        occupancy + ambient temperature rather than hardcoded hour checks.
+        """
+        day_of_week = self.simulated_time.weekday()
+        schedule_state = self.building_schedule.get_state(hour, day_of_week)
+
         logger.info(
-            f"Processing simulated hour: {hour:02d}:00 (Day {self.days_simulated + 1}/365)"
-            if self.seasonal_modeler
-            else f"Processing simulated hour: {hour:02d}:00"
+            f"[Hour {hour:02d}:00] Day {self.days_simulated + 1} "
+            f"| {schedule_state.state.value} | HVAC: {schedule_state.hvac_mode.value} "
+            f"| Occupancy: {schedule_state.target_occupancy_pct:.0f}%"
         )
+
+        # Emit schedule transition events
+        await self._emit_schedule_event(hour, schedule_state)
 
         # Midnight: daily summary for annual simulations
         if hour == 0 and self.seasonal_modeler:
@@ -659,45 +683,21 @@ class LifecycleOrchestrator:
                 )
             )
 
-        # Morning startup
-        if hour == 6:
-            await self._building_wake()
+        # === FAULT INJECTION (scenario-driven) ===
+        if self.current_scenario and self.current_scenario.fault_probability > 0:
+            if self.current_scenario.fault_hour == hour:
+                await self._inject_fault()
+            elif self.current_scenario.fault_hour is None:
+                # Random fault based on probability (spread across 24 hours)
+                if self._scenario_rng.random() < (self.current_scenario.fault_probability / 24):
+                    await self._inject_fault()
 
-        # Occupancy increase
-        elif hour == 8:
-            await self._occupancy_increase()
+        # === PENDING REPAIRS CHECK ===
+        if self.active_faults:
+            await self._check_pending_repairs()
 
-        # Peak load period
-        elif hour == 11:
-            await self._peak_load()
-
-        # Evening wind-down
-        elif hour == 18:
-            await self._occupancy_decrease()
-
-        # Night mode
-        elif hour == 22:
-            await self._night_mode()
-
-        # === THERMAL UPDATE: Calculate and update zone temperatures ===
-        # This is called EVERY hour and updates sensor_readings with realistic thermal behavior
-        #
-        # IMPORTANT: Equipment Health Degradation
-        # For NORMAL simulations (Grant/Bederf baseline): consider_equipment_health=False (default)
-        #   → Equipment stays healthy, HVAC always responds at full capacity
-        #
-        # For MAINTENANCE/FAULT simulations: consider_equipment_health=True
-        #   → HVAC response degrades with equipment health
-        #   → If chiller health = 50%, HVAC response reduced to 50%
-        #   → Zones won't reach setpoint during equipment failure
-        #   → Enables realistic modeling of cooling loss during faults
-        #
-        # To enable for a maintenance simulation:
-        #   1. Add parameter to update_simulation_temperatures() call below
-        #   2. Set consider_equipment_health=True
-        #   3. Run simulation with degraded equipment health in database
+        # === THERMAL UPDATE ===
         try:
-            # Generate occupancy data for all zones based on hour
             occupancy_data = self._generate_occupancy_for_hour(hour)
 
             # Get ambient temperature from seasonal modeler
@@ -709,37 +709,38 @@ class LifecycleOrchestrator:
             else:
                 ambient_temp = 20.0
 
-            # Determine if building is in night setback mode
-            is_night_mode = hour >= 22 or hour < 6
+            # Use schedule state for equipment health consideration
+            consider_health = bool(self.active_faults) or (
+                self.current_scenario is not None and self.current_scenario.fault_probability >= 0.5
+            )
 
-            # Update zone temperatures (writes to sensor_readings table)
-            # Also calculates HVAC power and daily costs
-            # For maintenance simulation, set consider_equipment_health=True
+            is_night_mode = schedule_state.hvac_mode in (HVACMode.OFF, HVACMode.NIGHT_SETBACK)
+
             await update_simulation_temperatures(
                 building_id=self.building_id,
                 simulated_hour=hour,
                 occupancy_data=occupancy_data,
                 ambient_temp=ambient_temp,
                 is_night_mode=is_night_mode,
-                consider_equipment_health=False,  # Set to True for maintenance/fault simulations
-                simulated_date=self.simulated_time,  # For tariff band calculation
+                consider_equipment_health=consider_health,
+                simulated_date=self.simulated_time,
             )
         except Exception as e:
             logger.warning(f"[THERMAL] Failed to update temperatures at hour {hour}: {e}")
+            occupancy_data = {}
 
-        # === ENERGY CONSUMPTION TRACKING ===
-        # Calculate hourly power and add to cumulative energy
-        occupancy_factor = self._calculate_occupancy(hour) / 100.0
-        current_power_kw = 20.0 + (occupancy_factor * 15.0)  # 20-35 kW range
-        self.current_hour_power_kw = current_power_kw
-        self.total_energy_kwh += current_power_kw  # Add 1 hour of consumption
+        # === ENERGY CONSUMPTION TRACKING (schedule-driven) ===
+        # Power consumption based on equipment staging, not flat 20-35kW
+        base_power = self._calculate_hourly_power(schedule_state, occupancy_data)
+        self.current_hour_power_kw = base_power
+        self.total_energy_kwh += base_power
 
         # === POWER METER VALIDATION (A.3) ===
         try:
             power_engine = get_power_meter_validation_engine("S002")
             result = await power_engine.validate_hourly_power(
                 meter_id="S002-MTR-B1-HVAC",
-                reading_kwh=current_power_kw,
+                reading_kwh=base_power,
                 simulated_hour=hour,
                 simulated_date=self.simulated_time,
             )
@@ -762,8 +763,100 @@ class LifecycleOrchestrator:
             except Exception as e:
                 logger.debug(f"[COST VALIDATION] Skipped: {e}")
 
-        # AI optimization runs every hour — creates recommendations when it finds improvements
-        await self._ai_optimization(f"hour_{hour}")
+        # AI optimization runs when the building is occupied (HVAC active)
+        if schedule_state.hvac_mode != HVACMode.OFF:
+            await self._ai_optimization(f"hour_{hour}")
+
+    async def _emit_schedule_event(self, hour: int, schedule_state: ScheduleState):
+        """Emit events on meaningful schedule transitions."""
+        event_map = {
+            BuildingState.PRE_COOL: (
+                EventType.BUILDING_WAKE,
+                "Pre-cool cycle started -- pulling overnight heat from zones",
+            ),
+            BuildingState.MORNING_STARTUP: (
+                EventType.BUILDING_WAKE,
+                "Full plant online -- chillers staged, AHUs at design speed",
+            ),
+            BuildingState.OCCUPIED_RAMPUP: (
+                EventType.OCCUPANCY_INCREASE,
+                "Staff arriving -- occupancy ramping, HVAC at full capacity",
+            ),
+            BuildingState.AFTERNOON_WINDDOWN: (
+                EventType.OCCUPANCY_DECREASE,
+                "Staff leaving -- HVAC de-staging",
+            ),
+            BuildingState.HVAC_SHUTDOWN: (
+                EventType.NIGHT_MODE,
+                "HVAC shutdown -- building coasting on thermal mass",
+            ),
+            BuildingState.UNOCCUPIED: (
+                EventType.NIGHT_MODE,
+                "Building empty -- security mode activated",
+            ),
+        }
+        mapping = event_map.get(schedule_state.state)
+        if mapping:
+            event_type, description = mapping
+            self._emit_event(
+                LifecycleEvent(
+                    timestamp=datetime.now(),
+                    simulated_hour=hour,
+                    event_type=event_type,
+                    description=description,
+                    details={
+                        "schedule_state": schedule_state.state.value,
+                        "hvac_mode": schedule_state.hvac_mode.value,
+                        "chiller": schedule_state.chiller_staging.value,
+                        "occupancy_target": schedule_state.target_occupancy_pct,
+                    },
+                )
+            )
+
+    def _calculate_hourly_power(self, schedule_state: ScheduleState, occupancy_data: Dict[str, float]) -> float:
+        """Calculate realistic hourly power based on equipment staging.
+
+        Args:
+            schedule_state: Current building schedule state
+            occupancy_data: Zone occupancy percentages
+
+        Returns:
+            Power consumption in kW for this hour
+        """
+        # Base loads (always-on: UPS, security, lifts, IT)
+        base_kw = 8.0
+
+        # HVAC power based on chiller staging
+        hvac_kw = {
+            "off": 0.0,
+            "stage_1": 25.0,  # ~30% chiller + AHU
+            "stage_2": 55.0,  # ~60% chiller + AHU + pumps
+            "full_load": 85.0,  # Full cooling plant
+        }.get(schedule_state.chiller_staging.value, 0.0)
+
+        # AHU fan power (proportional to fan %)
+        ahu_kw = (schedule_state.ahu_fan_pct / 100.0) * 15.0  # 15kW at 100%
+
+        # Lighting power based on mode
+        lighting_kw = {
+            "off": 0.0,
+            "security_only": 2.0,
+            "dimmed": 5.0,
+            "full": 12.0,
+            "daylight_harvest": 8.0,
+        }.get(schedule_state.lighting_mode.value, 0.0)
+
+        # Occupancy-driven misc loads (computers, appliances)
+        if occupancy_data:
+            avg_occupancy = sum(occupancy_data.values()) / len(occupancy_data)
+        else:
+            avg_occupancy = schedule_state.target_occupancy_pct
+        misc_kw = (avg_occupancy / 100.0) * 20.0  # 20kW at full occupancy
+
+        total = base_kw + hvac_kw + ahu_kw + lighting_kw + misc_kw
+        # Add +/-5% noise for realism
+        noise = self._scenario_rng.uniform(0.95, 1.05)
+        return round(total * noise, 1)
 
     def _generate_occupancy_for_hour(self, hour: int) -> Dict[str, float]:
         """
@@ -778,26 +871,13 @@ class LifecycleOrchestrator:
         day_of_week = self.simulated_time.weekday()  # 0=Monday, 6=Sunday
         is_weekend = day_of_week >= 5
 
-        # Zone types and their typical occupancy patterns
+        # Site 002 actual zone IDs and their typical occupancy patterns
         zone_profiles = {
-            "Zone-001": "office",  # Level 0 Zone A - Office space
-            "Zone-002": "office",  # Level 0 Zone B
-            "Zone-003": "meeting",  # Level 0 Zone C - Meeting rooms
-            "Zone-004": "common",  # Level 0 Zone D - Common areas
-            "Zone-005": "entry",  # Level 0 Zone E - Reception/entry
-            "Zone-101": "office",  # Level 1 Zone A
-            "Zone-102": "office",  # Level 1 Zone B
-            "Zone-103": "meeting",  # Level 1 Zone C
-            "Zone-104": "common",  # Level 1 Zone D
-            "Zone-105": "entry",  # Level 1 Zone E
-            "Zone-201": "office",  # Level 2 Zone A
-            "Zone-202": "office",  # Level 2 Zone B
-            "Zone-203": "meeting",  # Level 2 Zone C
-            "Zone-204": "common",  # Level 2 Zone D
-            "Zone-205": "utility",  # Level 2 Zone E - Utility/server
-            "Zone-B1": "utility",  # Basement - HVAC & Power Plant
-            "Zone-L2-Plant": "utility",  # L2 Mechanical Room
-            "Zone-R": "utility",  # Rooftop - Solar & Cooling
+            "Zone-B1-001": "utility",  # Basement plant room
+            "Zone-L1-A": "office",  # Level 1 Zone A
+            "Zone-L1-B": "office",  # Level 1 Zone B
+            "Zone-L2-A": "office",  # Level 2 Zone A
+            "Zone-L2-B": "office",  # Level 2 Zone B
         }
 
         occupancy_data = {}
@@ -1489,6 +1569,133 @@ class LifecycleOrchestrator:
                 details={"point": point, "value": value, "reason": reason},
             )
         )
+
+    # === PERSISTENCE METHODS (104-02) ===
+    # Wire persistence call into _process_hour after 104-01 completes.
+    # Usage: at end of _process_hour, call:
+    #   equipment_states = await self._collect_equipment_states(hour, schedule_state)
+    #   await self.persistence.persist_hourly_state(
+    #       simulated_time=self.simulated_time, equipment_states=equipment_states,
+    #       schedule_state=schedule_state, energy_kw=self.current_hour_power_kw,
+    #       ambient_temp=ambient_temp, humidity=humidity,
+    #   )
+
+    async def _collect_equipment_states(self, hour: int, schedule_state: ScheduleState) -> Dict[str, Dict]:
+        """Collect current state of all site equipment for persistence."""
+        equipment_states: Dict[str, Dict] = {}
+
+        try:
+            equipment_list = self.equipment_repo.get_all(building_id=self.site_id)
+            site_prefix = self.site_id.replace("site-", "S").upper()  # site-002 -> S002
+
+            for equip in equipment_list:
+                code = equip.get("code", "")
+                if not code.startswith(site_prefix):
+                    continue
+
+                equip_type = equip.get("type", "unknown").lower()
+                health = equip.get("health_score", 75)
+
+                # Apply fault degradation if this equipment has an active fault
+                if code in self.active_faults:
+                    fault = self.active_faults[code]
+                    hours_faulted = fault.get("hours_faulted", 0) + 1
+                    fault["hours_faulted"] = hours_faulted
+                    health = max(10, health - (hours_faulted * 2))  # 2% per hour while faulted
+
+                # Generate sensor readings based on equipment type and schedule
+                sensor_readings = self._generate_sensor_readings(code, equip_type, health, hour, schedule_state)
+
+                equipment_states[code] = {
+                    "health_score": health,
+                    "status": "online" if health >= 70 else ("degraded" if health >= 40 else "offline"),
+                    "sensor_readings": sensor_readings,
+                    "type": equip_type,
+                }
+        except Exception as e:
+            logger.warning(f"Failed to collect equipment states: {e}")
+
+        return equipment_states
+
+    def _generate_sensor_readings(
+        self,
+        code: str,
+        equip_type: str,
+        health: float,
+        hour: int,
+        schedule_state: ScheduleState,
+    ) -> Dict[str, float]:
+        """Generate realistic sensor readings for an equipment item."""
+        readings: Dict[str, float] = {}
+
+        if equip_type in ("chiller", "cooling_tower"):
+            if schedule_state.chiller_staging.value != "off":
+                readings["supply_temp"] = 6.0 + (100 - health) * 0.1  # Degrades with health
+                readings["load_pct"] = {"stage_1": 30, "stage_2": 60, "full_load": 90}.get(
+                    schedule_state.chiller_staging.value, 0
+                )
+                readings["compressor_status"] = 1
+            else:
+                readings["supply_temp"] = 12.0
+                readings["load_pct"] = 0
+                readings["compressor_status"] = 0
+
+        elif equip_type == "ahu":
+            readings["fan_speed_pct"] = schedule_state.ahu_fan_pct
+            readings["supply_air_temp"] = 14.0 + (100 - health) * 0.05
+            readings["fan_status"] = 1 if schedule_state.ahu_fan_pct > 0 else 0
+
+        elif equip_type == "vav":
+            if schedule_state.hvac_mode.value not in ("off", "night_setback"):
+                damper = min(100, schedule_state.target_occupancy_pct + 10)
+                readings["damper_position"] = damper
+                readings["zone_temp"] = 22.0 + self._scenario_rng.uniform(-1, 1)
+                readings["airflow_lps"] = damper * 0.8  # Rough L/s from damper %
+            else:
+                readings["damper_position"] = 0
+                readings["zone_temp"] = 22.0 + schedule_state.setpoint_offset
+                readings["airflow_lps"] = 0
+
+        elif equip_type == "fcu":
+            if schedule_state.hvac_mode.value not in ("off", "night_setback"):
+                readings["valve_position"] = min(100, schedule_state.target_occupancy_pct + 15)
+                readings["room_temp"] = 22.0 + self._scenario_rng.uniform(-0.5, 0.5)
+                readings["fan_speed"] = 2  # medium
+            else:
+                readings["valve_position"] = 0
+                readings["room_temp"] = 22.0 + schedule_state.setpoint_offset
+                readings["fan_speed"] = 0
+
+        elif equip_type == "ups":
+            readings["battery_level"] = max(50, 100 - (24 - hour) * 0.5)  # Slow drain
+            readings["load_pct"] = 30 + self._scenario_rng.uniform(-5, 5)
+
+        elif equip_type == "generator":
+            readings["status"] = 0  # Standby unless load shedding
+            readings["fuel_level"] = 85 + self._scenario_rng.uniform(-2, 2)
+
+        elif equip_type == "meter":
+            readings["power_kw"] = self.current_hour_power_kw
+            readings["power_factor"] = 0.92 + self._scenario_rng.uniform(-0.02, 0.02)
+
+        elif equip_type in ("dali_zone", "dali_controller"):
+            lighting_pct = {
+                "off": 0,
+                "security_only": 10,
+                "dimmed": 30,
+                "full": 100,
+                "daylight_harvest": 65,
+            }.get(schedule_state.lighting_mode.value, 0)
+            readings["brightness_pct"] = float(lighting_pct)
+            readings["status"] = 1.0 if lighting_pct > 0 else 0.0
+
+        elif equip_type == "zone_sensor":
+            # CO2 and humidity
+            occupancy_factor = schedule_state.target_occupancy_pct / 100.0
+            readings["co2_ppm"] = 400 + occupancy_factor * 200 + self._scenario_rng.uniform(-20, 20)
+            readings["humidity_pct"] = 45 + occupancy_factor * 10 + self._scenario_rng.uniform(-3, 3)
+
+        return readings
 
     async def _inject_fault(self):
         """Inject a fault into equipment."""
