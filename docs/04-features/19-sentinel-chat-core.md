@@ -332,7 +332,8 @@ Would you like me to look up fault codes for this model?
 Access TechnicianChat via sidebar:
 - **Nav Item:** "Tech Chat" with Wrench icon
 - **View ID:** `"technician"`
-- **Route:** Sidebar selection → TechnicianChat component
+- **Required Module:** `maintenance` (gated via `TechnicianPortalGated`)
+- **Route:** Sidebar selection → `TechnicianPortalGated` → `TechnicianChat`
 
 ## Files Reference
 
