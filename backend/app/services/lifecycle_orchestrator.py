@@ -14,39 +14,40 @@ Time compression: 24 hours → configurable (default 24 minutes)
 import asyncio
 import logging
 import random
-from datetime import datetime, timedelta
-from typing import Optional, Dict, Any, List, Callable
+from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta
 from enum import Enum
+from typing import Any
 
 from app.database.repositories.equipment_repository import EquipmentRepository
 from app.database.repositories.prediction_repository import PredictionRepository
-from app.database.repositories.work_order_repository import get_work_order_repository
 from app.database.repositories.recommendation_repository import (
     get_recommendation_repository,
 )
-from app.services.feedback_collection_service import (
-    get_feedback_collection_service,
-    FeedbackItemType,
+from app.database.repositories.work_order_repository import get_work_order_repository
+from app.models.recommendation import (
+    ActionRiskLevel,
+    Recommendation,
+    RecommendationStatus,
 )
-from app.services.device_control_service import get_device_control_service
-from app.services.seasonal_modeler import SeasonalModeler
-from app.services.thermal_simulation_engine import update_simulation_temperatures
 from app.services.building_schedule import (
     BuildingSchedule,
     BuildingState,
+    ChilledWaterModel,
     HVACMode,
     ScheduleState,
 )
-
-from app.services.power_meter_validation_engine import get_power_meter_validation_engine
 from app.services.cost_validation_engine import get_cost_validation_engine
-from app.services.simulation_persistence import get_simulation_persistence
-from app.models.recommendation import (
-    Recommendation,
-    RecommendationStatus,
-    ActionRiskLevel,
+from app.services.device_control_service import get_device_control_service
+from app.services.feedback_collection_service import (
+    FeedbackItemType,
+    get_feedback_collection_service,
 )
+from app.services.power_meter_validation_engine import get_power_meter_validation_engine
+from app.services.seasonal_modeler import SeasonalModeler
+from app.services.simulation_persistence import get_simulation_persistence
+from app.services.thermal_simulation_engine import update_simulation_temperatures
 
 logger = logging.getLogger(__name__)
 
@@ -102,10 +103,10 @@ class LifecycleEvent:
     timestamp: datetime
     simulated_hour: int
     event_type: EventType
-    equipment_id: Optional[str] = None
-    equipment_name: Optional[str] = None
+    equipment_id: str | None = None
+    equipment_name: str | None = None
     description: str = ""
-    details: Dict[str, Any] = field(default_factory=dict)
+    details: dict[str, Any] = field(default_factory=dict)
     success: bool = True
 
 
@@ -116,13 +117,13 @@ class ScenarioConfig:
     name: str
     description: str
     fault_probability: float = 0.3  # 30% chance of fault during day
-    fault_hour: Optional[int] = None  # Specific hour for fault (None = random)
-    fault_equipment_type: Optional[str] = None  # Specific type to fault
+    fault_hour: int | None = None  # Specific hour for fault (None = random)
+    fault_equipment_type: str | None = None  # Specific type to fault
     auto_repair: bool = True  # Automatically simulate technician repair
     repair_delay_hours: int = 2  # Hours after fault before repair
     optimization_enabled: bool = True
     sentry_notifications: bool = True
-    operation_mode: Optional[OperationMode] = None
+    operation_mode: OperationMode | None = None
     # Enable continuous AI recommendations (lower thresholds, BESS arbitrage)
     # and building operation mode for demos
     demo_mode: bool = False
@@ -242,29 +243,29 @@ class LifecycleOrchestrator:
     and multi-day seasonal patterns into a unified lifecycle loop.
     """
 
-    def __init__(self, task_id: Optional[str] = None, site_id: str = "site-002"):
+    def __init__(self, task_id: str | None = None, site_id: str = "site-002"):
         self.task_id = task_id  # For database task tracking
         self.site_id = site_id  # Parameterized site identifier
         self.building_id = site_id  # Used by update_simulation_temperatures
         self.running = False
         self.paused = False
-        self.current_scenario: Optional[ScenarioConfig] = None
+        self.current_scenario: ScenarioConfig | None = None
         self.simulated_time: datetime = datetime.now().replace(hour=0, minute=0, second=0)
-        self.real_start_time: Optional[datetime] = None
+        self.real_start_time: datetime | None = None
         self.time_multiplier: float = 60.0  # 1 real minute = 1 simulated hour
         self.speed_multiplier: float = 1.0  # 1x real-time, 10x = 10x faster, etc.
         self.max_days: int = 1  # 1 for daily, 365 for annual
-        self.events: List[LifecycleEvent] = []
-        self.active_faults: Dict[str, Dict[str, Any]] = {}
-        self.pending_repairs: Dict[str, Dict[str, Any]] = {}
+        self.events: list[LifecycleEvent] = []
+        self.active_faults: dict[str, dict[str, Any]] = {}
+        self.pending_repairs: dict[str, dict[str, Any]] = {}
         self.equipment_repo = EquipmentRepository()
         self.prediction_repo = PredictionRepository()
         self.work_order_repo = get_work_order_repository()
         self.feedback_service = get_feedback_collection_service()
         self.recommendation_repo = get_recommendation_repository()
         self.device_control_service = get_device_control_service()
-        self._task: Optional[asyncio.Task] = None
-        self._callbacks: List[Callable[[LifecycleEvent], None]] = []
+        self._task: asyncio.Task | None = None
+        self._callbacks: list[Callable[[LifecycleEvent], None]] = []
 
         # Energy tracking
         self.total_energy_kwh: float = 0.0  # Cumulative energy consumption
@@ -272,13 +273,19 @@ class LifecycleOrchestrator:
         self.days_simulated: int = 0  # Track days for annual simulations
         # Same scenario always produces same results, but with day-to-day variation
         self._scenario_rng = random.Random()
-        self._occupancy_seed: Optional[int] = None
+        self._occupancy_seed: int | None = None
 
         # Seasonal modeler for annual simulations
-        self.seasonal_modeler: Optional[SeasonalModeler] = None
+        self.seasonal_modeler: SeasonalModeler | None = None
 
         # Building schedule engine for time-of-day operating states
         self.building_schedule = BuildingSchedule()
+
+        # Chilled water model for physics-based zone cooling (105-01)
+        self.chw_model = ChilledWaterModel()
+
+        # Zone temperatures from thermal engine (105-01)
+        self.zone_temperatures: dict[str, float] = {}
 
         # JHB climate engine for realistic ambient temperature (104-01)
         # Lazy-import ClimatePattern to avoid bms_simulator/__init__.py which
@@ -299,8 +306,28 @@ class LifecycleOrchestrator:
         except Exception:
             pass  # Fall back to seasonal modeler
 
+        # Runtime hours tracking per equipment (105-02)
+        self.runtime_hours: dict[str, float] = {}  # equipment_code -> cumulative hours
+
         # Supabase persistence for dashboard visibility (104-02)
         self.persistence = get_simulation_persistence(site_id=site_id)
+
+    # Baseline wear rates per running hour (% health loss) (105-02)
+    WEAR_RATES = {
+        "chiller": 0.0006,  # ~5% per year (8760 running hours)
+        "cooling_tower": 0.0005,
+        "ahu": 0.0004,  # ~3.5% per year
+        "fcu": 0.0003,  # ~2.6% per year
+        "vav": 0.0003,
+        "pump": 0.0005,  # ~4.4% per year
+        "ups": 0.001,  # ~8.7% per year (always on, battery aging)
+        "generator": 0.0001,  # ~0.9% per year (standby)
+        "meter": 0.0,  # Meters don't degrade
+        "dali_zone": 0.0001,
+        "dali_controller": 0.0001,
+        "zone_sensor": 0.0001,
+        "sensor": 0.0001,
+    }
 
     def reset(self):
         """Reset orchestrator state for a fresh demo.
@@ -324,6 +351,9 @@ class LifecycleOrchestrator:
         self._occupancy_seed = None
         self.seasonal_modeler = None
         self.days_simulated = 0
+        self.runtime_hours = {}  # Reset runtime hours (105-02)
+        self.chw_model = ChilledWaterModel()  # Reset CHW model (105-01)
+        self.zone_temperatures = {}  # Reset zone temps (105-01)
         logger.info("Orchestrator reset: Ready for fresh demo")
 
     @property
@@ -338,7 +368,7 @@ class LifecycleOrchestrator:
         base_seconds = 60.0  # 1 minute per simulated hour at 1x
         return max(0.05, base_seconds / self.speed_multiplier)
 
-    def set_speed(self, speed_multiplier: float) -> Dict[str, Any]:
+    def set_speed(self, speed_multiplier: float) -> dict[str, Any]:
         """Change simulation speed while running.
 
         Args:
@@ -379,8 +409,8 @@ class LifecycleOrchestrator:
         start_hour: int = 0,
         task_id: str = None,  # For checkpoint recovery
         speed_multiplier: float = 10.0,
-        start_date: Optional[str] = None,  # ISO date string e.g. "2025-06-15"
-    ) -> Dict[str, Any]:
+        start_date: str | None = None,  # ISO date string e.g. "2025-06-15"
+    ) -> dict[str, Any]:
         """
         Start the 24-hour simulation.
 
@@ -532,7 +562,7 @@ class LifecycleOrchestrator:
             "started_at": self.real_start_time.isoformat(),
         }
 
-    async def stop(self) -> Dict[str, Any]:
+    async def stop(self) -> dict[str, Any]:
         """Stop the running simulation cleanly.
 
         Returns:
@@ -568,7 +598,7 @@ class LifecycleOrchestrator:
     def pause(self):
         """Pause the simulation."""
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Get current simulation status including weather and seasonal data."""
         elapsed_real = (datetime.now() - self.real_start_time).total_seconds() if self.real_start_time else 0
 
@@ -861,6 +891,41 @@ class LifecycleOrchestrator:
             logger.warning(f"[THERMAL] Failed to update temperatures at hour {hour}: {e}")
             occupancy_data = {}
 
+        # === CHILLED WATER MODEL UPDATE (105-01) ===
+        # Advance CHW supply/return temps based on chiller staging and ambient
+        self.chw_model.update(schedule_state.chiller_staging, ambient_temp)
+
+        # === ZONE TEMPERATURE CAPTURE (105-01) ===
+        # Calculate zone temps from setpoint, ambient, and CHW cooling capacity
+        # When HVAC is active and CHW is cold, zones stay near setpoint.
+        # When HVAC is off or CHW is warm, zones drift toward ambient.
+        setpoint = self.building_schedule.COMFORT_SETPOINT + schedule_state.setpoint_offset
+        if schedule_state.hvac_mode not in (HVACMode.OFF, HVACMode.NIGHT_SETBACK):
+            # HVAC active: zone temp depends on CHW cooling capacity
+            # Warmer CHW supply = less cooling = zone drifts above setpoint
+            chw_deficit = max(0, self.chw_model.supply_temp - 7.0)  # 7C = design supply
+            zone_base = setpoint + chw_deficit * 0.3  # 0.3C zone rise per 1C CHW deficit
+        else:
+            # HVAC off: zone drifts toward ambient (slow due to building thermal mass)
+            current_avg = (
+                sum(self.zone_temperatures.values()) / max(1, len(self.zone_temperatures))
+                if self.zone_temperatures
+                else setpoint
+            )
+            drift_rate = 0.3  # degrees C per hour toward ambient
+            if ambient_temp > current_avg:
+                zone_base = current_avg + drift_rate
+            else:
+                zone_base = current_avg - drift_rate
+            zone_base = min(zone_base, ambient_temp) if ambient_temp > setpoint else max(zone_base, ambient_temp)
+
+        # Update all known zones (or seed with defaults for known zones)
+        default_zones = ["Zone-L1-A", "Zone-L1-B", "Zone-L2-A", "Zone-L2-B"]
+        for zone_id in set(list(self.zone_temperatures.keys()) + default_zones):
+            # Small per-zone variation (orientation, occupancy, solar gain)
+            variation = self._scenario_rng.uniform(-0.5, 0.5)
+            self.zone_temperatures[zone_id] = round(zone_base + variation, 1)
+
         # === ENERGY CONSUMPTION TRACKING (schedule-driven) ===
         # Power consumption based on equipment staging, not flat 20-35kW
         base_power = self._calculate_hourly_power(schedule_state, occupancy_data)
@@ -961,7 +1026,7 @@ class LifecycleOrchestrator:
                 )
             )
 
-    def _calculate_hourly_power(self, schedule_state: ScheduleState, occupancy_data: Dict[str, float]) -> float:
+    def _calculate_hourly_power(self, schedule_state: ScheduleState, occupancy_data: dict[str, float]) -> float:
         """Calculate realistic hourly power based on equipment staging.
 
         Args:
@@ -1006,7 +1071,7 @@ class LifecycleOrchestrator:
         noise = self._scenario_rng.uniform(0.95, 1.05)
         return round(total * noise, 1)
 
-    def _generate_occupancy_for_hour(self, hour: int) -> Dict[str, float]:
+    def _generate_occupancy_for_hour(self, hour: int) -> dict[str, float]:
         """
         Generate zone occupancy percentages for all zones based on hour of day.
 
@@ -1418,7 +1483,7 @@ class LifecycleOrchestrator:
 
     def _generate_fcu_recommendation(
         self, eq_code: str, context: str, occupancy_percent: int, hour: int
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Generate FCU recommendation — cooling_setpoint adjustments."""
         low_thresh, high_thresh = self._get_demo_thresholds()
 
@@ -1453,7 +1518,7 @@ class LifecycleOrchestrator:
 
     def _generate_ahu_recommendation(
         self, eq_code: str, context: str, occupancy_percent: int, hour: int
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Generate AHU recommendation — supply_temp_setpoint + economizer control."""
         low_thresh, high_thresh = self._get_demo_thresholds()
 
@@ -1501,7 +1566,7 @@ class LifecycleOrchestrator:
 
     def _generate_chiller_recommendation(
         self, eq_code: str, context: str, occupancy_percent: int, hour: int
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Generate chiller recommendation — chw_setpoint + capacity_percent."""
         low_thresh, high_thresh = self._get_demo_thresholds()
 
@@ -1549,7 +1614,7 @@ class LifecycleOrchestrator:
 
     def _generate_vav_recommendation(
         self, eq_code: str, context: str, occupancy_percent: int, hour: int
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Generate VAV recommendation — damper_position + airflow_setpoint."""
         low_thresh, high_thresh = self._get_demo_thresholds()
 
@@ -1587,7 +1652,7 @@ class LifecycleOrchestrator:
 
     def _generate_pump_recommendation(
         self, eq_code: str, context: str, occupancy_percent: int, hour: int
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Generate pump recommendation — speed_percent (affinity laws: 50% speed ≈ 12.5% power)."""
         low_thresh, _ = self._get_demo_thresholds()
 
@@ -1625,7 +1690,7 @@ class LifecycleOrchestrator:
 
     def _generate_hvac_recommendation(
         self, eq_code: str, eq_type: str, context: str, occupancy_percent: int, hour: int
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Generate generic HVAC recommendation (fallback for CT, SPLIT, etc.)."""
         low_thresh, high_thresh = self._get_demo_thresholds()
 
@@ -1667,7 +1732,7 @@ class LifecycleOrchestrator:
         daylight_factor: int,
         zones_active: int,
         hour: int,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Generate occupancy-aware + daylight-aware DALI recommendation (Tridonic luminaire control)."""
 
         if occupancy_percent < 10:
@@ -1718,11 +1783,73 @@ class LifecycleOrchestrator:
             )
         )
 
+    # === RUNTIME & DEGRADATION METHODS (105-02) ===
+
+    def _is_equipment_running(self, equip_type: str, schedule_state: ScheduleState) -> bool:
+        """Determine if equipment is running based on type and schedule."""
+        if equip_type in ("chiller", "cooling_tower"):
+            return schedule_state.chiller_staging.value != "off"
+        elif equip_type == "ahu":
+            return schedule_state.ahu_fan_pct > 0
+        elif equip_type in ("vav", "fcu"):
+            return schedule_state.hvac_mode.value not in ("off", "night_setback")
+        elif equip_type == "pump":
+            return schedule_state.chiller_staging.value != "off"
+        elif equip_type in ("ups", "generator"):
+            return True  # Always on
+        elif equip_type in ("dali_zone", "dali_controller"):
+            return schedule_state.lighting_mode.value != "off"
+        return False
+
+    def _apply_cascade_effects(self, equipment_states: dict[str, dict]) -> dict[str, dict]:
+        """Apply cascade effects from failed equipment to downstream systems.
+
+        When critical plant equipment (chillers, pumps) degrades, downstream
+        zone equipment (VAVs, FCUs) loses cooling capacity, and zone temps
+        drift warmer.
+        """
+        # Collect health of critical plant equipment
+        chillers = []
+        pumps = []
+
+        for code, state in equipment_states.items():
+            if state.get("type") == "chiller":
+                chillers.append(state.get("health_score", 100))
+            elif state.get("type") == "pump":
+                pumps.append(state.get("health_score", 100))
+
+        chiller_health_avg = sum(chillers) / len(chillers) if chillers else 100.0
+        pump_health_avg = sum(pumps) / len(pumps) if pumps else 100.0
+
+        # Cascade: chiller/pump failure -> reduced cooling for all zones
+        cooling_capacity = min(chiller_health_avg, pump_health_avg) / 100.0
+
+        if cooling_capacity < 0.9:  # Some degradation
+            for code, state in equipment_states.items():
+                if state.get("type") in ("vav", "fcu"):
+                    readings = state.get("sensor_readings", {})
+                    # Reduce damper/valve effectiveness
+                    if "damper_position" in readings:
+                        effective_damper = readings["damper_position"] * cooling_capacity
+                        readings["damper_position"] = round(effective_damper, 1)
+                    if "valve_position" in readings:
+                        effective_valve = readings["valve_position"] * cooling_capacity
+                        readings["valve_position"] = round(effective_valve, 1)
+                    # Zone temp drifts warmer if cooling reduced significantly
+                    if "zone_temp" in readings and cooling_capacity < 0.7:
+                        temp_drift = (1 - cooling_capacity) * 3.0  # Up to 3C drift
+                        readings["zone_temp"] = round(readings["zone_temp"] + temp_drift, 1)
+                    if "room_temp" in readings and cooling_capacity < 0.7:
+                        temp_drift = (1 - cooling_capacity) * 3.0
+                        readings["room_temp"] = round(readings["room_temp"] + temp_drift, 1)
+
+        return equipment_states
+
     # === PERSISTENCE METHODS (104-02) ===
 
-    async def _collect_equipment_states(self, hour: int, schedule_state: ScheduleState) -> Dict[str, Dict]:
+    async def _collect_equipment_states(self, hour: int, schedule_state: ScheduleState) -> dict[str, dict]:
         """Collect current state of all site equipment for persistence."""
-        equipment_states: Dict[str, Dict] = {}
+        equipment_states: dict[str, dict] = {}
 
         try:
             equipment_list = self.equipment_repo.get_all(building_id=self.site_id)
@@ -1736,6 +1863,13 @@ class LifecycleOrchestrator:
                 equip_type = equip.get("type", "unknown").lower()
                 health = equip.get("health_score", 75)
 
+                # Baseline wear: slow degradation during normal operation (105-02)
+                is_running = self._is_equipment_running(equip_type, schedule_state)
+                if is_running:
+                    wear_rate = self.WEAR_RATES.get(equip_type, 0.0002)
+                    health -= wear_rate  # Very small per hour, adds up over months
+                    health = max(30.0, health)  # Floor: equipment doesn't die from wear alone
+
                 # Apply fault degradation if this equipment has an active fault
                 if code in self.active_faults:
                     fault = self.active_faults[code]
@@ -1746,16 +1880,38 @@ class LifecycleOrchestrator:
                 # Generate sensor readings based on equipment type and schedule
                 sensor_readings = self._generate_sensor_readings(code, equip_type, health, hour, schedule_state)
 
+                # Track runtime hours (105-02)
+                if is_running:
+                    self.runtime_hours[code] = self.runtime_hours.get(code, 0) + 1
+
                 equipment_states[code] = {
                     "health_score": health,
                     "status": "online" if health >= 70 else ("degraded" if health >= 40 else "offline"),
                     "sensor_readings": sensor_readings,
                     "type": equip_type,
+                    "runtime_hours": self.runtime_hours.get(code, 0),
                 }
         except Exception as e:
             logger.warning(f"Failed to collect equipment states: {e}")
 
+        # Apply cascade effects from failed plant to downstream zones (105-02)
+        equipment_states = self._apply_cascade_effects(equipment_states)
+
         return equipment_states
+
+    def _equipment_to_zone(self, equipment_code: str) -> str:
+        """Map equipment code to zone ID for temperature lookup.
+
+        Examples:
+            S002-VAV-L1-A  -> Zone-L1-A
+            S002-FCU-L2-B  -> Zone-L2-B
+            S002-AHU-B1-001 -> Zone-B1-001
+        """
+        parts = equipment_code.split("-")
+        if len(parts) >= 3:
+            location = "-".join(parts[2:])  # L1-A, L2-B, B1-001
+            return f"Zone-{location}"
+        return ""
 
     def _generate_sensor_readings(
         self,
@@ -1764,21 +1920,26 @@ class LifecycleOrchestrator:
         health: float,
         hour: int,
         schedule_state: ScheduleState,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Generate realistic sensor readings for an equipment item."""
-        readings: Dict[str, float] = {}
+        readings: dict[str, float] = {}
 
         if equip_type in ("chiller", "cooling_tower"):
+            # Use CHW model for supply/return temps (105-01)
+            readings["supply_temp"] = round(self.chw_model.supply_temp, 1)
+            readings["return_temp"] = round(self.chw_model.return_temp, 1)
             if schedule_state.chiller_staging.value != "off":
-                readings["supply_temp"] = 6.0 + (100 - health) * 0.1  # Degrades with health
                 readings["load_pct"] = {"stage_1": 30, "stage_2": 60, "full_load": 90}.get(
                     schedule_state.chiller_staging.value, 0
                 )
                 readings["compressor_status"] = 1
+                # COP degrades with health (105-01)
+                base_cop = 5.5  # Design COP
+                readings["cop"] = round(base_cop * (health / 100.0), 2)
             else:
-                readings["supply_temp"] = 12.0
                 readings["load_pct"] = 0
                 readings["compressor_status"] = 0
+                readings["cop"] = 0
 
         elif equip_type == "ahu":
             readings["fan_speed_pct"] = schedule_state.ahu_fan_pct
@@ -1786,24 +1947,43 @@ class LifecycleOrchestrator:
             readings["fan_status"] = 1 if schedule_state.ahu_fan_pct > 0 else 0
 
         elif equip_type == "vav":
+            # Use physics-based zone temp from thermal model (105-01)
+            zone_id = self._equipment_to_zone(code)
+            actual_temp = self.zone_temperatures.get(
+                zone_id, self.building_schedule.COMFORT_SETPOINT + schedule_state.setpoint_offset
+            )
+            sensor_noise = self._scenario_rng.uniform(-0.3, 0.3)
+            readings["zone_temp"] = round(actual_temp + sensor_noise, 1)
+
             if schedule_state.hvac_mode.value not in ("off", "night_setback"):
-                damper = min(100, schedule_state.target_occupancy_pct + 10)
-                readings["damper_position"] = damper
-                readings["zone_temp"] = 22.0 + self._scenario_rng.uniform(-1, 1)
-                readings["airflow_lps"] = damper * 0.8  # Rough L/s from damper %
+                # Damper responds to temp error (demand-responsive)
+                temp_error = actual_temp - self.building_schedule.COMFORT_SETPOINT
+                base_damper = schedule_state.target_occupancy_pct + 10
+                demand_adjustment = max(0, temp_error * 10)  # 10% more damper per deg C above setpoint
+                readings["damper_position"] = min(100, base_damper + demand_adjustment)
+                readings["airflow_lps"] = readings["damper_position"] * 0.8  # Rough L/s from damper %
             else:
                 readings["damper_position"] = 0
-                readings["zone_temp"] = 22.0 + schedule_state.setpoint_offset
                 readings["airflow_lps"] = 0
 
         elif equip_type == "fcu":
+            # Use physics-based zone temp from thermal model (105-01)
+            zone_id = self._equipment_to_zone(code)
+            actual_temp = self.zone_temperatures.get(
+                zone_id, self.building_schedule.COMFORT_SETPOINT + schedule_state.setpoint_offset
+            )
+            sensor_noise = self._scenario_rng.uniform(-0.3, 0.3)
+            readings["room_temp"] = round(actual_temp + sensor_noise, 1)
+
             if schedule_state.hvac_mode.value not in ("off", "night_setback"):
-                readings["valve_position"] = min(100, schedule_state.target_occupancy_pct + 15)
-                readings["room_temp"] = 22.0 + self._scenario_rng.uniform(-0.5, 0.5)
+                # Valve responds to temp error (demand-responsive)
+                temp_error = actual_temp - self.building_schedule.COMFORT_SETPOINT
+                base_valve = schedule_state.target_occupancy_pct + 15
+                demand_adjustment = max(0, temp_error * 8)  # 8% more valve per deg C above setpoint
+                readings["valve_position"] = min(100, base_valve + demand_adjustment)
                 readings["fan_speed"] = 2  # medium
             else:
                 readings["valve_position"] = 0
-                readings["room_temp"] = 22.0 + schedule_state.setpoint_offset
                 readings["fan_speed"] = 0
 
         elif equip_type == "ups":
@@ -1813,6 +1993,21 @@ class LifecycleOrchestrator:
         elif equip_type == "generator":
             readings["status"] = 0  # Standby unless load shedding
             readings["fuel_level"] = 85 + self._scenario_rng.uniform(-2, 2)
+
+        elif equip_type == "pump":
+            # Pump readings respond to chiller staging (105-01)
+            if schedule_state.chiller_staging.value != "off":
+                readings["speed_pct"] = {"stage_1": 50, "stage_2": 75, "full_load": 95}.get(
+                    schedule_state.chiller_staging.value, 0
+                )
+                readings["flow_lps"] = readings["speed_pct"] * 0.3  # Rough L/s
+                readings["differential_pressure_kpa"] = readings["speed_pct"] * 1.5
+                readings["status"] = 1
+            else:
+                readings["speed_pct"] = 0
+                readings["flow_lps"] = 0
+                readings["differential_pressure_kpa"] = 0
+                readings["status"] = 0
 
         elif equip_type == "meter":
             readings["power_kw"] = self.current_hour_power_kw
@@ -1960,7 +2155,7 @@ class LifecycleOrchestrator:
         except Exception as e:
             logger.error(f"Fault injection error: {e}")
 
-    async def _create_prediction(self, equipment: Dict, fault_info: Dict):
+    async def _create_prediction(self, equipment: dict, fault_info: dict):
         """Create a prediction in the database."""
         try:
             eq_id = equipment.get("id")
@@ -1995,7 +2190,7 @@ class LifecycleOrchestrator:
         except Exception as e:
             logger.error(f"Prediction creation error: {e}")
 
-    async def _generate_alert(self, equipment: Dict, fault_info: Dict):
+    async def _generate_alert(self, equipment: dict, fault_info: dict):
         """Generate alert and optionally notify Sentry."""
         try:
             # Create work order
@@ -2037,7 +2232,7 @@ class LifecycleOrchestrator:
         except Exception as e:
             logger.error(f"Alert generation error: {e}")
 
-    async def _notify_sentry(self, equipment: Dict, fault_info: Dict, work_order_code: str):
+    async def _notify_sentry(self, equipment: dict, fault_info: dict, work_order_code: str):
         """Send notification to Sentry bot."""
         try:
             # This would send actual Telegram message
@@ -2071,7 +2266,7 @@ class LifecycleOrchestrator:
         for eq_code, repair_info in repairs_to_complete:
             await self._complete_repair(eq_code, repair_info)
 
-    async def _complete_repair(self, eq_code: str, repair_info: Dict):
+    async def _complete_repair(self, eq_code: str, repair_info: dict):
         """Simulate technician completing repair with health restoration."""
         try:
             # Create completed work order in Supabase (104-02)
@@ -2137,7 +2332,7 @@ class LifecycleOrchestrator:
         except Exception as e:
             logger.error(f"Repair completion error: {e}")
 
-    async def _submit_service_feedback(self, eq_code: str, repair_info: Dict):
+    async def _submit_service_feedback(self, eq_code: str, repair_info: dict):
         """Simulate technician submitting service feedback."""
         try:
             # Start feedback session
@@ -2232,7 +2427,7 @@ class LifecycleOrchestrator:
         except Exception as e:
             logger.error(f"Service feedback submission error: {e}")
 
-    def serialize_state(self) -> Dict[str, Any]:
+    def serialize_state(self) -> dict[str, Any]:
         """
         Serialize orchestrator state to JSON-serializable dict for database storage.
         Enables crash recovery by preserving simulation state.
@@ -2262,7 +2457,7 @@ class LifecycleOrchestrator:
         }
 
     @staticmethod
-    def deserialize_state(state_dict: Dict[str, Any]) -> "LifecycleOrchestrator":
+    def deserialize_state(state_dict: dict[str, Any]) -> "LifecycleOrchestrator":
         """
         Restore orchestrator from serialized state (crash recovery).
         Creates new instance and restores state from checkpoint.
@@ -2336,7 +2531,7 @@ class LifecycleOrchestrator:
             return False
 
 
-def create_lifecycle_orchestrator(task_id: Optional[str] = None, site_id: str = "site-002") -> LifecycleOrchestrator:
+def create_lifecycle_orchestrator(task_id: str | None = None, site_id: str = "site-002") -> LifecycleOrchestrator:
     """
     Create a new lifecycle orchestrator instance.
 
@@ -2351,7 +2546,7 @@ def create_lifecycle_orchestrator(task_id: Optional[str] = None, site_id: str = 
 
 
 # Global singleton instance
-_orchestrator_instance: Optional[LifecycleOrchestrator] = None
+_orchestrator_instance: LifecycleOrchestrator | None = None
 
 
 def get_lifecycle_orchestrator(site_id: str = "site-002") -> LifecycleOrchestrator:

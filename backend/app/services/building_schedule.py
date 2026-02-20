@@ -67,6 +67,55 @@ class ScheduleState:
     description: str
 
 
+class ChilledWaterModel:
+    """Tracks chilled water supply temperature based on chiller staging.
+
+    Provides the thermal link between chillers and zones. CHW supply temp
+    determines cooling capacity available to VAVs and FCUs.
+
+    State persists between hours (thermal mass of water in pipes).
+    """
+
+    TARGET_TEMPS = {
+        ChillerStaging.OFF: None,  # No target -- drifts warm
+        ChillerStaging.STAGE_1: 7.0,
+        ChillerStaging.STAGE_2: 6.5,
+        ChillerStaging.FULL_LOAD: 6.0,
+    }
+
+    COOLING_RATES = {  # degrees C change per hour
+        ChillerStaging.OFF: 0.0,
+        ChillerStaging.STAGE_1: 1.0,
+        ChillerStaging.STAGE_2: 1.5,
+        ChillerStaging.FULL_LOAD: 2.5,
+    }
+
+    def __init__(self):
+        self.supply_temp: float = 7.0  # degrees C (design supply)
+        self.return_temp: float = 12.0  # degrees C (design return)
+
+    def update(self, staging: ChillerStaging, ambient_temp: float) -> float:
+        """Advance CHW model by one hour. Returns new supply temp."""
+        if staging == ChillerStaging.OFF:
+            # Drift toward ambient (slow -- pipe insulation)
+            drift_rate = 0.5  # degrees C per hour
+            equilibrium = min(ambient_temp, self.return_temp)
+            if self.supply_temp < equilibrium:
+                self.supply_temp = min(equilibrium, self.supply_temp + drift_rate)
+        else:
+            target = self.TARGET_TEMPS[staging]
+            rate = self.COOLING_RATES[staging]
+            if self.supply_temp > target:
+                self.supply_temp = max(target, self.supply_temp - rate)
+            elif self.supply_temp < target:
+                self.supply_temp = min(target, self.supply_temp + rate * 0.3)
+
+        # Update return temp (simplified: supply + delta from zone loads)
+        self.return_temp = self.supply_temp + 5.0  # 5 degrees C delta-T design
+
+        return self.supply_temp
+
+
 class BuildingSchedule:
     """Daily operating schedule for Site 002."""
 
