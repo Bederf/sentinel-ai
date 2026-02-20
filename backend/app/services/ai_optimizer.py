@@ -233,6 +233,9 @@ class AIOptimizerService:
             if profile:
                 recommendation = self._score_and_rank_recommendations(recommendation, profile)
 
+            # Phase 109: Apply quality gate evaluation to recommendations
+            recommendation = await self._apply_quality_gate(site_id, recommendation)
+
             return recommendation
 
         except Exception as e:
@@ -244,7 +247,52 @@ class AIOptimizerService:
             # Apply scoring to fallback recommendations too
             if profile:
                 rec = self._score_and_rank_recommendations(rec, profile)
+            # Phase 109: Apply quality gate to fallback recommendations too
+            rec = await self._apply_quality_gate(site_id, rec)
             return rec
+
+    async def _apply_quality_gate(
+        self, site_id: str, recommendation: "OptimizationRecommendation"
+    ) -> "OptimizationRecommendation":
+        """Apply quality gate evaluation to an OptimizationRecommendation.
+
+        Evaluates all 14 quality metrics and applies enforcement actions
+        to each recommendation dict in the response.
+
+        Args:
+            site_id: Site identifier
+            recommendation: OptimizationRecommendation to evaluate
+
+        Returns:
+            Modified OptimizationRecommendation with gate metadata
+        """
+        try:
+            from app.services.quality_gate_evaluator import QualityGateEvaluator
+            from app.config.settings import settings as app_settings
+
+            evaluator = QualityGateEvaluator()
+            mode = app_settings.resolved_ingestion_mode.value
+            metrics = await evaluator.collect_metrics(site_id)
+            result = evaluator.evaluate(mode, metrics)
+
+            # Apply enforcement to each recommendation dict
+            for rec_dict in recommendation.recommendations:
+                evaluator.apply_enforcement(result, rec_dict)
+
+            # Set top-level quality gate metadata
+            recommendation.quality_gate_status = result.overall.value
+            recommendation.quality_gate_enforcement = result.enforcement.value
+            recommendation.quality_gate_reason_codes = [rc.value for rc in result.reason_codes]
+
+            logger.info(
+                f"Quality gate for {site_id}: status={result.overall.value}, "
+                f"enforcement={result.enforcement.value}, "
+                f"failed={result.failed_rules}"
+            )
+        except Exception as e:
+            logger.warning(f"Quality gate evaluation failed for {site_id}, proceeding without gate: {e}")
+
+        return recommendation
 
     async def _gather_current_conditions(self, site_id: str) -> Dict[str, Any]:
         """Gather current building conditions from devices and DALI sensors."""
@@ -1758,6 +1806,166 @@ Provide ONLY the JSON response, no additional text."""
                         )
                         # Mark as advisory - add low confidence to route to Tier 1
                         recommendations[-1]["confidence"] = 0.45  # Below tier2_min (~0.6)
+
+        # Rule 5: AHU Supply Air Temperature Reset
+        ahus = self._find_devices_by_type(hvac_devices, "ahu")
+        if not ahus:
+            # Fallback: devices with supply_temp_setpoint or supply_air_temp_setpoint
+            ahus = [
+                d
+                for d in hvac_devices
+                if self._has_any_point(d, ["supply_temp_setpoint", "supply_air_temp_setpoint"])
+                and getattr(d, "hvac_type", "") not in ("fcu", "chiller")
+            ]
+
+        if outdoor_temp < 18.0:
+            # Mild outdoor temp: raise supply air temp to save reheat energy
+            for ahu in ahus:
+                sat_point_names = ["supply_temp_setpoint", "supply_air_temp_setpoint"]
+                sat_point = self._find_point_on_device(ahu, sat_point_names)
+                if sat_point:
+                    current_value = sat_point.default_value if sat_point else 12.0
+                    new_sat = min(current_value + 2.0, 14.0)
+                    if new_sat > current_value:
+                        add_recommendation(
+                            ahu,
+                            sat_point.name,
+                            current_value,
+                            new_sat,
+                            f"Raise AHU supply air temp {new_sat - current_value:.1f}°C"
+                            f" — mild outdoor temp ({outdoor_temp}°C) reduces"
+                            f" reheat energy",
+                        )
+        elif outdoor_temp > 32.0:
+            # Hot outdoor: lower supply air for more cooling capacity
+            for ahu in ahus:
+                sat_point_names = ["supply_temp_setpoint", "supply_air_temp_setpoint"]
+                sat_point = self._find_point_on_device(ahu, sat_point_names)
+                if sat_point:
+                    current_value = sat_point.default_value if sat_point else 12.0
+                    new_sat = max(current_value - 1.0, 11.0)
+                    if new_sat < current_value:
+                        add_recommendation(
+                            ahu,
+                            sat_point.name,
+                            current_value,
+                            new_sat,
+                            f"Lower AHU supply air to {new_sat}°C — high outdoor"
+                            f" temp ({outdoor_temp}°C) requires more cooling capacity",
+                        )
+
+        # Rule 6: AHU Economizer / Fresh Air Damper
+        if 15.0 <= outdoor_temp <= 22.0 and humidity < 65.0:
+            # Mild and dry: enable economizer for free cooling
+            for ahu in ahus:
+                eco_point_names = ["economizer_mode", "fresh_air_damper", "outdoor_air_damper"]
+                eco_point = self._find_point_on_device(ahu, eco_point_names)
+                if eco_point:
+                    current_value = eco_point.default_value if eco_point else 20.0
+                    # For damper points, open to 80-100%; for mode points, set to 1 (enabled)
+                    if "mode" in eco_point.name:
+                        target_value = 1  # enabled
+                        reason = (
+                            f"Enable AHU economizer — outdoor temp {outdoor_temp}°C"
+                            f" and humidity {humidity}% ideal for free cooling"
+                        )
+                    else:
+                        target_value = 85.0  # 85% open
+                        reason = (
+                            f"Open AHU fresh air damper to 85% — outdoor"
+                            f" {outdoor_temp}°C/{humidity}% RH provides free cooling"
+                        )
+                    add_recommendation(ahu, eco_point.name, current_value, target_value, reason)
+        elif outdoor_temp > 28.0:
+            # Hot: close fresh air damper to minimum
+            for ahu in ahus:
+                damper_point_names = ["fresh_air_damper", "outdoor_air_damper"]
+                damper_point = self._find_point_on_device(ahu, damper_point_names)
+                if damper_point:
+                    current_value = damper_point.default_value if damper_point else 50.0
+                    if current_value > 20.0:
+                        add_recommendation(
+                            ahu,
+                            damper_point.name,
+                            current_value,
+                            15.0,
+                            f"Close AHU fresh air damper to 15% minimum —"
+                            f" outdoor temp {outdoor_temp}°C too hot for economizer",
+                        )
+
+        # Rule 7: VAV Damper Position Optimization
+        vavs = self._find_devices_by_type(hvac_devices, "vav")
+        if not vavs:
+            # Fallback: devices with damper_position or airflow_setpoint
+            vavs = [
+                d
+                for d in hvac_devices
+                if self._has_any_point(d, ["damper_position", "airflow_setpoint"])
+                and getattr(d, "hvac_type", "") not in ("fcu", "ahu")
+            ]
+
+        if temp_diff > 2.0:
+            for vav in vavs:
+                zone_type = self._get_zone_type(vav)
+
+                # Skip critical zones (server rooms keep higher minimum)
+                if self._should_skip_zone_optimization(vav, zone_type):
+                    continue
+
+                damper_point_names = ["damper_position", "airflow_setpoint"]
+                damper_point = self._find_point_on_device(vav, damper_point_names)
+                if damper_point:
+                    current_value = damper_point.default_value if damper_point else 70.0
+
+                    # Apply zone-aware adjustment
+                    adjusted_change = self._apply_zone_aware_adjustments(vav, -15.0, outdoor_temp)
+                    # Executive/server zones get smaller reduction
+                    if zone_type in [ZoneType.EXECUTIVE, ZoneType.SERVER_ROOM]:
+                        adjusted_change = adjusted_change * 0.5
+
+                    new_position = max(current_value + adjusted_change, 30.0)  # 30% minimum
+                    if new_position < current_value - 5:  # Only recommend meaningful change
+                        zone_info = f" ({zone_type.value} zone)" if zone_type else ""
+                        add_recommendation(
+                            vav,
+                            damper_point.name,
+                            current_value,
+                            round(new_position, 0),
+                            f"Reduce VAV damper to {new_position:.0f}%{zone_info}"
+                            f" — outdoor temp rising ({outdoor_temp}°C),"
+                            f" reduce airflow to save fan energy",
+                        )
+                        recommendations[-1]["unit"] = "%"
+                        recommendations[-1]["confidence"] = 0.5
+
+        # Rule 8: Pump Speed Optimization (affinity laws: 50% speed ≈ 12.5% power)
+        pumps = [d for d in hvac_devices if self._has_any_point(d, ["speed_percent", "pump_speed", "flow_setpoint"])]
+
+        if pumps and temp_diff < 5.0:
+            # Moderate conditions: reduce pump speed proportionally
+            # Count actively cooling FCUs/AHUs to estimate load
+            active_cooling_count = len(fcus) + len(ahus)  # noqa: F841
+
+            for pump in pumps:
+                speed_point_names = ["speed_percent", "pump_speed"]
+                speed_point = self._find_point_on_device(pump, speed_point_names)
+                if speed_point:
+                    current_value = speed_point.default_value if speed_point else 80.0
+                    # Reduce by 20% when temp diff is moderate
+                    target_speed = max(current_value - 20.0, 35.0)
+
+                    if target_speed < current_value - 5:
+                        add_recommendation(
+                            pump,
+                            speed_point.name,
+                            current_value,
+                            round(target_speed, 0),
+                            f"Reduce pump speed to {target_speed:.0f}%"
+                            f" — moderate cooling load (temp diff {temp_diff:.1f}°C)."
+                            f" Affinity laws: ~{(1 - (target_speed / 100) ** 3) * 100:.0f}% power savings",
+                        )
+                        recommendations[-1]["unit"] = "%"
+                        recommendations[-1]["confidence"] = 0.5
 
         # ============================================================
         # DALI Lighting Optimization Rules

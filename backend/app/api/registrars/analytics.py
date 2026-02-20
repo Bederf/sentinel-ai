@@ -13,7 +13,7 @@ from app.api import timeseries, sensor_analysis, features, data_quality
 from app.api import survival, classification, ml_feedback, repair_effectiveness
 from app.api import rag, ml_retraining, fleet_learning, mlops
 from app.api import mcp, mcp_sse, mcp_openai
-from app.api import recommendations, simulation_analytics
+from app.api import recommendations, simulation_analytics, optimization_quality
 from app.api import system_health, solar, solar_grid, solar_performance, solar_arbitrage
 from app.api import solar_config, peak_demand, solar_annual
 
@@ -32,6 +32,7 @@ def register_analytics_routers(app: FastAPI) -> None:
     app.include_router(ml_predictions.router)
     app.include_router(recommendations.router, tags=["recommendations"])
     app.include_router(simulation_analytics.router, tags=["simulation-analytics"])
+    app.include_router(optimization_quality.router, prefix="/api/optimization", tags=["optimization-quality"])
 
     # Equipment lookup and diagnostics
     app.include_router(equipment_lookup.router, prefix="/api", tags=["equipment-lookup"])

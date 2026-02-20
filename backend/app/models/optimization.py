@@ -151,6 +151,10 @@ class OptimizationRecommendation:
     scoring_summary: Optional[Dict[str, Any]] = None  # Scoring statistics: total_recommendations, top_score, avg_score
     # Data quality tracking: which sensors were live vs defaulted
     data_quality: Optional[Dict[str, Any]] = None
+    # Phase 109: Quality gate status and enforcement metadata
+    quality_gate_status: Optional[str] = None  # "pass" / "warn" / "fail"
+    quality_gate_enforcement: Optional[str] = None  # "normal" / "cap_confidence" / "suppress_tier3" / "block_writes"
+    quality_gate_reason_codes: Optional[List[str]] = None  # Machine-readable reason codes
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
@@ -172,6 +176,10 @@ class OptimizationRecommendation:
             result["scoring_summary"] = self.scoring_summary
         if self.data_quality:
             result["data_quality"] = self.data_quality
+        if self.quality_gate_status:
+            result["quality_gate_status"] = self.quality_gate_status
+            result["quality_gate_enforcement"] = self.quality_gate_enforcement
+            result["quality_gate_reason_codes"] = self.quality_gate_reason_codes or []
         return result
 
     @classmethod
