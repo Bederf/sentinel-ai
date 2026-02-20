@@ -15,6 +15,7 @@ from app.services.lifecycle_orchestrator import (
     LifecycleOrchestrator,
     create_lifecycle_orchestrator,
 )
+from app.services.health_simulation_service import get_health_simulation_service
 
 logger = logging.getLogger(__name__)
 
@@ -38,12 +39,18 @@ def create_orchestrator(task_id: str) -> LifecycleOrchestrator:
 def register_simulation(task_id: str, orchestrator: LifecycleOrchestrator) -> None:
     """
     Register an active simulation in the global registry.
+    Pauses independent health writer to prevent conflicting updates.
 
     Args:
         task_id: Unique task identifier
         orchestrator: LifecycleOrchestrator instance
     """
     _active_simulations[task_id] = orchestrator
+
+    # Pause independent health writer to prevent conflicting updates
+    health_sim = get_health_simulation_service()
+    health_sim.defer_to_orchestrator(task_id)
+
     logger.info(f"Registered simulation task {task_id} (total active: {len(_active_simulations)})")
 
 
@@ -64,6 +71,7 @@ def unregister_simulation(task_id: str) -> bool:
     """
     Remove a simulation from the active registry.
     Called when simulation completes or fails.
+    Resumes independent health writer if no other simulations are active.
 
     Args:
         task_id: Task identifier
@@ -73,6 +81,12 @@ def unregister_simulation(task_id: str) -> bool:
     """
     if task_id in _active_simulations:
         del _active_simulations[task_id]
+
+        # Resume independent health writer if no other simulations active
+        if not _active_simulations:
+            health_sim = get_health_simulation_service()
+            health_sim.resume_independent(task_id)
+
         logger.info(f"Unregistered simulation task {task_id} (remaining: {len(_active_simulations)})")
         return True
     return False

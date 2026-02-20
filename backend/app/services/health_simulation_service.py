@@ -29,6 +29,8 @@ class HealthSimulationService:
         self.client = get_supabase_client()
         self.is_running = False
         self._task: Optional[asyncio.Task] = None
+        self._deferred = False  # True when lifecycle orchestrator is managing health
+        self._deferred_by: Optional[str] = None  # task_id of deferring simulation
 
         # Configuration
         self.config = {
@@ -42,8 +44,8 @@ class HealthSimulationService:
             "target_equipment_per_cycle": 10,  # How many to update per cycle
             "building_id": "site-002",  # Target building for simulation
             "business_hours_only": True,  # Only run during business hours
-            "business_hours_start": 8,   # 08:00
-            "business_hours_end": 17,    # 17:00
+            "business_hours_start": 8,  # 08:00
+            "business_hours_end": 17,  # 17:00
         }
 
         # Health thresholds (matches Sentry alerts)
@@ -83,10 +85,62 @@ class HealthSimulationService:
             except asyncio.CancelledError:
                 pass
 
+    def defer_to_orchestrator(self, task_id: str) -> bool:
+        """
+        Pause independent health simulation while a lifecycle orchestrator runs.
+        The orchestrator manages health scores directly during simulation.
+
+        Args:
+            task_id: ID of the lifecycle simulation taking over health management
+
+        Returns:
+            True if deferred successfully, False if already deferred by another task
+        """
+        if self._deferred and self._deferred_by != task_id:
+            logger.warning(f"Health sim already deferred by {self._deferred_by}, cannot defer for {task_id}")
+            return False
+
+        self._deferred = True
+        self._deferred_by = task_id
+        logger.info(f"Health simulation deferred to orchestrator (task: {task_id})")
+        return True
+
+    def resume_independent(self, task_id: str) -> bool:
+        """
+        Resume independent health simulation after orchestrator completes.
+
+        Args:
+            task_id: ID of the lifecycle simulation releasing health management
+
+        Returns:
+            True if resumed, False if task_id doesn't match deferring task
+        """
+        if self._deferred_by and self._deferred_by != task_id:
+            logger.warning(f"Health sim deferred by {self._deferred_by}, cannot resume for {task_id}")
+            return False
+
+        self._deferred = False
+        self._deferred_by = None
+        logger.info(f"Health simulation resumed independent mode (task: {task_id})")
+        return True
+
+    @property
+    def is_deferred(self) -> bool:
+        """Check if health simulation is deferred to an orchestrator."""
+        return self._deferred
+
     async def _simulation_loop(self):
         """Main simulation loop."""
         while self.is_running:
             try:
+                # Skip cycle if deferred to lifecycle orchestrator
+                if self._deferred:
+                    logger.debug(
+                        f"Health simulation deferred to orchestrator (task: {self._deferred_by}), skipping cycle"
+                    )
+                    await asyncio.sleep(self.config["interval_seconds"])
+                    continue
+
                 # Check if we're within business hours
                 if self._is_business_hours():
                     await self._run_simulation_cycle()
@@ -134,13 +188,15 @@ class HealthSimulationService:
             new_health = self._calculate_new_health(eq)
 
             if new_health != old_health:
-                updates.append({
-                    "id": eq["id"],
-                    "name": eq.get("name", eq["id"]),
-                    "old_health": old_health,
-                    "new_health": new_health,
-                    "crossed_threshold": self._check_threshold_crossing(old_health, new_health),
-                })
+                updates.append(
+                    {
+                        "id": eq["id"],
+                        "name": eq.get("name", eq["id"]),
+                        "old_health": old_health,
+                        "new_health": new_health,
+                        "crossed_threshold": self._check_threshold_crossing(old_health, new_health),
+                    }
+                )
 
                 # Update in Supabase
                 self._update_equipment_health(eq["id"], new_health)
@@ -152,24 +208,22 @@ class HealthSimulationService:
             self.alerts_triggered += len(threshold_crossings)
 
             logger.info(
-                f"Simulation cycle: {len(updates)} equipment updated, "
-                f"{len(threshold_crossings)} threshold crossings"
+                f"Simulation cycle: {len(updates)} equipment updated, {len(threshold_crossings)} threshold crossings"
             )
 
             # Log threshold crossings (will trigger Sentry alerts)
             for u in threshold_crossings:
                 logger.warning(
-                    f"THRESHOLD CROSSED: {u['name']} dropped from "
-                    f"{u['old_health']:.0f}% to {u['new_health']:.0f}%"
+                    f"THRESHOLD CROSSED: {u['name']} dropped from {u['old_health']:.0f}% to {u['new_health']:.0f}%"
                 )
 
     def _get_equipment(self) -> List[Dict[str, Any]]:
         """Get equipment from Supabase."""
         try:
             # First get the building UUID from the code
-            building_response = self.client.table("buildings").select("id").eq(
-                "code", self.config["building_id"]
-            ).execute()
+            building_response = (
+                self.client.table("buildings").select("id").eq("code", self.config["building_id"]).execute()
+            )
 
             if not building_response.data:
                 logger.warning(f"Building {self.config['building_id']} not found")
@@ -178,9 +232,12 @@ class HealthSimulationService:
             building_uuid = building_response.data[0]["id"]
 
             # Get equipment for that building
-            response = self.client.table("equipment").select(
-                "id, code, name, type, health_score, building_id"
-            ).eq("building_id", building_uuid).execute()
+            response = (
+                self.client.table("equipment")
+                .select("id, code, name, type, health_score, building_id")
+                .eq("building_id", building_uuid)
+                .execute()
+            )
             return response.data or []
         except Exception as e:
             logger.error(f"Failed to get equipment: {e}")
@@ -209,15 +266,15 @@ class HealthSimulationService:
 
         # Normal degradation based on equipment type
         degradation_rates = {
-            "hvac_zone": 0.5,      # HVAC zones degrade slowly
-            "ahu": 1.0,            # AHUs moderate
-            "chiller": 1.5,        # Chillers degrade faster
-            "generator": 0.3,      # Generators very slow (rarely used)
-            "ups": 0.2,            # UPS very slow
-            "transformer": 0.1,   # Transformers almost static
-            "switchboard": 0.2,    # Switchboards slow
-            "distribution": 0.3,   # Distribution boards slow
-            "luminaire": 0.8,      # Lights moderate
+            "hvac_zone": 0.5,  # HVAC zones degrade slowly
+            "ahu": 1.0,  # AHUs moderate
+            "chiller": 1.5,  # Chillers degrade faster
+            "generator": 0.3,  # Generators very slow (rarely used)
+            "ups": 0.2,  # UPS very slow
+            "transformer": 0.1,  # Transformers almost static
+            "switchboard": 0.2,  # Switchboards slow
+            "distribution": 0.3,  # Distribution boards slow
+            "luminaire": 0.8,  # Lights moderate
             "default": 0.5,
         }
 
@@ -249,10 +306,12 @@ class HealthSimulationService:
         try:
             # Round to integer since health_score is INTEGER in database
             health_int = int(round(new_health))
-            self.client.table("equipment").update({
-                "health_score": health_int,
-                "updated_at": datetime.now().isoformat(),
-            }).eq("id", equipment_id).execute()
+            self.client.table("equipment").update(
+                {
+                    "health_score": health_int,
+                    "updated_at": datetime.now().isoformat(),
+                }
+            ).eq("id", equipment_id).execute()
         except Exception as e:
             logger.error(f"Failed to update equipment {equipment_id}: {e}")
 
@@ -261,6 +320,8 @@ class HealthSimulationService:
         return {
             "running": self.is_running,
             "enabled": self.config["enabled"],
+            "deferred": self._deferred,
+            "deferred_by": self._deferred_by,
             "interval_seconds": self.config["interval_seconds"],
             "last_run": self.last_run.isoformat() if self.last_run else None,
             "total_updates": self.total_updates,
@@ -286,15 +347,15 @@ class HealthSimulationService:
         drop_range = severity_drops.get(severity, (20, 35))
 
         # Get current health - try by code first, then by UUID
-        response = self.client.table("equipment").select(
-            "id, code, name, health_score"
-        ).eq("code", equipment_id).execute()
+        response = (
+            self.client.table("equipment").select("id, code, name, health_score").eq("code", equipment_id).execute()
+        )
 
         if not response.data:
             # Try by UUID
-            response = self.client.table("equipment").select(
-                "id, code, name, health_score"
-            ).eq("id", equipment_id).execute()
+            response = (
+                self.client.table("equipment").select("id, code, name, health_score").eq("id", equipment_id).execute()
+            )
 
         if not response.data:
             return {"error": f"Equipment {equipment_id} not found"}
@@ -319,15 +380,15 @@ class HealthSimulationService:
     async def trigger_maintenance(self, equipment_id: str):
         """Manually trigger maintenance on specific equipment."""
         # Get current health - try by code first, then by UUID
-        response = self.client.table("equipment").select(
-            "id, code, name, health_score"
-        ).eq("code", equipment_id).execute()
+        response = (
+            self.client.table("equipment").select("id, code, name, health_score").eq("code", equipment_id).execute()
+        )
 
         if not response.data:
             # Try by UUID
-            response = self.client.table("equipment").select(
-                "id, code, name, health_score"
-            ).eq("id", equipment_id).execute()
+            response = (
+                self.client.table("equipment").select("id, code, name, health_score").eq("id", equipment_id).execute()
+            )
 
         if not response.data:
             return {"error": f"Equipment {equipment_id} not found"}
@@ -353,4 +414,16 @@ class HealthSimulationService:
 # Global service instance
 health_simulation_service = HealthSimulationService()
 
-__all__ = ["health_simulation_service", "HealthSimulationService"]
+# Singleton accessor
+_health_sim_instance: Optional[HealthSimulationService] = None
+
+
+def get_health_simulation_service() -> HealthSimulationService:
+    """Get or create the singleton HealthSimulationService instance."""
+    global _health_sim_instance
+    if _health_sim_instance is None:
+        _health_sim_instance = HealthSimulationService()
+    return _health_sim_instance
+
+
+__all__ = ["health_simulation_service", "HealthSimulationService", "get_health_simulation_service"]
