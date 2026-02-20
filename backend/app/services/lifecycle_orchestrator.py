@@ -234,8 +234,10 @@ class LifecycleOrchestrator:
     and multi-day seasonal patterns into a unified lifecycle loop.
     """
 
-    def __init__(self, task_id: Optional[str] = None):
+    def __init__(self, task_id: Optional[str] = None, site_id: str = "site-002"):
         self.task_id = task_id  # For database task tracking
+        self.site_id = site_id  # Parameterized site identifier
+        self.building_id = site_id  # Used by update_simulation_temperatures
         self.running = False
         self.paused = False
         self.current_scenario: Optional[ScenarioConfig] = None
@@ -506,6 +508,7 @@ class LifecycleOrchestrator:
             "ambient_temp": ambient_temp,
             "solar_efficiency": solar_efficiency,
             "current_season": current_season,
+            "occupancy_percent": self._calculate_occupancy(self.simulated_time.hour if self.simulated_time else 0),
             "total_energy_kwh": round(self.total_energy_kwh, 1),
             "current_hour_power_kw": round(self.current_hour_power_kw, 2),
             "recent_events": [
@@ -937,18 +940,18 @@ class LifecycleOrchestrator:
             if not equipment_list:
                 return
 
-            # Filter to site-002 if available
-            site_002_equipment = [eq for eq in equipment_list if eq.get("code", "").startswith("S002-")]
-            if not site_002_equipment:
-                site_002_equipment = equipment_list[:5]
-            else:
-                site_002_equipment = site_002_equipment[:5]
+            # Filter to target site if available — process ALL equipment (no cap)
+            # Derive equipment code prefix from site_id: "site-002" -> "S002-"
+            site_prefix = "S" + self.site_id.replace("site-", "").upper() + "-"
+            site_equipment = [eq for eq in equipment_list if eq.get("code", "").startswith(site_prefix)]
+            if not site_equipment:
+                site_equipment = equipment_list
 
             recommendations_created = []
             hvac_recs = []
             dali_recs = []
 
-            for eq in site_002_equipment:
+            for eq in site_equipment:
                 eq_code = eq.get("code", eq.get("id"))
                 eq_type = eq.get("type", "unknown").upper()
 
@@ -956,43 +959,66 @@ class LifecycleOrchestrator:
                 if not self.device_control_service.is_controllable(eq_code):
                     continue
 
-                # ========== HVAC OPTIMIZATION ==========
-                if eq_type in ["FCU", "VAV", "AHU", "CHILLER"]:
+                # ========== HVAC OPTIMIZATION (type-specific dispatch) ==========
+                hvac_recommendation = None
+                if eq_type == "FCU":
+                    hvac_recommendation = self._generate_fcu_recommendation(
+                        eq_code, context, occupancy_percent, current_hour
+                    )
+                elif eq_type == "AHU":
+                    hvac_recommendation = self._generate_ahu_recommendation(
+                        eq_code, context, occupancy_percent, current_hour
+                    )
+                elif eq_type == "CHILLER":
+                    hvac_recommendation = self._generate_chiller_recommendation(
+                        eq_code, context, occupancy_percent, current_hour
+                    )
+                elif eq_type == "VAV":
+                    hvac_recommendation = self._generate_vav_recommendation(
+                        eq_code, context, occupancy_percent, current_hour
+                    )
+                elif eq_type == "PUMP":
+                    hvac_recommendation = self._generate_pump_recommendation(
+                        eq_code, context, occupancy_percent, current_hour
+                    )
+                elif eq_type in ["CT", "SPLIT", "ZONE", "CONTROLLER"]:
+                    # Generic HVAC fallback for cooling towers, splits, zone controllers
                     hvac_recommendation = self._generate_hvac_recommendation(
                         eq_code, eq_type, context, occupancy_percent, current_hour
                     )
-                    if hvac_recommendation:
-                        recommendations_created.append(hvac_recommendation)
-                        hvac_recs.append(hvac_recommendation["equipment"])
 
-                        # Create control recommendation
-                        try:
-                            rec = Recommendation(
-                                site_id="S002",
-                                timestamp=datetime.utcnow(),
-                                action_type="ai_optimization",
-                                risk_level=ActionRiskLevel.LOW,
-                                target_equipment=eq_code,
-                                action={
-                                    "point": hvac_recommendation["control_point"],
-                                    "value": hvac_recommendation["target_value"],
-                                },
-                                reason=hvac_recommendation["reason"],
-                                expected_impact={
-                                    "description": hvac_recommendation["description"],
-                                    "energy_savings_percent": hvac_recommendation.get("savings", 5),
-                                },
-                                confidence="high",
-                                profile=context,
-                                status=RecommendationStatus.PENDING,
-                                requires_approval=True,
-                            )
-                            await self.recommendation_repo.create(rec)
-                        except Exception as e:
-                            logger.warning(f"Failed to create HVAC recommendation for {eq_code}: {e}")
+                if hvac_recommendation:
+                    recommendations_created.append(hvac_recommendation)
+                    hvac_recs.append(hvac_recommendation["equipment"])
+
+                    # Create control recommendation
+                    try:
+                        rec = Recommendation(
+                            site_id="S002",
+                            timestamp=datetime.utcnow(),
+                            action_type="ai_optimization",
+                            risk_level=ActionRiskLevel.LOW,
+                            target_equipment=eq_code,
+                            action={
+                                "point": hvac_recommendation["control_point"],
+                                "value": hvac_recommendation["target_value"],
+                            },
+                            reason=hvac_recommendation["reason"],
+                            expected_impact={
+                                "description": hvac_recommendation["description"],
+                                "energy_savings_percent": hvac_recommendation.get("savings", 5),
+                            },
+                            confidence="high",
+                            profile=context,
+                            status=RecommendationStatus.PENDING,
+                            requires_approval=True,
+                        )
+                        await self.recommendation_repo.create(rec)
+                    except Exception as e:
+                        logger.warning(f"Failed to create HVAC recommendation for {eq_code}: {e}")
 
                 # ========== DALI OPTIMIZATION ==========
-                if eq_type in ["DALI", "LUM"]:
+                if eq_type in ["DALI", "LUM", "DALI_CONTROLLER", "LUMINAIRE", "DALI_LUMINAIRE"]:
                     dali_recommendation = self._generate_dali_recommendation(
                         eq_code, eq_type, context, occupancy_percent, daylight_factor, zones_active, current_hour
                     )
@@ -1157,46 +1183,251 @@ class LifecycleOrchestrator:
         # Apply multiplier to base probability (capped at 1.0 for daily chance)
         return min(1.0, base_probability * multiplier)
 
-    def _generate_hvac_recommendation(
-        self, eq_code: str, eq_type: str, context: str, occupancy_percent: int, hour: int
-    ) -> Optional[Dict[str, Any]]:
-        """Generate occupancy-aware HVAC recommendation."""
-        # Demo mode: lower thresholds for continuous recommendations (2x more sensitive)
+    def _get_demo_thresholds(self) -> tuple:
+        """Return (low_occupancy, high_occupancy) thresholds adjusted for demo mode."""
         is_demo = self.current_scenario and self.current_scenario.demo_mode
-        low_occupancy_threshold = 30 if is_demo else 20
-        high_occupancy_threshold = 70 if is_demo else 80
+        return (30 if is_demo else 20, 70 if is_demo else 80)
 
-        if occupancy_percent < low_occupancy_threshold:
-            # Low occupancy: reduce cooling, increase setpoint
+    def _generate_fcu_recommendation(
+        self, eq_code: str, context: str, occupancy_percent: int, hour: int
+    ) -> Optional[Dict[str, Any]]:
+        """Generate FCU recommendation — cooling_setpoint adjustments."""
+        low_thresh, high_thresh = self._get_demo_thresholds()
+
+        if occupancy_percent < low_thresh:
             return {
                 "equipment": eq_code,
                 "control_point": "cooling_setpoint",
-                "target_value": 24.0,  # Relax setpoint when unoccupied
+                "target_value": 24.0,
                 "reason": f"Low occupancy ({occupancy_percent}%) - reduce active cooling",
-                "description": "Increase setpoint to 24°C for energy efficiency",
+                "description": "Increase FCU setpoint to 24°C for energy efficiency",
                 "savings": 8,
             }
-        elif occupancy_percent >= high_occupancy_threshold and hour >= 10 and hour <= 12:
-            # Peak occupancy during peak solar hours: pre-cool
+        elif occupancy_percent >= high_thresh and 10 <= hour <= 12:
             return {
                 "equipment": eq_code,
                 "control_point": "cooling_setpoint",
-                "target_value": 20.5,  # Pre-cool during peak demand
+                "target_value": 20.5,
                 "reason": f"High occupancy ({occupancy_percent}%) + peak demand - anticipatory pre-cooling",
-                "description": "Reduce setpoint to 20.5°C for peak demand management",
+                "description": "Reduce FCU setpoint to 20.5°C for peak demand management",
                 "savings": 5,
             }
         elif context == "afternoon":
-            # Afternoon: moderate adjustment
+            return {
+                "equipment": eq_code,
+                "control_point": "cooling_setpoint",
+                "target_value": 21.5,
+                "reason": f"Afternoon FCU optimization at {occupancy_percent}% occupancy",
+                "description": "Adjust FCU setpoint to 21.5°C for afternoon efficiency",
+                "savings": 3,
+            }
+        return None
+
+    def _generate_ahu_recommendation(
+        self, eq_code: str, context: str, occupancy_percent: int, hour: int
+    ) -> Optional[Dict[str, Any]]:
+        """Generate AHU recommendation — supply_temp_setpoint + economizer control."""
+        low_thresh, high_thresh = self._get_demo_thresholds()
+
+        if occupancy_percent < low_thresh:
+            # Low occupancy: raise supply air temp to save reheat energy
+            return {
+                "equipment": eq_code,
+                "control_point": "supply_temp_setpoint",
+                "target_value": 14.0,
+                "reason": f"Low occupancy ({occupancy_percent}%) - raise supply air temp to reduce reheat",
+                "description": "Increase AHU supply air to 14°C (from 12°C) during low occupancy",
+                "savings": 10,
+            }
+        elif 9 <= hour <= 16 and occupancy_percent >= high_thresh:
+            # Business hours, high occupancy: full cooling capacity
+            return {
+                "equipment": eq_code,
+                "control_point": "supply_temp_setpoint",
+                "target_value": 12.0,
+                "reason": f"Peak occupancy ({occupancy_percent}%) - maintain full AHU cooling",
+                "description": "Set AHU supply air to 12°C for maximum cooling capacity",
+                "savings": 2,
+            }
+        elif 6 <= hour <= 9:
+            # Morning mild conditions: enable economizer (free cooling)
+            return {
+                "equipment": eq_code,
+                "control_point": "economizer_mode",
+                "target_value": 1,  # 1=enabled
+                "reason": "Morning hours - enable AHU economizer for free cooling",
+                "description": "Enable economizer mode during mild morning temperatures",
+                "savings": 12,
+            }
+        elif context == "afternoon" and hour >= 14:
+            # Hot afternoon: disable economizer, lower supply air
+            return {
+                "equipment": eq_code,
+                "control_point": "supply_temp_setpoint",
+                "target_value": 11.5,
+                "reason": "Hot afternoon - lower AHU supply air for increased cooling",
+                "description": "Reduce AHU supply air to 11.5°C during peak afternoon heat",
+                "savings": 3,
+            }
+        return None
+
+    def _generate_chiller_recommendation(
+        self, eq_code: str, context: str, occupancy_percent: int, hour: int
+    ) -> Optional[Dict[str, Any]]:
+        """Generate chiller recommendation — chw_setpoint + capacity_percent."""
+        low_thresh, high_thresh = self._get_demo_thresholds()
+
+        if occupancy_percent < low_thresh:
+            # Low load: raise CHW setpoint for compressor efficiency
+            return {
+                "equipment": eq_code,
+                "control_point": "chw_setpoint",
+                "target_value": 8.0,
+                "reason": f"Low occupancy ({occupancy_percent}%) - raise CHW setpoint for efficiency",
+                "description": "Raise chiller CHW setpoint to 8°C (from 6°C) to reduce compressor load",
+                "savings": 12,
+            }
+        elif occupancy_percent >= high_thresh and 10 <= hour <= 15:
+            # Peak load: ensure full capacity
+            return {
+                "equipment": eq_code,
+                "control_point": "capacity_percent",
+                "target_value": 100,
+                "reason": f"Peak occupancy ({occupancy_percent}%) during business hours - full chiller capacity",
+                "description": "Set chiller to 100% capacity for peak cooling demand",
+                "savings": 0,
+            }
+        elif context == "afternoon":
+            # Afternoon: moderate CHW adjustment
+            return {
+                "equipment": eq_code,
+                "control_point": "chw_setpoint",
+                "target_value": 7.0,
+                "reason": f"Afternoon optimization - moderate CHW setpoint at {occupancy_percent}% occupancy",
+                "description": "Set chiller CHW to 7°C for balance of efficiency and capacity",
+                "savings": 6,
+            }
+        elif hour >= 17:
+            # After hours: raise CHW temp aggressively
+            return {
+                "equipment": eq_code,
+                "control_point": "chw_setpoint",
+                "target_value": 9.0,
+                "reason": "After-hours operation - raise CHW setpoint to minimize energy use",
+                "description": "Raise chiller CHW to 9°C during low-demand after-hours period",
+                "savings": 15,
+            }
+        return None
+
+    def _generate_vav_recommendation(
+        self, eq_code: str, context: str, occupancy_percent: int, hour: int
+    ) -> Optional[Dict[str, Any]]:
+        """Generate VAV recommendation — damper_position + airflow_setpoint."""
+        low_thresh, high_thresh = self._get_demo_thresholds()
+
+        if occupancy_percent < low_thresh:
+            # Low occupancy: close damper toward minimum
+            return {
+                "equipment": eq_code,
+                "control_point": "damper_position",
+                "target_value": 30,  # 30% minimum position
+                "reason": f"Low occupancy ({occupancy_percent}%) - reduce VAV airflow to minimum",
+                "description": "Close VAV damper to 30% minimum position during low occupancy",
+                "savings": 10,
+            }
+        elif occupancy_percent >= high_thresh:
+            # High occupancy: open damper fully
+            return {
+                "equipment": eq_code,
+                "control_point": "damper_position",
+                "target_value": 90,  # 90% open
+                "reason": f"High occupancy ({occupancy_percent}%) - increase VAV airflow for comfort",
+                "description": "Open VAV damper to 90% for adequate airflow during high occupancy",
+                "savings": 0,
+            }
+        elif context == "afternoon":
+            # Afternoon moderate: adjust airflow setpoint
+            return {
+                "equipment": eq_code,
+                "control_point": "airflow_setpoint",
+                "target_value": 60,  # 60% of design airflow
+                "reason": f"Afternoon VAV optimization at {occupancy_percent}% occupancy",
+                "description": "Set VAV airflow to 60% of design for afternoon efficiency",
+                "savings": 5,
+            }
+        return None
+
+    def _generate_pump_recommendation(
+        self, eq_code: str, context: str, occupancy_percent: int, hour: int
+    ) -> Optional[Dict[str, Any]]:
+        """Generate pump recommendation — speed_percent (affinity laws: 50% speed ≈ 12.5% power)."""
+        low_thresh, _ = self._get_demo_thresholds()
+
+        if occupancy_percent < low_thresh:
+            # Low load: reduce pump speed aggressively
+            return {
+                "equipment": eq_code,
+                "control_point": "speed_percent",
+                "target_value": 40,
+                "reason": f"Low occupancy ({occupancy_percent}%) - reduce pump speed (affinity law savings)",
+                "description": "Reduce pump to 40% speed — affinity laws yield ~94% power reduction vs full speed",
+                "savings": 18,
+            }
+        elif hour < 7 or hour >= 20:
+            # Night/unoccupied: minimum pump speed
+            return {
+                "equipment": eq_code,
+                "control_point": "speed_percent",
+                "target_value": 30,
+                "reason": "Night/unoccupied hours - pump at minimum circulation speed",
+                "description": "Reduce pump to 30% minimum speed during unoccupied hours",
+                "savings": 20,
+            }
+        elif context == "afternoon":
+            # Afternoon moderate reduction
+            return {
+                "equipment": eq_code,
+                "control_point": "speed_percent",
+                "target_value": 70,
+                "reason": f"Afternoon pump optimization at {occupancy_percent}% occupancy",
+                "description": "Reduce pump to 70% speed for afternoon efficiency",
+                "savings": 8,
+            }
+        return None
+
+    def _generate_hvac_recommendation(
+        self, eq_code: str, eq_type: str, context: str, occupancy_percent: int, hour: int
+    ) -> Optional[Dict[str, Any]]:
+        """Generate generic HVAC recommendation (fallback for CT, SPLIT, etc.)."""
+        low_thresh, high_thresh = self._get_demo_thresholds()
+
+        if occupancy_percent < low_thresh:
+            return {
+                "equipment": eq_code,
+                "control_point": "cooling_setpoint",
+                "target_value": 24.0,
+                "reason": f"Low occupancy ({occupancy_percent}%) - reduce active cooling",
+                "description": f"Increase {eq_type} setpoint to 24°C for energy efficiency",
+                "savings": 8,
+            }
+        elif occupancy_percent >= high_thresh and 10 <= hour <= 12:
+            return {
+                "equipment": eq_code,
+                "control_point": "cooling_setpoint",
+                "target_value": 20.5,
+                "reason": f"High occupancy ({occupancy_percent}%) + peak demand - anticipatory pre-cooling",
+                "description": f"Reduce {eq_type} setpoint to 20.5°C for peak demand management",
+                "savings": 5,
+            }
+        elif context == "afternoon":
             return {
                 "equipment": eq_code,
                 "control_point": "cooling_setpoint",
                 "target_value": 21.5,
                 "reason": f"Afternoon optimization at {occupancy_percent}% occupancy",
-                "description": "Adjust setpoint to 21.5°C for afternoon efficiency",
+                "description": f"Adjust {eq_type} setpoint to 21.5°C for afternoon efficiency",
                 "savings": 3,
             }
-
         return None
 
     def _generate_dali_recommendation(
@@ -1262,8 +1493,8 @@ class LifecycleOrchestrator:
     async def _inject_fault(self):
         """Inject a fault into equipment."""
         try:
-            # Get equipment to fault (site-002 only)
-            equipment_list = self.equipment_repo.get_all(building_id="site-002")
+            # Get equipment to fault (filtered by site_id)
+            equipment_list = self.equipment_repo.get_all(building_id=self.site_id)
             if not equipment_list:
                 logger.warning("No equipment available to fault")
                 return
@@ -1609,6 +1840,8 @@ class LifecycleOrchestrator:
             ],
             "time_multiplier": self.time_multiplier,
             "occupancy_seed": self._occupancy_seed,
+            "total_energy_kwh": round(self.total_energy_kwh, 1),
+            "current_hour_power_kw": round(self.current_hour_power_kw, 2),
         }
 
     @staticmethod
@@ -1634,6 +1867,10 @@ class LifecycleOrchestrator:
         # Restore faults and repairs
         orchestrator.active_faults = state_dict.get("active_faults", {})
         orchestrator.pending_repairs = state_dict.get("pending_repairs", {})
+
+        # Restore energy consumption tracking
+        orchestrator.total_energy_kwh = state_dict.get("total_energy_kwh", 0.0)
+        orchestrator.current_hour_power_kw = state_dict.get("current_hour_power_kw", 0.0)
 
         # Restore occupancy randomness (deterministic for same seed)
         if orchestrator._occupancy_seed is not None:
@@ -1682,32 +1919,36 @@ class LifecycleOrchestrator:
             return False
 
 
-def create_lifecycle_orchestrator(task_id: Optional[str] = None) -> LifecycleOrchestrator:
+def create_lifecycle_orchestrator(task_id: Optional[str] = None, site_id: str = "site-002") -> LifecycleOrchestrator:
     """
     Create a new lifecycle orchestrator instance.
 
     Args:
         task_id: Optional task ID for database-backed task tracking
+        site_id: Target site identifier (default "site-002")
 
     Returns:
         New LifecycleOrchestrator instance
     """
-    return LifecycleOrchestrator(task_id=task_id)
+    return LifecycleOrchestrator(task_id=task_id, site_id=site_id)
 
 
 # Global singleton instance
 _orchestrator_instance: Optional[LifecycleOrchestrator] = None
 
 
-def get_lifecycle_orchestrator() -> LifecycleOrchestrator:
+def get_lifecycle_orchestrator(site_id: str = "site-002") -> LifecycleOrchestrator:
     """
     Get or create the global lifecycle orchestrator singleton.
+
+    Args:
+        site_id: Target site identifier (default "site-002")
 
     Returns:
         Singleton LifecycleOrchestrator instance
     """
     global _orchestrator_instance
     if _orchestrator_instance is None:
-        _orchestrator_instance = LifecycleOrchestrator()
-        logger.info("Created lifecycle orchestrator singleton")
+        _orchestrator_instance = LifecycleOrchestrator(site_id=site_id)
+        logger.info(f"Created lifecycle orchestrator singleton for {site_id}")
     return _orchestrator_instance
