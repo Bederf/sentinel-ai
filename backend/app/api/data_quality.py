@@ -34,6 +34,7 @@ router = APIRouter(prefix="/api/data-quality", tags=["data-quality"])
 # Response models
 class AlertSummary(BaseModel):
     """Summary of data quality alerts."""
+
     total_active: int = Field(..., description="Total active alerts")
     by_type: dict = Field(default_factory=dict, description="Count by alert type")
     by_severity: dict = Field(default_factory=dict, description="Count by severity")
@@ -42,6 +43,7 @@ class AlertSummary(BaseModel):
 
 class HealthCheckResponse(BaseModel):
     """Health check response for data quality service."""
+
     status: str = Field(..., description="Service status")
     influxdb_mode: str = Field(..., description="InfluxDB mode (real/mock)")
     active_alerts: int = Field(..., description="Number of active alerts")
@@ -227,8 +229,16 @@ async def check_training_readiness(
     minimum_equipment: int = Query(default=5, ge=1, description="Minimum equipment count"),
     minimum_days: int = Query(default=30, ge=7, le=365, description="Minimum days of data"),
     minimum_quality: float = Query(default=80.0, ge=0, le=100, description="Minimum quality score"),
+    mode: Optional[str] = Query(
+        default=None,
+        description="Ingestion mode for threshold selection (simulation/shadow_live/live_control). "
+        "If not provided, reads from settings.",
+    ),
 ):
     """Check if sufficient data exists for ML model training.
+
+    Phase 109-03: Mode-aware thresholds. When mode is provided, thresholds
+    are adjusted per mode (live_control is strictest, simulation most lenient).
 
     Evaluates equipment count, data quality, and history duration
     to determine if ML training is viable.
@@ -240,6 +250,7 @@ async def check_training_readiness(
         minimum_equipment=minimum_equipment,
         minimum_days=minimum_days,
         minimum_quality_score=minimum_quality,
+        mode=mode,
     )
 
     return readiness

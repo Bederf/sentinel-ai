@@ -46,18 +46,34 @@ class DataQualityService:
     # Sensor types tracked per equipment type
     EQUIPMENT_SENSORS: Dict[str, List[str]] = {
         "chiller": [
-            "temperature", "chw_supply_temp", "chw_return_temp",
-            "condenser_pressure", "evaporator_pressure", "current",
-            "vibration_rms", "power"
+            "temperature",
+            "chw_supply_temp",
+            "chw_return_temp",
+            "condenser_pressure",
+            "evaporator_pressure",
+            "current",
+            "vibration_rms",
+            "power",
         ],
         "ahu": [
-            "supply_air_temp", "return_air_temp", "mixed_air_temp",
-            "supply_fan_speed", "return_fan_speed", "filter_dp",
-            "damper_position", "humidity"
+            "supply_air_temp",
+            "return_air_temp",
+            "mixed_air_temp",
+            "supply_fan_speed",
+            "return_fan_speed",
+            "filter_dp",
+            "damper_position",
+            "humidity",
         ],
         "generator": [
-            "engine_temp", "oil_pressure", "coolant_temp",
-            "rpm", "voltage", "current", "frequency", "fuel_level"
+            "engine_temp",
+            "oil_pressure",
+            "coolant_temp",
+            "rpm",
+            "voltage",
+            "current",
+            "frequency",
+            "fuel_level",
         ],
     }
 
@@ -94,9 +110,7 @@ class DataQualityService:
             EquipmentDataQuality with sensor health and overall score
         """
         # Get sensor types for this equipment
-        sensor_types = self.EQUIPMENT_SENSORS.get(
-            equipment_type.lower(), self.DEFAULT_SENSORS
-        )
+        sensor_types = self.EQUIPMENT_SENSORS.get(equipment_type.lower(), self.DEFAULT_SENSORS)
 
         start = datetime.utcnow() - timedelta(hours=lookback_hours)
         sensor_health_list: List[SensorHealth] = []
@@ -116,17 +130,14 @@ class DataQualityService:
             total_actual += health.actual_readings_24h
 
         # Calculate overall completeness (cap at 100% to handle timing variations)
-        completeness_pct = (
-            min(100.0, (total_actual / total_expected * 100)) if total_expected > 0 else 0.0
-        )
+        completeness_pct = min(100.0, (total_actual / total_expected * 100)) if total_expected > 0 else 0.0
 
         # Determine overall quality level
         overall_quality = self._level_from_pct(completeness_pct)
 
         # Quality score is the average of sensor completeness percentages
         quality_score = (
-            sum(s.completeness_pct for s in sensor_health_list) / len(sensor_health_list)
-            if sensor_health_list else 0.0
+            sum(s.completeness_pct for s in sensor_health_list) / len(sensor_health_list) if sensor_health_list else 0.0
         )
 
         return EquipmentDataQuality(
@@ -173,10 +184,7 @@ class DataQualityService:
         )
 
         actual_readings = len(readings)
-        completeness_pct = (
-            min(100.0, (actual_readings / expected_readings * 100))
-            if expected_readings > 0 else 0.0
-        )
+        completeness_pct = min(100.0, (actual_readings / expected_readings * 100)) if expected_readings > 0 else 0.0
 
         # Detect gaps (threshold: 5 minutes)
         gaps = self._detect_gaps(
@@ -352,24 +360,73 @@ class DataQualityService:
             total_gaps=total_gaps,
         )
 
+    # Mode-specific training readiness thresholds (Phase 109-03)
+    MODE_TRAINING_THRESHOLDS: Dict[str, Dict[str, Any]] = {
+        "live_control": {"min_quality": 0.85, "min_days": 180, "min_equipment": 5},
+        "shadow_live": {"min_quality": 0.75, "min_days": 120, "min_equipment": 3},
+        "simulation": {"min_quality": 0.50, "min_days": 30, "min_equipment": 1},
+    }
+
+    # Mode-specific mock days of data (Phase 109-03: replaces hardcoded 30)
+    MODE_MOCK_DAYS: Dict[str, int] = {
+        "live_control": 200,
+        "shadow_live": 90,
+        "simulation": 30,
+    }
+
     def check_training_readiness(
         self,
         equipment_type: str,
         minimum_equipment: int = 5,
         minimum_days: int = 30,
         minimum_quality_score: float = 80.0,
+        mode: Optional[str] = None,
     ) -> TrainingReadiness:
         """Check if sufficient data exists to train ML models.
 
+        Phase 109-03: Mode-aware thresholds. When mode is provided (or read
+        from settings), thresholds are selected per mode instead of using
+        the caller-supplied defaults.
+
+        Mode thresholds:
+            live_control:  avg_quality >= 0.85, days >= 180, equipment >= 5
+            shadow_live:   avg_quality >= 0.75, days >= 120, equipment >= 3
+            simulation:    avg_quality >= 0.50, days >= 30,  equipment >= 1
+
         Args:
             equipment_type: Equipment type to assess
-            minimum_equipment: Minimum equipment count required
-            minimum_days: Minimum days of data required
-            minimum_quality_score: Minimum quality score for "good" data
+            minimum_equipment: Minimum equipment count required (overridden by mode)
+            minimum_days: Minimum days of data required (overridden by mode)
+            minimum_quality_score: Minimum quality score for "good" data (overridden by mode)
+            mode: Ingestion mode. If None, reads from settings.
 
         Returns:
-            TrainingReadiness assessment
+            TrainingReadiness assessment with mode and thresholds_used
         """
+        # Resolve mode
+        resolved_mode = mode
+        if resolved_mode is None:
+            try:
+                from app.config.settings import settings
+
+                resolved_mode = settings.resolved_ingestion_mode.value
+            except Exception:
+                resolved_mode = "simulation"
+
+        # Apply mode-specific thresholds if available
+        mode_thresholds = self.MODE_TRAINING_THRESHOLDS.get(resolved_mode)
+        if mode_thresholds:
+            # Quality score is on 0-100 scale in the service, thresholds are 0-1
+            minimum_quality_score = mode_thresholds["min_quality"] * 100.0
+            minimum_days = mode_thresholds["min_days"]
+            minimum_equipment = mode_thresholds["min_equipment"]
+
+        thresholds_used = {
+            "min_quality": minimum_quality_score,
+            "min_days": minimum_days,
+            "min_equipment": minimum_equipment,
+        }
+
         # Load all equipment of this type
         equipment_list = self._load_equipment_by_type(equipment_type)
         total_equipment = len(equipment_list)
@@ -385,37 +442,30 @@ class DataQualityService:
             if quality.quality_score >= minimum_quality_score:
                 good_data_count += 1
 
-        # Check if we have enough days of data (mock check - in real system would query InfluxDB)
-        # For demo, assume we have data based on mock generation
-        days_of_data = 30  # Mock value
+        # Days of data: mode-aware mock value (replaces hardcoded 30)
+        days_of_data = self.MODE_MOCK_DAYS.get(resolved_mode, 30)
 
         # Determine readiness
         issues: List[str] = []
         recommendations: List[str] = []
+        gaps: List[str] = []
 
         if total_equipment < minimum_equipment:
-            issues.append(
-                f"Insufficient equipment: {total_equipment}/{minimum_equipment} required"
-            )
+            issues.append(f"Insufficient equipment: {total_equipment}/{minimum_equipment} required")
             recommendations.append(
                 f"Add at least {minimum_equipment - total_equipment} more {equipment_type} equipment to the system"
             )
+            gaps.append("equipment_count")
 
         if good_data_count < minimum_equipment:
-            issues.append(
-                f"Insufficient quality data: {good_data_count}/{minimum_equipment} equipment with good data"
-            )
-            recommendations.append(
-                "Improve sensor connectivity and reduce data gaps for affected equipment"
-            )
+            issues.append(f"Insufficient quality data: {good_data_count}/{minimum_equipment} equipment with good data")
+            recommendations.append("Improve sensor connectivity and reduce data gaps for affected equipment")
+            gaps.append("quality_data")
 
         if days_of_data < minimum_days:
-            issues.append(
-                f"Insufficient history: {days_of_data}/{minimum_days} days of data"
-            )
-            recommendations.append(
-                f"Continue collecting data for {minimum_days - days_of_data} more days"
-            )
+            issues.append(f"Insufficient history: {days_of_data}/{minimum_days} days of data")
+            recommendations.append(f"Continue collecting data for {minimum_days - days_of_data} more days")
+            gaps.append("history_days")
 
         is_ready = len(issues) == 0
         readiness_score = self._calculate_readiness_score(
@@ -437,6 +487,9 @@ class DataQualityService:
             minimum_days_required=minimum_days,
             issues=issues,
             recommendations=recommendations,
+            mode=resolved_mode,
+            thresholds_used=thresholds_used,
+            gaps=gaps,
         )
 
     def _calculate_readiness_score(
@@ -460,9 +513,7 @@ class DataQualityService:
 
         return (eq_score * 0.3) + (quality_score * 0.4) + (days_score * 0.3)
 
-    def _load_equipment_for_building(
-        self, building_id: str
-    ) -> List[Dict[str, str]]:
+    def _load_equipment_for_building(self, building_id: str) -> List[Dict[str, str]]:
         """Load equipment list for a building from equipment.json.
 
         Args:
@@ -486,9 +537,7 @@ class DataQualityService:
             logger.warning(f"Failed to load equipment for building {building_id}: {e}")
             return []
 
-    def _load_equipment_by_type(
-        self, equipment_type: str
-    ) -> List[Dict[str, str]]:
+    def _load_equipment_by_type(self, equipment_type: str) -> List[Dict[str, str]]:
         """Load all equipment of a specific type.
 
         Args:

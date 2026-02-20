@@ -346,3 +346,99 @@ class TestMLOpsHealthExtended:
         for key in ("feedback_capture_rate", "label_lag", "drift_alerts"):
             if key in mapping:
                 assert mapping[key] in ("pass", "warn", "fail")
+
+
+# ============================================================================
+# Mode-Aware Training Readiness Tests (Task 2)
+# ============================================================================
+
+
+class TestModeAwareTrainingReadiness:
+    """Test DataQualityService.check_training_readiness() with mode-aware thresholds."""
+
+    def _make_service(self):
+        """Create a DataQualityService with mocked InfluxDB."""
+        from app.services.data_quality_service import DataQualityService
+
+        mock_influx = MagicMock()
+        mock_influx.query_raw.return_value = []
+        mock_influx.use_mock = True
+        return DataQualityService(influxdb_service=mock_influx)
+
+    def test_training_readiness_live_control_thresholds(self):
+        """live_control mode uses strict thresholds: 0.85/180/5."""
+        svc = self._make_service()
+        result = svc.check_training_readiness("chiller", mode="live_control")
+
+        assert result.mode == "live_control"
+        assert result.thresholds_used is not None
+        assert result.thresholds_used["min_quality"] == 85.0
+        assert result.thresholds_used["min_days"] == 180
+        assert result.thresholds_used["min_equipment"] == 5
+        assert result.minimum_required == 5
+        assert result.minimum_days_required == 180
+
+    def test_training_readiness_shadow_live_thresholds(self):
+        """shadow_live mode uses moderate thresholds: 0.75/120/3."""
+        svc = self._make_service()
+        result = svc.check_training_readiness("ahu", mode="shadow_live")
+
+        assert result.mode == "shadow_live"
+        assert result.thresholds_used is not None
+        assert result.thresholds_used["min_quality"] == 75.0
+        assert result.thresholds_used["min_days"] == 120
+        assert result.thresholds_used["min_equipment"] == 3
+        assert result.minimum_required == 3
+        assert result.minimum_days_required == 120
+
+    def test_training_readiness_simulation_thresholds(self):
+        """simulation mode uses lenient thresholds: 0.50/30/1."""
+        svc = self._make_service()
+        result = svc.check_training_readiness("generator", mode="simulation")
+
+        assert result.mode == "simulation"
+        assert result.thresholds_used is not None
+        assert result.thresholds_used["min_quality"] == 50.0
+        assert result.thresholds_used["min_days"] == 30
+        assert result.thresholds_used["min_equipment"] == 1
+        assert result.minimum_required == 1
+        assert result.minimum_days_required == 30
+
+    def test_training_readiness_includes_mode_in_response(self):
+        """Response includes mode and thresholds_used fields."""
+        svc = self._make_service()
+        result = svc.check_training_readiness("chiller", mode="simulation")
+
+        assert result.mode == "simulation"
+        assert result.thresholds_used is not None
+        assert "min_quality" in result.thresholds_used
+        assert "min_days" in result.thresholds_used
+        assert "min_equipment" in result.thresholds_used
+
+    def test_training_readiness_gaps_populated(self):
+        """gaps list identifies which thresholds were missed."""
+        svc = self._make_service()
+        # With live_control (strict), most equipment won't meet the bar
+        result = svc.check_training_readiness("chiller", mode="live_control")
+
+        # gaps should be a list of strings
+        assert isinstance(result.gaps, list)
+
+    def test_training_readiness_simulation_days_not_hardcoded(self):
+        """simulation mode uses 30 days (configurable), not hardcoded."""
+        svc = self._make_service()
+        result_sim = svc.check_training_readiness("chiller", mode="simulation")
+        result_live = svc.check_training_readiness("chiller", mode="live_control")
+
+        # Simulation: 30 mock days, live_control: 200 mock days
+        assert result_sim.days_of_data == 30
+        assert result_live.days_of_data == 200
+
+    def test_training_readiness_default_mode_from_settings(self):
+        """When mode is None, reads from settings (DEMO_MODE=true -> simulation)."""
+        svc = self._make_service()
+        result = svc.check_training_readiness("chiller")
+
+        # In demo mode, resolved_ingestion_mode is simulation
+        assert result.mode == "simulation"
+        assert result.thresholds_used["min_quality"] == 50.0
