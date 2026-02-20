@@ -252,6 +252,7 @@ class LifecycleOrchestrator:
         self.simulated_time: datetime = datetime.now().replace(hour=0, minute=0, second=0)
         self.real_start_time: Optional[datetime] = None
         self.time_multiplier: float = 60.0  # 1 real minute = 1 simulated hour
+        self.speed_multiplier: float = 1.0  # 1x real-time, 10x = 10x faster, etc.
         self.events: List[LifecycleEvent] = []
         self.active_faults: Dict[str, Dict[str, Any]] = {}
         self.pending_repairs: Dict[str, Dict[str, Any]] = {}
@@ -313,6 +314,7 @@ class LifecycleOrchestrator:
         self.simulated_time = datetime.now().replace(hour=0, minute=0, second=0)
         self.real_start_time = None
         self.time_multiplier = 60.0
+        self.speed_multiplier = 1.0
         self.events = []
         self.active_faults = {}
         self.pending_repairs = {}
@@ -322,6 +324,38 @@ class LifecycleOrchestrator:
         self.seasonal_modeler = None
         self.days_simulated = 0
         logger.info("Orchestrator reset: Ready for fresh demo")
+
+    @property
+    def seconds_per_simulated_hour(self) -> float:
+        """Real seconds to wait between each simulated hour.
+
+        At 1x speed: 60 seconds per simulated hour (24h sim takes 24 minutes).
+        At 10x speed: 6 seconds per simulated hour (24h sim takes 2.4 minutes).
+        At 100x speed: 0.6 seconds per simulated hour (24h sim takes 14.4 seconds).
+        At 1000x speed: 0.06 seconds per simulated hour (24h sim takes 1.4 seconds).
+        """
+        base_seconds = 60.0  # 1 minute per simulated hour at 1x
+        return max(0.05, base_seconds / self.speed_multiplier)
+
+    def set_speed(self, speed_multiplier: float) -> Dict[str, Any]:
+        """Change simulation speed while running.
+
+        Args:
+            speed_multiplier: New speed multiplier (0.1 to 10000).
+
+        Returns:
+            Dict with new speed and seconds_per_hour.
+        """
+        old_speed = self.speed_multiplier
+        self.speed_multiplier = max(0.1, min(10000, speed_multiplier))
+        logger.info(
+            f"Speed changed: {old_speed}x -> {self.speed_multiplier}x "
+            f"({self.seconds_per_simulated_hour:.2f}s per simulated hour)"
+        )
+        return {
+            "speed": self.speed_multiplier,
+            "seconds_per_hour": self.seconds_per_simulated_hour,
+        }
 
     def add_event_callback(self, callback: Callable[[LifecycleEvent], None]):
         """Add callback to be notified of events."""
@@ -339,10 +373,12 @@ class LifecycleOrchestrator:
 
     async def start(
         self,
-        scenario: str = "fault_day",
+        scenario: str = "normal_day",
         duration_minutes: float = 24.0,
         start_hour: int = 0,
         task_id: str = None,  # For checkpoint recovery
+        speed_multiplier: float = 10.0,
+        start_date: Optional[str] = None,  # ISO date string e.g. "2025-06-15"
     ) -> Dict[str, Any]:
         """
         Start the 24-hour simulation.
@@ -352,6 +388,8 @@ class LifecycleOrchestrator:
             duration_minutes: Real-time duration (24 = 1 min per hour)
             start_hour: Simulated hour to start (0-23)
             task_id: Optional task_id for checkpoint recovery
+            speed_multiplier: Speed factor (1x=real-time, 10x=10x faster, etc.)
+            start_date: Optional ISO date string for simulation start date
 
         Returns:
             Status dict with session info
@@ -391,6 +429,9 @@ class LifecycleOrchestrator:
 
         # Check if this is an annual scenario (365-day simulations have "annual" in name)
         is_annual = "annual" in scenario.lower()
+
+        # Set speed multiplier for new speed control system
+        self.speed_multiplier = max(0.1, min(10000, speed_multiplier))
 
         # RECOVERY PATH: If we have a checkpoint, restore ALL state BEFORE starting loop
         if checkpoint and is_annual:
@@ -433,11 +474,16 @@ class LifecycleOrchestrator:
             # Each simulated hour takes: (duration_minutes * 60) / 8760 seconds
             total_hours_annual = 365 * 24
             self.time_multiplier = (duration_minutes * 60.0) / total_hours_annual  # seconds per simulated hour
-            # Start on January 1st, 6am (year is arbitrary - Python will handle date math)
-            self.simulated_time = datetime(2024, 1, 1, start_hour, 0, 0)
+            # Start date: use provided date or default to January 1st
+            if start_date:
+                self.simulated_time = datetime.fromisoformat(start_date).replace(hour=start_hour, minute=0, second=0)
+            else:
+                self.simulated_time = datetime(2024, 1, 1, start_hour, 0, 0)
             time_mult = f"{self.time_multiplier:.3f}"
+            speed_str = f"{self.speed_multiplier}x"
             logger.info(
-                f"Annual simulation initialized: {duration_minutes} min for full year (365 days), {time_mult}s per hour"
+                f"Annual simulation initialized: {speed_str} speed, {duration_minutes} min for full year "
+                f"(365 days), {time_mult}s per hour, {self.seconds_per_simulated_hour:.2f}s effective"
             )
         else:
             # Daily simulation: just 24 hours
@@ -446,7 +492,11 @@ class LifecycleOrchestrator:
             # duration_minutes for full 24 hours
             # Each simulated hour takes: (duration_minutes * 60) / 24 seconds
             self.time_multiplier = (duration_minutes * 60.0) / 24.0  # seconds per simulated hour
-            self.simulated_time = datetime.now().replace(hour=start_hour, minute=0, second=0, microsecond=0)
+            # Start date: use provided date or default to today
+            if start_date:
+                self.simulated_time = datetime.fromisoformat(start_date).replace(hour=start_hour, minute=0, second=0)
+            else:
+                self.simulated_time = datetime.now().replace(hour=start_hour, minute=0, second=0, microsecond=0)
 
         self.real_start_time = datetime.now()
         self.events = []
@@ -457,8 +507,8 @@ class LifecycleOrchestrator:
 
         logger.info(
             f"Starting lifecycle simulation: {self.current_scenario.name}, "
-            f"duration={duration_minutes}min, start_hour={start_hour}, "
-            f"time_multiplier={self.time_multiplier}s/hour"
+            f"speed={self.speed_multiplier}x, start_hour={start_hour}, "
+            f"seconds_per_hour={self.seconds_per_simulated_hour:.2f}s"
         )
 
         # Start background task
@@ -467,6 +517,8 @@ class LifecycleOrchestrator:
         return {
             "success": True,
             "scenario": self.current_scenario.name,
+            "speed_multiplier": self.speed_multiplier,
+            "seconds_per_simulated_hour": self.seconds_per_simulated_hour,
             "duration_minutes": duration_minutes,
             "time_multiplier_seconds_per_hour": self.time_multiplier,
             "start_hour": start_hour,
@@ -621,7 +673,7 @@ class LifecycleOrchestrator:
                             await self._update_progress_to_db(iteration, total_iterations)
 
                     # Sleep for the calculated time per simulated hour
-                    await asyncio.sleep(self.time_multiplier)
+                    await asyncio.sleep(self.seconds_per_simulated_hour)
 
                 except asyncio.CancelledError:
                     logger.warning(f"[CANCELLED] iteration={iteration}, task was cancelled")
