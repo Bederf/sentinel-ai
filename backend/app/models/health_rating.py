@@ -120,6 +120,31 @@ class AssetHealthSummaryItem(BaseModel):
     health_source: str = Field("calculator", description="'calculator' | 'simulation' | 'manual_override'")
 
 
+class HealthFeaturePayload(BaseModel):
+    """Health signals for recommendation ranking. Separate from risk probability.
+
+    HARD RULE: This payload contains ONLY health assessment data.
+    It NEVER contains risk probabilities or failure predictions.
+    Risk prediction is a separate concern handled by PredictionGeneratorService.
+    """
+
+    health_score_current: float = Field(..., ge=0, le=100, description="Current composite health score (0-100)")
+    health_status_current: str = Field(..., description="Current health status: 'healthy' | 'warning' | 'critical'")
+    health_trend_7d_slope: Optional[float] = Field(
+        None, description="7-day health score trend slope (points/day, negative = improving)"
+    )
+    health_trend_30d_slope: Optional[float] = Field(
+        None, description="30-day health score trend slope (points/day, negative = improving)"
+    )
+    health_volatility_30d: Optional[float] = Field(
+        None, description="30-day health score volatility (stddev of daily avg scores)"
+    )
+    health_confidence: str = Field(..., description="Data quality confidence: 'high' | 'medium' | 'low'")
+    baseline_deviation_max_24h: Optional[float] = Field(
+        None, description="Maximum baseline deviation percentage in last 24 hours"
+    )
+
+
 class RecomputeRequest(BaseModel):
     """Request to recompute health ratings."""
 

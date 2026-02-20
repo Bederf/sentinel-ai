@@ -236,6 +236,9 @@ class AIOptimizerService:
             # Phase 109: Apply quality gate evaluation to recommendations
             recommendation = await self._apply_quality_gate(site_id, recommendation)
 
+            # Phase 109B-03: Enrich recommendations with health features (ADDITIVE)
+            recommendation = await self._enrich_with_health_features(recommendation)
+
             return recommendation
 
         except Exception as e:
@@ -249,6 +252,8 @@ class AIOptimizerService:
                 rec = self._score_and_rank_recommendations(rec, profile)
             # Phase 109: Apply quality gate to fallback recommendations too
             rec = await self._apply_quality_gate(site_id, rec)
+            # Phase 109B-03: Enrich fallback recommendations with health features too
+            rec = await self._enrich_with_health_features(rec)
             return rec
 
     async def _apply_quality_gate(
@@ -291,6 +296,54 @@ class AIOptimizerService:
             )
         except Exception as e:
             logger.warning(f"Quality gate evaluation failed for {site_id}, proceeding without gate: {e}")
+
+        return recommendation
+
+    async def _enrich_with_health_features(
+        self, recommendation: "OptimizationRecommendation"
+    ) -> "OptimizationRecommendation":
+        """Enrich recommendations with health feature payloads.
+
+        Phase 109B-03: For each recommendation that has an equipment_id,
+        retrieves the health feature payload and attaches it as a SEPARATE
+        dict — never merged into risk/confidence fields.
+
+        HARD RULES:
+          - health_features is ADDITIVE — does not modify existing fields
+          - health_features dict NEVER contains risk probabilities
+          - health_severity_signal is derived from health_score, not risk
+          - Existing confidence (risk-based) is preserved as-is
+
+        Args:
+            recommendation: OptimizationRecommendation to enrich.
+
+        Returns:
+            Modified OptimizationRecommendation with health features added.
+        """
+        try:
+            from app.services.health_feature_provider import HealthFeatureProvider
+
+            provider = HealthFeatureProvider()
+
+            for rec_dict in recommendation.recommendations:
+                equipment_id = rec_dict.get("equipment_id") or rec_dict.get("device_id")
+                if not equipment_id:
+                    continue
+
+                try:
+                    payload = await provider.get_health_features(equipment_id)
+
+                    # Add health features as a SEPARATE dict (never merged with risk)
+                    rec_dict["health_features"] = payload.model_dump()
+
+                    # Add health severity signal for ranking (0 = healthy, 1 = critical)
+                    rec_dict["health_severity_signal"] = round(1 - (payload.health_score_current / 100), 4)
+
+                except Exception as e:
+                    logger.debug(f"Could not get health features for {equipment_id}: {e}")
+
+        except Exception as e:
+            logger.warning(f"Health feature enrichment failed, proceeding without: {e}")
 
         return recommendation
 
