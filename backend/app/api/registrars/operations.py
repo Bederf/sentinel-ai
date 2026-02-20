@@ -16,6 +16,8 @@ from app.api import modules, health_config, service_records, preferences
 from app.api import solar, water, sustainability, contracts, pricing, municipal_billing
 from app.api import parts_orders, approval_workflow, delivery_tracking, approvals, parasite_decisions
 from app.api import security, compliance, notifications
+from app.api import asset_health
+from app.api import health_rating
 
 
 def register_operations_routers(app: FastAPI) -> None:
@@ -91,3 +93,9 @@ def register_operations_routers(app: FastAPI) -> None:
 
     # Compliance module (Phase 28)
     app.include_router(compliance.router, tags=["compliance"])
+
+    # Asset health + baseline (Phase 109A)
+    app.include_router(asset_health.router, tags=["asset-health"])
+
+    # Health rating timeline (Phase 109B)
+    app.include_router(health_rating.router, tags=["health-rating"])
