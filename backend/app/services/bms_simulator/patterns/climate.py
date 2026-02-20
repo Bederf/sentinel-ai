@@ -6,7 +6,7 @@ Includes temperature, humidity, and wet-bulb patterns for different regions.
 """
 
 import numpy as np
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, Tuple, Optional
 from dataclasses import dataclass
 from enum import Enum
@@ -14,33 +14,37 @@ from enum import Enum
 
 class Season(str, Enum):
     """South African seasons."""
-    SUMMER = "summer"      # Dec-Feb
-    AUTUMN = "autumn"      # Mar-May
-    WINTER = "winter"      # Jun-Aug
-    SPRING = "spring"      # Sep-Nov
+
+    SUMMER = "summer"  # Dec-Feb
+    AUTUMN = "autumn"  # Mar-May
+    WINTER = "winter"  # Jun-Aug
+    SPRING = "spring"  # Sep-Nov
 
 
 class ClimateZone(str, Enum):
     """South African climate zones."""
+
     JOHANNESBURG = "johannesburg"  # Highveld - hot summers, cool dry winters
-    DURBAN = "durban"              # Subtropical - hot humid summers, mild winters
-    CAPE_TOWN = "cape_town"        # Mediterranean - hot dry summers, cool wet winters
-    PRETORIA = "pretoria"          # Similar to Johannesburg
+    DURBAN = "durban"  # Subtropical - hot humid summers, mild winters
+    CAPE_TOWN = "cape_town"  # Mediterranean - hot dry summers, cool wet winters
+    PRETORIA = "pretoria"  # Similar to Johannesburg
 
 
 @dataclass
 class SeasonalClimate:
     """Climate parameters for a season."""
-    temp_range: Tuple[float, float]      # Min/max outdoor temp (degC)
+
+    temp_range: Tuple[float, float]  # Min/max outdoor temp (degC)
     humidity_range: Tuple[float, float]  # Min/max humidity (%RH)
     wet_bulb_range: Tuple[float, float]  # Min/max wet bulb (degC)
-    solar_peak_hour: int = 14            # Hour of peak solar radiation
-    solar_intensity: float = 1.0         # Relative solar intensity (0-1)
+    solar_peak_hour: int = 14  # Hour of peak solar radiation
+    solar_intensity: float = 1.0  # Relative solar intensity (0-1)
 
 
 @dataclass
 class ClimateProfile:
     """Complete climate profile for a location."""
+
     zone: ClimateZone
     summer: SeasonalClimate
     autumn: SeasonalClimate
@@ -107,7 +111,6 @@ CLIMATE_PROFILES: Dict[str, ClimateProfile] = {
         load_shedding_group=4,
         altitude_m=1753,
     ),
-
     "durban": ClimateProfile(
         zone=ClimateZone.DURBAN,
         summer=SeasonalClimate(
@@ -141,7 +144,6 @@ CLIMATE_PROFILES: Dict[str, ClimateProfile] = {
         load_shedding_group=5,
         altitude_m=8,
     ),
-
     "cape_town": ClimateProfile(
         zone=ClimateZone.CAPE_TOWN,
         summer=SeasonalClimate(
@@ -175,7 +177,6 @@ CLIMATE_PROFILES: Dict[str, ClimateProfile] = {
         load_shedding_group=2,
         altitude_m=0,
     ),
-
     "pretoria": ClimateProfile(
         zone=ClimateZone.PRETORIA,
         summer=SeasonalClimate(
@@ -227,10 +228,7 @@ class ClimatePattern:
             climate_zone: Climate zone name (johannesburg, durban, cape_town, pretoria)
             seed: Random seed for reproducibility
         """
-        self.profile = CLIMATE_PROFILES.get(
-            climate_zone.lower(),
-            CLIMATE_PROFILES["johannesburg"]
-        )
+        self.profile = CLIMATE_PROFILES.get(climate_zone.lower(), CLIMATE_PROFILES["johannesburg"])
         self.rng = np.random.default_rng(seed)
 
     def get_outdoor_temp(
@@ -352,7 +350,7 @@ class ClimatePattern:
             T * np.arctan(0.151977 * np.sqrt(RH + 8.313659))
             + np.arctan(T + RH)
             - np.arctan(RH - 1.676331)
-            + 0.00391838 * (RH ** 1.5) * np.arctan(0.023101 * RH)
+            + 0.00391838 * (RH**1.5) * np.arctan(0.023101 * RH)
             - 4.686035
         )
 
@@ -536,3 +534,37 @@ class ClimatePattern:
             "wet_bulb_temp": wet_bulb,
             "cooling_load_factor": cooling_load,
         }
+
+    def get_temperature(self, day_of_year: int, hour: int) -> float:
+        """Get ambient temperature for given day of year and hour.
+
+        Convenience wrapper around get_outdoor_temp for the lifecycle
+        orchestrator which works with (day_of_year, hour) instead of datetime.
+
+        Args:
+            day_of_year: Day of year (1-365)
+            hour: Hour of day (0-23)
+
+        Returns:
+            Outdoor temperature in degC
+        """
+        # Convert day_of_year + hour into a datetime for the existing method
+        dt = datetime(2024, 1, 1) + timedelta(days=day_of_year - 1, hours=hour)
+        return float(self.get_outdoor_temp(dt))
+
+    def get_humidity(self, day_of_year: int, hour: int) -> float:
+        """Get relative humidity for given day of year and hour.
+
+        Convenience wrapper around get_outdoor_humidity for the lifecycle
+        orchestrator which works with (day_of_year, hour) instead of datetime.
+
+        Args:
+            day_of_year: Day of year (1-365)
+            hour: Hour of day (0-23)
+
+        Returns:
+            Relative humidity in %RH
+        """
+        dt = datetime(2024, 1, 1) + timedelta(days=day_of_year - 1, hours=hour)
+        temp = self.get_outdoor_temp(dt)
+        return float(self.get_outdoor_humidity(dt, temp))

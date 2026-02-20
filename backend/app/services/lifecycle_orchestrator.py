@@ -39,13 +39,6 @@ from app.services.building_schedule import (
     ScheduleState,
 )
 
-# Import ClimatePattern directly from the module file to avoid bms_simulator/__init__.py
-# which pulls in pandas via the full simulator chain
-try:
-    from app.services.bms_simulator.patterns.climate import ClimatePattern
-except ImportError:
-    ClimatePattern = None  # type: ignore[misc,assignment]
-
 from app.services.power_meter_validation_engine import get_power_meter_validation_engine
 from app.services.cost_validation_engine import get_cost_validation_engine
 from app.services.simulation_persistence import get_simulation_persistence
@@ -287,10 +280,23 @@ class LifecycleOrchestrator:
         self.building_schedule = BuildingSchedule()
 
         # JHB climate engine for realistic ambient temperature (104-01)
-        if ClimatePattern is not None:
-            self.climate_engine = ClimatePattern(climate_zone="johannesburg")
-        else:
-            self.climate_engine = None
+        # Lazy-import ClimatePattern to avoid bms_simulator/__init__.py which
+        # triggers pandas import via the full simulator chain
+        self.climate_engine = None
+        try:
+            import importlib.util
+            import os
+
+            spec = importlib.util.spec_from_file_location(
+                "climate_pattern",
+                os.path.join(os.path.dirname(__file__), "bms_simulator", "patterns", "climate.py"),
+            )
+            if spec and spec.loader:
+                mod = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(mod)
+                self.climate_engine = mod.ClimatePattern(climate_zone="johannesburg")
+        except Exception:
+            pass  # Fall back to seasonal modeler
 
         # Supabase persistence for dashboard visibility (104-02)
         self.persistence = get_simulation_persistence(site_id=site_id)
@@ -500,6 +506,12 @@ class LifecycleOrchestrator:
         ambient_temp = 22.0
         solar_efficiency = 100.0
 
+        # Use JHB climate engine for ambient temp if available
+        if self.climate_engine and self.running:
+            current_hour = self.simulated_time.hour
+            day_of_year = self.simulated_time.timetuple().tm_yday
+            ambient_temp = self.climate_engine.get_temperature(day_of_year, current_hour)
+
         if self.seasonal_modeler:
             current_date = self.simulated_time.date()
             current_season = self.seasonal_modeler.get_season_name(current_date)
@@ -508,7 +520,9 @@ class LifecycleOrchestrator:
             # Get weather data using individual SeasonalModeler methods
             is_raining = self.seasonal_modeler.should_rain_today(current_date)
             cloud_cover = self.seasonal_modeler.get_cloud_cover_percent(current_date)
-            ambient_temp = self.seasonal_modeler.get_ambient_temperature(current_date, current_hour, is_raining)
+            # Only use seasonal modeler for temp if climate engine not available
+            if not self.climate_engine:
+                ambient_temp = self.seasonal_modeler.get_ambient_temperature(current_date, current_hour, is_raining)
 
             # Calculate solar efficiency based on time and weather
             if 6 <= current_hour < 18:  # Daytime
@@ -533,6 +547,7 @@ class LifecycleOrchestrator:
             "is_raining": is_raining,
             "cloud_cover": cloud_cover,
             "ambient_temp": ambient_temp,
+            "humidity": getattr(self, "current_humidity", 50.0),
             "solar_efficiency": solar_efficiency,
             "current_season": current_season,
             "occupancy_percent": self._calculate_occupancy(self.simulated_time.hour if self.simulated_time else 0),
@@ -714,14 +729,21 @@ class LifecycleOrchestrator:
         try:
             occupancy_data = self._generate_occupancy_for_hour(hour)
 
-            # Get ambient temperature from seasonal modeler
-            if self.seasonal_modeler:
+            # Get ambient temperature from JHB climate engine (preferred)
+            # or fall back to seasonal modeler for backward compatibility
+            if self.climate_engine:
+                day_of_year = self.simulated_time.timetuple().tm_yday
+                ambient_temp = self.climate_engine.get_temperature(day_of_year, hour)
+                self.current_humidity = self.climate_engine.get_humidity(day_of_year, hour)
+            elif self.seasonal_modeler:
                 is_raining = self.seasonal_modeler.should_rain_today(self.simulated_time.date())
                 ambient_temp = self.seasonal_modeler.get_ambient_temperature(
                     self.simulated_time.date(), self.simulated_time.hour, is_raining
                 )
+                self.current_humidity = 50.0  # Default when no climate engine
             else:
                 ambient_temp = 20.0
+                self.current_humidity = 50.0
 
             # Use schedule state for equipment health consideration
             consider_health = bool(self.active_faults) or (
