@@ -726,6 +726,8 @@ class LifecycleOrchestrator:
             await self._check_pending_repairs()
 
         # === THERMAL UPDATE ===
+        ambient_temp = 20.0  # Default, updated below
+        occupancy_data = {}
         try:
             occupancy_data = self._generate_occupancy_for_hour(hour)
 
@@ -802,6 +804,22 @@ class LifecycleOrchestrator:
         # AI optimization runs when the building is occupied (HVAC active)
         if schedule_state.hvac_mode != HVACMode.OFF:
             await self._ai_optimization(f"hour_{hour}")
+
+        # === PERSIST STATE TO SUPABASE (104-02) ===
+        # Write equipment health, sensor readings, and energy to Supabase
+        # so existing dashboards show live building operation
+        try:
+            equipment_states = await self._collect_equipment_states(hour, schedule_state)
+            await self.persistence.persist_hourly_state(
+                simulated_time=self.simulated_time,
+                equipment_states=equipment_states,
+                schedule_state=schedule_state,
+                energy_kw=self.current_hour_power_kw,
+                ambient_temp=ambient_temp,
+                humidity=getattr(self, "current_humidity", 50.0),
+            )
+        except Exception as e:
+            logger.warning(f"[PERSISTENCE] Failed to persist hourly state: {e}")
 
     async def _emit_schedule_event(self, hour: int, schedule_state: ScheduleState):
         """Emit events on meaningful schedule transitions."""
@@ -1607,14 +1625,6 @@ class LifecycleOrchestrator:
         )
 
     # === PERSISTENCE METHODS (104-02) ===
-    # Wire persistence call into _process_hour after 104-01 completes.
-    # Usage: at end of _process_hour, call:
-    #   equipment_states = await self._collect_equipment_states(hour, schedule_state)
-    #   await self.persistence.persist_hourly_state(
-    #       simulated_time=self.simulated_time, equipment_states=equipment_states,
-    #       schedule_state=schedule_state, energy_kw=self.current_hour_power_kw,
-    #       ambient_temp=ambient_temp, humidity=humidity,
-    #   )
 
     async def _collect_equipment_states(self, hour: int, schedule_state: ScheduleState) -> Dict[str, Dict]:
         """Collect current state of all site equipment for persistence."""
