@@ -107,7 +107,13 @@ async def test_quality_gate_endpoint_returns_200(client):
     mock_metrics = {"freshness_minutes": 60.0, "ingest_error_rate_pct_1h": 0.0}
     mock_result = _make_gate_result_with_details()
 
-    with patch("app.api.optimization_quality.QualityGateEvaluator") as MockEvaluator:
+    mock_settings = MagicMock()
+    mock_settings.resolved_ingestion_mode.value = "simulation"
+
+    with (
+        patch("app.api.optimization_quality.QualityGateEvaluator") as MockEvaluator,
+        patch("app.api.optimization_quality.settings", mock_settings),
+    ):
         instance = MockEvaluator.return_value
         instance.collect_metrics = AsyncMock(return_value=mock_metrics)
         instance.evaluate = MagicMock(return_value=mock_result)
@@ -129,7 +135,13 @@ async def test_quality_gate_endpoint_returns_200(client):
 @pytest.mark.asyncio
 async def test_quality_gate_endpoint_returns_500_on_error(client):
     """GET /api/optimization/quality-gate/{site_id} returns 500 on collection failure."""
-    with patch("app.api.optimization_quality.QualityGateEvaluator") as MockEvaluator:
+    mock_settings = MagicMock()
+    mock_settings.resolved_ingestion_mode.value = "simulation"
+
+    with (
+        patch("app.api.optimization_quality.QualityGateEvaluator") as MockEvaluator,
+        patch("app.api.optimization_quality.settings", mock_settings),
+    ):
         instance = MockEvaluator.return_value
         instance.collect_metrics = AsyncMock(side_effect=Exception("Collection failed"))
         instance.evaluate = MagicMock()
@@ -154,7 +166,13 @@ async def test_quality_gate_response_structure(client):
     }
     mock_result = _make_gate_result_with_details()
 
-    with patch("app.api.optimization_quality.QualityGateEvaluator") as MockEvaluator:
+    mock_settings = MagicMock()
+    mock_settings.resolved_ingestion_mode.value = "simulation"
+
+    with (
+        patch("app.api.optimization_quality.QualityGateEvaluator") as MockEvaluator,
+        patch("app.api.optimization_quality.settings", mock_settings),
+    ):
         instance = MockEvaluator.return_value
         instance.collect_metrics = AsyncMock(return_value=mock_metrics)
         instance.evaluate = MagicMock(return_value=mock_result)

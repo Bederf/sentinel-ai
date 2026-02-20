@@ -209,6 +209,54 @@ async def approve_recommendation(
         JSON response with approved recommendation
     """
     try:
+        # Phase 109: Quality gate pre-check at the API boundary
+        try:
+            from app.config.settings import settings
+            from app.services.quality_gate_evaluator import QualityGateEvaluator
+            from app.services.quality_gate_policy import GateStatus
+
+            mode = settings.resolved_ingestion_mode.value
+
+            if mode == "shadow_live":
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "error": "SHADOW_MODE_NO_EXEC",
+                        "message": "Cannot approve recommendations in shadow_live mode",
+                    },
+                )
+
+            if mode == "live_control":
+                evaluator = QualityGateEvaluator()
+                # Try to get site_id from the recommendation
+                try:
+                    from app.database.repositories import get_recommendation_repository
+
+                    repo = get_recommendation_repository()
+                    rec_obj = await repo.get(rec_id)
+                    site_id = rec_obj.site_id if rec_obj else "unknown"
+                except Exception:
+                    site_id = "unknown"
+
+                metrics = await evaluator.collect_metrics(site_id)
+                gate_result = evaluator.evaluate(mode, metrics)
+
+                if gate_result.overall == GateStatus.FAIL:
+                    raise HTTPException(
+                        status_code=409,
+                        detail={
+                            "error": "QUALITY_GATE_BLOCK",
+                            "failed_rules": gate_result.failed_rules,
+                            "reason_codes": [rc.value for rc in gate_result.reason_codes],
+                            "message": "Quality gate failed — execution blocked",
+                        },
+                    )
+
+        except HTTPException:
+            raise
+        except Exception as gate_err:
+            logger.debug(f"Quality gate pre-check skipped in recommendations.approve: {gate_err}")
+
         user_id = request.headers.get("X-User-Id", "operator")
         service = get_recommendation_service()
 

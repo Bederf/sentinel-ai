@@ -81,6 +81,48 @@ class ApprovalService:
             logger.error(f"Error validating approval for {recommendation_id}: {str(e)}")
             return False, f"Validation error: {str(e)}"
 
+    async def _check_quality_gate(self, site_id: str):
+        """Evaluate quality gate for a site.
+
+        Returns the QualityGateResult containing overall status, enforcement
+        action, and reason codes.
+
+        Args:
+            site_id: Site/building identifier
+
+        Returns:
+            QualityGateResult from evaluator
+        """
+        from app.services.quality_gate_evaluator import QualityGateEvaluator
+
+        evaluator = QualityGateEvaluator()
+        mode = settings.resolved_ingestion_mode.value
+        metrics = await evaluator.collect_metrics(site_id)
+        return evaluator.evaluate(mode, metrics)
+
+    def _audit_gate_block(self, recommendation_id: str, error_code: str, gate_result) -> None:
+        """Log a quality gate block to the audit trail."""
+        try:
+            from app.services.audit_logger import AuditLogger
+            from app.models.audit_log import AuditResultType
+
+            audit = AuditLogger()
+            audit.log_system_event(
+                event_type="quality_gate_blocked_execution",
+                user="system",
+                result=AuditResultType.BLOCKED,
+                metadata={
+                    "recommendation_id": recommendation_id,
+                    "error_code": error_code,
+                    "mode": gate_result.mode,
+                    "overall": gate_result.overall.value,
+                    "failed_rules": gate_result.failed_rules,
+                    "reason_codes": [rc.value for rc in gate_result.reason_codes],
+                },
+            )
+        except Exception as e:
+            logger.debug(f"Failed to audit log quality gate block: {e}")
+
     async def execute_approval(
         self, recommendation_id: str, approved_by: str, approval_notes: Optional[str] = None
     ) -> ApprovalResult:
@@ -88,12 +130,13 @@ class ApprovalService:
 
         Flow:
         1. Validate recommendation exists and is pending
-        2. Run SafetyEngine check (second validation before write)
-        3. Extract control change from recommendation
-        4. Write to Niagara device via device_manager
-        5. Verify COV feedback (read back to confirm)
-        6. Update recommendation status to "executed"
-        7. Create audit log entry
+        2. Quality gate check (Phase 109)
+        3. Run SafetyEngine check (second validation before write)
+        4. Extract control change from recommendation
+        5. Write to Niagara device via device_manager
+        6. Verify COV feedback (read back to confirm)
+        7. Update recommendation status to "executed"
+        8. Create audit log entry
 
         Args:
             recommendation_id: ID of recommendation to approve
@@ -122,6 +165,47 @@ class ApprovalService:
                     status="failed",
                     error_message=f"Recommendation is {recommendation.status.value}, not pending",
                 )
+
+            # Phase 109: Quality gate check before execution
+            try:
+                from app.services.quality_gate_policy import GateStatus
+
+                gate_result = await self._check_quality_gate(recommendation.site_id or "unknown")
+                mode = settings.resolved_ingestion_mode.value
+
+                # shadow_live: always block execution (writes are shadow-only)
+                if mode == "shadow_live":
+                    self._audit_gate_block(recommendation_id, "SHADOW_MODE_NO_EXEC", gate_result)
+                    return ApprovalResult(
+                        success=False,
+                        recommendation_id=recommendation_id,
+                        status="failed",
+                        error_message="SHADOW_MODE_NO_EXEC: Cannot execute in shadow_live mode",
+                    )
+
+                # live_control + FAIL: block all writes
+                if mode == "live_control" and gate_result.overall == GateStatus.FAIL:
+                    self._audit_gate_block(recommendation_id, "QUALITY_GATE_BLOCK", gate_result)
+                    return ApprovalResult(
+                        success=False,
+                        recommendation_id=recommendation_id,
+                        status="failed",
+                        error_message=(
+                            f"QUALITY_GATE_BLOCK: Quality gate failed — "
+                            f"failed rules: {gate_result.failed_rules}, "
+                            f"reason codes: {[rc.value for rc in gate_result.reason_codes]}"
+                        ),
+                    )
+
+                # live_control + WARN: allow Tier 2 (this method is Tier 2), log warning
+                if mode == "live_control" and gate_result.overall == GateStatus.WARN:
+                    logger.warning(
+                        f"Quality gate WARN for approval {recommendation_id}: "
+                        f"warn_rules={gate_result.warn_rules} — allowing Tier 2 execution"
+                    )
+
+            except Exception as e:
+                logger.warning(f"Quality gate check failed for approval {recommendation_id}, proceeding: {e}")
 
             # CRITICAL: Run SafetyEngine validation AGAIN before write
             # (Defense-in-depth: validate at both recommendation creation and approval time)
@@ -707,6 +791,63 @@ class ApprovalService:
                     recommendation_id=recommendation_id,
                     status="failed",
                     error_message=f"Recommendation is {recommendation.status.value}, not pending",
+                )
+
+            # Phase 109: Quality gate check — Tier 3 is blocked on shadow_live, WARN, or FAIL
+            try:
+                from app.services.quality_gate_policy import GateStatus
+
+                gate_result = await self._check_quality_gate(recommendation.site_id or "unknown")
+                mode = settings.resolved_ingestion_mode.value
+
+                # shadow_live: Tier 3 never executes in shadow mode
+                if mode == "shadow_live":
+                    self._audit_gate_block(recommendation_id, "SHADOW_MODE_NO_EXEC", gate_result)
+                    return ApprovalResult(
+                        success=False,
+                        recommendation_id=recommendation_id,
+                        status="failed",
+                        error_message="SHADOW_MODE_NO_EXEC: Tier 3 auto-execute blocked in shadow_live mode",
+                    )
+
+                # live_control + FAIL: block Tier 3
+                if mode == "live_control" and gate_result.overall == GateStatus.FAIL:
+                    self._audit_gate_block(recommendation_id, "QUALITY_GATE_BLOCK", gate_result)
+                    return ApprovalResult(
+                        success=False,
+                        recommendation_id=recommendation_id,
+                        status="failed",
+                        error_message=(
+                            f"QUALITY_GATE_BLOCK: Tier 3 auto-execute blocked — "
+                            f"failed rules: {gate_result.failed_rules}, "
+                            f"reason codes: {[rc.value for rc in gate_result.reason_codes]}"
+                        ),
+                    )
+
+                # live_control + WARN: Tier 3 disabled (only Tier 2 allowed on WARN)
+                if mode == "live_control" and gate_result.overall == GateStatus.WARN:
+                    self._audit_gate_block(recommendation_id, "QUALITY_GATE_WARN_TIER3_BLOCK", gate_result)
+                    return ApprovalResult(
+                        success=False,
+                        recommendation_id=recommendation_id,
+                        status="failed",
+                        error_message=(
+                            f"QUALITY_GATE_WARN_TIER3_BLOCK: Tier 3 disabled on quality gate WARN — "
+                            f"warn_rules: {gate_result.warn_rules}"
+                        ),
+                    )
+
+            except Exception as e:
+                # Fail-closed for Tier 3: if gate check fails, block execution
+                logger.error(
+                    f"Quality gate check failed for Tier 3 auto-execute {recommendation_id}, "
+                    f"blocking (fail-closed): {e}"
+                )
+                return ApprovalResult(
+                    success=False,
+                    recommendation_id=recommendation_id,
+                    status="failed",
+                    error_message=f"Quality gate check failed (fail-closed): {e}",
                 )
 
             # CRITICAL: Run SafetyEngine validation AGAIN before write (defense-in-depth)
