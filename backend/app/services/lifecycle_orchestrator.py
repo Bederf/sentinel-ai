@@ -253,6 +253,7 @@ class LifecycleOrchestrator:
         self.real_start_time: Optional[datetime] = None
         self.time_multiplier: float = 60.0  # 1 real minute = 1 simulated hour
         self.speed_multiplier: float = 1.0  # 1x real-time, 10x = 10x faster, etc.
+        self.max_days: int = 1  # 1 for daily, 365 for annual
         self.events: List[LifecycleEvent] = []
         self.active_faults: Dict[str, Dict[str, Any]] = {}
         self.pending_repairs: Dict[str, Dict[str, Any]] = {}
@@ -268,14 +269,13 @@ class LifecycleOrchestrator:
         # Energy tracking
         self.total_energy_kwh: float = 0.0  # Cumulative energy consumption
         self.current_hour_power_kw: float = 0.0  # Current hour's power in kW
-        self.days_simulated: int = 0  # Track days for progresscible but realistic variation
+        self.days_simulated: int = 0  # Track days for annual simulations
         # Same scenario always produces same results, but with day-to-day variation
         self._scenario_rng = random.Random()
         self._occupancy_seed: Optional[int] = None
 
         # Seasonal modeler for annual simulations
         self.seasonal_modeler: Optional[SeasonalModeler] = None
-        self.days_simulated: int = 0  # Track days for annual simulations
 
         # Building schedule engine for time-of-day operating states
         self.building_schedule = BuildingSchedule()
@@ -315,6 +315,7 @@ class LifecycleOrchestrator:
         self.real_start_time = None
         self.time_multiplier = 60.0
         self.speed_multiplier = 1.0
+        self.max_days = 1
         self.events = []
         self.active_faults = {}
         self.pending_repairs = {}
@@ -433,9 +434,12 @@ class LifecycleOrchestrator:
         # Set speed multiplier for new speed control system
         self.speed_multiplier = max(0.1, min(10000, speed_multiplier))
 
+        # Determine max days for recovery path too
+        self.max_days = 365 if is_annual else 1
+
         # RECOVERY PATH: If we have a checkpoint, restore ALL state BEFORE starting loop
         if checkpoint and is_annual:
-            logger.info("🔄 RECOVERY PATH: Restoring checkpoint state...")
+            logger.info("RECOVERY PATH: Restoring checkpoint state...")
             self.simulated_time = datetime.fromisoformat(checkpoint.get("simulated_time", datetime.now().isoformat()))
             self.days_simulated = checkpoint.get("days_simulated", 0)
             self.time_multiplier = checkpoint.get("time_multiplier", 60.0)
@@ -464,8 +468,11 @@ class LifecycleOrchestrator:
             }
 
         # FRESH START PATH: Initialize fresh (no checkpoint)
+        # Determine simulation duration from scenario
+        self.max_days = 365 if is_annual else 1
+
         if is_annual:
-            # Annual simulation: 365 days × 24 hours = 8760 hours total
+            # Annual simulation: 365 days x 24 hours = 8760 hours total
             self.seasonal_modeler = SeasonalModeler(seed=self._occupancy_seed)
             self.days_simulated = 0
             # Calculate time multiplier for 365-day simulation
@@ -526,19 +533,37 @@ class LifecycleOrchestrator:
         }
 
     async def stop(self) -> Dict[str, Any]:
-        """Stop the simulation."""
+        """Stop the running simulation cleanly.
+
+        Returns:
+            Summary dict with simulation statistics.
+        """
         if not self.running:
-            return {"success": False, "error": "Simulation not running"}
+            return {"success": False, "error": "No simulation running"}
 
         self.running = False
-        if self._task:
+        summary = {
+            "success": True,
+            "days_simulated": self.days_simulated,
+            "total_energy_kwh": round(self.total_energy_kwh, 1),
+            "events_count": len(self.events),
+            "faults_occurred": len(self.active_faults),
+            "stopped_at": datetime.now().isoformat(),
+        }
+
+        # Cancel the async task
+        if self._task and not self._task.done():
             self._task.cancel()
             try:
                 await self._task
             except asyncio.CancelledError:
                 pass
 
-        return {"success": True, "events_generated": len(self.events), "stopped_at": datetime.now().isoformat()}
+        logger.info(
+            f"Simulation stopped: {self.days_simulated} days, "
+            f"{self.total_energy_kwh:.0f} kWh, {len(self.events)} events"
+        )
+        return summary
 
     def pause(self):
         """Pause the simulation."""
@@ -617,21 +642,29 @@ class LifecycleOrchestrator:
         }
 
     async def _run_simulation(self):
-        """Main simulation loop - Advances hour-by-hour for entire 365-day year."""
+        """Main simulation loop -- advances hour-by-hour.
+
+        Handles both 24-hour single-day and 365-day annual scenarios.
+        Uses self.max_days (set in start()) to determine when to stop or cycle.
+        Uses self.seconds_per_simulated_hour (speed-controlled) for pacing.
+        Checks self.running and self.paused each iteration.
+        """
         try:
             is_annual = self.seasonal_modeler is not None
-            time_mult_str = f"{self.time_multiplier:.3f}"
+            max_days = getattr(self, "max_days", 365 if is_annual else 1)
+            total_iterations = max_days * 24
+            speed_str = f"{self.speed_multiplier}x"
             logger.warning(
                 f"[SIMULATION START] task_id={self.task_id}, is_annual={is_annual}, "
-                f"days={self.days_simulated}, time_mult={time_mult_str}s/hour"
+                f"max_days={max_days}, speed={speed_str}, "
+                f"days={self.days_simulated}, "
+                f"{self.seconds_per_simulated_hour:.2f}s/hour"
             )
 
-            is_annual = self.seasonal_modeler is not None
-            total_iterations = (365 * 24) if is_annual else 24  # Hours: 8760 for annual, 24 for daily
             iteration = 0
             last_checkpoint_hour = -1  # Track checkpoint saves
 
-            # Persistent loop: Run 365 days, then restart (loops until manually stopped)
+            # Persistent loop: Run max_days, then restart (loops until manually stopped)
             cycle_num = 1
             while self.running:
                 iteration += 1
@@ -642,7 +675,7 @@ class LifecycleOrchestrator:
                     day_num = self.days_simulated + 1
                     logger.warning(
                         f"[SIMULATION CYCLE {cycle_num}] Hour {iteration}/{total_iterations} "
-                        f"(day={day_num}, hour={current_hour:02d}:00)"
+                        f"(day={day_num}/{max_days}, hour={current_hour:02d}:00)"
                     )
 
                 try:
@@ -650,6 +683,10 @@ class LifecycleOrchestrator:
                     if self.paused:
                         await asyncio.sleep(0.1)
                         continue
+
+                    # Check self.running before processing (may have been stopped)
+                    if not self.running:
+                        break
 
                     # Process events for this hour
                     await self._process_hour(current_hour)
@@ -664,32 +701,40 @@ class LifecycleOrchestrator:
                     self.simulated_time += timedelta(hours=1)
 
                     # Track day transitions (every 24 hours)
-                    if iteration > 0 and (iteration % 24) == 0:  # Every 24 hours = 1 day
+                    if iteration > 0 and (iteration % 24) == 0:
                         self.days_simulated += 1
+                        progress = int((self.days_simulated / max_days) * 100)
                         if is_annual:
-                            progress = int((self.days_simulated / 365) * 100)
-                            logger.warning(f"[DAY COMPLETE] Day {self.days_simulated}/365, progress={progress}%")
+                            logger.warning(f"[DAY COMPLETE] Day {self.days_simulated}/{max_days}, progress={progress}%")
                             # Update database with progress every day
                             await self._update_progress_to_db(iteration, total_iterations)
 
                     # Sleep for the calculated time per simulated hour
+                    # (uses speed_multiplier via seconds_per_simulated_hour property)
                     await asyncio.sleep(self.seconds_per_simulated_hour)
 
                 except asyncio.CancelledError:
                     logger.warning(f"[CANCELLED] iteration={iteration}, task was cancelled")
                     raise
                 except Exception as e:
-                    logger.error(f"[ERROR in iteration {iteration}] {type(e).__name__}: {e}", exc_info=True)
+                    logger.error(
+                        f"[ERROR in iteration {iteration}] {type(e).__name__}: {e}",
+                        exc_info=True,
+                    )
                     raise
 
-                # Check if completed 365 days (one full cycle)
+                # Check if completed max_days (one full cycle)
                 if iteration >= total_iterations:
                     days = self.days_simulated
                     logger.warning(f"[CYCLE {cycle_num} COMPLETE] Completed {days} days. Resetting for next cycle...")
                     # Reset for next cycle
                     iteration = 0
                     self.days_simulated = 0
-                    self.simulated_time = datetime(2024, 1, 1, 0, 0, 0)  # Reset to Jan 1
+                    # Reset simulated_time to start of year/day
+                    if is_annual:
+                        self.simulated_time = datetime(2024, 1, 1, 0, 0, 0)
+                    else:
+                        self.simulated_time = self.simulated_time.replace(hour=0, minute=0, second=0)
                     cycle_num += 1
                     last_checkpoint_hour = -1
                     logger.warning(f"[CYCLE {cycle_num} START] Beginning persistent loop cycle {cycle_num}")
@@ -724,9 +769,6 @@ class LifecycleOrchestrator:
             logger.debug(f"Updated task {self.task_id}: {progress_pct}% progress, {self.days_simulated} days")
         except Exception as e:
             logger.warning(f"Failed to update progress for task {self.task_id}: {e}")
-
-            logger.error(f"Simulation error: {e}", exc_info=True)
-            self.running = False
 
     async def _process_hour(self, hour: int):
         """Process a simulated hour using the building schedule engine.
