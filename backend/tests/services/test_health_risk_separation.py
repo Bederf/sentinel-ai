@@ -94,15 +94,15 @@ class TestSeparationInvariants:
         source = inspect.getsource(HealthRatingCalculator)
         module_source = inspect.getsource(inspect.getmodule(HealthRatingCalculator))
 
-        assert (
-            "prediction_generator" not in module_source
-        ), "HealthRatingCalculator must NOT import prediction_generator"
-        assert (
-            "prediction_calculator" not in module_source
-        ), "HealthRatingCalculator must NOT import prediction_calculator"
-        assert (
-            "PredictionGeneratorService" not in source
-        ), "HealthRatingCalculator must NOT reference PredictionGeneratorService"
+        assert "prediction_generator" not in module_source, (
+            "HealthRatingCalculator must NOT import prediction_generator"
+        )
+        assert "prediction_calculator" not in module_source, (
+            "HealthRatingCalculator must NOT import prediction_calculator"
+        )
+        assert "PredictionGeneratorService" not in source, (
+            "HealthRatingCalculator must NOT reference PredictionGeneratorService"
+        )
 
     def test_health_snapshot_service_has_no_risk_writes(self):
         """HealthSnapshotService must not write to the predictions table."""
@@ -135,12 +135,12 @@ class TestSeparationInvariants:
             if not line.strip().startswith(("#", '"""', "'''", "-")) and "docstring" not in line.lower()
         ]
         code_text = "\n".join(code_lines)
-        assert (
-            "from app.services.prediction_generator" not in code_text
-        ), "HealthFeatureProvider has a lazy import of prediction_generator"
-        assert (
-            "from app.services.prediction_calculator" not in code_text
-        ), "HealthFeatureProvider has a lazy import of prediction_calculator"
+        assert "from app.services.prediction_generator" not in code_text, (
+            "HealthFeatureProvider has a lazy import of prediction_generator"
+        )
+        assert "from app.services.prediction_calculator" not in code_text, (
+            "HealthFeatureProvider has a lazy import of prediction_calculator"
+        )
 
     def test_prediction_generator_has_no_health_write(self):
         """PredictionGeneratorService must not write to equipment.health_score directly."""
@@ -149,12 +149,12 @@ class TestSeparationInvariants:
         source = inspect.getsource(PredictionGeneratorService)
 
         # PredictionGenerator reads health_score but should not write it
-        assert (
-            '.update({"health_score"' not in source
-        ), "PredictionGeneratorService must NOT write health_score to equipment table"
-        assert (
-            "HealthRatingCalculator" not in source
-        ), "PredictionGeneratorService must NOT import HealthRatingCalculator"
+        assert '.update({"health_score"' not in source, (
+            "PredictionGeneratorService must NOT write health_score to equipment table"
+        )
+        assert "HealthRatingCalculator" not in source, (
+            "PredictionGeneratorService must NOT import HealthRatingCalculator"
+        )
 
     def test_health_features_separate_from_risk(self, sample_payload):
         """Health feature payload must not contain risk probability fields."""
@@ -179,9 +179,9 @@ class TestSeparationInvariants:
 
         # The _generate_prediction method should not produce health_score_current
         assert "health_score_current" not in source, "PredictionGeneratorService must NOT produce health_score_current"
-        assert (
-            "health_severity_signal" not in source
-        ), "PredictionGeneratorService must NOT produce health_severity_signal"
+        assert "health_severity_signal" not in source, (
+            "PredictionGeneratorService must NOT produce health_severity_signal"
+        )
 
     @pytest.mark.asyncio
     async def test_health_and_risk_both_in_recommendation(self):
@@ -432,9 +432,9 @@ class TestRegressionUnchanged:
             "error_rate",
         ]
         for gate_name in expected_gates:
-            assert hasattr(
-                CommissioningGateId, gate_name.upper()
-            ), f"CommissioningGateId.{gate_name.upper()} must still exist"
+            assert hasattr(CommissioningGateId, gate_name.upper()), (
+                f"CommissioningGateId.{gate_name.upper()} must still exist"
+            )
 
     def test_prediction_generator_still_works(self):
         """PredictionGeneratorService can be instantiated (structure unchanged)."""
@@ -499,6 +499,6 @@ class TestRegressionUnchanged:
         from app.api.asset_health import router
 
         route_paths = [r.path for r in router.routes]
-        assert (
-            "/api/equipment/{equipment_id}/health-baseline" in route_paths
-        ), f"health-baseline endpoint missing from asset_health router. Routes: {route_paths}"
+        assert "/api/equipment/{equipment_id}/health-baseline" in route_paths, (
+            f"health-baseline endpoint missing from asset_health router. Routes: {route_paths}"
+        )
