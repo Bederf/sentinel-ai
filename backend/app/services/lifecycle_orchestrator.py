@@ -38,6 +38,14 @@ from app.services.building_schedule import (
     HVACMode,
     ScheduleState,
 )
+
+# Import ClimatePattern directly from the module file to avoid bms_simulator/__init__.py
+# which pulls in pandas via the full simulator chain
+try:
+    from app.services.bms_simulator.patterns.climate import ClimatePattern
+except ImportError:
+    ClimatePattern = None  # type: ignore[misc,assignment]
+
 from app.services.power_meter_validation_engine import get_power_meter_validation_engine
 from app.services.cost_validation_engine import get_cost_validation_engine
 from app.services.simulation_persistence import get_simulation_persistence
@@ -277,6 +285,12 @@ class LifecycleOrchestrator:
 
         # Building schedule engine for time-of-day operating states
         self.building_schedule = BuildingSchedule()
+
+        # JHB climate engine for realistic ambient temperature (104-01)
+        if ClimatePattern is not None:
+            self.climate_engine = ClimatePattern(climate_zone="johannesburg")
+        else:
+            self.climate_engine = None
 
         # Supabase persistence for dashboard visibility (104-02)
         self.persistence = get_simulation_persistence(site_id=site_id)
@@ -1698,7 +1712,7 @@ class LifecycleOrchestrator:
         return readings
 
     async def _inject_fault(self):
-        """Inject a fault into equipment."""
+        """Inject a fault into equipment and create real alerts."""
         try:
             # Get equipment to fault (filtered by site_id)
             equipment_list = self.equipment_repo.get_all(building_id=self.site_id)
@@ -1717,12 +1731,19 @@ class LifecycleOrchestrator:
                 ]
                 if filtered:
                     equipment_list = filtered
+            else:
+                # Prefer HVAC equipment for faults (more realistic)
+                hvac_types = {"chiller", "ahu", "fcu", "vav", "pump", "cooling_tower", "ct"}
+                hvac_candidates = [e for e in equipment_list if (e.get("type", "") or "").lower() in hvac_types]
+                if hvac_candidates:
+                    equipment_list = hvac_candidates
 
             # Pick random equipment
-            equipment = random.choice(equipment_list)
+            equipment = self._scenario_rng.choice(equipment_list)
             eq_id = equipment.get("id")
             eq_code = equipment.get("code", eq_id)
             eq_name = equipment.get("name", eq_code)
+            eq_type = (equipment.get("type", "") or "unknown").lower()
 
             # Generate fault details
             fault_types = [
@@ -1732,9 +1753,9 @@ class LifecycleOrchestrator:
                 ("Current draw elevated", "electrical", 80),
                 ("Filter differential high", "filter", 65),
             ]
-            fault_type, fault_category, severity = random.choice(fault_types)
+            fault_type, fault_category, severity = self._scenario_rng.choice(fault_types)
 
-            # Record fault
+            # Record fault with hours_faulted tracking for persistence degradation
             fault_info = {
                 "equipment_id": eq_id,
                 "equipment_code": eq_code,
@@ -1744,6 +1765,7 @@ class LifecycleOrchestrator:
                 "severity": severity,
                 "fault_hour": self.simulated_time.hour,
                 "detected_at": datetime.now().isoformat(),
+                "hours_faulted": 0,
             }
             self.active_faults[eq_code] = fault_info
 
@@ -1762,17 +1784,39 @@ class LifecycleOrchestrator:
 
             # Degrade equipment health
             current_health = equipment.get("health_score", 80)
-            new_health = max(30, current_health - random.randint(15, 30))
+            new_health = max(30, current_health - self._scenario_rng.randint(15, 30))
 
             self.equipment_repo.update(
-                eq_code, {"health_score": new_health, "status": "warning" if new_health >= 50 else "critical"}
+                eq_code,
+                {
+                    "health_score": new_health,
+                    "status": "warning" if new_health >= 50 else "critical",
+                },
             )
 
             # Create prediction in database
             await self._create_prediction(equipment, fault_info)
 
-            # Generate alert
+            # Generate alert and work order via existing pipeline
             await self._generate_alert(equipment, fault_info)
+
+            # Create real alert in Supabase via EquipmentAlertService (104-02)
+            try:
+                from app.services.equipment_alert_service import EquipmentAlertService
+
+                alert_svc = EquipmentAlertService()
+                alert_severity = "critical" if eq_type in ("chiller", "generator") else "warning"
+                alert_svc.create_alert_for_equipment(
+                    equipment_id=eq_id,
+                    building_id=equipment.get("building_id", self.site_id),
+                    severity=alert_severity,
+                    message=f"Simulated fault on {eq_code}: {fault_type}",
+                    alert_type="equipment_fault",
+                    notify_telegram=self.current_scenario.sentry_notifications if self.current_scenario else False,
+                )
+                logger.info(f"Alert created for {eq_code} via EquipmentAlertService")
+            except Exception as e:
+                logger.debug(f"Could not create Supabase alert for {eq_code}: {e}")
 
             # Schedule repair if auto_repair enabled
             if self.current_scenario and self.current_scenario.auto_repair:
@@ -1902,9 +1946,46 @@ class LifecycleOrchestrator:
             await self._complete_repair(eq_code, repair_info)
 
     async def _complete_repair(self, eq_code: str, repair_info: Dict):
-        """Simulate technician completing repair."""
+        """Simulate technician completing repair with health restoration."""
         try:
-            # Emit repair started
+            # Create completed work order in Supabase (104-02)
+            try:
+                wo_id = f"WO-SIM-{eq_code}-{self.simulated_time.strftime('%m%d%H')}"
+                await self.work_order_repo.create_work_order(
+                    {
+                        "work_order_id": wo_id,
+                        "equipment_id": repair_info.get("equipment_id", eq_code),
+                        "title": f"Repair complete: {repair_info.get('fault_type', 'fault')}",
+                        "description": (f"Simulated repair for fault on {eq_code}. Health restored to 85%."),
+                        "status": "completed",
+                        "priority": "high",
+                        "created_by": "LIFECYCLE_SIM",
+                    }
+                )
+                logger.info(f"Work order {wo_id} created for repair of {eq_code}")
+            except Exception as e:
+                logger.debug(f"Work order creation skipped for {eq_code}: {e}")
+
+            # Restore equipment health to 85% via Supabase (104-02)
+            try:
+                from app.database.supabase_client import get_supabase_client
+
+                supabase = get_supabase_client()
+                supabase.table("equipment").update(
+                    {
+                        "health_score": 85,
+                        "status": "online",
+                    }
+                ).eq("code", eq_code).execute()
+                logger.info(f"Health restored to 85% for {eq_code}")
+            except Exception:
+                # Fallback: update via equipment repo
+                try:
+                    self.equipment_repo.update(eq_code, {"health_score": 85, "status": "online"})
+                except Exception:
+                    pass  # JSON fallback handled by persistence service
+
+            # Emit repair completed event
             self._emit_event(
                 LifecycleEvent(
                     timestamp=datetime.now(),
@@ -1912,8 +1993,11 @@ class LifecycleOrchestrator:
                     event_type=EventType.REPAIR_COMPLETED,
                     equipment_id=eq_code,
                     equipment_name=repair_info.get("equipment_name"),
-                    description=f"Technician completed repair on {repair_info.get('equipment_name')}",
-                    details={"fault_type": repair_info.get("fault_type")},
+                    description=(f"Repair complete: {repair_info.get('equipment_name')} health restored to 85%"),
+                    details={
+                        "fault_type": repair_info.get("fault_type"),
+                        "health_restored": 85,
+                    },
                 )
             )
 
