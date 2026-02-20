@@ -80,10 +80,13 @@ class EventType(str, Enum):
     FEEDBACK_SUBMITTED = "feedback_submitted"
     HEALTH_RESTORED = "health_restored"
     ALERT_RESOLVED = "alert_resolved"
+    ALERT_CREATED = "alert_created"
+    HEALTH_DEGRADED = "health_degraded"
     OCCUPANCY_DECREASE = "occupancy_decrease"
     NIGHT_MODE = "night_mode"
     AI_OPTIMIZATION = "ai_optimization"
     SETPOINT_CHANGE = "setpoint_change"
+    SAFETY_VIOLATION = "safety_violation"
 
 
 class OperationMode(str, Enum):
@@ -309,8 +312,28 @@ class LifecycleOrchestrator:
         # Runtime hours tracking per equipment (105-02)
         self.runtime_hours: dict[str, float] = {}  # equipment_code -> cumulative hours
 
+        # Health monitoring state (106-01)
+        self.health_status_cache: dict[str, str] = {}  # code -> "healthy"/"warning"/"critical"
+        self.last_alert_time: dict[str, int] = {}  # code -> simulated_hour of last alert
+
         # Supabase persistence for dashboard visibility (104-02)
         self.persistence = get_simulation_persistence(site_id=site_id)
+
+    # Equipment type -> technician specialty mapping (106-01)
+    EQUIPMENT_SPECIALTY_MAP = {
+        "chiller": "HVAC",
+        "cooling_tower": "HVAC",
+        "ahu": "HVAC",
+        "vav": "HVAC",
+        "fcu": "HVAC",
+        "pump": "HVAC",
+        "ups": "Electrical",
+        "generator": "Electrical",
+        "meter": "Electrical",
+        "dali_zone": "Controls",
+        "dali_controller": "Controls",
+        "fire": "Fire Safety",
+    }
 
     # Baseline wear rates per running hour (% health loss) (105-02)
     WEAR_RATES = {
@@ -327,6 +350,17 @@ class LifecycleOrchestrator:
         "dali_controller": 0.0001,
         "zone_sensor": 0.0001,
         "sensor": 0.0001,
+    }
+
+    # Safety boundary limits for proactive monitoring (106-02)
+    SAFETY_LIMITS = {
+        "zone_temp": {"min": 16.0, "max": 28.0, "unit": "°C"},
+        "room_temp": {"min": 16.0, "max": 28.0, "unit": "°C"},
+        "supply_temp": {"min": 4.0, "max": 15.0, "unit": "°C"},
+        "supply_air_temp": {"min": 12.0, "max": 22.0, "unit": "°C"},
+        "battery_pct": {"min": 30.0, "max": 100.0, "unit": "%"},
+        "load_pct": {"min": 0.0, "max": 95.0, "unit": "%"},
+        "differential_pressure_kpa": {"min": 0.0, "max": 200.0, "unit": "kPa"},
     }
 
     def reset(self):
@@ -354,6 +388,8 @@ class LifecycleOrchestrator:
         self.runtime_hours = {}  # Reset runtime hours (105-02)
         self.chw_model = ChilledWaterModel()  # Reset CHW model (105-01)
         self.zone_temperatures = {}  # Reset zone temps (105-01)
+        self.health_status_cache = {}  # Reset health monitoring (106-01)
+        self.last_alert_time = {}  # Reset alert cooldowns (106-01)
         logger.info("Orchestrator reset: Ready for fresh demo")
 
     @property
@@ -979,6 +1015,21 @@ class LifecycleOrchestrator:
             )
         except Exception as e:
             logger.warning(f"[PERSISTENCE] Failed to persist hourly state: {e}")
+
+        # === HEALTH MONITORING & ALERT PIPELINE (106-01) ===
+        # Monitor equipment health against thresholds, trigger alerts on transitions
+        try:
+            await self._monitor_equipment_health(equipment_states, hour)
+        except Exception as e:
+            logger.warning(f"[HEALTH MONITOR] Failed health monitoring at hour {hour}: {e}")
+
+        # === SAFETY BOUNDARY SCANNING (106-02) ===
+        # Scan equipment readings against safety limits, escalate on approach
+        try:
+            if equipment_states:
+                self._scan_safety_boundaries(equipment_states, hour)
+        except Exception as e:
+            logger.warning(f"[SAFETY SCAN] Failed safety boundary scan at hour {hour}: {e}")
 
     async def _emit_schedule_event(self, hour: int, schedule_state: ScheduleState):
         """Emit events on meaningful schedule transitions."""
@@ -1899,6 +1950,192 @@ class LifecycleOrchestrator:
 
         return equipment_states
 
+    # =========================================================================
+    # Health Monitoring & Alert Pipeline (106-01)
+    # =========================================================================
+
+    async def _monitor_equipment_health(self, equipment_states: dict[str, dict], simulated_hour: int):
+        """Monitor equipment health against thresholds. Trigger alerts on status transitions.
+
+        Uses HealthThresholdService for configurable thresholds (not hardcoded).
+        Only alerts on STATUS TRANSITIONS (healthy->warning, warning->critical, etc.),
+        not every hour, with a 1-hour cooldown per equipment to prevent spam.
+
+        Args:
+            equipment_states: Dict of equipment_code -> state dict (from _collect_equipment_states)
+            simulated_hour: Current simulated hour (0-23, cumulative across days)
+        """
+        from app.services.health_threshold_service import get_health_threshold_service
+
+        threshold_svc = get_health_threshold_service()
+        thresholds = threshold_svc.get_thresholds()
+        warning_threshold = thresholds.get("warning", 70)
+        critical_threshold = thresholds.get("critical", 50)
+
+        # Use absolute hour for cooldown tracking across multi-day simulations
+        absolute_hour = self.days_simulated * 24 + simulated_hour
+
+        for code, state in equipment_states.items():
+            health = state.get("health_score", 100)
+            equip_type = state.get("type", "unknown")
+
+            # Determine current status using threshold boundaries
+            if health >= warning_threshold:
+                current_status = "healthy"
+            elif health >= critical_threshold:
+                current_status = "warning"
+            else:
+                current_status = "critical"
+
+            previous_status = self.health_status_cache.get(code, "healthy")
+            self.health_status_cache[code] = current_status
+
+            # Only act on TRANSITIONS (not every hour)
+            if current_status == previous_status:
+                continue
+
+            # Cooldown: don't re-alert within 1 simulated hour
+            last_alert = self.last_alert_time.get(code, -999)
+            if absolute_hour - last_alert < 1:
+                continue
+
+            if current_status == "warning" and previous_status == "healthy":
+                # Health degraded to warning
+                await self._create_health_alert(code, equip_type, health, "warning", simulated_hour)
+                self.last_alert_time[code] = absolute_hour
+                # SENTINEL AI response — generate recommendation and potentially auto-execute (106-02)
+                await self._sentinel_response(code, equip_type, health, current_status, simulated_hour)
+
+            elif current_status == "critical":
+                # Health degraded to critical -- alert + work order
+                await self._create_health_alert(code, equip_type, health, "critical", simulated_hour)
+                await self._auto_create_work_order(code, equip_type, health, simulated_hour)
+                self.last_alert_time[code] = absolute_hour
+                # SENTINEL AI response — escalate with technician dispatch (106-02)
+                await self._sentinel_response(code, equip_type, health, current_status, simulated_hour)
+
+    async def _create_health_alert(self, code: str, equip_type: str, health: float, severity: str, simulated_hour: int):
+        """Create a health-driven alert with deduplication.
+
+        Checks for existing active alerts before creating a new one to avoid
+        duplicate alerts for the same equipment. Emits a lifecycle event.
+
+        Args:
+            code: Equipment code (e.g., S002-CHILLER-B1-001)
+            equip_type: Equipment type (e.g., chiller, ahu)
+            health: Current health score (0-100)
+            severity: Alert severity (warning, critical)
+            simulated_hour: Current simulated hour
+        """
+        # Check for existing active alert (deduplication)
+        try:
+            from app.database.repositories.alert_repository import AlertRepository
+
+            alert_repo = AlertRepository()
+            existing = alert_repo.get_active_alerts_for_equipment(code)
+            if existing:
+                # Already have an active alert for this equipment -- skip
+                return
+        except Exception:
+            pass  # No dedup if repo unavailable
+
+        description = (
+            f"{code} ({equip_type}) health degraded to {health:.1f}% -- "
+            f"status: {severity}. "
+            f"{'Immediate attention required.' if severity == 'critical' else 'Monitor closely.'}"
+        )
+
+        # Use EquipmentAlertService if available
+        try:
+            from app.services.equipment_alert_service import get_equipment_alert_service
+
+            alert_svc = get_equipment_alert_service()
+            alert_svc.create_alert_for_equipment(
+                equipment_id=code,
+                alert_type="health_degradation",
+                severity=severity,
+                message=description,
+                building_id=self.building_id,
+            )
+        except Exception as e:
+            logger.warning(f"Could not create alert via service: {e}")
+
+        self._emit_event(
+            LifecycleEvent(
+                timestamp=datetime.now(),
+                simulated_hour=simulated_hour,
+                event_type=EventType.ALERT_CREATED if severity == "critical" else EventType.HEALTH_DEGRADED,
+                equipment_id=code,
+                description=f"Health alert ({severity}): {code} at {health:.1f}%",
+                details={"equipment_code": code, "health": health, "severity": severity},
+            )
+        )
+
+    async def _auto_create_work_order(self, code: str, equip_type: str, health: float, simulated_hour: int):
+        """Auto-create work order with technician specialty matching.
+
+        Maps equipment type to technician specialty via EQUIPMENT_SPECIALTY_MAP,
+        finds an available technician, and creates a work order with proper assignment.
+
+        Args:
+            code: Equipment code (e.g., S002-CHILLER-B1-001)
+            equip_type: Equipment type (e.g., chiller, ahu)
+            health: Current health score (0-100)
+            simulated_hour: Current simulated hour
+        """
+        specialty = self.EQUIPMENT_SPECIALTY_MAP.get(equip_type, "Facilities")
+
+        # Find available technician by specialty
+        technician_name = None
+        try:
+            from app.database.repositories.technician_repository import TechnicianRepository
+
+            tech_repo = TechnicianRepository()
+            technician = await tech_repo.get_technician_for_equipment_code(code)
+            if technician:
+                technician_name = technician.get("name", "Unassigned")
+        except Exception:
+            technician_name = "Unassigned"
+
+        wo_id = f"WO-SIM-{code}-{self.days_simulated * 24 + simulated_hour}"
+
+        try:
+            self.work_order_repo.create(
+                {
+                    "id": wo_id,
+                    "site_id": self.site_id,
+                    "equipment_code": code,
+                    "title": f"Health critical: {code} at {health:.1f}%",
+                    "description": (
+                        f"Equipment {code} ({equip_type}) health has degraded to {health:.1f}%. "
+                        f"Specialty: {specialty}. Assigned to: {technician_name or 'Unassigned'}."
+                    ),
+                    "priority": "high" if health < 40 else "medium",
+                    "category": "corrective_maintenance",
+                    "status": "assigned" if technician_name else "scheduled",
+                    "assigned_to": technician_name,
+                    "created_by": "SENTINEL_HEALTH_MONITOR",
+                }
+            )
+        except Exception as e:
+            logger.warning(f"Could not create work order: {e}")
+
+        self._emit_event(
+            LifecycleEvent(
+                timestamp=datetime.now(),
+                simulated_hour=simulated_hour,
+                event_type=EventType.WORK_ORDER_CREATED,
+                equipment_id=code,
+                description=f"Work order {wo_id}: {code} assigned to {technician_name or 'unassigned'} ({specialty})",
+                details={
+                    "wo_id": wo_id,
+                    "equipment_code": code,
+                    "technician": technician_name,
+                    "specialty": specialty,
+                },
+            )
+        )
+
     def _equipment_to_zone(self, equipment_code: str) -> str:
         """Map equipment code to zone ID for temperature lookup.
 
@@ -2529,6 +2766,343 @@ class LifecycleOrchestrator:
         except Exception as e:
             logger.error(f"Failed to save checkpoint: {e}")
             return False
+
+    # === SENTINEL RESPONSE LOOP (106-02) ===
+
+    def _generate_health_recommendation(self, code: str, equip_type: str, health: float, tier: int) -> dict:
+        """Generate a targeted recommendation based on equipment health and type.
+
+        Args:
+            code: Equipment code (e.g. S002-CHILLER-B1-001)
+            equip_type: Equipment type (e.g. chiller, ahu, vav, fcu, ups)
+            health: Current health score (0-100)
+            tier: Response tier (1=auto-execute, 2=pending approval, 3=escalation)
+
+        Returns:
+            Dict with action, point_name, target_value, rationale
+        """
+        recommendations = {
+            "chiller": {
+                1: {
+                    "action": "Reduce chiller load by staging down",
+                    "point_name": "load_pct",
+                    "target_value": 60,
+                    "rationale": f"Chiller {code} health at {health:.0f}% — reduce load to slow degradation",
+                },
+                2: {
+                    "action": "Schedule chiller maintenance inspection",
+                    "point_name": "maintenance_flag",
+                    "target_value": 1,
+                    "rationale": f"Chiller {code} health at {health:.0f}% — maintenance inspection recommended",
+                },
+                3: {
+                    "action": "Emergency chiller shutdown and technician dispatch",
+                    "point_name": "compressor_status",
+                    "target_value": 0,
+                    "rationale": f"Chiller {code} critically degraded at {health:.0f}% — shutdown to prevent damage",
+                },
+            },
+            "ahu": {
+                1: {
+                    "action": "Reduce AHU fan speed 10%",
+                    "point_name": "fan_speed_pct",
+                    "target_value": 70,
+                    "rationale": f"AHU {code} health at {health:.0f}% — reduce fan stress",
+                },
+                2: {
+                    "action": "Schedule AHU filter and belt inspection",
+                    "point_name": "maintenance_flag",
+                    "target_value": 1,
+                    "rationale": f"AHU {code} health at {health:.0f}% — belt/filter check needed",
+                },
+                3: {
+                    "action": "Emergency AHU shutdown",
+                    "point_name": "fan_status",
+                    "target_value": 0,
+                    "rationale": f"AHU {code} critically degraded at {health:.0f}%",
+                },
+            },
+            "vav": {
+                1: {
+                    "action": "Widen VAV deadband by 1°C",
+                    "point_name": "setpoint_offset",
+                    "target_value": 1.0,
+                    "rationale": f"VAV {code} health at {health:.0f}% — reduce cycling",
+                },
+                2: {
+                    "action": "Schedule VAV actuator inspection",
+                    "point_name": "maintenance_flag",
+                    "target_value": 1,
+                    "rationale": f"VAV {code} health at {health:.0f}% — actuator wear likely",
+                },
+                3: {
+                    "action": "Lock VAV to minimum position",
+                    "point_name": "damper_position",
+                    "target_value": 20,
+                    "rationale": f"VAV {code} critically degraded — lock to safe minimum",
+                },
+            },
+            "fcu": {
+                1: {
+                    "action": "Reduce FCU fan speed",
+                    "point_name": "fan_speed",
+                    "target_value": "low",
+                    "rationale": f"FCU {code} health at {health:.0f}% — reduce wear",
+                },
+                2: {
+                    "action": "Schedule FCU filter clean and valve inspection",
+                    "point_name": "maintenance_flag",
+                    "target_value": 1,
+                    "rationale": f"FCU {code} health at {health:.0f}%",
+                },
+                3: {
+                    "action": "Disable FCU",
+                    "point_name": "status",
+                    "target_value": 0,
+                    "rationale": f"FCU {code} critically degraded at {health:.0f}%",
+                },
+            },
+            "ups": {
+                1: {
+                    "action": "Reduce UPS load by shedding non-critical circuits",
+                    "point_name": "load_shed",
+                    "target_value": 1,
+                    "rationale": f"UPS {code} battery health at {health:.0f}% — reduce draw",
+                },
+                2: {
+                    "action": "Schedule UPS battery test",
+                    "point_name": "maintenance_flag",
+                    "target_value": 1,
+                    "rationale": f"UPS {code} health at {health:.0f}% — battery test required",
+                },
+                3: {
+                    "action": "UPS battery replacement required",
+                    "point_name": "battery_replace",
+                    "target_value": 1,
+                    "rationale": f"UPS {code} critically degraded at {health:.0f}% — replace batteries",
+                },
+            },
+        }
+
+        # Default recommendation for unknown equipment types
+        default = {
+            1: {
+                "action": f"Monitor {equip_type} {code} closely",
+                "point_name": "monitoring_flag",
+                "target_value": 1,
+                "rationale": f"{code} health at {health:.0f}%",
+            },
+            2: {
+                "action": f"Schedule {equip_type} inspection",
+                "point_name": "maintenance_flag",
+                "target_value": 1,
+                "rationale": f"{code} health at {health:.0f}%",
+            },
+            3: {
+                "action": f"Escalate {equip_type} to technician",
+                "point_name": "escalation_flag",
+                "target_value": 1,
+                "rationale": f"{code} critically degraded at {health:.0f}%",
+            },
+        }
+
+        type_recs = recommendations.get(equip_type, default)
+        return type_recs.get(tier, default[tier])
+
+    async def _sentinel_response(self, code: str, equip_type: str, health: float, severity: str, simulated_hour: int):
+        """SENTINEL AI response to equipment health issues.
+
+        Generates recommendation and acts on Tier 1 (safe auto-execute).
+        Logs Tier 2 as pending_approval. Escalates Tier 3 with technician dispatch.
+
+        Args:
+            code: Equipment code (e.g. S002-CHILLER-B1-001)
+            equip_type: Equipment type (e.g. chiller, ahu, vav)
+            health: Current health score (0-100)
+            severity: Health status ("warning" or "critical")
+            simulated_hour: Current simulated hour (0-23)
+        """
+        # Determine response tier based on severity and health
+        if severity == "warning" and health > 60:
+            tier = 1  # Safe auto-response
+        elif severity == "critical" or health < 40:
+            tier = 3  # Escalation needed
+        else:
+            tier = 2  # Log recommendation
+
+        # Generate targeted recommendation
+        recommendation = self._generate_health_recommendation(code, equip_type, health, tier)
+
+        if tier == 1:
+            # Auto-execute safe response
+            try:
+                from app.services.autonomous_decision_engine import AutonomousDecisionEngine
+
+                decision_engine = AutonomousDecisionEngine()
+
+                result = await decision_engine.evaluate_and_execute(
+                    rule_id=f"health_response_{code}",
+                    device_id=code,
+                    point_name=recommendation["point_name"],
+                    target_value=recommendation["target_value"],
+                    rationale=recommendation["rationale"],
+                )
+
+                self._emit_event(
+                    LifecycleEvent(
+                        timestamp=datetime.now(),
+                        simulated_hour=simulated_hour,
+                        event_type=EventType.AI_OPTIMIZATION,
+                        equipment_id=code,
+                        description=f"SENTINEL auto-response (Tier 1): {recommendation['action']} for {code}",
+                        details={
+                            "tier": 1,
+                            "equipment": code,
+                            "action": recommendation["action"],
+                            "result": result.status if hasattr(result, "status") else "executed",
+                        },
+                    )
+                )
+            except Exception as e:
+                # If auto-execute fails, fall through to logged recommendation
+                logger.info(f"Tier 1 auto-execute unavailable for {code}: {e}")
+                self._emit_event(
+                    LifecycleEvent(
+                        timestamp=datetime.now(),
+                        simulated_hour=simulated_hour,
+                        event_type=EventType.AI_OPTIMIZATION,
+                        equipment_id=code,
+                        description=f"SENTINEL recommendation (Tier 1 fallback): {recommendation['action']} for {code}",
+                        details={"tier": 1, "equipment": code, "action": recommendation["action"], "status": "logged"},
+                    )
+                )
+
+        elif tier == 2:
+            self._emit_event(
+                LifecycleEvent(
+                    timestamp=datetime.now(),
+                    simulated_hour=simulated_hour,
+                    event_type=EventType.AI_OPTIMIZATION,
+                    equipment_id=code,
+                    description=f"SENTINEL recommendation (Tier 2): {recommendation['action']} for {code}",
+                    details={
+                        "tier": 2,
+                        "equipment": code,
+                        "action": recommendation["action"],
+                        "status": "pending_approval",
+                    },
+                )
+            )
+
+        else:  # tier == 3
+            self._emit_event(
+                LifecycleEvent(
+                    timestamp=datetime.now(),
+                    simulated_hour=simulated_hour,
+                    event_type=EventType.ALERT_CREATED,
+                    equipment_id=code,
+                    description=(f"SENTINEL escalation (Tier 3): {recommendation['action']} for {code}"),
+                    details={"tier": 3, "equipment": code, "action": recommendation["action"], "status": "escalated"},
+                )
+            )
+
+    def _scan_safety_boundaries(self, equipment_states: dict[str, dict], simulated_hour: int):
+        """Scan equipment readings against safety boundaries. Escalate on approach.
+
+        Checks all equipment sensor readings against SAFETY_LIMITS. If a reading
+        is within 10% of a boundary, emits a warning. If it exceeds the boundary,
+        emits a critical event. Limits to 3 violations per scan to prevent spam.
+
+        Args:
+            equipment_states: Dict mapping equipment code to state dict with sensor_readings
+            simulated_hour: Current simulated hour (0-23)
+        """
+        violations = []
+
+        for code, state in equipment_states.items():
+            readings = state.get("sensor_readings", {})
+            for point_name, value in readings.items():
+                if point_name not in self.SAFETY_LIMITS:
+                    continue
+
+                limits = self.SAFETY_LIMITS[point_name]
+                safe_min = limits["min"]
+                safe_max = limits["max"]
+                safe_range = safe_max - safe_min
+
+                if not isinstance(value, (int, float)):
+                    continue
+
+                # Check proximity to boundaries
+                if value < safe_min:
+                    approach_pct = 100  # Already violated
+                elif value > safe_max:
+                    approach_pct = 100
+                elif value < safe_min + safe_range * 0.1:
+                    approach_pct = 90  # Within 10% of lower limit
+                elif value > safe_max - safe_range * 0.1:
+                    approach_pct = 90  # Within 10% of upper limit
+                else:
+                    approach_pct = 0  # Safe
+
+                if approach_pct >= 90:
+                    violations.append(
+                        {
+                            "code": code,
+                            "point": point_name,
+                            "value": value,
+                            "limits": f"{safe_min}-{safe_max} {limits['unit']}",
+                            "approach_pct": approach_pct,
+                        }
+                    )
+
+        # Emit events for violations (limit to top 3 to avoid event spam)
+        for v in violations[:3]:
+            severity = "critical" if v["approach_pct"] >= 100 else "warning"
+            self._emit_event(
+                LifecycleEvent(
+                    timestamp=datetime.now(),
+                    simulated_hour=simulated_hour,
+                    event_type=EventType.SAFETY_VIOLATION if severity == "critical" else EventType.ALERT_CREATED,
+                    equipment_id=v["code"],
+                    description=(
+                        f"Safety boundary {severity}: {v['code']} {v['point']}={v['value']} (limits: {v['limits']})"
+                    ),
+                    details=v,
+                )
+            )
+
+    def _get_sentinel_status(self) -> dict[str, Any]:
+        """Get current SENTINEL response loop status for API.
+
+        Returns:
+            Dict with monitoring_active, equipment_monitored, health_distribution,
+            active_alerts, recent_responses, and response_loop status.
+        """
+        health_distribution = {"healthy": 0, "warning": 0, "critical": 0}
+        for status in self.health_status_cache.values():
+            health_distribution[status] = health_distribution.get(status, 0) + 1
+
+        recent_responses = [
+            e
+            for e in self.events[-50:]
+            if e.event_type
+            in (
+                EventType.AI_OPTIMIZATION,
+                EventType.ALERT_CREATED,
+                EventType.WORK_ORDER_CREATED,
+                EventType.SAFETY_VIOLATION,
+            )
+        ]
+
+        return {
+            "monitoring_active": self.running,
+            "equipment_monitored": len(self.health_status_cache),
+            "health_distribution": health_distribution,
+            "active_alerts": len(self.last_alert_time),
+            "recent_responses": len(recent_responses),
+            "response_loop": "active" if self.running else "idle",
+        }
 
 
 def create_lifecycle_orchestrator(task_id: str | None = None, site_id: str = "site-002") -> LifecycleOrchestrator:

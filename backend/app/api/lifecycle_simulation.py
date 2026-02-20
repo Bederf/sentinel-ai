@@ -111,6 +111,8 @@ class SimulationStatusResponse(BaseModel):
     # Energy consumption fields
     total_energy_kwh: Optional[float] = None  # Cumulative kWh consumed
     current_hour_power_kw: Optional[float] = None  # Current hour's power in kW
+    # SENTINEL response loop status (106-02)
+    sentinel_status: Optional[dict] = None
 
 
 class ScenarioInfo(BaseModel):
@@ -522,6 +524,10 @@ async def get_simulation_status(task_id: str):
                 # Energy consumption data
                 total_energy_kwh=status.get("total_energy_kwh"),
                 current_hour_power_kw=status.get("current_hour_power_kw"),
+                # SENTINEL response loop status (106-02)
+                sentinel_status=orchestrator._get_sentinel_status()
+                if hasattr(orchestrator, "_get_sentinel_status")
+                else None,
             )
         else:
             # Simulation not running - get status from database

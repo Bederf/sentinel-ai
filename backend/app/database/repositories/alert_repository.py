@@ -16,7 +16,7 @@ class AlertRepository:
         building_id: Optional[str] = None,
         equipment_id: Optional[str] = None,
         status: Optional[str] = None,
-        severity: Optional[str] = None
+        severity: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """Get all alerts with optional filtering.
 
@@ -29,16 +29,16 @@ class AlertRepository:
         Returns:
             List of alerts
         """
-        query = self.client.table('alerts').select("*")
+        query = self.client.table("alerts").select("*")
 
         if building_id:
-            query = query.eq('building_id', building_id)
+            query = query.eq("building_id", building_id)
         if equipment_id:
-            query = query.eq('equipment_id', equipment_id)
+            query = query.eq("equipment_id", equipment_id)
         if status:
-            query = query.eq('status', status)
+            query = query.eq("status", status)
         if severity:
-            query = query.eq('severity', severity)
+            query = query.eq("severity", severity)
 
         response = query.execute()
         return response.data
@@ -52,7 +52,7 @@ class AlertRepository:
         Returns:
             Alert data or None if not found
         """
-        response = self.client.table('alerts').select("*").eq('id', alert_id).execute()
+        response = self.client.table("alerts").select("*").eq("id", alert_id).execute()
 
         if response.data:
             return response.data[0]
@@ -67,9 +67,9 @@ class AlertRepository:
         Returns:
             List of active alerts
         """
-        response = self.client.table('alerts').select("*").eq(
-            'building_id', building_uuid
-        ).eq('status', 'active').execute()
+        response = (
+            self.client.table("alerts").select("*").eq("building_id", building_uuid).eq("status", "active").execute()
+        )
 
         return response.data
 
@@ -82,11 +82,35 @@ class AlertRepository:
         Returns:
             List of active alerts
         """
-        response = self.client.table('alerts').select("*").eq(
-            'equipment_id', equipment_uuid
-        ).eq('status', 'active').execute()
+        response = (
+            self.client.table("alerts").select("*").eq("equipment_id", equipment_uuid).eq("status", "active").execute()
+        )
 
         return response.data
+
+    def get_active_alerts_for_equipment(self, equipment_code: str) -> List[Dict[str, Any]]:
+        """Check if active alerts exist for equipment by code (for deduplication).
+
+        Searches for active alerts whose title contains the equipment code.
+        Used by the health monitoring pipeline to avoid creating duplicate alerts.
+
+        Args:
+            equipment_code: Equipment code (e.g., S002-CHILLER-B1-001)
+
+        Returns:
+            List of active alerts for this equipment code
+        """
+        try:
+            response = (
+                self.client.table("alerts")
+                .select("id, title, severity, status")
+                .eq("status", "active")
+                .ilike("title", f"%{equipment_code}%")
+                .execute()
+            )
+            return response.data or []
+        except Exception:
+            return []
 
     def get_critical_alerts(self) -> List[Dict[str, Any]]:
         """Get all critical active alerts.
@@ -94,9 +118,7 @@ class AlertRepository:
         Returns:
             List of critical alerts
         """
-        response = self.client.table('alerts').select("*").eq(
-            'severity', 'critical'
-        ).eq('status', 'active').execute()
+        response = self.client.table("alerts").select("*").eq("severity", "critical").eq("status", "active").execute()
 
         return response.data
 
@@ -109,7 +131,7 @@ class AlertRepository:
         Returns:
             Created alert
         """
-        response = self.client.table('alerts').insert(alert_data).execute()
+        response = self.client.table("alerts").insert(alert_data).execute()
         return response.data[0]
 
     def update(self, alert_id: str, alert_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -122,9 +144,7 @@ class AlertRepository:
         Returns:
             Updated alert or None if not found
         """
-        response = self.client.table('alerts').update(
-            alert_data
-        ).eq('id', alert_id).execute()
+        response = self.client.table("alerts").update(alert_data).eq("id", alert_id).execute()
 
         if response.data:
             return response.data[0]
@@ -142,11 +162,14 @@ class AlertRepository:
         """
         from datetime import datetime, timezone
 
-        return self.update(alert_id, {
-            'status': 'acknowledged',
-            'acknowledged_by': acknowledged_by,
-            'acknowledged_at': datetime.now(timezone.utc).isoformat()
-        })
+        return self.update(
+            alert_id,
+            {
+                "status": "acknowledged",
+                "acknowledged_by": acknowledged_by,
+                "acknowledged_at": datetime.now(timezone.utc).isoformat(),
+            },
+        )
 
     def resolve(self, alert_id: str) -> Optional[Dict[str, Any]]:
         """Resolve an alert.
@@ -157,7 +180,7 @@ class AlertRepository:
         Returns:
             Updated alert or None if not found
         """
-        return self.update(alert_id, {'status': 'resolved'})
+        return self.update(alert_id, {"status": "resolved"})
 
     def delete(self, alert_id: str) -> bool:
         """Delete an alert.
@@ -168,7 +191,7 @@ class AlertRepository:
         Returns:
             True if deleted, False if not found
         """
-        response = self.client.table('alerts').delete().eq('id', alert_id).execute()
+        response = self.client.table("alerts").delete().eq("id", alert_id).execute()
 
         return len(response.data) > 0
 
@@ -193,7 +216,7 @@ class AlertRepository:
         # Resolve each alert
         resolved_count = 0
         for alert in active_alerts:
-            result = self.resolve(alert['id'])
+            result = self.resolve(alert["id"])
             if result:
                 resolved_count += 1
 
@@ -217,7 +240,7 @@ class AlertRepository:
         # Resolve each alert
         resolved_count = 0
         for alert in active_alerts:
-            result = self.resolve(alert['id'])
+            result = self.resolve(alert["id"])
             if result:
                 resolved_count += 1
 
@@ -225,10 +248,10 @@ class AlertRepository:
 
 
 # Singleton instance
-_alert_repository_instance: Optional['AlertRepository'] = None
+_alert_repository_instance: Optional["AlertRepository"] = None
 
 
-def get_alert_repository() -> 'AlertRepository':
+def get_alert_repository() -> "AlertRepository":
     """Get or create the singleton AlertRepository instance."""
     global _alert_repository_instance
     if _alert_repository_instance is None:
